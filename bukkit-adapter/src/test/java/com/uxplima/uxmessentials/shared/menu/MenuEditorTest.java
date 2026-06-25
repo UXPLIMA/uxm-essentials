@@ -85,7 +85,14 @@ class MenuEditorTest {
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
         menus = new Menus(renderer, scheduler, new ListSourceRegistry(), editorRenderer);
         MenuListener listener = new MenuListener(
-                renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin, editorRenderer);
+                renderer,
+                new ActionRegistry(),
+                new ConditionRegistry(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

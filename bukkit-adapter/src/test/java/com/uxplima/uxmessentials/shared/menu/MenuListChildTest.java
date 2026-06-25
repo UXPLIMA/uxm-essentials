@@ -35,7 +35,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyLayout;
@@ -60,8 +59,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * {@link MenuListener} — rather than a uxmLib {@code SimpleGui}. The per-entry buttons branch on the click gesture
  * (left moves up, right moves down, shift-left edits through the anvil seam, shift-right removes via the engine
  * confirm window), the add button opens the anvil seam, and the back button reopens the parent editor. Each mutation
- * reopens the list child so the change shows. A {@link ClickContext} with no opener still drives the property down
- * the legacy uxmLib path, so editors still on {@code EntityEditorView} are unaffected.
+ * reopens the list child so the change shows.
  */
 class MenuListChildTest {
 
@@ -210,21 +208,6 @@ class MenuListChildTest {
         // No editor, list child, or confirm arms a refresh timer, so start and cancel both stay balanced at zero.
         assertThat(recording.scheduled).isZero();
         assertThat(recording.cancelled).isZero();
-    }
-
-    @Test
-    void aClickContextWithNoOpenerKeepsTheListPropertyOnTheLegacyPath() {
-        // The legacy EntityEditorView builds a ClickContext via ClickContext.from, which carries no opener. Such a
-        // context must not open an engine child window; the property falls back to its uxmLib SimpleGui sub-menu,
-        // which is not a MenuHolder.
-        ListProperty property = listProperty();
-        ClickContext legacy = new ClickContext(player, viewer, false, false, () -> {});
-        assertThat(legacy.opener()).isNull();
-
-        property.onClick(legacy);
-
-        Inventory open = player.getOpenInventory().getTopInventory();
-        assertThat(open.getHolder()).isNotInstanceOf(MenuHolder.class);
     }
 
     private void installEngine(Scheduler sched) {

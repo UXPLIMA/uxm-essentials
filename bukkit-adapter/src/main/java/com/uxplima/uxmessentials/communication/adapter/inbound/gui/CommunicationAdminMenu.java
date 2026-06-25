@@ -41,7 +41,6 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.ConfirmMenu;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -157,7 +156,7 @@ public final class CommunicationAdminMenu {
         Player player = ctx.player();
         PlayerRef viewer = ctx.viewer();
         Component title = guiText.text(viewer, CommunicationMessageKey.GUI_CLEARCHAT_CONFIRM);
-        ConfirmMenu.of(title, () -> doClearChat(player), () -> open(viewer)).open(player);
+        menus.confirm(viewer, title, () -> doClearChat(player), () -> open(viewer));
     }
 
     /**

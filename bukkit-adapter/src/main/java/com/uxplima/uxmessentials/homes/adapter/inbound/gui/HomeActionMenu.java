@@ -50,7 +50,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
-import com.uxplima.uxmlib.gui.ConfirmMenu;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -62,7 +61,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Each mutating use case runs off the click thread (the write hits SQLite); the menu re-opens through {@link Menus}
  * with the (re-read) home subject so a flip or rename shows immediately. Delete and relocate optionally confirm
- * through a {@link ConfirmMenu} first, and teleport reads the destination region for claim access and an unsafe-tp
+ * through {@link Menus#confirm} first, and teleport reads the destination region for claim access and an unsafe-tp
  * warning — exactly the threads and decisions the old view used. The icon picker, invited-players list, and the grid
  * are reached through injected seams so this menu does not need to know which renders them.
  */
@@ -200,7 +199,7 @@ public final class HomeActionMenu {
                 return;
             }
             confirm(
-                    player,
+                    viewer,
                     text(viewer, HomesMessageKey.HOME_CONFIRM_UNSAFE_TP, Map.of()),
                     () -> doTeleport(player, viewer, home),
                     () -> open(viewer, home));
@@ -214,12 +213,11 @@ public final class HomeActionMenu {
 
     /** Delete the home, opening a confirm dialog first when {@code confirm-delete} is on. */
     private void handleDelete(MenuActionContext ctx) {
-        Player player = ctx.player();
         PlayerRef viewer = ctx.viewer();
         Home home = home(ctx);
         if (confirmDelete) {
             confirm(
-                    player,
+                    viewer,
                     text(viewer, HomesMessageKey.HOME_CONFIRM_DELETE, slotName(home)),
                     () -> doDelete(viewer, home),
                     () -> open(viewer, home));
@@ -244,7 +242,7 @@ public final class HomeActionMenu {
                 Objects.requireNonNull(player.getLocation(), "player location"));
         if (confirmRelocate) {
             confirm(
-                    player,
+                    viewer,
                     text(viewer, HomesMessageKey.HOME_CONFIRM_RELOCATE, slotName(home)),
                     () -> doRelocate(viewer, home, at),
                     () -> open(viewer, home));
@@ -327,8 +325,8 @@ public final class HomeActionMenu {
         open(viewer, updated);
     }
 
-    private void confirm(Player player, Component title, Runnable onConfirm, Runnable onCancel) {
-        ConfirmMenu.of(title, onConfirm, onCancel).open(player);
+    private void confirm(PlayerRef viewer, Component title, Runnable onConfirm, Runnable onCancel) {
+        menus.confirm(viewer, title, onConfirm, onCancel);
     }
 
     private Player playerFor(PlayerRef viewer) {

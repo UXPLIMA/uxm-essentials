@@ -36,7 +36,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHol
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
@@ -63,8 +62,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * setter and reopens the parent editor in place, the clear button fires the clear runnable and reopens the parent,
  * and back reopens the parent. The custom-hex anvil submit branch rides the runtime-neutral apply seam
  * ({@link ColourProperty#applyCustom}): a valid hex writes through the setter, an invalid one writes nothing and
- * reopens the picker child. The whole open → swatch → back → close flow leaves no live refresh task, and a
- * {@link ClickContext} with no opener still drives the property down the legacy uxmLib path.
+ * reopens the picker child. The whole open → swatch → back → close flow leaves no live refresh task.
  */
 class MenuColourChildTest {
 
@@ -225,21 +223,6 @@ class MenuColourChildTest {
         assertThat(recording.cancelled).isZero();
     }
 
-    @Test
-    void aClickContextWithNoOpenerKeepsTheColourPropertyOnTheLegacyPath() {
-        // The legacy EntityEditorView builds a ClickContext via ClickContext.from, which carries no opener. Such a
-        // context must not open an engine child window; the property falls back to its uxmLib SimpleGui picker,
-        // which is not a MenuHolder.
-        ColourProperty property = property();
-        ClickContext legacy = new ClickContext(player, viewer, false, false, () -> {});
-        assertThat(legacy.opener()).isNull();
-
-        property.onClick(legacy);
-
-        Inventory open = player.getOpenInventory().getTopInventory();
-        assertThat(open.getHolder()).isNotInstanceOf(MenuHolder.class);
-    }
-
     private void installEngine(Scheduler sched) {
         EditorRenderer editorRenderer = new EditorRenderer(guiText);
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
@@ -252,7 +235,8 @@ class MenuColourChildTest {
                 sched,
                 plugin,
                 editorRenderer,
-                menus.selectorOpener());
+                menus.selectorOpener(),
+                menus.confirmOpener());
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -271,11 +255,16 @@ class MenuColourChildTest {
                 .build();
     }
 
-    /** A context on the engine path: it carries the engine selector opener so a custom-hex reopen takes the engine branch. */
+    /** A context on the engine path: it carries the engine openers so a custom-hex reopen takes the engine branch. */
     private ClickContext engineContext() {
-        SelectorOpener opener = menus.selectorOpener();
         return new ClickContext(
-                player, viewer, false, false, () -> menus.openEditor(viewer, editorSpec(), widget), opener);
+                player,
+                viewer,
+                false,
+                false,
+                () -> menus.openEditor(viewer, editorSpec(), widget),
+                menus.selectorOpener(),
+                menus.confirmOpener());
     }
 
     private ColourProperty property() {

@@ -251,6 +251,11 @@ public final class MenuListener implements Listener {
 
     /** Hop to the viewer's entity thread, re-resolve the live player, and run one property's click there. */
     private void runProperty(MenuHolder holder, EditableProperty property, boolean rightClick, boolean shiftClick) {
+        // A property click only reaches here when an editor is open, and an editor-capable listener is always wired
+        // with both openers (the engine threads its own in); a missing one is a wiring error, surfaced here rather
+        // than deep in the click context.
+        SelectorOpener selector = Objects.requireNonNull(selectorOpener, "an editor listener needs a selector opener");
+        ConfirmOpener confirm = Objects.requireNonNull(confirmOpener, "an editor listener needs a confirm opener");
         PlayerRef viewer = holder.ctx().viewer();
         scheduler.onEntity(viewer, () -> {
             Player live = Bukkit.getPlayer(viewer.uuid());
@@ -258,8 +263,7 @@ public final class MenuListener implements Listener {
                 return;
             }
             Runnable reopen = () -> reRenderEditor(holder);
-            property.onClick(
-                    new ClickContext(live, viewer, rightClick, shiftClick, reopen, selectorOpener, confirmOpener));
+            property.onClick(new ClickContext(live, viewer, rightClick, shiftClick, reopen, selector, confirm));
         });
     }
 

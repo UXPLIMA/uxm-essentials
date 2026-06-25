@@ -117,11 +117,12 @@ class ListPropertyApplyTest {
 
     /**
      * A context on the engine path: it carries a no-op selector opener so the post-save reopen takes the engine branch
-     * without opening a real window. The confirm opener is unused by add/edit, so it is left null.
+     * without opening a real window. The confirm opener is unused by add/edit, so it is a harmless no-op.
      */
     private ClickContext engineContext() {
-        SelectorOpener noOp = (v, title, rows, filler, buttons) -> {};
-        return new ClickContext(player, viewer, false, false, () -> {}, noOp, null);
+        SelectorOpener noOpSelector = (v, title, rows, filler, buttons) -> {};
+        ConfirmOpener noOpConfirm = (v, title, onYes, onNo) -> {};
+        return new ClickContext(player, viewer, false, false, () -> {}, noOpSelector, noOpConfirm);
     }
 
     private static ListPropertyText listText() {

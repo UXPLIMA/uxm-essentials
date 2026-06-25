@@ -7,24 +7,21 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The immutable context handed to an {@link EditableProperty#onClick} when its button is clicked in an editor: the
  * live {@link Player} doing the clicking (so a property can open an anvil/confirm in their screen), the viewer's
  * {@link PlayerRef} (the locale and identity dimension for catalog text and use-case calls), the click kind
  * (left vs right, shift-held) so a stepper or cycle can read direction off it, a {@code reopen} hook the property
- * calls to redraw the editor after an asynchronous setter completes, an optional {@link SelectorOpener} the
- * property uses to open a picker as a menu-engine child window, and an optional {@link ConfirmOpener} it uses to gate
- * a destructive step behind an engine confirm child.
+ * calls to redraw the editor after an asynchronous setter completes, a {@link SelectorOpener} the property uses to
+ * open a picker as a menu-engine child window, and a {@link ConfirmOpener} it uses to gate a destructive step
+ * behind an engine confirm child.
  *
- * <p>Both openers are present only when the editor runs on the engine editor runtime; the legacy
- * {@code EntityEditorView} path builds its context through {@link #from} with neither, so a property that opens a
- * picker or a confirm falls back to its uxmLib equivalent there. These optional fields are the single seam that lets
- * the enum/list/colour pickers ride the engine child-menu capability on the new runtime while staying on uxmLib on
- * the old one.
+ * <p>Both openers are always present: every editor runs on the menu-engine editor runtime, which builds this
+ * context with the engine's selector and confirm openers. The enum/list/colour pickers ride the engine child-menu
+ * capability through them, so a property never needs to know which window system painted its parent.
  *
- * <p>A property never touches the raw {@link InventoryClickEvent}; the click kind is captured into the three
+ * <p>A property never touches the raw {@link InventoryClickEvent}; the click kind is captured into the two
  * boolean flags at construction so the editors stay unit-testable without forging a full Bukkit event.
  *
  * @param player the live player who clicked
@@ -32,8 +29,8 @@ import org.jspecify.annotations.Nullable;
  * @param rightClick whether the click was a right-click (left-click otherwise)
  * @param shiftClick whether shift was held during the click
  * @param reopen redraws the editor for the viewer; a property runs it after a setter so the new value shows
- * @param opener opens a picker as an engine child window, or null when the property must use its uxmLib fallback
- * @param confirmOpener opens a confirm as an engine child window, or null when the property must use its uxmLib fallback
+ * @param opener opens a picker as an engine child window
+ * @param confirmOpener opens a confirm as an engine child window
  */
 @NullMarked
 public record ClickContext(
@@ -42,37 +39,14 @@ public record ClickContext(
         boolean rightClick,
         boolean shiftClick,
         Runnable reopen,
-        @Nullable SelectorOpener opener,
-        @Nullable ConfirmOpener confirmOpener) {
+        SelectorOpener opener,
+        ConfirmOpener confirmOpener) {
 
     public ClickContext {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(reopen, "reopen");
-    }
-
-    /** A context with a selector opener but no confirm opener — for callers that wire only the picker seam. */
-    public ClickContext(
-            Player player,
-            PlayerRef viewer,
-            boolean rightClick,
-            boolean shiftClick,
-            Runnable reopen,
-            @Nullable SelectorOpener opener) {
-        this(player, viewer, rightClick, shiftClick, reopen, opener, null);
-    }
-
-    /** A context with neither opener — the legacy editor path, where a picker/confirm uses its uxmLib fallback. */
-    public ClickContext(Player player, PlayerRef viewer, boolean rightClick, boolean shiftClick, Runnable reopen) {
-        this(player, viewer, rightClick, shiftClick, reopen, null, null);
-    }
-
-    /** Build a context from a live click event plus the editor's reopen hook; no openers (legacy uxmLib path). */
-    public static ClickContext from(InventoryClickEvent event, PlayerRef viewer, Runnable reopen) {
-        Objects.requireNonNull(event, "event");
-        Objects.requireNonNull(viewer, "viewer");
-        Objects.requireNonNull(reopen, "reopen");
-        Player player = (Player) event.getWhoClicked();
-        return new ClickContext(player, viewer, event.isRightClick(), event.isShiftClick(), reopen, null, null);
+        Objects.requireNonNull(opener, "opener");
+        Objects.requireNonNull(confirmOpener, "confirmOpener");
     }
 }

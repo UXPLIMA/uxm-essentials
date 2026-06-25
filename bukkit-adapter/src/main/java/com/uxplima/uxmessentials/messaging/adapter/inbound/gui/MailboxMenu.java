@@ -14,8 +14,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import org.bukkit.entity.Player;
-
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
@@ -35,7 +33,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpe
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.ConfirmMenu;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -138,10 +135,9 @@ public final class MailboxMenu {
 
     /** Confirm-gate the {@code /mail clear} empty; cancel reopens the mailbox. */
     private void confirmClear(MenuActionContext ctx) {
-        Player player = ctx.player();
         PlayerRef viewer = ctx.viewer();
         Component title = guiText.text(viewer, MessagingMessageKey.GUI_MAIL_CLEAR_CONFIRM);
-        ConfirmMenu.of(title, () -> doClear(viewer), () -> open(viewer)).open(player);
+        menus.confirm(viewer, title, () -> doClear(viewer), () -> open(viewer));
     }
 
     /** Empty the box through the {@link ClearMail} use case off the click thread, then reopen the mailbox. */

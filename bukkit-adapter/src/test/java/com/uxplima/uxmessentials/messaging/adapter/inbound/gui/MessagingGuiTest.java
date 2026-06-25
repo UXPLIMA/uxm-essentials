@@ -135,10 +135,18 @@ class MessagingGuiTest {
         EditorRenderer editorRenderer = new EditorRenderer(guiText);
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
+        Menus menus = new Menus(renderer, scheduler, new ListSourceRegistry(), editorRenderer);
         MenuListener listener = new MenuListener(
-                renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin, editorRenderer);
+                renderer,
+                new ActionRegistry(),
+                new ConditionRegistry(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
         server.getPluginManager().registerEvents(listener, plugin);
-        return new Menus(renderer, scheduler, new ListSourceRegistry(), editorRenderer);
+        return menus;
     }
 
     private void settingsLayout(Path dir) throws Exception {

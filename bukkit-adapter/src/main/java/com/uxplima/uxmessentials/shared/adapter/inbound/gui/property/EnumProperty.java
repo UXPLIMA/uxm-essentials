@@ -13,16 +13,11 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
-
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -36,9 +31,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The chosen option is written through the caller's setter off the tick thread via the shared
  * {@link Scheduler}, then the editor is redrawn. The setter is the module's existing application use case
- * wrapped as a {@link Consumer}; this property holds no domain logic. The selector is opened on the player's
- * region thread (the click already runs there) and is a uxmLib {@link SimpleGui}, so click routing flows
- * through the installed menu listener like every other framework menu.
+ * wrapped as a {@link Consumer}; this property holds no domain logic. The selector opens as an engine child
+ * window the one menu listener routes, so click routing and teardown stay on a single holder.
  *
  * <p>Every option draws with the same configured {@code optionIcon} by default; a caller that wants a
  * per-option icon (e.g. the NPC type selector showing each mob's spawn egg) passes an {@code optionIconFn}
@@ -159,20 +153,15 @@ public final class EnumProperty<E> implements EditableProperty {
     @Override
     public void onClick(ClickContext context) {
         Objects.requireNonNull(context, "context");
-        SelectorOpener opener = context.opener();
-        if (opener != null) {
-            // The editor runs on the engine runtime, so the selector opens as an engine child window the one menu
-            // listener routes — not a uxmLib SimpleGui — keeping the whole flow on a single holder and teardown.
-            opener.openSelector(
-                    context.viewer(),
-                    guiText.text(context.viewer(), selectorTitle),
-                    rows,
-                    fillerIcon,
-                    selectorButtons(context));
-            return;
-        }
-        // No opener: the editor is still on the legacy uxmLib EntityEditorView, so fall back to a uxmLib selector.
-        scheduler.onEntity(context.viewer(), () -> openSelector(context));
+        // The selector opens as an engine child window the one menu listener routes, keeping the whole flow on a
+        // single holder and teardown.
+        context.opener()
+                .openSelector(
+                        context.viewer(),
+                        guiText.text(context.viewer(), selectorTitle),
+                        rows,
+                        fillerIcon,
+                        selectorButtons(context));
     }
 
     /** One engine selector button per option (icon plus its choose action), glint baked onto the selected option. */
@@ -186,22 +175,6 @@ public final class EnumProperty<E> implements EditableProperty {
                     optionSlots.get(i), optionIcon(context.viewer(), option, selected), () -> choose(context, option)));
         }
         return buttons;
-    }
-
-    private void openSelector(ClickContext context) {
-        SimpleGui selector = Guis.gui()
-                .title(guiText.text(context.viewer(), selectorTitle))
-                .rows(rows)
-                .build();
-        fill(selector);
-        E selected = current.get();
-        for (int i = 0; i < options.size() && i < optionSlots.size(); i++) {
-            E option = options.get(i);
-            selector.set(
-                    optionSlots.get(i),
-                    GuiItem.button(optionIcon(context.viewer(), option, selected), e -> choose(context, option)));
-        }
-        selector.open(context.player());
     }
 
     private void choose(ClickContext context, E option) {
@@ -222,12 +195,5 @@ public final class EnumProperty<E> implements EditableProperty {
             builder.enchant(Enchantment.UNBREAKING, 1).flags(ItemFlag.HIDE_ENCHANTS);
         }
         return builder.build();
-    }
-
-    private void fill(SimpleGui selector) {
-        ItemStack filler = ItemBuilder.of(fillerIcon).name(Component.empty()).build();
-        for (int slot = 0; slot < rows * 9; slot++) {
-            selector.set(slot, GuiItem.display(filler));
-        }
     }
 }

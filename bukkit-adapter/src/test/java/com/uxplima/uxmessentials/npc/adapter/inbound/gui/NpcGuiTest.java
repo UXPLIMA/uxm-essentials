@@ -79,7 +79,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
@@ -254,7 +254,7 @@ class NpcGuiTest {
                 editorView.grid().propertyAt(NAME_SLOT, npc("alpha")).orElseThrow();
         assertThat(name).isInstanceOf(TextProperty.class);
 
-        ((TextProperty) name).applyInput(new ClickContext(player, viewer, false, false, () -> {}), "renamed");
+        ((TextProperty) name).applyInput(ClickContexts.carrier(player, viewer), "renamed");
 
         assertThat(repository.find(NpcName.of("renamed"))).isPresent();
         assertThat(repository.find(NpcName.of("alpha"))).isEmpty();

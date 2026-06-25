@@ -37,7 +37,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
@@ -187,7 +187,7 @@ class PlayerWarpGuiTest {
                 editorView.grid().propertyAt(PASSWORD_SLOT, owned("alpha")).orElseThrow();
         assertThat(password).isInstanceOf(TextProperty.class);
 
-        ((TextProperty) password).applyInput(new ClickContext(player, viewer, false, false, () -> {}), "hunter2");
+        ((TextProperty) password).applyInput(ClickContexts.carrier(player, viewer), "hunter2");
 
         assertThat(warp("alpha").password()).contains("hunter2");
     }

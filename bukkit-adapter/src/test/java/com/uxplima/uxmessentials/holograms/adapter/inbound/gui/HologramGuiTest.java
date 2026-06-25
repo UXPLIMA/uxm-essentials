@@ -76,7 +76,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
@@ -209,7 +209,7 @@ class HologramGuiTest {
         EditableProperty name = editorView.grid().propertyAt(NAME_SLOT, holo).orElseThrow();
         assertThat(name).isInstanceOf(TextProperty.class);
 
-        ((TextProperty) name).applyInput(new ClickContext(player, viewer, false, false, () -> {}), "renamed");
+        ((TextProperty) name).applyInput(ClickContexts.carrier(player, viewer), "renamed");
 
         assertThat(repository.find(HologramName.of("renamed"))).isPresent();
         assertThat(repository.find(HologramName.of("alpha"))).isEmpty();
@@ -279,7 +279,7 @@ class HologramGuiTest {
         Hologram holo = repository.find(HologramName.of("alpha")).orElseThrow();
         ColourProperty background = (ColourProperty)
                 editorView.grid().propertyAt(BACKGROUND_SLOT, holo).orElseThrow();
-        ClickContext ctx = new ClickContext(player, viewer, false, false, () -> {});
+        var ctx = ClickContexts.carrier(player, viewer);
 
         background.applyCustom(ctx, "#112233");
         assertThat(appearance("alpha").backgroundArgb()).isEqualTo(0xFF112233);

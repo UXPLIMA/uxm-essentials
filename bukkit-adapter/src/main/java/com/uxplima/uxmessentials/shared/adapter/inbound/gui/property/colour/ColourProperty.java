@@ -14,8 +14,6 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
-
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -26,9 +24,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpe
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -47,11 +42,9 @@ import org.jspecify.annotations.NullMarked;
  * no domain logic. Geometry and materials come from a {@link ColourPickerLayout} loaded from conf, so nothing is
  * hardcoded.
  *
- * <p>When the click context carries a {@code SelectorOpener} (the engine editor runtime threads one in) the picker
- * opens as an engine child window the one menu listener routes — its swatch/custom/clear/back buttons are
- * single-gesture {@code SelectorButton}s and a swatch, clear, or back reopens the parent editor through the
- * context's reopen hook. With no opener (the legacy {@code EntityEditorView} path) it falls back to the uxmLib
- * {@code SimpleGui} unchanged, so both runtimes coexist while editors migrate.
+ * <p>The picker opens as an engine child window the one menu listener routes — its swatch/custom/clear/back buttons
+ * are single-gesture {@code SelectorButton}s and a swatch, clear, or back reopens the parent editor through the
+ * context's reopen hook — so the whole flow stays on a single holder and teardown.
  */
 @NullMarked
 public final class ColourProperty implements EditableProperty {
@@ -123,23 +116,14 @@ public final class ColourProperty implements EditableProperty {
         scheduler.onEntity(context.viewer(), () -> open(context));
     }
 
-    /** Open the picker, as an engine child window when the context carries an opener, else as a uxmLib menu. */
+    /**
+     * Open the picker as an engine child window: the swatch/custom/clear/back buttons are handed to the engine opener
+     * as single-gesture {@link SelectorButton}s so the one menu listener routes them. A swatch writes its packed ARGB
+     * and reopens the parent editor; custom opens the anvil seam; clear fires the clear runnable then reopens the
+     * parent; back reopens the parent — all through the {@code context.reopen()} contract.
+     */
     private void open(ClickContext context) {
         SelectorOpener opener = context.opener();
-        if (opener != null) {
-            openEngine(context, opener);
-        } else {
-            openPicker(context);
-        }
-    }
-
-    /**
-     * The engine picker child: the same swatch/custom/clear/back buttons as the uxmLib menu, handed to the engine
-     * opener as single-gesture {@link SelectorButton}s so the one menu listener routes them. A swatch writes its packed
-     * ARGB and reopens the parent editor; custom opens the anvil seam; clear fires the clear runnable then reopens the
-     * parent; back reopens the parent — the same {@code context.reopen()} contract the uxmLib picker uses.
-     */
-    private void openEngine(ClickContext context, SelectorOpener opener) {
         int selected = current.getAsInt();
         List<ColourSwatch> palette = ColourSwatch.palette();
         List<Integer> slots = layout.paletteSlots();
@@ -162,27 +146,6 @@ public final class ColourProperty implements EditableProperty {
                 buttons);
     }
 
-    private void openPicker(ClickContext context) {
-        SimpleGui picker = Guis.gui()
-                .title(guiText.text(context.viewer(), text.title()))
-                .rows(layout.rows())
-                .build();
-        fill(picker);
-        int selected = current.getAsInt();
-        List<ColourSwatch> palette = ColourSwatch.palette();
-        List<Integer> slots = layout.paletteSlots();
-        List<Material> icons = layout.paletteIcons();
-        for (int i = 0; i < palette.size() && i < slots.size(); i++) {
-            ColourSwatch swatch = palette.get(i);
-            ItemStack swatchIcon = swatchIcon(context.viewer(), swatch, icons.get(i), selected);
-            picker.set(slots.get(i), GuiItem.button(swatchIcon, e -> pick(context, swatch.argb())));
-        }
-        picker.set(layout.customSlot(), customButton(context));
-        picker.set(layout.clearSlot(), clearButton(context));
-        picker.set(layout.backSlot(), backButton(context));
-        picker.open(context.player());
-    }
-
     private ItemStack swatchIcon(PlayerRef viewer, ColourSwatch swatch, Material material, int selected) {
         ItemBuilder builder = ItemBuilder.of(material).name(guiText.text(viewer, swatch.nameKey()));
         if (swatch.argb() == selected) {
@@ -190,18 +153,6 @@ public final class ColourProperty implements EditableProperty {
             builder.enchant(Enchantment.UNBREAKING, 1).flags(ItemFlag.HIDE_ENCHANTS);
         }
         return builder.build();
-    }
-
-    private GuiItem customButton(ClickContext context) {
-        return GuiItem.button(customIcon(context), e -> openCustom(context));
-    }
-
-    private GuiItem clearButton(ClickContext context) {
-        return GuiItem.button(clearIcon(context), e -> clear(context));
-    }
-
-    private GuiItem backButton(ClickContext context) {
-        return GuiItem.button(backIcon(context), e -> context.reopen().run());
     }
 
     private ItemStack customIcon(ClickContext context) {
@@ -259,14 +210,6 @@ public final class ColourProperty implements EditableProperty {
             clear.run();
             scheduler.onEntity(context.viewer(), context.reopen());
         });
-    }
-
-    private void fill(SimpleGui picker) {
-        ItemStack filler =
-                ItemBuilder.of(layout.filler()).name(Component.empty()).build();
-        for (int slot = 0; slot < layout.rows() * 9; slot++) {
-            picker.set(slot, GuiItem.display(filler));
-        }
     }
 
     /** Render a packed ARGB int as {@code #AARRGGBB}, or {@code #RRGGBB} when fully opaque, for the value lore. */

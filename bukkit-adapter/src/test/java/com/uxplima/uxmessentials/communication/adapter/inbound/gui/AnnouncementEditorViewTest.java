@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -290,7 +291,7 @@ class AnnouncementEditorViewTest {
     }
 
     private ClickContext context() {
-        return new ClickContext(player, viewer, false, false, () -> {});
+        return ClickContexts.carrier(player, viewer);
     }
 
     private void fireClick(int slot, ClickType type) {

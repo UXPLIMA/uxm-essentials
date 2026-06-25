@@ -34,7 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
@@ -170,8 +170,7 @@ class EntityEditorViewTest {
                 textInput,
                 scheduler);
 
-        ClickContext context = new ClickContext(player, viewer, false, false, () -> {});
-        property.applyInput(context, "  Castle  ");
+        property.applyInput(ClickContexts.carrier(player, viewer), "  Castle  ");
 
         assertThat(widget.label).isEqualTo("Castle");
     }
@@ -189,7 +188,7 @@ class EntityEditorViewTest {
                 textInput,
                 scheduler);
 
-        property.applyInput(new ClickContext(player, viewer, false, false, () -> {}), "   ");
+        property.applyInput(ClickContexts.carrier(player, viewer), "   ");
 
         assertThat(widget.label).isEqualTo("old");
     }

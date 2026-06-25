@@ -33,7 +33,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -53,8 +52,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * editor runtime opens its option selector as an engine child window — a {@link MenuHolder} routed by the one
  * {@link MenuListener} — rather than a uxmLib {@code SimpleGui}. Choosing a non-selected option hands it to the
  * setter and reopens the parent editor in place; the selected option carries a glint. The whole open → click →
- * child → choose → back flow leaves no live refresh task, and a {@link ClickContext} with no opener still drives
- * the property down the legacy uxmLib path, so the editors still on {@code EntityEditorView} are unaffected.
+ * child → choose → back flow leaves no live refresh task.
  */
 class MenuEnumSelectorTest {
 
@@ -101,7 +99,8 @@ class MenuEnumSelectorTest {
                 scheduler,
                 plugin,
                 editorRenderer,
-                menus.selectorOpener());
+                menus.selectorOpener(),
+                menus.confirmOpener());
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -157,7 +156,8 @@ class MenuEnumSelectorTest {
                 recording,
                 plugin,
                 editorRenderer,
-                leakMenus.selectorOpener());
+                leakMenus.selectorOpener(),
+                leakMenus.confirmOpener());
         server.getPluginManager().registerEvents(leakListener, plugin);
 
         leakMenus.openEditor(viewer, editorSpec(), widget);
@@ -169,22 +169,6 @@ class MenuEnumSelectorTest {
         // Neither the editor nor the selector arms a refresh timer, so start and cancel both stay balanced at zero.
         assertThat(recording.scheduled).isZero();
         assertThat(recording.cancelled).isZero();
-    }
-
-    @Test
-    void aClickContextWithNoOpenerKeepsTheEnumPropertyOnTheLegacyPath() {
-        // The legacy EntityEditorView builds a ClickContext via ClickContext.from, which carries no opener. Such a
-        // context must not open an engine child window; the property falls back to its uxmLib SimpleGui selector,
-        // which is not a MenuHolder. We assert the property does not open an engine child for the null-opener context.
-        EnumProperty<Choice> property = enumProperty();
-        ClickContext legacy = new ClickContext(player, viewer, false, false, () -> {});
-        assertThat(legacy.opener()).isNull();
-
-        property.onClick(legacy);
-
-        // The uxmLib selector is not a MenuHolder window; no engine child opened from the null-opener context.
-        Inventory open = player.getOpenInventory().getTopInventory();
-        assertThat(open.getHolder()).isNotInstanceOf(MenuHolder.class);
     }
 
     private void openEditor() {
