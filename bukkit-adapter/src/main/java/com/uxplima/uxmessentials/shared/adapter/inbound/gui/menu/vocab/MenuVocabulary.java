@@ -61,11 +61,15 @@ public final class MenuVocabulary {
      * on whether the viewer holds that node through the shared {@link Permissions} port. {@code papi-compare} reads
      * three named args ({@code left}, {@code op}, {@code right}) and compares the two operands after expanding any
      * {@code %token%} in them, so a spec gates on a (PlaceholderAPI-bridged) value such as a balance or vote count.
+     * {@code has-prev} / {@code has-next} read the render-time page position so a paginated menu can hide its
+     * previous/next arrow on the first/last page rather than showing a dead button.
      */
     public static void registerConditions(MenuBindings bindings, Permissions permissions) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(permissions, "permissions");
         bindings.condition("perm", (ctx, args) -> permissions.has(ctx.viewer(), args.getOrDefault("value", "")));
+        bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
+        bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
         PlaceholderRegistry placeholders = bindings.placeholders();
         bindings.condition("papi-compare", (ctx, args) -> compare(ctx, args, placeholders));
     }

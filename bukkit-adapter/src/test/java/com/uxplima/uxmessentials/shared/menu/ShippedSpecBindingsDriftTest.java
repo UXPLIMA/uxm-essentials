@@ -82,10 +82,12 @@ class ShippedSpecBindingsDriftTest {
             "homes:open-icons",
             "homes:toggle-visibility",
             "homes:open-invites",
-            "homes:action-back");
+            "homes:action-back",
+            "homes:open-slot");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm", "homes:home-public", "homes:home-private");
+    private static final Set<String> EXPECTED_CONDITIONS =
+            Set.of("perm", "has-prev", "has-next", "homes:home-public", "homes:home-private");
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
@@ -176,7 +178,10 @@ class ShippedSpecBindingsDriftTest {
             "home_x",
             "home_y",
             "home_z",
-            "home_created");
+            "home_created",
+            "home_icon",
+            "home_cell_name",
+            "home_cell_lore");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -191,7 +196,8 @@ class ShippedSpecBindingsDriftTest {
             "playerwarps:list",
             "npc:list",
             "homes:icon-palette",
-            "homes:invited-players");
+            "homes:invited-players",
+            "home:slots");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

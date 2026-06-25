@@ -715,7 +715,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.homes.application.HomesMessageKey.HOME_MENU_TITLE,
                 Material.RED_BED,
                 "uxmessentials.home.use",
-                (player, viewer) -> wired.listView().open(player, viewer)));
+                (player, viewer) -> wired.listView().open(viewer)));
     }
 
     private static void bindHomeRespawn(ContextLinks links, HomeRespawnLocator locator) {

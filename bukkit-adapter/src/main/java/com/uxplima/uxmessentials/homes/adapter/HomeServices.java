@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.homes.adapter;
 
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListMenu;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
@@ -30,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public record HomeServices(
-        HomeListView homeList,
+        HomeListMenu homeList,
         HomeAdmin homeAdmin,
         VisitHome visitHome,
         InviteToHome inviteToHome,

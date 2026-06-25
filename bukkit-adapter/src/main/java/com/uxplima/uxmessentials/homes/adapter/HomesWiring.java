@@ -18,7 +18,7 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommands;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeInvitesMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenus;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.listener.HomesJoinListener;
@@ -224,7 +224,7 @@ public final class HomesWiring {
         // invited-players list, which in turn re-open the action menu; the action menu's back / post-delete flow
         // re-opens the grid. These three references form a cycle, so the three children are bound after construction
         // through holders.
-        HomeListView[] listHolder = new HomeListView[1];
+        HomeListMenu[] listHolder = new HomeListMenu[1];
         HomeMenus[] iconHolder = new HomeMenus[1];
         HomeInvitesMenu[] invitesHolder = new HomeInvitesMenu[1];
         HomeActionMenu actionMenu = buildActionMenu(
@@ -266,7 +266,8 @@ public final class HomesWiring {
         invitesMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         invitesHolder[0] = invitesMenu;
         actionMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
-        HomeListView listView = new HomeListView(
+        HomeListMenu listView = new HomeListMenu(
+                menus,
                 kernel.messages(),
                 notifier,
                 kernel.permissions(),
@@ -276,10 +277,11 @@ public final class HomesWiring {
                 createHome,
                 safeGuard,
                 claimService,
-                actionMenu::open,
                 listLayout(guiLayouts),
                 unlimitedMax,
-                dateFormat);
+                dateFormat,
+                actionMenu::open);
+        listView.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         listHolder[0] = listView;
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, kernel.events(), clock);
         return new HomeServices(
@@ -317,7 +319,7 @@ public final class HomesWiring {
                             com.uxplima.uxmessentials.shared.domain.PlayerRef,
                             com.uxplima.uxmessentials.homes.domain.Home>
                     openInvites,
-            HomeListView[] listHolder) {
+            HomeListMenu[] listHolder) {
         HomeActionMenu.Collaborators collaborators = new HomeActionMenu.Collaborators(
                 menus,
                 kernel.messages(),
@@ -340,7 +342,7 @@ public final class HomesWiring {
                 claimService,
                 openIconPicker,
                 openInvites,
-                player -> listHolder[0].open(player, BukkitRefs.toRef(player)));
+                player -> listHolder[0].open(BukkitRefs.toRef(player)));
         return new HomeActionMenu(collaborators);
     }
 
@@ -433,7 +435,7 @@ public final class HomesWiring {
             List<Listener> listeners,
             HomeRepository repository,
             HomeQuota quota,
-            HomeListView listView) {
+            HomeListMenu listView) {
 
         public Wired {
             commands = List.copyOf(commands);

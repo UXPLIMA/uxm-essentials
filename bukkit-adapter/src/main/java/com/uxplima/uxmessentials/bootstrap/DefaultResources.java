@@ -117,6 +117,7 @@ final class DefaultResources {
             "modules/menu/specs/home-icon.conf",
             "modules/menu/specs/home-invites.conf",
             "modules/menu/specs/home-action.conf",
+            "modules/menu/specs/home-list.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

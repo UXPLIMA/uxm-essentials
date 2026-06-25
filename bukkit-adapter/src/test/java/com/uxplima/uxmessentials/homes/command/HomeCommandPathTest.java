@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.homes.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,7 +25,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommand;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListMenu;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
@@ -42,9 +43,17 @@ import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -55,7 +64,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,6 +85,20 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 class HomeCommandPathTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
+
+    private static final Logger NOOP_LOG = new Logger() {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    };
 
     private ServerMock server;
     private Plugin plugin;
@@ -114,7 +136,7 @@ class HomeCommandPathTest {
         execute(dispatcher, "home");
 
         Inventory open = player.getOpenInventory().getTopInventory();
-        assertThat(open.getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(open.getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -489,7 +511,18 @@ class HomeCommandPathTest {
         InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);
         UninviteFromHome uninviteFromHome = new UninviteFromHome(invites, notifier);
         VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier);
-        HomeListView listView = new HomeListView(
+        MenuBindings bindings = new MenuBindings();
+        bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
+        bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
+        ItemRenderer itemRenderer = new ItemRenderer(new GuiText(messages), bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        server.getPluginManager()
+                .registerEvents(
+                        new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin),
+                        plugin);
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        HomeListMenu listView = new HomeListMenu(
+                menus,
                 messages,
                 notifier,
                 new AllowAllPermissions(),
@@ -500,10 +533,11 @@ class HomeCommandPathTest {
                         repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock),
                 new SafeLocationGuard(server, false, false, 5),
                 new AlwaysAllowClaimService(),
-                (viewer, home) -> {},
                 HomeListLayout.codeDefault(),
                 1000,
-                fmt);
+                fmt,
+                (viewer, home) -> {});
+        listView.register(bindings, Path.of("nonexistent"), NOOP_LOG);
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, events, clock);
         return new HomeServices(listView, homeAdmin, visitHome, inviteToHome, uninviteFromHome, lookup, repository);
     }
