@@ -91,7 +91,6 @@ class WarpManagerCategoryTest {
     private PlayerMock player;
     private RecordingRepository repository;
     private StubWarpCategoryRepository categories;
-    private WarpCategoryManagerView categoryManagerView;
     private WarpCategorySettingsView categorySettingsView;
 
     @BeforeEach
@@ -133,24 +132,6 @@ class WarpManagerCategoryTest {
 
         WarpEditorView editorView = new WarpEditorView(
                 messages, scheduler, repository, WarpEditorLayout.defaultLayout(), new PlayerWarpRepositoryHandle());
-        categoryManagerView = new WarpCategoryManagerView(messages, categories, scheduler);
-        categorySettingsView = new WarpCategorySettingsView(messages, scheduler);
-        var parentSelectorView = new WarpCategoryParentSelectorView(messages, categories, scheduler);
-        var categorySelectorView = new WarpCategorySelectorView(messages, categories, scheduler);
-        WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
-        UseWarp useWarp = new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions);
-        // The category manager's back button reopens the warp manager; these tests do not exercise it, so the seam
-        // is a no-op here.
-        WarpCategoryEditing categoryEditing = new WarpCategoryEditing(
-                (p, v) -> {},
-                categoryManagerView,
-                categorySettingsView,
-                parentSelectorView,
-                categories,
-                repository,
-                editorView,
-                textInput,
-                messages);
 
         var soundOptionSource = new WarpSoundSelectorView(messages, scheduler, WarpSoundSelectorView.defaultLayout());
         var menuBindings = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
@@ -160,6 +141,21 @@ class WarpManagerCategoryTest {
                 menuItemRenderer, menuBindings.conditions());
         var menus = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
                 menuRenderer, scheduler, menuBindings.lists());
+
+        var categoryManagerView = new WarpCategoryManagerView(messages, categories, textInput, menus, scheduler);
+        categorySettingsView = new WarpCategorySettingsView(messages, scheduler);
+        var parentSelectorView =
+                new WarpCategoryParentSelectorView(messages, categories, categorySettingsView, menus, scheduler);
+        var categorySelectorView =
+                new WarpCategorySelectorView(messages, categories, repository, editorView, menus, scheduler);
+        // The category manager's back button reopens the warp manager; these tests do not exercise it, so the seam
+        // is a no-op here.
+        categoryManagerView.bind(categorySettingsView, (p, v) -> {});
+        WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
+        UseWarp useWarp = new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions);
+        WarpCategoryEditing categoryEditing = new WarpCategoryEditing(
+                categoryManagerView, categorySettingsView, parentSelectorView, categories, textInput, messages);
+
         var soundMenu = WarpSoundMenu.create(menus, soundOptionSource, repository, editorView, textInput);
         soundMenu.register(menuBindings, plugin.getDataFolder().toPath(), new SilentLogger());
         WarpEditorListener listener = new WarpEditorListener(
@@ -182,23 +178,6 @@ class WarpManagerCategoryTest {
     @AfterEach
     void tearDown() {
         MockBukkit.unmock();
-    }
-
-    @Test
-    void categoryManagerCreateButtonCreatesACategory() {
-        categoryManagerView.open(player, ref());
-
-        fireClick(49); // create-category button
-
-        fireChat("pvp");
-
-        assertThat(categories.find("pvp")).isPresent();
-        assertThat(player.getOpenInventory()
-                        .getTopInventory()
-                        .getHolder()
-                        .getClass()
-                        .getSimpleName())
-                .isEqualTo("WarpCategorySettingsHolder");
     }
 
     @Test

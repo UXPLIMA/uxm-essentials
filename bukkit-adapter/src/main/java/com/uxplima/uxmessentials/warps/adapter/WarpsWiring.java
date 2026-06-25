@@ -151,14 +151,14 @@ public final class WarpsWiring {
         // memory rather than a synchronous SQLite read on the command/region thread.
         categoryRepository.all();
         var categoryManagerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView(
-                kernel.messages(), categoryRepository, kernel.scheduler());
+                kernel.messages(), categoryRepository, textInput, menus, kernel.scheduler());
         var categorySettingsView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView(
                 kernel.messages(), kernel.scheduler());
         var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView(
-                kernel.messages(), categoryRepository, kernel.scheduler());
+                kernel.messages(), categoryRepository, repository, editorView, menus, kernel.scheduler());
         var categoryParentSelectorView =
                 new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView(
-                        kernel.messages(), categoryRepository, kernel.scheduler());
+                        kernel.messages(), categoryRepository, categorySettingsView, menus, kernel.scheduler());
         SetWarp setWarp = new SetWarp(
                 repository,
                 notifier,
@@ -182,19 +182,20 @@ public final class WarpsWiring {
                 createPrompt.boundTo((player, viewer) -> managerHolder[0].open(player, viewer)));
         managerHolder[0] = managerView;
         managerView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
+        // Close the category manager's loop now that the warp manager exists: a category click opens its settings,
+        // and the manager's back button reopens the engine warp manager. Both targets are wired after the category
+        // manager, so they are bound here rather than passed to the constructor.
+        categoryManagerView.bind(categorySettingsView, (player, viewer) -> managerView.open(player, viewer));
         // The read-only /warp browse menu now renders through the always-on menu engine. It opens off the same UseWarp
         // path the command drives and resolves its tiles off the warm warp/category sets, so the engine renders without
         // a port read of its own.
         var browseMenu = new WarpBrowseMenu(menus, kernel.scheduler(), useWarp, kernel.messages(), categoryRepository);
         browseMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categoryEditing = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryEditing(
-                (player, viewer) -> managerView.open(player, viewer),
                 categoryManagerView,
                 categorySettingsView,
                 categoryParentSelectorView,
                 categoryRepository,
-                repository,
-                editorView,
                 textInput,
                 kernel.messages());
         var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(

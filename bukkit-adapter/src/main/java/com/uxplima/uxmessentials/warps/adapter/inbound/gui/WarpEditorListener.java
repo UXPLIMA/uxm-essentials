@@ -110,31 +110,10 @@ public final class WarpEditorListener implements Listener {
             return;
         }
 
-        if (holder instanceof WarpCategoryManagerHolder categoryManagerHolder) {
-            event.setCancelled(true);
-            categoryEditing.onCategoryManagerClick(
-                    (Player) event.getWhoClicked(), categoryManagerHolder, event.getRawSlot());
-            return;
-        }
-
         if (holder instanceof WarpCategorySettingsHolder categorySettingsHolder) {
             event.setCancelled(true);
             categoryEditing.onCategorySettingsClick(
                     (Player) event.getWhoClicked(), categorySettingsHolder, event.getRawSlot());
-            return;
-        }
-
-        if (holder instanceof WarpCategorySelectorHolder categorySelectorHolder) {
-            event.setCancelled(true);
-            categoryEditing.onCategorySelectorClick(
-                    (Player) event.getWhoClicked(), categorySelectorHolder, event.getRawSlot());
-            return;
-        }
-
-        if (holder instanceof WarpCategoryParentSelectorHolder parentSelectorHolder) {
-            event.setCancelled(true);
-            categoryEditing.onCategoryParentSelectorClick(
-                    (Player) event.getWhoClicked(), parentSelectorHolder, event.getRawSlot());
             return;
         }
 

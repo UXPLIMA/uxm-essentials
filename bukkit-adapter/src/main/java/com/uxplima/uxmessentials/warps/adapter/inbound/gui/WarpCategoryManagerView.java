@@ -4,16 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BiConsumer;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -24,79 +28,154 @@ import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
- * The warp category manager: a 6-row chest listing every category as a clickable icon, with a "create
- * category" button and a back arrow that returns to the warp manager. Mirrors {@code KitCategoryManagerView}.
- * Clicking a category opens its settings (handled by {@link WarpCategoryEditing} via the listener); every line
- * resolves from a {@link MessageKey} in the viewer's locale.
+ * The warp category manager the admin warp manager opens to author the category tree: a six-row grid with one icon
+ * per configured {@link WarpCategory}, a "create category" button, and a back button to the engine warp manager.
+ * Clicking a category opens its {@link WarpCategorySettingsView}; the create button prompts for a category id through
+ * the shared input seam, saves the new empty category through the repository, and opens its settings — exactly as the
+ * old bespoke window did.
+ *
+ * <p>The window draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over a
+ * {@link ListSpec}, so it is a holder-backed engine list routed and torn down by the one menu listener and one
+ * {@code closeMenu}, with paging re-paginating the same holder. The category list is a plain repository read that
+ * touches no Bukkit API, so the engine reads only that snapshot and shows the window on the viewer's entity thread.
+ * Mirrors the two category selectors the warp editor and category-settings editors open.
  */
 @NullMarked
 public final class WarpCategoryManagerView {
 
+    private static final int ROWS = 6;
+    private static final int PREV_SLOT = 45;
+    private static final int NEXT_SLOT = 46;
+    private static final int CREATE_SLOT = 49;
+    private static final int BACK_SLOT = 53;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
+    private static final List<Integer> CONTENT_SLOTS = contentSlots();
+
     private final Messages messages;
     private final WarpCategoryRepository categoryRepository;
-    private final Scheduler scheduler;
+    private final TextInput textInput;
+    private final Menus menus;
     private final MiniMessage miniMessage;
 
-    public WarpCategoryManagerView(Messages messages, WarpCategoryRepository categoryRepository, Scheduler scheduler) {
+    /** The settings editor opened on a category click and after a create; injected after this view to break the cycle. */
+    private @Nullable WarpCategorySettingsView settingsView;
+
+    /** Reopens the engine warp manager when the back button is clicked; injected after this view to break the cycle. */
+    private @Nullable BiConsumer<Player, PlayerRef> onBack;
+
+    public WarpCategoryManagerView(
+            Messages messages,
+            WarpCategoryRepository categoryRepository,
+            TextInput textInput,
+            Menus menus,
+            Scheduler scheduler) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.menus = Objects.requireNonNull(menus, "menus");
+        // The engine hops onto the viewer's entity thread inside openList, so the scheduler is only validated here.
+        Objects.requireNonNull(scheduler, "scheduler");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
+    /**
+     * Wire the two collaborators that close the manager→settings→back loop. The settings editor opens this manager
+     * back on its own back button, and the back button reopens the warp manager, so all three are built before any
+     * one of them exists; this setter breaks that cycle, mirroring the {@code managerHolder[0]} indirection in wiring.
+     */
+    public void bind(WarpCategorySettingsView settingsView, BiConsumer<Player, PlayerRef> onBack) {
+        this.settingsView = Objects.requireNonNull(settingsView, "settingsView");
+        this.onBack = Objects.requireNonNull(onBack, "onBack");
+    }
+
+    /** Open the category manager for {@code viewer}; a category click opens its settings, create prompts for an id. */
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        scheduler.onEntity(viewer, () -> {
-            List<WarpCategory> categories = categoryRepository.all();
-            WarpCategoryManagerHolder holder = new WarpCategoryManagerHolder(viewer, categories);
-            Inventory inventory = Bukkit.createInventory(holder, 54, title(viewer));
-            holder.attach(inventory);
-            populate(inventory, categories, viewer);
-            player.openInventory(inventory);
-        });
+        List<WarpCategory> snapshot = List.copyOf(categoryRepository.all());
+        menus.openList(viewer, spec(viewer, snapshot));
     }
 
-    private void populate(Inventory inventory, List<WarpCategory> categories, PlayerRef viewer) {
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
+    /**
+     * Build the engine {@link ListSpec}: the categories as the listed entities, the per-category icon reproducing the
+     * old {@code icon(cat, viewer)}, an {@code onSelect} that opens the clicked category's settings, plus the create
+     * and back buttons the old grid drew at slots 49 and 53.
+     */
+    private ListSpec spec(PlayerRef viewer, List<WarpCategory> categories) {
+        return ListSpec.builder()
+                .title(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_MANAGER_TITLE))
+                .rows(ROWS)
+                .contentSlots(CONTENT_SLOTS)
+                .navigation(PREV_SLOT, NEXT_SLOT, Material.ARROW)
+                .navNames(text(viewer, WarpsMessageKey.WARP_MENU_PREV), text(viewer, WarpsMessageKey.WARP_MENU_NEXT))
+                .filler(FILLER)
+                .entities(() -> List.<Object>copyOf(categories))
+                .iconRenderer((v, entity) -> icon((WarpCategory) entity, v))
+                .onSelect((p, entity) -> openSettings(p, viewer, (WarpCategory) entity))
+                .extraButtons(List.of(createButton(viewer), backButton(viewer)))
                 .build();
-        for (int i = 0; i < 54; i++) {
-            inventory.setItem(i, filler);
+    }
+
+    private ListSpec.ExtraButton createButton(PlayerRef viewer) {
+        ItemStack icon = ItemBuilder.of(Material.EMERALD_BLOCK)
+                .name(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_CREATE_BUTTON_NAME))
+                .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_CREATE_BUTTON_LORE)))
+                .build();
+        return new ListSpec.ExtraButton(CREATE_SLOT, icon, p -> promptCreate(p, viewer));
+    }
+
+    private ListSpec.ExtraButton backButton(PlayerRef viewer) {
+        ItemStack icon = ItemBuilder.of(Material.ARROW)
+                .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK))
+                .build();
+        return new ListSpec.ExtraButton(BACK_SLOT, icon, p -> back(p, viewer));
+    }
+
+    /** Prompt for a category id, save the new empty category, and open its settings — the old create button's effect. */
+    private void promptCreate(Player player, PlayerRef viewer) {
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of("warp.category.create-name", WarpsMessageKey.WARP_EDITOR_CATEGORY_PROMPT_CREATE),
+                name -> create(player, viewer, name),
+                () -> open(player, viewer));
+    }
+
+    /**
+     * Save a new category under the sanitized id and open its settings; a name with a space sanitizes to empty and is
+     * rejected, exactly as the old window did. Package-private so the create branch is unit-tested without an anvil.
+     */
+    void create(Player player, PlayerRef viewer, String name) {
+        String clean = sanitizeId(name);
+        if (clean.isEmpty()) {
+            player.sendMessage(text(viewer, WarpsMessageKey.WARP_MANAGER_ERROR_INVALID_NAME));
+            return;
         }
+        WarpCategory category = new WarpCategory(clean, name, Optional.empty(), List.of(), 0, Optional.empty());
+        categoryRepository.save(category);
+        openSettings(player, viewer, category);
+    }
 
-        int index = 0;
-        for (WarpCategory cat : categories) {
-            if (index >= 45) {
-                break;
-            }
-            inventory.setItem(index, icon(cat, viewer));
-            index++;
+    private void openSettings(Player player, PlayerRef viewer, WarpCategory category) {
+        if (settingsView != null) {
+            settingsView.open(player, viewer, category);
         }
+    }
 
-        inventory.setItem(
-                49,
-                ItemBuilder.of(Material.EMERALD_BLOCK)
-                        .name(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_CREATE_BUTTON_NAME))
-                        .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_CREATE_BUTTON_LORE)))
-                        .build());
-
-        inventory.setItem(
-                53,
-                ItemBuilder.of(Material.ARROW)
-                        .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK))
-                        .build());
+    private void back(Player player, PlayerRef viewer) {
+        if (onBack != null) {
+            onBack.accept(player, viewer);
+        }
     }
 
     private ItemStack icon(WarpCategory category, PlayerRef viewer) {
         Component name = miniMessage.deserialize(category.displayName());
         List<Component> lore = new ArrayList<>();
-        if (!category.displayLore().isEmpty()) {
-            for (String line : category.displayLore()) {
-                lore.add(miniMessage.deserialize(line));
-            }
+        for (String line : category.displayLore()) {
+            lore.add(miniMessage.deserialize(line));
         }
         lore.add(Component.empty());
         lore.add(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_ICON_ID, Map.of("id", category.id())));
@@ -116,8 +195,8 @@ public final class WarpCategoryManagerView {
                 .build();
     }
 
-    private Component title(PlayerRef viewer) {
-        return text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_MANAGER_TITLE);
+    private String none(PlayerRef viewer) {
+        return messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_VALUE_NONE, Map.of());
     }
 
     private Component text(PlayerRef viewer, MessageKey key) {
@@ -128,7 +207,16 @@ public final class WarpCategoryManagerView {
         return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
-    private String none(PlayerRef viewer) {
-        return messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_VALUE_NONE, Map.of());
+    private static String sanitizeId(String name) {
+        String clean = name.trim().toLowerCase(java.util.Locale.ROOT);
+        return clean.contains(" ") ? "" : clean;
+    }
+
+    private static List<Integer> contentSlots() {
+        List<Integer> slots = new ArrayList<>();
+        for (int slot = 0; slot < 45; slot++) {
+            slots.add(slot);
+        }
+        return List.copyOf(slots);
     }
 }

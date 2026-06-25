@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
@@ -150,15 +151,12 @@ class WarpManagerGoldenTest {
     void leftClickingTheCategoriesButtonThroughTheEngineOpensTheCategoryManager() {
         seed("alpha");
         openEngine();
-        // Slot 51 is the manage-categories button; a left click must open the bespoke category manager.
+        // Slot 51 is the manage-categories button; a left click must open the category manager, which now renders
+        // through the menu engine — so its window is a holder-backed MenuHolder, not the old bespoke holder.
         fireClick(51, ClickType.LEFT);
 
-        assertThat(player.getOpenInventory()
-                        .getTopInventory()
-                        .getHolder()
-                        .getClass()
-                        .getSimpleName())
-                .isEqualTo("WarpCategoryManagerHolder");
+        assertThat(player.getOpenInventory().getTopInventory().getHolder())
+                .isInstanceOf(com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder.class);
     }
 
     /**
@@ -206,8 +204,15 @@ class WarpManagerGoldenTest {
         Messages messages = new KeyMessages();
         WarpEditorView editorView = new WarpEditorView(
                 messages, scheduler, repository, WarpEditorLayout.defaultLayout(), new PlayerWarpRepositoryHandle());
-        WarpCategoryManagerView categoryManager =
-                new WarpCategoryManagerView(messages, new StubCategoryRepository(), scheduler);
+        WarpCategoryManagerView categoryManager = new WarpCategoryManagerView(
+                messages,
+                new StubCategoryRepository(),
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput.class),
+                menus,
+                scheduler);
+        // The category manager is only the warp manager's category-button target here; this test never drives its own
+        // create/click/back seams, so the loop-closing collaborators are no-ops.
+        categoryManager.bind(new WarpCategorySettingsView(messages, scheduler), (p, v) -> {});
         return new WarpManagerMenu(
                 menus,
                 scheduler,
