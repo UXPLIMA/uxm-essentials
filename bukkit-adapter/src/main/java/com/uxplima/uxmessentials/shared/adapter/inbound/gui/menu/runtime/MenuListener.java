@@ -106,12 +106,37 @@ public final class MenuListener implements Listener {
             return;
         }
         int slot = event.getRawSlot();
+        ConfirmState confirm = holder.confirm().orElse(null);
+        if (confirm != null) {
+            handleConfirmClick(holder, confirm, slot, (Player) event.getWhoClicked());
+            return;
+        }
         EditorState editor = holder.editor().orElse(null);
         if (editor != null) {
             handleEditorClick(holder, editor, slot, event.isRightClick(), event.isShiftClick());
             return;
         }
         holder.clickAt(slot).ifPresent(rs -> handleClick(holder, rs, event.getClick()));
+    }
+
+    /**
+     * Route a click in a confirm window: the yes/no slot runs its decision exactly once. The single-fire guard on
+     * the {@link ConfirmState} makes a stray second click in the same tick a no-op, and the window is closed before
+     * the decision runs — mirroring uxmLib's {@code ConfirmMenu} — so a decision that opens another menu is not
+     * clobbered by the close. The close funnels through the one {@code closeMenu}, so no second listener or teardown
+     * path is introduced. A click on a non-button slot does nothing; the click is already cancelled.
+     */
+    private void handleConfirmClick(MenuHolder holder, ConfirmState confirm, int slot, Player clicker) {
+        Runnable decision = confirm.decisionAt(slot).orElse(null);
+        if (decision == null || !confirm.fire()) {
+            return;
+        }
+        clicker.closeInventory();
+        scheduler.onEntity(holder.ctx().viewer(), () -> {
+            if (Bukkit.getPlayer(holder.ctx().viewer().uuid()) != null) {
+                decision.run();
+            }
+        });
     }
 
     /**

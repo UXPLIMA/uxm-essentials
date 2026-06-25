@@ -11,9 +11,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
+import net.kyori.adventure.text.Component;
+
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ConfirmState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
@@ -48,6 +52,9 @@ public final class Menus {
      * wiring error that fails loudly rather than half-rendering.
      */
     @Nullable private final EditorRenderer editorRenderer;
+
+    /** Paints the two-button confirm window; stateless, so one instance serves every confirm open. */
+    private final ConfirmRenderer confirmRenderer = new ConfirmRenderer();
 
     private final Map<String, MenuSpec> specs = new ConcurrentHashMap<>();
 
@@ -136,6 +143,45 @@ public final class Menus {
     public void reRenderEditor(MenuHolder holder) {
         Objects.requireNonNull(holder, "holder");
         EditorRefresh.reRender(holder, requireEditorRenderer(), scheduler);
+    }
+
+    /**
+     * Open a two-button confirm window for {@code viewer} — the engine's replacement for uxmLib's {@code ConfirmMenu}.
+     * It builds the same {@link MenuHolder} every other menu uses, so the one listener routes its clicks and the one
+     * {@code closeMenu} tears it down: clicking the yes button runs {@code onYes} exactly once, clicking no runs
+     * {@code onNo} exactly once, and either click closes the window first. Closing the window (or quitting) without a
+     * click runs neither. The window is shown on the viewer's entity thread, where touching the live inventory is
+     * legal; the supplied runnables run on that same thread when their button is clicked, mirroring the editor and
+     * spec-action click hops. The {@code title} is a {@link Component} the caller already resolved from a
+     * {@code MessageKey}, so the window carries no inline user-facing literal.
+     */
+    public void confirm(PlayerRef viewer, Component title, Runnable onYes, Runnable onNo) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(onYes, "onYes");
+        Objects.requireNonNull(onNo, "onNo");
+        scheduler.onEntity(viewer, () -> openConfirmResolved(viewer, title, onYes, onNo));
+    }
+
+    /** On the viewer's entity thread: build the confirm holder + window, paint the two buttons, show it. No refresh. */
+    private void openConfirmResolved(PlayerRef viewer, Component title, Runnable onYes, Runnable onNo) {
+        Player live = Bukkit.getPlayer(viewer.uuid());
+        if (live == null || !live.isOnline()) {
+            return;
+        }
+        MenuContext ctx = MenuContext.of(viewer, null, 0);
+        MenuHolder holder = new MenuHolder("confirm", confirmMenuSpec(), ctx);
+        holder.attachConfirm(new ConfirmState(ConfirmRenderer.YES_SLOT, ConfirmRenderer.NO_SLOT, onYes, onNo));
+        Inventory inv = Bukkit.createInventory(holder, ConfirmRenderer.ROWS * 9, title);
+        holder.attach(inv);
+        confirmRenderer.populate(inv);
+        live.openInventory(inv);
+    }
+
+    /** The minimal {@link MenuSpec} a confirm holder carries: three rows, refresh off, no items — clicks ride state. */
+    private static MenuSpec confirmMenuSpec() {
+        return new MenuSpec(
+                "", ConfirmRenderer.ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     private EditorRenderer requireEditorRenderer() {

@@ -48,6 +48,13 @@ public final class MenuHolder implements InventoryHolder {
      */
     @Nullable private EditorState editor;
 
+    /**
+     * Set only on the confirm path: the two-button confirm window's yes/no decisions. A spec or editor menu leaves
+     * this null; a confirm window sets it and the one listener routes its clicks through it, so all three menu kinds
+     * ride the same holder and the same teardown without a separate listener.
+     */
+    @Nullable private ConfirmState confirm;
+
     public MenuHolder(String specId, MenuSpec spec, MenuContext ctx) {
         this.specId = Objects.requireNonNull(specId, "specId");
         this.spec = Objects.requireNonNull(spec, "spec");
@@ -117,6 +124,16 @@ public final class MenuHolder implements InventoryHolder {
     /** The editor state if this holder backs an editor, or empty for a spec menu. */
     public Optional<EditorState> editor() {
         return Optional.ofNullable(editor);
+    }
+
+    /** Attaches the confirm state for a confirm-window open; a spec or editor menu never calls this. */
+    public void attachConfirm(ConfirmState confirm) {
+        this.confirm = Objects.requireNonNull(confirm, "confirm");
+    }
+
+    /** The confirm state if this holder backs a confirm window, or empty for a spec or editor menu. */
+    public Optional<ConfirmState> confirm() {
+        return Optional.ofNullable(confirm);
     }
 
     public void setRefreshHandle(Cancellable handle) {
