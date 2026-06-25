@@ -30,9 +30,8 @@ import org.jspecify.annotations.NullMarked;
  * Handles the click events for the warp-category administration GUIs (the category manager, a category's
  * settings, the warp→category selector, and the parent-category selector). The warp-editor listener owns the
  * inventory dispatch and forwards each category-holder click here, so the category logic lives in one focused
- * collaborator rather than padding the listener. Mirrors {@code KitCategoryEditing}: each handler acts and then
- * reopens the relevant menu so the operator sees the result, and every prompt resolves its label from a
- * {@link MessageKey} in the viewer's locale.
+ * collaborator rather than padding the listener. Each handler acts and then reopens the relevant menu so the
+ * operator sees the result, and every prompt resolves its label from a {@link MessageKey} in the viewer's locale.
  */
 @NullMarked
 public final class WarpCategoryEditing {

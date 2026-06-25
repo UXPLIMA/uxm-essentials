@@ -122,10 +122,6 @@ class KitManagerCreateButtonTest {
                 .textInput();
 
         KitSettingsView settingsView = new KitSettingsView(messages, scheduler, SETTINGS_LAYOUT);
-        KitCategoryManagerView categoryManager =
-                new KitCategoryManagerView(messages, new StubCategoryRepository(), scheduler);
-        KitCreatePrompt createPrompt =
-                new KitCreatePrompt(messages, textInput, new CreateKit(repository, notifier), repository, settingsView);
 
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
@@ -135,6 +131,11 @@ class KitManagerCreateButtonTest {
         bindings.action("close", ctx -> ctx.player().closeInventory());
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
+
+        KitCategoryManagerView categoryManager = new KitCategoryManagerView(
+                guiText, messages, new StubCategoryRepository(), textInput, menus, scheduler);
+        KitCreatePrompt createPrompt =
+                new KitCreatePrompt(messages, textInput, new CreateKit(repository, notifier), repository, settingsView);
 
         KitManagerMenu[] holder = new KitManagerMenu[1];
         manager = new KitManagerMenu(

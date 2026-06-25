@@ -146,13 +146,30 @@ public final class KitsWiring {
         // The kit settings editor a manager click opens, and the create flow that opens a fresh kit's settings, are
         // shared by the engine-rendered manager. Build them before the manager so it can seam to both.
         KitSettingsView settingsView = new KitSettingsView(kernel.messages(), kernel.scheduler(), settingsLayout);
-        KitCategoryManagerView categoryManagerView =
-                new KitCategoryManagerView(kernel.messages(), categoryRepository, kernel.scheduler());
+        // The category manager and a category's settings panel now render through the menu engine. The manager is a
+        // code-built list (like the selectors); the settings panel is a declarative spec. Both close a small cycle —
+        // the manager opens a category's settings on a click, the settings panel reopens the manager on back, and the
+        // settings panel and the parent selector reopen each other — so they are bound through one-element holders and
+        // bind(...) setters after all three exist. The kit editor is shared with assemble() below, built here once.
+        GuiText guiText = new GuiText(kernel.messages());
+        KitEditor kitEditor = new KitEditor(repository, notifier);
+        KitManagerMenu[] managerHolder = new KitManagerMenu[1];
+        KitCategoryManagerView categoryManagerView = new KitCategoryManagerView(
+                guiText, kernel.messages(), categoryRepository, textInput, menus, kernel.scheduler());
+        KitCategorySettingsView categorySettingsView = new KitCategorySettingsView(
+                menus,
+                guiText,
+                kernel.messages(),
+                textInput,
+                categoryRepository,
+                (player, viewer) -> categoryManagerView.open(player, viewer));
+        categorySettingsView.register(menuBindings, dataFolder, kernel.log());
+        KitCategoryParentSelectorView categoryParentSelectorView = new KitCategoryParentSelectorView(
+                guiText, categoryRepository, categorySettingsView, menus, kernel.scheduler());
+        categorySettingsView.bind(categoryParentSelectorView);
+        categoryManagerView.bind(categorySettingsView, (player, viewer) -> managerHolder[0].open(player, viewer));
         KitCreatePrompt createPrompt = new KitCreatePrompt(
                 kernel.messages(), textInput, new CreateKit(repository, notifier), repository, settingsView);
-        // One-element holder breaks the cycle: the manager's create button reopens the manager on cancel, and the
-        // category manager's back button reopens it, but both are wired before the manager exists.
-        KitManagerMenu[] managerHolder = new KitManagerMenu[1];
         KitManagerMenu kitManager = new KitManagerMenu(
                 menus,
                 kernel.scheduler(),
@@ -163,17 +180,10 @@ public final class KitsWiring {
                 createPrompt.boundTo((player, viewer) -> managerHolder[0].open(player, viewer)));
         managerHolder[0] = kitManager;
         kitManager.register(menuBindings, dataFolder, kernel.log());
-        KitCategorySettingsView categorySettingsView =
-                new KitCategorySettingsView(kernel.messages(), kernel.scheduler());
-        // The two category selectors now render through the menu engine, so they take the engine façade, the GuiText
-        // catalog adapter, and the use case / repository their pick saves through, plus the bespoke settings view each
-        // reopens once the assign is done. The kit editor is shared with assemble() below, so it is built here once.
-        GuiText guiText = new GuiText(kernel.messages());
-        KitEditor kitEditor = new KitEditor(repository, notifier);
+        // The kit→category selector renders through the menu engine, so it takes the engine façade, the GuiText catalog
+        // adapter, and the kit editor its pick saves through, plus the bespoke kit settings view it reopens once done.
         KitCategorySelectorView categorySelectorView = new KitCategorySelectorView(
                 guiText, categoryRepository, kitEditor, settingsView, menus, kernel.scheduler());
-        KitCategoryParentSelectorView categoryParentSelectorView = new KitCategoryParentSelectorView(
-                guiText, categoryRepository, categorySettingsView, menus, kernel.scheduler());
 
         // The placeholder requirement evaluator soft-couples to PlaceholderAPI exactly like the economy bridge:
         // present only when PlaceholderAPI is installed, otherwise empty, in which case a kit that declares
@@ -221,13 +231,7 @@ public final class KitsWiring {
 
         List<Listener> listeners = List.of(
                 new KitPreviewListener(),
-                new KitEditorListener(
-                        services.kitEditorView(),
-                        services,
-                        categoryRepository,
-                        settingsView,
-                        textInput,
-                        kernel.messages()),
+                new KitEditorListener(services.kitEditorView(), services, settingsView, textInput, kernel.messages()),
                 new KitsJoinListener(repository, granter, access));
 
         // The kit's claim/deny effects (sound, particles, title, firework, commands, the wait-ticks delay) now run

@@ -1,174 +1,287 @@
 package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-
-import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
+import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+/**
+ * Registers the per-category settings panel with the menu engine and opens it. A three-row property panel for one
+ * {@link KitCategory}: labeled buttons for its display name, material, lore, sorting slot, and parent category, a
+ * delete button, and a back button to the category manager. The display-name / lore / slot buttons capture a value
+ * through the shared input seam, the material button copies the item in the operator's main hand, and the parent
+ * button opens the already-engine {@link KitCategoryParentSelectorView}; each mutation saves the edited category and
+ * re-opens this panel with the new subject so the operator sees the result.
+ *
+ * <p>The edited category is handed in as the menu subject, so the title and every current-value line fill from the
+ * {@code cat_set_*} placeholders without the renderer touching a port. The panel holds no new domain logic — it
+ * replays the old bespoke window's handlers verbatim through the engine. This is the economy target-panel pattern
+ * (subject-carried state, the input seam, and re-open after a mutation). Every visible string resolves from the kits
+ * catalog.
+ */
 @NullMarked
 public final class KitCategorySettingsView {
 
-    private final Messages messages;
-    private final Scheduler scheduler;
+    /** The engine spec id this panel registers and opens under. */
+    public static final String SPEC_ID = "kit-category-settings";
 
-    public KitCategorySettingsView(Messages messages, Scheduler scheduler) {
+    private static final String SPEC_RESOURCE = "modules/menu/specs/kit-category-settings.conf";
+    private static final int ROWS = 3;
+
+    private final Menus menus;
+    private final GuiText guiText;
+    private final Messages messages;
+    private final TextInput textInput;
+    private final KitCategoryRepository categoryRepository;
+    private final BiConsumer<Player, PlayerRef> onBack;
+
+    /** The parent selector the parent button opens; injected after this view to break the settings↔selector cycle. */
+    private @Nullable KitCategoryParentSelectorView parentSelector;
+
+    public KitCategorySettingsView(
+            Menus menus,
+            GuiText guiText,
+            Messages messages,
+            TextInput textInput,
+            KitCategoryRepository categoryRepository,
+            BiConsumer<Player, PlayerRef> onBack) {
+        this.menus = Objects.requireNonNull(menus, "menus");
+        this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
+        this.onBack = Objects.requireNonNull(onBack, "onBack");
     }
 
+    /**
+     * Wire the parent-category selector the parent button opens. The selector reopens this panel after a pick, so it
+     * holds this view and this view holds it; this setter breaks that cycle, mirroring the manager's {@code bind}.
+     */
+    public void bind(KitCategoryParentSelectorView parentSelector) {
+        this.parentSelector = Objects.requireNonNull(parentSelector, "parentSelector");
+    }
+
+    /** Register the subject placeholders and the action buttons the spec names, and the spec itself. */
+    public void register(MenuBindings bindings, Path dataFolder, Logger log) {
+        Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
+        bindings.placeholder("cat_set_id", ctx -> subject(ctx).id());
+        bindings.placeholder("cat_set_name", ctx -> subject(ctx).displayName());
+        bindings.placeholder(
+                "cat_set_material", ctx -> subject(ctx).displayMaterial().orElse("BOOK"));
+        bindings.placeholder(
+                "cat_set_lore_count",
+                ctx -> Integer.toString(subject(ctx).displayLore().size()));
+        bindings.placeholder(
+                "cat_set_slot", ctx -> Integer.toString(subject(ctx).slot()));
+        bindings.placeholder("cat_set_parent", this::parentName);
+        bindings.action("kits:cat-set-name", this::promptName);
+        bindings.action("kits:cat-set-material", this::setMaterial);
+        bindings.action("kits:cat-set-lore", this::promptLore);
+        bindings.action("kits:cat-set-slot", this::promptSlot);
+        bindings.action("kits:cat-set-parent", this::openParent);
+        bindings.action("kits:cat-set-delete", this::delete);
+        bindings.action("kits:cat-set-back", ctx -> onBack.accept(ctx.player(), ctx.viewer()));
+        menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
+    }
+
+    /** Open the settings panel for {@code category}; reads no port, the category is the subject the panel renders. */
     public void open(Player player, PlayerRef viewer, KitCategory category) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(category, "category");
-        scheduler.onEntity(viewer, () -> {
-            KitCategorySettingsHolder holder = new KitCategorySettingsHolder(viewer, category);
-            Inventory inventory = Bukkit.createInventory(holder, 27, title(category, viewer));
-            holder.attach(inventory);
-            populate(inventory, category, viewer);
-            player.openInventory(inventory);
-        });
+        menus.open(viewer, SPEC_ID, category);
     }
 
-    private void populate(Inventory inventory, KitCategory category, PlayerRef viewer) {
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
-        for (int i = 0; i < 27; i++) {
-            inventory.setItem(i, filler);
+    /** Capture a display name through the input seam, then save it and re-open; cancel re-opens unchanged. */
+    private void promptName(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        KitCategory category = subject(ctx);
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of(
+                        "kit.category.display-name", KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_PROMPT),
+                name -> applyName(player, viewer, category, name),
+                () -> open(player, viewer, category));
+    }
+
+    /** Save {@code category} with the new display name and re-open the panel. Package-private for the golden test. */
+    void applyName(Player player, PlayerRef viewer, KitCategory category, String name) {
+        save(player, viewer, category.withDisplayName(name));
+    }
+
+    /** Copy the item in the operator's main hand as the icon material, then save and re-open; empty hand is rejected. */
+    private void setMaterial(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        KitCategory category = subject(ctx);
+        org.bukkit.Material hand = player.getInventory().getItemInMainHand().getType();
+        if (hand.isAir()) {
+            player.sendMessage(guiText.text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_EMPTY_HAND));
+            open(player, viewer, category);
+            return;
         }
+        save(player, viewer, category.withDisplayMaterial(Optional.of(hand.name())));
+    }
 
-        // Slot 10: Set Display Name
-        inventory.setItem(
-                10,
-                ItemBuilder.of(Material.NAME_TAG)
-                        .name(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_NAME))
-                        .lore(List.of(
-                                text(
-                                        viewer,
-                                        KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_CURRENT,
-                                        Map.of("current", category.displayName())),
-                                Component.empty(),
-                                text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_PROMPT)))
-                        .build());
+    /** Capture pipe-separated lore through the input seam, then save it and re-open; cancel re-opens unchanged. */
+    private void promptLore(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        KitCategory category = subject(ctx);
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of(
+                        "kit.category.display-lore", KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_PROMPT),
+                input -> applyLore(player, viewer, category, input),
+                () -> open(player, viewer, category));
+    }
 
-        // Slot 12: Set Display Material
-        String matName = category.displayMaterial().orElse("BOOK");
-        inventory.setItem(
-                12,
-                ItemBuilder.of(buttonMaterial(matName))
-                        .name(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_NAME))
-                        .lore(List.of(
-                                text(
-                                        viewer,
-                                        KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_CURRENT,
-                                        Map.of("current", matName)),
-                                Component.empty(),
-                                text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_PROMPT)))
-                        .build());
+    /** Save {@code category} with the pipe-split lore and re-open the panel. Package-private for the golden test. */
+    void applyLore(Player player, PlayerRef viewer, KitCategory category, String input) {
+        save(player, viewer, category.withDisplayLore(splitLines(input)));
+    }
 
-        // Slot 14: Edit Display Lore
-        inventory.setItem(
-                14,
-                ItemBuilder.of(Material.BOOK)
-                        .name(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_NAME))
-                        .lore(List.of(
-                                text(
-                                        viewer,
-                                        KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_CURRENT,
-                                        Map.of(
-                                                "count",
-                                                Integer.toString(
-                                                        category.displayLore().size()))),
-                                Component.empty(),
-                                text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_PROMPT)))
-                        .build());
-
-        // Slot 16: Set Slot Index (Sorting Slot)
-        inventory.setItem(
-                16,
-                ItemBuilder.of(Material.COMPARATOR)
-                        .name(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_NAME))
-                        .lore(List.of(
-                                text(
-                                        viewer,
-                                        KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_CURRENT,
-                                        Map.of("slot", Integer.toString(category.slot()))),
-                                Component.empty(),
-                                text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT)))
-                        .build());
-
-        // Slot 18: Set Parent Category
-        String parentName = category.parentCategoryId()
-                .orElseGet(() -> messages.resolve(viewer, KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
-        inventory.setItem(
-                18,
-                ItemBuilder.of(Material.BOOKSHELF)
-                        .name(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_PARENT_NAME))
-                        .lore(List.of(
-                                text(
-                                        viewer,
-                                        KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_PARENT_CURRENT,
-                                        Map.of("parent", parentName)),
-                                Component.empty(),
-                                text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_PARENT_PROMPT)))
-                        .build());
-
-        // Slot 22: Delete Category
-        inventory.setItem(
-                22,
-                ItemBuilder.of(Material.REDSTONE_BLOCK)
-                        .name(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DELETE_NAME))
-                        .lore(List.of(
-                                text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DELETE_LORE),
-                                Component.empty(),
-                                text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DELETE_WARNING)))
-                        .build());
-
-        // Slot 26: Back Arrow
-        inventory.setItem(
-                26,
-                ItemBuilder.of(Material.ARROW)
-                        .name(text(viewer, KitsMessageKey.KIT_EDITOR_SETTINGS_BACK_BUTTON))
-                        .build());
+    /** Capture a sorting-slot index through the input seam, then save it and re-open; a non-number is rejected. */
+    private void promptSlot(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        KitCategory category = subject(ctx);
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of("kit.category.slot", KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT),
+                input -> applySlot(player, viewer, category, input),
+                () -> open(player, viewer, category));
     }
 
     /**
-     * The button material for the display-material option: the category's configured material itself, so an
-     * operator sees the icon they set rather than a fixed stand-in. An unset or unparseable name falls back to
-     * the same {@code BOOK} the lore line names.
+     * Parse the typed slot index and, when valid, save it and re-open; a non-number sends the existing rejection and
+     * re-opens unchanged. Package-private so the slot branch is unit-tested without driving a live anvil.
      */
-    private static Material buttonMaterial(String name) {
-        Material parsed = Material.matchMaterial(name);
-        return parsed != null && parsed != Material.AIR ? parsed : Material.BOOK;
+    void applySlot(Player player, PlayerRef viewer, KitCategory category, String input) {
+        int target;
+        try {
+            target = Integer.parseInt(input);
+        } catch (NumberFormatException notANumber) {
+            player.sendMessage(guiText.text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
+            open(player, viewer, category);
+            return;
+        }
+        save(player, viewer, category.withSlot(target));
     }
 
-    private Component title(KitCategory category, PlayerRef viewer) {
-        return StyledText.render(messages.resolve(
-                viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_TITLE, Map.of("kit", category.id())));
+    /** Open the engine parent-category selector; choosing a parent saves it and re-opens this panel. */
+    private void openParent(MenuActionContext ctx) {
+        if (parentSelector != null) {
+            parentSelector.open(ctx.player(), ctx.viewer(), subject(ctx));
+        }
     }
 
-    private Component text(PlayerRef viewer, MessageKey key) {
-        return StyledText.render(messages.resolve(viewer, key, Map.of()));
+    /** Delete the category through the repository, then return to the manager — the old delete button's effect. */
+    private void delete(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        categoryRepository.delete(subject(ctx).id());
+        onBack.accept(player, viewer);
     }
 
-    private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return StyledText.render(messages.resolve(viewer, key, placeholders));
+    /** Save the edited category through the repository, then re-open the panel with the new subject. */
+    private void save(Player player, PlayerRef viewer, KitCategory category) {
+        categoryRepository.save(category);
+        open(player, viewer, category);
+    }
+
+    /** The current parent id, or the catalog "none" string when the category has no parent. */
+    private String parentName(MenuContext ctx) {
+        return subject(ctx)
+                .parentCategoryId()
+                .orElseGet(() -> messages.resolve(ctx.viewer(), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
+    }
+
+    private KitCategory subject(MenuContext ctx) {
+        return ctx.subject(KitCategory.class);
+    }
+
+    private KitCategory subject(MenuActionContext ctx) {
+        return ctx.subject(KitCategory.class);
+    }
+
+    private static List<String> splitLines(String input) {
+        return input.equalsIgnoreCase("none") ? List.of() : Arrays.asList(input.split("\\|"));
+    }
+
+    /**
+     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
+     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting kits wiring.
+     * Resolution mirrors {@code GuiLayouts}: disk first, then the classpath default.
+     */
+    private MenuSpec loadSpec(Path dataFolder, Logger log) {
+        MenuSpecLoader specLoader = new MenuSpecLoader();
+        Path onDisk = dataFolder.resolve(SPEC_RESOURCE);
+        if (Files.isRegularFile(onDisk)) {
+            try {
+                return specLoader.load(onDisk);
+            } catch (MenuSpecException malformed) {
+                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
+            }
+        }
+        return loadBundledSpec(specLoader, log);
+    }
+
+    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(SPEC_RESOURCE)) {
+            if (in == null) {
+                log.warn("bundled menu spec {} is missing from the jar", SPEC_RESOURCE);
+                return emptySpec();
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
+            }
+        } catch (IOException | MenuSpecException failure) {
+            log.error("could not read bundled menu spec " + SPEC_RESOURCE, failure);
+            return emptySpec();
+        }
+    }
+
+    /** A minimal valid spec used only when the real one cannot be read, so kits still wires cleanly. */
+    private static MenuSpec emptySpec() {
+        return new MenuSpec("", ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 }

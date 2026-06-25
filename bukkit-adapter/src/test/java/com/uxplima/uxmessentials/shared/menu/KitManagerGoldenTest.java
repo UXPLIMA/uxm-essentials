@@ -37,10 +37,12 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -130,15 +132,11 @@ class KitManagerGoldenTest {
     void leftClickingTheCategoriesButtonThroughTheEngineOpensTheCategoryManager() {
         seed("alpha");
         openEngine();
-        // Slot 51 is the manage-categories button; a left click must open the bespoke category manager.
+        // Slot 51 is the manage-categories button; a left click must open the engine-rendered category manager, now a
+        // holder-backed menu list rather than the old bespoke window.
         fireClick(51, ClickType.LEFT);
 
-        assertThat(player.getOpenInventory()
-                        .getTopInventory()
-                        .getHolder()
-                        .getClass()
-                        .getSimpleName())
-                .isEqualTo("KitCategoryManagerHolder");
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     /**
@@ -194,8 +192,15 @@ class KitManagerGoldenTest {
                 22,
                 List.of(0, 2, 4, 6, 8, 10, 12, 14, 16, 22, 18, 20, 24));
         KitSettingsView settingsView = new KitSettingsView(messages, scheduler, settingsLayout);
-        KitCategoryManagerView categoryManager =
-                new KitCategoryManagerView(messages, new StubCategoryRepository(), scheduler);
+        // The category manager renders through the engine now; the categories-button test only opens it (an empty
+        // grid), so the input seam it would prompt through is a stand-in and the click/back collaborators stay unbound.
+        KitCategoryManagerView categoryManager = new KitCategoryManagerView(
+                guiText,
+                messages,
+                new StubCategoryRepository(),
+                org.mockito.Mockito.mock(TextInput.class),
+                menus,
+                scheduler);
         return new KitManagerMenu(menus, scheduler, repository, messages, settingsView, categoryManager, (p, v) -> {});
     }
 

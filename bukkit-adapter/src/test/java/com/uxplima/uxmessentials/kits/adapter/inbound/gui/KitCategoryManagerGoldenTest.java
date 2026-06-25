@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.menu;
+package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
@@ -24,8 +25,6 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
@@ -38,6 +37,8 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,27 +48,26 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The parent-category selector golden test: the engine-rendered selector must draw the exact grid the original
- * bespoke {@code KitCategoryParentSelectorView} drew on its own {@code Bukkit.createInventory}. The fixture edits the
- * "child" category over a three-category set, so the candidate list is the two others (a {@code DIAMOND}-iconed "pvp"
- * and a default-BOOK "misc"), drawn at content slots 0 and 1, with the "No Parent" BARRIER at slot 49 and the back
- * ARROW at slot 53. The window is snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for
- * slot, to the analytic baseline the old view produced — candidate icons, the two fixed buttons, and the engine's
- * mandatory nav arrows at 45/46 — and the category being edited never appears (the cyclic-parent guard). Then a left
- * click on the first candidate through the engine's own
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener} proves the migrated path runs
- * the same assign the old click did — the edited category saved with that parent id — and returns the viewer to its
- * settings window, faithful in both appearance and behaviour.
+ * The kit-category manager golden test: the engine-rendered manager must draw the exact grid the original bespoke
+ * {@code KitCategoryManagerView} drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
+ * {@code DIAMOND}-iconed "pvp" and a default-BOOK "misc") over the six-row layout (content slots 0..44, gray-glass
+ * filler), so page 0 places one icon per category at content slots 0 and 1, the EMERALD_BLOCK "Create New Category"
+ * button at slot 49, and the back ARROW at slot 53. The window is snapshotted as {@code (slot -> material, plain name)}
+ * and asserted equal, slot for slot, to the analytic baseline the old view produced — category icons, the two fixed
+ * buttons, and the engine's mandatory nav arrows at 45/46.
+ *
+ * <p>Then, through the engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener},
+ * a left click on the first category opens that category's settings panel (now a holder-backed engine menu), the back
+ * button invokes the manager's back seam, and the create button's recorded create seam saves a new category and opens
+ * its settings — proving the migrated path runs what the old click did, in both appearance and behaviour.
  */
-class KitCategoryParentSelectorGoldenTest {
+class KitCategoryManagerGoldenTest {
 
     private static final int PREV_SLOT = 45;
     private static final int NEXT_SLOT = 46;
-    private static final int NONE_SLOT = 49;
+    private static final int CREATE_SLOT = 49;
     private static final int BACK_SLOT = 53;
 
-    private static final KitCategory CHILD =
-            new KitCategory("child", "<aqua>Child</aqua>", Optional.empty(), List.of(), 0, Optional.empty());
     private static final KitCategory PVP =
             new KitCategory("pvp", "<red>PvP</red>", Optional.of("DIAMOND"), List.of(), 0, Optional.empty());
     private static final KitCategory MISC =
@@ -81,7 +81,8 @@ class KitCategoryParentSelectorGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingCategories categories;
-    private KitCategoryParentSelectorView selector;
+    private KitCategoryManagerView manager;
+    private AtomicReference<PlayerRef> backTarget;
 
     @TempDir
     Path dataFolder;
@@ -96,18 +97,17 @@ class KitCategoryParentSelectorGoldenTest {
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
-        categories = new RecordingCategories(List.of(CHILD, PVP, MISC));
-        // The settings panel the selector reopens after a pick now renders through the engine, so it registers its
-        // spec on the same engine; a pick must land the viewer back on that holder-backed panel.
+        categories = new RecordingCategories(List.of(PVP, MISC));
+        backTarget = new AtomicReference<>();
+        TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
+        manager = new KitCategoryManagerView(
+                guiText, new KeyMessages(), categories, textInput, engine.menus(), scheduler);
+        // The settings panel a category click opens renders through the same engine, so it registers its spec here; a
+        // category click must land the viewer on that holder-backed panel.
         KitCategorySettingsView settingsView = new KitCategorySettingsView(
-                engine.menus(),
-                guiText,
-                new KeyMessages(),
-                org.mockito.Mockito.mock(TextInput.class),
-                categories,
-                (p, v) -> {});
+                engine.menus(), guiText, new KeyMessages(), textInput, categories, (p, v) -> manager.open(p, v));
         settingsView.register(engine.bindings(), dataFolder, NOOP);
-        selector = new KitCategoryParentSelectorView(guiText, categories, settingsView, engine.menus(), scheduler);
+        manager.bind(settingsView, (p, v) -> backTarget.set(v));
     }
 
     @AfterEach
@@ -116,8 +116,8 @@ class KitCategoryParentSelectorGoldenTest {
     }
 
     @Test
-    void engineRendersTheSameCandidateGridButtonsAndFillerAsTheOldView() {
-        selector.open(player, viewer, CHILD);
+    void engineRendersTheSameCategoryGridButtonsAndFillerAsTheOldView() {
+        manager.open(player, viewer);
 
         Map<Integer, Snapshot> baseline = oldViewBaseline();
         Map<Integer, Snapshot> rendered = snapshot(player.getOpenInventory().getTopInventory());
@@ -127,60 +127,61 @@ class KitCategoryParentSelectorGoldenTest {
     }
 
     @Test
-    void theEditedCategoryIsNeverAParentCandidate() {
-        selector.open(player, viewer, CHILD);
-        Map<Integer, Snapshot> rendered = snapshot(player.getOpenInventory().getTopInventory());
-
-        // "Child" is the category being edited, so it must not appear in the grid (the cyclic-parent guard).
-        assertThat(rendered.values()).noneMatch(s -> s.name().equals("Child"));
-    }
-
-    @Test
     void theEngineWindowIsMenuBacked() {
-        selector.open(player, viewer, CHILD);
+        manager.open(player, viewer);
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
-    void clickingACandidateSetsItAsParentAndReturnsToSettings() {
-        selector.open(player, viewer, CHILD);
+    void clickingACategoryOpensItsSettingsPanel() {
+        manager.open(player, viewer);
 
-        fireClick(0); // content slot 0 holds the first candidate, "pvp"
+        fireClick(0); // content slot 0 holds "pvp"
 
-        assertThat(categories.lastSaved()).isNotNull();
-        assertThat(categories.lastSaved().id()).isEqualTo("child");
-        assertThat(categories.lastSaved().parentCategoryId()).contains("pvp");
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
+        // The settings panel's back-button material (ARROW at slot 26 of the three-row panel) confirms it is the panel,
+        // not the six-row manager grid (whose back arrow sits at slot 53).
+        Inventory open = player.getOpenInventory().getTopInventory();
+        assertThat(open.getSize()).isEqualTo(27);
     }
 
     @Test
-    void clickingNoParentClearsTheParentAndReturnsToSettings() {
-        selector.open(player, viewer, CHILD);
-
-        fireClick(NONE_SLOT);
-
-        assertThat(categories.lastSaved()).isNotNull();
-        assertThat(categories.lastSaved().id()).isEqualTo("child");
-        assertThat(categories.lastSaved().parentCategoryId()).isEmpty();
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
-    }
-
-    @Test
-    void clickingBackReturnsToSettingsWithoutSaving() {
-        selector.open(player, viewer, CHILD);
+    void clickingBackInvokesTheManagersBackSeam() {
+        manager.open(player, viewer);
 
         fireClick(BACK_SLOT);
 
-        assertThat(categories.lastSaved()).isNull();
+        assertThat(backTarget.get()).isEqualTo(viewer);
+    }
+
+    @Test
+    void theCreateSeamSavesANewCategoryAndOpensItsSettings() {
+        manager.open(player, viewer);
+
+        manager.create(player, viewer, "events");
+
+        assertThat(categories.lastSaved())
+                .hasValueSatisfying(saved -> assertThat(saved.id()).isEqualTo("events"));
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(player.getOpenInventory().getTopInventory().getSize()).isEqualTo(27);
+    }
+
+    @Test
+    void theCreateSeamRejectsAnIdWithASpaceWithoutSaving() {
+        manager.open(player, viewer);
+
+        manager.create(player, viewer, "two words");
+
+        assertThat(categories.lastSaved()).isEmpty();
     }
 
     /**
-     * The slot -> (material, plain name) map the bespoke {@code KitCategoryParentSelectorView} produced for this
-     * fixture: a DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback),
-     * the "No Parent" BARRIER at slot 49 and the back ARROW at slot 53, each named through the catalog key the test's
-     * {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46. The category being
-     * edited is excluded by the cyclic-parent guard, and the gray-glass filler slots are dropped from the snapshot.
+     * The slot -> (material, plain name) map the bespoke {@code KitCategoryManagerView} produced for this fixture: a
+     * DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback), the
+     * EMERALD_BLOCK "Create New Category" button at slot 49 and the back ARROW at slot 53, each named through the
+     * catalog key the test's {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46.
+     * The gray-glass filler slots are dropped from the snapshot, so a wrong material, name, or misplaced icon shows up
+     * as a mismatch.
      */
     private static Map<Integer, Snapshot> oldViewBaseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
@@ -189,7 +190,8 @@ class KitCategoryParentSelectorGoldenTest {
         baseline.put(PREV_SLOT, new Snapshot(Material.ARROW, KitsMessageKey.KIT_MENU_PREV.key()));
         baseline.put(NEXT_SLOT, new Snapshot(Material.ARROW, KitsMessageKey.KIT_MENU_NEXT.key()));
         baseline.put(
-                NONE_SLOT, new Snapshot(Material.BARRIER, KitsMessageKey.KIT_EDITOR_CATEGORY_SELECTOR_NONE_NAME.key()));
+                CREATE_SLOT,
+                new Snapshot(Material.EMERALD_BLOCK, KitsMessageKey.KIT_EDITOR_CATEGORY_CREATE_BUTTON_NAME.key()));
         baseline.put(BACK_SLOT, new Snapshot(Material.ARROW, KitsMessageKey.KIT_EDITOR_SETTINGS_BACK_BUTTON.key()));
         return baseline;
     }
@@ -222,17 +224,18 @@ class KitCategoryParentSelectorGoldenTest {
     /** What one rendered slot looks like for comparison: its material and the plain-text of its display name. */
     private record Snapshot(Material material, String name) {}
 
-    /** A category repository over a fixed list that records the category the selector's assign saves back. */
+    /** A category repository over a fixed, mutable list that records the category the create/save path stores. */
     private static final class RecordingCategories implements KitCategoryRepository {
         private final List<KitCategory> categories;
-        private KitCategory saved;
+        private @Nullable KitCategory saved;
 
         RecordingCategories(List<KitCategory> categories) {
             this.categories = new ArrayList<>(categories);
         }
 
-        KitCategory lastSaved() {
-            return saved;
+        /** The last category {@link #save} stored, or empty if none was saved — read by the create-seam assertions. */
+        Optional<KitCategory> lastSaved() {
+            return Optional.ofNullable(saved);
         }
 
         @Override
@@ -248,10 +251,14 @@ class KitCategoryParentSelectorGoldenTest {
         @Override
         public void save(KitCategory category) {
             this.saved = category;
+            categories.removeIf(c -> c.id().equals(category.id()));
+            categories.add(category);
         }
 
         @Override
-        public void delete(String id) {}
+        public void delete(String id) {
+            categories.removeIf(c -> c.id().equals(id));
+        }
     }
 
     private static final class KeyMessages implements Messages {
