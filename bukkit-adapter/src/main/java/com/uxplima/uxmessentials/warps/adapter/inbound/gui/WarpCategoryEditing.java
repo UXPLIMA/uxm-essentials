@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.bukkit.Material;
@@ -36,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WarpCategoryEditing {
 
-    private final WarpManagerView managerView;
+    private final BiConsumer<Player, PlayerRef> reopenManager;
     private final WarpCategoryManagerView categoryManagerView;
     private final WarpCategorySettingsView categorySettingsView;
     private final WarpCategoryParentSelectorView parentSelectorView;
@@ -46,8 +47,12 @@ public final class WarpCategoryEditing {
     private final TextInput textInput;
     private final Messages messages;
 
+    /**
+     * @param reopenManager reopens the engine-rendered warp manager — the surface the category manager's back button
+     *     returns to. The manager is wired after this collaborator, so it is bound as a seam rather than the view
+     */
     public WarpCategoryEditing(
-            WarpManagerView managerView,
+            BiConsumer<Player, PlayerRef> reopenManager,
             WarpCategoryManagerView categoryManagerView,
             WarpCategorySettingsView categorySettingsView,
             WarpCategoryParentSelectorView parentSelectorView,
@@ -56,7 +61,7 @@ public final class WarpCategoryEditing {
             WarpEditorView editorView,
             TextInput textInput,
             Messages messages) {
-        this.managerView = Objects.requireNonNull(managerView, "managerView");
+        this.reopenManager = Objects.requireNonNull(reopenManager, "reopenManager");
         this.categoryManagerView = Objects.requireNonNull(categoryManagerView, "categoryManagerView");
         this.categorySettingsView = Objects.requireNonNull(categorySettingsView, "categorySettingsView");
         this.parentSelectorView = Objects.requireNonNull(parentSelectorView, "parentSelectorView");
@@ -67,15 +72,10 @@ public final class WarpCategoryEditing {
         this.messages = Objects.requireNonNull(messages, "messages");
     }
 
-    /** Open the category manager — the entry point the warp manager's categories button drives. */
-    void openCategoryManager(Player player, PlayerRef viewer) {
-        categoryManagerView.open(player, viewer);
-    }
-
     void onCategoryManagerClick(Player player, WarpCategoryManagerHolder holder, int slot) {
         PlayerRef viewer = holder.viewer();
         if (slot == 53) {
-            managerView.open(player, viewer);
+            reopenManager.accept(player, viewer);
         } else if (slot == 49) {
             promptCreateCategory(player, viewer);
         } else {

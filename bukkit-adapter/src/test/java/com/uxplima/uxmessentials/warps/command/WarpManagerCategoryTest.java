@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -16,20 +15,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -52,12 +48,10 @@ import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorV
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView;
-import com.uxplima.uxmessentials.warps.application.SetWarp;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpAccess;
 import com.uxplima.uxmessentials.warps.application.WarpNotifier;
@@ -76,33 +70,27 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage that the warp manager's "create new warp" button and the warp-category administration GUIs
- * drive the real use cases through {@link WarpEditorListener} and {@link WarpCategoryEditing}. It proves:
+ * MockBukkit coverage that the warp-category administration GUIs drive the real use cases through
+ * {@link WarpEditorListener} and {@link WarpCategoryEditing}. It proves:
  *
  * <ul>
- *   <li>clicking the manager's create button arms a name prompt, and the typed name creates a warp at the
- *       operator's position through the same {@link SetWarp} path {@code /warp create} uses, then opens that
- *       warp's editor;
  *   <li>the category manager's create button creates a category from the typed id;
  *   <li>a category-settings click that edits the display name saves the renamed category;
  *   <li>a category-settings delete click removes the category.
  * </ul>
  *
- * The {@code warp.create-name} and {@code warp.category.create-name}/{@code warp.category.display-name} input
- * points are configured as chat here so the typed line round-trips through the shared {@link TextInput} chat
+ * The warp manager itself now renders through the menu engine; its create-button and slot-for-slot appearance are
+ * covered by {@code WarpManagerGoldenTest}. The {@code warp.category.create-name}/{@code warp.category.display-name}
+ * input points are configured as chat here so the typed line round-trips through the shared {@link TextInput} chat
  * backend.
  */
 class WarpManagerCategoryTest {
-
-    private static final GuiLayout MANAGER_LAYOUT =
-            GuiLayout.paginatedDefault(Material.ENDER_PEARL); // 6 rows, prev=45, next=53
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
     private RecordingRepository repository;
     private StubWarpCategoryRepository categories;
-    private WarpManagerView managerView;
     private WarpCategoryManagerView categoryManagerView;
     private WarpCategorySettingsView categorySettingsView;
 
@@ -145,16 +133,16 @@ class WarpManagerCategoryTest {
 
         WarpEditorView editorView = new WarpEditorView(
                 messages, scheduler, repository, WarpEditorLayout.defaultLayout(), new PlayerWarpRepositoryHandle());
-        managerView = new WarpManagerView(messages, repository, scheduler, MANAGER_LAYOUT);
         categoryManagerView = new WarpCategoryManagerView(messages, categories, scheduler);
         categorySettingsView = new WarpCategorySettingsView(messages, scheduler);
         var parentSelectorView = new WarpCategoryParentSelectorView(messages, categories, scheduler);
         var categorySelectorView = new WarpCategorySelectorView(messages, categories, scheduler);
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         UseWarp useWarp = new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions);
-        SetWarp setWarp = new SetWarp(repository, notifier, event -> {}, Clock.systemUTC(), List.of());
+        // The category manager's back button reopens the warp manager; these tests do not exercise it, so the seam
+        // is a no-op here.
         WarpCategoryEditing categoryEditing = new WarpCategoryEditing(
-                managerView,
+                (p, v) -> {},
                 categoryManagerView,
                 categorySettingsView,
                 parentSelectorView,
@@ -185,10 +173,8 @@ class WarpManagerCategoryTest {
                         messages, scheduler, repository, editorView, WarpWelcomeMessagesView.defaultLayout()),
                 useWarp,
                 new PlayerWarpGoToHandle(),
-                managerView,
                 categorySelectorView,
                 categoryEditing,
-                setWarp,
                 soundMenu);
         server.getPluginManager().registerEvents(listener, plugin);
     }
@@ -196,47 +182,6 @@ class WarpManagerCategoryTest {
     @AfterEach
     void tearDown() {
         MockBukkit.unmock();
-    }
-
-    @Test
-    void managerCreateButtonCreatesAWarpAtTheOperatorPositionAndOpensItsEditor() {
-        managerView.open(player, ref());
-        assertThat(player.getOpenInventory()
-                        .getTopInventory()
-                        .getHolder()
-                        .getClass()
-                        .getSimpleName())
-                .isEqualTo("WarpManagerHolder");
-
-        fireClick(MANAGER_LAYOUT.prevSlot()); // the create-new-warp button
-        // The create button closed the manager to arm the name prompt — no inventory is open meanwhile.
-        assertThat(player.getOpenInventory().getType()).isEqualTo(InventoryType.CRAFTING);
-
-        fireChat("market");
-
-        assertThat(repository.exists(WarpName.of("market")))
-                .as("the typed name created a warp through the SetWarp create path")
-                .isTrue();
-        assertThat(player.getOpenInventory()
-                        .getTopInventory()
-                        .getHolder()
-                        .getClass()
-                        .getSimpleName())
-                .as("the new warp's editor opens after creation")
-                .isEqualTo("WarpEditorHolder");
-    }
-
-    @Test
-    void managerBackgroundFillerIsAPaneNotTheWarpFallbackIcon() {
-        // MANAGER_LAYOUT's fallback icon is ENDER_PEARL — a server warp's default icon. The empty-slot filler must
-        // not reuse it, or the whole manager reads as a wall of ender pearls (the "GUI looks broken" report). Slot
-        // 53 is a corner that is never a warp (content is slots 0-44) nor a button (48/50/51), so it is pure filler.
-        managerView.open(player, ref());
-        ItemStack corner = player.getOpenInventory().getTopInventory().getItem(53);
-        assertThat(corner).isNotNull();
-        assertThat(corner.getType())
-                .as("the background filler is a neutral pane, not the ENDER_PEARL warp fallback icon")
-                .isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test

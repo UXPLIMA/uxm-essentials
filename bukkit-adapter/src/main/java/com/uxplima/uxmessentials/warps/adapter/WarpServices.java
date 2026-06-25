@@ -5,7 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
@@ -48,7 +48,7 @@ public record WarpServices(
         PlayerLookup players,
         WarpRepository repository,
         @org.jspecify.annotations.Nullable WarpEditorView editorView,
-        @org.jspecify.annotations.Nullable WarpManagerView managerView,
+        @org.jspecify.annotations.Nullable WarpManagerMenu managerView,
         Scheduler scheduler) {
 
     public WarpServices {

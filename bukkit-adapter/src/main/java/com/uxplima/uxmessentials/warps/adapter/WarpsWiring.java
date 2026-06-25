@@ -163,16 +163,31 @@ public final class WarpsWiring {
         var categoryParentSelectorView =
                 new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView(
                         kernel.messages(), categoryRepository, kernel.scheduler());
-        var managerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView(
-                kernel.messages(), repository, kernel.scheduler(), menuLayout);
         SetWarp setWarp = new SetWarp(
                 repository,
                 notifier,
                 kernel.events(),
                 Clock.systemUTC(),
                 ctx.config().getStringList("world-blacklist", List.of()));
+        // The admin warp manager renders through the always-on menu engine. The create flow that opens a fresh warp's
+        // editor is pulled out so the engine-rendered manager can drive it. A one-element holder breaks the cycle: the
+        // manager's create button reopens the manager on cancel, and the category manager's back button reopens it,
+        // but both are wired before the manager exists.
+        var createPrompt = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCreatePrompt(
+                kernel.messages(), textInput, setWarp, editorView);
+        var managerHolder = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu[1];
+        var managerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu(
+                menus,
+                kernel.scheduler(),
+                repository,
+                kernel.messages(),
+                editorView,
+                categoryManagerView,
+                createPrompt.boundTo((player, viewer) -> managerHolder[0].open(player, viewer)));
+        managerHolder[0] = managerView;
+        managerView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categoryEditing = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryEditing(
-                managerView,
+                (player, viewer) -> managerView.open(player, viewer),
                 categoryManagerView,
                 categorySettingsView,
                 categoryParentSelectorView,
@@ -191,10 +206,8 @@ public final class WarpsWiring {
                 welcomeMessagesView,
                 useWarp,
                 playerWarpGoTo,
-                managerView,
                 categorySelectorView,
                 categoryEditing,
-                setWarp,
                 soundMenu);
 
         WarpServices services = assemble(
@@ -227,7 +240,7 @@ public final class WarpsWiring {
             com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx,
             UseWarp useWarp,
             com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository categoryRepository,
-            com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView managerView) {
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu managerView) {
         Clock clock = Clock.systemUTC();
         WarpMenuView warpMenu =
                 new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp, menuLayout, categoryRepository);
