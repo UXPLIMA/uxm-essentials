@@ -19,13 +19,17 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -51,17 +55,35 @@ public final class MenuListener implements Listener {
     private final Scheduler scheduler;
     private final Plugin plugin;
 
+    /**
+     * The editor renderer, present only on an engine wired for typed property editors. It is what a property's
+     * reopen hook repaints the editor through; a spec-only engine leaves it null and never opens an editor, so the
+     * editor branch is never reached.
+     */
+    @Nullable private final EditorRenderer editorRenderer;
+
     public MenuListener(
             MenuRenderer renderer,
             ActionRegistry actions,
             ConditionRegistry conditions,
             Scheduler scheduler,
             Plugin plugin) {
+        this(renderer, actions, conditions, scheduler, plugin, null);
+    }
+
+    public MenuListener(
+            MenuRenderer renderer,
+            ActionRegistry actions,
+            ConditionRegistry conditions,
+            Scheduler scheduler,
+            Plugin plugin,
+            @Nullable EditorRenderer editorRenderer) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.editorRenderer = editorRenderer;
     }
 
     /** Registers this listener with the server. Called once when the menu engine starts. */
@@ -84,7 +106,55 @@ public final class MenuListener implements Listener {
             return;
         }
         int slot = event.getRawSlot();
+        EditorState editor = holder.editor().orElse(null);
+        if (editor != null) {
+            handleEditorClick(holder, editor, slot, event.isRightClick(), event.isShiftClick());
+            return;
+        }
         holder.clickAt(slot).ifPresent(rs -> handleClick(holder, rs, event.getClick()));
+    }
+
+    /**
+     * Route a click in an editor window: a property slot runs that property's {@link EditableProperty#onClick} with a
+     * freshly built {@link ClickContext}, a plain button (back, delete) runs its recorded action. Both hop to the
+     * viewer's entity thread first — the same hop a spec action takes — and re-resolve the live player there, so a
+     * viewer who logged off in the gap is simply skipped and Bukkit is only ever touched on the owning thread. The
+     * context's reopen hook repaints this editor in place, so the property's own setter-then-reopen loop redraws the
+     * window the viewer is already looking at.
+     */
+    private void handleEditorClick(
+            MenuHolder holder, EditorState editor, int slot, boolean rightClick, boolean shiftClick) {
+        EditableProperty property = editor.propertyAt(slot).orElse(null);
+        if (property != null) {
+            runProperty(holder, property, rightClick, shiftClick);
+            return;
+        }
+        editor.buttonAt(slot)
+                .ifPresent(action -> scheduler.onEntity(holder.ctx().viewer(), () -> {
+                    if (Bukkit.getPlayer(holder.ctx().viewer().uuid()) != null) {
+                        action.run();
+                    }
+                }));
+    }
+
+    /** Hop to the viewer's entity thread, re-resolve the live player, and run one property's click there. */
+    private void runProperty(MenuHolder holder, EditableProperty property, boolean rightClick, boolean shiftClick) {
+        PlayerRef viewer = holder.ctx().viewer();
+        scheduler.onEntity(viewer, () -> {
+            Player live = Bukkit.getPlayer(viewer.uuid());
+            if (live == null) {
+                return;
+            }
+            Runnable reopen = () -> reRenderEditor(holder);
+            property.onClick(new ClickContext(live, viewer, rightClick, shiftClick, reopen));
+        });
+    }
+
+    /** Repaint {@code holder}'s editor in place; a no-op when the engine was wired without editor support. */
+    private void reRenderEditor(MenuHolder holder) {
+        if (editorRenderer != null) {
+            EditorRefresh.reRender(holder, editorRenderer, scheduler);
+        }
     }
 
     private void handleClick(MenuHolder holder, RenderedSlot rs, ClickType click) {

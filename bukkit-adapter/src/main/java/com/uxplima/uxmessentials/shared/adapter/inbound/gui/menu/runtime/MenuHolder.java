@@ -41,6 +41,13 @@ public final class MenuHolder implements InventoryHolder {
 
     @Nullable private Inventory inventory;
 
+    /**
+     * Set only on the editor path: the editor's per-open property/subject state and its slot routing. A spec menu
+     * leaves this null and routes clicks through {@link #clickMap}; an editor sets it and routes through it instead,
+     * so the one listener tells the two apart by its presence.
+     */
+    @Nullable private EditorState editor;
+
     public MenuHolder(String specId, MenuSpec spec, MenuContext ctx) {
         this.specId = Objects.requireNonNull(specId, "specId");
         this.spec = Objects.requireNonNull(spec, "spec");
@@ -100,6 +107,16 @@ public final class MenuHolder implements InventoryHolder {
 
     public Optional<RenderedSlot> clickAt(int slot) {
         return Optional.ofNullable(clickMap.get(slot));
+    }
+
+    /** Attaches the editor state for an editor-path open; a spec menu never calls this and leaves it null. */
+    public void attachEditor(EditorState editor) {
+        this.editor = Objects.requireNonNull(editor, "editor");
+    }
+
+    /** The editor state if this holder backs an editor, or empty for a spec menu. */
+    public Optional<EditorState> editor() {
+        return Optional.ofNullable(editor);
     }
 
     public void setRefreshHandle(Cancellable handle) {
