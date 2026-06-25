@@ -123,6 +123,9 @@ class ShippedSpecBindingsDriftTest {
             "economy:bulk-resetall",
             "economy:bulk-select-currency",
             "economy:bulk-back",
+            "economy:admin-manage",
+            "economy:admin-bulk",
+            "economy:admin-history",
             "economy:exchange-source",
             "economy:exchange-target",
             "economy:exchange-convert");

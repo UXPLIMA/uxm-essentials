@@ -129,6 +129,7 @@ final class DefaultResources {
             "modules/menu/specs/economy-target.conf",
             "modules/menu/specs/economy-bulk.conf",
             "modules/menu/specs/economy-exchange.conf",
+            "modules/menu/specs/economy-admin.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

@@ -353,8 +353,9 @@ class EconomyAdminGuiTest {
     void theHubOpensTheManageScreenWhenAPlayerIsPicked() {
         Screens screens = wire(singleCoins());
         PlayerLookup players = mock(PlayerLookup.class);
-        EconomyAdminView hub = new EconomyAdminView(
-                guiText, scheduler, picker, players, screens.target(), screens.bulk(), historyView);
+        EconomyAdminMenu hub =
+                new EconomyAdminMenu(menus, scheduler, picker, players, screens.target(), screens.bulk(), historyView);
+        hub.register(bindings, specDir(), NOOP);
 
         hub.open(admin, adminRef);
         fireClick(MANAGE_SLOT); // [Manage a player] -> player picker

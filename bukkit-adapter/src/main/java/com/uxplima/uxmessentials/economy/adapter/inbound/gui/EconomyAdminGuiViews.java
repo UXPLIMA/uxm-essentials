@@ -20,26 +20,27 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Assembles the eco-admin GUI stack the bare {@code /eco} opens: the {@link EconomyAdminView hub}, the
+ * Assembles the eco-admin GUI stack the bare {@code /eco} opens: the {@link EconomyAdminMenu hub}, the
  * per-player {@link EconomyTargetMenu manage screen}, and the server-wide {@link EconomyBulkMenu bulk screen}.
  * The hub holds the other two so its [Manage a player] and [Server-wide] entries open them through the menu engine,
  * and each child carries a back-callback into the hub. One instance is built per module start by
  * {@code EconomyWiring}; the command's {@code guiRoot()} delegates here.
  *
- * <p>The hub remains a bespoke view that opens the two engine-rendered children — a transitional cross-runtime
- * seam: the hub's entry buttons call each child menu's {@code open}, which routes through the {@link Menus} façade.
+ * <p>The hub is now an engine-rendered menu too; only its [Manage a player] entry opens the still-bespoke shared
+ * {@link PlayerPickerView} — a transitional cross-runtime seam — before routing the picked target back through the
+ * engine manage screen. The bulk and history entries route straight through the {@link Menus} façade.
  */
 @NullMarked
 public final class EconomyAdminGuiViews {
 
-    private final EconomyAdminView hub;
+    private final EconomyAdminMenu hub;
 
-    private EconomyAdminGuiViews(EconomyAdminView hub) {
+    private EconomyAdminGuiViews(EconomyAdminMenu hub) {
         this.hub = Objects.requireNonNull(hub, "hub");
     }
 
     /** The hub the bare {@code /eco} opens. */
-    public EconomyAdminView hub() {
+    public EconomyAdminMenu hub() {
         return hub;
     }
 
@@ -65,7 +66,7 @@ public final class EconomyAdminGuiViews {
         CurrencyPickerView currencyPicker = new CurrencyPickerView(menus, guiText, scheduler);
         // Both child screens return to the hub; the hub is constructed last, so the back-callbacks read it
         // through a one-slot holder rather than a setter, keeping every cross-link constructor-injected.
-        EconomyAdminView[] hubHolder = new EconomyAdminView[1];
+        EconomyAdminMenu[] hubHolder = new EconomyAdminMenu[1];
         EconomyTargetMenu targetMenu = new EconomyTargetMenu(
                 menus,
                 guiText,
@@ -92,8 +93,9 @@ public final class EconomyAdminGuiViews {
                 currencyPicker,
                 (player, viewer) -> hubHolder[0].open(player, viewer));
         bulkMenu.register(menuBindings, dataFolder, log);
-        EconomyAdminView hub =
-                new EconomyAdminView(guiText, scheduler, picker, players, targetMenu, bulkMenu, historyView);
+        EconomyAdminMenu hub =
+                new EconomyAdminMenu(menus, scheduler, picker, players, targetMenu, bulkMenu, historyView);
+        hub.register(menuBindings, dataFolder, log);
         hubHolder[0] = hub;
         return new EconomyAdminGuiViews(hub);
     }
