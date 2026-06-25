@@ -22,6 +22,8 @@ import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
 import com.uxplima.uxmessentials.persistence.vote.VoteRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VoteSync;
@@ -122,12 +124,18 @@ public final class VoteWiring {
      * the bus disabled both seams are no-ops, so the single-server path is unchanged.
      */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, Persistence persistence, InProcessDomainEventPublisher events, Bus bus) {
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            InProcessDomainEventPublisher events,
+            Bus bus,
+            Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
         VoteRepository repository = VoteSync.repository(cachedRepository, bus.publisher());
@@ -154,8 +162,9 @@ public final class VoteWiring {
                 kernel.scheduler(), kernel.messages(), broadcastVisibility, broadcastConfig.display());
 
         VoteSitesGuiView.GuiConfig guiCfg = loadGuiConfig(ctx.config());
-        VoteSitesGuiView sitesGuiView =
-                new VoteSitesGuiView(siteCatalog, repository, kernel.scheduler(), kernel.messages(), guiCfg);
+        GuiText guiText = new GuiText(kernel.messages());
+        VoteSitesGuiView sitesGuiView = new VoteSitesGuiView(
+                siteCatalog, repository, kernel.scheduler(), kernel.messages(), menus, guiText, guiCfg);
 
         VoteServices services = assemble(
                 kernel,

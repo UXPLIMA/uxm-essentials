@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,6 +16,9 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -25,22 +29,22 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.SiteCooldown;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteSpec;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
-import com.uxplima.uxmlib.gui.item.ItemPopulator;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Paginated GUI listing every configured vote site with its current cooldown state. One icon per
- * site: green ({@code votable-material}) when the player can vote now, amber ({@code cooldown-material})
- * when the cooldown has not yet elapsed. Clicking a votable site with a URL sends the player an
- * Adventure {@link ClickEvent#openUrl} chat component so their client can open the link; clicking a
- * site with no URL is a no-op.
+ * Paginated GUI listing every configured vote site with its current cooldown state. One icon per site: green
+ * ({@code votable-material}) when the player can vote now, amber ({@code cooldown-material}) when the cooldown has
+ * not yet elapsed. Clicking a votable site with a URL sends the player an Adventure {@link ClickEvent#openUrl} chat
+ * component so their client can open the link; clicking a site with no URL (or one still on cooldown) is a no-op.
  *
- * <p>The view fetches cooldown data off the tick thread via {@link Scheduler#async}, then hops back to
- * the player's entity thread to build and open the inventory — the standard read-off-thread, render-on-entity
- * pattern the menu-engine list sources follow.
+ * <p>The view draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over a
+ * {@link ListSpec}, so the window is a holder-backed engine list routed and torn down by the one menu listener and
+ * one {@code closeMenu}, with paging re-paginating the same holder. The per-site cooldown read is a database hit, so
+ * {@link #open} resolves each site's votable/remaining state off the tick thread first and hands the engine the
+ * resolved {@link SiteEntry} snapshot; the imperative icon renderer then reads only that snapshot and shows the
+ * window on the viewer's entity thread — the same read-off-thread, render-on-entity pattern the other list views
+ * follow.
  */
 @NullMarked
 public final class VoteSitesGuiView {
@@ -69,7 +73,7 @@ public final class VoteSitesGuiView {
                 return fallback;
             }
             try {
-                Material m = Material.valueOf(name.strip().toUpperCase(java.util.Locale.ROOT));
+                Material m = Material.valueOf(name.strip().toUpperCase(Locale.ROOT));
                 return m == Material.AIR ? fallback : m;
             } catch (IllegalArgumentException ignored) {
                 return fallback;
@@ -86,6 +90,8 @@ public final class VoteSitesGuiView {
     private final VoteRepository repository;
     private final Scheduler scheduler;
     private final Messages messages;
+    private final Menus menus;
+    private final GuiText guiText;
     private final GuiConfig guiConfig;
 
     public VoteSitesGuiView(
@@ -93,11 +99,15 @@ public final class VoteSitesGuiView {
             VoteRepository repository,
             Scheduler scheduler,
             Messages messages,
+            Menus menus,
+            GuiText guiText,
             GuiConfig guiConfig) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.menus = Objects.requireNonNull(menus, "menus");
+        this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.guiConfig = Objects.requireNonNull(guiConfig, "guiConfig");
     }
 
@@ -112,17 +122,16 @@ public final class VoteSitesGuiView {
     }
 
     /**
-     * Open the vote-sites GUI for {@code viewer}. Fetches per-site cooldown data asynchronously,
-     * then opens the inventory on the player's entity thread.
+     * Open the vote-sites GUI for {@code viewer}. Fetches per-site cooldown data asynchronously, then opens the
+     * engine list on the player's entity thread over the resolved snapshot.
      */
     public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         PlayerRef viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
         Instant now = Instant.now();
-
         scheduler.async(() -> {
             List<SiteEntry> entries = buildEntries(viewerRef, now);
-            scheduler.onEntity(viewerRef, () -> buildAndOpen(viewer, viewerRef, entries));
+            menus.openList(viewerRef, spec(viewerRef, entries));
         });
     }
 
@@ -140,44 +149,45 @@ public final class VoteSitesGuiView {
         return entries;
     }
 
-    private void buildAndOpen(Player viewer, PlayerRef viewerRef, List<SiteEntry> entries) {
-        int rows = Math.max(1, Math.min(6, computeRows(entries.size())));
-
-        Component title = text(viewerRef, VoteMessageKey.VOTE_GUI_TITLE, Map.of());
-
-        int contentSlotCount = rows * 9;
-        List<Integer> contentSlots = new ArrayList<>(contentSlotCount);
-        for (int i = 0; i < contentSlotCount; i++) {
-            contentSlots.add(i);
-        }
-
-        PaginatedGui gui = Guis.paginated()
-                .title(title)
+    /**
+     * Build the engine {@link ListSpec} for one viewer over the resolved site entries: one icon per site (votable
+     * green / cooldown amber, matching the config materials), and an {@code onSelect} that sends the clickable vote
+     * link for a votable site with a URL — a no-op otherwise. The window is sized just large enough for the entries
+     * (capped at the configured {@code rows} plus the reserved nav row); the content grid fills every row above the
+     * bottom one, and the previous/next arrows sit at the bottom-row corners, the same shape the other engine lists
+     * draw.
+     */
+    private ListSpec spec(PlayerRef viewerRef, List<SiteEntry> entries) {
+        int rows = windowRows(entries.size());
+        return ListSpec.builder()
+                .title(guiText.text(viewerRef, VoteMessageKey.VOTE_GUI_TITLE))
                 .rows(rows)
-                .contentSlots(contentSlots)
+                .contentSlots(contentSlots(rows))
+                .navigation(navPrevSlot(rows), navNextSlot(rows), Material.ARROW)
+                .navNames(
+                        guiText.text(viewerRef, VoteMessageKey.VOTE_GUI_PREV),
+                        guiText.text(viewerRef, VoteMessageKey.VOTE_GUI_NEXT))
+                .filler(Material.BLACK_STAINED_GLASS_PANE)
+                .entities(() -> List.<Object>copyOf(entries))
+                .iconRenderer((v, entity) -> buildSiteIcon(v, (SiteEntry) entity))
+                .onSelect((player, entity) -> handleClick(player, (SiteEntry) entity))
                 .build();
-
-        gui.populate(
-                entries,
-                ItemPopulator.of(
-                        entry -> buildSiteIcon(viewerRef, entry),
-                        (entry, event) -> handleClick(viewer, viewerRef, entry, gui)));
-
-        gui.open(viewer);
     }
 
-    private void handleClick(Player viewer, PlayerRef viewerRef, SiteEntry entry, PaginatedGui gui) {
+    /** Send the clickable vote link for a votable site with a URL; a no-op for a URL-less or cooled-down site. */
+    private void handleClick(Player player, SiteEntry entry) {
+        if (!entry.votable()) {
+            return;
+        }
         Optional<String> url = entry.spec().url();
         if (url.isEmpty()) {
             return;
         }
-        // Close the GUI, then send the clickable URL link.
-        scheduler.onEntity(viewerRef, () -> {
-            gui.close(viewer);
-            Component link = text(viewerRef, VoteMessageKey.VOTE_GUI_CLICK, Map.of("url", url.get()))
-                    .clickEvent(ClickEvent.openUrl(url.get()));
-            viewer.sendMessage(link);
-        });
+        PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
+        Component link = text(viewerRef, VoteMessageKey.VOTE_GUI_CLICK, Map.of("url", url.get()))
+                .clickEvent(ClickEvent.openUrl(url.get()));
+        player.closeInventory();
+        player.sendMessage(link);
     }
 
     private ItemStack buildSiteIcon(PlayerRef viewer, SiteEntry entry) {
@@ -200,13 +210,35 @@ public final class VoteSitesGuiView {
                 .build();
     }
 
-    /** Determine a row count large enough for all entries, capped at {@link GuiConfig#rows()}. */
-    private int computeRows(int entryCount) {
-        if (entryCount == 0) {
-            return 1;
+    /**
+     * The window's total row count: enough content rows to hold all entries (capped at the configured {@code rows})
+     * plus the bottom row reserved for the nav arrows, clamped to a chest's 1..6. A single content row holds nine
+     * sites, so a typical handful of sites opens a compact two-row window.
+     */
+    private int windowRows(int entryCount) {
+        int contentRows = entryCount == 0 ? 1 : (entryCount + 8) / 9;
+        contentRows = Math.min(contentRows, guiConfig.rows());
+        return Math.min(6, contentRows + 1);
+    }
+
+    /** The content slots an icon may occupy: every row above the bottom one (which carries the nav arrows). */
+    private static List<Integer> contentSlots(int rows) {
+        int limit = (rows - 1) * 9;
+        List<Integer> slots = new ArrayList<>(limit);
+        for (int i = 0; i < limit; i++) {
+            slots.add(i);
         }
-        int needed = (entryCount + 8) / 9;
-        return Math.min(needed, guiConfig.rows());
+        return List.copyOf(slots);
+    }
+
+    /** The previous-page nav slot: the bottom-left corner of the window. */
+    private static int navPrevSlot(int rows) {
+        return (rows - 1) * 9;
+    }
+
+    /** The next-page nav slot: the bottom-right corner of the window. */
+    private static int navNextSlot(int rows) {
+        return rows * 9 - 1;
     }
 
     private Component text(PlayerRef viewer, VoteMessageKey key, Map<String, String> placeholders) {

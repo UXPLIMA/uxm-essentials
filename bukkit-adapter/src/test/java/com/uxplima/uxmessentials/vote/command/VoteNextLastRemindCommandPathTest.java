@@ -18,6 +18,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
@@ -279,7 +281,13 @@ class VoteNextLastRemindCommandPathTest {
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
         VoteSitesGuiView sitesGui = new VoteSitesGuiView(
-                catalog, repository, new SyncScheduler(), messages, VoteSitesGuiView.GuiConfig.defaults());
+                catalog,
+                repository,
+                new SyncScheduler(),
+                messages,
+                TestMenuEngine.create(messages, new SyncScheduler()).menus(),
+                new GuiText(messages),
+                VoteSitesGuiView.GuiConfig.defaults());
         VotePartyStatus partyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         ShowVoteStreak showVoteStreak = new ShowVoteStreak(repository, notifier);

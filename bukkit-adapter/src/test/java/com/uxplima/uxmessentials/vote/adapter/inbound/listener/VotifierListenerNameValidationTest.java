@@ -14,6 +14,7 @@ import java.util.UUID;
 
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -25,6 +26,7 @@ import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
@@ -168,6 +170,8 @@ class VotifierListenerNameValidationTest {
                 repository,
                 new SyncScheduler(),
                 messages,
+                TestMenuEngine.create(messages, new SyncScheduler()).menus(),
+                new GuiText(messages),
                 VoteSitesGuiView.GuiConfig.defaults());
         return new VoteServices(
                 handleVote,

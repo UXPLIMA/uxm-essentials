@@ -89,8 +89,10 @@ public enum VoteMessageKey implements MessageKey {
     VOTE_BROADCASTS_SHOWN("vote.broadcasts.shown"),
     VOTE_BROADCASTS_HIDDEN("vote.broadcasts.hidden"),
 
-    // /vote sites GUI — title, per-site status, and clickable URL prompt
+    // /vote sites GUI — title, page navigation, per-site status, and clickable URL prompt
     VOTE_GUI_TITLE("vote.gui.title"),
+    VOTE_GUI_PREV("vote.gui.prev"),
+    VOTE_GUI_NEXT("vote.gui.next"),
     VOTE_GUI_SITE_VOTABLE("vote.gui.site.votable"),
     VOTE_GUI_SITE_COOLDOWN("vote.gui.site.cooldown"),
     VOTE_GUI_CLICK("vote.gui.click");

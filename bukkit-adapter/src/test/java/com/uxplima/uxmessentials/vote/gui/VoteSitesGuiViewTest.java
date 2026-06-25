@@ -15,12 +15,21 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.Material;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -30,6 +39,7 @@ import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
@@ -73,8 +83,6 @@ import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,17 +92,19 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@link VoteSitesGuiView}: the view builds and opens without throwing for a
- * variety of site configurations, unknown/blank materials are tolerated, a site with no URL renders
- * silently, and the {@code /vote sites} command path routes to the view (or falls back to chat links
- * when the catalog is empty). The scheduler is a synchronous double so the async→entity hops run
- * inline.
+ * MockBukkit coverage of {@link VoteSitesGuiView} rendered through the menu engine: the window is a holder-backed
+ * engine list (a {@link MenuHolder} routed by the one menu listener), drawn slot-for-slot from the resolved site
+ * entries with the votable/cooldown materials the config supplies, and a click on a votable site sends that site's
+ * clickable vote link. Unknown/blank materials still fall back, a site with no URL or one on cooldown is a silent
+ * no-op, and the {@code /vote sites} command path routes to the view (or falls back to chat links when the catalog
+ * is empty). The scheduler is a synchronous double so the async→entity hops run inline.
  */
 class VoteSitesGuiViewTest {
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
+    private TestMenuEngine engine;
 
     @BeforeEach
     void setUp() {
@@ -102,12 +112,12 @@ class VoteSitesGuiViewTest {
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
         player.setOp(true);
-        Guis.install(plugin);
+        engine = TestMenuEngine.create(new FakeMessages(), new SyncScheduler());
+        engine.installListener(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -127,7 +137,61 @@ class VoteSitesGuiViewTest {
         VoteSitesGuiView view = view(catalog, repository, VoteSitesGuiView.GuiConfig.defaults());
 
         assertThatCode(() -> view.open(player)).doesNotThrowAnyException();
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
+        Inventory top = player.getOpenInventory().getTopInventory();
+        assertThat(top.getHolder()).isInstanceOf(MenuHolder.class);
+        // The first content slot is the votable site (green default PAPER), the second the cooled-down one (CLOCK).
+        assertThat(top.getItem(0).getType()).isEqualTo(Material.PAPER);
+        assertThat(top.getItem(1).getType()).isEqualTo(Material.CLOCK);
+    }
+
+    @Test
+    void openDrawsTheVotableAndCooldownMaterialsTheConfigSupplies() {
+        VoteSiteCatalog catalog = catalogOf(
+                new VoteSiteSpec("Votable", Optional.of("https://votable.example"), Duration.ofHours(24)),
+                new VoteSiteSpec("Cooling", Optional.of("https://cooling.example"), Duration.ofHours(24)));
+        FakeVoteRepository repository = new FakeVoteRepository();
+        repository.setLastVotedAtSite(
+                player.getUniqueId(), "Cooling", Instant.now().minus(Duration.ofHours(1)));
+        VoteSitesGuiView.GuiConfig cfg =
+                new VoteSitesGuiView.GuiConfig(true, 3, Material.EMERALD_BLOCK, Material.REDSTONE_BLOCK);
+
+        view(catalog, repository, cfg).open(player);
+
+        Inventory top = player.getOpenInventory().getTopInventory();
+        // Votable site renders with the configured votable material, the cooled-down one with the cooldown material.
+        assertThat(top.getItem(0).getType()).isEqualTo(Material.EMERALD_BLOCK);
+        assertThat(top.getItem(1).getType()).isEqualTo(Material.REDSTONE_BLOCK);
+        // The bottom-row corners carry the two ARROW nav buttons (two-row window: one content row plus the nav row).
+        assertThat(top.getItem(9).getType()).isEqualTo(Material.ARROW);
+        assertThat(top.getItem(17).getType()).isEqualTo(Material.ARROW);
+    }
+
+    @Test
+    void clickingAVotableSiteSendsTheClickableVoteLink() {
+        VoteSiteCatalog catalog = catalogOf(
+                new VoteSiteSpec("PlanetMinecraft", Optional.of("https://pmc.example"), Duration.ofHours(24)));
+        view(catalog, new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults())
+                .open(player);
+
+        fireClick(0); // the only content slot holds the votable site
+
+        // The click sent the vote-link prompt (the engine routed the entity click to onSelect).
+        assertThat(player.nextMessage()).contains(VoteMessageKey.VOTE_GUI_CLICK.key());
+    }
+
+    @Test
+    void clickingACooledDownSiteSendsNoLink() {
+        VoteSiteCatalog catalog =
+                catalogOf(new VoteSiteSpec("Cooling", Optional.of("https://cooling.example"), Duration.ofHours(24)));
+        FakeVoteRepository repository = new FakeVoteRepository();
+        repository.setLastVotedAtSite(
+                player.getUniqueId(), "Cooling", Instant.now().minus(Duration.ofHours(1)));
+        view(catalog, repository, VoteSitesGuiView.GuiConfig.defaults()).open(player);
+
+        fireClick(0);
+
+        // A site still on cooldown is a no-op: no vote-link prompt is sent.
+        assertThat(player.nextMessage()).isNull();
     }
 
     @Test
@@ -157,7 +221,10 @@ class VoteSitesGuiViewTest {
         VoteSitesGuiView view = view(catalog, new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults());
 
         assertThatCode(() -> view.open(player)).doesNotThrowAnyException();
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
+        // The URL-less site renders as a votable green icon but a click sends nothing.
+        fireClick(0);
+        assertThat(player.nextMessage()).isNull();
     }
 
     @Test
@@ -181,7 +248,7 @@ class VoteSitesGuiViewTest {
 
         execute(dispatcher, "vote sites");
 
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -196,7 +263,7 @@ class VoteSitesGuiViewTest {
 
         execute(dispatcher, "vote");
 
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -235,7 +302,16 @@ class VoteSitesGuiViewTest {
 
     private VoteSitesGuiView view(
             VoteSiteCatalog catalog, FakeVoteRepository repository, VoteSitesGuiView.GuiConfig cfg) {
-        return new VoteSitesGuiView(catalog, repository, new SyncScheduler(), new FakeMessages(), cfg);
+        Menus menus = engine.menus();
+        GuiText guiText = new GuiText(new FakeMessages());
+        return new VoteSitesGuiView(catalog, repository, new SyncScheduler(), new FakeMessages(), menus, guiText, cfg);
+    }
+
+    private void fireClick(int slot) {
+        InventoryView view = player.getOpenInventory();
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(event);
     }
 
     private VoteSiteCatalog catalogOf(VoteSiteSpec... specs) {
