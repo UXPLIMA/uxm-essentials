@@ -8,7 +8,6 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
-import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -36,11 +35,11 @@ public final class ModerationGuiViews {
     private static final String MODULE = "moderation";
 
     private final ActivePunishmentsView list;
-    private final PlayerHistoryView historyView;
+    private final ModerationHistoryMenu historyMenu;
 
-    private ModerationGuiViews(ActivePunishmentsView list, PlayerHistoryView historyView) {
+    private ModerationGuiViews(ActivePunishmentsView list, ModerationHistoryMenu historyMenu) {
         this.list = list;
-        this.historyView = historyView;
+        this.historyMenu = historyMenu;
     }
 
     /** Build the three views over the existing use cases and the module's GUI layouts. */
@@ -50,7 +49,7 @@ public final class ModerationGuiViews {
             ModerationServices services,
             ModerationRepository repository,
             PlayerLookup players,
-            SanctionHistory history,
+            ModerationHistoryMenu historyMenu,
             Clock clock,
             GuiLayouts layouts) {
         Objects.requireNonNull(guiText, "guiText");
@@ -58,15 +57,12 @@ public final class ModerationGuiViews {
         Objects.requireNonNull(services, "services");
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(players, "players");
-        Objects.requireNonNull(history, "history");
+        Objects.requireNonNull(historyMenu, "historyMenu");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(layouts, "layouts");
 
         EntityListLayout listLayout = layouts.loadEntityList(MODULE, "punishments-list", listCodeDefault());
         EntityEditorLayout detailLayout = layouts.loadEntityEditor(MODULE, "punishment-detail", detailCodeDefault());
-        EntityListLayout historyLayout = layouts.loadEntityList(MODULE, "player-history", historyCodeDefault());
-
-        PlayerHistoryView historyView = new PlayerHistoryView(guiText, scheduler, history, historyLayout);
 
         // Revoking routes by kind to the existing audited use cases the /unban /unmute /unjail commands take.
         PunishmentRevoker revoker = (actor, target, kind) -> {
@@ -87,15 +83,14 @@ public final class ModerationGuiViews {
                 clock,
                 detailLayout,
                 (player, viewer) -> listHolder[0].open(player, viewer),
-                (player, punishment) -> historyView.open(
-                        player,
+                (player, punishment) -> historyMenu.open(
                         com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(player),
                         punishment.target()));
 
         ActivePunishmentsView list =
                 new ActivePunishmentsView(guiText, scheduler, repository, players, clock, listLayout, detail);
         listHolder[0] = list;
-        return new ModerationGuiViews(list, historyView);
+        return new ModerationGuiViews(list, historyMenu);
     }
 
     /** Open the active-punishments list — the management GUI's entry point — for {@code viewer}. */
@@ -112,15 +107,11 @@ public final class ModerationGuiViews {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(target, "target");
-        historyView.open(player, viewer, target.uuid());
+        historyMenu.open(viewer, target.uuid());
     }
 
     private static EntityListLayout listCodeDefault() {
         return EntityListLayout.paginatedDefault(Material.BARRIER);
-    }
-
-    private static EntityListLayout historyCodeDefault() {
-        return EntityListLayout.paginatedDefault(Material.PAPER);
     }
 
     private static EntityEditorLayout detailCodeDefault() {

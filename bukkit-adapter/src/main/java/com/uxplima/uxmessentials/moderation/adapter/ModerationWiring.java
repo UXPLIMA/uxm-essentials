@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.moderation.adapter;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -11,6 +12,8 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCo
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationGuiCommand;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiViews;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationHistoryMenu;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationJailedMenu;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentConfirmView;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.CommandSpyListener;
@@ -87,6 +90,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -141,7 +146,10 @@ public final class ModerationWiring {
             Bus bus,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -150,6 +158,9 @@ public final class ModerationWiring {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -190,13 +201,22 @@ public final class ModerationWiring {
         // detail/revoke → player history) read FRESH from the same repository / history port the list commands
         // use and revoke through the same audited unban/unmute/unjail use cases the /un* commands take. The
         // /mod command and the /uxmess gui hub entry both open the active-punishments list.
+        // The history list and the jailed-players release list render through the shared menu engine: each
+        // registers its spec and bindings once here, then opens through the Menus façade. The history read and the
+        // jailed read (with its name/remaining resolution) both run off the tick thread at the open site, so the
+        // list sources only read a pre-resolved subject.
+        ModerationHistoryMenu historyMenu = new ModerationHistoryMenu(menus, kernel.scheduler(), sanctionHistory);
+        historyMenu.register(menuBindings, dataFolder, kernel.log());
+        ModerationJailedMenu jailedMenu = new ModerationJailedMenu(
+                menus, kernel.scheduler(), services.unjail(), repository, kernel.playerLookup(), clock);
+        jailedMenu.register(menuBindings, dataFolder, kernel.log());
         ModerationGuiViews guiViews = ModerationGuiViews.create(
                 guiText,
                 kernel.scheduler(),
                 services,
                 repository,
                 kernel.playerLookup(),
-                sanctionHistory,
+                historyMenu,
                 clock,
                 guiLayouts);
         // The bare-command GUI flow for the named sanctions (/ban /mute /tempban /tempmute /warn /banip): the
@@ -224,14 +244,12 @@ public final class ModerationWiring {
                 services,
                 sanctions,
                 jailLocator,
-                repository,
-                kernel.playerLookup(),
+                jailedMenu,
                 picker,
                 durationPicker,
                 textInput,
                 kernel.messages(),
                 kernel.messageSink(),
-                clock,
                 guiLayouts);
         java.util.List<CommandRegistration> commands = new java.util.ArrayList<>(ModerationCommands.all(
                 services,

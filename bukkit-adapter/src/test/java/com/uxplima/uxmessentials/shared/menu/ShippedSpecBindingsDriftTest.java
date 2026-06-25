@@ -86,7 +86,8 @@ class ShippedSpecBindingsDriftTest {
             "homes:toggle-visibility",
             "homes:open-invites",
             "homes:action-back",
-            "homes:open-slot");
+            "homes:open-slot",
+            "moderation:release");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS =
@@ -188,7 +189,17 @@ class ShippedSpecBindingsDriftTest {
             "home_created",
             "home_icon",
             "home_cell_name",
-            "home_cell_lore");
+            "home_cell_lore",
+            "mod_history_icon",
+            "mod_history_action",
+            "mod_history_issuer",
+            "mod_history_reason",
+            "mod_history_at",
+            "mod_jailed_player",
+            "mod_jailed_jail",
+            "mod_jailed_issuer",
+            "mod_jailed_reason",
+            "mod_jailed_remaining");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -205,7 +216,9 @@ class ShippedSpecBindingsDriftTest {
             "worlds:list",
             "homes:icon-palette",
             "homes:invited-players",
-            "home:slots");
+            "home:slots",
+            "moderation:history",
+            "moderation:jailed");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

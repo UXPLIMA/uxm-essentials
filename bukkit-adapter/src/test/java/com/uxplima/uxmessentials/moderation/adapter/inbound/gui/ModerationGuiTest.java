@@ -24,7 +24,6 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
-import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -33,8 +32,6 @@ import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
-import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
-import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
@@ -62,8 +59,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * MockBukkit coverage of the moderation management GUI: the active-punishments list renders one icon per active
  * ban/mute/jail at the conf slots; clicking one opens the detail/manage view; the Revoke button is confirm-gated
  * and, only on confirm, calls the matching revoke seam (which the production wiring binds to unban/unmute/unjail);
- * the "view history" button opens the read-only player-history list, which renders the target's history entries;
- * and the entry point is permission-gated. The views are laid out from temp confs (no hardcoded slots); the
+ * the "view history" button hands the clicked target to the engine-rendered history menu (its rendering is covered
+ * by {@code ModerationHistoryListGoldenTest}); and the entry point is permission-gated. The views are laid out from
+ * temp confs (no hardcoded slots); the
  * scheduler runs every hop inline so the off-thread reads and writes land synchronously.
  */
 class ModerationGuiTest {
@@ -82,12 +80,11 @@ class ModerationGuiTest {
     private Scheduler scheduler;
     private Clock clock;
     private FakeRepository repository;
-    private FakeHistory history;
     private RecordingRevoker revoker;
 
     private ActivePunishmentsView list;
     private PunishmentDetailView detail;
-    private PlayerHistoryView historyView;
+    private final List<UUID> historyOpened = new ArrayList<>();
 
     @BeforeEach
     void setUp(@TempDir Path dir) throws Exception {
@@ -99,15 +96,15 @@ class ModerationGuiTest {
         scheduler = new SyncScheduler();
         clock = Clock.systemUTC();
         repository = new FakeRepository();
-        history = new FakeHistory();
         revoker = new RecordingRevoker();
+        historyOpened.clear();
         Guis.install(plugin);
 
         EntityListLayout listLayout = listLayout(dir, "punishments-list");
-        EntityListLayout historyLayout = listLayout(dir, "player-history");
         EntityEditorLayout detailLayout = detailLayout(dir);
 
-        historyView = new PlayerHistoryView(guiText, scheduler, history, historyLayout);
+        // The history button now hands the clicked punishment's target to the engine-rendered history menu (covered
+        // by ModerationHistoryListGoldenTest); here it captures the target so the button's wiring is asserted.
         detail = new PunishmentDetailView(
                 guiText,
                 scheduler,
@@ -115,7 +112,7 @@ class ModerationGuiTest {
                 clock,
                 detailLayout,
                 (p, v) -> list.open(p, v),
-                (p, punishment) -> historyView.open(p, viewer, punishment.target()));
+                (p, punishment) -> historyOpened.add(punishment.target()));
         list = new ActivePunishmentsView(guiText, scheduler, repository, new FakeLookup(), clock, listLayout, detail);
     }
 
@@ -169,29 +166,16 @@ class ModerationGuiTest {
     }
 
     @Test
-    void historyButtonOpensThePlayerHistoryList() {
+    void historyButtonHandsTheClickedTargetToTheHistoryMenu() {
         UUID target = uuid("Mallory");
         repository.addBan(target, Instant.now().plus(Duration.ofDays(7)));
-        history.add(target, SanctionAction.BAN, "spam");
-        history.add(target, SanctionAction.UNBAN, "appeal");
         detail.open(player, viewer, repository.firstActive());
 
         fireClick(HISTORY_SLOT, ClickType.LEFT);
 
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(10).getType()).isEqualTo(Material.BARRIER); // BAN row
-        assertThat(inv.getItem(11).getType()).isEqualTo(Material.LIME_DYE); // UNBAN row
-    }
-
-    @Test
-    void playerHistoryViewRendersEntriesDirectly() {
-        UUID target = uuid("Mallory");
-        history.add(target, SanctionAction.MUTE, "caps");
-
-        historyView.open(player, viewer, target);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(10).getType()).isEqualTo(Material.BOOK); // MUTE row
+        // The history list now renders through the menu engine (ModerationHistoryListGoldenTest); the detail
+        // screen's only job is to hand that engine the clicked punishment's target.
+        assertThat(historyOpened).containsExactly(target);
     }
 
     @Test
@@ -471,45 +455,5 @@ class ModerationGuiTest {
 
         @Override
         public void setLockedDown(boolean enabled) {}
-    }
-
-    private static final class FakeHistory implements SanctionHistory {
-        private final List<SanctionHistoryEntry> entries = new ArrayList<>();
-
-        void add(UUID target, SanctionAction action, String reason) {
-            entries.add(new SanctionHistoryEntry(
-                    action,
-                    target,
-                    Issuer.console("console"),
-                    Optional.of(reason),
-                    Instant.now(),
-                    Optional.empty(),
-                    Optional.empty()));
-        }
-
-        @Override
-        public void append(SanctionHistoryEntry entry) {
-            entries.add(entry);
-        }
-
-        @Override
-        public List<SanctionHistoryEntry> banHistory(UUID target, int limit) {
-            return List.copyOf(entries);
-        }
-
-        @Override
-        public List<SanctionHistoryEntry> muteHistory(UUID target, int limit) {
-            return List.copyOf(entries);
-        }
-
-        @Override
-        public List<SanctionHistoryEntry> recentForTarget(UUID target, int limit) {
-            return List.copyOf(entries);
-        }
-
-        @Override
-        public List<SanctionHistoryEntry> recentByActor(UUID actor, int limit) {
-            return List.copyOf(entries);
-        }
     }
 }

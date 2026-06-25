@@ -507,7 +507,18 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
-            wireModeration(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wireModeration(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
@@ -933,7 +944,9 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // moderation builds its jOOQ ModerationRepository over persistence.dsl(), the audit logger on the
         // dedicated audit channel, and the login/join/freeze listeners. It rebinds the messaging mute gate and
         // the teleport jail gate captured during their wiring to the real policies — when either context is
@@ -947,8 +960,18 @@ public final class PluginModule {
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(
                         ctx.kernel().messages());
-        ModerationWiring.Wired wired =
-                ModerationWiring.wire(plugin, ctx, persistence, gates, bus, guiText, guiLayouts, textInput);
+        ModerationWiring.Wired wired = ModerationWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                gates,
+                bus,
+                guiText,
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
