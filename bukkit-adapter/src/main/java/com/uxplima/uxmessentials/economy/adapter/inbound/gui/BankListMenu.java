@@ -45,7 +45,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Registers the {@code /bank} list menu with the menu engine and opens it. A paginated grid of one chest per shared
  * bank the viewer belongs to, showing the bank's name, id, balance, creator and member count. A left click opens that
- * bank's still-bespoke {@link BankActionsView} hub through the {@link BankNavigation} supplier; the create button
+ * bank's engine {@link BankActionsMenu} hub through the {@link BankNavigation} supplier; the create button
  * opens the still-bespoke {@link CurrencyPickerView} after prompting for a name, exactly as the old view did.
  *
  * <p>The bank list is a repository read (no Bukkit call), but each bank is resolved by id, so {@link #open} runs the

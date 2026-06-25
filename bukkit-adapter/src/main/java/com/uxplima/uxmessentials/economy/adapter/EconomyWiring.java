@@ -10,8 +10,6 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.command.EconomyCommands;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopMenu;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsView;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.ExchangeGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
@@ -453,17 +451,24 @@ public final class EconomyWiring {
         WalletPanelMenu walletGuiView =
                 new WalletPanelMenu(plugin, menus, resolved, kernel.scheduler(), notifier, historyView);
         walletGuiView.register(menuBindings, dataFolder, kernel.log());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout exchangeLayout =
-                guiLayouts.loadFixedMenu("economy", "exchange", ExchangeGuiView.defaultLayout());
-        ExchangeGuiView exchangeView = new ExchangeGuiView(
-                plugin,
-                resolved,
-                exchangeService,
-                kernel.scheduler(),
-                notifier,
-                kernel.messages(),
-                input,
-                exchangeLayout);
+        // The exchange dashboard is an engine-rendered panel now: it registers its spec and bindings here once, then
+        // opens through the Menus façade. Its source/target icons open the shared currency picker to switch each side.
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText exchangeGuiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView exchangeCurrencyPicker =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView(
+                        menus, exchangeGuiText, kernel.scheduler());
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyExchangeMenu exchangeView =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyExchangeMenu(
+                        menus,
+                        resolved,
+                        exchangeService,
+                        kernel.scheduler(),
+                        notifier,
+                        kernel.messages(),
+                        input,
+                        exchangeCurrencyPicker);
+        exchangeView.register(menuBindings, dataFolder, kernel.log());
 
         com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore =
                 com.uxplima.uxmessentials.persistence.economy.WalletRepositories.banknoteStore(persistence);
@@ -527,10 +532,10 @@ public final class EconomyWiring {
                         kernel.messages(),
                         navigation);
         bankMembersMenu.register(menuBindings, dataFolder, kernel.log());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout bankActionsLayout =
-                guiLayouts.loadFixedMenu("economy", "bank-actions", BankActionsView.defaultLayout());
-        BankActionsView bankActionsView = new BankActionsView(
-                bankService, input, kernel.scheduler(), kernel.messages(), historyView, navigation, bankActionsLayout);
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsMenu bankActionsView =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsMenu(
+                        menus, bankService, input, kernel.scheduler(), kernel.messages(), historyView, navigation);
+        bankActionsView.register(menuBindings, dataFolder, kernel.log());
         navigationHolder.set(new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation(
                 bankListMenu, bankActionsView, bankMembersMenu));
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout loanLayout =

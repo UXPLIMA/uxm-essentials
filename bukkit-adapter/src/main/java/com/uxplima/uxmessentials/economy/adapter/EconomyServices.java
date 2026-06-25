@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.economy.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopMenu;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.ExchangeGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyExchangeMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletPanelMenu;
@@ -55,7 +55,7 @@ public record EconomyServices(
         PayConfirmPanelMenu payConfirmationView,
         BaltopMenu baltopView,
         WalletPanelMenu walletView,
-        ExchangeGuiView exchangeView,
+        EconomyExchangeMenu exchangeView,
         EconomyProvider provider,
         com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore,
         com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteRedeemer banknoteRedeemer,

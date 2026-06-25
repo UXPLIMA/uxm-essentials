@@ -11,13 +11,13 @@ import org.jspecify.annotations.NullMarked;
  * constructor-injection-only rule (no post-construction setters) while still allowing the menus to open each other,
  * since the router and the views it holds cannot all be constructed in one pass.
  *
- * <p>The bank list and the members list are now engine-rendered menus; the router carries the {@link BankListMenu}
- * and the {@link BankMembersMenu} so the bespoke actions hub's "back" reopens the list and its "members" button
- * opens the members grid, while the still-bespoke actions hub stays a direct view reference.
+ * <p>The bank list, the actions panel, and the members list are all engine-rendered menus now; the router carries
+ * the {@link BankListMenu}, the {@link BankActionsMenu}, and the {@link BankMembersMenu} so the list's bank click
+ * opens the actions panel, the panel's "back" reopens the list, and its "members" button opens the members grid.
  */
 @NullMarked
 public record BankNavigation(
-        BankListMenu bankListMenu, BankActionsView bankActionsView, BankMembersMenu bankMembersMenu) {
+        BankListMenu bankListMenu, BankActionsMenu bankActionsView, BankMembersMenu bankMembersMenu) {
 
     public BankNavigation {
         Objects.requireNonNull(bankListMenu, "bankListMenu");

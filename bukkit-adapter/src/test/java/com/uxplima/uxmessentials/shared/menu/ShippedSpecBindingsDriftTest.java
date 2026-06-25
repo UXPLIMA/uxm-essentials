@@ -104,6 +104,11 @@ class ShippedSpecBindingsDriftTest {
             "economy:remove-member",
             "economy:add-member",
             "economy:bank-back",
+            "economy:bank-deposit",
+            "economy:bank-deposit-withdraw",
+            "economy:bank-members",
+            "economy:bank-logs",
+            "economy:bank-actions-back",
             "economy:open-history",
             "economy:pay-confirm",
             "economy:pay-cancel",
@@ -117,7 +122,10 @@ class ShippedSpecBindingsDriftTest {
             "economy:bulk-giveall",
             "economy:bulk-resetall",
             "economy:bulk-select-currency",
-            "economy:bulk-back");
+            "economy:bulk-back",
+            "economy:exchange-source",
+            "economy:exchange-target",
+            "economy:exchange-convert");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of(
@@ -128,6 +136,8 @@ class ShippedSpecBindingsDriftTest {
             "homes:home-private",
             "economy:can-add-member",
             "economy:multi-currency",
+            "economy:exchange-has-rate",
+            "economy:exchange-no-rate",
             "warps:browse-has-parent",
             "kits:browse-has-parent");
 
@@ -290,11 +300,20 @@ class ShippedSpecBindingsDriftTest {
             "bank_member_role",
             "wallet_balance",
             "wallet_banknotes",
+            "bank_actions_name",
             "payconfirm_target",
             "payconfirm_amount",
             "eco_target",
             "eco_currency",
-            "eco_target_balances");
+            "eco_target_balances",
+            "exchange_source_material",
+            "exchange_target_material",
+            "exchange_source_currency",
+            "exchange_target_currency",
+            "exchange_source_balance",
+            "exchange_target_balance",
+            "exchange_rate",
+            "exchange_fee");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(

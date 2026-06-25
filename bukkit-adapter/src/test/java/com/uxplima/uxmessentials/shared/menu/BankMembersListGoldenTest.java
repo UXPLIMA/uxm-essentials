@@ -32,7 +32,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation;
@@ -192,7 +192,7 @@ class BankMembersListGoldenTest {
         Supplier<BankNavigation> navigation = () -> Objects.requireNonNull(navigationHolder.get(), "navigation");
         BankMembersMenu menu =
                 new BankMembersMenu(menus, bankService, textInput, scheduler, new FakeLookup(), messages, navigation);
-        navigationHolder.set(new BankNavigation(mock(BankListMenu.class), mock(BankActionsView.class), menu));
+        navigationHolder.set(new BankNavigation(mock(BankListMenu.class), mock(BankActionsMenu.class), menu));
         return menu;
     }
 

@@ -34,7 +34,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation;
@@ -56,6 +56,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -67,7 +68,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +85,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * could be deleted.
  *
  * <p>A left click on the first chest through the engine's own {@link MenuListener} proves the migrated path opens that
- * bank's still-bespoke {@link BankActionsView} hub, and the create button still drives the name prompt into the
+ * bank's engine {@link BankActionsMenu} hub, and the create button still drives the name prompt into the
  * currency picker and reaches {@code BankService.createBank} — so the move is faithful in both appearance and the
  * create flow. The {@code KeyMessages} catalog surfaces the entry name's {@code bank_name} token; every other key
  * renders verbatim, so a real rendering difference still shows up as a snapshot mismatch.
@@ -149,10 +149,10 @@ class BankListGoldenTest {
 
         fireClick(0, ClickType.LEFT); // content slot 0 holds Vault; a left click opens its actions hub
 
-        // The bank-actions hub is a bespoke uxmLib SimpleGui: a 3-row window with the deposit GOLD_INGOT at slot 10
-        // and the BARRIER back button at slot 22, distinct from the 6-row list this click left.
+        // The bank-actions hub is now an engine-rendered MenuHolder window: a 3-row window with the deposit GOLD_INGOT
+        // at slot 10 and the BARRIER back button at slot 22, distinct from the 6-row list this click left.
         Inventory top = player.getOpenInventory().getTopInventory();
-        assertThat(top.getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(top.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(top.getSize()).isEqualTo(27);
         assertThat(Objects.requireNonNull(top.getItem(10)).getType()).isEqualTo(Material.GOLD_INGOT);
         assertThat(Objects.requireNonNull(top.getItem(22)).getType()).isEqualTo(Material.BARRIER);
@@ -208,28 +208,34 @@ class BankListGoldenTest {
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
 
-        BankListMenu menu = listMenu(menus);
+        BankListMenu menu = listMenu(menus, bindings);
         menu.register(bindings, dataFolder, NOOP);
         menu.open(player);
     }
 
     /** A {@link BankListMenu} wired off the same collaborators as the old view, over the engine façade. */
-    private BankListMenu listMenu(Menus menus) {
+    private BankListMenu listMenu(Menus menus, MenuBindings bindings) {
         Messages messages = new KeyMessages();
         CurrencyPickerView picker = new CurrencyPickerView(menus, guiText, scheduler);
         Supplier<BankNavigation> navigation = () -> Objects.requireNonNull(navigationHolder.get(), "navigation");
         BankListMenu listMenu = new BankListMenu(
                 menus, bankService, CurrencyRegistry.single(COINS), textInput, picker, scheduler, messages, navigation);
-        BankActionsView actions = new BankActionsView(
-                bankService,
-                textInput,
-                scheduler,
-                messages,
-                mock(TransactionsHistoryMenu.class),
-                navigation,
-                BankActionsView.defaultLayout());
+        BankActionsMenu actions = new BankActionsMenu(
+                menus, bankService, textInput, scheduler, messages, mock(TransactionsHistoryMenu.class), navigation);
+        // The bank click now opens the engine actions panel, so its spec must be registered for the open to draw.
+        actions.register(bindings, specDir(), NOOP);
         navigationHolder.set(new BankNavigation(listMenu, actions, mock(BankMembersMenu.class)));
         return listMenu;
+    }
+
+    /** The bundled spec directory under the source tree, so the actions panel loads the shipped spec. */
+    private static Path specDir() {
+        Path repoRoot = Path.of("").toAbsolutePath();
+        while (repoRoot != null && !java.nio.file.Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        Objects.requireNonNull(repoRoot, "repo root");
+        return repoRoot.resolve("bukkit-adapter/src/main/resources");
     }
 
     private void feedName(String name) {

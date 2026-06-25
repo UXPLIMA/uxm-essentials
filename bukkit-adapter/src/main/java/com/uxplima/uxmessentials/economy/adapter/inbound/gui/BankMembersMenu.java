@@ -50,8 +50,8 @@ import org.jspecify.annotations.NullMarked;
  * Registers the bank members menu with the menu engine and opens it. A paginated grid of one player head per member
  * of a shared bank, showing the member's name and role. A right click removes that member through the same
  * {@link BankService} the {@code /bank removemember} command takes, then reopens the refreshed list; the add button
- * opens the still-bespoke name prompt, and the back button returns to the bespoke {@link BankActionsView} hub through
- * the {@link BankNavigation} supplier.
+ * opens the name prompt, and the back button returns to the engine {@link BankActionsMenu} hub through the
+ * {@link BankNavigation} supplier.
  *
  * <p>The open re-fetches the bank fresh and resolves its members off the tick thread (all repository/domain reads,
  * no Bukkit call) and hands the fresh bank in as the menu subject; the {@code economy:bank-members} list source only
