@@ -26,7 +26,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -40,6 +39,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundEdit;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu;
@@ -126,8 +126,16 @@ class WarpSoundsPilotGoldenTest {
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Menus menus = new Menus(renderer, sync(), bindings.lists());
-        WarpEditorView editorView =
-                new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());
+        WarpEditorView editorView = new WarpEditorView(
+                menus,
+                messages,
+                sync(),
+                repository,
+                textInput(),
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.warps.application.UseWarp.class),
+                playerWarpHandle(),
+                new PlayerWarpGoToHandle());
+        editorView.register(bindings, dataFolder, new NoopLogger());
         WarpSoundSelectorView view = WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput());
         view.open(player, viewer, WARP.value(), null, true);
         Inventory inv = player.getOpenInventory().getTopInventory();
@@ -141,8 +149,16 @@ class WarpSoundsPilotGoldenTest {
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Menus menus = new Menus(renderer, sync(), bindings.lists());
-        WarpEditorView editorView =
-                new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());
+        WarpEditorView editorView = new WarpEditorView(
+                menus,
+                messages,
+                sync(),
+                repository,
+                textInput(),
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.warps.application.UseWarp.class),
+                playerWarpHandle(),
+                new PlayerWarpGoToHandle());
+        editorView.register(bindings, dataFolder, new NoopLogger());
         return WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput())
                 .getOptions();
     }
@@ -164,8 +180,16 @@ class WarpSoundsPilotGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, sync(), bindings.lists());
 
-        WarpEditorView editorView =
-                new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());
+        WarpEditorView editorView = new WarpEditorView(
+                menus,
+                messages,
+                sync(),
+                repository,
+                textInput(),
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.warps.application.UseWarp.class),
+                playerWarpHandle(),
+                new PlayerWarpGoToHandle());
+        editorView.register(bindings, dataFolder, new NoopLogger());
         WarpSoundSelectorView optionSource =
                 WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput());
         WarpSoundMenu menu = WarpSoundMenu.create(menus, optionSource, repository, editorView, textInput());
@@ -195,10 +219,6 @@ class WarpSoundsPilotGoldenTest {
         Position location = Position.of(new WorldRef(UUID.randomUUID(), "world"), 1, 2, 3);
         PlayerRef owner = new PlayerRef(UUID.randomUUID(), "Owner");
         return Warp.create(WARP, location, owner, Instant.EPOCH);
-    }
-
-    private static WarpEditorLayout editorLayout() {
-        return WarpEditorLayout.defaultLayout();
     }
 
     private com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle playerWarpHandle() {

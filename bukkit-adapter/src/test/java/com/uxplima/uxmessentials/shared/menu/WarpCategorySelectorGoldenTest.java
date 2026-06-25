@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.menu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,14 +25,16 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
@@ -44,6 +47,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
@@ -73,6 +77,23 @@ class WarpCategorySelectorGoldenTest {
     private static final WarpCategory MISC =
             new WarpCategory("misc", "<gray>Misc</gray>", Optional.empty(), List.of(), 0, Optional.empty());
 
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
+
+    @TempDir
+    Path dataFolder;
+
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
@@ -94,14 +115,19 @@ class WarpCategorySelectorGoldenTest {
         warps = new RecordingWarps();
         warps.seed("spawn");
         WarpCategoryRepository categories = new FixedCategories(List.of(PVP, MISC));
-        // The selector reopens the warp editor after a pick; the still-bespoke editor opens its own 54-slot window, so
-        // the assign assertions see that holder rather than a menu-backed one.
+        // The selector reopens the warp editor after a pick; the editor renders through the menu engine, so its spec
+        // is registered here before any reopen drives it.
+        TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
         WarpEditorView editorView = new WarpEditorView(
+                engine.menus(),
                 new KeyMessages(),
                 scheduler,
                 warps,
-                WarpEditorLayout.defaultLayout(),
-                new PlayerWarpRepositoryHandle());
+                textInput,
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.warps.application.UseWarp.class),
+                new PlayerWarpRepositoryHandle(),
+                new PlayerWarpGoToHandle());
+        editorView.register(engine.bindings(), dataFolder, NOOP);
         selector = new WarpCategorySelectorView(
                 new KeyMessages(), categories, warps, editorView, engine.menus(), scheduler);
     }

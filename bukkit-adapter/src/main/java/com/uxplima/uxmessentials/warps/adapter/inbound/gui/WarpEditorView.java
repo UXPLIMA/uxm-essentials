@@ -1,341 +1,459 @@
 package com.uxplima.uxmessentials.warps.adapter.inbound.gui;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
-import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Registers the per-warp editor hub with the menu engine and opens it. A three-row property panel for one warp
+ * reached from the warp manager (a left click on a warp icon), the {@code /warp editor <name>} command, and the
+ * create flow: a teleport button that warps the viewer to the warp, an icon-material button, a category button (a
+ * server-warp concept, gated behind the {@code warps:editor-server-warp} condition), a lock toggle, a password
+ * button, a welcome-messages button into the engine welcome list, sounds and particles buttons into the engine
+ * selectors, and warmup / cooldown override buttons. Each mutation saves the edited warp through the shared
+ * {@link EditableWarp} loader and re-opens this panel with the new subject so the operator sees the result.
+ *
+ * <p>The edited warp is handed in as the menu subject — its name, owner, and a display snapshot read off the
+ * viewer's entity thread at open — so the title and every current-value line fill from the {@code warp_edit_*}
+ * placeholders without the renderer touching a port. The panel holds no new domain logic: it replays the old
+ * bespoke window's handlers verbatim through the engine. This is the warp category settings-panel pattern
+ * (subject-carried state, the input seam, the engine sub-screens, and re-open after a mutation). The selector and
+ * welcome collaborators are injected after this view to break their re-open cycle. Every visible string resolves
+ * from the warps catalog.
+ */
 @NullMarked
 public final class WarpEditorView {
+
+    /** The engine spec id this panel registers and opens under. */
+    public static final String SPEC_ID = "warp-editor";
+
+    private static final String SPEC_RESOURCE = "modules/menu/specs/warp-editor.conf";
+    private static final int ROWS = 3;
 
     /** The display item a warp shows when no icon is set — the same default the browse menu falls back to. */
     private static final Material DEFAULT_ICON = Material.ENDER_PEARL;
 
-    /**
-     * The fixed slot for the category-assignment button. Categories are a server-warp concept, so this button
-     * appears only when the editor is opened on a server warp; the slot sits in the otherwise-empty top-right
-     * corner of the 3-row editor and is read by {@link WarpEditorListener} to open the category selector.
-     */
-    static final int CATEGORY_SLOT = 8;
-
+    private final Menus menus;
     private final Messages messages;
     private final Scheduler scheduler;
     private final WarpRepository warpRepository;
-    private final WarpEditorLayout layout;
+    private final TextInput textInput;
+    private final UseWarp useWarp;
     private final PlayerWarpRepositoryHandle playerWarpRepositoryHandle;
+    private final PlayerWarpGoToHandle playerWarpGoTo;
+    private final EditableWarpLoader loader;
+
+    /** The sub-screen collaborators the buttons open; injected after this view to break their re-open cycle. */
+    private @Nullable WarpCategorySelectorView categorySelector;
+
+    private @Nullable WarpWelcomeMessagesView welcomeMessagesView;
+    private @Nullable WarpSoundMenu soundMenu;
+    private @Nullable WarpSoundSelectorView soundSelectorView;
+    private @Nullable WarpParticleSelectorView particleSelectorView;
 
     public WarpEditorView(
+            Menus menus,
             Messages messages,
             Scheduler scheduler,
             WarpRepository warpRepository,
-            WarpEditorLayout layout,
-            PlayerWarpRepositoryHandle playerWarpRepositoryHandle) {
+            TextInput textInput,
+            UseWarp useWarp,
+            PlayerWarpRepositoryHandle playerWarpRepositoryHandle,
+            PlayerWarpGoToHandle playerWarpGoTo) {
+        this.menus = Objects.requireNonNull(menus, "menus");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.warpRepository = Objects.requireNonNull(warpRepository, "warpRepository");
-        this.layout = Objects.requireNonNull(layout, "layout");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.useWarp = Objects.requireNonNull(useWarp, "useWarp");
         this.playerWarpRepositoryHandle =
                 Objects.requireNonNull(playerWarpRepositoryHandle, "playerWarpRepositoryHandle");
-    }
-
-    public WarpEditorLayout layout() {
-        return layout;
+        this.playerWarpGoTo = Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
+        this.loader = new EditableWarpLoader(warpRepository, this);
     }
 
     public @Nullable PlayerWarpRepository playerWarpRepository() {
         return playerWarpRepositoryHandle.get();
     }
 
+    /**
+     * Wire the sub-screens the editor buttons open. Each reopens the editor after its work, so they hold this view
+     * and this view holds them; this setter breaks that cycle, mirroring the category settings panel's {@code bind}.
+     */
+    public void bind(
+            WarpCategorySelectorView categorySelector,
+            WarpWelcomeMessagesView welcomeMessagesView,
+            WarpSoundMenu soundMenu,
+            WarpSoundSelectorView soundSelectorView,
+            WarpParticleSelectorView particleSelectorView) {
+        this.categorySelector = Objects.requireNonNull(categorySelector, "categorySelector");
+        this.welcomeMessagesView = Objects.requireNonNull(welcomeMessagesView, "welcomeMessagesView");
+        this.soundMenu = Objects.requireNonNull(soundMenu, "soundMenu");
+        this.soundSelectorView = Objects.requireNonNull(soundSelectorView, "soundSelectorView");
+        this.particleSelectorView = Objects.requireNonNull(particleSelectorView, "particleSelectorView");
+    }
+
+    /** Register the subject placeholders, the visibility condition, the action buttons, and the spec itself. */
+    public void register(MenuBindings bindings, Path dataFolder, Logger log) {
+        Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
+        registerPlaceholders(bindings);
+        bindings.condition(
+                "warps:editor-server-warp", (ctx, args) -> subject(ctx).owner() == null);
+        registerActions(bindings);
+        menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
+    }
+
+    private void registerPlaceholders(MenuBindings bindings) {
+        bindings.placeholder("warp_edit_name", ctx -> subject(ctx).warpName());
+        bindings.placeholder(
+                "warp_edit_icon_material", ctx -> iconMaterial(subject(ctx)).name());
+        bindings.placeholder(
+                "warp_edit_icon", ctx -> iconMaterial(subject(ctx)).name().toLowerCase(Locale.ROOT));
+        bindings.placeholder(
+                "warp_edit_lock",
+                ctx -> lockState(ctx.viewer(), subject(ctx).display().isLocked()));
+        bindings.placeholder(
+                "warp_edit_password", ctx -> orNone(ctx, subject(ctx).display().password()));
+        bindings.placeholder("warp_edit_welcome", this::welcomeText);
+        bindings.placeholder("warp_edit_welcome_type", this::welcomeType);
+        bindings.placeholder(
+                "warp_edit_sound_departure",
+                ctx -> orNone(ctx, subject(ctx).display().departureSound()));
+        bindings.placeholder(
+                "warp_edit_sound_arrival",
+                ctx -> orNone(ctx, subject(ctx).display().arrivalSound()));
+        bindings.placeholder(
+                "warp_edit_particle_departure",
+                ctx -> orNone(ctx, subject(ctx).display().departureParticle()));
+        bindings.placeholder(
+                "warp_edit_particle_arrival",
+                ctx -> orNone(ctx, subject(ctx).display().arrivalParticle()));
+        bindings.placeholder(
+                "warp_edit_warmup", ctx -> seconds(ctx, subject(ctx).display().warmupOverrideSeconds()));
+        bindings.placeholder(
+                "warp_edit_cooldown", ctx -> seconds(ctx, subject(ctx).display().cooldownOverrideSeconds()));
+        bindings.placeholder("warp_edit_category", this::categoryName);
+        bindings.placeholder(
+                "warp_edit_world",
+                ctx -> subject(ctx).display().location().world().name());
+        bindings.placeholder(
+                "warp_edit_x",
+                ctx -> Integer.toString(subject(ctx).display().location().blockX()));
+        bindings.placeholder(
+                "warp_edit_y",
+                ctx -> Integer.toString(subject(ctx).display().location().blockY()));
+        bindings.placeholder(
+                "warp_edit_z",
+                ctx -> Integer.toString(subject(ctx).display().location().blockZ()));
+    }
+
+    private void registerActions(MenuBindings bindings) {
+        bindings.action("warps:editor-teleport", this::teleport);
+        bindings.action("warps:editor-icon-set", this::setIcon);
+        bindings.action("warps:editor-icon-clear", this::clearIcon);
+        bindings.action("warps:editor-category", this::openCategory);
+        bindings.action("warps:editor-lock", this::toggleLock);
+        bindings.action("warps:editor-password-set", this::promptPassword);
+        bindings.action("warps:editor-password-clear", this::clearPassword);
+        bindings.action("warps:editor-welcome", this::openWelcome);
+        bindings.action("warps:editor-sounds-departure", ctx -> openSounds(ctx, true));
+        bindings.action("warps:editor-sounds-arrival", ctx -> openSounds(ctx, false));
+        bindings.action("warps:editor-sounds-clear", this::clearSounds);
+        bindings.action("warps:editor-particles-departure", ctx -> openParticles(ctx, true));
+        bindings.action("warps:editor-particles-arrival", ctx -> openParticles(ctx, false));
+        bindings.action("warps:editor-particles-clear", this::clearParticles);
+        bindings.action("warps:editor-warmup-set", ctx -> promptDuration(ctx, true));
+        bindings.action("warps:editor-warmup-clear", ctx -> clearDuration(ctx, true));
+        bindings.action("warps:editor-cooldown-set", ctx -> promptDuration(ctx, false));
+        bindings.action("warps:editor-cooldown-clear", ctx -> clearDuration(ctx, false));
+        bindings.action("warps:editor-close", ctx -> ctx.player().closeInventory());
+    }
+
+    /**
+     * Open the editor for the warp {@code warpName} ({@code warpOwner} null for a server warp). The warp is read on
+     * the viewer's entity thread into a display snapshot handed to the engine as the subject, so the engine renders
+     * off that snapshot without a port read of its own. A warp that no longer exists closes the menu.
+     */
     public void open(Player player, PlayerRef viewer, String warpName, @Nullable PlayerRef warpOwner) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(warpName, "warpName");
         scheduler.onEntity(viewer, () -> {
-            WarpEditorHolder holder = new WarpEditorHolder(viewer, warpName, warpOwner);
-            Inventory inventory = Bukkit.createInventory(holder, layout.rows() * 9, title(warpName, viewer));
-            holder.attach(inventory);
-            populate(inventory, holder);
-            player.openInventory(inventory);
+            WarpDisplay display = snapshot(warpName, warpOwner);
+            if (display == null) {
+                player.closeInventory();
+                return;
+            }
+            menus.open(viewer, SPEC_ID, new WarpEditTarget(warpName, warpOwner, display));
         });
     }
 
-    public void populate(Inventory inventory, WarpEditorHolder holder) {
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
-        for (int i = 0; i < layout.rows() * 9; i++) {
-            inventory.setItem(i, filler);
-        }
-
-        PlayerRef viewer = holder.viewer();
-        if (holder.isPlayerWarp()) {
+    /** Read the clicked warp's display projection, or {@code null} when it no longer exists. */
+    private @Nullable WarpDisplay snapshot(String warpName, @Nullable PlayerRef warpOwner) {
+        if (warpOwner != null) {
             PlayerWarpRepository repo = playerWarpRepositoryHandle.get();
             if (repo == null) {
-                return;
+                return null;
             }
-            repo.find(Objects.requireNonNull(holder.warpOwner()), PlayerWarpName.of(holder.warpName()))
-                    .ifPresent(warp -> populateFrom(inventory, WarpDisplay.of(warp), viewer));
+            return repo.find(warpOwner, PlayerWarpName.of(warpName))
+                    .map(WarpDisplay::of)
+                    .orElse(null);
+        }
+        return warpRepository.find(WarpName.of(warpName)).map(WarpDisplay::of).orElse(null);
+    }
+
+    /** Teleport to the warp through the same path the {@code /warp <name>} command uses; close first to debounce. */
+    private void teleport(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        WarpEditTarget target = subject(ctx);
+        player.closeInventory();
+        if (target.owner() == null) {
+            useWarp.use(viewer, WarpName.of(target.warpName()));
         } else {
-            warpRepository.find(WarpName.of(holder.warpName())).ifPresent(warp -> {
-                populateFrom(inventory, WarpDisplay.of(warp), viewer);
-                categoryOption(inventory, warp.categoryId(), viewer);
-            });
+            playerWarpGoTo.teleport(viewer, target.owner(), target.warpName());
         }
     }
 
-    /**
-     * The category-assignment button, shown only for a server warp. Its lore names the warp's current category
-     * (or "none"); a click opens the warp→category selector, handled by {@link WarpEditorListener}.
-     */
-    private void categoryOption(Inventory inventory, java.util.Optional<String> categoryId, PlayerRef viewer) {
-        option(
-                inventory,
-                viewer,
-                CATEGORY_SLOT,
-                Material.BOOK,
-                WarpsMessageKey.WARP_EDITOR_CATEGORY_NAME,
-                List.of(text(
-                        viewer,
-                        WarpsMessageKey.WARP_EDITOR_CATEGORY_LORE_CURRENT,
-                        Map.of("category", categoryId.orElse(none(viewer))))),
-                WarpsMessageKey.WARP_EDITOR_CATEGORY_LORE_PROMPT);
+    /** Copy the item in the operator's main hand as the icon material, then save and re-open; empty hand rejected. */
+    private void setIcon(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        WarpEditTarget target = subject(ctx);
+        Material hand = player.getInventory().getItemInMainHand().getType();
+        if (hand.isAir()) {
+            player.sendMessage(text(viewer, WarpsMessageKey.WARP_EDITOR_ICON_ERROR_HAND));
+            reopen(ctx, target);
+            return;
+        }
+        mutate(target, warp -> warp.setIconMaterial(Optional.of(hand.name())));
+        reopen(ctx, target);
     }
 
-    private void populateFrom(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
-        iconOption(inventory, warp, viewer);
-        teleportOption(inventory, warp, viewer);
-        lockOption(inventory, warp, viewer);
-        passwordOption(inventory, warp, viewer);
-        option(
-                inventory,
-                viewer,
-                layout.welcomeSlot(),
-                layout.welcomeMaterial(),
-                WarpsMessageKey.WARP_EDITOR_WELCOME_NAME,
-                welcomeLines(warp, viewer),
-                WarpsMessageKey.WARP_EDITOR_WELCOME_LORE_PROMPT);
-        soundsOption(inventory, warp, viewer);
-        particlesOption(inventory, warp, viewer);
-        durationOption(
-                inventory,
-                viewer,
-                layout.warmupSlot(),
-                layout.warmupMaterial(),
-                WarpsMessageKey.WARP_EDITOR_WARMUP_NAME,
-                WarpsMessageKey.WARP_EDITOR_WARMUP_LORE_CURRENT,
-                WarpsMessageKey.WARP_EDITOR_WARMUP_LORE_PROMPT,
-                warp.warmupOverrideSeconds());
-        durationOption(
-                inventory,
-                viewer,
-                layout.cooldownSlot(),
-                layout.cooldownMaterial(),
-                WarpsMessageKey.WARP_EDITOR_COOLDOWN_NAME,
-                WarpsMessageKey.WARP_EDITOR_COOLDOWN_LORE_CURRENT,
-                WarpsMessageKey.WARP_EDITOR_COOLDOWN_LORE_PROMPT,
-                warp.cooldownOverrideSeconds());
-        inventory.setItem(
-                layout.closeSlot(),
-                ItemBuilder.of(Material.BARRIER)
-                        .name(text(viewer, WarpsMessageKey.WARP_EDITOR_CLOSE))
-                        .build());
+    /** Clear the warp's icon, then save and re-open. */
+    private void clearIcon(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        mutate(target, warp -> warp.setIconMaterial(Optional.empty()));
+        reopen(ctx, target);
     }
 
-    /**
-     * The "go to" button: a navigation action that teleports the viewer to the warp, the GUI twin of
-     * {@code /warp <name>}. The lore names the warp's world and integer coordinates so an operator sees where the
-     * click will send them; the teleport itself runs through the same {@code UseWarp} path the command takes,
-     * driven by {@link WarpEditorListener} on click.
-     */
-    private void teleportOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
-        option(
-                inventory,
-                viewer,
-                layout.teleportSlot(),
-                layout.teleportMaterial(),
-                WarpsMessageKey.WARP_EDITOR_TELEPORT_NAME,
-                List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_TELEPORT_LORE_LOCATION, coords(warp))),
-                WarpsMessageKey.WARP_EDITOR_TELEPORT_LORE_PROMPT);
+    /** Open the engine category selector for a server warp; choosing a category saves it and re-opens the editor. */
+    private void openCategory(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        if (categorySelector != null && target.owner() == null) {
+            categorySelector.open(ctx.player(), ctx.viewer(), target.warpName());
+        }
     }
 
-    /** The warp's world and integer block coordinates as the placeholder map the location lore line fills. */
-    private static Map<String, String> coords(WarpDisplay warp) {
-        return Map.of(
-                "world", warp.location().world().name(),
-                "x", Integer.toString(warp.location().blockX()),
-                "y", Integer.toString(warp.location().blockY()),
-                "z", Integer.toString(warp.location().blockZ()));
+    /** Toggle the warp's locked state, then save and re-open. */
+    private void toggleLock(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        mutate(target, warp -> warp.setLocked(!warp.isLocked()));
+        reopen(ctx, target);
     }
 
-    private void lockOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
-        option(
-                inventory,
-                viewer,
-                layout.lockSlot(),
-                layout.lockMaterial(),
-                WarpsMessageKey.WARP_EDITOR_LOCK_NAME,
-                List.of(text(
-                        viewer,
-                        WarpsMessageKey.WARP_EDITOR_LOCK_LORE_CURRENT,
-                        Map.of("state", lockState(viewer, warp.isLocked())))),
-                WarpsMessageKey.WARP_EDITOR_LOCK_LORE_PROMPT);
+    /** Capture a password through the input seam, then save it and re-open; cancel re-opens unchanged. */
+    private void promptPassword(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        prompt(ctx, "warp.password", WarpsMessageKey.WARP_EDITOR_PASSWORD_PROMPT, target, input -> {
+            mutate(target, warp -> warp.setPassword(Optional.of(input)));
+            reopen(ctx, target);
+        });
     }
 
-    private void passwordOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
-        option(
-                inventory,
-                viewer,
-                layout.passwordSlot(),
-                layout.passwordMaterial(),
-                WarpsMessageKey.WARP_EDITOR_PASSWORD_NAME,
-                List.of(text(
-                        viewer,
-                        WarpsMessageKey.WARP_EDITOR_PASSWORD_LORE_CURRENT,
-                        Map.of("password", warp.password().orElse(none(viewer))))),
-                WarpsMessageKey.WARP_EDITOR_PASSWORD_LORE_PROMPT);
+    /** Clear the warp's password, then save and re-open. */
+    private void clearPassword(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        mutate(target, warp -> warp.setPassword(Optional.empty()));
+        reopen(ctx, target);
     }
 
-    private void soundsOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
-        option(
-                inventory,
-                viewer,
-                layout.soundsSlot(),
-                layout.soundsMaterial(),
-                WarpsMessageKey.WARP_EDITOR_SOUNDS_NAME,
-                List.of(
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_DEPARTURE,
-                                Map.of("sound", warp.departureSound().orElse(none(viewer)))),
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_ARRIVAL,
-                                Map.of("sound", warp.arrivalSound().orElse(none(viewer))))),
-                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_PROMPT);
+    /** Open the engine welcome-messages list for this warp. */
+    private void openWelcome(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        if (welcomeMessagesView != null) {
+            welcomeMessagesView.open(ctx.player(), ctx.viewer(), target.warpName(), target.owner());
+        }
     }
 
-    private void particlesOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
-        option(
-                inventory,
-                viewer,
-                layout.particlesSlot(),
-                layout.particlesMaterial(),
-                WarpsMessageKey.WARP_EDITOR_PARTICLES_NAME,
-                List.of(
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_DEPARTURE,
-                                Map.of("particle", warp.departureParticle().orElse(none(viewer)))),
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_ARRIVAL,
-                                Map.of("particle", warp.arrivalParticle().orElse(none(viewer))))),
-                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_PROMPT);
+    /** Open the engine sound selector for the departure or arrival side. */
+    private void openSounds(MenuActionContext ctx, boolean departure) {
+        WarpEditTarget target = subject(ctx);
+        if (target.owner() == null) {
+            if (soundMenu != null) {
+                soundMenu.open(ctx.viewer(), new WarpSoundEdit(WarpName.of(target.warpName()), departure));
+            }
+        } else if (soundSelectorView != null) {
+            soundSelectorView.open(ctx.player(), ctx.viewer(), target.warpName(), target.owner(), departure);
+        }
     }
 
-    /**
-     * The icon material option. The button itself shows the warp's live display item, and its lore names that
-     * material — so the option always reflects what the browse menu actually renders. A warp with no icon set
-     * falls back to the same {@link #DEFAULT_ICON} the browse menu uses ({@code enderpearl}), shown both as the
-     * button material and in the "Current:" line, never a stand-in like {@code item_frame}.
-     */
-    private void iconOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
-        Material iconMat = warp.iconMaterial()
+    /** Clear both sound sides, then save and re-open. */
+    private void clearSounds(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        mutate(target, EditableWarp::clearSounds);
+        reopen(ctx, target);
+    }
+
+    /** Open the engine particle selector for the departure or arrival side. */
+    private void openParticles(MenuActionContext ctx, boolean departure) {
+        WarpEditTarget target = subject(ctx);
+        if (particleSelectorView != null) {
+            particleSelectorView.open(ctx.player(), ctx.viewer(), target.warpName(), target.owner(), departure);
+        }
+    }
+
+    /** Clear both particle sides, then save and re-open. */
+    private void clearParticles(MenuActionContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        mutate(target, EditableWarp::clearParticles);
+        reopen(ctx, target);
+    }
+
+    /** Capture a warmup or cooldown override in seconds through the input seam; cancel re-opens unchanged. */
+    private void promptDuration(MenuActionContext ctx, boolean warmup) {
+        WarpEditTarget target = subject(ctx);
+        MessageKey promptKey =
+                warmup ? WarpsMessageKey.WARP_EDITOR_WARMUP_PROMPT : WarpsMessageKey.WARP_EDITOR_COOLDOWN_PROMPT;
+        String key = warmup ? "warp.warmup" : "warp.cooldown";
+        prompt(ctx, key, promptKey, target, input -> applyDuration(ctx, target, warmup, input));
+    }
+
+    /** Parse the typed duration and, when valid, save it and re-open; a non-number sends the existing rejection. */
+    void applyDuration(MenuActionContext ctx, WarpEditTarget target, boolean warmup, String input) {
+        double parsed;
+        try {
+            parsed = Double.parseDouble(input.trim());
+        } catch (NumberFormatException notANumber) {
+            ctx.player().sendMessage(text(ctx.viewer(), WarpsMessageKey.WARP_EDITOR_INVALID_NUMBER));
+            reopen(ctx, target);
+            return;
+        }
+        Optional<Double> seconds = Optional.of(parsed);
+        mutate(target, warp -> setDuration(warp, warmup, seconds));
+        reopen(ctx, target);
+    }
+
+    /** Clear the warmup or cooldown override, then save and re-open. */
+    private void clearDuration(MenuActionContext ctx, boolean warmup) {
+        WarpEditTarget target = subject(ctx);
+        mutate(target, warp -> setDuration(warp, warmup, Optional.empty()));
+        reopen(ctx, target);
+    }
+
+    private static void setDuration(EditableWarp warp, boolean warmup, Optional<Double> seconds) {
+        if (warmup) {
+            warp.setWarmupOverride(seconds);
+        } else {
+            warp.setCooldownOverride(seconds);
+        }
+    }
+
+    /** Drive the shared input seam for {@code key}, applying {@code action} on submit and re-opening on cancel. */
+    private void prompt(
+            MenuActionContext ctx,
+            String inputKey,
+            MessageKey promptKey,
+            WarpEditTarget target,
+            java.util.function.Consumer<String> action) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        player.closeInventory();
+        textInput.prompt(player, viewer, InputRequest.of(inputKey, promptKey), action, () -> reopen(ctx, target));
+    }
+
+    /** Apply a mutation to the edited warp through the shared loader; a stale warp is a no-op the re-open catches. */
+    private void mutate(WarpEditTarget target, java.util.function.Consumer<EditableWarp> change) {
+        EditableWarp warp = loader.load(target.warpName(), target.owner());
+        if (warp != null) {
+            change.accept(warp);
+        }
+    }
+
+    /** Re-open the editor after a mutation so the operator sees the result with a fresh subject snapshot. */
+    private void reopen(MenuActionContext ctx, WarpEditTarget target) {
+        open(ctx.player(), ctx.viewer(), target.warpName(), target.owner());
+    }
+
+    /** The warp's live display item — a valid per-warp override, else the {@link #DEFAULT_ICON} fallback. */
+    private static Material iconMaterial(WarpEditTarget target) {
+        Optional<Material> override = target.display()
+                .iconMaterial()
                 .map(Material::matchMaterial)
-                .filter(m -> m != Material.AIR)
-                .orElse(DEFAULT_ICON);
-        String currentName = warp.iconMaterial()
-                .map(Material::matchMaterial)
-                .filter(m -> m != Material.AIR)
-                .orElse(DEFAULT_ICON)
-                .name()
-                .toLowerCase(java.util.Locale.ROOT);
-        List<Component> current =
-                List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_ICON_LORE_CURRENT, Map.of("material", currentName)));
-        option(
-                inventory,
-                viewer,
-                layout.iconSlot(),
-                iconMat,
-                WarpsMessageKey.WARP_EDITOR_ICON_NAME,
-                current,
-                WarpsMessageKey.WARP_EDITOR_ICON_LORE_PROMPT);
+                .filter(material -> material != Material.AIR);
+        return override.orElse(DEFAULT_ICON);
     }
 
-    private List<Component> welcomeLines(WarpDisplay warp, PlayerRef viewer) {
-        if (warp.welcomeMessages().isEmpty()) {
-            return List.of(
-                    text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_LORE_CURRENT, Map.of("message", none(viewer))));
+    private String welcomeText(MenuContext ctx) {
+        List<WelcomeMessage> messages = subject(ctx).display().welcomeMessages();
+        return messages.isEmpty() ? none(ctx.viewer()) : messages.get(0).message();
+    }
+
+    private String welcomeType(MenuContext ctx) {
+        List<WelcomeMessage> messages = subject(ctx).display().welcomeMessages();
+        return messages.isEmpty() ? none(ctx.viewer()) : messages.get(0).type();
+    }
+
+    private String categoryName(MenuContext ctx) {
+        WarpEditTarget target = subject(ctx);
+        if (target.owner() != null) {
+            return none(ctx.viewer());
         }
-        List<Component> lines = new java.util.ArrayList<>();
-        for (WelcomeMessage msg : warp.welcomeMessages()) {
-            lines.add(text(
-                    viewer,
-                    WarpsMessageKey.WARP_EDITOR_WELCOME_LORE_ENTRY,
-                    Map.of("type", msg.type(), "message", msg.message())));
-        }
-        return lines;
+        return warpRepository
+                .find(WarpName.of(target.warpName()))
+                .flatMap(warp -> warp.categoryId())
+                .orElseGet(() -> none(ctx.viewer()));
     }
 
-    private void durationOption(
-            Inventory inventory,
-            PlayerRef viewer,
-            int slot,
-            Material material,
-            WarpsMessageKey nameKey,
-            WarpsMessageKey currentKey,
-            WarpsMessageKey promptKey,
-            Optional<Double> seconds) {
-        String value = seconds.map(d -> d + "s").orElse(none(viewer));
-        option(
-                inventory,
-                viewer,
-                slot,
-                material,
-                nameKey,
-                List.of(text(viewer, currentKey, Map.of("seconds", value))),
-                promptKey);
+    private String seconds(MenuContext ctx, Optional<Double> value) {
+        return value.map(d -> d + "s").orElseGet(() -> none(ctx.viewer()));
     }
 
-    /** Render one editor option: an item at {@code slot} with its name, the current-value lines, and a prompt. */
-    private void option(
-            Inventory inventory,
-            PlayerRef viewer,
-            int slot,
-            Material material,
-            WarpsMessageKey nameKey,
-            List<Component> currentLines,
-            WarpsMessageKey promptKey) {
-        List<Component> lore = new java.util.ArrayList<>(currentLines);
-        lore.add(Component.empty());
-        lore.addAll(textPrompt(viewer, promptKey));
-        inventory.setItem(
-                slot,
-                ItemBuilder.of(material).name(text(viewer, nameKey)).lore(lore).build());
+    private String orNone(MenuContext ctx, Optional<String> value) {
+        return value.orElseGet(() -> none(ctx.viewer()));
     }
 
     private String none(PlayerRef viewer) {
@@ -348,30 +466,53 @@ public final class WarpEditorView {
         return messages.resolve(viewer, key, Map.of());
     }
 
-    private Component title(String warpName, PlayerRef viewer) {
-        return StyledText.render(messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_TITLE, Map.of("warp", warpName)));
-    }
-
     private Component text(PlayerRef viewer, MessageKey key) {
         return StyledText.render(messages.resolve(viewer, key, Map.of()));
     }
 
-    private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return StyledText.render(messages.resolve(viewer, key, placeholders));
+    private WarpEditTarget subject(MenuContext ctx) {
+        return ctx.subject(WarpEditTarget.class);
     }
 
-    private List<Component> textPrompt(PlayerRef viewer, MessageKey key) {
-        String resolved = messages.resolve(viewer, key, Map.of());
-        return splitAndParse(resolved);
+    private WarpEditTarget subject(MenuActionContext ctx) {
+        return ctx.subject(WarpEditTarget.class);
     }
 
-    private List<Component> splitAndParse(String resolved) {
-        Iterable<String> parts = com.google.common.base.Splitter.on(java.util.regex.Pattern.compile("(?i)<br/?>|\\n"))
-                .split(resolved);
-        java.util.ArrayList<Component> list = new java.util.ArrayList<>();
-        for (String part : parts) {
-            list.add(StyledText.render(part));
+    /**
+     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
+     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting warps wiring.
+     * Resolution mirrors {@code GuiLayouts}: disk first, then the classpath default.
+     */
+    private MenuSpec loadSpec(Path dataFolder, Logger log) {
+        MenuSpecLoader specLoader = new MenuSpecLoader();
+        Path onDisk = dataFolder.resolve(SPEC_RESOURCE);
+        if (Files.isRegularFile(onDisk)) {
+            try {
+                return specLoader.load(onDisk);
+            } catch (MenuSpecException malformed) {
+                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
+            }
         }
-        return list;
+        return loadBundledSpec(specLoader, log);
+    }
+
+    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(SPEC_RESOURCE)) {
+            if (in == null) {
+                log.warn("bundled menu spec {} is missing from the jar", SPEC_RESOURCE);
+                return emptySpec();
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
+            }
+        } catch (IOException | MenuSpecException failure) {
+            log.error("could not read bundled menu spec " + SPEC_RESOURCE, failure);
+            return emptySpec();
+        }
+    }
+
+    /** A minimal valid spec used only when the real one cannot be read, so warps still wires cleanly. */
+    private static MenuSpec emptySpec() {
+        return new MenuSpec("", ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 }

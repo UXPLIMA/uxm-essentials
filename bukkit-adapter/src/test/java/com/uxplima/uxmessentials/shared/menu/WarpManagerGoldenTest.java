@@ -28,11 +28,11 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
@@ -69,7 +70,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the baseline the old view
  * produced — captured once while both rendered the same fixture, then frozen here as the contract so the old class could
  * be deleted. Then, through the engine's own {@link MenuListener}, a left click on the first warp icon proves the
- * migrated path opens that warp's bespoke {@link WarpEditorView}, a left click on the create button proves it reaches
+ * migrated path opens that warp's engine {@link WarpEditorView}, a left click on the create button proves it reaches
  * the create prompt, and a left click on the categories button proves it opens the bespoke
  * {@link WarpCategoryManagerView} — so the move is faithful in both appearance and behaviour.
  *
@@ -129,12 +130,7 @@ class WarpManagerGoldenTest {
         // Content slot 0 is the first warp icon, "alpha"; a left click must open that warp's editor.
         fireClick(0, ClickType.LEFT);
 
-        assertThat(player.getOpenInventory()
-                        .getTopInventory()
-                        .getHolder()
-                        .getClass()
-                        .getSimpleName())
-                .isEqualTo("WarpEditorHolder");
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -194,18 +190,28 @@ class WarpManagerGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
-        WarpManagerMenu manager = managerMenu(menus);
+        WarpManagerMenu manager = managerMenu(menus, bindings);
         manager.register(bindings, dataFolder, NOOP);
         manager.open(player, viewer);
     }
 
     /** A {@link WarpManagerMenu} wired off the same collaborators as the old view, over the engine façade. */
-    private WarpManagerMenu managerMenu(Menus menus) {
+    private WarpManagerMenu managerMenu(Menus menus, MenuBindings bindings) {
         Messages messages = new KeyMessages();
-        WarpEditorView editorView = new WarpEditorView(
-                messages, scheduler, repository, WarpEditorLayout.defaultLayout(), new PlayerWarpRepositoryHandle());
         var textInput =
                 org.mockito.Mockito.mock(com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput.class);
+        WarpEditorView editorView = new WarpEditorView(
+                menus,
+                messages,
+                scheduler,
+                repository,
+                textInput,
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.warps.application.UseWarp.class),
+                new PlayerWarpRepositoryHandle(),
+                new PlayerWarpGoToHandle());
+        // The manager only opens the editor here; its sub-screens are exercised by the editor's own golden test, so the
+        // editor is registered (its spec must be known for the open) but not bound to live sub-screens.
+        editorView.register(bindings, dataFolder, NOOP);
         WarpCategoryManagerView categoryManager =
                 new WarpCategoryManagerView(messages, new StubCategoryRepository(), textInput, menus, scheduler);
         // The category manager is only the warp manager's category-button target here; this test never drives its own

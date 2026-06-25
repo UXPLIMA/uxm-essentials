@@ -116,6 +116,8 @@ final class DefaultResources {
             "modules/menu/specs/kit-browse.conf",
             "modules/menu/specs/warp-manager.conf",
             "modules/menu/specs/warp-category-settings.conf",
+            "modules/menu/specs/warp-editor.conf",
+            "modules/menu/specs/warp-welcome.conf",
             "modules/menu/specs/warp-browse.conf",
             "modules/menu/specs/world-list.conf",
             "modules/menu/specs/moderation-active.conf",

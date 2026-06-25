@@ -11,7 +11,6 @@ import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
@@ -110,29 +109,8 @@ public final class WarpsWiring {
         WarpNotifier notifier = new WarpNotifier(kernel.messages(), kernel.messageSink());
         WarpTeleportRegistry teleportRegistry = new WarpTeleportRegistry();
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
-        WarpEditorLayout editorLayout =
-                guiLayouts.loadWarpEditor("warps", "warps-editor", WarpEditorLayout.defaultLayout());
-        var welcomeLayout = guiLayouts.loadFixedMenu(
-                "warps",
-                "warps-welcome",
-                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView.defaultLayout());
-
         var playerWarpHandle = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle();
         var playerWarpGoTo = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle();
-        var editorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView(
-                kernel.messages(), kernel.scheduler(), repository, editorLayout, playerWarpHandle);
-        // The sound and particle selectors render through the menu engine's selector runtime now; both pick the warp's
-        // departure/arrival effect through the same editable-warp loader the editor listener uses and reopen the editor
-        // on a pick, so a single picker covers server and player warps exactly as before.
-        var soundSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.create(
-                kernel.messages(), menus, repository, editorView, textInput);
-        var soundMenu = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu.create(
-                menus, soundSelectorView, repository, editorView, textInput);
-        soundMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
-        var particleSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView.create(
-                kernel.messages(), menus, repository, editorView, textInput);
-        var welcomeMessagesView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView(
-                kernel.messages(), kernel.scheduler(), repository, editorView, welcomeLayout);
         // UseWarp is built once here so the editor's "go to" button and the /warp command share the exact same
         // teleport path, then handed to assemble() rather than rebuilt there.
         UseWarp useWarp = new UseWarp(
@@ -142,6 +120,35 @@ public final class WarpsWiring {
                 notifier,
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
                 kernel.permissions());
+        // The per-warp editor hub now renders through the menu engine: a declarative spec over the edited warp as its
+        // subject. The manager opens it on a warp click, the /warp editor command and the create flow open it, and the
+        // sub-screen back buttons reopen it. Its category/welcome/sound/particle sub-screens are all engine now and
+        // close a cycle with it (they reopen the editor after their work), broken through the bind(...) setter below.
+        var editorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView(
+                menus,
+                kernel.messages(),
+                kernel.scheduler(),
+                repository,
+                textInput,
+                useWarp,
+                playerWarpHandle,
+                playerWarpGoTo);
+        // The sound and particle selectors render through the menu engine's selector runtime; both pick the warp's
+        // departure/arrival effect through the same editable-warp loader the editor uses and reopen the editor on a
+        // pick, so a single picker covers server and player warps exactly as before.
+        var soundSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.create(
+                kernel.messages(), menus, repository, editorView, textInput);
+        var soundMenu = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu.create(
+                menus, soundSelectorView, repository, editorView, textInput);
+        soundMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
+        var particleSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView.create(
+                kernel.messages(), menus, repository, editorView, textInput);
+        // The welcome-messages list editor renders through the menu engine's list pattern over the edited warp as its
+        // subject; it shares an editable-warp loader built from the same repository/editor pair the editor uses, so
+        // server and player warps resolve the same way and its back button reopens this editor.
+        var welcomeMessagesView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView.create(
+                menus, kernel.scheduler(), textInput, repository, editorView);
+        welcomeMessagesView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         // Warm the category set once on enable so every browse-menu open and category-GUI render is served from
         // memory rather than a synchronous SQLite read on the command/region thread.
         categoryRepository.all();
@@ -160,6 +167,11 @@ public final class WarpsWiring {
         categorySettingsView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView(
                 kernel.messages(), categoryRepository, repository, editorView, menus, kernel.scheduler());
+        // Close the editor's sub-screen cycle now that every collaborator exists: the editor's category / welcome /
+        // sound / particle buttons open these views, and each reopens the editor after its work. The editor registers
+        // its spec last, once its bindings can resolve.
+        editorView.bind(categorySelectorView, welcomeMessagesView, soundMenu, soundSelectorView, particleSelectorView);
+        editorView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categoryParentSelectorView =
                 new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView(
                         kernel.messages(), categoryRepository, categorySettingsView, menus, kernel.scheduler());
@@ -196,28 +208,18 @@ public final class WarpsWiring {
         // a port read of its own.
         var browseMenu = new WarpBrowseMenu(menus, kernel.scheduler(), useWarp, kernel.messages(), categoryRepository);
         browseMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
-        var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(
-                editorView,
-                repository,
-                textInput,
-                kernel.messages(),
-                soundSelectorView,
-                particleSelectorView,
-                welcomeMessagesView,
-                useWarp,
-                playerWarpGoTo,
-                categorySelectorView,
-                soundMenu);
 
         WarpServices services =
                 assemble(kernel, repository, notifier, browseMenu, editorView, ctx, useWarp, managerView);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
+        // The editor and its welcome / sound / particle / category sub-screens all render through the always-on menu
+        // engine now, routed and torn down by the one shared menu listener, so the warps context registers no editor
+        // listener of its own — only the arrival-notification and warp-sign listeners remain.
         var listeners = List.<org.bukkit.event.Listener>of(
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpArrivalNotificationListener(
                         kernel.scheduler(), ctx.config(), teleportRegistry),
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpSignListener(
-                        repository, services.useWarp(), kernel.permissions(), ctx.config(), kernel.messages()),
-                editorListener);
+                        repository, services.useWarp(), kernel.permissions(), ctx.config(), kernel.messages()));
         return new Wired(
                 commands,
                 listeners,

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.menu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -25,14 +26,15 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView;
@@ -43,6 +45,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
@@ -67,6 +70,23 @@ class WarpParticleSelectorGoldenTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
 
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
+
+    @TempDir
+    Path dataFolder;
+
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
@@ -87,13 +107,17 @@ class WarpParticleSelectorGoldenTest {
         engine.installListener(plugin);
         repository = new RecordingRepository();
         repository.save(Warp.create(WarpName.of("spawn"), Position.of(WORLD, 0, 64, 0), viewer, Instant.EPOCH));
+        TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
         WarpEditorView editorView = new WarpEditorView(
+                engine.menus(),
                 new KeyMessages(),
                 scheduler,
                 repository,
-                WarpEditorLayout.defaultLayout(),
-                new PlayerWarpRepositoryHandle());
-        TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
+                textInput,
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.warps.application.UseWarp.class),
+                new PlayerWarpRepositoryHandle(),
+                new PlayerWarpGoToHandle());
+        editorView.register(engine.bindings(), dataFolder, NOOP);
         selector =
                 WarpParticleSelectorView.create(new KeyMessages(), engine.menus(), repository, editorView, textInput);
     }

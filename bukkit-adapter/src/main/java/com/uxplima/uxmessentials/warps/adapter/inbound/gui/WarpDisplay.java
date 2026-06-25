@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
  * the editor lore and the destination the "go to" button reads.
  */
 @NullMarked
-record WarpDisplay(
+public record WarpDisplay(
         Position location,
         Optional<String> iconMaterial,
         boolean locked,
