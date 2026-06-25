@@ -26,7 +26,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickHandler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ConfirmOpener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpener;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -70,13 +72,20 @@ public final class MenuListener implements Listener {
      */
     @Nullable private final SelectorOpener selectorOpener;
 
+    /**
+     * The opener a property's click hook uses to gate a destructive step behind an engine confirm child, threaded into
+     * the {@link ClickContext} on the editor path alongside the selector opener. Null when the engine is wired without
+     * it, in which case a property that confirms a removal falls back to its uxmLib {@code ConfirmMenu}.
+     */
+    @Nullable private final ConfirmOpener confirmOpener;
+
     public MenuListener(
             MenuRenderer renderer,
             ActionRegistry actions,
             ConditionRegistry conditions,
             Scheduler scheduler,
             Plugin plugin) {
-        this(renderer, actions, conditions, scheduler, plugin, null, null);
+        this(renderer, actions, conditions, scheduler, plugin, null, null, null);
     }
 
     public MenuListener(
@@ -86,7 +95,7 @@ public final class MenuListener implements Listener {
             Scheduler scheduler,
             Plugin plugin,
             @Nullable EditorRenderer editorRenderer) {
-        this(renderer, actions, conditions, scheduler, plugin, editorRenderer, null);
+        this(renderer, actions, conditions, scheduler, plugin, editorRenderer, null, null);
     }
 
     public MenuListener(
@@ -97,6 +106,18 @@ public final class MenuListener implements Listener {
             Plugin plugin,
             @Nullable EditorRenderer editorRenderer,
             @Nullable SelectorOpener selectorOpener) {
+        this(renderer, actions, conditions, scheduler, plugin, editorRenderer, selectorOpener, null);
+    }
+
+    public MenuListener(
+            MenuRenderer renderer,
+            ActionRegistry actions,
+            ConditionRegistry conditions,
+            Scheduler scheduler,
+            Plugin plugin,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable SelectorOpener selectorOpener,
+            @Nullable ConfirmOpener confirmOpener) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
@@ -104,6 +125,7 @@ public final class MenuListener implements Listener {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.editorRenderer = editorRenderer;
         this.selectorOpener = selectorOpener;
+        this.confirmOpener = confirmOpener;
     }
 
     /** Registers this listener with the server. Called once when the menu engine starts. */
@@ -133,7 +155,8 @@ public final class MenuListener implements Listener {
         }
         SelectorState selector = holder.selector().orElse(null);
         if (selector != null) {
-            handleSelectorClick(holder, selector, slot, (Player) event.getWhoClicked());
+            handleSelectorClick(
+                    holder, selector, slot, (Player) event.getWhoClicked(), event.isRightClick(), event.isShiftClick());
             return;
         }
         EditorState editor = holder.editor().orElse(null);
@@ -165,23 +188,30 @@ public final class MenuListener implements Listener {
     }
 
     /**
-     * Route a click in a selector window: the clicked option runs its choose action exactly once. The single-fire
-     * guard on the {@link SelectorState} makes a stray second click in the same tick a no-op, and the window is closed
-     * before the choice runs — mirroring the confirm flow — so a choice that reopens the parent editor is not clobbered
-     * by the close. The close funnels through the one {@code closeMenu}, so no second listener or teardown path is
-     * introduced. A click on a non-option slot does nothing; the click is already cancelled. The choose action itself
-     * (the property's async-setter-then-reopen loop) is enqueued on the viewer's entity thread, matching every other
-     * menu hop, and skipped if the viewer logged off in the gap.
+     * Route a click in a selector window: the clicked button runs its handler exactly once, given the click gesture
+     * so a list-entry button can branch (an option/add/back button ignores it). The single-fire guard on the
+     * {@link SelectorState} makes a stray second click in the same tick a no-op, and the window is closed before the
+     * handler runs — mirroring the confirm flow — so a handler that reopens the parent editor (or the list child after
+     * a mutation) is not clobbered by the close. The close funnels through the one {@code closeMenu}, so no second
+     * listener or teardown path is introduced. A click on a non-button slot does nothing; the click is already
+     * cancelled. The handler itself (the property's async-setter-then-reopen loop) is enqueued on the viewer's entity
+     * thread, matching every other menu hop, and skipped if the viewer logged off in the gap.
      */
-    private void handleSelectorClick(MenuHolder holder, SelectorState selector, int slot, Player clicker) {
-        Runnable choice = selector.chooseAt(slot).orElse(null);
+    private void handleSelectorClick(
+            MenuHolder holder,
+            SelectorState selector,
+            int slot,
+            Player clicker,
+            boolean rightClick,
+            boolean shiftClick) {
+        ChildClickHandler choice = selector.chooseAt(slot).orElse(null);
         if (choice == null || !selector.fire()) {
             return;
         }
         clicker.closeInventory();
         scheduler.onEntity(holder.ctx().viewer(), () -> {
             if (Bukkit.getPlayer(holder.ctx().viewer().uuid()) != null) {
-                choice.run();
+                choice.onClick(rightClick, shiftClick);
             }
         });
     }
@@ -218,7 +248,8 @@ public final class MenuListener implements Listener {
                 return;
             }
             Runnable reopen = () -> reRenderEditor(holder);
-            property.onClick(new ClickContext(live, viewer, rightClick, shiftClick, reopen, selectorOpener));
+            property.onClick(
+                    new ClickContext(live, viewer, rightClick, shiftClick, reopen, selectorOpener, confirmOpener));
         });
     }
 

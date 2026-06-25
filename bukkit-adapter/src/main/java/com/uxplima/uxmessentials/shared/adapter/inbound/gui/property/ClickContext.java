@@ -14,13 +14,15 @@ import org.jspecify.annotations.Nullable;
  * live {@link Player} doing the clicking (so a property can open an anvil/confirm in their screen), the viewer's
  * {@link PlayerRef} (the locale and identity dimension for catalog text and use-case calls), the click kind
  * (left vs right, shift-held) so a stepper or cycle can read direction off it, a {@code reopen} hook the property
- * calls to redraw the editor after an asynchronous setter completes, and an optional {@link SelectorOpener} the
- * property uses to open a picker as a menu-engine child window.
+ * calls to redraw the editor after an asynchronous setter completes, an optional {@link SelectorOpener} the
+ * property uses to open a picker as a menu-engine child window, and an optional {@link ConfirmOpener} it uses to gate
+ * a destructive step behind an engine confirm child.
  *
- * <p>The opener is present only when the editor runs on the engine editor runtime; the legacy
- * {@code EntityEditorView} path builds its context through {@link #from} with no opener, so a property that opens a
- * picker falls back to its uxmLib selector there. This optional field is the single seam that lets the enum/list/
- * colour pickers ride the engine child-menu capability on the new runtime while staying on uxmLib on the old one.
+ * <p>Both openers are present only when the editor runs on the engine editor runtime; the legacy
+ * {@code EntityEditorView} path builds its context through {@link #from} with neither, so a property that opens a
+ * picker or a confirm falls back to its uxmLib equivalent there. These optional fields are the single seam that lets
+ * the enum/list/colour pickers ride the engine child-menu capability on the new runtime while staying on uxmLib on
+ * the old one.
  *
  * <p>A property never touches the raw {@link InventoryClickEvent}; the click kind is captured into the three
  * boolean flags at construction so the editors stay unit-testable without forging a full Bukkit event.
@@ -31,6 +33,7 @@ import org.jspecify.annotations.Nullable;
  * @param shiftClick whether shift was held during the click
  * @param reopen redraws the editor for the viewer; a property runs it after a setter so the new value shows
  * @param opener opens a picker as an engine child window, or null when the property must use its uxmLib fallback
+ * @param confirmOpener opens a confirm as an engine child window, or null when the property must use its uxmLib fallback
  */
 @NullMarked
 public record ClickContext(
@@ -39,7 +42,8 @@ public record ClickContext(
         boolean rightClick,
         boolean shiftClick,
         Runnable reopen,
-        @Nullable SelectorOpener opener) {
+        @Nullable SelectorOpener opener,
+        @Nullable ConfirmOpener confirmOpener) {
 
     public ClickContext {
         Objects.requireNonNull(player, "player");
@@ -47,17 +51,28 @@ public record ClickContext(
         Objects.requireNonNull(reopen, "reopen");
     }
 
-    /** A context with no selector opener — the legacy editor path, where a picker uses its uxmLib fallback. */
-    public ClickContext(Player player, PlayerRef viewer, boolean rightClick, boolean shiftClick, Runnable reopen) {
-        this(player, viewer, rightClick, shiftClick, reopen, null);
+    /** A context with a selector opener but no confirm opener — for callers that wire only the picker seam. */
+    public ClickContext(
+            Player player,
+            PlayerRef viewer,
+            boolean rightClick,
+            boolean shiftClick,
+            Runnable reopen,
+            @Nullable SelectorOpener opener) {
+        this(player, viewer, rightClick, shiftClick, reopen, opener, null);
     }
 
-    /** Build a context from a live click event plus the editor's reopen hook; no opener (legacy uxmLib path). */
+    /** A context with neither opener — the legacy editor path, where a picker/confirm uses its uxmLib fallback. */
+    public ClickContext(Player player, PlayerRef viewer, boolean rightClick, boolean shiftClick, Runnable reopen) {
+        this(player, viewer, rightClick, shiftClick, reopen, null, null);
+    }
+
+    /** Build a context from a live click event plus the editor's reopen hook; no openers (legacy uxmLib path). */
     public static ClickContext from(InventoryClickEvent event, PlayerRef viewer, Runnable reopen) {
         Objects.requireNonNull(event, "event");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(reopen, "reopen");
         Player player = (Player) event.getWhoClicked();
-        return new ClickContext(player, viewer, event.isRightClick(), event.isShiftClick(), reopen, null);
+        return new ClickContext(player, viewer, event.isRightClick(), event.isShiftClick(), reopen, null, null);
     }
 }

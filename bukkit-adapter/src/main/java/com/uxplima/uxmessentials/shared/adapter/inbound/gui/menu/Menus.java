@@ -29,6 +29,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.Selecto
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickHandler;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ConfirmOpener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpener;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -66,6 +68,9 @@ public final class Menus {
 
     /** The opener a property's click hook calls to show its picker as an engine child window; wraps this façade. */
     private final SelectorOpener selectorOpener = this::openSelector;
+
+    /** The opener a property's click hook calls to gate a removal behind an engine confirm child; wraps this façade. */
+    private final ConfirmOpener confirmOpener = this::confirm;
 
     private final Map<String, MenuSpec> specs = new ConcurrentHashMap<>();
 
@@ -206,6 +211,17 @@ public final class Menus {
     }
 
     /**
+     * The opener a property hands a destructive step to: it gates the step behind a {@link MenuHolder} confirm child
+     * the one listener routes and the one {@code closeMenu} tears down. Threaded into the editor {@code ClickContext}
+     * alongside {@link #selectorOpener()} so a {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.property
+     * .ListProperty}'s remove gesture opens an engine confirm rather than a uxmLib {@code ConfirmMenu} on the engine
+     * runtime.
+     */
+    public ConfirmOpener confirmOpener() {
+        return confirmOpener;
+    }
+
+    /**
      * Open a selector child window for {@code viewer} — a flat picker of option buttons, the engine's replacement for
      * a property's uxmLib {@code SimpleGui} selector. It builds the same {@link MenuHolder} every other menu uses, so
      * the one listener routes its clicks and the one {@code closeMenu} tears it down: clicking an option button runs
@@ -236,9 +252,9 @@ public final class Menus {
         }
         MenuContext ctx = MenuContext.of(viewer, null, 0);
         MenuHolder holder = new MenuHolder("selector", selectorMenuSpec(rows), ctx);
-        Map<Integer, Runnable> choices = new HashMap<>();
+        Map<Integer, ChildClickHandler> choices = new HashMap<>();
         for (SelectorButton button : buttons) {
-            choices.put(button.slot(), button.onChoose());
+            choices.put(button.slot(), button.onClick());
         }
         holder.attachSelector(new SelectorState(choices));
         Inventory inv = Bukkit.createInventory(holder, rows * 9, title);

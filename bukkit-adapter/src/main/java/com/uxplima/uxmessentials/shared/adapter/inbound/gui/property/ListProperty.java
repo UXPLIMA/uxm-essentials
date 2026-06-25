@@ -36,6 +36,12 @@ import org.jspecify.annotations.NullMarked;
  * <p>Every label, hint, and the sub-menu title are catalog keys resolved through {@link GuiText}; the slots
  * and materials come from the caller (the editor layout conf), so nothing is hardcoded. The setter is the
  * module's existing application use case wrapped as a {@link Consumer}; this property holds no domain logic.
+ *
+ * <p>When the click context carries a {@link SelectorOpener} (the engine editor runtime threads one in) the sub-menu
+ * opens as an engine child window the one menu listener routes — its entry/add/back buttons are {@link SelectorButton}s
+ * and a removal gates through the context's {@link ConfirmOpener} confirm child — and each mutation reopens the engine
+ * list. With no opener (the legacy {@code EntityEditorView} path) it falls back to the uxmLib {@code SimpleGui} and
+ * {@code ConfirmMenu} unchanged, so both runtimes coexist while editors migrate.
  */
 @NullMarked
 public final class ListProperty implements EditableProperty {
@@ -93,7 +99,76 @@ public final class ListProperty implements EditableProperty {
     @Override
     public void onClick(ClickContext context) {
         Objects.requireNonNull(context, "context");
-        scheduler.onEntity(context.viewer(), () -> openList(context));
+        scheduler.onEntity(context.viewer(), () -> open(context));
+    }
+
+    /** Open the list sub-menu, as an engine child window when the context carries an opener, else as a uxmLib menu. */
+    private void open(ClickContext context) {
+        if (context.opener() != null) {
+            openEngineList(context, context.opener());
+        } else {
+            openList(context);
+        }
+    }
+
+    /**
+     * The engine list child: the same per-entry/add/back buttons as the uxmLib menu, handed to the engine opener as
+     * {@link SelectorButton}s so the one menu listener routes them. The entry button is gesture-aware (left/right move,
+     * shift-left edit, shift-right remove); the add and back buttons ignore the gesture. After any mutation the list
+     * reopens itself through this same method, so a change shows; back reopens the parent editor via the context.
+     */
+    private void openEngineList(ClickContext context, SelectorOpener opener) {
+        List<String> entries = current.get();
+        List<Integer> slots = layout.entrySlots();
+        List<SelectorButton> buttons = new ArrayList<>();
+        for (int i = 0; i < entries.size() && i < slots.size(); i++) {
+            buttons.add(engineEntryButton(context, entries.get(i), i, slots.get(i)));
+        }
+        buttons.add(SelectorButton.of(layout.addSlot(), addIcon(context), () -> add(context)));
+        buttons.add(SelectorButton.of(
+                layout.backSlot(), backIcon(context), () -> context.reopen().run()));
+        opener.openSelector(
+                context.viewer(),
+                guiText.text(context.viewer(), keys.title()),
+                layout.rows(),
+                layout.fillerIcon(),
+                buttons);
+    }
+
+    /** A gesture-aware engine entry button: shift-left edits, shift-right removes, left moves up, right moves down. */
+    private SelectorButton engineEntryButton(ClickContext context, String entry, int index, int slot) {
+        ItemStack icon = entryIcon(context, entry);
+        ChildClickHandler handler = (rightClick, shiftClick) -> {
+            if (shiftClick && !rightClick) {
+                edit(context, index, entry);
+            } else if (shiftClick) {
+                confirmRemove(context, index);
+            } else if (rightClick) {
+                move(context, index, 1);
+            } else {
+                move(context, index, -1);
+            }
+        };
+        return new SelectorButton(slot, icon, handler);
+    }
+
+    private ItemStack entryIcon(ClickContext context, String entry) {
+        return ItemBuilder.of(layout.entryIcon())
+                .name(guiText.text(context.viewer(), keys.entryName(), Map.of("entry", entry)))
+                .lore(guiText.text(context.viewer(), keys.entryHints()))
+                .build();
+    }
+
+    private ItemStack addIcon(ClickContext context) {
+        return ItemBuilder.of(layout.addIcon())
+                .name(guiText.text(context.viewer(), keys.addName()))
+                .build();
+    }
+
+    private ItemStack backIcon(ClickContext context) {
+        return ItemBuilder.of(layout.backIcon())
+                .name(guiText.text(context.viewer(), keys.backName()))
+                .build();
     }
 
     private void openList(ClickContext context) {
@@ -152,13 +227,13 @@ public final class ListProperty implements EditableProperty {
                 context.viewer(),
                 InputRequest.of(inputKey, keys.addPrompt()),
                 text -> applyAdd(context, text),
-                () -> openList(context));
+                () -> open(context));
     }
 
     /** Append a non-blank submitted line; a blank line reopens the list unchanged. Package-private for unit tests. */
     void applyAdd(ClickContext context, String text) {
         if (text.isBlank()) {
-            openList(context);
+            open(context);
             return;
         }
         List<String> next = new ArrayList<>(current.get());
@@ -172,7 +247,7 @@ public final class ListProperty implements EditableProperty {
                 context.viewer(),
                 InputRequest.of(inputKey, keys.editPrompt(), Map.of("entry", existing)),
                 text -> applyEdit(context, index, text),
-                () -> openList(context));
+                () -> open(context));
     }
 
     /** Replace entry {@code index} with a non-blank submitted line; otherwise reopen unchanged. Package-private for tests. */
@@ -183,12 +258,21 @@ public final class ListProperty implements EditableProperty {
             save(context, next);
             return;
         }
-        openList(context);
+        open(context);
     }
 
+    /**
+     * Gate a removal behind a confirm: an engine confirm child when the context carries a confirm opener, else a
+     * uxmLib {@code ConfirmMenu}. Either way, confirming removes the entry and reopens the list, declining just reopens.
+     */
     private void confirmRemove(ClickContext context, int index) {
         Component title = guiText.text(context.viewer(), keys.removeConfirm());
-        ConfirmMenu.of(title, () -> remove(context, index), () -> reopenList(context))
+        if (context.confirmOpener() != null) {
+            context.confirmOpener()
+                    .openConfirm(context.viewer(), title, () -> remove(context, index), () -> reopen(context));
+            return;
+        }
+        ConfirmMenu.of(title, () -> remove(context, index), () -> reopen(context))
                 .open(context.player());
     }
 
@@ -198,7 +282,7 @@ public final class ListProperty implements EditableProperty {
             next.remove(index);
             save(context, next);
         } else {
-            reopenList(context);
+            reopen(context);
         }
     }
 
@@ -210,19 +294,20 @@ public final class ListProperty implements EditableProperty {
             next.add(target, moved);
             save(context, next);
         } else {
-            reopenList(context);
+            reopen(context);
         }
     }
 
     private void save(ClickContext context, List<String> next) {
         scheduler.async(() -> {
             setter.accept(List.copyOf(next));
-            scheduler.onEntity(context.viewer(), () -> openList(context));
+            reopen(context);
         });
     }
 
-    private void reopenList(ClickContext context) {
-        scheduler.onEntity(context.viewer(), () -> openList(context));
+    /** Reopen the list sub-menu on the viewer's entity thread, picking the engine or uxmLib path off the context. */
+    private void reopen(ClickContext context) {
+        scheduler.onEntity(context.viewer(), () -> open(context));
     }
 
     private void fill(SimpleGui menu) {

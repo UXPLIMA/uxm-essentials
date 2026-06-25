@@ -181,7 +181,8 @@ public final class EnumProperty<E> implements EditableProperty {
         List<SelectorButton> buttons = new ArrayList<>();
         for (int i = 0; i < options.size() && i < optionSlots.size(); i++) {
             E option = options.get(i);
-            buttons.add(new SelectorButton(
+            // An enum option is single-gesture: any click chooses it, so the gesture is ignored.
+            buttons.add(SelectorButton.of(
                     optionSlots.get(i), optionIcon(context.viewer(), option, selected), () -> choose(context, option)));
         }
         return buttons;
