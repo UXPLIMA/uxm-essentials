@@ -55,6 +55,13 @@ public final class MenuHolder implements InventoryHolder {
      */
     @Nullable private ConfirmState confirm;
 
+    /**
+     * Set only on the selector path: the option choices of a picker child window. A spec, editor, or confirm menu
+     * leaves this null; a selector sets it and the one listener routes its clicks through it, so all four menu kinds
+     * ride the same holder and the same teardown without a separate listener.
+     */
+    @Nullable private SelectorState selector;
+
     public MenuHolder(String specId, MenuSpec spec, MenuContext ctx) {
         this.specId = Objects.requireNonNull(specId, "specId");
         this.spec = Objects.requireNonNull(spec, "spec");
@@ -134,6 +141,16 @@ public final class MenuHolder implements InventoryHolder {
     /** The confirm state if this holder backs a confirm window, or empty for a spec or editor menu. */
     public Optional<ConfirmState> confirm() {
         return Optional.ofNullable(confirm);
+    }
+
+    /** Attaches the selector state for a picker-window open; a spec, editor, or confirm menu never calls this. */
+    public void attachSelector(SelectorState selector) {
+        this.selector = Objects.requireNonNull(selector, "selector");
+    }
+
+    /** The selector state if this holder backs a picker window, or empty for any other menu kind. */
+    public Optional<SelectorState> selector() {
+        return Optional.ofNullable(selector);
     }
 
     public void setRefreshHandle(Cancellable handle) {

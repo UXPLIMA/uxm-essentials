@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpener;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -62,13 +63,20 @@ public final class MenuListener implements Listener {
      */
     @Nullable private final EditorRenderer editorRenderer;
 
+    /**
+     * The opener a property's click hook uses to show its picker as an engine child window, threaded into the
+     * {@link ClickContext} on the editor path. Null on a spec-only engine and on an editor engine wired without it,
+     * in which case a property that opens a picker falls back to its uxmLib selector — both runtimes coexist.
+     */
+    @Nullable private final SelectorOpener selectorOpener;
+
     public MenuListener(
             MenuRenderer renderer,
             ActionRegistry actions,
             ConditionRegistry conditions,
             Scheduler scheduler,
             Plugin plugin) {
-        this(renderer, actions, conditions, scheduler, plugin, null);
+        this(renderer, actions, conditions, scheduler, plugin, null, null);
     }
 
     public MenuListener(
@@ -78,12 +86,24 @@ public final class MenuListener implements Listener {
             Scheduler scheduler,
             Plugin plugin,
             @Nullable EditorRenderer editorRenderer) {
+        this(renderer, actions, conditions, scheduler, plugin, editorRenderer, null);
+    }
+
+    public MenuListener(
+            MenuRenderer renderer,
+            ActionRegistry actions,
+            ConditionRegistry conditions,
+            Scheduler scheduler,
+            Plugin plugin,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable SelectorOpener selectorOpener) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.editorRenderer = editorRenderer;
+        this.selectorOpener = selectorOpener;
     }
 
     /** Registers this listener with the server. Called once when the menu engine starts. */
@@ -111,6 +131,11 @@ public final class MenuListener implements Listener {
             handleConfirmClick(holder, confirm, slot, (Player) event.getWhoClicked());
             return;
         }
+        SelectorState selector = holder.selector().orElse(null);
+        if (selector != null) {
+            handleSelectorClick(holder, selector, slot, (Player) event.getWhoClicked());
+            return;
+        }
         EditorState editor = holder.editor().orElse(null);
         if (editor != null) {
             handleEditorClick(holder, editor, slot, event.isRightClick(), event.isShiftClick());
@@ -135,6 +160,28 @@ public final class MenuListener implements Listener {
         scheduler.onEntity(holder.ctx().viewer(), () -> {
             if (Bukkit.getPlayer(holder.ctx().viewer().uuid()) != null) {
                 decision.run();
+            }
+        });
+    }
+
+    /**
+     * Route a click in a selector window: the clicked option runs its choose action exactly once. The single-fire
+     * guard on the {@link SelectorState} makes a stray second click in the same tick a no-op, and the window is closed
+     * before the choice runs — mirroring the confirm flow — so a choice that reopens the parent editor is not clobbered
+     * by the close. The close funnels through the one {@code closeMenu}, so no second listener or teardown path is
+     * introduced. A click on a non-option slot does nothing; the click is already cancelled. The choose action itself
+     * (the property's async-setter-then-reopen loop) is enqueued on the viewer's entity thread, matching every other
+     * menu hop, and skipped if the viewer logged off in the gap.
+     */
+    private void handleSelectorClick(MenuHolder holder, SelectorState selector, int slot, Player clicker) {
+        Runnable choice = selector.chooseAt(slot).orElse(null);
+        if (choice == null || !selector.fire()) {
+            return;
+        }
+        clicker.closeInventory();
+        scheduler.onEntity(holder.ctx().viewer(), () -> {
+            if (Bukkit.getPlayer(holder.ctx().viewer().uuid()) != null) {
+                choice.run();
             }
         });
     }
@@ -171,7 +218,7 @@ public final class MenuListener implements Listener {
                 return;
             }
             Runnable reopen = () -> reRenderEditor(holder);
-            property.onClick(new ClickContext(live, viewer, rightClick, shiftClick, reopen));
+            property.onClick(new ClickContext(live, viewer, rightClick, shiftClick, reopen, selectorOpener));
         });
     }
 

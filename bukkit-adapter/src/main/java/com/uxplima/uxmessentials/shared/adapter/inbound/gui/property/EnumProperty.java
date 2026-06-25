@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.property;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -158,7 +159,32 @@ public final class EnumProperty<E> implements EditableProperty {
     @Override
     public void onClick(ClickContext context) {
         Objects.requireNonNull(context, "context");
+        SelectorOpener opener = context.opener();
+        if (opener != null) {
+            // The editor runs on the engine runtime, so the selector opens as an engine child window the one menu
+            // listener routes — not a uxmLib SimpleGui — keeping the whole flow on a single holder and teardown.
+            opener.openSelector(
+                    context.viewer(),
+                    guiText.text(context.viewer(), selectorTitle),
+                    rows,
+                    fillerIcon,
+                    selectorButtons(context));
+            return;
+        }
+        // No opener: the editor is still on the legacy uxmLib EntityEditorView, so fall back to a uxmLib selector.
         scheduler.onEntity(context.viewer(), () -> openSelector(context));
+    }
+
+    /** One engine selector button per option (icon plus its choose action), glint baked onto the selected option. */
+    private List<SelectorButton> selectorButtons(ClickContext context) {
+        E selected = current.get();
+        List<SelectorButton> buttons = new ArrayList<>();
+        for (int i = 0; i < options.size() && i < optionSlots.size(); i++) {
+            E option = options.get(i);
+            buttons.add(new SelectorButton(
+                    optionSlots.get(i), optionIcon(context.viewer(), option, selected), () -> choose(context, option)));
+        }
+        return buttons;
     }
 
     private void openSelector(ClickContext context) {

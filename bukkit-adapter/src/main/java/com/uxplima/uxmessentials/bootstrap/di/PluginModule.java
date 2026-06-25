@@ -198,17 +198,20 @@ public final class PluginModule {
         MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions());
         // The editor renderer is the typed-property capability the same engine grows: a property editor is a
         // MenuHolder window the one listener routes and the one shutdown tears down, so the renderer is threaded into
-        // both the listener (it repaints an editor after a property click) and the façade (it opens one).
+        // both the listener (it repaints an editor after a property click) and the façade (it opens one). The façade
+        // is built first so the listener can borrow its selector opener — what a property's click hook uses to open a
+        // picker as an engine child window — and thread it into the editor click context.
         EditorRenderer menuEditorRenderer = new EditorRenderer(guiText);
+        Menus menus = new Menus(menuRenderer, kernel.scheduler(), menuBindings.lists(), menuEditorRenderer);
         MenuListener menuListener = new MenuListener(
                 menuRenderer,
                 menuBindings.actions(),
                 menuBindings.conditions(),
                 kernel.scheduler(),
                 plugin,
-                menuEditorRenderer);
+                menuEditorRenderer,
+                menus.selectorOpener());
         menuListener.install();
-        Menus menus = new Menus(menuRenderer, kernel.scheduler(), menuBindings.lists(), menuEditorRenderer);
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —
         // this flag only governs the generic console action a disk-loaded menu can reference.

@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -17,15 +18,19 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSou
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.SelectorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ConfirmState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.SelectorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpener;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
@@ -55,6 +60,12 @@ public final class Menus {
 
     /** Paints the two-button confirm window; stateless, so one instance serves every confirm open. */
     private final ConfirmRenderer confirmRenderer = new ConfirmRenderer();
+
+    /** Paints a selector child window; stateless, so one instance serves every picker open. */
+    private final SelectorRenderer selectorRenderer = new SelectorRenderer();
+
+    /** The opener a property's click hook calls to show its picker as an engine child window; wraps this façade. */
+    private final SelectorOpener selectorOpener = this::openSelector;
 
     private final Map<String, MenuSpec> specs = new ConcurrentHashMap<>();
 
@@ -182,6 +193,63 @@ public final class Menus {
     private static MenuSpec confirmMenuSpec() {
         return new MenuSpec(
                 "", ConfirmRenderer.ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
+    }
+
+    /**
+     * The opener a property hands its picker to: opening a selector through it shows a {@link MenuHolder} child window
+     * the one listener routes and the one {@code closeMenu} tears down. Threaded into the editor {@code ClickContext}
+     * so an {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty} (and, as they migrate,
+     * the list/colour pickers) opens an engine child rather than a uxmLib {@code SimpleGui} on the engine runtime.
+     */
+    public SelectorOpener selectorOpener() {
+        return selectorOpener;
+    }
+
+    /**
+     * Open a selector child window for {@code viewer} — a flat picker of option buttons, the engine's replacement for
+     * a property's uxmLib {@code SimpleGui} selector. It builds the same {@link MenuHolder} every other menu uses, so
+     * the one listener routes its clicks and the one {@code closeMenu} tears it down: clicking an option button runs
+     * its choose action exactly once, and either that or closing the window (or quitting) ends the picker. The window
+     * is shown on the viewer's entity thread, where touching the live inventory is legal; each button's choose action
+     * runs on that same thread when clicked, mirroring the editor and confirm hops. The {@code title} is a
+     * {@link Component} the caller resolved from a {@code MessageKey}, so the window carries no inline literal.
+     */
+    public void openSelector(
+            PlayerRef viewer, Component title, int rows, Material filler, List<SelectorButton> buttons) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(filler, "filler");
+        Objects.requireNonNull(buttons, "buttons");
+        if (rows < 1 || rows > 6) {
+            throw new IllegalArgumentException("rows must be 1..6, was " + rows);
+        }
+        List<SelectorButton> copy = List.copyOf(buttons);
+        scheduler.onEntity(viewer, () -> openSelectorResolved(viewer, title, rows, filler, copy));
+    }
+
+    /** On the viewer's entity thread: build the selector holder + window, paint the option buttons, show it. */
+    private void openSelectorResolved(
+            PlayerRef viewer, Component title, int rows, Material filler, List<SelectorButton> buttons) {
+        Player live = Bukkit.getPlayer(viewer.uuid());
+        if (live == null || !live.isOnline()) {
+            return;
+        }
+        MenuContext ctx = MenuContext.of(viewer, null, 0);
+        MenuHolder holder = new MenuHolder("selector", selectorMenuSpec(rows), ctx);
+        Map<Integer, Runnable> choices = new HashMap<>();
+        for (SelectorButton button : buttons) {
+            choices.put(button.slot(), button.onChoose());
+        }
+        holder.attachSelector(new SelectorState(choices));
+        Inventory inv = Bukkit.createInventory(holder, rows * 9, title);
+        holder.attach(inv);
+        selectorRenderer.populate(inv, filler, buttons);
+        live.openInventory(inv);
+    }
+
+    /** The minimal {@link MenuSpec} a selector holder carries: the row count, refresh off, no items — clicks ride state. */
+    private static MenuSpec selectorMenuSpec(int rows) {
+        return new MenuSpec("", rows, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     private EditorRenderer requireEditorRenderer() {
