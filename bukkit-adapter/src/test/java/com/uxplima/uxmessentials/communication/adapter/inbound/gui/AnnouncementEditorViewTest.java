@@ -23,6 +23,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
@@ -60,7 +66,8 @@ class AnnouncementEditorViewTest {
     private static final int WORLD_SLOT = PROPERTY_SLOTS.get(7);
     private static final int PERMISSION_SLOT = PROPERTY_SLOTS.get(8);
     private static final int DELETE_SLOT = 26;
-    private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
+    private static final int CONFIRM_SLOT =
+            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
 
     private ServerMock server;
     private Plugin plugin;
@@ -83,8 +90,32 @@ class AnnouncementEditorViewTest {
         settingsStore = new InMemoryAnnouncerSettingsStore();
         TextInput textInput =
                 TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
+        // The list stays a uxmLib EntityListView for now; the per-announcement editor and the settings screen open
+        // through this one editor-capable engine, routed by the one listener registered here.
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
+        server.getPluginManager().registerEvents(listener, plugin);
         view = new AnnouncementEditorView(
-                guiText, scheduler, new KeyMessages(), store, settingsStore, new GuiLayouts(dir, NOOP), textInput);
+                menus,
+                guiText,
+                scheduler,
+                new KeyMessages(),
+                store,
+                settingsStore,
+                new GuiLayouts(dir, NOOP),
+                textInput);
     }
 
     @AfterEach

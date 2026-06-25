@@ -37,6 +37,12 @@ import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -66,7 +72,8 @@ class ModerationGuiTest {
     private static final List<Integer> DETAIL_SLOTS = List.of(10, 11, 12, 13, 14, 16);
     private static final int HISTORY_SLOT = DETAIL_SLOTS.get(5);
     private static final int REVOKE_SLOT = 26;
-    private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
+    private static final int CONFIRM_SLOT =
+            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
 
     private ServerMock server;
     private Plugin plugin;
@@ -102,6 +109,7 @@ class ModerationGuiTest {
         // ModerationHistoryListGoldenTest); here back is a no-op and history captures the target so the button's
         // wiring is asserted.
         detail = new PunishmentDetailView(
+                editorEngine(),
                 guiText,
                 scheduler,
                 revoker,
@@ -164,6 +172,30 @@ class ModerationGuiTest {
         InventoryClickEvent event =
                 new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
+    }
+
+    /**
+     * One editor-capable engine plus its single listener: the detail editor opens through this {@link Menus} and its
+     * revoke-confirm child is routed by the one registered {@link MenuListener}, the engine path the production wiring
+     * uses.
+     */
+    private Menus editorEngine() {
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
+        server.getPluginManager().registerEvents(listener, plugin);
+        return menus;
     }
 
     private EntityEditorLayout detailLayout(Path dir) throws Exception {

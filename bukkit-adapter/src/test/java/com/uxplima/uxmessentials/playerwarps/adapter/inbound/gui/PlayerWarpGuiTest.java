@@ -31,6 +31,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
@@ -74,7 +80,8 @@ class PlayerWarpGuiTest {
     private static final int PASSWORD_SLOT = EDITOR_SLOTS.get(5);
     private static final int WARMUP_SLOT = EDITOR_SLOTS.get(10);
     private static final int DELETE_SLOT = 53;
-    private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
+    private static final int CONFIRM_SLOT =
+            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
 
     private ServerMock server;
     private Plugin plugin;
@@ -111,6 +118,7 @@ class PlayerWarpGuiTest {
                 Material.BARRIER,
                 Material.BLACK_STAINED_GLASS_PANE);
         editorView = new PlayerWarpEditorView(
+                editorEngine(guiText),
                 guiText,
                 scheduler,
                 repository,
@@ -121,6 +129,30 @@ class PlayerWarpGuiTest {
                 editorLayout,
                 PlayerWarpEditorSubLayouts.codeDefault(),
                 (p, v) -> {});
+    }
+
+    /**
+     * One editor-capable engine plus its single listener: the editor opens through this {@link Menus} and its
+     * visibility selector and delete-confirm children are routed by the one registered {@link MenuListener}, the
+     * engine path the production wiring uses.
+     */
+    private Menus editorEngine(GuiText guiText) {
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
+        server.getPluginManager().registerEvents(listener, plugin);
+        return menus;
     }
 
     @AfterEach

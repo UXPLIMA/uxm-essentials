@@ -44,8 +44,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -56,7 +58,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -141,7 +142,7 @@ class PlayerWarpListGoldenTest {
         // Content slot 0 is the first warp icon, "alpha"; clicking it must open that warp's editor.
         fireClick(0);
 
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
         // The editor draws the name-tag property button at its first property slot (code-default slot 10).
         assertThat(player.getOpenInventory().getTopInventory().getItem(10)).isNotNull();
         assertThat(player.getOpenInventory().getTopInventory().getItem(10).getType())
@@ -198,13 +199,21 @@ class PlayerWarpListGoldenTest {
 
     /** Build the engine, register the player-warp bindings + spec, and open the list for the player. */
     private void openEngine() {
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
         PlayerWarpListMenu listMenu = listMenu(menus);
         listMenu.register(bindings, dataFolder, NOOP);
@@ -234,6 +243,7 @@ class PlayerWarpListGoldenTest {
                 Material.BARRIER,
                 Material.BLACK_STAINED_GLASS_PANE);
         PlayerWarpEditorView editor = new PlayerWarpEditorView(
+                menus,
                 guiText,
                 scheduler,
                 repository,

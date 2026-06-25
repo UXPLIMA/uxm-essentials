@@ -277,6 +277,7 @@ class AnnounceCommandTest {
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(messages);
         return new AnnouncementEditorView(
+                editorEngine(guiText),
                 guiText,
                 scheduler,
                 messages,
@@ -289,6 +290,22 @@ class AnnounceCommandTest {
                         scheduler,
                         java.nio.file.Path.of("nonexistent"),
                         new NoopLogger()));
+    }
+
+    /** A minimal editor-capable engine for the editor view; the subcommand tests never open it, so it is inert here. */
+    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus editorEngine(
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText) {
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings bindings =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer renderer =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
+                        new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
+                                guiText, bindings.placeholders()),
+                        bindings.conditions());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer editorRenderer =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer(guiText);
+        return new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
+                renderer, scheduler, bindings.lists(), editorRenderer);
     }
 
     private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {

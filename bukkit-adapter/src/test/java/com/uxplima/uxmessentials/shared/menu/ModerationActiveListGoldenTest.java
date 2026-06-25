@@ -49,6 +49,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
@@ -75,9 +76,10 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * token) and the two ARROW nav buttons (slots 48 and 50). The engine window is snapshotted as
  * {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the baseline the old view produced for
  * this fixture, then frozen here as the contract so the old class could be deleted. Then a left click on the ban icon
- * through the engine's own {@link MenuListener} proves the migrated path opens that punishment's still-bespoke
- * {@link PunishmentDetailView} — the detail editor's distinctive PLAYER_HEAD target label and LAVA_BUCKET revoke
- * button replace the list, and the target label carries the clicked punishment's target name.
+ * through the engine's own {@link MenuListener} proves the migrated path opens that punishment's
+ * {@link PunishmentDetailView} — now itself an engine editor reached through the same {@code Menus}: the detail
+ * editor's distinctive PLAYER_HEAD target label and LAVA_BUCKET revoke button replace the list, and the target label
+ * carries the clicked punishment's target name.
  *
  * <p>The {@code KeyMessages} catalog surfaces the entry name's {@code mod_active_player} token and the detail value
  * line's {@code value} token, so a target's name appears both in the list label and in the opened detail editor;
@@ -104,6 +106,8 @@ class ModerationActiveListGoldenTest {
     private FakeRepository repository;
     private RecordingRevoker revoker;
     private PunishmentDetailView detail;
+    private MenuBindings bindings;
+    private Menus menus;
 
     private final java.nio.file.Path dataFolder = java.nio.file.Path.of("nonexistent");
 
@@ -118,7 +122,25 @@ class ModerationActiveListGoldenTest {
         repository = new FakeRepository();
         revoker = new RecordingRevoker();
         Guis.install(plugin);
+        // One editor-capable engine and one listener for both the engine list and the detail editor it drills into,
+        // so the migrated detail view opens through the same Menus that renders the list.
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
+        server.getPluginManager().registerEvents(listener, plugin);
         detail = new PunishmentDetailView(
+                menus,
                 guiText,
                 scheduler,
                 revoker,
@@ -185,14 +207,6 @@ class ModerationActiveListGoldenTest {
     }
 
     private void openEngine() {
-        MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
-        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
-        server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
-
         ModerationActiveMenu menu = new ModerationActiveMenu(
                 menus,
                 scheduler,

@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyLayout;
@@ -109,6 +110,7 @@ public final class AnnouncementEditorView {
     private final EntityEditorView<Object> settings;
 
     public AnnouncementEditorView(
+            Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             Messages messages,
@@ -116,6 +118,7 @@ public final class AnnouncementEditorView {
             AnnouncerSettingsStore settingsStore,
             GuiLayouts guiLayouts,
             TextInput textInput) {
+        Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
@@ -133,6 +136,7 @@ public final class AnnouncementEditorView {
                 EDITOR_LAYOUT,
                 EntityEditorLayout.withDelete(DEFAULT_PROPERTY_SLOTS, DEFAULT_BACK_SLOT, DEFAULT_DELETE_SLOT));
         this.editor = EntityEditorView.<StoredAnnouncement>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(editorLayout)
@@ -157,6 +161,7 @@ public final class AnnouncementEditorView {
         EntityEditorLayout settingsLayout = guiLayouts.loadEntityEditor(
                 MODULE, SETTINGS_LAYOUT, EntityEditorLayout.codeDefault(SETTINGS_PROPERTY_SLOTS, SETTINGS_BACK_SLOT));
         this.settings = EntityEditorView.builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(settingsLayout)

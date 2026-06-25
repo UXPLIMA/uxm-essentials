@@ -90,6 +90,7 @@ public final class ModerationGuiViews {
         // at click time, by which point it is constructed. This mirrors the worlds list→bespoke-editor wiring.
         ModerationActiveMenu[] listHolder = new ModerationActiveMenu[1];
         PunishmentDetailView detail = new PunishmentDetailView(
+                menus,
                 guiText,
                 scheduler,
                 revoker,

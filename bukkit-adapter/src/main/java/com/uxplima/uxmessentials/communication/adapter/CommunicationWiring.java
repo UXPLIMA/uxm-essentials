@@ -138,6 +138,7 @@ public final class CommunicationWiring {
         // effect on the next tick with no reload. The admin panel's announcer list stays the read-only /announce
         // list surface (it shows the merged config view); the editor is the writable surface, reached via /announce.
         AnnouncementEditorView editorView = new AnnouncementEditorView(
+                menus,
                 guiText,
                 kernel.scheduler(),
                 kernel.messages(),

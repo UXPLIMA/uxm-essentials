@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -47,6 +48,7 @@ public final class PunishmentDetailView {
     private final EntityEditorView<ActivePunishment> editor;
 
     public PunishmentDetailView(
+            Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             PunishmentRevoker revoker,
@@ -54,6 +56,7 @@ public final class PunishmentDetailView {
             EntityEditorLayout layout,
             BiConsumer<Player, PlayerRef> onBack,
             BiConsumer<Player, ActivePunishment> onHistory) {
+        Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.revoker = Objects.requireNonNull(revoker, "revoker");
@@ -62,6 +65,7 @@ public final class PunishmentDetailView {
         Objects.requireNonNull(onBack, "onBack");
         Objects.requireNonNull(onHistory, "onHistory");
         this.editor = EntityEditorView.<ActivePunishment>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)

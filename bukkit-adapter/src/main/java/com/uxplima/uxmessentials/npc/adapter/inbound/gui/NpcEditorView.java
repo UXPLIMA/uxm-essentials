@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
@@ -76,6 +77,7 @@ public final class NpcEditorView {
     private final EntityEditorView<Npc> view;
 
     public NpcEditorView(
+            Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             NpcRepository repository,
@@ -87,6 +89,7 @@ public final class NpcEditorView {
             NpcEditorSubLayouts sub,
             ColourPickerLayout colourPicker,
             BiConsumer<Player, PlayerRef> onBack) {
+        Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -100,6 +103,7 @@ public final class NpcEditorView {
         Objects.requireNonNull(layout, "layout");
         Objects.requireNonNull(onBack, "onBack");
         this.view = EntityEditorView.<Npc>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)

@@ -27,6 +27,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
@@ -38,9 +45,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.ConfirmMenu;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,12 +54,13 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the shared {@link EntityEditorView} and its value editors. The editor is laid out
- * entirely from a temp layout conf (no hardcoded slots): it draws one button per property at its conf slot
- * plus the conf'd back and delete buttons, a {@link ToggleProperty} click flips the value and runs its setter,
- * a {@link NumberProperty} click steps within bounds, a {@link TextProperty} routes a validated line to its
- * setter, and the delete button opens a uxmLib {@link ConfirmMenu} so a stray click cannot delete — only a
- * confirm-slot click does. The scheduler is synchronous so the off-thread setter runs inline.
+ * MockBukkit coverage of the shared {@link EntityEditorView} and its value editors, now a thin shim over the menu
+ * engine: the view opens through {@link Menus#openEditor} as a holder-backed engine editor routed by the one
+ * {@link MenuListener}. The editor is laid out entirely from a temp layout conf (no hardcoded slots): it draws one
+ * button per property at its conf slot plus the conf'd back and delete buttons, a {@link ToggleProperty} click flips
+ * the value and runs its setter, a {@link NumberProperty} click steps within bounds, a {@link TextProperty} routes a
+ * validated line to its setter, and the delete button opens the engine confirm so a stray click cannot delete — only
+ * a confirm-slot click does. The scheduler is synchronous so the off-thread setter runs inline.
  */
 class EntityEditorViewTest {
 
@@ -66,7 +71,8 @@ class EntityEditorViewTest {
         private String label = "old";
     }
 
-    private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
+    private static final int CONFIRM_SLOT =
+            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
 
     private ServerMock server;
     private Plugin plugin;
@@ -75,6 +81,7 @@ class EntityEditorViewTest {
     private GuiText guiText;
     private Scheduler scheduler;
     private TextInput textInput;
+    private Menus menus;
     private Widget widget;
 
     @BeforeEach
@@ -87,12 +94,27 @@ class EntityEditorViewTest {
         scheduler = new SyncScheduler();
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         widget = new Widget();
-        Guis.install(plugin);
+        // One editor-capable engine and its single listener: the shim opens through this Menus and its delete-confirm
+        // child is routed by the one listener, the engine path the production wiring uses.
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
+        server.getPluginManager().registerEvents(listener, plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -102,7 +124,7 @@ class EntityEditorViewTest {
         editor(layout, List.of(togglePill(), counter()), true).open(player, viewer, widget);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(inv.getItem(10).getType()).isEqualTo(Material.LEVER); // toggle icon
         assertThat(inv.getItem(12).getType()).isEqualTo(Material.CLOCK); // number icon
         assertThat(inv.getItem(22).getType()).isEqualTo(Material.ARROW); // back
@@ -177,6 +199,7 @@ class EntityEditorViewTest {
         EntityEditorLayout layout = layout(dir, "property-slots = [10]\nback-slot = 22\ndelete-slot = 26\n");
         AtomicBoolean deleted = new AtomicBoolean(false);
         EntityEditorView<Widget> view = EntityEditorView.<Widget>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)
@@ -192,7 +215,7 @@ class EntityEditorViewTest {
         fireClick(26, ClickType.LEFT); // clicking delete opens the confirm menu, it does not delete
 
         Inventory confirm = player.getOpenInventory().getTopInventory();
-        assertThat(confirm.getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(confirm.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(deleted).isFalse();
 
         fireClick(CONFIRM_SLOT, ClickType.LEFT); // the confirm button does delete
@@ -203,6 +226,7 @@ class EntityEditorViewTest {
     private EntityEditorView<Widget> editor(
             EntityEditorLayout layout, List<EditableProperty> properties, boolean withDelete) {
         EntityEditorView.Builder<Widget> builder = EntityEditorView.<Widget>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)

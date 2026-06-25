@@ -82,8 +82,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -98,7 +100,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -183,7 +184,7 @@ class NpcListGoldenTest {
         // Content slot 0 is the first NPC icon, "alpha"; clicking it must open that NPC's editor.
         fireClick(0);
 
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
         // The editor draws the name-tag property button at its first property slot (code-default slot 10).
         assertThat(player.getOpenInventory().getTopInventory().getItem(10)).isNotNull();
         assertThat(player.getOpenInventory().getTopInventory().getItem(10).getType())
@@ -215,13 +216,21 @@ class NpcListGoldenTest {
 
     /** Build the engine, register the npc bindings + spec, and open the list for the player. */
     private void openEngine() {
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
         listMenu(menus).register(bindings, dataFolder, NOOP);
         menus.open(viewer, NpcListMenu.SPEC_ID, null);
@@ -240,6 +249,7 @@ class NpcListGoldenTest {
         NpcSkinByName skinByName =
                 new NpcSkinByName(new NoSkinService(), services.skin(), repository, notifier(), scheduler);
         NpcEditorView editor = new NpcEditorView(
+                menus,
                 guiText,
                 scheduler,
                 repository,

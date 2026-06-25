@@ -73,6 +73,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
@@ -120,7 +126,8 @@ class NpcGuiTest {
     private static final int GLOW_COLOR_SLOT = EDITOR_SLOTS.get(8);
     private static final int TELEPORT_SLOT = EDITOR_SLOTS.get(18); // "Teleport here", the last property
     private static final int DELETE_SLOT = 53;
-    private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
+    private static final int CONFIRM_SLOT =
+            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
     private static final int EQUIP_HEAD_SLOT = 11; // first armour slot in the equipment sub-menu (code default)
 
     private ServerMock server;
@@ -151,6 +158,7 @@ class NpcGuiTest {
         NpcSkinByName skinByName =
                 new NpcSkinByName(new NoSkinService(), services.skin(), repository, notifier(), scheduler);
         editorView = new NpcEditorView(
+                editorEngine(),
                 guiText,
                 scheduler,
                 repository,
@@ -342,6 +350,30 @@ class NpcGuiTest {
         InventoryClickEvent event =
                 new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
+    }
+
+    /**
+     * One editor-capable engine plus its single listener: the editor opens through this {@link Menus} and its enum
+     * selector and delete-confirm children are routed by the one registered {@link MenuListener}, the engine path the
+     * production wiring uses.
+     */
+    private Menus editorEngine() {
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                editorRenderer,
+                menus.selectorOpener(),
+                menus.confirmOpener());
+        server.getPluginManager().registerEvents(listener, plugin);
+        return menus;
     }
 
     private NpcNotifier notifier() {

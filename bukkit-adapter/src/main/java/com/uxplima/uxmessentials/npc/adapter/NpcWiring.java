@@ -244,6 +244,7 @@ public final class NpcWiring {
                         plugin.getDataFolder().toPath(), kernel.log());
         NpcListMenu[] listHolder = new NpcListMenu[1];
         NpcEditorView editor = new NpcEditorView(
+                menus,
                 guiText,
                 kernel.scheduler(),
                 repository,

@@ -193,6 +193,7 @@ public final class PlayerwarpsWiring {
                 guiLayouts.loadEntityEditor("playerwarps", "pwarp-editor", editorCodeDefault());
         PlayerWarpListMenu[] listHolder = new PlayerWarpListMenu[1];
         PlayerWarpEditorView editor = new PlayerWarpEditorView(
+                menus,
                 guiText,
                 kernel.scheduler(),
                 repository,

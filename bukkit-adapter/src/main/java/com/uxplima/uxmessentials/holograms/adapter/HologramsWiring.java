@@ -271,6 +271,7 @@ public final class HologramsWiring {
                 guiLayouts.loadEntityEditor("holograms", "hologram-editor", editorCodeDefault());
         HologramListMenu[] listHolder = new HologramListMenu[1];
         HologramEditorView editorView = new HologramEditorView(
+                menus,
                 guiText,
                 kernel.scheduler(),
                 repository,

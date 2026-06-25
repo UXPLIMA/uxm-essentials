@@ -180,7 +180,12 @@ class PlayerWarpOffThreadReadTest {
                 org.bukkit.Material.ARROW,
                 org.bukkit.Material.BARRIER,
                 org.bukkit.Material.BLACK_STAINED_GLASS_PANE);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         PlayerWarpEditorView editor = new PlayerWarpEditorView(
+                menus,
                 guiText,
                 scheduler,
                 repository,
@@ -191,10 +196,6 @@ class PlayerWarpOffThreadReadTest {
                 editorLayout,
                 PlayerWarpEditorSubLayouts.codeDefault(),
                 (p, v) -> {});
-        MenuBindings bindings = new MenuBindings();
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         return new PlayerWarpListMenu(
                 menus, scheduler, permissions, messages, repository, setPlayerWarp, textInput, editor);
     }

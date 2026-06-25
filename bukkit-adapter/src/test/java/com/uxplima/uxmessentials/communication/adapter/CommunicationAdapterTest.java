@@ -352,6 +352,7 @@ class CommunicationAdapterTest {
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(sink);
         return new com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView(
+                editorEngine(guiText, scheduler),
                 guiText,
                 scheduler,
                 sink,
@@ -365,6 +366,22 @@ class CommunicationAdapterTest {
                         scheduler,
                         java.nio.file.Path.of("nonexistent"),
                         new NoopLogger()));
+    }
+
+    /** A minimal editor-capable engine for the editor view; the command tests never open it, so it is inert here. */
+    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus editorEngine(
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText, Scheduler scheduler) {
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings bindings =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer renderer =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
+                        new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
+                                guiText, bindings.placeholders()),
+                        bindings.conditions());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer editorRenderer =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer(guiText);
+        return new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
+                renderer, scheduler, bindings.lists(), editorRenderer);
     }
 
     private BukkitAnnouncerBroadcaster announcerBroadcaster() {

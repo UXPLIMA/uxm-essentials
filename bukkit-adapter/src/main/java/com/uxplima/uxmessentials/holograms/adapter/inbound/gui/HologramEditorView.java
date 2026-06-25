@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
@@ -71,6 +72,7 @@ public final class HologramEditorView {
     private final EntityEditorView<Hologram> view;
 
     public HologramEditorView(
+            Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             HologramRepository repository,
@@ -82,6 +84,7 @@ public final class HologramEditorView {
             HologramEditorSubLayouts sub,
             ColourPickerLayout colourPicker,
             BiConsumer<Player, PlayerRef> onBack) {
+        Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -95,6 +98,7 @@ public final class HologramEditorView {
         Objects.requireNonNull(layout, "layout");
         Objects.requireNonNull(onBack, "onBack");
         this.view = EntityEditorView.<Hologram>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)
