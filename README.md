@@ -93,13 +93,14 @@ extensive MockBukkit/JUnit test suite.
    `commands.conf`, a `config.conf` per module under `modules/`, the message catalogs, and the GUI layouts.
 3. Edit what you want, then `/uxmess reload <module>` (or restart). That's it.
 
-Two optional companion jars extend the suite onto other platforms — see
+Three optional companion jars extend the suite onto other platforms — see
 [Cross-server & Discord add-ons](#cross-server--discord-add-ons):
 
 | Jar | Where it goes | What it adds |
 | --- | --- | --- |
 | `uxmEssentials-0.3.0.jar` | Paper `plugins/` | The plugin itself (required). |
 | `uxmEssentials-velocity-0.3.0.jar` | Velocity `plugins/` | Proxy-side bus broker — relays every synced context (homes, warps, economy, vaults, moderation, votes, and more) across the network. |
+| `uxmEssentials-redis-0.3.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus — the same sync over Redis pub/sub, with no proxy required. |
 | `uxmEssentials-discord-0.3.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
 
 ## Modules
@@ -299,8 +300,9 @@ network {
 
 - **Velocity** — drop `uxmEssentials-velocity-0.3.0.jar` on the proxy and the bus rides a proxy-side broker
   over plugin messaging.
-- **Redis** — point `network.redis` at a Redis server and the same bus runs over Redis pub/sub with **no
-  Velocity proxy required** — a plain set of backends sharing a database and a Redis instance sync directly.
+- **Redis** — drop `uxmEssentials-redis-0.3.0.jar` on each backend and point `network.redis` at a Redis
+  server; the same bus then runs over Redis pub/sub with **no Velocity proxy required** — a plain set of
+  backends sharing a database and a Redis instance sync directly.
 - **both** — run both transports at once (handy mid-migration); a frame goes out on each.
 
 Either way the sync covers homes, warps, player-warps, economy, vaults, moderation, holograms, NPCs, the vote
