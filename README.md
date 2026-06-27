@@ -4,12 +4,12 @@
 [![Java 25](https://img.shields.io/badge/Java-25-orange.svg)](https://adoptium.net/)
 [![Paper 26.1.2](https://img.shields.io/badge/Paper-26.1.2-brightgreen.svg)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-ready-success.svg)](https://docs.papermc.io/folia)
-[![Modules](https://img.shields.io/badge/modules-22-blueviolet.svg)](#modules)
+[![Modules](https://img.shields.io/badge/modules-23-blueviolet.svg)](#modules)
 [![Version](https://img.shields.io/badge/version-0.3.0-informational.svg)](#)
 
 The all-in-one essentials suite for **Paper 26.1.2** servers, on **Java 25**. Homes, warps, teleports, a
 real economy, kits, vaults, moderation, a staff mode, holograms, NPCs, scoreboards, a vote engine, multi-world
-management — the entire day-to-day toolkit a survival or network server needs — built as **22 independent
+management — the entire day-to-day toolkit a survival or network server needs — built as **23 independent
 feature modules** behind one clean, fully configurable plugin.
 
 Every module is its own bounded context: turn one off and it wires *nothing* — no commands, no listeners, no
@@ -56,10 +56,13 @@ extensive MockBukkit/JUnit test suite.
 
 - **One platform, done well.** Paper 26.1.2 and Java 25 only — no legacy cross-version reflection to drag
   around, just the current server API used natively.
-- **Genuinely modular.** Twenty-two feature modules, each toggled on its own. A disabled module instantiates
+- **Genuinely modular.** Twenty-three feature modules, each toggled on its own. A disabled module instantiates
   zero adapters, registers zero commands and listeners, runs zero migrations, and holds zero state.
 - **Configure in-game.** Every module has a management GUI reachable from `/uxmess gui` — edit a hologram, an
-  NPC, a warp, a vault, or a punishment by clicking. The grids, slots, and icons are themselves config-driven.
+  NPC, a warp, a vault, or a punishment by clicking. Every screen in the plugin renders through one data-driven
+  menu engine, so the grids, slots, and icons are themselves config values.
+- **Build your own menus.** `/menu` loads operator-authored menu files from `menus/*.conf` and opens them with
+  `/menu open <name>` — the same engine, a generic action vocabulary, custom GUIs without a line of code.
 - **Nothing hardcoded.** Every player-facing string lives in a per-locale catalog; every command can be
   renamed, aliased, or disabled; every GUI layout, cost, cooldown, and limit is a config value.
 - **Rollback-proof data.** Economy balances and player vaults are stored in the database — never in item
@@ -129,6 +132,7 @@ database-backed so they survive rollbacks.
 | **discordlink** | Link a Minecraft account to Discord, sync roles, and push audit / economy notifications (with the Discord add-on). |
 | **itemworld** | The everyday item & world utility surface — item tools, virtual workstations, world cleanup, powertool, mob / entity controls, time / weather aliases, and admin-fun — split into independently disableable sub-feature groups. |
 | **worlds** | A full multi-world manager: create / import / load / unload / delete (confirm-staged), per-world properties and gamerules, built-in void and flat generators, access gating with economy entry fees, cross-world portals, a world-editor GUI, pre-generation, backup / restore, and idle auto-unload. |
+| **custommenus** | Operator-authored menus over the built-in menu engine — drop a `menus/<name>.conf` and open it with `/menu open <name>`, built from a generic action / condition / placeholder vocabulary (close, open another menu, run a command, send a message, …). Custom GUIs with no code, hot-reloadable with `/menu reload`; the privileged console action is config-gated and off by default. |
 
 ## Command cheat-sheet
 
@@ -143,7 +147,7 @@ Player state    /gm(s/c/sp/a) /heal /feed /fly /god /speed /more /repair   /invs
 Messaging       /msg (/w /tell) /reply (/r)  /mail   /afk   /ignore
 Moderation      /ban /tempban /unban /mute /kick /warn /jail /history /checkban   /banip
 Staff           /staff /vanish /freeze /staffchat (/sc) /stafflist
-Worlds & more   /world /worlds   /hologram   /npc   /vote
+Worlds & more   /world /worlds   /hologram   /npc   /vote   /menu
 Admin root      /uxmess  (aliases /uxmessentials /uxe)
 ```
 
@@ -214,6 +218,14 @@ warps, vaults, moderation) get a list → editor flow — pick an entity, then f
 steppers, text / number / enum editors, a colour picker, and list editors. Settings-style modules (teleport,
 messaging, presence, scoreboard, …) get a panel of switches. The rows, slots, icons, and filler all come from
 `modules/<module>/gui/*.conf`, so you can re-skin every menu without code.
+
+Under the hood it is all one **data-driven menu engine**: every screen — including the GUI that opens when you
+run a bare command like `/eco`, `/jail`, or `/list` — is a HOCON spec plus type-safe bindings, behind a single
+window holder and listener with no per-menu code. Operators reach that engine directly through **`/menu`**:
+drop a `menus/<name>.conf` in the data folder, open it with `/menu open <name>`, and `/menu reload` re-reads
+the folder. Custom menus use a generic vocabulary (close, open another menu, run a command, send a message); a
+file that fails to parse or names an unknown binding is skipped with a warning rather than hiding the rest, and
+the console action — which runs a command with full server permissions — is gated off by default.
 
 ## Economy
 
