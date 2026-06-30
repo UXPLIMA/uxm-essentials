@@ -96,6 +96,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.NbtApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
@@ -240,9 +241,9 @@ public final class PluginModule {
 
         // The optional-plugin hook façade: resolved once here (plugin presence is stable for the run) over the
         // registered hooks, each binding to its real impl when its soft-depend is installed or to a no-op default
-        // otherwise. The Vault economy/permission hooks join the worked PlaceholderAPI example here; later
-        // integration features (the multi-currency providers, HeadDatabase, the item providers) add their hook
-        // the same way and read their capability from resources.hooks(). A missing soft-depend never loads an
+        // otherwise. The Vault economy/permission, NBT-API and HeadDatabase hooks join the worked PlaceholderAPI
+        // example here; later integration features (the item providers) add their hook the same way and read
+        // their capability from resources.hooks(). A missing soft-depend never loads an
         // external class — the no-op default carries none, so there is no NoClassDefFoundError path.
         Hooks hooks = Hooks.resolve(
                 plugin.getServer(),
@@ -251,7 +252,8 @@ public final class PluginModule {
                         new PlaceholderApiHook(),
                         new VaultEconomyHook(),
                         new VaultPermissionHook(),
-                        new NbtApiHook(kernel.log())));
+                        new NbtApiHook(kernel.log()),
+                        new HeadDatabaseHook(kernel.log())));
         resources.hooks(hooks);
 
         // The multi-currency seam over those hooks plus native Exp and the reflective economies (PlayerPoints,
