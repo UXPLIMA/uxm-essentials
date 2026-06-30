@@ -103,6 +103,22 @@ class ArchitectureTest {
             .resideInAnyPackage("org.bukkit..", "io.papermc..", "net.minecraft..")
             .because("the menu engine's spec model and evaluation must stay pure for plain-JUnit testing");
 
+    // Optional-plugin integrations are an outbound, Bukkit-side concern: the hooks SPI references org.bukkit and
+    // each real impl references a plugin SDK. The menu engine's pure core (spec model + evaluation) must stay
+    // plain-JUnit testable, so it may not reach into the hooks package — a spec/eval class importing Hooks would
+    // pull the Bukkit-side integration layer into the pure core. (Vacuous today; a guard for the future, since the
+    // org.bukkit fence above only catches direct org.bukkit dependencies, not a transitive one through Hooks.)
+    @ArchTest
+    static final ArchRule menuPureCoreDoesNotUseHooks = noClasses()
+            .that()
+            .resideInAnyPackage("..gui.menu.spec..", "..gui.menu.eval..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("..shared.adapter.outbound.hooks..")
+            .because("the menu engine's spec model and evaluation stay pure; optional-plugin hooks are an "
+                    + "outbound Bukkit-side concern consumed at the adapter edge")
+            .allowEmptyShould(true);
+
     // The engine's public surface is the Menus facade, the MenuBindings registries, and the two context
     // types a binding lambda is handed — MenuContext (condition/placeholder/list) and MenuActionContext
     // (action). A feature wires behaviour by reading those contexts, so they are public by contract even

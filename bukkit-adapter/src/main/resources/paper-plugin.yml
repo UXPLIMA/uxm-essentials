@@ -69,6 +69,26 @@ dependencies:
     Homestead:
       load: BEFORE
       required: false
+    # Menu-engine optional integrations — consumed behind the hooks SPI (shared.adapter.outbound.hooks). Each is
+    # reached only past a plugin-present guard, so the menu engine (and the plugin as a whole) runs fully without
+    # any of them; the no-op default carries no SDK type, so an absent one never loads an external class. Loaded
+    # before us so their head/item registries are ready when a menu renders on enable. Floodgate + Cumulus (the
+    # Bedrock-form integrations) are added in Phase 8, when their renderer lands.
+    HeadDatabase:
+      load: BEFORE
+      required: false
+    ItemsAdder:
+      load: BEFORE
+      required: false
+    Oraxen:
+      load: BEFORE
+      required: false
+    Nexo:
+      load: BEFORE
+      required: false
+    MMOItems:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with

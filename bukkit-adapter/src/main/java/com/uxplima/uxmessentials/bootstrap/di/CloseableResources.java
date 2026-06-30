@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -44,6 +45,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable GuiRootBinding guiRootBinding;
     private @Nullable UsageBinding usageBinding;
     private @Nullable WorldGeneratorResolver worldGeneratorResolver;
+    private @Nullable Hooks hooks;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -93,6 +95,20 @@ public final class CloseableResources implements AutoCloseable {
     /** The captured worlds generator resolver, or null when worlds is disabled (vanilla fallback). */
     public @Nullable WorldGeneratorResolver worldGeneratorResolver() {
         return worldGeneratorResolver;
+    }
+
+    /**
+     * Captures the resolved optional-plugin hook façade so later integration features (Vault economy and
+     * permission, the multi-currency providers, HeadDatabase, the item providers) read their capability from
+     * one place. Resolved once at wiring, when plugin presence is settled for the run.
+     */
+    public void hooks(Hooks resolved) {
+        this.hooks = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The resolved optional-plugin hooks, or null before wiring has constructed them. */
+    public @Nullable Hooks hooks() {
+        return hooks;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */

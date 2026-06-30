@@ -92,6 +92,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
@@ -227,6 +229,14 @@ public final class PluginModule {
             menuListener.uninstall();
             menus.shutdown();
         });
+
+        // The optional-plugin hook façade: resolved once here (plugin presence is stable for the run) over the
+        // registered hooks, each binding to its real impl when its soft-depend is installed or to a no-op default
+        // otherwise. This phase registers only the worked PlaceholderAPI example; later integration features
+        // (Vault economy/permission, the multi-currency providers, HeadDatabase, the item providers) add their
+        // hook here and read their capability from resources.hooks(). A missing soft-depend never loads an
+        // external class — the no-op default carries none, so there is no NoClassDefFoundError path.
+        resources.hooks(Hooks.resolve(plugin.getServer(), kernel.log(), List.of(new PlaceholderApiHook())));
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,
