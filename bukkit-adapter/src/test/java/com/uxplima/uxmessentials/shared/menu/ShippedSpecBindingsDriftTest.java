@@ -220,6 +220,7 @@ class ShippedSpecBindingsDriftTest {
             "perm",
             "has-prev",
             "has-next",
+            "expr",
             "homes:home-public",
             "homes:home-private",
             "moderation:confirm-silent-offered",

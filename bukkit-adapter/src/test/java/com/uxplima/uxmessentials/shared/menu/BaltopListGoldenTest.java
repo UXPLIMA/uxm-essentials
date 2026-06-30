@@ -175,7 +175,7 @@ class BaltopListGoldenTest {
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
         // The leaderboard spec binds the generic close action, so the shared vocabulary must be registered too.
         MenuVocabulary.registerActions(bindings, menus, false, NOOP);
-        MenuVocabulary.registerConditions(bindings, mock(Permissions.class));
+        MenuVocabulary.registerConditions(bindings, mock(Permissions.class), mock(Logger.class));
         MenuVocabulary.registerPlaceholders(bindings);
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);

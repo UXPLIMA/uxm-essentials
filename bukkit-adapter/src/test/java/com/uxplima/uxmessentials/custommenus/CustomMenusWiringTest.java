@@ -62,7 +62,7 @@ class CustomMenusWiringTest {
     private static MenuBindings bindings() {
         MenuBindings bindings = new MenuBindings();
         MenuVocabulary.registerActions(bindings, menus(), false, log());
-        MenuVocabulary.registerConditions(bindings, allowAll());
+        MenuVocabulary.registerConditions(bindings, allowAll(), log());
         MenuVocabulary.registerPlaceholders(bindings);
         return bindings;
     }

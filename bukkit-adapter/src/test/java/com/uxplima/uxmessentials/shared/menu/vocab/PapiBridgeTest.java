@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -88,7 +89,7 @@ class PapiBridgeTest {
     @Test
     void papiCompareNumeric() {
         MenuBindings bindings = new MenuBindings();
-        MenuVocabulary.registerConditions(bindings, new DenyAll());
+        MenuVocabulary.registerConditions(bindings, new DenyAll(), new NoopLogger());
         BiPredicate<MenuContext, Map<String, String>> compare = bindings.condition("papi-compare")
                 .orElseThrow(() -> new AssertionError("papi-compare condition not registered"));
         MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
@@ -97,6 +98,35 @@ class PapiBridgeTest {
                 .isTrue();
         assertThat(compare.test(ctx, Map.of("left", "3", "op", ">=", "right", "5")))
                 .isFalse();
+    }
+
+    @Test
+    void exprConditionEvaluatesSubstitutedExpression() {
+        MenuBindings bindings = new MenuBindings();
+        bindings.placeholder("balance", ctx -> "1500");
+        bindings.placeholder("world", ctx -> "world_nether");
+        MenuVocabulary.registerConditions(bindings, new DenyAll(), new NoopLogger());
+        BiPredicate<MenuContext, Map<String, String>> expr =
+                bindings.condition("expr").orElseThrow(() -> new AssertionError("expr condition not registered"));
+        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+
+        assertThat(expr.test(ctx, Map.of("value", "%balance% >= 1000"))).isTrue();
+        assertThat(expr.test(ctx, Map.of("value", "%balance% < 1000"))).isFalse();
+        assertThat(expr.test(ctx, Map.of("value", "'%world%' == 'world_nether'")))
+                .isTrue();
+        assertThat(expr.test(ctx, Map.of("value", "(2 + 3) * 2 == 10"))).isTrue();
+    }
+
+    @Test
+    void exprConditionFailsClosedOnMalformedInput() {
+        MenuBindings bindings = new MenuBindings();
+        MenuVocabulary.registerConditions(bindings, new DenyAll(), new NoopLogger());
+        BiPredicate<MenuContext, Map<String, String>> expr =
+                bindings.condition("expr").orElseThrow(() -> new AssertionError("expr condition not registered"));
+        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+
+        assertThat(expr.test(ctx, Map.of("value", "this is not ("))).isFalse();
+        assertThat(expr.test(ctx, Map.of("value", "1 / 0 > 0"))).isFalse();
     }
 
     @Test
@@ -142,6 +172,21 @@ class PapiBridgeTest {
         public QuotaResult resolveQuota(PlayerRef who, QuotaFamily family, WorldRef world, long configDefault) {
             return QuotaResult.limited(configDefault);
         }
+    }
+
+    /** A {@link Logger} that swallows every line; the {@code expr} tests assert behaviour, not log output. */
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class KeyMessages implements Messages {

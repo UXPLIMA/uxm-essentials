@@ -4,6 +4,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,6 +16,8 @@ import org.bukkit.Bukkit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.ExpressionException;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Expressions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -62,16 +67,42 @@ public final class MenuVocabulary {
      * three named args ({@code left}, {@code op}, {@code right}) and compares the two operands after expanding any
      * {@code %token%} in them, so a spec gates on a (PlaceholderAPI-bridged) value such as a balance or vote count.
      * {@code has-prev} / {@code has-next} read the render-time page position so a paginated menu can hide its
-     * previous/next arrow on the first/last page rather than showing a dead button.
+     * previous/next arrow on the first/last page rather than showing a dead button. {@code expr} expands the
+     * {@code %token%}s in its expression then runs it through the sandboxed evaluator, so a spec can gate on a
+     * computed condition such as {@code expr:"%balance% >= 1000"}.
      */
-    public static void registerConditions(MenuBindings bindings, Permissions permissions) {
+    public static void registerConditions(MenuBindings bindings, Permissions permissions, Logger log) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(permissions, "permissions");
+        Objects.requireNonNull(log, "log");
         bindings.condition("perm", (ctx, args) -> permissions.has(ctx.viewer(), args.getOrDefault("value", "")));
         bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
         bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
         PlaceholderRegistry placeholders = bindings.placeholders();
         bindings.condition("papi-compare", (ctx, args) -> compare(ctx, args, placeholders));
+        bindings.condition("expr", exprCondition(placeholders, log));
+    }
+
+    /**
+     * Build the {@code expr} condition: expand the {@code %token%}s in its raw expression against {@code placeholders}
+     * (so a {@code %balance%} compares live), then evaluate the result through the sandboxed {@link Expressions}.
+     * A malformed expression fails closed — the condition is {@code false} so the item hides or the click is denied —
+     * and the offending text is logged once (de-duplicated so a broken spec does not flood the log on every render).
+     */
+    private static BiPredicate<MenuContext, Map<String, String>> exprCondition(
+            PlaceholderRegistry placeholders, Logger log) {
+        Set<String> warned = ConcurrentHashMap.newKeySet();
+        return (ctx, args) -> {
+            String expression = expand(args.getOrDefault("value", ""), ctx, placeholders);
+            try {
+                return Expressions.evaluateBoolean(expression);
+            } catch (ExpressionException malformed) {
+                if (warned.add(expression)) {
+                    log.warn("menu expr condition could not be evaluated: {}", expression);
+                }
+                return false;
+            }
+        };
     }
 
     /**

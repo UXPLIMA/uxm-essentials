@@ -200,7 +200,7 @@ class ItemworldHubGoldenTest {
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
         // The hub leans on the generic perm view-condition and close action, registered into the shared bindings
         // exactly as production wiring does.
-        MenuVocabulary.registerConditions(bindings, permissions);
+        MenuVocabulary.registerConditions(bindings, permissions, new NoopLogger());
         MenuVocabulary.registerActions(bindings, menus, false, new NoopLogger());
         ItemworldHubMenu menu = new ItemworldHubMenu(menus, messages, scheduler, services(permissions), purge());
         menu.register(bindings, specDir(), new NoopLogger());

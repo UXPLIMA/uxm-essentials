@@ -220,7 +220,7 @@ public final class PluginModule {
         boolean allowMenuConsole =
                 config.scoped(ModuleId.of("custommenus").configRoot()).getBoolean("allow-console", false);
         MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
-        MenuVocabulary.registerConditions(menuBindings, kernel.permissions());
+        MenuVocabulary.registerConditions(menuBindings, kernel.permissions(), kernel.log());
         MenuVocabulary.registerPlaceholders(menuBindings);
         PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {

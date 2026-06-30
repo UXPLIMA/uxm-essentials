@@ -11,6 +11,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -27,7 +28,7 @@ class GenericConditionsTest {
     @Test
     void permConditionChecksTheViewerNode() {
         MenuBindings bindings = new MenuBindings();
-        MenuVocabulary.registerConditions(bindings, new GrantOnly("x.allow"));
+        MenuVocabulary.registerConditions(bindings, new GrantOnly("x.allow"), new NoopLogger());
         BiPredicate<MenuContext, Map<String, String>> perm =
                 bindings.condition("perm").orElseThrow(() -> new AssertionError("perm condition not registered"));
         MenuContext ctx = MenuContext.of(viewer("Allowed"), null, 0);
@@ -52,6 +53,21 @@ class GenericConditionsTest {
 
     private static PlayerRef viewer(String name) {
         return new PlayerRef(UUID.randomUUID(), name);
+    }
+
+    /** A {@link Logger} that discards every line; this test asserts behaviour, not log output. */
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /** A {@link Permissions} fake that grants exactly one node and rejects every other; only {@link #has} is used. */
