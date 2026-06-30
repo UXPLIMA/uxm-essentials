@@ -4,10 +4,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.Server;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 
 /**
  * The ordered chain of {@link IconProvider}s the renderer consults before falling back to a plain material.
@@ -19,7 +21,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
  * PlaceholderRegistry)} constructor uses, so every existing call site gains skulls and equipment for free.
  * {@link #withHeadDatabase(HeadQuery)} additionally chains the HeadDatabase provider, built from the Phase-0
  * {@link HeadQuery} hook; bootstrap uses it so {@code hdb:<id>} resolves when HeadDatabase is installed and
- * degrades to a plain head (the material fallback) when it is not.
+ * degrades to a plain head (the material fallback) when it is not. {@link #full(Server, Logger, HeadQuery)} is the
+ * composition root's full chain — those same providers plus the four custom-item integrations (ItemsAdder, Oraxen,
+ * Nexo, MMOItems), each reached reflectively and degrading to the material fallback when its plugin is absent.
  */
 public final class IconProviders {
 
@@ -48,6 +52,27 @@ public final class IconProviders {
         Objects.requireNonNull(headQuery, "headQuery");
         return new IconProviders(
                 List.of(new SkullIconProvider(), new EquipmentIconProvider(), new HeadDatabaseIconProvider(headQuery)));
+    }
+
+    /**
+     * The full chain the composition root wires: the skull and equipment providers, then the four custom-item
+     * providers (ItemsAdder, Oraxen, Nexo, MMOItems), then the HeadDatabase provider. The prefixes are disjoint, so
+     * order is a readability choice rather than a routing one — a spec reaches exactly the one provider that owns its
+     * prefix. Each custom-item provider reaches its plugin reflectively behind a present-guard, so on a server without
+     * that plugin its prefix resolves to empty and the renderer falls back to the plain material.
+     */
+    public static IconProviders full(Server server, Logger log, HeadQuery headQuery) {
+        Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(headQuery, "headQuery");
+        return new IconProviders(List.of(
+                new SkullIconProvider(),
+                new EquipmentIconProvider(),
+                new ItemsAdderIconProvider(server, log),
+                new OraxenIconProvider(server, log),
+                new NexoIconProvider(server, log),
+                new MMOItemsIconProvider(server, log),
+                new HeadDatabaseIconProvider(headQuery)));
     }
 
     /**

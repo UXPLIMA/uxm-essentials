@@ -225,14 +225,16 @@ public final class PluginModule {
         // façade and the bindings are threaded into module wiring (the warp sound selector is the first feature to
         // register its bindings and open a spec through them); Phase 3 reuses the same path for the rest.
         MenuBindings menuBindings = new MenuBindings();
-        // The icon chain backs every menu item's material field: the skull and equipment providers plus the
-        // HeadDatabase provider over the just-resolved hook, so hdb:<id> resolves when HeadDatabase is installed
-        // and degrades to a plain head when it is not. The plain two-arg ItemRenderer used by feature menus uses
-        // the default chain (skull + equipment); this composition-root renderer adds the HeadDatabase source.
+        // The icon chain backs every menu item's material field: the skull and equipment providers, the four
+        // custom-item providers (ItemsAdder/Oraxen/Nexo/MMOItems, each reached reflectively behind a present-guard),
+        // and the HeadDatabase provider over the just-resolved hook. So skull:/itemsadder:/hdb: etc. resolve when
+        // the backing plugin is installed and degrade to the plain material when it is not. The plain two-arg
+        // ItemRenderer used by feature menus uses only the no-dependency default chain (skull + equipment); this
+        // composition-root renderer adds the plugin-backed sources.
         ItemRenderer menuItemRenderer = new ItemRenderer(
                 guiText,
                 menuBindings.placeholders(),
-                IconProviders.withHeadDatabase(hooks.capability(HeadQuery.class)));
+                IconProviders.full(plugin.getServer(), kernel.log(), hooks.capability(HeadQuery.class)));
         MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions());
         // The editor renderer is the typed-property capability the same engine grows: a property editor is a
         // MenuHolder window the one listener routes and the one shutdown tears down, so the renderer is threaded into
