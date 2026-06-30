@@ -62,6 +62,7 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
 import com.uxplima.uxmessentials.persistence.communication.AnnouncementStores;
+import com.uxplima.uxmessentials.persistence.menu.PlayerDataRepositories;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
@@ -88,6 +89,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -117,6 +119,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreDiscordlinkPl
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
@@ -252,6 +255,16 @@ public final class PluginModule {
         String defaultCurrency =
                 config.scoped(ModuleId.of("custommenus").configRoot()).getString("default-currency", "vault");
         resources.currencies(new Currencies(hooks, plugin.getServer(), kernel.log(), defaultCurrency));
+
+        // The persistent player-data store reuses the plugin database (the same Flyway+jOOQ pattern every context
+        // uses, V68's menu_player_data table) behind an in-memory cache, so the Phase-2 data actions and the Phase-6
+        // %..._value_<key>% placeholders read player-scoped data as entity-thread cache hits and persist their
+        // writes off-tick. Cross-cutting menu substrate, so it is built here beside the currencies and hooks; its
+        // join/quit cache lifecycle registers as a normal listener through the shared listener path.
+        CachingPlayerDataStore playerData =
+                new CachingPlayerDataStore(PlayerDataRepositories.jooq(persistence), kernel.scheduler());
+        resources.playerData(playerData);
+        resources.addListener(new PlayerDataLifecycleListener(playerData, kernel.scheduler()));
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,

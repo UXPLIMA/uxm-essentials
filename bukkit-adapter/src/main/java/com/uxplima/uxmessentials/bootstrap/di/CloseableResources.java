@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -48,6 +49,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable WorldGeneratorResolver worldGeneratorResolver;
     private @Nullable Hooks hooks;
     private @Nullable Currencies currencies;
+    private @Nullable PlayerDataStore playerData;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -125,6 +127,20 @@ public final class CloseableResources implements AutoCloseable {
     /** The multi-currency façade, or null before wiring has constructed it. */
     public @Nullable Currencies currencies() {
         return currencies;
+    }
+
+    /**
+     * Captures the persistent player-data store so the Phase-2 data actions (SET/ADD/SUB/MUL/DIV) and the Phase-6
+     * {@code %..._value_<key>%} placeholders read and write per-player data from one place. Built once at wiring,
+     * beside the cross-cutting menu substrate; its join/quit cache lifecycle is registered as a normal listener.
+     */
+    public void playerData(PlayerDataStore resolved) {
+        this.playerData = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The persistent player-data store, or null before wiring has constructed it. */
+    public @Nullable PlayerDataStore playerData() {
+        return playerData;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */
