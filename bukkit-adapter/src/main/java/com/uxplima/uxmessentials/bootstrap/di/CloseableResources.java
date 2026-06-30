@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
@@ -46,6 +47,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable UsageBinding usageBinding;
     private @Nullable WorldGeneratorResolver worldGeneratorResolver;
     private @Nullable Hooks hooks;
+    private @Nullable Currencies currencies;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -109,6 +111,20 @@ public final class CloseableResources implements AutoCloseable {
     /** The resolved optional-plugin hooks, or null before wiring has constructed them. */
     public @Nullable Hooks hooks() {
         return hooks;
+    }
+
+    /**
+     * Captures the multi-currency façade so the Phase-2 economy actions and Phase-3 requirements read every
+     * back-end (Vault, Exp, PlayerPoints, CoinsEngine, zEssentials) from one place. Built once at wiring, beside
+     * the hooks it depends on.
+     */
+    public void currencies(Currencies resolved) {
+        this.currencies = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The multi-currency façade, or null before wiring has constructed it. */
+    public @Nullable Currencies currencies() {
+        return currencies;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */

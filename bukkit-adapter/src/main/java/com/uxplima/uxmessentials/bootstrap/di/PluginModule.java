@@ -91,6 +91,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlace
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
@@ -238,10 +239,19 @@ public final class PluginModule {
         // integration features (the multi-currency providers, HeadDatabase, the item providers) add their hook
         // the same way and read their capability from resources.hooks(). A missing soft-depend never loads an
         // external class — the no-op default carries none, so there is no NoClassDefFoundError path.
-        resources.hooks(Hooks.resolve(
+        Hooks hooks = Hooks.resolve(
                 plugin.getServer(),
                 kernel.log(),
-                List.of(new PlaceholderApiHook(), new VaultEconomyHook(), new VaultPermissionHook())));
+                List.of(new PlaceholderApiHook(), new VaultEconomyHook(), new VaultPermissionHook()));
+        resources.hooks(hooks);
+
+        // The multi-currency seam over those hooks plus native Exp and the reflective economies (PlayerPoints,
+        // CoinsEngine, zEssentials). Built here because it reads the just-resolved Vault economy capability; the
+        // configured default currency (custommenus config, vault out of the box) is what a Phase-2 economy action
+        // with no explicit currency spec falls back to. Phase-2/3 vocab reads this façade from resources.currencies().
+        String defaultCurrency =
+                config.scoped(ModuleId.of("custommenus").configRoot()).getString("default-currency", "vault");
+        resources.currencies(new Currencies(hooks, plugin.getServer(), kernel.log(), defaultCurrency));
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,
