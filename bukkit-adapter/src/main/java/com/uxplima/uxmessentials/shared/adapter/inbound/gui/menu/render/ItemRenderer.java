@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,6 +15,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
@@ -37,10 +39,26 @@ public final class ItemRenderer {
 
     private final GuiText guiText;
     private final PlaceholderRegistry placeholders;
+    private final IconProviders iconProviders;
 
+    /**
+     * The plain two-argument form, kept so the engine's many existing call sites are untouched. It renders with
+     * the {@link IconProviders#defaults() default} icon chain — skull sources and viewer equipment — so a menu
+     * gains those for free; HeadDatabase needs the hook and so is only present on the three-argument form.
+     */
     public ItemRenderer(GuiText guiText, PlaceholderRegistry placeholders) {
+        this(guiText, placeholders, IconProviders.defaults());
+    }
+
+    /**
+     * The full form the composition root uses: the same renderer plus an explicit {@link IconProviders} chain,
+     * which bootstrap builds with HeadDatabase wired in so {@code hdb:<id>} resolves (and degrades to a plain
+     * head when HeadDatabase is absent).
+     */
+    public ItemRenderer(GuiText guiText, PlaceholderRegistry placeholders, IconProviders iconProviders) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.placeholders = Objects.requireNonNull(placeholders, "placeholders");
+        this.iconProviders = Objects.requireNonNull(iconProviders, "iconProviders");
     }
 
     /**
@@ -59,9 +77,9 @@ public final class ItemRenderer {
     public ItemStack render(MenuItemSpec item, MenuContext ctx) {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(ctx, "ctx");
-        Material material = resolveMaterial(item.material(), ctx);
+        String materialSpec = resolveMaterialSpec(item.material(), ctx);
         Component name = resolveText(item.name(), ctx);
-        return applyDecor(ItemBuilder.of(material).name(name).lore(lore(item, ctx)), item.decor())
+        return applyDecor(baseItem(materialSpec, ctx).name(name).lore(lore(item, ctx)), item.decor())
                 .build();
     }
 
@@ -106,14 +124,30 @@ public final class ItemRenderer {
     }
 
     /**
-     * The material to render. A {@code %token%} spec resolves through the placeholder whose value is treated as
-     * a material name; a literal spec is the name itself. An unmatched name (or a blank one) falls back to
-     * {@link Material#STONE} so a typo never aborts the render.
+     * The resolved material spec string: a {@code %token%} spec expands through its placeholder, a literal spec
+     * is itself. This is the string the icon providers and the material fallback both read — so {@code %head%}
+     * → {@code skull:Notch} reaches the skull provider, and {@code DIAMOND} reaches the material lookup.
      */
-    private Material resolveMaterial(String raw, MenuContext ctx) {
+    private String resolveMaterialSpec(String raw, MenuContext ctx) {
         Matcher matcher = PLACEHOLDER.matcher(raw);
-        String name =
-                matcher.find() ? placeholders.resolve(matcher.group(1), ctx).orElse("") : raw;
+        return matcher.find() ? placeholders.resolve(matcher.group(1), ctx).orElse("") : raw;
+    }
+
+    /**
+     * The base item for {@code spec}: an icon provider's stack (a skull source, the viewer's equipment, an HDB
+     * head) when one claims the spec, else a plain item of the named material. A provider that builds a head
+     * still has the item's name, lore and decor layered on top by the caller, exactly as a material item does.
+     */
+    private ItemBuilder baseItem(String spec, MenuContext ctx) {
+        Optional<ItemStack> provided = iconProviders.resolve(spec, ctx);
+        return provided.map(ItemBuilder::from).orElseGet(() -> ItemBuilder.of(materialOrStone(spec)));
+    }
+
+    /**
+     * The material named by {@code name}, falling back to {@link Material#STONE} for a blank or unknown name so a
+     * typo (or a provider-shaped spec no provider claimed) never aborts the render.
+     */
+    private Material materialOrStone(String name) {
         if (name.isBlank()) {
             return Material.STONE;
         }

@@ -83,6 +83,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
@@ -97,6 +98,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogCo
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.NbtApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
@@ -197,6 +199,24 @@ public final class PluginModule {
         BusWiring.Wired bus = BusWiring.wire(plugin, config, kernel.scheduler(), kernel.log());
         resources.onClose(bus::stop);
 
+        // The optional-plugin hook façade: resolved once here (plugin presence is stable for the run) over the
+        // registered hooks, each binding to its real impl when its soft-depend is installed or to a no-op default
+        // otherwise. The Vault economy/permission, NBT-API and HeadDatabase hooks join the worked PlaceholderAPI
+        // example here; later integration features (the item providers) add their hook the same way and read
+        // their capability from resources.hooks(). A missing soft-depend never loads an
+        // external class — the no-op default carries none, so there is no NoClassDefFoundError path. Resolved
+        // before the menu engine so the renderer's skull provider can read the HeadDatabase capability for hdb:<id>.
+        Hooks hooks = Hooks.resolve(
+                plugin.getServer(),
+                kernel.log(),
+                List.of(
+                        new PlaceholderApiHook(),
+                        new VaultEconomyHook(),
+                        new VaultPermissionHook(),
+                        new NbtApiHook(kernel.log()),
+                        new HeadDatabaseHook(kernel.log())));
+        resources.hooks(hooks);
+
         GuiText guiText = new GuiText(kernel.messages());
         // The data-driven menu engine: one binding façade holds every feature's handlers, and the renderer and
         // click listener share those exact registry instances so a feature registering behaviour after wiring is
@@ -205,7 +225,14 @@ public final class PluginModule {
         // façade and the bindings are threaded into module wiring (the warp sound selector is the first feature to
         // register its bindings and open a spec through them); Phase 3 reuses the same path for the rest.
         MenuBindings menuBindings = new MenuBindings();
-        ItemRenderer menuItemRenderer = new ItemRenderer(guiText, menuBindings.placeholders());
+        // The icon chain backs every menu item's material field: the skull and equipment providers plus the
+        // HeadDatabase provider over the just-resolved hook, so hdb:<id> resolves when HeadDatabase is installed
+        // and degrades to a plain head when it is not. The plain two-arg ItemRenderer used by feature menus uses
+        // the default chain (skull + equipment); this composition-root renderer adds the HeadDatabase source.
+        ItemRenderer menuItemRenderer = new ItemRenderer(
+                guiText,
+                menuBindings.placeholders(),
+                IconProviders.withHeadDatabase(hooks.capability(HeadQuery.class)));
         MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions());
         // The editor renderer is the typed-property capability the same engine grows: a property editor is a
         // MenuHolder window the one listener routes and the one shutdown tears down, so the renderer is threaded into
@@ -238,23 +265,6 @@ public final class PluginModule {
             menuListener.uninstall();
             menus.shutdown();
         });
-
-        // The optional-plugin hook façade: resolved once here (plugin presence is stable for the run) over the
-        // registered hooks, each binding to its real impl when its soft-depend is installed or to a no-op default
-        // otherwise. The Vault economy/permission, NBT-API and HeadDatabase hooks join the worked PlaceholderAPI
-        // example here; later integration features (the item providers) add their hook the same way and read
-        // their capability from resources.hooks(). A missing soft-depend never loads an
-        // external class — the no-op default carries none, so there is no NoClassDefFoundError path.
-        Hooks hooks = Hooks.resolve(
-                plugin.getServer(),
-                kernel.log(),
-                List.of(
-                        new PlaceholderApiHook(),
-                        new VaultEconomyHook(),
-                        new VaultPermissionHook(),
-                        new NbtApiHook(kernel.log()),
-                        new HeadDatabaseHook(kernel.log())));
-        resources.hooks(hooks);
 
         // The multi-currency seam over those hooks plus native Exp and the reflective economies (PlayerPoints,
         // CoinsEngine, zEssentials). Built here because it reads the just-resolved Vault economy capability; the
