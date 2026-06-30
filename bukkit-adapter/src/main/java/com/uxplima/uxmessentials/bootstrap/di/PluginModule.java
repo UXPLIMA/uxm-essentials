@@ -90,6 +90,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuLis
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -270,6 +271,12 @@ public final class PluginModule {
                 new CachingPlayerDataStore(PlayerDataRepositories.jooq(persistence), kernel.scheduler());
         resources.playerData(playerData);
         resources.addListener(new PlayerDataLifecycleListener(playerData, kernel.scheduler()));
+
+        // The proxy connect seam shares the one BungeeCord/Velocity channel (npc and holograms build their own
+        // over the same plugin-scoped channel; Paper drops them all on disable). Built here so the Phase-2
+        // [connect] movement action reaches it from resources.serverConnector(); with no proxy in front the
+        // frame is harmlessly discarded, which is the degraded single-server behaviour.
+        resources.serverConnector(new BukkitServerConnector(plugin, kernel.log()));
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
@@ -50,6 +51,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable Hooks hooks;
     private @Nullable Currencies currencies;
     private @Nullable PlayerDataStore playerData;
+    private @Nullable ServerConnector serverConnector;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -141,6 +143,21 @@ public final class CloseableResources implements AutoCloseable {
     /** The persistent player-data store, or null before wiring has constructed it. */
     public @Nullable PlayerDataStore playerData() {
         return playerData;
+    }
+
+    /**
+     * Captures the proxy {@link ServerConnector} so the Phase-2 {@code [connect]} movement action can move a
+     * viewer to another backend through one shared BungeeCord/Velocity channel. Built once at wiring beside the
+     * other menu substrate; with no proxy in front the underlying frame is harmlessly discarded, so a
+     * single-server install reads this as a logged no-op rather than an error.
+     */
+    public void serverConnector(ServerConnector resolved) {
+        this.serverConnector = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The proxy server connector, or null before wiring has constructed it. */
+    public @Nullable ServerConnector serverConnector() {
+        return serverConnector;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */

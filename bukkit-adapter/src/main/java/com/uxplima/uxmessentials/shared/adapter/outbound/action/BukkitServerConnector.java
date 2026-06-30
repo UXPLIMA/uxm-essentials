@@ -64,7 +64,9 @@ public final class BukkitServerConnector implements ServerConnector {
         // No per-module teardown — see the method contract above.
     }
 
-    private static byte[] connectFrame(String server) {
+    // Package-private rather than private so the connector's own test can decode and assert the exact
+    // "Connect" + server frame the proxy expects, without sending a real plugin message.
+    static byte[] connectFrame(String server) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
             out.writeUTF(CONNECT_SUBCHANNEL);
