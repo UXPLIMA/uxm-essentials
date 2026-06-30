@@ -51,7 +51,7 @@ public final class TextInputTestKit {
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(inputDir, "inputDir");
         Objects.requireNonNull(log, "log");
-        InputSettings settings = new InputSettings(inputDir, log);
+        InputSettings settings = new InputSettings(inputDir.resolve("text-input.conf"), log);
         AnvilTextBackend anvilBackend = new AnvilTextBackend(new AnvilInput(plugin));
         ChatTextBackend chatBackend = new ChatTextBackend(plugin);
         TextInput textInput = new TextInput(settings, guiText, scheduler, anvilBackend, chatBackend);

@@ -127,7 +127,7 @@ final class DefaultResources {
             "modules/worlds/gui/world-list.conf",
             "modules/worlds/gui/world-main.conf",
             "menus/example.conf",
-            "input/config.conf",
+            "text-input.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");
 

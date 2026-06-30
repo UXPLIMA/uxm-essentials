@@ -92,9 +92,9 @@ class KitManagerCreateButtonTest {
         player.setOp(true);
 
         // Route the create-name input point through chat so firing an AsyncChatEvent completes the prompt.
-        Path inputDir = plugin.getDataFolder().toPath().resolve("input");
+        Path inputDir = plugin.getDataFolder().toPath();
         Files.createDirectories(inputDir);
-        Files.writeString(inputDir.resolve("config.conf"), """
+        Files.writeString(inputDir.resolve("text-input.conf"), """
                 default-mode = anvil
                 modes {
                   "kit.create-name" = chat

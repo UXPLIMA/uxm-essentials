@@ -413,7 +413,7 @@ public final class PluginModule {
         anvil.install();
         resources.onClose(anvil::uninstall);
         // The unified text-input seam: one entry point every GUI uses to capture a line of text, with the operator
-        // choosing anvil-or-chat per input point in input/config.conf. It wraps the shared anvil above as one backend
+        // choosing anvil-or-chat per input point in text-input.conf. It wraps the shared anvil above as one backend
         // and installs a single shared chat listener as the other, replacing the per-context chat-prompt listeners.
         TextInputInstaller.Installed input = TextInputInstaller.install(
                 plugin,

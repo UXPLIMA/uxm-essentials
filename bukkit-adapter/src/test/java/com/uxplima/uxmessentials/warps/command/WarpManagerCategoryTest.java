@@ -79,9 +79,9 @@ class WarpManagerCategoryTest {
         player = server.addPlayer("Alice");
         player.setOp(true);
 
-        Path inputDir = plugin.getDataFolder().toPath().resolve("input");
+        Path inputDir = plugin.getDataFolder().toPath();
         Files.createDirectories(inputDir);
-        Files.writeString(inputDir.resolve("config.conf"), """
+        Files.writeString(inputDir.resolve("text-input.conf"), """
                 default-mode = anvil
                 modes {
                   "warp.category.display-name" = chat

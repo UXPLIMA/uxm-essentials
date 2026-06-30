@@ -63,7 +63,7 @@ class TextInputTest {
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
-        Files.writeString(dir.resolve("config.conf"), """
+        Files.writeString(dir.resolve("text-input.conf"), """
                 default-mode = anvil
                 modes {
                   "the.chat-key" = chat

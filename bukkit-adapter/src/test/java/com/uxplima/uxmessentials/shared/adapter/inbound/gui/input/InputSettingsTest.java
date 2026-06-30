@@ -22,7 +22,7 @@ class InputSettingsTest {
 
     @Test
     void absentFileFallsBackToAnvilDefaultAndTheTwoCancelKeywords() {
-        InputSettings settings = new InputSettings(dir, new SilentLogger());
+        InputSettings settings = new InputSettings(dir.resolve("text-input.conf"), new SilentLogger());
 
         assertThat(settings.modeFor("anything")).isEqualTo(InputMode.ANVIL);
         assertThat(settings.cancelKeywords()).containsExactly("cancel", "iptal");
@@ -41,7 +41,7 @@ class InputSettingsTest {
                 }
                 cancel-keywords = ["stop", "dur"]
                 """);
-        InputSettings settings = new InputSettings(dir, new SilentLogger());
+        InputSettings settings = new InputSettings(dir.resolve("text-input.conf"), new SilentLogger());
 
         assertThat(settings.modeFor("home.rename")).isEqualTo(InputMode.ANVIL);
         assertThat(settings.modeFor("loan.amount")).isEqualTo(InputMode.CHAT);
@@ -56,7 +56,7 @@ class InputSettingsTest {
     @Test
     void reloadSwapsTheParsedContent() throws IOException {
         write("default-mode = anvil\n");
-        InputSettings settings = new InputSettings(dir, new SilentLogger());
+        InputSettings settings = new InputSettings(dir.resolve("text-input.conf"), new SilentLogger());
         assertThat(settings.modeFor("x")).isEqualTo(InputMode.ANVIL);
 
         write("default-mode = chat\n");
@@ -65,7 +65,7 @@ class InputSettingsTest {
     }
 
     private void write(String content) throws IOException {
-        Files.writeString(dir.resolve("config.conf"), content);
+        Files.writeString(dir.resolve("text-input.conf"), content);
     }
 
     private static final class SilentLogger implements Logger {

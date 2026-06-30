@@ -15,7 +15,7 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
- * The text-input seam's operator config, loaded once at wiring time from {@code input/config.conf} and held in an
+ * The text-input seam's operator config, loaded once at wiring time from {@code text-input.conf} and held in an
  * {@link AtomicReference} so a reload swaps a fresh parse whole — a reader sees either the previous or the new
  * content, never a half-applied tree (CLAUDE.md "swapped atomically via AtomicReference on reload"). The file
  * carries the global {@code default-mode}, the per-key {@code modes} overrides, and the {@code cancel-keywords}; an
@@ -28,17 +28,15 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 @NullMarked
 public final class InputSettings {
 
-    private static final String CONTENT_FILE = "config.conf";
-
-    private final Path inputDir;
+    private final Path configFile;
     private final Logger log;
     private final AtomicReference<InputContentCodec.Parsed> parsed;
 
-    /** @param inputDir the {@code input/} folder under the data folder; the config file is {@code config.conf} inside it */
-    public InputSettings(Path inputDir, Logger log) {
-        this.inputDir = Objects.requireNonNull(inputDir, "inputDir");
+    /** @param configFile the {@code text-input.conf} file under the data folder */
+    public InputSettings(Path configFile, Logger log) {
+        this.configFile = Objects.requireNonNull(configFile, "configFile");
         this.log = Objects.requireNonNull(log, "log");
-        this.parsed = new AtomicReference<>(InputContentCodec.read(load(inputDir, log), log));
+        this.parsed = new AtomicReference<>(InputContentCodec.read(load(configFile, log), log));
     }
 
     /** The configured mode for {@code key} — its per-key override if set, otherwise the global default. */
@@ -72,15 +70,14 @@ public final class InputSettings {
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        parsed.set(InputContentCodec.read(load(inputDir, log), log));
+        parsed.set(InputContentCodec.read(load(configFile, log), log));
     }
 
     private InputContentCodec.Parsed current() {
         return Objects.requireNonNull(parsed.get(), "parsed");
     }
 
-    private static ConfigurationNode load(Path inputDir, Logger log) {
-        Path file = inputDir.resolve(CONTENT_FILE);
+    private static ConfigurationNode load(Path file, Logger log) {
         if (!Files.exists(file)) {
             return CommentedConfigurationNode.root();
         }
