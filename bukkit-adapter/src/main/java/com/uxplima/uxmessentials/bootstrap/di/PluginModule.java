@@ -96,6 +96,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogCo
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.NbtApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
@@ -245,7 +246,11 @@ public final class PluginModule {
         Hooks hooks = Hooks.resolve(
                 plugin.getServer(),
                 kernel.log(),
-                List.of(new PlaceholderApiHook(), new VaultEconomyHook(), new VaultPermissionHook()));
+                List.of(
+                        new PlaceholderApiHook(),
+                        new VaultEconomyHook(),
+                        new VaultPermissionHook(),
+                        new NbtApiHook(kernel.log())));
         resources.hooks(hooks);
 
         // The multi-currency seam over those hooks plus native Exp and the reflective economies (PlayerPoints,
