@@ -2,14 +2,31 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bukkit.Color;
+import org.bukkit.DyeColor;
+import org.bukkit.Keyed;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
+import org.bukkit.block.banner.PatternType;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ArmorMeta;
+import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.inventory.meta.trim.ArmorTrim;
+import org.bukkit.inventory.meta.trim.TrimMaterial;
+import org.bukkit.inventory.meta.trim.TrimPattern;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
 
 import net.kyori.adventure.text.Component;
 
@@ -19,9 +36,11 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconP
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Resolves one {@link MenuItemSpec} into the {@link ItemStack} a viewer sees. The spec carries only raw text —
@@ -36,6 +55,9 @@ public final class ItemRenderer {
 
     /** A single {@code %token%} placeholder. {@code group(1)} is the bare token name. */
     private static final Pattern PLACEHOLDER = Pattern.compile("%(\\w+)%");
+
+    /** Default custom-effect duration in ticks when a {@code effect:amplifier} token omits the duration. */
+    private static final int DEFAULT_EFFECT_TICKS = 600;
 
     private final GuiText guiText;
     private final PlaceholderRegistry placeholders;
@@ -79,7 +101,7 @@ public final class ItemRenderer {
         Objects.requireNonNull(ctx, "ctx");
         String materialSpec = resolveMaterialSpec(item.material(), ctx);
         Component name = resolveText(item.name(), ctx);
-        return applyDecor(baseItem(materialSpec, ctx).name(name).lore(lore(item, ctx)), item.decor())
+        return applyDecor(baseItem(materialSpec, ctx).name(name).lore(lore(item, ctx)), item.decor(), ctx)
                 .build();
     }
 
@@ -187,15 +209,65 @@ public final class ItemRenderer {
         return out.toString();
     }
 
-    /** Layer the spec's amount, glow, optional model data, and item flags onto the in-progress item. */
-    private ItemBuilder applyDecor(ItemBuilder builder, ItemDecor decor) {
-        builder.amount(decor.amount()).glow(decor.glow());
-        decor.modelData().ifPresent(builder::customModelData);
+    /** Layer the spec's amount, glow, model data, item flags, and native rich meta onto the in-progress item. */
+    private ItemBuilder applyDecor(ItemBuilder builder, ItemDecor decor, MenuContext ctx) {
+        applyAmount(builder, decor, ctx);
+        builder.glow(decor.glow());
+        applyModelData(builder, decor, ctx);
         ItemFlag[] flags = resolveFlags(decor.flagTokens());
         if (flags.length > 0) {
             builder.flags(flags);
         }
+        applyRichMeta(builder, decor.meta());
         return builder;
+    }
+
+    /**
+     * Set the stack amount, preferring a {@code dynamicAmount} {@code %token%} resolved to a number over the static
+     * spec value and clamping the floor to one. A value above the material's max stack size keeps a single item
+     * rather than aborting the render, matching the fail-soft stance the rest of the decor takes.
+     */
+    private void applyAmount(ItemBuilder builder, ItemDecor decor, MenuContext ctx) {
+        int amount = Math.max(1, dynamicInt(decor.meta().dynamicAmount(), ctx).orElse(decor.amount()));
+        try {
+            builder.amount(amount);
+        } catch (IllegalArgumentException aboveMax) {
+            // A dynamic amount above the material's max stack size keeps a single item rather than aborting.
+            builder.amount(1);
+        }
+    }
+
+    /** Apply the custom model data, preferring a {@code dynamicModelData} {@code %token%} over the static value. */
+    private void applyModelData(ItemBuilder builder, ItemDecor decor, MenuContext ctx) {
+        dynamicInt(decor.meta().dynamicModelData(), ctx)
+                .or(decor::modelData)
+                .ifPresent(data -> safely(() -> builder.customModelData(data)));
+    }
+
+    /** Resolve a {@code %token%} string through the placeholder path and parse it to an int, when both succeed. */
+    private Optional<Integer> dynamicInt(Optional<String> token, MenuContext ctx) {
+        return token.map(raw -> substitutePlaceholders(raw, ctx)).flatMap(ItemRenderer::parseInt);
+    }
+
+    /**
+     * Apply every native rich-meta value the operator declared, resolving each token against the live registries.
+     * Anything that does not resolve — an unknown enchant, an unsupported colour, a banner/trim registry the
+     * runtime cannot model — is skipped rather than aborting the render, the same way an unknown flag is skipped.
+     */
+    private void applyRichMeta(ItemBuilder builder, RichMeta meta) {
+        if (meta.unbreakable()) {
+            safely(() -> builder.unbreakable(true));
+        }
+        meta.enchantments().forEach(token -> applyEnchant(builder, token, false));
+        meta.storedEnchantments().forEach(token -> applyEnchant(builder, token, true));
+        meta.leatherColor()
+                .flatMap(ItemRenderer::parseColor)
+                .ifPresent(color -> safely(() -> builder.leatherColor(color)));
+        applyPotion(builder, meta.potion());
+        meta.bannerPatterns().forEach(token -> applyBannerPattern(builder, token));
+        meta.trim().ifPresent(trim -> applyTrim(builder, trim));
+        meta.damage().ifPresent(damage -> applyDamage(builder, damage));
+        meta.itemModel().ifPresent(model -> applyItemModel(builder, model));
     }
 
     /** Map the spec's raw flag tokens to Bukkit {@link ItemFlag}s, skipping any token that is not a flag name. */
@@ -209,5 +281,180 @@ public final class ItemRenderer {
             }
         }
         return flags.toArray(ItemFlag[]::new);
+    }
+
+    /**
+     * Apply one {@code name:level} enchant token to the item or its stored-enchant book. The level defaults to one
+     * when absent or unparseable, and an id that does not resolve in the enchantment registry is skipped.
+     */
+    private void applyEnchant(ItemBuilder builder, String token, boolean stored) {
+        int colon = token.lastIndexOf(':');
+        Optional<Integer> parsed = colon < 0 ? Optional.empty() : parseInt(token.substring(colon + 1));
+        String name = colon < 0 || parsed.isEmpty() ? token : token.substring(0, colon);
+        fromRegistry(RegistryKey.ENCHANTMENT, keyOf(name)).ifPresent(enchant -> {
+            int level = Math.max(1, parsed.orElse(1));
+            safely(() -> {
+                if (stored) {
+                    builder.storedEnchant(enchant, level);
+                } else {
+                    builder.enchant(enchant, level);
+                }
+            });
+        });
+    }
+
+    /** Apply a potion's base type, display colour, and any {@code effect:amplifier:durationTicks} custom effects. */
+    private void applyPotion(ItemBuilder builder, RichMeta.PotionSpec potion) {
+        potion.type()
+                .flatMap(name -> fromRegistry(Registry.POTION, keyOf(name)))
+                .ifPresent(base ->
+                        safely(() -> builder.editTypedMeta(PotionMeta.class, meta -> meta.setBasePotionType(base))));
+        potion.color().flatMap(ItemRenderer::parseColor).ifPresent(color -> safely(() -> builder.potionColor(color)));
+        potion.effects()
+                .forEach(token -> parsePotionEffect(token).ifPresent(e -> safely(() -> builder.potionEffect(e))));
+    }
+
+    /** Append one {@code pattern:dyecolor} banner pattern, skipping an unknown pattern id or dye name. */
+    private void applyBannerPattern(ItemBuilder builder, String token) {
+        int colon = token.lastIndexOf(':');
+        if (colon <= 0) {
+            return;
+        }
+        Optional<PatternType> type = fromRegistry(RegistryKey.BANNER_PATTERN, keyOf(token.substring(0, colon)));
+        Optional<DyeColor> color = parseDye(token.substring(colon + 1));
+        if (type.isPresent() && color.isPresent()) {
+            safely(() -> builder.bannerPattern(color.get(), type.get()));
+        }
+    }
+
+    /** Set the armour trim from a trim-material id and trim-pattern id, skipping either that does not resolve. */
+    private void applyTrim(ItemBuilder builder, RichMeta.TrimSpec trim) {
+        Optional<TrimMaterial> material = fromRegistry(RegistryKey.TRIM_MATERIAL, keyOf(trim.material()));
+        Optional<TrimPattern> pattern = fromRegistry(RegistryKey.TRIM_PATTERN, keyOf(trim.pattern()));
+        if (material.isPresent() && pattern.isPresent()) {
+            safely(() -> builder.editTypedMeta(
+                    ArmorMeta.class, meta -> meta.setTrim(new ArmorTrim(material.get(), pattern.get()))));
+        }
+    }
+
+    /** Set the durability damage, a no-op on a non-damageable item; a negative value is ignored. */
+    private void applyDamage(ItemBuilder builder, int damage) {
+        if (damage >= 0) {
+            safely(() -> builder.damage(damage));
+        }
+    }
+
+    /** Override the item model with a resource-pack key, skipping a malformed or unsupported key. */
+    private void applyItemModel(ItemBuilder builder, String raw) {
+        NamespacedKey key = keyOf(raw);
+        if (key == null) {
+            return;
+        }
+        safely(() -> builder.itemModel(key));
+    }
+
+    /** Parse a {@code effect:amplifier:durationTicks} token into a {@link PotionEffect}, when its type resolves. */
+    private static Optional<PotionEffect> parsePotionEffect(String token) {
+        String[] parts = token.split(":", 3);
+        Optional<PotionEffectType> type = fromRegistry(Registry.EFFECT, keyOf(parts[0]));
+        if (type.isEmpty()) {
+            return Optional.empty();
+        }
+        int amplifier = parts.length > 1 ? Math.max(0, parseInt(parts[1]).orElse(0)) : 0;
+        int duration = parts.length > 2 ? parseInt(parts[2]).orElse(DEFAULT_EFFECT_TICKS) : DEFAULT_EFFECT_TICKS;
+        return Optional.of(new PotionEffect(type.get(), duration, amplifier));
+    }
+
+    /** A colour as a {@code #RRGGBB} hex, an {@code r,g,b} triple, or a named dye colour; empty when unparseable. */
+    private static Optional<Color> parseColor(String raw) {
+        String value = raw.trim();
+        if (value.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            if (value.startsWith("#")) {
+                return Optional.of(Color.fromRGB(Integer.parseInt(value.substring(1), 16)));
+            }
+            if (value.contains(",")) {
+                return rgbTriple(value);
+            }
+            return Optional.of(DyeColor.valueOf(value.toUpperCase(Locale.ROOT)).getColor());
+        } catch (IllegalArgumentException malformed) {
+            // A bad hex, an out-of-range channel, or an unknown colour name is skipped, like an unknown flag.
+            return Optional.empty();
+        }
+    }
+
+    /** Parse an {@code r,g,b} triple into a colour; empty when it is not exactly three channels. */
+    private static Optional<Color> rgbTriple(String value) {
+        String[] parts = value.split(",", -1);
+        if (parts.length != 3) {
+            return Optional.empty();
+        }
+        return Optional.of(Color.fromRGB(
+                Integer.parseInt(parts[0].trim()),
+                Integer.parseInt(parts[1].trim()),
+                Integer.parseInt(parts[2].trim())));
+    }
+
+    /** A {@link DyeColor} by case-insensitive name, present only when it matches a known dye. */
+    private static Optional<DyeColor> parseDye(String name) {
+        try {
+            return Optional.of(DyeColor.valueOf(name.trim().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException unknown) {
+            return Optional.empty();
+        }
+    }
+
+    /** The registry entry for {@code key}, empty when the key is null or the data-driven registry cannot model it. */
+    private static <T extends Keyed> Optional<T> fromRegistry(RegistryKey<T> registry, @Nullable NamespacedKey key) {
+        if (key == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(
+                    RegistryAccess.registryAccess().getRegistry(registry).get(key));
+        } catch (RuntimeException registryUnavailable) {
+            return Optional.empty();
+        }
+    }
+
+    /** The entry for {@code key} in a directly-held {@link Registry}, empty when null or the runtime cannot model it. */
+    private static <T extends Keyed> Optional<T> fromRegistry(Registry<T> registry, @Nullable NamespacedKey key) {
+        if (key == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(registry.get(key));
+        } catch (RuntimeException registryUnavailable) {
+            return Optional.empty();
+        }
+    }
+
+    /** A registry key from a raw id, lower-cased so an UPPER_SNAKE config value still resolves; null when malformed. */
+    private static @Nullable NamespacedKey keyOf(String raw) {
+        return NamespacedKey.fromString(raw.trim().toLowerCase(Locale.ROOT));
+    }
+
+    /** Parse a trimmed integer, empty when the value is not a number. */
+    private static Optional<Integer> parseInt(String raw) {
+        try {
+            return Optional.of(Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException notANumber) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Run one meta application, swallowing any runtime failure so a single unsupported value never aborts the whole
+     * render. A meta type the test runtime cannot model (an unimplemented registry or setter) still ships working on
+     * real Paper; here it simply degrades to a no-op, the same fail-soft contract as an unknown flag token.
+     */
+    private static void safely(Runnable application) {
+        try {
+            application.run();
+        } catch (RuntimeException unsupported) {
+            // This meta type is not modelled by the runtime (or its value did not resolve); skip, never abort.
+        }
     }
 }

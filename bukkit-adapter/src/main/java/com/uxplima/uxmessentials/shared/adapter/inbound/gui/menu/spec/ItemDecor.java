@@ -6,13 +6,24 @@ import java.util.Optional;
 
 /**
  * The cosmetic extras layered onto a rendered item beyond its material, name, and lore — stack amount, an
- * optional custom model data id, an enchant glow, and the raw item-flag tokens the renderer maps to Bukkit
- * {@code ItemFlag}s. Flag tokens stay as strings here so the pure model never references Bukkit.
+ * optional custom model data id, an enchant glow, the raw item-flag tokens the renderer maps to Bukkit
+ * {@code ItemFlag}s, and the richer native {@link RichMeta} (enchantments, colours, potion/banner/trim data, …).
+ * Flag tokens and every {@link RichMeta} value stay as strings/ints here so the pure model never references Bukkit.
  */
-public record ItemDecor(int amount, Optional<Integer> modelData, boolean glow, List<String> flagTokens) {
+public record ItemDecor(int amount, Optional<Integer> modelData, boolean glow, List<String> flagTokens, RichMeta meta) {
 
     public ItemDecor {
         Objects.requireNonNull(modelData, "modelData");
         flagTokens = List.copyOf(Objects.requireNonNull(flagTokens, "flagTokens"));
+        Objects.requireNonNull(meta, "meta");
+    }
+
+    /**
+     * The original four-argument form, retained so every existing call site keeps compiling unchanged: it carries
+     * no rich meta ({@link RichMeta#NONE}). Only the loader builds the five-argument canonical form when a spec's
+     * {@code decor} block declares native metadata.
+     */
+    public ItemDecor(int amount, Optional<Integer> modelData, boolean glow, List<String> flagTokens) {
+        this(amount, modelData, glow, flagTokens, RichMeta.NONE);
     }
 }

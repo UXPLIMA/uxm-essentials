@@ -140,12 +140,81 @@ public final class MenuSpecLoader {
         return new ClickSpec(actions, Map.of());
     }
 
+    /**
+     * Parse the {@code decor} block. Beyond the original amount/model-data/glow/flags it reads the native
+     * {@link RichMeta}, whose grammar is: {@code unbreakable=true}, {@code enchantments=["sharpness:5"]},
+     * {@code stored-enchantments=["mending:1"]}, {@code leather-color="#A1FF33"} (hex / {@code "r,g,b"} / named),
+     * {@code potion{ type=STRENGTH, color="#00AAFF", effects=["speed:1:600"] }},
+     * {@code banner{ patterns=["stripe_top:red"] }}, {@code trim{ material=diamond, pattern=sentry }},
+     * {@code damage=100}, {@code item-model="minecraft:diamond_sword"}. The {@code amount} and {@code model-data}
+     * values may instead be a {@code %placeholder%} string, in which case the literal token is carried as the
+     * dynamic override (the renderer resolves it to a number each draw) and the static default is kept.
+     */
     private ItemDecor parseDecor(ConfigurationNode node) {
-        ConfigurationNode modelData = node.node("model-data");
-        Optional<Integer> model =
-                modelData.virtual() || modelData.isNull() ? Optional.empty() : Optional.of(modelData.getInt());
-        return new ItemDecor(
-                node.node("amount").getInt(1), model, node.node("glow").getBoolean(false), strings(node.node("flags")));
+        ConfigurationNode amountNode = node.node("amount");
+        ConfigurationNode modelNode = node.node("model-data");
+        Optional<String> dynamicAmount = dynamicToken(amountNode);
+        Optional<String> dynamicModel = dynamicToken(modelNode);
+        int amount = dynamicAmount.isPresent() ? 1 : amountNode.getInt(1);
+        Optional<Integer> model = dynamicModel.isPresent() || modelNode.virtual() || modelNode.isNull()
+                ? Optional.empty()
+                : Optional.of(modelNode.getInt());
+        RichMeta meta = new RichMeta(
+                node.node("unbreakable").getBoolean(false),
+                strings(node.node("enchantments")),
+                strings(node.node("stored-enchantments")),
+                optionalString(node.node("leather-color")),
+                parsePotion(node.node("potion")),
+                strings(node.node("banner").node("patterns")),
+                parseTrim(node.node("trim")),
+                optionalInt(node.node("damage")),
+                dynamicAmount,
+                dynamicModel,
+                optionalString(node.node("item-model")));
+        return new ItemDecor(amount, model, node.node("glow").getBoolean(false), strings(node.node("flags")), meta);
+    }
+
+    private RichMeta.PotionSpec parsePotion(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return RichMeta.PotionSpec.NONE;
+        }
+        return new RichMeta.PotionSpec(
+                optionalString(node.node("type")), optionalString(node.node("color")), strings(node.node("effects")));
+    }
+
+    private Optional<RichMeta.TrimSpec> parseTrim(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        String material = node.node("material").getString("");
+        String pattern = node.node("pattern").getString("");
+        if (material.isBlank() || pattern.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(new RichMeta.TrimSpec(material, pattern));
+    }
+
+    /** The literal {@code %placeholder%} token a scalar node holds, present only when its value contains a {@code %}. */
+    private static Optional<String> dynamicToken(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        String raw = node.getString("");
+        return raw.contains("%") ? Optional.of(raw) : Optional.empty();
+    }
+
+    /** A node's trimmed-non-blank string value, or empty when the node is absent or blank. */
+    private static Optional<String> optionalString(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        String value = node.getString("");
+        return value.isBlank() ? Optional.empty() : Optional.of(value);
+    }
+
+    /** A node's int value, or empty when the node is absent. */
+    private static Optional<Integer> optionalInt(ConfigurationNode node) {
+        return node.virtual() || node.isNull() ? Optional.empty() : Optional.of(node.getInt());
     }
 
     private Optional<ListSpec> parseList(ConfigurationNode node, int rows) {
