@@ -71,7 +71,7 @@ public final class PlayerWarpListMenu {
     public static final String SPEC_ID = "playerwarp-list";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/playerwarp-list.conf";
+    private static final String SPEC_RESOURCE = "modules/playerwarps/gui/playerwarp-list.conf";
 
     /** The icon a warp with no configured (or an unparseable) material falls back to, matching the old list. */
     private static final Material FALLBACK_ICON = Material.ENDER_PEARL;

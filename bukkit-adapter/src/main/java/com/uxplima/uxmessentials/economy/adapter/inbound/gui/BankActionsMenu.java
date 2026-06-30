@@ -63,7 +63,7 @@ public final class BankActionsMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "economy-bank-actions";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-bank-actions.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-bank-actions.conf";
     private static final int ROWS = 3;
 
     private final Menus menus;

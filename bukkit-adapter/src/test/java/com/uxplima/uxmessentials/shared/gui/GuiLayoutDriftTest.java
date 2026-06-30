@@ -19,13 +19,8 @@ class GuiLayoutDriftTest {
     @Test
     void everyBrowseMenuShipsItsLayoutResourceWithTheExpectedRows() {
         assertRows("kits", "kits-menu", 6);
-        assertRows("homes", "home-list", 3);
-        assertRows("homes", "home-actions", 3);
         assertRows("homes", "icon-selector", 6);
-        assertRows("homes", "invites-menu", 6);
         assertRows("itemworld", "disposal", 6);
-        assertRows("kits", "kits-manager", 6);
-        assertRows("kits", "kits-settings", 3);
         assertRows("kits", "kits-preview", 6);
     }
 
@@ -34,17 +29,12 @@ class GuiLayoutDriftTest {
         // The comments may mention "title"/"lore" in prose (to point operators at the catalog); what must never
         // appear is a config key that would carry player text — a "title"/"lore"/"name" assignment or a
         // MessageKey reference. Player text stays in the message catalog, asserted by the locale-parity guard. A
-        // key like home-actions' rename-slot legitimately contains "name", so the check targets the assignment
-        // form (key = value) rather than the bare substring.
+        // key like a rename-slot legitimately contains "name", so the check targets the assignment form
+        // (key = value) rather than the bare substring.
         for (String[] menu : new String[][] {
             {"kits", "kits-menu"},
-            {"homes", "home-list"},
-            {"homes", "home-actions"},
             {"homes", "icon-selector"},
-            {"homes", "invites-menu"},
             {"itemworld", "disposal"},
-            {"kits", "kits-manager"},
-            {"kits", "kits-settings"},
             {"kits", "kits-preview"}
         }) {
             String body = read(menu[0], menu[1]);

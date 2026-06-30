@@ -58,7 +58,7 @@ public final class ModerationJailedMenu {
     public static final String SPEC_ID = "moderation-jailed";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/moderation-jailed.conf";
+    private static final String SPEC_RESOURCE = "modules/moderation/gui/moderation-jailed.conf";
 
     /** Mirrors the per-list page cap the {@code /jailedplayers} read uses, so the off-thread read stays bounded. */
     private static final int PAGE_LIMIT = 50;

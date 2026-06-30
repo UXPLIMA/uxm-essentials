@@ -56,8 +56,8 @@ public final class StaffPlayerMenu {
 
     public static final String LIST_SPEC_ID = "staff-list";
 
-    private static final String NAVIGATOR_RESOURCE = "modules/menu/specs/staff-navigator.conf";
-    private static final String LIST_RESOURCE = "modules/menu/specs/staff-list.conf";
+    private static final String NAVIGATOR_RESOURCE = "modules/staff/gui/staff-navigator.conf";
+    private static final String LIST_RESOURCE = "modules/staff/gui/staff-list.conf";
 
     private final Menus menus;
     private final Server server;

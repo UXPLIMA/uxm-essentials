@@ -51,8 +51,8 @@ public final class RecipeGridMenu {
 
     public static final String EMPTY_SPEC_ID = "itemworld-recipe-none";
 
-    private static final String GRID_RESOURCE = "modules/menu/specs/itemworld-recipe.conf";
-    private static final String EMPTY_RESOURCE = "modules/menu/specs/itemworld-recipe-none.conf";
+    private static final String GRID_RESOURCE = "modules/itemworld/gui/itemworld-recipe.conf";
+    private static final String EMPTY_RESOURCE = "modules/itemworld/gui/itemworld-recipe-none.conf";
 
     /** The nine grid cells, row-major top-left to bottom-right; matched by the spec's per-slot placeholders. */
     private static final int GRID_CELLS = 9;

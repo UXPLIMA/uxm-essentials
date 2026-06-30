@@ -55,7 +55,7 @@ public final class PunishmentConfirmView {
     /** The engine spec id this view registers and opens under. */
     public static final String SPEC_ID = "moderation-punishment-confirm";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/moderation-punishment-confirm.conf";
+    private static final String SPEC_RESOURCE = "modules/moderation/gui/moderation-punishment-confirm.conf";
     private static final int ROWS = 3;
     private static final String REASON_KEY = "moderation.reason";
 

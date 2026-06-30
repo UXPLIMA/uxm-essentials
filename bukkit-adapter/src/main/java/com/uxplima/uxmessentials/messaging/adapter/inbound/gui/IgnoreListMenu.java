@@ -56,7 +56,7 @@ public final class IgnoreListMenu {
     public static final String SPEC_ID = "messaging-ignore";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/messaging-ignore.conf";
+    private static final String SPEC_RESOURCE = "modules/messaging/gui/messaging-ignore.conf";
 
     private static final String IGNORE_ADD_INPUT_KEY = "messaging.ignore-add";
 

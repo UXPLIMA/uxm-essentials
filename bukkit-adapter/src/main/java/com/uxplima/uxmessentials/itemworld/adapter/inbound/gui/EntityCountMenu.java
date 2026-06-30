@@ -46,8 +46,8 @@ public final class EntityCountMenu {
 
     public static final String EMPTY_SPEC_ID = "itemworld-entitycount-empty";
 
-    private static final String GRID_RESOURCE = "modules/menu/specs/itemworld-entitycount.conf";
-    private static final String EMPTY_RESOURCE = "modules/menu/specs/itemworld-entitycount-empty.conf";
+    private static final String GRID_RESOURCE = "modules/itemworld/gui/itemworld-entitycount.conf";
+    private static final String EMPTY_RESOURCE = "modules/itemworld/gui/itemworld-entitycount-empty.conf";
 
     private final Menus menus;
 

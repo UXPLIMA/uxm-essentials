@@ -66,7 +66,7 @@ public final class EconomyBulkMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "economy-bulk";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-bulk.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-bulk.conf";
     private static final int ROWS = 3;
 
     private final Menus menus;

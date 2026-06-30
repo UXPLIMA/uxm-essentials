@@ -68,7 +68,7 @@ public final class WarpEditorView {
     /** The engine spec id this panel registers and opens under. */
     public static final String SPEC_ID = "warp-editor";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/warp-editor.conf";
+    private static final String SPEC_RESOURCE = "modules/warps/gui/warp-editor.conf";
     private static final int ROWS = 3;
 
     /** The display item a warp shows when no icon is set — the same default the browse menu falls back to. */

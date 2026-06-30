@@ -59,7 +59,7 @@ public final class WorldListMenu {
     public static final String SPEC_ID = "world-list";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/world-list.conf";
+    private static final String SPEC_RESOURCE = "modules/worlds/gui/world-list.conf";
 
     private final Menus menus;
     private final Scheduler scheduler;

@@ -15,6 +15,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.Test;
+import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * A shipped menu spec may only name binding ids that production wiring actually registers. Without this guard a
@@ -522,13 +524,12 @@ class ShippedSpecBindingsDriftTest {
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {
-        Path specsDir = repoRoot().resolve("bukkit-adapter/src/main/resources/modules/menu/specs");
-        if (!Files.isDirectory(specsDir)) {
-            // No spec ships yet — the pilot (Task 17) creates the directory and its first spec. Nothing to guard.
+        Path modulesDir = repoRoot().resolve("bukkit-adapter/src/main/resources/modules");
+        if (!Files.isDirectory(modulesDir)) {
             return;
         }
 
-        List<MenuSpec> specs = loadAll(specsDir);
+        List<MenuSpec> specs = loadAll(modulesDir);
 
         MenuBindings bindings = new MenuBindings();
         EXPECTED_ACTIONS.forEach(id -> bindings.action(id, ctx -> {}));
@@ -543,19 +544,44 @@ class ShippedSpecBindingsDriftTest {
                 .isEmpty();
     }
 
-    /** Parses every {@code .conf} under {@code specsDir}; a parse failure propagates as the drift it is. */
-    private static List<MenuSpec> loadAll(Path specsDir) {
+    /**
+     * Parses every engine spec shipped under a module's {@code gui/} folder; a parse failure propagates as the
+     * drift it is. Each built-in menu's spec lives under its own module ({@code modules/<module>/gui/<name>.conf}),
+     * alongside the layout {@code .conf}s the older menus still read. An engine spec is told apart by its
+     * {@code items} block — a layout conf carries none — so the geometry layouts are skipped rather than parsed as
+     * specs.
+     */
+    private static List<MenuSpec> loadAll(Path modulesDir) {
         MenuSpecLoader loader = new MenuSpecLoader();
         List<MenuSpec> specs = new ArrayList<>();
-        try (Stream<Path> walk = Files.walk(specsDir)) {
+        try (Stream<Path> walk = Files.walk(modulesDir)) {
             walk.filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().endsWith(".conf"))
+                    .filter(ShippedSpecBindingsDriftTest::inGuiFolder)
+                    .filter(ShippedSpecBindingsDriftTest::isEngineSpec)
                     .sorted()
                     .forEach(p -> specs.add(loader.load(p)));
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
         return specs;
+    }
+
+    /** True when {@code conf} sits directly in a {@code gui/} folder, where every built-in menu spec now lives. */
+    private static boolean inGuiFolder(Path conf) {
+        Path parent = conf.getParent();
+        return parent != null && parent.getFileName().toString().equals("gui");
+    }
+
+    /** True when {@code conf} is an engine menu spec — it declares an {@code items} block; a layout conf does not. */
+    private static boolean isEngineSpec(Path conf) {
+        try {
+            ConfigurationNode root =
+                    HoconConfigurationLoader.builder().path(conf).build().load();
+            return !root.node("items").virtual();
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
     }
 
     private static Path repoRoot() {

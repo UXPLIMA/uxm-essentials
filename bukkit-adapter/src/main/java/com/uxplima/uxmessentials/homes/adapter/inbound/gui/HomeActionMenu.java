@@ -71,7 +71,7 @@ public final class HomeActionMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "home-action";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/home-action.conf";
+    private static final String SPEC_RESOURCE = "modules/homes/gui/home-action.conf";
     private static final String BYPASS_UNSAFE_PERMISSION = "uxmessentials.home.bypass.unsafe";
     private static final String HOME_RENAME_INPUT_KEY = "home.rename";
 

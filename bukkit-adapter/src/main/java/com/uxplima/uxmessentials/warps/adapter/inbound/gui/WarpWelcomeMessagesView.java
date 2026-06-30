@@ -57,7 +57,7 @@ public final class WarpWelcomeMessagesView {
     /** The engine spec id this list registers and opens under. */
     public static final String SPEC_ID = "warp-welcome";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/warp-welcome.conf";
+    private static final String SPEC_RESOURCE = "modules/warps/gui/warp-welcome.conf";
     private static final int ROWS = 3;
 
     /** The entry grid's capacity: the top two rows of the three-row chest, as the old fixed view drew. */

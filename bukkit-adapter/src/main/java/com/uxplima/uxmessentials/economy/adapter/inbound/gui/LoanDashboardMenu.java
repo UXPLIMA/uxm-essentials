@@ -67,7 +67,7 @@ public final class LoanDashboardMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "economy-loan";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-loan.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-loan.conf";
     private static final int ROWS = 3;
 
     private final Menus menus;

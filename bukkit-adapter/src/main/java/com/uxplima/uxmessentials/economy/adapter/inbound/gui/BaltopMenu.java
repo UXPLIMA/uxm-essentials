@@ -48,7 +48,7 @@ public final class BaltopMenu {
     public static final String SPEC_ID = "economy-baltop";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-baltop.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-baltop.conf";
 
     /** Mirrors the per-page cap the original leaderboard read, so the off-thread read stays bounded. */
     private static final int TOP_LIMIT = 100;

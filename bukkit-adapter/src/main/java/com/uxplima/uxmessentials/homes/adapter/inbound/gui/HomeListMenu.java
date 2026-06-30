@@ -68,7 +68,7 @@ public final class HomeListMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "home-list";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/home-list.conf";
+    private static final String SPEC_RESOURCE = "modules/homes/gui/home-list.conf";
     private static final String BYPASS_UNSAFE_PERMISSION = "uxmessentials.home.bypass.unsafe";
 
     private final Menus menus;

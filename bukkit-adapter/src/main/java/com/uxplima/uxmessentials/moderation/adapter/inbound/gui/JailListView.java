@@ -64,7 +64,7 @@ public final class JailListView {
     /** The engine spec id the per-jail edit screen registers and opens under. */
     public static final String EDIT_SPEC_ID = "moderation-jail-edit";
 
-    private static final String EDIT_SPEC_RESOURCE = "modules/menu/specs/moderation-jail-edit.conf";
+    private static final String EDIT_SPEC_RESOURCE = "modules/moderation/gui/moderation-jail-edit.conf";
     private static final int EDIT_ROWS = 3;
     private static final Material JAIL_ICON = Material.IRON_BARS;
     private static final String CREATE_KEY = "moderation.jail-create";

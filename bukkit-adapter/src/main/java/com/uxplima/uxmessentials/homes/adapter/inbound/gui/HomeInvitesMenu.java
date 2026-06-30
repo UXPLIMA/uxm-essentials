@@ -63,7 +63,7 @@ public final class HomeInvitesMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "home-invites";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/home-invites.conf";
+    private static final String SPEC_RESOURCE = "modules/homes/gui/home-invites.conf";
 
     private static final String INVITE_ADD_INPUT_KEY = "home.invite-add";
 

@@ -61,7 +61,7 @@ public final class NpcListMenu {
     public static final String SPEC_ID = "npc-list";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/npc-list.conf";
+    private static final String SPEC_RESOURCE = "modules/npc/gui/npc-list.conf";
 
     private final Menus menus;
     private final Scheduler scheduler;

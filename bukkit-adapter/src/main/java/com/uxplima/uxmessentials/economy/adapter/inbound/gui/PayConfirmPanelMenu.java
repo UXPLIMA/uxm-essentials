@@ -47,7 +47,7 @@ public final class PayConfirmPanelMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "economy-pay-confirm";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-pay-confirm.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-pay-confirm.conf";
 
     private final Menus menus;
     private final Pay pay;

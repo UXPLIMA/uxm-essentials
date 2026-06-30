@@ -50,7 +50,7 @@ public final class ModerationHistoryMenu {
     public static final String SPEC_ID = "moderation-history";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/moderation-history.conf";
+    private static final String SPEC_RESOURCE = "modules/moderation/gui/moderation-history.conf";
 
     /** Mirrors the per-page cap the {@code /history} read uses, so the off-thread read stays bounded. */
     private static final int PAGE_LIMIT = 50;

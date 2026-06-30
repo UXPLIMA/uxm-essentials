@@ -49,7 +49,7 @@ public final class HomeMenus {
     /** The engine spec ids the home menus register and open under. */
     public static final String ICON_SPEC_ID = "home-icon";
 
-    private static final String ICON_RESOURCE = "modules/menu/specs/home-icon.conf";
+    private static final String ICON_RESOURCE = "modules/homes/gui/home-icon.conf";
 
     /**
      * Re-opens the home action menu ({@link HomeActionMenu}) for a clicked home, so the icon picker and the

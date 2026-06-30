@@ -64,7 +64,7 @@ public final class EconomyExchangeMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "economy-exchange";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-exchange.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-exchange.conf";
     private static final int ROWS = 3;
 
     private final Menus menus;

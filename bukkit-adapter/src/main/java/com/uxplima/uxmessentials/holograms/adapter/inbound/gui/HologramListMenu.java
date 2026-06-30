@@ -60,7 +60,7 @@ public final class HologramListMenu {
     public static final String SPEC_ID = "hologram-list";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/hologram-list.conf";
+    private static final String SPEC_RESOURCE = "modules/holograms/gui/hologram-list.conf";
 
     private final Menus menus;
     private final Scheduler scheduler;

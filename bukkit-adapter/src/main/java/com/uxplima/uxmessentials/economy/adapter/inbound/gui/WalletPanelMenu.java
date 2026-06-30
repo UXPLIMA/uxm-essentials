@@ -60,7 +60,7 @@ public final class WalletPanelMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "economy-wallet";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-wallet.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-wallet.conf";
 
     private final Menus menus;
     private final EconomyProvider economyProvider;

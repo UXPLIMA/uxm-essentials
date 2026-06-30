@@ -64,7 +64,7 @@ public final class WarpBrowseMenu {
     public static final String SPEC_ID = "warp-browse";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/warp-browse.conf";
+    private static final String SPEC_RESOURCE = "modules/warps/gui/warp-browse.conf";
 
     /** The single material every warp tile uses, since warps carry no item — matches the old view's fallback. */
     private static final Material WARP_FALLBACK_ICON = Material.ENDER_PEARL;

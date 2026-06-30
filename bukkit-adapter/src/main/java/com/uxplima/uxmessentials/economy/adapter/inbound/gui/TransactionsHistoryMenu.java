@@ -53,7 +53,7 @@ public final class TransactionsHistoryMenu {
     public static final String SPEC_ID = "economy-transactions";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-transactions.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-transactions.conf";
 
     /** Mirrors the per-page cap the original view used, so the off-thread read stays bounded. */
     private static final int PAGE_LIMIT = 200;

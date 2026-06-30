@@ -67,7 +67,7 @@ public final class VaultSelectorMenu {
     public static final String SPEC_ID = "vault-selector";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/vault-selector.conf";
+    private static final String SPEC_RESOURCE = "modules/vaults/gui/vault-selector.conf";
 
     // A defensive clamp so an oversized stored name can never overflow the item label, independent of the
     // command's configurable rename cap (a name may pre-date a lowered cap or arrive from another backend).

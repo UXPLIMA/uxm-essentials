@@ -38,7 +38,7 @@ public final class WorldGenerationMenu {
     /** The engine spec id this summary registers and opens under. */
     public static final String SPEC_ID = "world-generation";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/world-generation.conf";
+    private static final String SPEC_RESOURCE = "modules/worlds/gui/world-generation.conf";
     private static final int ROWS = 3;
     private static final String NONE_SEED = "(random)";
     private static final String VANILLA = "vanilla";

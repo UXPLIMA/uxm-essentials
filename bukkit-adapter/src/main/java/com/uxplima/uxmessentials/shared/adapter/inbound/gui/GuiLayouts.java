@@ -13,10 +13,8 @@ import java.util.Objects;
 
 import org.bukkit.Material;
 
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurateException;
@@ -183,89 +181,6 @@ public final class GuiLayouts {
         return builder.build();
     }
 
-    public WarpEditorLayout loadWarpEditor(String module, String name, WarpEditorLayout codeDefault) {
-        Objects.requireNonNull(module, "module");
-        Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(codeDefault, "codeDefault");
-        Path onDisk =
-                dataFolder.resolve("modules").resolve(module).resolve("gui").resolve(name + ".conf");
-        if (Files.isRegularFile(onDisk)) {
-            return parseWarpEditor(
-                    HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString(), codeDefault);
-        }
-        String resource = "modules/" + module + "/gui/" + name + ".conf";
-        if (getClass().getClassLoader().getResource(resource) == null) {
-            return codeDefault;
-        }
-        try {
-            return parseWarpEditor(
-                    HoconConfigurationLoader.builder()
-                            .source(() -> openReader(resource))
-                            .build(),
-                    resource,
-                    codeDefault);
-        } catch (Exception e) {
-            log.error("failed to open resource gui layout " + resource, e);
-            return codeDefault;
-        }
-    }
-
-    private WarpEditorLayout parseWarpEditor(
-            HoconConfigurationLoader loader, String origin, WarpEditorLayout codeDefault) {
-        ConfigurationNode root;
-        try {
-            root = loader.load();
-        } catch (ConfigurateException failure) {
-            log.error("failed to load warp editor gui layout " + origin, failure);
-            return codeDefault;
-        }
-        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
-        int iconSlot = root.node("icon-slot").getInt(codeDefault.iconSlot());
-        int teleportSlot = root.node("teleport-slot").getInt(codeDefault.teleportSlot());
-        int lockSlot = root.node("lock-slot").getInt(codeDefault.lockSlot());
-        int passwordSlot = root.node("password-slot").getInt(codeDefault.passwordSlot());
-        int welcomeSlot = root.node("welcome-slot").getInt(codeDefault.welcomeSlot());
-        int soundsSlot = root.node("sounds-slot").getInt(codeDefault.soundsSlot());
-        int particlesSlot = root.node("particles-slot").getInt(codeDefault.particlesSlot());
-        int warmupSlot = root.node("warmup-slot").getInt(codeDefault.warmupSlot());
-        int cooldownSlot = root.node("cooldown-slot").getInt(codeDefault.cooldownSlot());
-        int closeSlot = root.node("close-slot").getInt(codeDefault.closeSlot());
-
-        Material teleportMaterial =
-                material(root.node("teleport-material").getString(), codeDefault.teleportMaterial());
-        Material lockMaterial = material(root.node("lock-material").getString(), codeDefault.lockMaterial());
-        Material passwordMaterial =
-                material(root.node("password-material").getString(), codeDefault.passwordMaterial());
-        Material welcomeMaterial = material(root.node("welcome-material").getString(), codeDefault.welcomeMaterial());
-        Material soundsMaterial = material(root.node("sounds-material").getString(), codeDefault.soundsMaterial());
-        Material particlesMaterial =
-                material(root.node("particles-material").getString(), codeDefault.particlesMaterial());
-        Material warmupMaterial = material(root.node("warmup-material").getString(), codeDefault.warmupMaterial());
-        Material cooldownMaterial =
-                material(root.node("cooldown-material").getString(), codeDefault.cooldownMaterial());
-
-        return new WarpEditorLayout(
-                rows,
-                iconSlot,
-                teleportSlot,
-                lockSlot,
-                passwordSlot,
-                welcomeSlot,
-                soundsSlot,
-                particlesSlot,
-                warmupSlot,
-                cooldownSlot,
-                closeSlot,
-                teleportMaterial,
-                lockMaterial,
-                passwordMaterial,
-                welcomeMaterial,
-                soundsMaterial,
-                particlesMaterial,
-                warmupMaterial,
-                cooldownMaterial);
-    }
-
     /** Resolve the {@code /home} slot-grid layout, falling back to the code default when no conf parses. */
     public HomeListLayout loadHomeList(String module, String name, HomeListLayout codeDefault) {
         ConfigurationNode root = root(module, name);
@@ -283,37 +198,6 @@ public final class GuiLayouts {
         return new HomeListLayout(rows, homeSlots, fallbackIcon, emptyIcon, filler, prevSlot, nextSlot, pageInfoSlot);
     }
 
-    /** Resolve the per-home action-menu layout, falling back to the code default when no conf parses. */
-    public HomeActionsLayout loadHomeActions(String module, String name, HomeActionsLayout codeDefault) {
-        ConfigurationNode root = root(module, name);
-        if (root == null) {
-            return codeDefault;
-        }
-        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
-        return new HomeActionsLayout(
-                rows,
-                Math.max(0, root.node("info-slot").getInt(codeDefault.infoSlot())),
-                Math.max(0, root.node("rename-slot").getInt(codeDefault.renameSlot())),
-                Math.max(0, root.node("teleport-slot").getInt(codeDefault.teleportSlot())),
-                Math.max(0, root.node("delete-slot").getInt(codeDefault.deleteSlot())),
-                Math.max(0, root.node("relocate-slot").getInt(codeDefault.relocateSlot())),
-                Math.max(0, root.node("change-icon-slot").getInt(codeDefault.changeIconSlot())),
-                Math.max(0, root.node("visibility-slot").getInt(codeDefault.visibilitySlot())),
-                Math.max(0, root.node("invites-slot").getInt(codeDefault.invitesSlot())),
-                Math.max(0, root.node("back-slot").getInt(codeDefault.backSlot())),
-                material(root.node("info-material").getString(), codeDefault.infoMaterial()),
-                material(root.node("rename-material").getString(), codeDefault.renameMaterial()),
-                material(root.node("teleport-material").getString(), codeDefault.teleportMaterial()),
-                material(root.node("delete-material").getString(), codeDefault.deleteMaterial()),
-                material(root.node("relocate-material").getString(), codeDefault.relocateMaterial()),
-                material(root.node("change-icon-material").getString(), codeDefault.changeIconMaterial()),
-                material(root.node("visibility-public-material").getString(), codeDefault.visibilityPublicMaterial()),
-                material(root.node("visibility-private-material").getString(), codeDefault.visibilityPrivateMaterial()),
-                material(root.node("invites-material").getString(), codeDefault.invitesMaterial()),
-                material(root.node("back-material").getString(), codeDefault.backMaterial()),
-                material(root.node("filler").getString(), codeDefault.filler()));
-    }
-
     /** Resolve the home-icon picker layout, falling back to the code default when no conf parses. */
     public IconSelectorLayout loadIconSelector(String module, String name, IconSelectorLayout codeDefault) {
         ConfigurationNode root = root(module, name);
@@ -329,37 +213,6 @@ public final class GuiLayouts {
         int backSlot = Math.max(0, root.node("back-slot").getInt(codeDefault.backSlot()));
         int nextSlot = Math.max(0, root.node("next-slot").getInt(codeDefault.nextSlot()));
         return new IconSelectorLayout(rows, icons, navMaterial, resetMaterial, resetSlot, prevSlot, backSlot, nextSlot);
-    }
-
-    /** Resolve the invited-players menu layout, falling back to the code default when no conf parses. */
-    public InvitesMenuLayout loadInvitesMenu(String module, String name, InvitesMenuLayout codeDefault) {
-        ConfigurationNode root = root(module, name);
-        if (root == null) {
-            return codeDefault;
-        }
-        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
-        List<Integer> contentSlots = intList(root.node("content-slots"), codeDefault.contentSlots());
-        Material entryMaterial = material(root.node("entry-material").getString(), codeDefault.entryMaterial());
-        Material navMaterial = material(root.node("nav-material").getString(), codeDefault.navMaterial());
-        Material addMaterial = material(root.node("add-material").getString(), codeDefault.addMaterial());
-        Material backMaterial = material(root.node("back-material").getString(), codeDefault.backMaterial());
-        Material filler = material(root.node("filler").getString(), codeDefault.filler());
-        int prevSlot = Math.max(0, root.node("prev-slot").getInt(codeDefault.prevSlot()));
-        int addSlot = Math.max(0, root.node("add-slot").getInt(codeDefault.addSlot()));
-        int backSlot = Math.max(0, root.node("back-slot").getInt(codeDefault.backSlot()));
-        int nextSlot = Math.max(0, root.node("next-slot").getInt(codeDefault.nextSlot()));
-        return new InvitesMenuLayout(
-                rows,
-                contentSlots,
-                entryMaterial,
-                navMaterial,
-                addMaterial,
-                backMaterial,
-                filler,
-                prevSlot,
-                addSlot,
-                backSlot,
-                nextSlot);
     }
 
     /**

@@ -57,7 +57,7 @@ public final class WarpManagerMenu {
     public static final String SPEC_ID = "warp-manager";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/warp-manager.conf";
+    private static final String SPEC_RESOURCE = "modules/warps/gui/warp-manager.conf";
 
     private final Menus menus;
     private final Scheduler scheduler;

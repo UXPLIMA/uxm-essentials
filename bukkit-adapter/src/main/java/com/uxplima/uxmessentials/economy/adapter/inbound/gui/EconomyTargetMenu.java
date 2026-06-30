@@ -64,7 +64,7 @@ public final class EconomyTargetMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "economy-target";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-target.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-target.conf";
     private static final int ROWS = 5;
 
     private final Menus menus;

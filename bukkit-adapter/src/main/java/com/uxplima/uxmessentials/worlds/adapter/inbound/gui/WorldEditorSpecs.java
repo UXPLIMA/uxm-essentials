@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The shared spec loader the four world-editor menu screens use: it resolves a {@code modules/menu/specs/world-*.conf}
+ * The shared spec loader the four world-editor menu screens use: it resolves a {@code modules/worlds/gui/world-*.conf}
  * disk-first then bundled, falling back to a closeable empty window so a typo or a missing file degrades cleanly rather
  * than aborting worlds wiring. Resolution mirrors {@code GuiLayouts} (disk first, then the classpath default), exactly
  * as each individual migrated menu's private loader does — but the four world-editor screens share one holder/listener

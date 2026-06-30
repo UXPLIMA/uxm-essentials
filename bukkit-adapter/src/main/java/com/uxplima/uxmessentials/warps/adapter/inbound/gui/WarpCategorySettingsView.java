@@ -61,7 +61,7 @@ public final class WarpCategorySettingsView {
     /** The engine spec id this panel registers and opens under. */
     public static final String SPEC_ID = "warp-category-settings";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/warp-category-settings.conf";
+    private static final String SPEC_RESOURCE = "modules/warps/gui/warp-category-settings.conf";
     private static final int ROWS = 3;
 
     private final Menus menus;

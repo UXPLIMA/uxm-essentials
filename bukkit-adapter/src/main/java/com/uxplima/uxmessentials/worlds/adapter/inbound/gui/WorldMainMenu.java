@@ -43,7 +43,7 @@ public final class WorldMainMenu {
     /** The engine spec id this hub registers and opens under. */
     public static final String SPEC_ID = "world-main";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/world-main.conf";
+    private static final String SPEC_RESOURCE = "modules/worlds/gui/world-main.conf";
     private static final int ROWS = 3;
 
     private final Menus menus;

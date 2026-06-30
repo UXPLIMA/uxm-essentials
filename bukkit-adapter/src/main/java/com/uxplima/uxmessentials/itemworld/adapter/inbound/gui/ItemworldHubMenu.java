@@ -66,7 +66,7 @@ public final class ItemworldHubMenu {
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "itemworld-hub";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/itemworld-hub.conf";
+    private static final String SPEC_RESOURCE = "modules/itemworld/gui/itemworld-hub.conf";
 
     private static final String DROPS_TYPE = "item";
     private static final int BUTCHER_RADIUS = 64;

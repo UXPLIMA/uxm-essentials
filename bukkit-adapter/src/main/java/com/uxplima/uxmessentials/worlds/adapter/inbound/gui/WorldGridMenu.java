@@ -51,7 +51,7 @@ public final class WorldGridMenu {
     /** The engine spec id this grid registers and opens under. */
     public static final String SPEC_ID = "world-grid";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/world-grid.conf";
+    private static final String SPEC_RESOURCE = "modules/worlds/gui/world-grid.conf";
     private static final int ROWS = 6;
 
     /** The properties the rules screen shows, in render order. */

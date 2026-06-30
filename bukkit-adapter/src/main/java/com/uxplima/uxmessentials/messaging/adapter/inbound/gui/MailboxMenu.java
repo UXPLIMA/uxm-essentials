@@ -58,8 +58,8 @@ public final class MailboxMenu {
 
     public static final String DETAIL_SPEC_ID = "messaging-mail-detail";
 
-    private static final String LIST_RESOURCE = "modules/menu/specs/messaging-mailbox.conf";
-    private static final String DETAIL_RESOURCE = "modules/menu/specs/messaging-mail-detail.conf";
+    private static final String LIST_RESOURCE = "modules/messaging/gui/messaging-mailbox.conf";
+    private static final String DETAIL_RESOURCE = "modules/messaging/gui/messaging-mail-detail.conf";
 
     /** How many characters of the body the list lore previews before eliding. */
     private static final int SNIPPET_LIMIT = 40;

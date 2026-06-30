@@ -52,7 +52,7 @@ public final class StaffExamineMenu {
     /** The engine spec id the examine picker registers and opens under. */
     public static final String SPEC_ID = "staff-examine";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/staff-examine.conf";
+    private static final String SPEC_RESOURCE = "modules/staff/gui/staff-examine.conf";
 
     private final Menus menus;
     private final Server server;

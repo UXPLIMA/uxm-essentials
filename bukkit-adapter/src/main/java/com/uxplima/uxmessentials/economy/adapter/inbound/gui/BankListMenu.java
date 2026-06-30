@@ -62,7 +62,7 @@ public final class BankListMenu {
     public static final String SPEC_ID = "economy-banks";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/economy-banks.conf";
+    private static final String SPEC_RESOURCE = "modules/economy/gui/economy-banks.conf";
 
     private final Menus menus;
     private final BankService bankService;

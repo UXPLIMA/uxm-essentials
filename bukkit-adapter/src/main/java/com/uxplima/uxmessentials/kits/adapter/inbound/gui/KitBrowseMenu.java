@@ -73,7 +73,7 @@ public final class KitBrowseMenu {
     public static final String SPEC_ID = "kit-browse";
 
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
-    private static final String SPEC_RESOURCE = "modules/menu/specs/kit-browse.conf";
+    private static final String SPEC_RESOURCE = "modules/kits/gui/kit-browse.conf";
 
     /** A row that is not a pinned category flows through the scrolling content slots, never fixed to a slot. */
     private static final int FLOWS = -1;

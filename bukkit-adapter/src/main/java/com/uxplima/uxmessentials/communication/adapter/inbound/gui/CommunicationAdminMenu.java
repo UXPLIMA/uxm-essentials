@@ -66,8 +66,8 @@ public final class CommunicationAdminMenu {
 
     public static final String ANNOUNCER_SPEC_ID = "communication-announcer";
 
-    private static final String PANEL_RESOURCE = "modules/menu/specs/communication-admin.conf";
-    private static final String ANNOUNCER_RESOURCE = "modules/menu/specs/communication-announcer.conf";
+    private static final String PANEL_RESOURCE = "modules/communication/gui/communication-admin.conf";
+    private static final String ANNOUNCER_RESOURCE = "modules/communication/gui/communication-announcer.conf";
 
     private static final String CLEARCHAT_EXEMPT = "uxmessentials.communication.clearchat.exempt";
     private static final int CLEARCHAT_BLANK_LINES = 100;

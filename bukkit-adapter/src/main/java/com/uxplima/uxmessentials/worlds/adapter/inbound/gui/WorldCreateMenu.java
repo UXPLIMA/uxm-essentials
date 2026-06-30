@@ -50,7 +50,7 @@ public final class WorldCreateMenu {
     /** The engine spec id this screen registers and opens under. */
     public static final String SPEC_ID = "world-create";
 
-    private static final String SPEC_RESOURCE = "modules/menu/specs/world-create.conf";
+    private static final String SPEC_RESOURCE = "modules/worlds/gui/world-create.conf";
     private static final int ROWS = 3;
 
     /** The config key the operator flips between anvil and chat for the new-world name prompt. */
