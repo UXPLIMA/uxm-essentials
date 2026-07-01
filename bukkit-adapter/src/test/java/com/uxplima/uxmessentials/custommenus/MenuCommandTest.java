@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.InventoryHolder;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
@@ -63,13 +65,25 @@ class MenuCommandTest {
             items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
             """;
 
+    private static final String TWO_ITEMS = """
+            rows = 1
+            items {
+              a { slot = 0, material = STONE, name = "", click { left = ["close"] } }
+              b { slots = [1,2], material = DIRT, name = "", click { left = ["close"], right = ["close"] } }
+            }
+            """;
+
     private ServerMock server;
     private PlayerMock player;
     private Menus menus;
     private LastMenu lastMenu;
+    private MenuBindings bindings;
+    private CustomMenuLoader loader;
     private RecordingMessages messages;
     private final List<String> names = new ArrayList<>();
     private final AtomicInteger reloads = new AtomicInteger();
+    private final AtomicReference<String> executedFor = new AtomicReference<>();
+    private final AtomicReference<String> executedArg = new AtomicReference<>();
 
     @TempDir
     Path menusDir;
@@ -83,9 +97,24 @@ class MenuCommandTest {
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
         lastMenu = new LastMenu();
-        // The engine records a subject-less open into this tracker, so /menu last has something to reopen. Null
-        // registries keep every other path byte-identical to the plain engine these command tests otherwise use.
-        menus = new Menus(renderer, new SyncScheduler(), new ListSourceRegistry(), null, null, null, lastMenu);
+        // The bindings back the action registry /menu execute dispatches through and the loader validates against:
+        // close is the SPEC_HOCON item's click action, record captures the target's live context so the execute test
+        // can assert what ran and for whom. The engine records a subject-less open into the tracker for /menu last.
+        bindings = new MenuBindings();
+        bindings.action("close", c -> {});
+        bindings.action("record", c -> {
+            executedFor.set(c.player().getName());
+            executedArg.set(c.arg());
+        });
+        menus = new Menus(
+                renderer,
+                new SyncScheduler(),
+                new ListSourceRegistry(),
+                null,
+                bindings.actions(),
+                bindings.conditions(),
+                lastMenu);
+        loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, menus, new NoopLogger());
         MenuSpec spec = new MenuSpecLoader().parse(SPEC_HOCON);
         menus.registerSpec("shop", spec);
         names.add("shop");
@@ -189,6 +218,129 @@ class MenuCommandTest {
 
         assertThat(reloads.get()).isEqualTo(1);
         assertThat(messages.keys).contains("menu.reloaded");
+    }
+
+    @Test
+    void reloadOfASingleMenuReRegistersJustThatOne() throws Exception {
+        Files.writeString(menusDir.resolve("shiny.conf"), SPEC_HOCON);
+
+        execute("menu reload shiny", player);
+
+        assertThat(messages.keys).contains("menu.reloaded-one");
+        assertThat(messages.placeholdersFor("menu.reloaded-one"))
+                .containsEntry("name", "shiny")
+                .containsEntry("loaded", "1")
+                .containsEntry("skipped", "0");
+        assertThat(menus.registeredSpec("shiny")).isPresent();
+        // The per-menu reload uses its own single-file seam, not the reload-all supplier.
+        assertThat(reloads.get()).isZero();
+    }
+
+    @Test
+    void reloadOfAnUnknownMenuRepliesNotFound() {
+        execute("menu reload ghost", player);
+
+        assertThat(messages.keys).contains("menu.not-found");
+        assertThat(menus.registeredSpec("ghost")).isEmpty();
+    }
+
+    @Test
+    void reloadOfASingleMenuIsGatedByTheAdminPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no admin node, so the reload branch stays hidden
+        executeExpectingDenial("menu reload shiny", plain);
+    }
+
+    @Test
+    void executeRunsTheActionForTheNamedTargetOnTheirContext() {
+        server.addPlayer("Steve");
+
+        execute("menu execute Steve record:hi", player);
+
+        // The action ran on Steve's context (its live player is Steve) and reached the record handler with its arg.
+        assertThat(executedFor.get()).isEqualTo("Steve");
+        assertThat(executedArg.get()).isEqualTo("hi");
+        assertThat(messages.keys).contains("menu.executed");
+        assertThat(messages.placeholdersFor("menu.executed"))
+                .containsEntry("name", "Steve")
+                .containsEntry("action", "record:hi");
+    }
+
+    @Test
+    void executeOnAnUnknownPlayerRepliesUnknownAndRunsNothing() {
+        execute("menu execute Ghost record:hi", player); // Ghost was never added, so the selector matches nobody
+
+        assertThat(messages.keys).contains("command.unknown-player");
+        assertThat(executedFor.get()).isNull();
+    }
+
+    @Test
+    void executeIsGatedByTheAdminPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no admin node, so the execute branch stays hidden
+        server.addPlayer("Steve");
+
+        executeExpectingDenial("menu execute Steve record:hi", plain);
+
+        assertThat(executedFor.get()).isNull();
+    }
+
+    @Test
+    void dumpListsTheTitleRowsAndEveryItem() {
+        menus.registerSpec("panel", new MenuSpecLoader().parse(TWO_ITEMS));
+        names.add("panel");
+
+        execute("menu dump panel", player);
+
+        assertThat(messages.keys).contains("menu.dump-header", "menu.dump-item");
+        assertThat(messages.placeholdersFor("menu.dump-header"))
+                .containsEntry("name", "panel")
+                .containsEntry("rows", "1")
+                .containsEntry("items", "2");
+        List<Map<String, String>> items = messages.allPlaceholdersFor("menu.dump-item");
+        assertThat(items).hasSize(2);
+        assertThat(items).extracting(item -> item.get("id")).containsExactlyInAnyOrder("a", "b");
+        assertThat(items).anySatisfy(item -> {
+            assertThat(item.get("id")).isEqualTo("b");
+            assertThat(item.get("slots")).isEqualTo("1,2");
+            assertThat(item.get("material")).isEqualTo("DIRT");
+            assertThat(item.get("actions")).isEqualTo("2"); // left + right, each one action
+        });
+    }
+
+    @Test
+    void dumpOfAnUnknownMenuRepliesNotFound() {
+        execute("menu dump ghost", player);
+
+        assertThat(messages.keys).contains("menu.not-found");
+    }
+
+    @Test
+    void dumpIsGatedByTheAdminPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no admin node, so the dump branch stays hidden
+        executeExpectingDenial("menu dump shop", plain);
+    }
+
+    @Test
+    void metaShowsRowsItemCountAndFlagsOnOneLine() {
+        execute("menu meta shop", player);
+
+        assertThat(messages.keys).contains("menu.meta");
+        assertThat(messages.allPlaceholdersFor("menu.meta"))
+                .hasSize(1); // one compact summary line, not a per-item dump
+        assertThat(messages.placeholdersFor("menu.meta"))
+                .containsEntry("name", "shop")
+                .containsEntry("rows", "1")
+                .containsEntry("items", "1")
+                .containsEntry("has-list", "false")
+                .containsEntry("has-bedrock", "false")
+                .containsEntry("chest-only", "false")
+                .containsEntry("bottom-inventory", "false");
+    }
+
+    @Test
+    void metaOfAnUnknownMenuRepliesNotFound() {
+        execute("menu meta ghost", player);
+
+        assertThat(messages.keys).contains("menu.not-found");
     }
 
     @Test
@@ -431,6 +583,7 @@ class MenuCommandTest {
                     reloads.incrementAndGet();
                     return new CustomMenuLoader.LoadResult(List.of("shop", "spawn"), List.of("broken"));
                 },
+                name -> loader.loadSingle(menusDir, name),
                 deluxeMenusConvert,
                 zMenuConvert,
                 oguiConvert,
@@ -454,16 +607,23 @@ class MenuCommandTest {
     private static final class RecordingMessages implements Messages {
         private final List<String> keys = new ArrayList<>();
         private final Map<String, Map<String, String>> byKey = new java.util.HashMap<>();
+        private final Map<String, List<Map<String, String>>> allByKey = new java.util.HashMap<>();
 
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             keys.add(key.key());
             byKey.put(key.key(), placeholders);
+            allByKey.computeIfAbsent(key.key(), k -> new ArrayList<>()).add(placeholders);
             return key.key();
         }
 
         Map<String, String> placeholdersFor(String key) {
             return byKey.getOrDefault(key, Map.of());
+        }
+
+        /** Every placeholder map delivered under {@code key}, in send order — for a line the command emits per item. */
+        List<Map<String, String>> allPlaceholdersFor(String key) {
+            return allByKey.getOrDefault(key, List.of());
         }
     }
 

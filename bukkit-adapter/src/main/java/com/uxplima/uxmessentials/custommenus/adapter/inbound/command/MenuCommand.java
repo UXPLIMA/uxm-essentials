@@ -3,7 +3,10 @@ package com.uxplima.uxmessentials.custommenus.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -12,6 +15,8 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
+
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -28,6 +33,9 @@ import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -41,9 +49,12 @@ import org.jspecify.annotations.Nullable;
  * it for another player (gated by {@code uxmessentials.menu.open.others}, so an operator can push a menu to someone
  * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu last} reopens the last
  * custom menu the player had open (with its page and typed arguments); {@code /menu reload} re-runs the loader and
- * reports the loaded/skipped counts, and {@code /menu convert <deluxemenus|zmenu|ogui> <path>} converts a DeluxeMenus,
- * zMenu or OGUI menu YAML (or a directory of them) into {@code menus/*.conf} (all gated by {@code uxmessentials.menu.admin}).
- * The set of
+ * reports the loaded/skipped counts, {@code /menu reload <menu>} re-loads just that one file, and
+ * {@code /menu convert <deluxemenus|zmenu|ogui> <path>} converts a DeluxeMenus, zMenu or OGUI menu YAML (or a
+ * directory of them) into {@code menus/*.conf}. Three admin diagnostics round out the surface:
+ * {@code /menu execute <player> <action>} runs one menu action for a target, {@code /menu dump <menu>} prints a
+ * loaded menu's title, rows and per-item breakdown, and {@code /menu meta <menu>} prints a compact one-line
+ * metadata summary (all gated by {@code uxmessentials.menu.admin}). The set of
  * registered names is
  * supplied by the wiring rather than read off the engine, so the same list backs the {@code <name>} tab-completion,
  * the not-found guard, {@code /menu list}, and the still-registered check {@code /menu last} makes before reopening.
@@ -58,6 +69,7 @@ public final class MenuCommand implements CommandRegistration {
     private final Menus menus;
     private final Supplier<List<String>> menuNames;
     private final Supplier<CustomMenuLoader.LoadResult> reload;
+    private final Function<String, CustomMenuLoader.SingleLoad> reloadOne;
     private final DeluxeMenusConvertService deluxeMenusConvert;
     private final ZMenuConvertService zMenuConvert;
     private final OguiConvertService oguiConvert;
@@ -67,6 +79,7 @@ public final class MenuCommand implements CommandRegistration {
             Menus menus,
             Supplier<List<String>> menuNames,
             Supplier<CustomMenuLoader.LoadResult> reload,
+            Function<String, CustomMenuLoader.SingleLoad> reloadOne,
             DeluxeMenusConvertService deluxeMenusConvert,
             ZMenuConvertService zMenuConvert,
             OguiConvertService oguiConvert,
@@ -74,6 +87,7 @@ public final class MenuCommand implements CommandRegistration {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
         this.reload = Objects.requireNonNull(reload, "reload");
+        this.reloadOne = Objects.requireNonNull(reloadOne, "reloadOne");
         this.deluxeMenusConvert = Objects.requireNonNull(deluxeMenusConvert, "deluxeMenusConvert");
         this.zMenuConvert = Objects.requireNonNull(zMenuConvert, "zMenuConvert");
         this.oguiConvert = Objects.requireNonNull(oguiConvert, "oguiConvert");
@@ -94,7 +108,19 @@ public final class MenuCommand implements CommandRegistration {
                 .then(Commands.literal("last").executes(this::last))
                 .then(Commands.literal("reload")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
-                        .executes(this::reload))
+                        .executes(this::reload)
+                        .then(menuArgument().executes(this::reloadOne)))
+                .then(Commands.literal("execute")
+                        .requires(src -> src.getSender().hasPermission(ADMIN))
+                        .then(Commands.argument("player", ArgumentTypes.player())
+                                .then(Commands.argument("action", StringArgumentType.greedyString())
+                                        .executes(this::executeAction))))
+                .then(Commands.literal("dump")
+                        .requires(src -> src.getSender().hasPermission(ADMIN))
+                        .then(menuArgument().executes(this::dump)))
+                .then(Commands.literal("meta")
+                        .requires(src -> src.getSender().hasPermission(ADMIN))
+                        .then(menuArgument().executes(this::meta)))
                 .then(Commands.literal("convert")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .then(Commands.literal("deluxemenus")
@@ -111,12 +137,21 @@ public final class MenuCommand implements CommandRegistration {
 
     @Override
     public String description() {
-        return "Open, list, and reload operator custom menus.";
+        return "Open, list, reload, execute, dump, and convert operator custom menus.";
     }
 
     /** The {@code <name>} argument, completed from the currently registered menu names. */
     private RequiredArgumentBuilder<CommandSourceStack, String> nameArgument() {
         return Commands.argument("name", StringArgumentType.word()).suggests(nameSuggestions());
+    }
+
+    /**
+     * The {@code <menu>} word argument the admin diagnostics ({@code reload}/{@code dump}/{@code meta}) take, completed
+     * from the same registered-name suggestions the {@code <name>} argument uses. It carries a distinct argument id so
+     * it can sit on the same {@code /menu} node without colliding with the open branch's {@code <name>}.
+     */
+    private RequiredArgumentBuilder<CommandSourceStack, String> menuArgument() {
+        return Commands.argument("menu", StringArgumentType.word()).suggests(nameSuggestions());
     }
 
     private SuggestionProvider<CommandSourceStack> nameSuggestions() {
@@ -188,6 +223,22 @@ public final class MenuCommand implements CommandRegistration {
         return resolved.size() == 1 ? resolved.get(0) : null;
     }
 
+    /**
+     * Resolve the single online player the {@code <player>} selector of {@code /menu execute} names, or null when it
+     * matched none — an offline name, or a selector that matched nothing or more than one. Unlike {@link #resolveTarget}
+     * this swallows the Brigadier parse error a no-match name raises, so the caller answers with the shared
+     * unknown-player line rather than surfacing a raw parse failure.
+     */
+    private static @Nullable Player resolvePlayer(CommandContext<CommandSourceStack> ctx) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            return resolved.size() == 1 ? resolved.get(0) : null;
+        } catch (CommandSyntaxException unmatched) {
+            return null;
+        }
+    }
+
     private int list(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         List<String> names = menuNames.get();
@@ -235,6 +286,152 @@ public final class MenuCommand implements CommandRegistration {
                         "skipped",
                         String.valueOf(result.skipped().size())));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Re-load just the single {@code menus/<menu>.conf} spec — the per-menu {@code /menu reload <menu>}. The seam
+     * re-parses that one file and re-registers its spec, leaving every other loaded menu in place; an absent file
+     * replies not-found, otherwise the one file's loaded / skipped outcome is reported (a re-registered menu reads
+     * {@code 1 loaded, 0 skipped}, a spec that failed to parse or named an unknown id reads {@code 0 loaded, 1
+     * skipped}). Bare {@code /menu reload} still reloads every menu — this is the argument-bearing branch only.
+     */
+    private int reloadOne(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "menu");
+        CustomMenuLoader.SingleLoad result = reloadOne.apply(name);
+        if (!result.found()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", name));
+            return 0;
+        }
+        feedback.send(
+                sender,
+                CustomMenusMessageKey.MENU_RELOADED_ONE,
+                Map.of(
+                        "name", name,
+                        "loaded", String.valueOf(result.loaded()),
+                        "skipped", String.valueOf(result.skipped())));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Run one menu action for a target — {@code /menu execute <player> <action>}, the admin "fire a menu action on
+     * someone" tool. The target is resolved from the single-player selector; an offline or no-match name draws the
+     * shared unknown-player line rather than running anything. The {@code <action>} greedy string is parsed into a
+     * {@link Ref} and dispatched through {@link Menus#execute}, which runs it on the target's own entity thread with
+     * the target as the action's viewer — so a {@code %player%} in the action resolves to them. The action runs
+     * standalone (no menu need be open or registered), and the sender is told which action ran for whom.
+     */
+    private int executeAction(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        Player target = resolvePlayer(ctx);
+        if (target == null) {
+            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+            return 0;
+        }
+        String actionString = StringArgumentType.getString(ctx, "action").strip();
+        if (actionString.isEmpty()) {
+            // A greedy string can capture an empty remainder on a trailing space; there is no action to run.
+            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+            return 0;
+        }
+        menus.execute(BukkitRefs.toRef(target), Ref.parse(actionString));
+        feedback.send(
+                sender, CustomMenusMessageKey.MENU_EXECUTED, Map.of("name", target.getName(), "action", actionString));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Print an operator diagnostic of a loaded menu — {@code /menu dump <menu>}. An unregistered name replies
+     * not-found; otherwise a header line (title, row count, item count) is followed by one line per item —
+     * {@code id @ slots — material (N actions)} — so an operator can see a menu's shape without opening it. Every line
+     * resolves through a {@link CustomMenusMessageKey}, so the dump carries no inline literal.
+     */
+    private int dump(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "menu");
+        Optional<MenuSpec> found = menus.registeredSpec(name);
+        if (found.isEmpty()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", name));
+            return 0;
+        }
+        MenuSpec spec = found.get();
+        feedback.send(
+                sender,
+                CustomMenusMessageKey.MENU_DUMP_HEADER,
+                Map.of(
+                        "name", name,
+                        "title", plainTitle(spec.title()),
+                        "rows", String.valueOf(spec.rows()),
+                        "items", String.valueOf(spec.items().size())));
+        spec.items()
+                .forEach((id, item) ->
+                        feedback.send(sender, CustomMenusMessageKey.MENU_DUMP_ITEM, dumpItemPlaceholders(id, item)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Print a compact one-line metadata summary of a loaded menu — {@code /menu meta <menu>}: its title, row count,
+     * item count, and the four routing flags (has a list source, declares a {@code bedrock {}} block, is chest-only,
+     * paints the bottom inventory). An unregistered name replies not-found. One reply line, resolved through a
+     * {@link CustomMenusMessageKey}.
+     */
+    private int meta(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "menu");
+        Optional<MenuSpec> found = menus.registeredSpec(name);
+        if (found.isEmpty()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", name));
+            return 0;
+        }
+        feedback.send(sender, CustomMenusMessageKey.MENU_META, metaPlaceholders(name, found.get()));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** The per-item dump line's placeholders: the item id, its slot list, its raw material token, and its action count. */
+    private static Map<String, String> dumpItemPlaceholders(String id, MenuItemSpec item) {
+        return Map.of(
+                "id", id,
+                "slots", slotsText(item),
+                "material", item.material(),
+                "actions", String.valueOf(actionCount(item)));
+    }
+
+    /** The one-line meta summary's placeholders: title, rows, item count and the four routing flags. */
+    private static Map<String, String> metaPlaceholders(String name, MenuSpec spec) {
+        return Map.of(
+                "name", name,
+                "title", plainTitle(spec.title()),
+                "rows", String.valueOf(spec.rows()),
+                "items", String.valueOf(spec.items().size()),
+                "has-list", String.valueOf(hasList(spec)),
+                "has-bedrock", String.valueOf(spec.bedrock().isPresent()),
+                "chest-only", String.valueOf(spec.chestOnly()),
+                "bottom-inventory", String.valueOf(spec.bottomInventory()));
+    }
+
+    /** The item's occupied slots as a comma-joined list ({@code 0,1,2}); empty when the item declares no slots. */
+    private static String slotsText(MenuItemSpec item) {
+        return item.slots().slots().stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    /** How many action refs the item binds across every click gesture — the total bound, without double-counting {@code ANY}. */
+    private static int actionCount(MenuItemSpec item) {
+        return item.click().actions().values().stream().mapToInt(List::size).sum();
+    }
+
+    /** Whether any of the menu's items draws from a list source — the {@code has-list} meta flag. */
+    private static boolean hasList(MenuSpec spec) {
+        return spec.items().values().stream().anyMatch(item -> item.list().isPresent());
+    }
+
+    /**
+     * The menu's raw title token reduced to plain text for a diagnostic line: MiniMessage tags are stripped so a title
+     * like {@code <title>Shop</title>} reads {@code Shop}, and — because the stripped value is folded back into a
+     * MiniMessage template — a title cannot inject markup into the reply. A {@code @key} reference or a {@code %token%}
+     * is left verbatim, which is the honest thing to show an operator inspecting the spec.
+     */
+    private static String plainTitle(String title) {
+        return MiniMessage.miniMessage().stripTags(title);
     }
 
     /**

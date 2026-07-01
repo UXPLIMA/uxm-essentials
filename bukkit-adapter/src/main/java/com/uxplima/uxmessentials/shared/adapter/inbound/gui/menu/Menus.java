@@ -235,6 +235,29 @@ public final class Menus {
     }
 
     /**
+     * The spec registered under {@code id}, or empty when none is — a read-only lookup the {@code /menu dump} and
+     * {@code /menu meta} operator diagnostics use to describe a loaded menu without opening it.
+     */
+    public Optional<MenuSpec> registeredSpec(String id) {
+        Objects.requireNonNull(id, "id");
+        return Optional.ofNullable(specs.get(id));
+    }
+
+    /**
+     * Run one menu {@code action} for {@code target} as if they had tapped it — the {@code /menu execute <player>
+     * <action>} admin tool. It hops onto the target's own entity thread (where touching the live inventory is legal)
+     * and dispatches through the same shared {@link #runActions} runner a form tap uses, with {@code target} as the
+     * context viewer so a {@code %player%} in the action resolves to them. No spec need be registered — the action
+     * runs standalone. An engine wired without an action registry (a list/spec-only test engine) runs nothing here,
+     * matching {@link #runActions}.
+     */
+    public void execute(PlayerRef target, Ref action) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(action, "action");
+        scheduler.onEntity(target, () -> runActions(MenuContext.of(target, null, 0), List.of(action)));
+    }
+
+    /**
      * Open the spec registered under {@code specId} for {@code viewer}, carrying {@code subject} as the domain
      * object the menu is about (or null for a subject-less menu). An unknown spec id is a coding error in the
      * caller's wiring, so it fails loudly here rather than opening an empty window a player would meet.

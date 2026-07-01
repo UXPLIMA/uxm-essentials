@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.bukkit.event.Listener;
@@ -94,6 +95,17 @@ public final class CustomMenusWiring {
             swapMenu.set(reloaded.swapMenu());
             return result;
         };
+        // Per-menu reload for /menu reload <menu>: re-parse the single menus/<name>.conf and re-register just that
+        // spec (leaving every other loaded menu in place). A newly-loaded name is folded into the shared names
+        // reference so /menu list and tab-completion pick it up; this does not re-read openers.conf, which the
+        // reload-all supplier above owns.
+        Function<String, CustomMenuLoader.SingleLoad> reloadOne = name -> {
+            CustomMenuLoader.SingleLoad result = loader.loadSingle(menusDir, name);
+            if (result.found() && result.loaded() > 0) {
+                names.updateAndGet(current -> withName(current, name));
+            }
+            return result;
+        };
         // The DeluxeMenus, zMenu and OGUI converters behind /menu convert <deluxemenus|zmenu|ogui> <path>. Each writes
         // into the same menus/ directory the loader reads, so a converted spec is picked up on the next /menu reload
         // (none of the converters reloads itself).
@@ -101,8 +113,8 @@ public final class CustomMenusWiring {
                 new DeluxeMenusConvertService(menusDir, new DeluxeMenusConverter(), log);
         ZMenuConvertService zMenuConvert = new ZMenuConvertService(menusDir, new ZMenuConverter(), log);
         OguiConvertService oguiConvert = new OguiConvertService(menusDir, new OguiConverter(), log);
-        MenuCommand command =
-                new MenuCommand(menus, nameSupplier, reload, deluxeMenusConvert, zMenuConvert, oguiConvert, messages);
+        MenuCommand command = new MenuCommand(
+                menus, nameSupplier, reload, reloadOne, deluxeMenusConvert, zMenuConvert, oguiConvert, messages);
 
         // The open commands a menu declares in its `command {}` block are built once here, from this first load,
         // and handed back for the bootstrap to register at the LifecycleEvents.COMMANDS event. Brigadier only
@@ -121,6 +133,16 @@ public final class CustomMenusWiring {
                 new MenuOpenerJoinListener(openerSupplier, openerItems),
                 new MenuSwapListener(menus, swapMenuSupplier, nameSupplier));
         return new Wired(commands, nameSupplier, listeners);
+    }
+
+    /** {@code current} with {@code name} appended when absent, as a fresh immutable list; unchanged when already present. */
+    private static List<String> withName(List<String> current, String name) {
+        if (current.contains(name)) {
+            return current;
+        }
+        List<String> next = new ArrayList<>(current);
+        next.add(name);
+        return List.copyOf(next);
     }
 
     /**

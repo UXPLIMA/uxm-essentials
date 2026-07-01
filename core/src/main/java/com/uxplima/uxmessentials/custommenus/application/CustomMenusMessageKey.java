@@ -32,6 +32,21 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Reply for {@code /menu reload} reporting how many specs loaded and how many were skipped. */
     MENU_RELOADED("menu.reloaded"),
 
+    /** Reply for {@code /menu reload <menu>} reporting the single re-loaded menu's loaded / skipped outcome. */
+    MENU_RELOADED_ONE("menu.reloaded-one"),
+
+    /** Confirmation for {@code /menu execute <player> <action>} that {@code {action}} ran for {@code {name}}. */
+    MENU_EXECUTED("menu.executed"),
+
+    /** Header line for {@code /menu dump <menu>}: the menu's title, row count and item count. */
+    MENU_DUMP_HEADER("menu.dump-header"),
+
+    /** One item line in the {@code /menu dump <menu>} output: id, slots, material and action count. */
+    MENU_DUMP_ITEM("menu.dump-item"),
+
+    /** Compact one-line metadata summary for {@code /menu meta <menu>}: rows, item count and the menu's flags. */
+    MENU_META("menu.meta"),
+
     /** Reply when a console (or other non-player) invokes a menu open command whose block forbids the console. */
     MENU_CONSOLE_DENIED("menu.console-denied"),
 

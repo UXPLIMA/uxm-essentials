@@ -130,6 +130,42 @@ public final class CustomMenuLoader {
     }
 
     /**
+     * The outcome of a single-file reload — {@code /menu reload <menu>}. {@code found} is whether a
+     * {@code menus/<name>.conf} menu spec file existed at all (a missing one is the not-found reply); {@code loaded}
+     * and {@code skipped} count that one file's outcome, so a re-registered menu reports {@code loaded=1, skipped=0}
+     * and one that failed to parse or named an unknown id reports {@code loaded=0, skipped=1}.
+     */
+    public record SingleLoad(String name, boolean found, int loaded, int skipped) {
+        public SingleLoad {
+            Objects.requireNonNull(name, "name");
+        }
+    }
+
+    /**
+     * Re-parse, validate and re-register the single {@code menus/<name>.conf} spec — the per-menu {@code /menu reload
+     * <menu>} target. A missing menus directory, a reserved file name ({@code openers}/{@code patterns}/{@code
+     * placeholders}), or an absent {@code <name>.conf} yields a not-found result; otherwise the one file is loaded
+     * exactly as {@link #loadFrom} loads each, through the shared {@link #loadOne}. The global patterns and custom
+     * placeholders are re-read first (a menu may reference them, and validation checks against the current set) and
+     * the survivor is re-registered into {@link Menus}, overwriting the previous spec under that id. One bad spec is
+     * skipped with a logged warning, never thrown. Runs once per command, never on a hot path.
+     */
+    public SingleLoad loadSingle(Path menusDir, String name) {
+        Objects.requireNonNull(menusDir, "menusDir");
+        Objects.requireNonNull(name, "name");
+        Path file = menusDir.resolve(name + ".conf");
+        if (!Files.isDirectory(menusDir) || isReserved(file.getFileName().toString()) || !Files.isRegularFile(file)) {
+            return new SingleLoad(name, false, 0, 0);
+        }
+        ConfigurationNode globalPatterns = loadGlobalPatterns(menusDir);
+        customPlaceholders.reload(loadGlobalPlaceholders(menusDir));
+        List<String> loaded = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        loadOne(file, globalPatterns, loaded, skipped, new LinkedHashMap<>());
+        return new SingleLoad(name, true, loaded.size(), skipped.size());
+    }
+
+    /**
      * The {@code .conf} files directly under the menus directory that are menu specs, in a stable order. Three files
      * are reserved and live alongside the menus without being specs: {@code openers.conf} (opener-item config,
      * {@code OpenerLoader}), {@code patterns.conf} (shared item templates, loaded once via {@link #loadGlobalPatterns})
