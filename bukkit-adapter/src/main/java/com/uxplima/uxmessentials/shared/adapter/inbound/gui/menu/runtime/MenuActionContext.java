@@ -13,7 +13,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * the gesture that fired. Actions need the live handle (to give items, play sounds, run commands) and the click
  * kind (to branch left vs. shift-right), neither of which belongs on the render-time {@link MenuContext}.
  *
- * <p>Public so feature bindings can read it; created by the engine on each click.
+ * <p>Public so feature bindings can read it; created by the engine on each click. A binding that drives the
+ * window it fired in — refresh, reset-pagination — reads {@link #control()}, the engine-supplied handle onto the
+ * clicked menu.
  */
 public final class MenuActionContext {
 
@@ -25,11 +27,26 @@ public final class MenuActionContext {
 
     private final Map<String, String> args;
 
+    private final MenuControl control;
+
+    /**
+     * The constructor every non-listener call-site uses: a context with no menu-control handle, so a control action
+     * invoked through it is a safe no-op. Delegates to the canonical constructor with {@link MenuControl#NOOP}, which
+     * keeps the existing call-sites (feature bindings, unit tests) compiling unchanged — only the live click path
+     * needs the five-argument form below.
+     */
     public MenuActionContext(MenuContext ctx, Player player, ClickKind clickKind, Map<String, String> args) {
+        this(ctx, player, clickKind, args, MenuControl.NOOP);
+    }
+
+    /** The canonical constructor: the same context plus the engine's handle onto the menu the click fired in. */
+    public MenuActionContext(
+            MenuContext ctx, Player player, ClickKind clickKind, Map<String, String> args, MenuControl control) {
         this.ctx = Objects.requireNonNull(ctx, "ctx");
         this.player = Objects.requireNonNull(player, "player");
         this.clickKind = Objects.requireNonNull(clickKind, "clickKind");
         this.args = Map.copyOf(Objects.requireNonNull(args, "args"));
+        this.control = Objects.requireNonNull(control, "control");
     }
 
     public PlayerRef viewer() {
@@ -42,6 +59,15 @@ public final class MenuActionContext {
 
     public ClickKind clickKind() {
         return clickKind;
+    }
+
+    /**
+     * The engine's handle onto the menu this click fired in — what a {@code refresh}/{@code reset-pagination} action
+     * drives the window through. A context built outside a live click carries {@link MenuControl#NOOP}, so reading it
+     * is always safe.
+     */
+    public MenuControl control() {
+        return control;
     }
 
     public int page() {

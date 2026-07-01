@@ -92,6 +92,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandAc
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuControlActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
@@ -298,6 +299,11 @@ public final class PluginModule {
         // untouched. It teleports through Paper's Folia-safe teleportAsync and reaches the proxy through the shared
         // connector built just above.
         MovementActions.register(menuBindings, menuServerConnector, kernel.log());
+        // The menu-control slice (refresh, refresh-slot, reset-pagination/reset-page) registers alongside the other
+        // slices; like them it has its own entry point so the MenuVocabulary signature stays untouched. Its actions
+        // drive the very window they fire in through the MenuControl the click supplies, so they need only the shared
+        // bindings and the operator logger — no live handle is threaded here.
+        MenuControlActions.register(menuBindings, kernel.log());
         PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {
             menuListener.uninstall();

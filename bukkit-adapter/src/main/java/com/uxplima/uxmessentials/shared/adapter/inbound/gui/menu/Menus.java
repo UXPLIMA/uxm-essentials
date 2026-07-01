@@ -107,16 +107,27 @@ public final class Menus {
      * caller's wiring, so it fails loudly here rather than opening an empty window a player would meet.
      */
     public void open(PlayerRef viewer, String specId, @Nullable Object subject) {
+        open(viewer, specId, subject, 0);
+    }
+
+    /**
+     * Open the spec registered under {@code specId} for {@code viewer} at {@code page}, the same as
+     * {@link #open(PlayerRef, String, Object)} but starting on a chosen page rather than page zero — what an
+     * {@code open:<menu> [page]} action reaches for. A negative page is clamped to zero. An unknown spec id is a
+     * caller wiring error, so it fails loudly here rather than opening an empty window.
+     */
+    public void open(PlayerRef viewer, String specId, @Nullable Object subject, int page) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(specId, "specId");
         MenuSpec spec = specs.get(specId);
         if (spec == null) {
             throw new IllegalArgumentException("no menu spec registered under id: " + specId);
         }
-        MenuContext ctx = MenuContext.of(viewer, subject, 0);
+        int startPage = Math.max(0, page);
+        MenuContext ctx = MenuContext.of(viewer, subject, startPage);
         scheduler.async(() -> {
             Map<String, List<?>> resolved = resolveLists(spec, ctx);
-            scheduler.onEntity(viewer, () -> openResolved(viewer, specId, spec, subject, resolved));
+            scheduler.onEntity(viewer, () -> openResolved(viewer, specId, spec, subject, resolved, startPage));
         });
     }
 
@@ -353,12 +364,17 @@ public final class Menus {
 
     /** On the viewer's entity thread: build the holder-backed window, cache the lists, render, show, arm refresh. */
     private void openResolved(
-            PlayerRef viewer, String specId, MenuSpec spec, @Nullable Object subject, Map<String, List<?>> resolved) {
+            PlayerRef viewer,
+            String specId,
+            MenuSpec spec,
+            @Nullable Object subject,
+            Map<String, List<?>> resolved,
+            int page) {
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live == null || !live.isOnline()) {
             return;
         }
-        MenuContext ctx = MenuContext.of(viewer, subject, 0);
+        MenuContext ctx = MenuContext.of(viewer, subject, page);
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
         holder.setResolvedLists(resolved);
         Inventory inv = Bukkit.createInventory(holder, spec.rows() * 9, renderer.title(spec, ctx));

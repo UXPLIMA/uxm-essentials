@@ -45,7 +45,7 @@ public record Ref(String id, Map<String, String> args) {
     }
 
     private static boolean isGeneric(String head) {
-        return Set.of("sound", "command", "console", "message", "perm", "open", "expr")
+        return Set.of("sound", "command", "console", "message", "perm", "open", "expr", "refresh-slot")
                 .contains(head);
     }
 }

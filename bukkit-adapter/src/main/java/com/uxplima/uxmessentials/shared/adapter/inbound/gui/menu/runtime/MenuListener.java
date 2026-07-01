@@ -377,8 +377,52 @@ public final class MenuListener implements Listener {
             if (live == null) {
                 return;
             }
-            handler.accept(new MenuActionContext(base, live, kind, ref.args()));
+            handler.accept(new MenuActionContext(base, live, kind, ref.args(), new HolderControl(holder)));
         });
+    }
+
+    /**
+     * The {@link MenuControl} the engine binds to one open window for the duration of a click: it drives that
+     * holder's repaint through the same viewer's-entity-thread hop {@link #navigate} uses and the same
+     * {@link #repaint}/{@link #repaginate} path a pagination click takes, so a menu-control action never touches the
+     * inventory off the viewer's region thread and never opens a second window. It captures only the holder; the live
+     * player is re-resolved inside each repaint, so a viewer who logged off in the gap is simply skipped there.
+     */
+    private final class HolderControl implements MenuControl {
+
+        private final MenuHolder holder;
+
+        HolderControl(MenuHolder holder) {
+            this.holder = holder;
+        }
+
+        @Override
+        public void refresh() {
+            scheduler.onEntity(holder.ctx().viewer(), () -> repaint(holder));
+        }
+
+        @Override
+        public void refreshSlot(int slot) {
+            scheduler.onEntity(holder.ctx().viewer(), () -> refreshOneSlot(holder, slot));
+        }
+
+        @Override
+        public void resetPagination() {
+            scheduler.onEntity(holder.ctx().viewer(), () -> repaginate(holder, 0));
+        }
+    }
+
+    /**
+     * Re-render a single slot of the holder's window. The engine's {@code populate} path is whole-inventory — it has
+     * no per-slot renderer yet — so a correct partial redraw is a full {@link #repaint}: broader than the caller
+     * asked, but idempotent (the same spec and cached lists are redrawn) and never wrong. An out-of-range slot is a
+     * no-op, so a spec typo cannot repaint on every click. When per-slot rendering lands this narrows to the one slot.
+     */
+    private void refreshOneSlot(MenuHolder holder, int slot) {
+        if (slot < 0 || slot >= holder.getInventory().getSize()) {
+            return;
+        }
+        repaint(holder);
     }
 
     /** Re-render the same holder one page over (next/previous), clamped at zero; jump is a v1 no-op target. */
@@ -395,6 +439,16 @@ public final class MenuListener implements Listener {
 
     private void repaginate(MenuHolder holder, int newPage) {
         holder.setCtx(holder.ctx().withPage(newPage));
+        repaint(holder);
+    }
+
+    /**
+     * The one repaint path: redraw the holder's window in place at its current page, rebuilding the click routing
+     * first so a stale slot can never be clicked. Both {@link #repaginate} (after moving the page) and a
+     * {@code refresh} control action (at the current page) funnel through here, so there is a single place the engine
+     * repaints a spec menu.
+     */
+    private void repaint(MenuHolder holder) {
         holder.clearClickMap();
         renderer.populate(
                 holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());

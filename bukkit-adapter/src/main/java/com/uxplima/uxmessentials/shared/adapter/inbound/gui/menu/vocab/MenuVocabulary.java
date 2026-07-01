@@ -52,7 +52,10 @@ public final class MenuVocabulary {
         bindings.action("close", ctx -> ctx.player().closeInventory());
         // v2: true previous-menu history is a later refinement, so back behaves as close for now.
         bindings.action("back", ctx -> ctx.player().closeInventory());
-        bindings.action("open", ctx -> menus.open(ctx.viewer(), ctx.arg(), null));
+        bindings.action("open", ctx -> {
+            OpenTarget target = OpenTarget.parse(ctx.arg());
+            menus.open(ctx.viewer(), target.menu(), null, target.page());
+        });
         bindings.action("command", ctx -> ctx.player().performCommand(ctx.arg()));
         bindings.action("console", consoleAction(allowConsole, log));
         bindings.action("message", ctx -> ctx.player().sendMessage(StyledText.render(ctx.arg())));
@@ -185,6 +188,36 @@ public final class MenuVocabulary {
         }
         return ctx ->
                 log.warn("menu console action is disabled (custommenus.allow-console=false); ignored: {}", ctx.arg());
+    }
+
+    /**
+     * A parsed {@code open:<menu> [page]} target: the first whitespace-delimited token is the id of another
+     * registered spec to open for the same viewer, and an optional second token is a zero-based start page (a blank,
+     * non-numeric, or negative page opens page zero). Parsing is Bukkit-free so a plain-JUnit grammar test can
+     * exercise it. The fuller {@code open <menu> <args> <page>} grammar's typed {@code <args>} are Phase-4 typed menu
+     * arguments — not parsed here; only the leading menu id and a trailing page are read.
+     */
+    public record OpenTarget(String menu, int page) {
+
+        public OpenTarget {
+            Objects.requireNonNull(menu, "menu");
+        }
+
+        public static OpenTarget parse(String value) {
+            Objects.requireNonNull(value, "value");
+            String[] parts = value.strip().split("\\s+", 2);
+            int page = parts.length > 1 ? parsePage(parts[1]) : 0;
+            return new OpenTarget(parts[0], page);
+        }
+
+        /** The zero-based, non-negative page in {@code token}, or zero when it is blank or not a whole number. */
+        private static int parsePage(String token) {
+            try {
+                return Math.max(0, Integer.parseInt(token.strip()));
+            } catch (NumberFormatException notANumber) {
+                return 0;
+            }
+        }
     }
 
     /** Play {@code arg} as a sound key for the clicking player; a blank key is a no-op rather than an error. */
