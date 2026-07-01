@@ -31,6 +31,12 @@ public final class MenuSpecLoader {
     /** Operator-facing diagnostics for a spec that parses but has a skippable defect (a modifier map with no action). */
     private static final Logger LOG = Logger.getLogger(MenuSpecLoader.class.getName());
 
+    /** A chest window is at most six rows of nine slots; the auto-sizer never grows a chest beyond this ceiling. */
+    private static final int MAX_ROWS = 6;
+
+    /** The width of every inventory row, the divisor that turns a slot index into the row count needed to hold it. */
+    private static final int SLOTS_PER_ROW = 9;
+
     /** Parse a spec held in memory. Primarily a test seam; production loads go through {@link #load(Path)}. */
     public MenuSpec parse(String hocon) {
         Objects.requireNonNull(hocon, "hocon");
@@ -63,22 +69,19 @@ public final class MenuSpecLoader {
 
     private MenuSpec parseRoot(ConfigurationNode root, String origin) {
         Optional<String> inventoryType = optionalString(root.node("inventory-type"));
-        // A chest still requires an explicit 1..6 rows (unchanged). A non-chest menu sizes its window from its
-        // inventory type, not rows, so a spec author need not name rows; default it to the largest chest so the
-        // load-time slot check stays permissive (no vanilla non-chest window exceeds 54 slots) and the type's own
-        // out-of-range slots are skipped later at render, and so the chest fallback — used only if the type rejects
-        // a custom window — is a full six rows rather than an empty one.
-        int rows = root.node("rows").getInt(inventoryType.isPresent() ? 6 : 0);
-        ConfigurationNode refresh = root.node("refresh");
-        RefreshSpec refreshSpec = new RefreshSpec(
-                refresh.node("enabled").getBoolean(false),
-                refresh.node("interval-ticks").getInt(0));
-        Map<String, MenuItemSpec> items = parseItems(root.node("items"), rows, origin);
+        boolean chest = inventoryType.isEmpty();
+        int declaredRows = root.node("rows").getInt(chest ? 0 : MAX_ROWS);
+        // A chest parses its items against the six-row ceiling so every declared slot is known before its rows are
+        // auto-sized to fit them. A non-chest sizes its window from its inventory type and keeps its declared (or
+        // six-row) fallback, whose own out-of-range slots the renderer skips, so its item ceiling stays that count.
+        int ceilingRows = chest ? MAX_ROWS : declaredRows;
+        Map<String, MenuItemSpec> items = parseItems(root.node("items"), ceilingRows, origin);
+        int rows = chest ? chestRows(declaredRows, items) : declaredRows;
         try {
             return new MenuSpec(
                     root.node("title").getString(""),
                     rows,
-                    refreshSpec,
+                    refreshSpec(root),
                     refs(root.node("open-requirement")),
                     refs(root.node("open-actions")),
                     refs(root.node("close-actions")),
@@ -87,6 +90,61 @@ public final class MenuSpecLoader {
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }
+    }
+
+    /**
+     * The refresh policy. The DeluxeMenus-style convenience key {@code update-interval = <ticks>}, when present and
+     * positive, enables the refresh at that cadence so an author need not spell out the whole {@code refresh {}}
+     * block; it wins over {@code refresh {}} when both are set. Otherwise the historic
+     * {@code refresh { enabled, interval-ticks }} block is read unchanged (absent → refresh disabled).
+     */
+    private static RefreshSpec refreshSpec(ConfigurationNode root) {
+        int updateInterval = root.node("update-interval").getInt(0);
+        if (updateInterval > 0) {
+            return new RefreshSpec(true, updateInterval);
+        }
+        ConfigurationNode refresh = root.node("refresh");
+        return new RefreshSpec(
+                refresh.node("enabled").getBoolean(false),
+                refresh.node("interval-ticks").getInt(0));
+    }
+
+    /**
+     * Auto-size a chest to hold its highest declared slot, growing an explicit-but-too-small {@code rows} to fit:
+     * {@code rows = clamp(max(declaredRows, ceil((maxSlot+1)/9)), 1, 6)}. An empty chest (no item declares a slot)
+     * is {@code max(declaredRows, 1)}, so a bare menu is one row rather than an invalid zero. Because a chest's
+     * items are parsed against the six-row ceiling, {@code maxSlot} never exceeds 53, so a packed menu caps at six
+     * rows and a slot past the six-row maximum a chest can render is rejected earlier as a fail-fast config error.
+     */
+    private static int chestRows(int declaredRows, Map<String, MenuItemSpec> items) {
+        int highest = maxSlot(items);
+        if (highest < 0) {
+            return Math.max(declaredRows, 1);
+        }
+        int neededRows = highest / SLOTS_PER_ROW + 1;
+        return Math.min(MAX_ROWS, Math.max(1, Math.max(declaredRows, neededRows)));
+    }
+
+    /** The highest inventory slot any item occupies, counting a list item's template slots, or {@code -1} if none. */
+    private static int maxSlot(Map<String, MenuItemSpec> items) {
+        int highest = -1;
+        for (MenuItemSpec item : items.values()) {
+            highest = Math.max(highest, highestSlot(item.slots()));
+            if (item.list().isPresent()) {
+                highest = Math.max(
+                        highest, highestSlot(item.list().get().template().slots()));
+            }
+        }
+        return highest;
+    }
+
+    /** The greatest index in a slot set, or {@code -1} when it declares none. */
+    private static int highestSlot(SlotSet slots) {
+        int highest = -1;
+        for (int slot : slots.slots()) {
+            highest = Math.max(highest, slot);
+        }
+        return highest;
     }
 
     private Map<String, MenuItemSpec> parseItems(ConfigurationNode itemsNode, int rows, String origin) {

@@ -339,4 +339,118 @@ class MenuSpecLoaderTest {
                 .as("the seven-argument constructor keeps every existing call-site on the default chest")
                 .isEmpty();
     }
+
+    @Test
+    void aPositiveUpdateIntervalKeyEnablesTheRefreshAtThatCadence() {
+        RefreshSpec refresh = new MenuSpecLoader()
+                .parse("update-interval = 40\nrows = 1\nitems {}")
+                .refresh();
+
+        assertThat(refresh).isEqualTo(new RefreshSpec(true, 40));
+    }
+
+    @Test
+    void aRefreshBlockAloneIsHonouredWhenNoUpdateIntervalIsSet() {
+        RefreshSpec refresh = new MenuSpecLoader()
+                .parse("rows = 1\nrefresh { enabled = true, interval-ticks = 20 }\nitems {}")
+                .refresh();
+
+        assertThat(refresh).isEqualTo(new RefreshSpec(true, 20));
+    }
+
+    @Test
+    void neitherUpdateIntervalNorARefreshBlockLeavesRefreshDisabled() {
+        RefreshSpec refresh = new MenuSpecLoader().parse("rows = 1\nitems {}").refresh();
+
+        assertThat(refresh).isEqualTo(new RefreshSpec(false, 0));
+    }
+
+    @Test
+    void updateIntervalWinsOverARefreshBlockWhenBothAreSet() {
+        RefreshSpec refresh = new MenuSpecLoader()
+                .parse("update-interval = 40\nrefresh { enabled = true, interval-ticks = 20 }\nrows = 1\nitems {}")
+                .refresh();
+
+        assertThat(refresh)
+                .as("the convenience update-interval key takes precedence over an explicit refresh block")
+                .isEqualTo(new RefreshSpec(true, 40));
+    }
+
+    @Test
+    void aNonPositiveUpdateIntervalFallsBackToTheRefreshBlock() {
+        RefreshSpec refresh = new MenuSpecLoader()
+                .parse("update-interval = 0\nrefresh { enabled = true, interval-ticks = 15 }\nrows = 1\nitems {}")
+                .refresh();
+
+        assertThat(refresh)
+                .as("update-interval only takes over when it is a positive tick count")
+                .isEqualTo(new RefreshSpec(true, 15));
+    }
+
+    @Test
+    void aChestWithoutRowsAutoSizesToFitItsHighestSlot() {
+        MenuSpec spec = new MenuSpecLoader()
+                .parse("items { a { slot = 0, material = STONE }, b { slot = 20, material = STONE } }");
+
+        assertThat(spec.rows()).as("a slot in the third row needs three rows").isEqualTo(3);
+    }
+
+    @Test
+    void aChestAutoSizesToFiveRowsForASlotInTheFifthRow() {
+        MenuSpec spec = new MenuSpecLoader().parse("items { a { slot = 40, material = STONE } }");
+
+        assertThat(spec.rows()).isEqualTo(5);
+    }
+
+    @Test
+    void anExplicitButTooSmallRowsGrowsToFitAHigherSlot() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows = 2\nitems { a { slot = 30, material = STONE } }");
+
+        assertThat(spec.rows())
+                .as("a declared two rows grows to four to hold a slot in the fourth row")
+                .isEqualTo(4);
+    }
+
+    @Test
+    void aBareChestWithNoItemsIsOneRowNotZero() {
+        MenuSpec spec = new MenuSpecLoader().parse("items {}");
+
+        assertThat(spec.rows()).isEqualTo(1);
+    }
+
+    @Test
+    void anExplicitRowsThatAlreadyFitsEverySlotIsUnchanged() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows = 3\nitems { a { slot = 26, material = STONE } }");
+
+        assertThat(spec.rows())
+                .as("three declared rows already hold every slot below 27, so the count is untouched")
+                .isEqualTo(3);
+    }
+
+    @Test
+    void aPackedChestCapsAtSixRows() {
+        MenuSpec spec = new MenuSpecLoader().parse("items { a { slot = 53, material = STONE } }");
+
+        assertThat(spec.rows())
+                .as("a slot in the last of six rows sizes the chest to the six-row ceiling")
+                .isEqualTo(6);
+    }
+
+    @Test
+    void aListTemplateSlotAlsoSizesTheChest() {
+        MenuSpec spec = new MenuSpecLoader()
+                .parse("items { grid { list { source = \"warps:all\", template { slot = 30, material = STONE } } } }");
+
+        assertThat(spec.rows())
+                .as("a paginated list's content slots count toward the auto-sized rows")
+                .isEqualTo(4);
+    }
+
+    @Test
+    void aChestSlotBeyondTheSixRowMaximumIsAFailFastConfigError() {
+        // A chest renders at most six rows (54 slots); a slot past that can never be shown, so — consistent with the
+        // loader's fail-fast slot check and the six-row ceiling the auto-sizer parses against — it is a loud error.
+        assertThatThrownBy(() -> new MenuSpecLoader().parse("items { a { slot = 60, material = STONE } }"))
+                .isInstanceOf(MenuSpecException.class);
+    }
 }
