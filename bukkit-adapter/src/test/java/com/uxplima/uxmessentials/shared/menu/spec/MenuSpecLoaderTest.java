@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDragSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
@@ -936,5 +937,68 @@ class MenuSpecLoaderTest {
         assertThat(spec.clickCooldownMs())
                 .as("no key means zero, i.e. inherit the server-wide default rather than set a per-menu window")
                 .isZero();
+    }
+
+    @Test
+    void parsesAnItemDragBlock() {
+        String hocon = """
+                rows = 1
+                items { drop-slot {
+                  slot = 0, material = CHEST, name = "Deposit",
+                  item-drag {
+                    rules { materials = ["diamond", "Emerald"], min-amount = 2, name-contains = "shiny" }
+                    consume = true
+                    actions = ["data-set:dropped %drag_material%"]
+                  }
+                } }
+                """;
+        ItemDragSpec drag = new MenuSpecLoader()
+                .parse(hocon)
+                .items()
+                .get("drop-slot")
+                .itemDrag()
+                .orElseThrow();
+
+        // Material names are upper-cased so the runtime can match them against Material.name() case-insensitively.
+        assertThat(drag.rules().materials()).containsExactly("DIAMOND", "EMERALD");
+        assertThat(drag.rules().minAmount()).isEqualTo(2);
+        assertThat(drag.rules().nameContains()).isEqualTo("shiny");
+        assertThat(drag.consume()).isTrue();
+        assertThat(drag.actions()).extracting(Ref::id).containsExactly("data-set:dropped %drag_material%");
+    }
+
+    @Test
+    void anItemDragBlockDefaultsMinAmountToOneAnyMaterialNoNameCheckAndNoConsume() {
+        String hocon = """
+                rows = 1
+                items { drop-slot {
+                  slot = 0, material = CHEST, name = "Deposit",
+                  item-drag { actions = ["message:got it"] }
+                } }
+                """;
+        ItemDragSpec drag = new MenuSpecLoader()
+                .parse(hocon)
+                .items()
+                .get("drop-slot")
+                .itemDrag()
+                .orElseThrow();
+
+        assertThat(drag.rules().materials())
+                .as("an empty whitelist means any material passes")
+                .isEmpty();
+        assertThat(drag.rules().minAmount()).isEqualTo(1);
+        assertThat(drag.rules().nameContains()).isEmpty();
+        assertThat(drag.consume()).isFalse();
+    }
+
+    @Test
+    void anItemWithNoItemDragBlockHasNone() {
+        String hocon = """
+                rows = 1
+                items { plain { slot = 0, material = STONE, name = "x" } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon).items().get("plain");
+
+        assertThat(item.itemDrag()).isEmpty();
     }
 }

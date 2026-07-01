@@ -58,4 +58,33 @@ public final class ActionArguments {
         matcher.appendTail(out);
         return out.toString();
     }
+
+    /**
+     * The action arguments with every bare {@code %name%} token that {@code locals} defines replaced by its value —
+     * the same menu-local placeholders (the open spec's {@code placeholders {}} block, plus the item-drag flow's
+     * {@code %drag_material%}/{@code %drag_amount%}/{@code %drag_name%}) that the renderer already expands in text.
+     * A token the map does not define is left verbatim, so the downstream registry / PlaceholderAPI / MiniMessage
+     * handling is unchanged. Returns {@code args} unchanged when {@code locals} is empty — the identity fast-path — so
+     * a menu without a local block or a drag exposure allocates nothing and dispatches byte-identically.
+     */
+    public static Map<String, String> resolveLocals(Map<String, String> args, Map<String, String> locals) {
+        if (locals.isEmpty()) {
+            return args;
+        }
+        Map<String, String> resolved = new LinkedHashMap<>(args.size());
+        args.forEach((key, value) -> resolved.put(key, substituteLocals(value, locals)));
+        return resolved;
+    }
+
+    /** Replace each {@code %name%} token in {@code value} that {@code locals} defines, leaving every other token verbatim. */
+    private static String substituteLocals(String value, Map<String, String> locals) {
+        Matcher matcher = PLACEHOLDER.matcher(value);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String replacement = locals.getOrDefault(matcher.group(1), matcher.group());
+            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
 }

@@ -5,12 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import org.junit.jupiter.api.Test;
 
 class MenuSpecRecordsTest {
@@ -39,6 +44,25 @@ class MenuSpecRecordsTest {
         assertThat(spec.clickCooldownMs())
                 .as("a menu built through the historic ctors sets no cooldown and defers to the global default")
                 .isZero();
+    }
+
+    @Test
+    void menuItemSpecDefaultsItemDragToEmptyThroughTheHistoricConstructor() {
+        var item = new MenuItemSpec(
+                SlotSet.parse(List.of("0"), 9),
+                0,
+                "STONE",
+                "",
+                List.of(),
+                new ItemDecor(1, Optional.empty(), false, List.of()),
+                List.<Ref>of(),
+                new ClickSpec(Map.of(), Map.of()),
+                false,
+                Optional.empty(),
+                ItemType.NONE);
+        assertThat(item.itemDrag())
+                .as("an item built through a historic ctor carries no item-drag binding")
+                .isEmpty();
     }
 
     @Test

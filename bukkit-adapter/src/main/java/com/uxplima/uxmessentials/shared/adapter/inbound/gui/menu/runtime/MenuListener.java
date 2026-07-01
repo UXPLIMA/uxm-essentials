@@ -2,7 +2,9 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -11,6 +13,7 @@ import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
@@ -20,7 +23,12 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
@@ -32,6 +40,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.Rendered
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDragSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemRuleSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
@@ -229,7 +239,116 @@ public final class MenuListener implements Listener {
             handleListClick(holder, list, slot);
             return;
         }
-        holder.clickAt(slot).ifPresent(rs -> handleClick(holder, rs, event.getClick()));
+        holder.clickAt(slot).ifPresent(rs -> routeSpecClick(holder, rs, event));
+    }
+
+    /**
+     * Route a click on a rendered spec slot. When the slot's item carries an item-drag binding and the viewer is
+     * holding an item on their cursor, the click runs the drag flow — the cursor is captured, validated, and (on a
+     * pass) fed to the item-drag actions rather than the ordinary click. An empty cursor, or a slot with no drag
+     * binding, takes the normal click exactly as before, so a plain item behaves identically. The click is already
+     * cancelled by the caller either way, so nothing the viewer holds is ever moved by vanilla.
+     */
+    private void routeSpecClick(MenuHolder holder, RenderedSlot rs, InventoryClickEvent event) {
+        ItemStack cursor = event.getCursor();
+        Optional<ItemDragSpec> drag = rs.item().itemDrag();
+        if (drag.isPresent() && cursor != null && cursor.getType() != Material.AIR) {
+            handleItemDrag(holder, rs, drag.get(), cursor, event);
+        } else {
+            handleClick(holder, rs, event.getClick());
+        }
+    }
+
+    /**
+     * Handle a click on an item-drag slot made while holding an item on the cursor. The click is already cancelled, so
+     * vanilla never moves the item — no dupe. The cursor is validated against the item's rules; on a pass the drag
+     * actions fire with the dropped item exposed as {@code %drag_material%}/{@code %drag_amount%}/{@code %drag_name%}
+     * placeholders, and when the item consumes, the matched amount is removed from the cursor here on the viewer's own
+     * entity thread (the thread this click runs on) — a controlled, single-threaded mutation, never a vanilla move, so
+     * it cannot dupe. A failed match leaves the cursor untouched: a silent deny, since a "wrong item" line would spam
+     * a mis-drop. It dispatches actions, so it is throttled by the same anti-spam window a normal action click is.
+     */
+    private void handleItemDrag(
+            MenuHolder holder, RenderedSlot rs, ItemDragSpec drag, ItemStack cursor, InventoryClickEvent event) {
+        if (throttled(holder)) {
+            return;
+        }
+        if (!matches(drag.rules(), cursor)) {
+            return;
+        }
+        MenuContext base = dragContext(holder, rs, cursor);
+        ClickKind kind = kindOf(event.getClick());
+        for (Ref ref : drag.actions()) {
+            runRef(holder, base, kind, ref);
+        }
+        if (drag.consume()) {
+            consumeCursor(event, cursor, Math.max(1, drag.rules().minAmount()));
+        }
+    }
+
+    /**
+     * The context the drag actions run against: the open context (bound to the slot's list entry when it has one) with
+     * the dropped item's {@code %drag_material%}/{@code %drag_amount%}/{@code %drag_name%} exposed as menu-local
+     * placeholders, merged over the menu's own local block, so a drag action (and any message it emits) can reference
+     * the item — the same local-placeholder channel the renderer resolves in text.
+     */
+    private MenuContext dragContext(MenuHolder holder, RenderedSlot rs, ItemStack cursor) {
+        Map<String, String> locals = new LinkedHashMap<>(holder.ctx().localPlaceholders());
+        locals.put("drag_material", cursor.getType().name());
+        locals.put("drag_amount", String.valueOf(cursor.getAmount()));
+        locals.put("drag_name", plainName(cursor));
+        MenuContext base = rs.entry() == null ? holder.ctx() : holder.ctx().withEntry(rs.entry());
+        return base.withLocalPlaceholders(locals);
+    }
+
+    /**
+     * Whether the held cursor satisfies the item-drag rules: its material is on the whitelist (an empty whitelist
+     * accepts any material), its stack size is at least the minimum (a minimum below one is read as one), and — when a
+     * name filter is set — its display name contains the filter case-insensitively. The name is read best-effort from
+     * the item's Adventure display name, falling back to the material name when the item is unnamed.
+     */
+    private boolean matches(ItemRuleSpec rules, ItemStack cursor) {
+        if (!rules.materials().isEmpty()
+                && !rules.materials().contains(cursor.getType().name())) {
+            return false;
+        }
+        if (cursor.getAmount() < Math.max(1, rules.minAmount())) {
+            return false;
+        }
+        if (rules.nameContains().isEmpty()) {
+            return true;
+        }
+        return plainName(cursor)
+                .toLowerCase(Locale.ROOT)
+                .contains(rules.nameContains().toLowerCase(Locale.ROOT));
+    }
+
+    /** The cursor's plain-text display name when it has one, else its material name — the {@code %drag_name%} value. */
+    private static String plainName(ItemStack cursor) {
+        ItemMeta meta = cursor.getItemMeta();
+        if (meta != null && meta.hasDisplayName()) {
+            Component name = meta.displayName();
+            if (name != null) {
+                return PlainTextComponentSerializer.plainText().serialize(name);
+            }
+        }
+        return cursor.getType().name();
+    }
+
+    /**
+     * Remove {@code amount} from the held cursor after a matched drag, clearing it to nothing when the stack empties.
+     * A controlled write on the viewer's own entity thread through the click view, never a vanilla item move, so it
+     * cannot dupe — the click itself stays cancelled.
+     */
+    private void consumeCursor(InventoryClickEvent event, ItemStack cursor, int amount) {
+        int remaining = cursor.getAmount() - amount;
+        if (remaining <= 0) {
+            event.getView().setCursor(null);
+            return;
+        }
+        ItemStack reduced = cursor.clone();
+        reduced.setAmount(remaining);
+        event.getView().setCursor(reduced);
     }
 
     /**
@@ -615,6 +734,9 @@ public final class MenuListener implements Listener {
                 return;
             }
             Map<String, String> args = ActionArguments.resolve(ref.args(), base.arguments());
+            // Expand the menu-local placeholders too — the open spec's own placeholders{} block, and the item-drag
+            // flow's %drag_*% tokens — so an action reads the dropped item the same way the renderer reads it in text.
+            args = ActionArguments.resolveLocals(args, base.localPlaceholders());
             handler.accept(new MenuActionContext(base, live, kind, args, new HolderControl(holder)));
         });
     }

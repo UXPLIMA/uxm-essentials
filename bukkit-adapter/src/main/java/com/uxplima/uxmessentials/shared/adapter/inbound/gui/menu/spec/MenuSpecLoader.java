@@ -295,7 +295,8 @@ public final class MenuSpecLoader {
                 parsed.click(),
                 parsed.update(),
                 parsed.list(),
-                parsed.type());
+                parsed.type(),
+                parsed.itemDrag());
     }
 
     private MenuItemSpec parseItem(ConfigurationNode node, int rows, Map<String, Pattern> patterns) {
@@ -323,7 +324,37 @@ public final class MenuSpecLoader {
                 parseClick(item.node("click")),
                 item.node("update").getBoolean(false),
                 parseList(item.node("list"), rows, patterns),
-                itemType(item.node("type")));
+                itemType(item.node("type")),
+                parseItemDrag(item.node("item-drag")));
+    }
+
+    /**
+     * Parse an item's optional {@code item-drag} block, which turns the item into a drag target. The grammar is
+     * {@code item-drag { rules { materials = [...], min-amount = 1, name-contains = "" }, consume = false,
+     * actions = [ … ] }}: {@code materials} is a whitelist of {@code Material} names (empty or absent → any material),
+     * {@code min-amount} the least stack size accepted (default one), {@code name-contains} a case-insensitive display
+     * name substring (blank → no name check), {@code consume} whether the matched amount is removed from the cursor,
+     * and {@code actions} the ref list fired on a match through the same parser the click actions use. An absent block
+     * yields {@link Optional#empty()}, so an item without one parses exactly as before.
+     */
+    private Optional<ItemDragSpec> parseItemDrag(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        ConfigurationNode rules = node.node("rules");
+        ItemRuleSpec ruleSpec = new ItemRuleSpec(
+                upperCased(strings(rules.node("materials"))),
+                rules.node("min-amount").getInt(1),
+                rules.node("name-contains").getString(""));
+        return Optional.of(
+                new ItemDragSpec(ruleSpec, node.node("consume").getBoolean(false), refs(node.node("actions"))));
+    }
+
+    /** Upper-case every material name so the runtime match compares against {@code Material.name()} case-insensitively. */
+    private static List<String> upperCased(List<String> materials) {
+        return materials.stream()
+                .map(m -> m.strip().toUpperCase(java.util.Locale.ROOT))
+                .toList();
     }
 
     /**
