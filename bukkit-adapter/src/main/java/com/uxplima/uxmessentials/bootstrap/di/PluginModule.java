@@ -96,6 +96,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyAc
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LuckPermsGroupSource;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuControlActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
@@ -324,6 +325,12 @@ public final class PluginModule {
         // server state before serving it back to the off-tick list resolver — the entity/world API is off-limits on
         // the async thread a source runs on, so the global snapshot is the Folia-safe seam.
         LiveDataSources.register(menuBindings, kernel.scheduler());
+        // The ready-made luckperms-groups source: every LuckPerms group as a menu entry (a rank list / rank-picker
+        // with no feature code). LuckPerms is a soft-depend reached purely by reflection past a plugin-present guard
+        // (an absent one loads no SDK class), and it is async-safe by design, so the source reads directly on the
+        // async list thread with no region hop — hence no Scheduler is threaded here, only the server (present-guard
+        // + ServicesManager lookup) and the operator logger the fail-closed degrade warns through.
+        LuckPermsGroupSource.register(menuBindings, plugin.getServer(), kernel.log());
         // The messaging slice of the vocabulary (message-to/whisper, broadcast(+json/legacy), action-bar, title,
         // toast, log) registers alongside the generic actions; its own registration entry point keeps the
         // MenuVocabulary signature untouched. The toast action pops through uxmLib's advancement-toast service,
