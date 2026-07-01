@@ -706,18 +706,22 @@ public final class Menus {
         // an item-display menu a form cannot represent). An explicit per-menu bedrock {} block wins first: it defines a
         // native CustomForm — the dropdown/slider/toggle/multi-input widgets the automatic SimpleForm degradation
         // cannot express — so a menu that declares one sends that form rather than the degraded button list. Absent a
-        // block, the automatic degradation is unchanged. The open-actions and last-open recording that follow the chest
-        // build are deliberately skipped for a form — it is an alternative render at the open choke-point, not a second
-        // window; a Java viewer (isBedrock false) falls straight through unchanged.
+        // block, the automatic degradation is unchanged. A form is an alternative render at the open choke-point, not a
+        // second window, so it builds no holder and arms no refresh; but it is still an open, so it records into the
+        // back history and fires the menu's open-actions the same way the chest path does — otherwise a back from a
+        // form would have no history to step to and a menu's open-actions would never fire for a Bedrock viewer. A Java
+        // viewer (isBedrock false) falls straight through to the chest path unchanged.
         if (bedrock.isBedrock(viewer.uuid())
                 && !spec.chestOnly()
                 && spec.bedrock().isPresent()) {
             sendBedrockCustomForm(live, spec, ctx);
+            afterBedrockOpen(spec, live, ctx, viewer, specId, subject, page, arguments, record);
             return;
         }
         // The resolved list cache is threaded through so a list-backed menu's entries page as form buttons.
         if (bedrock.isBedrock(viewer.uuid()) && !spec.chestOnly()) {
             sendBedrockForm(live, spec, ctx, resolved);
+            afterBedrockOpen(spec, live, ctx, viewer, specId, subject, page, arguments, record);
             return;
         }
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
@@ -734,6 +738,30 @@ public final class Menus {
         }
         runOpenActions(spec, live, ctx);
         MenuRefresh.start(holder, scheduler, () -> reRender(holder));
+    }
+
+    /**
+     * The bookkeeping a Bedrock form open shares with the chest path once the form is on the viewer's screen: record
+     * this open into the viewer's back history (subject permitting — the same rule the chest path applies) so a
+     * {@code back} from the form can step to it, and fire the menu's open-actions. A form carries no window, so — unlike
+     * the chest path — it builds no holder and arms no refresh; this runs only the two pieces that describe an open
+     * rather than a window. A reopen (a {@code back} re-sending the previous form) passes {@code record} false, so
+     * stepping back never re-stacks the form it just returned to.
+     */
+    private void afterBedrockOpen(
+            MenuSpec spec,
+            Player live,
+            MenuContext ctx,
+            PlayerRef viewer,
+            String specId,
+            @Nullable Object subject,
+            int page,
+            Map<String, String> arguments,
+            boolean record) {
+        if (record) {
+            rememberLastOpen(viewer, specId, subject, page, arguments);
+        }
+        runOpenActions(spec, live, ctx);
     }
 
     /**
