@@ -89,7 +89,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
@@ -111,6 +113,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
@@ -324,6 +327,14 @@ public final class PluginModule {
                 new CachingPlayerDataStore(PlayerDataRepositories.jooq(persistence), kernel.scheduler());
         resources.playerData(playerData);
         resources.addListener(new PlayerDataLifecycleListener(playerData, kernel.scheduler()));
+        // The item and player-data slices of the vocabulary (give/take/set-item; data-set/add/sub/mul/div/remove and
+        // meta-set/add/remove) register alongside the earlier slices; like them they have their own entry points so
+        // the MenuVocabulary signature stays untouched. The data actions write through the player-data store built
+        // just above; the meta actions store PDC on the online viewer through a PlayerMeta over this plugin's one
+        // namespace. Both register into the same live MenuBindings the earlier slices wrote to.
+        PlayerMeta menuPlayerMeta = new PlayerMeta(plugin);
+        ItemActions.register(menuBindings, kernel.log());
+        DataActions.register(menuBindings, playerData, menuPlayerMeta, kernel.log());
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,
