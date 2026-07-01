@@ -145,21 +145,20 @@ public final class MenuRenderer {
     }
 
     /**
-     * Whether every condition an item names in its {@code view} resolves to a registered predicate that passes for
-     * {@code ctx}. An empty view is visible; an unregistered condition is treated as failing so a wiring gap hides
-     * the item rather than silently showing it. Each ref is first resolved against the condition registry, so a
-     * valued condition written {@code has-money:100} splits its head off and the handler sees {@code value=100} in its
-     * args — the same registry-aware split the click and action paths take.
+     * Whether an item's {@code view} requirement block passes for {@code ctx}. The block decides how its requirements
+     * combine — an all-mandatory AND (the historic flat list), a minimum OR / N-of-M, or an inverted condition — and
+     * this supplies the per-requirement outcome it asks for: the condition is resolved against the registry (so a
+     * valued condition written {@code has-money:100} splits its head off and the handler sees {@code value=100}, the
+     * same registry-aware split the click and action paths take), tested, and negated when the requirement carries a
+     * leading {@code !}. An empty block is visible; an unregistered condition holds {@code false} — fail-closed — so a
+     * wiring gap hides the item rather than silently showing it.
      */
     private boolean viewPasses(MenuItemSpec item, MenuContext ctx) {
-        for (Ref ref : item.view()) {
-            Ref eff = ref.resolve(conditions::has);
-            boolean passes =
+        return item.view().passes(requirement -> {
+            Ref eff = requirement.condition().resolve(conditions::has);
+            boolean present =
                     conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false);
-            if (!passes) {
-                return false;
-            }
-        }
-        return true;
+            return present != requirement.inverted();
+        });
     }
 }

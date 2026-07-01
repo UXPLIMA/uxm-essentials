@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * A block of {@link Requirement}s bound to a click gesture, plus how many of them must pass and what to run when the
@@ -23,9 +24,14 @@ import java.util.Objects;
  * anything with a positive {@code minimum} — with the default AND minimum every requirement must be looked at anyway —
  * and it defaults to {@code false}, so a block that does not ask for it evaluates every requirement exactly as before.
  *
- * <p>Pure by design: which requirements actually pass is decided in the runtime (it holds the condition registry);
+ * <p>Pure by design: which requirements actually pass is decided by the caller (it holds the condition registry);
  * this record only says how they combine, so it stays Bukkit-free for plain-JUnit testing. {@link #NONE} is the empty
  * block that always passes and denies nothing — the value a gesture with no requirement block resolves to.
+ *
+ * <p>The same block also backs an item's {@code view} visibility gate: {@link #allOf(List)} lifts a flat list of
+ * condition refs into an all-mandatory AND block (the historic view grammar), and {@link #passes(Predicate)} is the
+ * pure yes/no a view gate needs, so an item can now gate visibility on a minimum (OR / N-of-M) or an inverted
+ * condition without any new model — the click path and the view path share one requirement block.
  */
 public record RequirementSpec(List<Requirement> requirements, int minimum, List<Ref> deny, boolean stopAtSuccess) {
 
@@ -53,5 +59,42 @@ public record RequirementSpec(List<Requirement> requirements, int minimum, List<
      */
     public int effectiveMinimum() {
         return minimum <= 0 ? requirements.size() : Math.min(minimum, requirements.size());
+    }
+
+    /**
+     * Wrap a flat list of condition refs into an all-mandatory AND block: every ref becomes a plain, non-inverted
+     * mandatory {@link Requirement}, the minimum is {@code 0} (so all of them must pass), and there are no deny
+     * actions or short-circuit. This is how the historic flat item {@code view} — a bare list of conditions every one
+     * of which had to hold — becomes a requirement block with its meaning intact, so a view that was an AND list stays
+     * an AND list. It is pure and Bukkit-free, like the rest of this record.
+     */
+    public static RequirementSpec allOf(List<Ref> refs) {
+        Objects.requireNonNull(refs, "refs");
+        return new RequirementSpec(
+                refs.stream().map(ref -> new Requirement(ref, false)).toList(), 0, List.of());
+    }
+
+    /**
+     * Whether this block passes, given {@code holds} — the caller's decision on which individual requirements hold
+     * right now (the caller owns the condition registry, so it evaluates each requirement's condition and hands the
+     * outcome back here). The pass rule mirrors the click runtime's {@code evaluateRequirements} exactly, minus its
+     * per-requirement side effects: with a non-positive {@link #minimum} every <em>mandatory</em> requirement must
+     * hold — an optional one failing does not block, though the caller may still react to it — and with a positive
+     * minimum at least {@link #effectiveMinimum()} of all requirements (optional included) must hold. A block with no
+     * requirements passes. A view gate uses this: visibility is a pure yes/no with no deny or success actions, so the
+     * boolean is all it needs.
+     */
+    public boolean passes(Predicate<Requirement> holds) {
+        Objects.requireNonNull(holds, "holds");
+        int passes = 0;
+        boolean mandatoryFail = false;
+        for (Requirement requirement : requirements) {
+            if (holds.test(requirement)) {
+                passes++;
+            } else if (!requirement.optional()) {
+                mandatoryFail = true;
+            }
+        }
+        return minimum <= 0 ? !mandatoryFail : passes >= effectiveMinimum();
     }
 }

@@ -107,7 +107,7 @@ public final class MenuSpecLoader {
                 strings(node.node("lore")),
                 parseDecor(node.node("decor")),
                 LoreMode.fromToken(node.node("lore-mode").getString()),
-                refs(node.node("view")),
+                parseView(node.node("view")),
                 parseClick(node.node("click")),
                 node.node("update").getBoolean(false),
                 parseList(node.node("list"), rows),
@@ -128,6 +128,28 @@ public final class MenuSpecLoader {
             return ItemType.NONE;
         }
         return ItemType.valueOf(raw.strip().toUpperCase(java.util.Locale.ROOT));
+    }
+
+    /**
+     * Parse an item's {@code view} gate into a {@link RequirementSpec}. It accepts either the historic flat list —
+     * {@code view = ["perm:vip", "!has-empty-slots:1"]}, where a leading {@code !} on an entry inverts it and every
+     * entry is mandatory (AND) — or a block map {@code view = { requirements = [...], minimum = N }} that brings the
+     * same minimum (OR / N-of-M) power the click requirement blocks have. A flat list with no {@code !} builds the
+     * same all-mandatory block it always did, so an existing spec renders identically. A view gate is a pure yes/no,
+     * so it carries no {@code deny}, {@code success}, or {@code stop-at-success} — those keys play no part here even
+     * if a block map names them by habit.
+     */
+    private RequirementSpec parseView(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return RequirementSpec.NONE;
+        }
+        if (node.isMap()) {
+            return new RequirementSpec(
+                    parseRequirements(node.node("requirements")),
+                    node.node("minimum").getInt(0),
+                    List.of());
+        }
+        return new RequirementSpec(parseRequirements(node), 0, List.of());
     }
 
     /**

@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuCon
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 
 /**
  * The single entry point a feature uses to give a menu spec its behaviour. Features call {@code action} /
@@ -121,7 +123,7 @@ public final class MenuBindings {
     }
 
     private void collectItemMissing(MenuItemSpec item, Set<String> missing) {
-        addMissing(item.view(), conditions::has, missing);
+        collectViewMissing(item.view(), conditions::has, missing);
         item.click().conditions().values().forEach(refs -> addMissing(refs, conditions::has, missing));
         item.click().actions().values().forEach(refs -> addMissing(refs, actions::has, missing));
         collectTextPlaceholders(item, missing);
@@ -156,6 +158,23 @@ public final class MenuBindings {
         for (Ref ref : refs) {
             if (!known.test(ref.resolve(known).id())) {
                 missing.add(ref.id());
+            }
+        }
+    }
+
+    /**
+     * Collect the conditions in a {@link RequirementSpec} view block whose id no registry knows. Each requirement's
+     * condition ref is resolved against {@code known} first, so a valued condition written {@code has-money:100} counts
+     * as known when its head {@code has-money} is registered — the same registry-aware split the runtime does when it
+     * gates the item's visibility. The original written token is reported when it is still unknown, so an operator sees
+     * exactly what they typed. A block's minimum and inversion are combinator metadata, not ids, so only the condition
+     * ids are validated here.
+     */
+    private void collectViewMissing(RequirementSpec view, Predicate<String> known, Set<String> missing) {
+        for (Requirement requirement : view.requirements()) {
+            Ref condition = requirement.condition();
+            if (!known.test(condition.resolve(known).id())) {
+                missing.add(condition.id());
             }
         }
     }

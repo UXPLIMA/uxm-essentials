@@ -7,9 +7,14 @@ import java.util.Optional;
 /**
  * One item in a menu spec. It declares the slots it occupies, a priority used when several items contend for the
  * same slot, the raw material/name/lore text (a {@code @key}, an inline literal, or a {@code %placeholder%} —
- * resolved later), its decoration, how its lore combines with the base icon's own lore, the view conditions that
- * gate visibility, click handling, whether it re-renders on refresh, an optional list expansion, and its
- * pagination role.
+ * resolved later), its decoration, how its lore combines with the base icon's own lore, the {@link RequirementSpec}
+ * view block that gates visibility, click handling, whether it re-renders on refresh, an optional list expansion, and
+ * its pagination role.
+ *
+ * <p>The {@code view} gate is a {@link RequirementSpec}, the same block that backs a click gesture, so an item can
+ * gate visibility on a minimum (OR / N-of-M) or an inverted condition — not just a flat AND list. A flat view list
+ * lifts into an all-mandatory block through {@link RequirementSpec#allOf(List)}, which the {@code List<Ref>}-taking
+ * constructors below do for their callers, so a spec that wrote a plain condition list keeps its exact meaning.
  */
 public record MenuItemSpec(
         SlotSet slots,
@@ -19,7 +24,7 @@ public record MenuItemSpec(
         List<String> lore,
         ItemDecor decor,
         LoreMode loreMode,
-        List<Ref> view,
+        RequirementSpec view,
         ClickSpec click,
         boolean update,
         Optional<ListSpec> list,
@@ -32,16 +37,51 @@ public record MenuItemSpec(
         lore = List.copyOf(Objects.requireNonNull(lore, "lore"));
         Objects.requireNonNull(decor, "decor");
         Objects.requireNonNull(loreMode, "loreMode");
-        view = List.copyOf(Objects.requireNonNull(view, "view"));
+        Objects.requireNonNull(view, "view");
         Objects.requireNonNull(click, "click");
         Objects.requireNonNull(list, "list");
         Objects.requireNonNull(type, "type");
     }
 
     /**
+     * The twelve-argument form that takes a flat {@code List<Ref>} view, retained so a call site holding a plain
+     * condition list keeps compiling unchanged: the list is lifted into an all-mandatory AND {@link RequirementSpec}
+     * via {@link RequirementSpec#allOf(List)}, the historic view meaning. Only the loader reaches for the canonical
+     * {@link RequirementSpec}-taking form, and only to build a view block that carries a minimum or inversion.
+     */
+    public MenuItemSpec(
+            SlotSet slots,
+            int priority,
+            String material,
+            String name,
+            List<String> lore,
+            ItemDecor decor,
+            LoreMode loreMode,
+            List<Ref> view,
+            ClickSpec click,
+            boolean update,
+            Optional<ListSpec> list,
+            ItemType type) {
+        this(
+                slots,
+                priority,
+                material,
+                name,
+                lore,
+                decor,
+                loreMode,
+                RequirementSpec.allOf(view),
+                click,
+                update,
+                list,
+                type);
+    }
+
+    /**
      * The original eleven-argument form, retained so every existing call site keeps compiling unchanged: it uses
-     * {@link LoreMode#REPLACE}, the historic behaviour where the spec lore is the whole lore. Only the loader
-     * builds the twelve-argument canonical form, and only when a spec declares a {@code lore-mode}.
+     * {@link LoreMode#REPLACE}, the historic behaviour where the spec lore is the whole lore, and lifts its flat
+     * {@code List<Ref>} view into an all-mandatory block via {@link RequirementSpec#allOf(List)}. Only the loader
+     * builds the canonical form, and only when a spec declares a {@code lore-mode} or a richer view block.
      */
     public MenuItemSpec(
             SlotSet slots,
@@ -55,6 +95,18 @@ public record MenuItemSpec(
             boolean update,
             Optional<ListSpec> list,
             ItemType type) {
-        this(slots, priority, material, name, lore, decor, LoreMode.REPLACE, view, click, update, list, type);
+        this(
+                slots,
+                priority,
+                material,
+                name,
+                lore,
+                decor,
+                LoreMode.REPLACE,
+                RequirementSpec.allOf(view),
+                click,
+                update,
+                list,
+                type);
     }
 }

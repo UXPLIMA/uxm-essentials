@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.menu.spec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.util.List;
 
@@ -12,6 +13,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import org.junit.jupiter.api.Test;
 
@@ -38,13 +41,55 @@ class MenuSpecLoaderTest {
         assertThat(s.items().get("go").click().actionsFor(ClickKind.LEFT))
                 .extracting(Ref::id)
                 .containsExactly("warp:set-icon");
-        assertThat(s.items().get("go").view()).extracting(Ref::id).containsExactly("warp:is-server-warp");
+        assertThat(s.items().get("go").view().requirements())
+                .extracting(r -> r.condition().id())
+                .containsExactly("warp:is-server-warp");
     }
 
     @Test
     void failsFastOnBadRows() {
         assertThatThrownBy(() -> new MenuSpecLoader().parse("rows = 9\nitems {}"))
                 .isInstanceOf(MenuSpecException.class);
+    }
+
+    @Test
+    void parsesAFlatViewListWithInversionAsAnAndBlock() {
+        String hocon = "rows=1\nitems{ x{ slot=0, material=STONE, view=[\"has-money:100\", \"!has-empty-slots:1\"] } }";
+        RequirementSpec view =
+                new MenuSpecLoader().parse(hocon).items().get("x").view();
+
+        assertThat(view.minimum())
+                .as("a flat view list is an all-mandatory AND block")
+                .isZero();
+        assertThat(view.requirements())
+                .extracting(r -> r.condition().id(), Requirement::inverted)
+                .containsExactly(tuple("has-money:100", false), tuple("has-empty-slots:1", true));
+    }
+
+    @Test
+    void parsesAMapViewBlockWithAMinimum() {
+        String hocon = "rows=1\nitems{ x{ slot=0, material=STONE,"
+                + " view={ requirements=[\"has-empty-slots:1\", \"has-empty-slots:9\"], minimum=1 } } }";
+        RequirementSpec view =
+                new MenuSpecLoader().parse(hocon).items().get("x").view();
+
+        assertThat(view.minimum()).isEqualTo(1);
+        assertThat(view.effectiveMinimum())
+                .as("minimum 1 over two conditions is an OR")
+                .isEqualTo(1);
+        assertThat(view.requirements())
+                .extracting(r -> r.condition().id())
+                .containsExactly("has-empty-slots:1", "has-empty-slots:9");
+    }
+
+    @Test
+    void anAbsentViewIsTheEmptyBlock() {
+        RequirementSpec view = new MenuSpecLoader()
+                .parse("rows=1\nitems{ x{ slot=0, material=STONE } }")
+                .items()
+                .get("x")
+                .view();
+        assertThat(view).isEqualTo(RequirementSpec.NONE);
     }
 
     private static final String RICH = """
