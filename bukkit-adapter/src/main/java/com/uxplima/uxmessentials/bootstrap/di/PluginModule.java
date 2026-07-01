@@ -91,10 +91,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuLis
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -264,6 +266,13 @@ public final class PluginModule {
         // this flag only governs the generic console action a disk-loaded menu can reference.
         boolean allowMenuConsole =
                 config.scoped(ModuleId.of("custommenus").configRoot()).getBoolean("allow-console", false);
+        // The proxy connect seam shares the one BungeeCord/Velocity channel (npc and holograms build their own over
+        // the same plugin-scoped channel; Paper drops them all on disable). Built once here as a local so the movement
+        // slice's connect action is handed it directly, and also exposed on resources.serverConnector() for any other
+        // consumer; with no proxy in front the frame is harmlessly discarded, which is the degraded single-server
+        // behaviour. It is constructed before the vocab block so the same instance registers into both.
+        ServerConnector menuServerConnector = new BukkitServerConnector(plugin, kernel.log());
+        resources.serverConnector(menuServerConnector);
         MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions(), kernel.log());
         MenuVocabulary.registerPlaceholders(menuBindings);
@@ -279,6 +288,11 @@ public final class PluginModule {
         // temporary-op elevation is not reimplemented here; its two elevated actions honour the same allow-console
         // gate as the generic console action.
         CommandActions.register(menuBindings, new BukkitClickCommandRunner(), allowMenuConsole, kernel.log());
+        // The movement slice (teleport within this server, connect to another proxy backend) registers alongside the
+        // generic actions; like the other slices it has its own entry point so the MenuVocabulary signature stays
+        // untouched. It teleports through Paper's Folia-safe teleportAsync and reaches the proxy through the shared
+        // connector built just above.
+        MovementActions.register(menuBindings, menuServerConnector, kernel.log());
         PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {
             menuListener.uninstall();
@@ -302,12 +316,6 @@ public final class PluginModule {
                 new CachingPlayerDataStore(PlayerDataRepositories.jooq(persistence), kernel.scheduler());
         resources.playerData(playerData);
         resources.addListener(new PlayerDataLifecycleListener(playerData, kernel.scheduler()));
-
-        // The proxy connect seam shares the one BungeeCord/Velocity channel (npc and holograms build their own
-        // over the same plugin-scoped channel; Paper drops them all on disable). Built here so the Phase-2
-        // [connect] movement action reaches it from resources.serverConnector(); with no proxy in front the
-        // frame is harmlessly discarded, which is the degraded single-server behaviour.
-        resources.serverConnector(new BukkitServerConnector(plugin, kernel.log()));
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,
