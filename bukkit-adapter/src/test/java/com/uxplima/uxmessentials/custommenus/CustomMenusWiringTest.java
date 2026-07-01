@@ -18,7 +18,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -63,12 +62,12 @@ class CustomMenusWiringTest {
         Files.writeString(menus.resolve("hub.conf"), "rows = 1\nitems { x { slot = 0, material = STONE } }\n");
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.commands().getFirst().build().getLiteral()).isEqualTo("menu");
         assertThat(wired.menuNames().get()).contains("example", "hub");
-        assertThat(wired.listeners()).hasSize(2);
+        assertThat(wired.listeners()).hasSize(3);
     }
 
     @Test
@@ -81,7 +80,7 @@ class CustomMenusWiringTest {
                 """);
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
 
         assertThat(wired.commands().stream().map(c -> c.build().getLiteral())).contains("menu", "shop");
         assertThat(wired.commands().stream()
@@ -95,11 +94,11 @@ class CustomMenusWiringTest {
     @Test
     void anEmptyMenusFolderLoadsNothingButStillRegistersTheCommandAndListeners(@TempDir Path dataFolder) {
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.menuNames().get()).isEmpty();
-        assertThat(wired.listeners()).hasSize(2);
+        assertThat(wired.listeners()).hasSize(3);
     }
 
     @Test
@@ -113,12 +112,12 @@ class CustomMenusWiringTest {
                 """);
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
 
         // openers.conf is reserved for opener config: it must not appear as a loaded menu name, and it arms the
         // two opener listeners rather than being skipped as a malformed menu spec.
         assertThat(wired.menuNames().get()).containsExactly("hub");
-        assertThat(wired.listeners()).hasSize(2);
+        assertThat(wired.listeners()).hasSize(3);
     }
 
     /** The generic vocabulary registry exactly as PluginModule installs it at startup (console dispatch off). */

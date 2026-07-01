@@ -27,6 +27,10 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  * <p>An opener naming a menu id that is not registered, or a material that does not resolve, is dropped with a
  * warning: the runtime interact listener also re-checks the menu is still registered, but validating here keeps a
  * typo from silently arming a dead opener item.
+ *
+ * <p>The same file carries the optional {@code swap-offhand-menu} root key: the menu a player's off-hand swap (F)
+ * opens instead of swapping items. It is parsed alongside the openers into an {@link OpenerConfig}, dropped to empty
+ * when blank or naming an unregistered menu, so a typo simply leaves the vanilla swap behaviour intact.
  */
 public final class OpenerLoader {
 
@@ -37,15 +41,41 @@ public final class OpenerLoader {
     }
 
     /**
+     * The opener-item openers plus the optional off-hand-swap menu, both read from {@code openers.conf} in one pass.
+     * {@code swapMenu} is empty when the file names none, names a blank one, or names a menu that is not registered.
+     */
+    public record OpenerConfig(List<OpenerSpec> openers, Optional<String> swapMenu) {
+        public OpenerConfig {
+            openers = List.copyOf(openers);
+            Objects.requireNonNull(swapMenu, "swapMenu");
+        }
+
+        /** The config for an absent, unreadable, or menu-less openers file: no openers and no swap menu. */
+        static OpenerConfig empty() {
+            return new OpenerConfig(List.of(), Optional.empty());
+        }
+    }
+
+    /**
      * Parse and validate every opener in {@code openersFile}, keeping only those that name a menu in
      * {@code knownMenus} and a real material. A missing file yields an empty list; an unreadable or malformed file
-     * is logged and also yields an empty list, so a broken openers config never blocks the menus themselves.
+     * is logged and also yields an empty list, so a broken openers config never blocks the menus themselves. This is
+     * the openers-only view of {@link #loadConfig}, kept for callers that do not read the swap menu.
      */
     public List<OpenerSpec> loadFrom(Path openersFile, Set<String> knownMenus) {
+        return loadConfig(openersFile, knownMenus).openers();
+    }
+
+    /**
+     * Parse the openers and the optional {@code swap-offhand-menu} from {@code openersFile} in one read. A missing
+     * file yields an {@linkplain OpenerConfig#empty() empty config}; an unreadable or malformed file is logged and
+     * also yields an empty config, so a broken openers config never blocks the menus themselves.
+     */
+    public OpenerConfig loadConfig(Path openersFile, Set<String> knownMenus) {
         Objects.requireNonNull(openersFile, "openersFile");
         Objects.requireNonNull(knownMenus, "knownMenus");
         if (!Files.isRegularFile(openersFile)) {
-            return List.of();
+            return OpenerConfig.empty();
         }
         try {
             ConfigurationNode root =
@@ -55,11 +85,27 @@ public final class OpenerLoader {
                 parseOne(entry, knownMenus).ifPresent(openers::add);
             }
             log.info("loaded {} menu openers", openers.size());
-            return List.copyOf(openers);
+            return new OpenerConfig(openers, parseSwapMenu(root, knownMenus));
         } catch (RuntimeException | java.io.IOException invalid) {
             log.warn("could not read menu openers from {} : {}", openersFile, String.valueOf(invalid.getMessage()));
-            return List.of();
+            return OpenerConfig.empty();
         }
+    }
+
+    /**
+     * The {@code swap-offhand-menu} the file names, or empty when it is absent, blank, or names a menu that is not in
+     * {@code knownMenus} — an unregistered id is dropped with a warning so the vanilla off-hand swap keeps working.
+     */
+    private Optional<String> parseSwapMenu(ConfigurationNode root, Set<String> knownMenus) {
+        String menu = root.node("swap-offhand-menu").getString("").strip();
+        if (menu.isBlank()) {
+            return Optional.empty();
+        }
+        if (!knownMenus.contains(menu)) {
+            log.warn("swap-offhand-menu names an unknown menu {}; ignoring it", menu);
+            return Optional.empty();
+        }
+        return Optional.of(menu);
     }
 
     /**

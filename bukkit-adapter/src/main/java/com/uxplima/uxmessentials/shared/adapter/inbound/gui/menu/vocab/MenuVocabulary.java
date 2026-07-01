@@ -50,8 +50,9 @@ public final class MenuVocabulary {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(log, "log");
         bindings.action("close", ctx -> ctx.player().closeInventory());
-        // v2: true previous-menu history is a later refinement, so back behaves as close for now.
-        bindings.action("back", ctx -> ctx.player().closeInventory());
+        // `back` steps to the previous menu in the viewer's history (the engine holds the per-player stack); from the
+        // first/root menu — or on an engine wired without a history tracker — there is nothing beneath, so it closes.
+        bindings.action("back", ctx -> menus.back(ctx.viewer()));
         bindings.action("open", ctx -> {
             OpenTarget target = OpenTarget.parse(ctx.arg());
             menus.open(ctx.viewer(), target.menu(), null, target.page());

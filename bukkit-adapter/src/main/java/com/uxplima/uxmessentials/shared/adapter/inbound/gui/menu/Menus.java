@@ -199,6 +199,23 @@ public final class Menus {
      */
     public void open(
             PlayerRef viewer, String specId, @Nullable Object subject, int page, Map<String, String> arguments) {
+        openInternal(viewer, specId, subject, page, arguments, true);
+    }
+
+    /**
+     * The shared open body every public {@link #open} overload and the internal {@link #reopen} route through. It
+     * resolves the spec, clamps the page, resolves list sources off the tick thread, then shows the window on the
+     * viewer's entity thread. {@code record} decides whether the open joins the viewer's {@code /menu last} / back
+     * history: a fresh open records (subject permitting), a back-step or reopen-last replays an already-recorded open
+     * and must not push it again — otherwise stepping back would immediately re-stack what it just popped.
+     */
+    private void openInternal(
+            PlayerRef viewer,
+            String specId,
+            @Nullable Object subject,
+            int page,
+            Map<String, String> arguments,
+            boolean record) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(specId, "specId");
         Objects.requireNonNull(arguments, "arguments");
@@ -211,7 +228,58 @@ public final class Menus {
         MenuContext ctx = MenuContext.of(viewer, subject, startPage, args);
         scheduler.async(() -> {
             Map<String, List<?>> resolved = resolveLists(spec, ctx);
-            scheduler.onEntity(viewer, () -> openResolved(viewer, specId, spec, subject, resolved, startPage, args));
+            scheduler.onEntity(
+                    viewer, () -> openResolved(viewer, specId, spec, subject, resolved, startPage, args, record));
+        });
+    }
+
+    /**
+     * Reopen the previous menu {@code viewer} had open — the target a {@code back} button steps to. It hops to the
+     * viewer's entity thread and, if nothing remains beneath the current open (they are at the root, or the engine was
+     * wired without a history), closes the window instead. A previous open whose spec is no longer registered (a
+     * since-dropped menu) is treated as nothing-below, so a stale entry closes cleanly rather than raising the loud
+     * unknown-spec failure a blind reopen would. The reopen itself replays the recorded open without re-recording it,
+     * so stepping back never grows the history.
+     */
+    public void back(PlayerRef viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        if (lastMenu == null) {
+            closeFor(viewer);
+            return;
+        }
+        lastMenu.back(viewer.uuid())
+                .filter(prev -> specs.containsKey(prev.menuId()))
+                .ifPresentOrElse(prev -> reopen(viewer, prev), () -> closeFor(viewer));
+    }
+
+    /**
+     * Reopen the menu {@code viewer} currently has on top of their history — what {@code /menu last} runs. Returns
+     * {@code false} (so the caller can show its own feedback) when there is nothing to reopen: the engine carries no
+     * history, none has been recorded, or the recorded spec is no longer registered. A successful reopen replays the
+     * recorded open without re-recording it, so calling it repeatedly never stacks duplicates.
+     */
+    public boolean reopenLast(PlayerRef viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        if (lastMenu == null) {
+            return false;
+        }
+        Optional<LastMenu.LastOpen> last = lastMenu.get(viewer.uuid()).filter(open -> specs.containsKey(open.menuId()));
+        last.ifPresent(open -> reopen(viewer, open));
+        return last.isPresent();
+    }
+
+    /** Replay a recorded open — same page and typed arguments, always subject-less — without recording it again. */
+    private void reopen(PlayerRef viewer, LastMenu.LastOpen open) {
+        openInternal(viewer, open.menuId(), null, open.page(), open.arguments(), false);
+    }
+
+    /** Close whatever window {@code viewer} has open, on their entity thread — the back-step to nothing / null-history path. */
+    private void closeFor(PlayerRef viewer) {
+        scheduler.onEntity(viewer, () -> {
+            Player live = Bukkit.getPlayer(viewer.uuid());
+            if (live != null && live.isOnline()) {
+                live.closeInventory();
+            }
         });
     }
 
@@ -454,7 +522,8 @@ public final class Menus {
             @Nullable Object subject,
             Map<String, List<?>> resolved,
             int page,
-            Map<String, String> arguments) {
+            Map<String, String> arguments,
+            boolean record) {
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live == null || !live.isOnline()) {
             return;
@@ -469,7 +538,9 @@ public final class Menus {
         holder.attach(inv);
         renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
         live.openInventory(inv);
-        rememberLastOpen(viewer, specId, subject, page, arguments);
+        if (record) {
+            rememberLastOpen(viewer, specId, subject, page, arguments);
+        }
         runOpenActions(spec, live, ctx);
         MenuRefresh.start(holder, scheduler, () -> reRender(holder));
     }

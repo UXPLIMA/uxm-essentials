@@ -214,14 +214,26 @@ class MenuCommandTest {
 
     @Test
     void lastWhoseMenuIsNoLongerRegisteredRepliesNoLastWithoutThrowing() {
-        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
-        player.closeInventory();
-        names.clear(); // a reload dropped the spec: it is recorded but no longer a registered name
+        // A menu can be recorded (opened, then dropped by a reload) yet no longer be a registered spec. reopenLast
+        // guards on the engine's registered specs, so a recorded-but-unregistered id replies no-last rather than
+        // raising the loud unknown-spec failure a blind reopen would.
+        lastMenu.record(player.getUniqueId(), new LastMenu.LastOpen("ghost", 0, Map.of()));
 
         execute("menu last", player);
 
         assertThat(messages.keys).contains("menu.no-last");
         assertThat(menuHolderIsOpenFor(player)).isFalse();
+    }
+
+    @Test
+    void lastReplaysWithoutGrowingTheBackHistory() {
+        // A single open records one entry; /menu last replays it without re-recording, so the history stays one deep
+        // however many times it is reopened — a back from it then finds nothing beneath.
+        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
+        execute("menu last", player);
+        execute("menu last", player);
+
+        assertThat(lastMenu.back(player.getUniqueId())).isEmpty();
     }
 
     @Test
@@ -311,7 +323,6 @@ class MenuCommandTest {
                     reloads.incrementAndGet();
                     return new CustomMenuLoader.LoadResult(List.of("shop", "spawn"), List.of("broken"));
                 },
-                lastMenu,
                 messages);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(command.build());

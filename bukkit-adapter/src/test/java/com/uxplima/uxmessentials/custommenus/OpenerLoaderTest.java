@@ -106,6 +106,54 @@ class OpenerLoaderTest {
         assertThat(loader.loadFrom(dir.resolve("openers.conf"), KNOWN)).isEmpty();
     }
 
+    @Test
+    void loadConfigParsesBothOpenersAndTheSwapMenu(@TempDir Path dir) throws Exception {
+        Path file = write(dir, """
+                swap-offhand-menu = "hub"
+                openers = [
+                  { menu = "shop", item { material = "CHEST" }, give-on-join = "always" }
+                ]
+                """);
+
+        OpenerLoader.OpenerConfig config = loader.loadConfig(file, KNOWN);
+
+        assertThat(config.openers()).hasSize(1);
+        assertThat(config.openers().getFirst().menu()).isEqualTo("shop");
+        assertThat(config.swapMenu()).contains("hub");
+    }
+
+    @Test
+    void loadConfigWithoutASwapKeyLeavesTheSwapMenuEmpty(@TempDir Path dir) throws Exception {
+        Path file = write(dir, "openers = [ { menu = \"hub\", item { material = \"COMPASS\" } } ]\n");
+
+        OpenerLoader.OpenerConfig config = loader.loadConfig(file, KNOWN);
+
+        assertThat(config.openers()).hasSize(1);
+        assertThat(config.swapMenu()).isEmpty();
+    }
+
+    @Test
+    void loadConfigDropsASwapMenuNamingAnUnknownMenu(@TempDir Path dir) throws Exception {
+        Path file = write(dir, "swap-offhand-menu = \"ghost\"\n");
+
+        assertThat(loader.loadConfig(file, KNOWN).swapMenu()).isEmpty();
+    }
+
+    @Test
+    void loadConfigDropsABlankSwapMenu(@TempDir Path dir) throws Exception {
+        Path file = write(dir, "swap-offhand-menu = \"\"\n");
+
+        assertThat(loader.loadConfig(file, KNOWN).swapMenu()).isEmpty();
+    }
+
+    @Test
+    void loadConfigOnAMissingFileIsEmpty(@TempDir Path dir) {
+        OpenerLoader.OpenerConfig config = loader.loadConfig(dir.resolve("openers.conf"), KNOWN);
+
+        assertThat(config.openers()).isEmpty();
+        assertThat(config.swapMenu()).isEmpty();
+    }
+
     private static Path write(Path dir, String content) throws Exception {
         Path file = dir.resolve("openers.conf");
         Files.writeString(file, content);

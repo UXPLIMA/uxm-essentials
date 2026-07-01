@@ -415,8 +415,7 @@ public final class PluginModule {
                 bus.bus(),
                 guiRegistry,
                 menus,
-                menuBindings,
-                lastMenu);
+                menuBindings);
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
@@ -574,8 +573,7 @@ public final class PluginModule {
             Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings,
-            LastMenu lastMenu) {
+            MenuBindings menuBindings) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
@@ -624,8 +622,7 @@ public final class PluginModule {
                     guiRegistry,
                     textInput,
                     menus,
-                    menuBindings,
-                    lastMenu);
+                    menuBindings);
         }
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -646,8 +643,7 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings,
-            LastMenu lastMenu) {
+            MenuBindings menuBindings) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
@@ -782,7 +778,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
-            wireCustomMenus(plugin, ctx, resources, menus, menuBindings, lastMenu);
+            wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
         }
     }
 
@@ -791,8 +787,7 @@ public final class PluginModule {
             ModuleContext ctx,
             CloseableResources resources,
             Menus menus,
-            MenuBindings menuBindings,
-            LastMenu lastMenu) {
+            MenuBindings menuBindings) {
         // custommenus consumes the always-on menu engine (the façade + bindings built in PluginModule): it loads the
         // operator's menus/*.conf into the engine on enable and registers the /menu command. There is no per-context
         // repository or listener — the single menu click listener is installed once in bootstrap — so the wiring is a
@@ -803,7 +798,6 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath(),
-                lastMenu,
                 ctx.kernel().log(),
                 ctx.kernel().messages());
         wired.commands().forEach(resources::addCommand);
