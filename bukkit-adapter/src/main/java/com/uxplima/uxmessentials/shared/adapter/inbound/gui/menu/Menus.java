@@ -443,8 +443,10 @@ public final class Menus {
      * proceeds — when the engine was wired without a condition registry (every list/spec-only test engine) or the
      * spec names no requirement, so an engine that predates this seam behaves byte-identically. Otherwise every
      * requirement ref is an AND gate: each is resolved against the condition registry (the same registry-aware split
-     * the click path uses, so a valued token like {@code has-money:100} reaches its handler with {@code value=100})
-     * and must test true. An unregistered or false condition fails the gate closed, so a wiring gap keeps the window
+     * the click path uses, so a valued token like {@code has-money:100} reaches its handler with {@code value=100}),
+     * has its {@code %argument_<name>%} tokens expanded from the arguments the menu was opened with (so a gate can read
+     * a typed open-command's argument, e.g. {@code expr:%argument_amount% > 0}), and must test true. An unregistered or
+     * false condition fails the gate closed, so a wiring gap keeps the window
      * shut rather than showing it — a deny message is a later, DeluxeMenus-style concern, not this simple gate.
      */
     private boolean gateOpen(MenuSpec spec, MenuContext ctx) {
@@ -454,8 +456,10 @@ public final class Menus {
         }
         for (Ref ref : spec.openRequirement()) {
             Ref eff = ref.resolve(conditions::has);
-            boolean pass =
-                    conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false);
+            boolean pass = conditions
+                    .get(eff.id())
+                    .map(p -> p.test(ctx, ActionArguments.resolve(eff.args(), ctx.arguments())))
+                    .orElse(false);
             if (!pass) {
                 return false;
             }

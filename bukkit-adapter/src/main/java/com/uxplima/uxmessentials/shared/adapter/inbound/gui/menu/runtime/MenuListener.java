@@ -421,14 +421,19 @@ public final class MenuListener implements Listener {
      * passed. The condition is resolved against the condition registry (so a valued token like {@code has-money:100}
      * reaches its handler with {@code value=100}, the same registry-aware split the action path takes) and then negated
      * when the requirement was written with a leading {@code !}. An unregistered condition evaluates {@code false} —
-     * fail-closed — so a wiring gap denies rather than silently granting. Both branches route their refs through
-     * {@link #runRef}, so per-requirement actions honour the same modifiers and viewer's-entity-thread hop as the
-     * click's own actions.
+     * fail-closed — so a wiring gap denies rather than silently granting. The condition's args have their
+     * {@code %argument_<name>%} tokens expanded from the arguments the menu was opened with first, so a click
+     * requirement can gate on a typed open-command's argument; an argument-less open takes the identity fast-path.
+     * Both branches route their refs through {@link #runRef}, so per-requirement actions honour the same modifiers and
+     * viewer's-entity-thread hop as the click's own actions.
      */
     private boolean evaluateOne(MenuHolder holder, MenuContext base, ClickKind kind, Requirement r) {
         Ref eff = r.condition().resolve(conditions::has);
-        boolean result =
-                conditions.get(eff.id()).map(p -> p.test(base, eff.args())).orElse(false) != r.inverted();
+        boolean result = conditions
+                        .get(eff.id())
+                        .map(p -> p.test(base, ActionArguments.resolve(eff.args(), base.arguments())))
+                        .orElse(false)
+                != r.inverted();
         runEach(holder, base, kind, result ? r.success() : r.deny());
         return result;
     }
@@ -445,12 +450,17 @@ public final class MenuListener implements Listener {
      * shared {@link ClickKind#ANY} list must hold; an unregistered condition fails closed so a wiring gap blocks
      * the click rather than silently running it. An empty condition list always passes. Each ref is first resolved
      * against the condition registry, so a valued condition written {@code has-money:100} splits its head off and the
-     * handler sees {@code value=100} in its args — the same registry-aware split the action path takes.
+     * handler sees {@code value=100} in its args — the same registry-aware split the action path takes. Each ref's args
+     * then have their {@code %argument_<name>%} tokens expanded from the arguments the menu was opened with, so a
+     * per-gesture condition can read a typed open-command's argument; an argument-less open takes the identity fast-path.
      */
     private boolean clickConditionsPass(ClickSpec click, ClickKind kind, MenuContext ctx) {
         for (Ref ref : merged(click.conditions().get(kind), click.conditions().get(ClickKind.ANY))) {
             Ref eff = ref.resolve(conditions::has);
-            if (!conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false)) {
+            if (!conditions
+                    .get(eff.id())
+                    .map(p -> p.test(ctx, ActionArguments.resolve(eff.args(), ctx.arguments())))
+                    .orElse(false)) {
                 return false;
             }
         }

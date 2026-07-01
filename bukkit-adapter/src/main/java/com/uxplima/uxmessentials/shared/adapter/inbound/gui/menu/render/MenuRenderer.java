@@ -13,6 +13,7 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PriorityLayering;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ActionArguments;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
@@ -151,13 +152,17 @@ public final class MenuRenderer {
      * valued condition written {@code has-money:100} splits its head off and the handler sees {@code value=100}, the
      * same registry-aware split the click and action paths take), tested, and negated when the requirement carries a
      * leading {@code !}. An empty block is visible; an unregistered condition holds {@code false} — fail-closed — so a
-     * wiring gap hides the item rather than silently showing it.
+     * wiring gap hides the item rather than silently showing it. The condition's args have their
+     * {@code %argument_<name>%} tokens expanded from the arguments the menu was opened with first, so a view can gate on
+     * a typed open-command's argument; an argument-less open takes the identity fast-path and is byte-identical.
      */
     private boolean viewPasses(MenuItemSpec item, MenuContext ctx) {
         return item.view().passes(requirement -> {
             Ref eff = requirement.condition().resolve(conditions::has);
-            boolean present =
-                    conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false);
+            boolean present = conditions
+                    .get(eff.id())
+                    .map(p -> p.test(ctx, ActionArguments.resolve(eff.args(), ctx.arguments())))
+                    .orElse(false);
             return present != requirement.inverted();
         });
     }
