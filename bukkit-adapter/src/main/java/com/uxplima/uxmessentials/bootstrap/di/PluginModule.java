@@ -96,6 +96,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuContr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.NumericSpatialConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
@@ -290,6 +291,12 @@ public final class PluginModule {
         // registry off the shared bindings internally to expand its operands, needs nothing else, and every
         // condition fails closed.
         StringConditions.register(menuBindings, kernel.log());
+        // The numeric/spatial slice of the condition vocabulary (compare, is-near, cuboid, world) registers alongside
+        // the generic conditions with its own entry point, so the MenuVocabulary.registerConditions signature stays
+        // untouched. compare is the config-reachable twin of papi-compare (whose named left/op/right args the loader
+        // cannot fill from a token); the spatial gates read only the viewer's own location and world, and every
+        // condition fails closed. The general numeric comparators/arithmetic are already reachable through expr.
+        NumericSpatialConditions.register(menuBindings, kernel.log());
         MenuVocabulary.registerPlaceholders(menuBindings);
         // The messaging slice of the vocabulary (message-to/whisper, broadcast(+json/legacy), action-bar, title,
         // toast, log) registers alongside the generic actions; its own registration entry point keeps the
