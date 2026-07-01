@@ -15,6 +15,8 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.GuiPlusConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.GuiPlusConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
@@ -106,15 +108,24 @@ public final class CustomMenusWiring {
             }
             return result;
         };
-        // The DeluxeMenus, zMenu and OGUI converters behind /menu convert <deluxemenus|zmenu|ogui> <path>. Each writes
-        // into the same menus/ directory the loader reads, so a converted spec is picked up on the next /menu reload
-        // (none of the converters reloads itself).
+        // The DeluxeMenus, zMenu, OGUI and GUIPlus converters behind /menu convert <deluxemenus|zmenu|ogui|guiplus>
+        // <path>. Each writes into the same menus/ directory the loader reads, so a converted spec is picked up on the
+        // next /menu reload (none of the converters reloads itself).
         DeluxeMenusConvertService deluxeMenusConvert =
                 new DeluxeMenusConvertService(menusDir, new DeluxeMenusConverter(), log);
         ZMenuConvertService zMenuConvert = new ZMenuConvertService(menusDir, new ZMenuConverter(), log);
         OguiConvertService oguiConvert = new OguiConvertService(menusDir, new OguiConverter(), log);
+        GuiPlusConvertService guiPlusConvert = new GuiPlusConvertService(menusDir, new GuiPlusConverter(), log);
         MenuCommand command = new MenuCommand(
-                menus, nameSupplier, reload, reloadOne, deluxeMenusConvert, zMenuConvert, oguiConvert, messages);
+                menus,
+                nameSupplier,
+                reload,
+                reloadOne,
+                deluxeMenusConvert,
+                zMenuConvert,
+                oguiConvert,
+                guiPlusConvert,
+                messages);
 
         // The open commands a menu declares in its `command {}` block are built once here, from this first load,
         // and handed back for the bootstrap to register at the LifecycleEvents.COMMANDS event. Brigadier only

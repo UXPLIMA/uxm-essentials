@@ -27,6 +27,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.GuiPlusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
@@ -50,8 +51,8 @@ import org.jspecify.annotations.Nullable;
  * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu last} reopens the last
  * custom menu the player had open (with its page and typed arguments); {@code /menu reload} re-runs the loader and
  * reports the loaded/skipped counts, {@code /menu reload <menu>} re-loads just that one file, and
- * {@code /menu convert <deluxemenus|zmenu|ogui> <path>} converts a DeluxeMenus, zMenu or OGUI menu YAML (or a
- * directory of them) into {@code menus/*.conf}. Three admin diagnostics round out the surface:
+ * {@code /menu convert <deluxemenus|zmenu|ogui|guiplus> <path>} converts a DeluxeMenus, zMenu, OGUI or GUIPlus menu
+ * YAML (or a directory of them) into {@code menus/*.conf}. Three admin diagnostics round out the surface:
  * {@code /menu execute <player> <action>} runs one menu action for a target, {@code /menu dump <menu>} prints a
  * loaded menu's title, rows and per-item breakdown, and {@code /menu meta <menu>} prints a compact one-line
  * metadata summary (all gated by {@code uxmessentials.menu.admin}). The set of
@@ -73,6 +74,7 @@ public final class MenuCommand implements CommandRegistration {
     private final DeluxeMenusConvertService deluxeMenusConvert;
     private final ZMenuConvertService zMenuConvert;
     private final OguiConvertService oguiConvert;
+    private final GuiPlusConvertService guiPlusConvert;
     private final CommandFeedback feedback;
 
     public MenuCommand(
@@ -83,6 +85,7 @@ public final class MenuCommand implements CommandRegistration {
             DeluxeMenusConvertService deluxeMenusConvert,
             ZMenuConvertService zMenuConvert,
             OguiConvertService oguiConvert,
+            GuiPlusConvertService guiPlusConvert,
             Messages messages) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
@@ -91,6 +94,7 @@ public final class MenuCommand implements CommandRegistration {
         this.deluxeMenusConvert = Objects.requireNonNull(deluxeMenusConvert, "deluxeMenusConvert");
         this.zMenuConvert = Objects.requireNonNull(zMenuConvert, "zMenuConvert");
         this.oguiConvert = Objects.requireNonNull(oguiConvert, "oguiConvert");
+        this.guiPlusConvert = Objects.requireNonNull(guiPlusConvert, "guiPlusConvert");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -131,7 +135,10 @@ public final class MenuCommand implements CommandRegistration {
                                         .executes(this::convertZMenu)))
                         .then(Commands.literal("ogui")
                                 .then(Commands.argument("path", StringArgumentType.greedyString())
-                                        .executes(this::convertOgui))))
+                                        .executes(this::convertOgui)))
+                        .then(Commands.literal("guiplus")
+                                .then(Commands.argument("path", StringArgumentType.greedyString())
+                                        .executes(this::convertGuiPlus))))
                 .build();
     }
 
@@ -478,6 +485,23 @@ public final class MenuCommand implements CommandRegistration {
         CommandSender sender = ctx.getSource().getSender();
         String path = StringArgumentType.getString(ctx, "path");
         OguiConvertService.ConvertReport report = oguiConvert.convert(path);
+        if (!report.found()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
+            return 0;
+        }
+        reportConverted(sender, report.converted(), report.skipped(), report.warnings());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Convert a GUIPlus GUI YAML (or a directory of them) at {@code <path>} into {@code menus/*.conf}, exactly as the
+     * DeluxeMenus, zMenu and OGUI branches do — same path resolution, same not-found reply, same converted / skipped /
+     * warning report, same deliberate no-reload. The per-file conversion never crashes the command.
+     */
+    private int convertGuiPlus(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String path = StringArgumentType.getString(ctx, "path");
+        GuiPlusConvertService.ConvertReport report = guiPlusConvert.convert(path);
         if (!report.found()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
             return 0;
