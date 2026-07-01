@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -172,6 +173,16 @@ class BedrockInputFormTest {
 
     /** Records the last input form it was asked to send and lets the test fire the submit or the close callback. */
     private static final class FakeBedrockScreen implements BedrockScreen {
+
+        @Override
+        public void sendCustomForm(
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockWidget> widgets,
+                Consumer<Map<String, String>> onSubmit,
+                Runnable onClose) {}
+
         private boolean sent;
         private @Nullable String title;
         private @Nullable String inputLabel;

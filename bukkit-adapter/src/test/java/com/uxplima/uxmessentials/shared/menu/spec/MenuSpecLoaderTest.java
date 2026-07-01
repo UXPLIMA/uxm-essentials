@@ -8,6 +8,8 @@ import java.io.BufferedReader;
 import java.io.StringReader;
 import java.util.List;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
@@ -1136,5 +1138,67 @@ class MenuSpecLoaderTest {
         } finally {
             logger.removeHandler(handler);
         }
+    }
+
+    private static final String BEDROCK = """
+            title = "Warps"
+            rows = 1
+            items { a { slot = 0, material = STONE, name = "A" } }
+            bedrock {
+              title = "Create Warp"
+              content = "Fill in the details"
+              widgets = [
+                { type = label,    text = "<gold>New warp" }
+                { type = input,    name = warpname, label = "Name", placeholder = "spawn", default = "" }
+                { type = dropdown, name = category, label = "Category", options = ["PvP","Build","Hub"], default = 1 }
+                { type = slider,   name = cost,     label = "Cost", min = 0, max = 1000, step = 50, default = 100 }
+                { type = toggle,   name = public,   label = "Public?", default = true }
+              ]
+              on-submit = [ "record:%warpname%|%category%|%cost%", "message:done" ]
+            }
+            """;
+
+    @Test
+    void parsesTheBedrockCustomFormBlockIntoItsWidgetRecordsAndOnSubmitRefs() {
+        BedrockFormSpec form = new MenuSpecLoader().parse(BEDROCK).bedrock().orElseThrow();
+
+        assertThat(form.title()).isEqualTo("Create Warp");
+        assertThat(form.content()).isEqualTo("Fill in the details");
+        assertThat(form.widgets())
+                .as("every widget parses into its matching record, in declared order, with strings kept verbatim")
+                .containsExactly(
+                        new BedrockWidget.Label("<gold>New warp"),
+                        new BedrockWidget.Input("warpname", "Name", "spawn", ""),
+                        new BedrockWidget.Dropdown("category", "Category", List.of("PvP", "Build", "Hub"), 1),
+                        new BedrockWidget.Slider("cost", "Cost", 0, 1000, 50, 100),
+                        new BedrockWidget.Toggle("public", "Public?", true));
+        assertThat(form.onSubmit())
+                .extracting(Ref::id)
+                .as("the on-submit actions parse through the same ref parser the click actions use")
+                .containsExactly("record:%warpname%|%category%|%cost%", "message");
+    }
+
+    @Test
+    void aMenuWithoutABedrockBlockHasNoBedrockForm() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows = 1\nitems { a { slot = 0, material = STONE } }");
+        assertThat(spec.bedrock())
+                .as("a menu that declares no bedrock {} block keeps the automatic Bedrock degradation")
+                .isEmpty();
+    }
+
+    @Test
+    void aBedrockWidgetWithAnUnknownTypeIsSkippedRatherThanAbortingTheMenu() {
+        String hocon = """
+                rows = 1
+                items { a { slot = 0, material = STONE } }
+                bedrock {
+                  title = "T"
+                  widgets = [ { type = mystery, name = x, label = "X" }, { type = toggle, name = ok, label = "OK" } ]
+                }
+                """;
+        BedrockFormSpec form = new MenuSpecLoader().parse(hocon).bedrock().orElseThrow();
+        assertThat(form.widgets())
+                .as("a widget with an unknown type is skipped, the rest of the form parses")
+                .containsExactly(new BedrockWidget.Toggle("ok", "OK", false));
     }
 }

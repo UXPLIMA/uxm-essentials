@@ -40,6 +40,13 @@ import java.util.Optional;
  * of the redirect so its Bedrock viewers still get the chest. It is purely a routing hint here — a plain boolean the
  * Bukkit-side façade reads — so this model stays pure and plain-JUnit testable. A menu that leaves it {@code false} —
  * the default — is redirected to a form for a Bedrock viewer and renders exactly as before for a Java one.
+ *
+ * <p>The {@code bedrock} block is the menu's optional {@code bedrock {}} native CustomForm: when present, a Bedrock
+ * viewer opening the menu (and not opted out by {@code chestOnly}) gets that explicit form — the form-native
+ * dropdown/slider/toggle/multi-input widgets the automatic SimpleForm degradation cannot express — instead of the
+ * degraded button list. It is {@link Optional#empty()} for a menu that declares no block, in which case the automatic
+ * degradation is unchanged; a Java viewer never sees it either way. Purely spec here — a value the Bukkit-side façade
+ * reads — so this model stays pure and plain-JUnit testable.
  */
 public record MenuSpec(
         String title,
@@ -53,7 +60,8 @@ public record MenuSpec(
         Map<String, String> placeholders,
         long clickCooldownMs,
         boolean bottomInventory,
-        boolean chestOnly) {
+        boolean chestOnly,
+        Optional<BedrockFormSpec> bedrock) {
 
     public MenuSpec {
         Objects.requireNonNull(title, "title");
@@ -70,13 +78,49 @@ public record MenuSpec(
         if (clickCooldownMs < 0) {
             throw new IllegalArgumentException("clickCooldownMs must be >= 0: " + clickCooldownMs);
         }
+        Objects.requireNonNull(bedrock, "bedrock");
         checkSlotsFit(items, rows, bottomInventory);
+    }
+
+    /**
+     * The twelve-argument shape that carries a chest-only routing hint but no {@code bedrock {}} block, kept so every
+     * existing {@code new MenuSpec(...)} call site compiles unchanged. It delegates to the canonical constructor with
+     * an empty Bedrock block, so a Bedrock viewer of such a menu gets the automatic SimpleForm degradation exactly as
+     * before this block existed.
+     */
+    public MenuSpec(
+            String title,
+            int rows,
+            RefreshSpec refresh,
+            List<Ref> openRequirement,
+            List<Ref> openActions,
+            List<Ref> closeActions,
+            Map<String, MenuItemSpec> items,
+            Optional<String> inventoryType,
+            Map<String, String> placeholders,
+            long clickCooldownMs,
+            boolean bottomInventory,
+            boolean chestOnly) {
+        this(
+                title,
+                rows,
+                refresh,
+                openRequirement,
+                openActions,
+                closeActions,
+                items,
+                inventoryType,
+                placeholders,
+                clickCooldownMs,
+                bottomInventory,
+                chestOnly,
+                Optional.empty());
     }
 
     /**
      * The eleven-argument shape that carries a bottom-inventory flag but no chest-only routing hint, kept so every
      * existing {@code new MenuSpec(...)} call site — the loader's older path and the record test fixtures — compiles
-     * unchanged. It delegates to the canonical constructor with the chest-only flag off, so the menu is a form
+     * unchanged. It delegates to the twelve-argument constructor with the chest-only flag off, so the menu is a form
      * candidate for a Bedrock viewer exactly as before this hint existed.
      */
     public MenuSpec(

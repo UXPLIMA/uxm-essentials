@@ -163,6 +163,18 @@ public final class ItemRenderer {
     }
 
     /**
+     * A raw spec string resolved through the same {@code %token%}/{@code @key} path an item name takes, then flattened
+     * to plain text. A Bedrock CustomForm's title, intro content and widget labels/options are flat strings, so the
+     * hybrid form renderer resolves each operator-written string here — carrying a per-entry or per-open token through
+     * — exactly as a button label or a menu title would.
+     */
+    public String plainText(String raw, MenuContext ctx) {
+        Objects.requireNonNull(raw, "raw");
+        Objects.requireNonNull(ctx, "ctx");
+        return plainLine(raw, ctx);
+    }
+
+    /**
      * One text line resolved through the same {@code %token%}/{@code @key} path an icon name or lore line takes, then
      * flattened to plain text — a Bedrock form label is a flat string, so a button's name and lore reach it stripped
      * of all formatting.

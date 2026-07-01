@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -159,6 +160,16 @@ class BedrockButtonImageGoldenTest {
 
     /** Records the last form it was asked to send and hands the test the select callback to invoke a tap with. */
     private static final class FakeBedrockScreen implements BedrockScreen {
+
+        @Override
+        public void sendCustomForm(
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockWidget> widgets,
+                Consumer<Map<String, String>> onSubmit,
+                Runnable onClose) {}
+
         private List<BedrockButton> buttons = List.of();
         private @Nullable IntConsumer onSelect;
 

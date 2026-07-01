@@ -153,10 +153,80 @@ public final class MenuSpecLoader {
                     // default, so a menu without the key opens and behaves exactly as before.
                     root.node("click-cooldown").getLong(0),
                     bottomInventory,
-                    chestOnly);
+                    chestOnly,
+                    // The optional `bedrock {}` native CustomForm override — absent → empty, so a menu without it
+                    // keeps the automatic Bedrock degradation unchanged.
+                    parseBedrock(root.node("bedrock")));
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }
+    }
+
+    /**
+     * Parse the optional per-menu {@code bedrock {}} block into a {@link BedrockFormSpec}, or {@link Optional#empty()}
+     * when absent so a menu without one keeps the automatic Bedrock degradation. It reads the form {@code title} and
+     * optional {@code content}, each {@code widgets} child through {@link #parseWidget}, and the {@code on-submit}
+     * action refs via the same {@link #refs} parser the click actions use. The title/content and the widget label,
+     * text, placeholder and option strings may carry {@code %token%}/{@code @key}; like an item name they are left
+     * verbatim for render-time resolution, never resolved here.
+     */
+    private Optional<BedrockFormSpec> parseBedrock(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        List<BedrockWidget> widgets = new ArrayList<>();
+        for (ConfigurationNode child : node.node("widgets").childrenList()) {
+            parseWidget(child).ifPresent(widgets::add);
+        }
+        return Optional.of(new BedrockFormSpec(
+                node.node("title").getString(""),
+                node.node("content").getString(),
+                widgets,
+                refs(node.node("on-submit"))));
+    }
+
+    /**
+     * Parse one {@code bedrock {}} widget node by its {@code type} into the matching {@link BedrockWidget} record: a
+     * {@code label}, or a value widget ({@code input}/{@code dropdown}/{@code slider}/{@code toggle}) carrying a
+     * {@code name} its submitted value binds to. Numeric fields read through {@code getInt} with sane defaults, a
+     * dropdown's {@code options} through the string-list parser. A widget with a missing or unknown {@code type} is a
+     * config mistake — logged and skipped so one bad widget does not abort the menu.
+     */
+    private Optional<BedrockWidget> parseWidget(ConfigurationNode node) {
+        String type = node.node("type").getString("").strip().toLowerCase(java.util.Locale.ROOT);
+        return switch (type) {
+            case "label" ->
+                Optional.of(new BedrockWidget.Label(node.node("text").getString("")));
+            case "input" ->
+                Optional.of(new BedrockWidget.Input(
+                        node.node("name").getString(""),
+                        node.node("label").getString(""),
+                        node.node("placeholder").getString(""),
+                        node.node("default").getString("")));
+            case "dropdown" ->
+                Optional.of(new BedrockWidget.Dropdown(
+                        node.node("name").getString(""),
+                        node.node("label").getString(""),
+                        strings(node.node("options")),
+                        node.node("default").getInt(0)));
+            case "slider" ->
+                Optional.of(new BedrockWidget.Slider(
+                        node.node("name").getString(""),
+                        node.node("label").getString(""),
+                        node.node("min").getInt(0),
+                        node.node("max").getInt(100),
+                        node.node("step").getInt(1),
+                        node.node("default").getInt(0)));
+            case "toggle" ->
+                Optional.of(new BedrockWidget.Toggle(
+                        node.node("name").getString(""),
+                        node.node("label").getString(""),
+                        node.node("default").getBoolean(false)));
+            default -> {
+                LOG.warning("skipping bedrock widget with missing or unknown type '" + type + "' at " + node.path());
+                yield Optional.empty();
+            }
+        };
     }
 
     /**

@@ -48,6 +48,14 @@ class MenuSpecRecordsTest {
     }
 
     @Test
+    void menuSpecDefaultsBedrockFormToEmpty() {
+        var spec = new MenuSpec("t", 1, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
+        assertThat(spec.bedrock())
+                .as("a menu built through the historic ctors declares no bedrock {} block")
+                .isEmpty();
+    }
+
+    @Test
     void menuItemSpecDefaultsItemDragToEmptyThroughTheHistoricConstructor() {
         var item = new MenuItemSpec(
                 SlotSet.parse(List.of("0"), 9),

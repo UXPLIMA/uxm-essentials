@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -8,6 +9,7 @@ import java.util.function.IntConsumer;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -52,6 +54,15 @@ public interface BedrockScreen {
                 String inputLabel,
                 @Nullable String initial,
                 Consumer<String> onSubmit,
+                Runnable onClose) {}
+
+        @Override
+        public void sendCustomForm(
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockWidget> widgets,
+                Consumer<Map<String, String>> onSubmit,
                 Runnable onClose) {}
     };
 
@@ -114,6 +125,30 @@ public interface BedrockScreen {
             String inputLabel,
             @Nullable String initial,
             Consumer<String> onSubmit,
+            Runnable onClose);
+
+    /**
+     * Send {@code player} a CustomForm built from an explicit per-menu {@code bedrock {}} block — a title, an optional
+     * intro {@code content} line, and a list of {@link BedrockWidget}s (label, input, dropdown, slider, toggle) — the
+     * form-native controls the automatic SimpleForm degradation cannot express. On submit each value widget's value is
+     * collected by name into a {@code Map<String, String>} (a dropdown yields its selected option string, a slider its
+     * value, a toggle {@code true}/{@code false}) and handed to {@code onSubmit}; {@code onClose} runs when the viewer
+     * closes or dismisses the form without submitting. Both callbacks fire off the main thread when the viewer responds,
+     * so the caller wraps each in its own entity-thread hop before it touches the world.
+     *
+     * @param player the Bedrock viewer to send the form to; never {@code null}
+     * @param title the form title as plain text; never {@code null}
+     * @param content optional intro text shown above the widgets, or {@code null} for none
+     * @param widgets the widgets in order, each already resolved to plain display text; never {@code null}
+     * @param onSubmit invoked with the widget name → value map when the viewer submits; never {@code null}
+     * @param onClose invoked when the viewer closes or dismisses the form without submitting; never {@code null}
+     */
+    void sendCustomForm(
+            Player player,
+            String title,
+            @Nullable String content,
+            List<BedrockWidget> widgets,
+            Consumer<Map<String, String>> onSubmit,
             Runnable onClose);
 
     /**

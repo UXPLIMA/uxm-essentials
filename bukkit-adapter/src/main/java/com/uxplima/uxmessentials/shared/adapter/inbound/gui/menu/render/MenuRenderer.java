@@ -100,6 +100,18 @@ public final class MenuRenderer {
     }
 
     /**
+     * A raw spec string resolved for {@code ctx} through the same {@code %token%}/{@code @key} path an item name takes,
+     * flattened to plain text — a Bedrock CustomForm's title, intro content and widget labels/options are flat strings.
+     * Delegates to the item renderer, which owns the resolution, so an operator string in a {@code bedrock {}} block
+     * fills its tokens exactly as a menu title or item name would.
+     */
+    public String plainText(String raw, MenuContext ctx) {
+        Objects.requireNonNull(raw, "raw");
+        Objects.requireNonNull(ctx, "ctx");
+        return itemRenderer.plainText(raw, ctx);
+    }
+
+    /**
      * A shared {@link MessageKey} resolved for {@code viewer} and flattened to plain text — a label (a confirm
      * window's yes/no) the hybrid form renderer needs as a flat string where the chest paints wordless wool.
      * Delegates to the item renderer, which owns the catalog lookup, so the label honours the viewer's locale exactly

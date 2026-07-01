@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,6 +47,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuCon
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.SelectorState;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
@@ -700,10 +703,19 @@ public final class Menus {
             return;
         }
         // A Bedrock viewer gets a native Cumulus form instead of the chest, unless the menu opts out (chest-only, for
-        // an item-display menu a form cannot represent). The open-actions and last-open recording that follow the
-        // chest build are deliberately skipped for a form in this slice — it is an alternative render at the open
-        // choke-point, not a second window; a Java viewer (isBedrock false) falls straight through unchanged. The
-        // resolved list cache is threaded through so a list-backed menu's entries page as form buttons.
+        // an item-display menu a form cannot represent). An explicit per-menu bedrock {} block wins first: it defines a
+        // native CustomForm — the dropdown/slider/toggle/multi-input widgets the automatic SimpleForm degradation
+        // cannot express — so a menu that declares one sends that form rather than the degraded button list. Absent a
+        // block, the automatic degradation is unchanged. The open-actions and last-open recording that follow the chest
+        // build are deliberately skipped for a form — it is an alternative render at the open choke-point, not a second
+        // window; a Java viewer (isBedrock false) falls straight through unchanged.
+        if (bedrock.isBedrock(viewer.uuid())
+                && !spec.chestOnly()
+                && spec.bedrock().isPresent()) {
+            sendBedrockCustomForm(live, spec, ctx);
+            return;
+        }
+        // The resolved list cache is threaded through so a list-backed menu's entries page as form buttons.
         if (bedrock.isBedrock(viewer.uuid()) && !spec.chestOnly()) {
             sendBedrockForm(live, spec, ctx, resolved);
             return;
@@ -861,6 +873,79 @@ public final class Menus {
     }
 
     /**
+     * Send the Bedrock viewer the menu's explicit {@code bedrock {}} CustomForm — the form-native widgets
+     * (label/input/dropdown/slider/toggle) the automatic SimpleForm degradation cannot express. The form's title,
+     * intro content and every widget's display text and options are resolved through the renderer's plain-text path
+     * (they may carry a {@code %token%}/{@code @key}, exactly like an item name), then handed to the screen. On submit,
+     * each widget's value arrives keyed by its {@code name}, and {@code runOnSubmit} binds those as local placeholders
+     * and runs the block's on-submit actions on the viewer's entity thread — Cumulus responds off-thread, so the hop
+     * is explicit. Closing without submitting is a no-op: the viewer simply dismissed the form.
+     */
+    private void sendBedrockCustomForm(Player live, MenuSpec spec, MenuContext ctx) {
+        BedrockFormSpec form = spec.bedrock().orElseThrow();
+        PlayerRef viewer = ctx.viewer();
+        String title = renderer.plainText(form.title(), ctx);
+        String content = form.content() == null ? null : renderer.plainText(form.content(), ctx);
+        List<BedrockWidget> widgets = resolveWidgets(form.widgets(), ctx);
+        bedrockScreen.sendCustomForm(
+                live,
+                title,
+                content,
+                widgets,
+                values -> scheduler.onEntity(viewer, () -> runOnSubmit(spec, ctx, values)),
+                () -> {
+                    // The viewer dismissed the form without submitting; there is nothing to run, they just closed it.
+                });
+    }
+
+    /** Resolve each widget's display text (and a dropdown's options) against {@code ctx}, keeping its binding name and numeric bounds. */
+    private List<BedrockWidget> resolveWidgets(List<BedrockWidget> widgets, MenuContext ctx) {
+        List<BedrockWidget> resolved = new ArrayList<>(widgets.size());
+        for (BedrockWidget widget : widgets) {
+            resolved.add(resolveWidget(widget, ctx));
+        }
+        return resolved;
+    }
+
+    /** One widget with its display strings resolved to plain text; the {@code name} and numeric bounds pass through unchanged. */
+    private BedrockWidget resolveWidget(BedrockWidget widget, MenuContext ctx) {
+        return switch (widget) {
+            case BedrockWidget.Label label -> new BedrockWidget.Label(renderer.plainText(label.text(), ctx));
+            case BedrockWidget.Input input ->
+                new BedrockWidget.Input(
+                        input.name(),
+                        renderer.plainText(input.label(), ctx),
+                        renderer.plainText(input.placeholder(), ctx),
+                        renderer.plainText(input.defaultText(), ctx));
+            case BedrockWidget.Dropdown dropdown ->
+                new BedrockWidget.Dropdown(
+                        dropdown.name(),
+                        renderer.plainText(dropdown.label(), ctx),
+                        resolveOptions(dropdown.options(), ctx),
+                        dropdown.defaultIndex());
+            case BedrockWidget.Slider slider ->
+                new BedrockWidget.Slider(
+                        slider.name(),
+                        renderer.plainText(slider.label(), ctx),
+                        slider.min(),
+                        slider.max(),
+                        slider.step(),
+                        slider.defaultValue());
+            case BedrockWidget.Toggle toggle ->
+                new BedrockWidget.Toggle(toggle.name(), renderer.plainText(toggle.label(), ctx), toggle.defaultValue());
+        };
+    }
+
+    /** Resolve every dropdown option string to plain text against {@code ctx}. */
+    private List<String> resolveOptions(List<String> options, MenuContext ctx) {
+        List<String> resolved = new ArrayList<>(options.size());
+        for (String option : options) {
+            resolved.add(renderer.plainText(option, ctx));
+        }
+        return resolved;
+    }
+
+    /**
      * Append one button per visible actionable static item, each tapping into that item's own left-click actions. The
      * button's icon is sourced from the item's own resolved material spec (a material → a Bedrock texture path, a
      * {@code skull:} → an mc-heads avatar URL), so a form button carries the same face the chest icon would.
@@ -966,13 +1051,47 @@ public final class Menus {
     /**
      * Run the tapped item's left-click actions against {@code ctx}, on the viewer's entity thread the caller already
      * hopped onto. A tap is a plain click, so it runs the item's {@code actionsFor(LEFT)} chain — which already merges
-     * the shared {@link ClickKind#ANY} block — through the very {@link ActionRegistry} the click listener resolves
-     * against (production hands both the same {@code MenuBindings.actions()} instance), with the same registry-aware
-     * ref split, so a form tap reaches the identical handler a chest click would. Skipped when the engine was wired
-     * without an action registry (a list/spec-only test engine), matching {@link #runOpenActions}. Per-click
-     * requirements and deny routing are a later item; this slice runs the actions only.
+     * the shared {@link ClickKind#ANY} block — through the shared {@link #runActions} runner, so a form tap reaches
+     * the identical handler a chest click would. Per-click requirements and deny routing are a later item; this runs
+     * the actions only.
      */
     private void runFormActions(MenuContext ctx, MenuItemSpec item) {
+        runActions(ctx, item.click().actionsFor(ClickKind.LEFT));
+    }
+
+    /**
+     * Run the {@code bedrock {}} block's on-submit actions with the submitted widget values bound. Each value arrives
+     * keyed by its widget {@code name}; they are layered over the menu's own {@code placeholders {}} block (the values
+     * winning) and carried as the context's local placeholders, so a {@code %warpname%}/{@code %cost%} token in an
+     * on-submit action's argument resolves to the submitted value through the local-placeholder channel — exactly the
+     * way the click path expands an item-drag's {@code %drag_*%} tokens. Runs on the viewer's entity thread the caller
+     * already hopped onto, through the same shared {@link #runActions} runner a form tap uses.
+     */
+    private void runOnSubmit(MenuSpec spec, MenuContext ctx, Map<String, String> values) {
+        MenuContext submitCtx = ctx.withLocalPlaceholders(merge(spec.placeholders(), values));
+        runActions(submitCtx, spec.bedrock().orElseThrow().onSubmit());
+    }
+
+    /** The menu's own local placeholders with the submitted values layered on top, the submitted value winning a clash. */
+    private static Map<String, String> merge(Map<String, String> base, Map<String, String> overrides) {
+        if (base.isEmpty()) {
+            return overrides;
+        }
+        Map<String, String> merged = new LinkedHashMap<>(base);
+        merged.putAll(overrides);
+        return merged;
+    }
+
+    /**
+     * Run a list of action refs against {@code ctx} on the viewer's entity thread the caller already hopped onto,
+     * through the very {@link ActionRegistry} the click listener resolves against (production hands both the same
+     * {@code MenuBindings.actions()} instance). Each ref is split registry-aware, then its argument values have their
+     * {@code %argument_<name>%} tokens and their menu-local {@code %name%} tokens expanded — the same two-channel
+     * substitution the click path's dispatch applies — so a form tap or an on-submit action reaches the identical
+     * handler with the identical arguments a chest click would. Skipped when the engine was wired without an action
+     * registry (a list/spec-only test engine), matching {@link #runOpenActions}.
+     */
+    private void runActions(MenuContext ctx, List<Ref> refs) {
         ActionRegistry actions = openActionRegistry;
         if (actions == null) {
             return;
@@ -981,11 +1100,12 @@ public final class Menus {
         if (live == null || !live.isOnline()) {
             return;
         }
-        for (Ref ref : item.click().actionsFor(ClickKind.LEFT)) {
+        for (Ref ref : refs) {
             Ref eff = ref.resolve(actions::has);
+            Map<String, String> args = ActionArguments.resolveLocals(
+                    ActionArguments.resolve(eff.args(), ctx.arguments()), ctx.localPlaceholders());
             actions.get(eff.id())
-                    .ifPresent(handler -> handler.accept(new MenuActionContext(
-                            ctx, live, ClickKind.LEFT, ActionArguments.resolve(eff.args(), ctx.arguments()))));
+                    .ifPresent(handler -> handler.accept(new MenuActionContext(ctx, live, ClickKind.LEFT, args)));
         }
     }
 
