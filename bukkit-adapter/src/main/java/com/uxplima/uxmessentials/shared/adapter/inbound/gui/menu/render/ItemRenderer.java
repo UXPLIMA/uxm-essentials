@@ -134,8 +134,12 @@ public final class ItemRenderer {
         Optional<ItemStack> base = iconProviders.resolve(materialSpec, ctx);
         Component name = resolveText(item.name(), ctx);
         List<Component> lore = combineLore(item, base, ctx);
-        return applyDecor(builderFor(base, materialSpec).name(name).lore(lore), item.decor(), ctx)
+        ItemStack built = applyDecor(builderFor(base, materialSpec).name(name).lore(lore), item.decor(), ctx)
                 .build();
+        // Tag every tile the engine renders — including an equipment/self-inventory icon, which is already a clone of
+        // the viewer's real item — so any display copy that escapes into a real inventory is strippable. The mark rides
+        // on the display copy only; the player's own items are never touched here (MenuItemMark, MenuAntiDupeListener).
+        return MenuItemMark.mark(built);
     }
 
     /**

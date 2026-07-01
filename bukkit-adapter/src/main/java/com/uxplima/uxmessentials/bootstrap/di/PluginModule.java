@@ -89,6 +89,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenuCleanupListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAntiDupeListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
@@ -286,6 +287,10 @@ public final class PluginModule {
                 menuBindings.conditions(),
                 lastMenu);
         resources.addListener(new LastMenuCleanupListener(lastMenu));
+        // Defence-in-depth over the engine's cancel-all-clicks invariant: strip a marked menu display item that ever
+        // escapes into a player's real inventory (close-sweep + join-sweep). A separate listener from the menu router,
+        // like the last-menu cleanup above.
+        resources.addListener(new MenuAntiDupeListener(kernel.log()));
         // The server-wide click-cooldown floor (milliseconds), read from modules/custommenus/config.conf. Zero (the
         // default, opt-in) means no throttling, so menus open byte-identically until an operator sets a floor; a menu
         // may raise it further with its own click-cooldown key. The system clock is threaded in explicitly so the
