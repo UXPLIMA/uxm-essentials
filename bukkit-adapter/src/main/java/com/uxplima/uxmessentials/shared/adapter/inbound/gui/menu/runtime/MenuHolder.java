@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
@@ -40,6 +41,15 @@ public final class MenuHolder implements InventoryHolder {
     @Nullable private Cancellable refreshHandle;
 
     @Nullable private Inventory inventory;
+
+    /**
+     * The viewer's own 36 inventory slots as they were the instant a bottom-inventory menu opened, saved so the
+     * engine can put them back when the menu closes (or drop them in place of the menu tiles on death). Null for an
+     * ordinary menu, which never touches the player inventory. It lives on the holder — GC'd with the open menu on
+     * close — so the snapshot needs no player-keyed side map and cannot leak when a viewer quits; the close handler
+     * threads the closing player in from the event, since the holder deliberately does not hold a live entity.
+     */
+    private @Nullable ItemStack @Nullable [] bottomSnapshot;
 
     /**
      * The clock reading of the last click this menu let through the anti-spam window, or {@code 0} before the first.
@@ -187,6 +197,20 @@ public final class MenuHolder implements InventoryHolder {
     /** Records the clock reading of a click the anti-spam window just let through. */
     public void lastClickMs(long now) {
         this.lastClickMs = now;
+    }
+
+    /**
+     * Save the viewer's real bottom inventory taken when a bottom-inventory menu opened, or clear it (with a
+     * {@code null}) once the restore has been scheduled/performed so a double close cannot restore twice. A defensive
+     * copy keeps the holder the sole owner of the array.
+     */
+    public void setBottomSnapshot(@Nullable ItemStack @Nullable [] snapshot) {
+        this.bottomSnapshot = snapshot == null ? null : snapshot.clone();
+    }
+
+    /** The saved real bottom inventory of a bottom-inventory menu, or null for an ordinary menu / after a restore. */
+    public @Nullable ItemStack @Nullable [] bottomSnapshot() {
+        return bottomSnapshot == null ? null : bottomSnapshot.clone();
     }
 
     public void setRefreshHandle(Cancellable handle) {

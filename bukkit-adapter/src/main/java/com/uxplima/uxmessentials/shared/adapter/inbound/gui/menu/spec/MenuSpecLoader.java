@@ -40,6 +40,9 @@ public final class MenuSpecLoader {
     /** The width of every inventory row, the divisor that turns a slot index into the row count needed to hold it. */
     private static final int SLOTS_PER_ROW = 9;
 
+    /** The count of the viewer's own inventory slots a bottom-inventory menu may paint into (27 main + 9 hotbar). */
+    private static final int BOTTOM_SLOTS = 36;
+
     /** The reserved id the auto-fill background item is stored under; an operator item of the same id is overwritten. */
     private static final String FILL_ITEM_ID = "__fill__";
 
@@ -103,18 +106,31 @@ public final class MenuSpecLoader {
     }
 
     private MenuSpec parseRoot(ConfigurationNode root, String origin, ConfigurationNode globalPatterns) {
-        Optional<String> inventoryType = optionalString(root.node("inventory-type"));
+        boolean bottomInventory = root.node("bottom-inventory").getBoolean(false);
+        Optional<String> declaredType = optionalString(root.node("inventory-type"));
+        // A bottom-inventory menu paints into the player's own 36 slots below a full 54-slot chest top, and that
+        // raw-slot geometry only lines up for a chest. So it ignores any inventory-type the author also set (warning
+        // once), and is fixed at six top rows — the double-chest whose raw slots 54..89 are exactly the player
+        // inventory the mapping targets.
+        if (bottomInventory && declaredType.isPresent()) {
+            LOG.warning("menu in " + origin + " sets bottom-inventory and inventory-type '" + declaredType.get()
+                    + "'; a bottom-inventory menu is chest-only, ignoring the type");
+        }
+        Optional<String> inventoryType = bottomInventory ? Optional.empty() : declaredType;
         boolean chest = inventoryType.isEmpty();
         int declaredRows = root.node("rows").getInt(chest ? 0 : MAX_ROWS);
         // A chest parses its items against the six-row ceiling so every declared slot is known before its rows are
         // auto-sized to fit them. A non-chest sizes its window from its inventory type and keeps its declared (or
         // six-row) fallback, whose own out-of-range slots the renderer skips, so its item ceiling stays that count.
         int ceilingRows = chest ? MAX_ROWS : declaredRows;
+        // A bottom-inventory menu addresses 36 extra slots beneath the top, so its items parse against a 90-slot
+        // ceiling rather than the 54 a plain chest allows.
+        int slotCeiling = ceilingRows * SLOTS_PER_ROW + (bottomInventory ? BOTTOM_SLOTS : 0);
         Map<String, Pattern> patterns = mergedPatterns(globalPatterns, root.node("patterns"));
         Map<Character, List<Integer>> layout = layoutSlots(root.node("layout"));
-        Map<String, MenuItemSpec> items = parseItems(root.node("items"), ceilingRows, origin, patterns, layout);
-        int rows = chest ? chestRows(declaredRows, items) : declaredRows;
-        addFillItem(root.node("fill-item"), items, rows, ceilingRows, patterns);
+        Map<String, MenuItemSpec> items = parseItems(root.node("items"), slotCeiling, origin, patterns, layout);
+        int rows = bottomInventory ? MAX_ROWS : (chest ? chestRows(declaredRows, items) : declaredRows);
+        addFillItem(root.node("fill-item"), items, rows, slotCeiling, patterns);
         try {
             return new MenuSpec(
                     root.node("title").getString(""),
@@ -131,7 +147,8 @@ public final class MenuSpecLoader {
                     varMap(root.node("placeholders")),
                     // The per-menu click-cooldown in milliseconds. Absent → 0 → the menu defers to the server-wide
                     // default, so a menu without the key opens and behaves exactly as before.
-                    root.node("click-cooldown").getLong(0));
+                    root.node("click-cooldown").getLong(0),
+                    bottomInventory);
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }
@@ -200,7 +217,7 @@ public final class MenuSpecLoader {
      */
     private Map<String, MenuItemSpec> parseItems(
             ConfigurationNode itemsNode,
-            int rows,
+            int slotCeiling,
             String origin,
             Map<String, Pattern> patterns,
             Map<Character, List<Integer>> layout) {
@@ -209,7 +226,7 @@ public final class MenuSpecLoader {
                 itemsNode.childrenMap().entrySet()) {
             String id = String.valueOf(entry.getKey());
             try {
-                items.put(id, parseItem(entry.getValue(), rows, patterns, layoutOverride(id, layout)));
+                items.put(id, parseItem(entry.getValue(), slotCeiling, patterns, layoutOverride(id, layout)));
             } catch (RuntimeException invalid) {
                 throw new MenuSpecException(
                         "invalid item '" + id + "' in " + origin + ": " + invalid.getMessage(), invalid);
@@ -256,12 +273,12 @@ public final class MenuSpecLoader {
             ConfigurationNode node,
             Map<String, MenuItemSpec> items,
             int rows,
-            int ceilingRows,
+            int slotCeiling,
             Map<String, Pattern> patterns) {
         if (node.virtual() || node.isNull()) {
             return;
         }
-        items.put(FILL_ITEM_ID, fillItem(node, emptySlots(items, rows), ceilingRows, patterns));
+        items.put(FILL_ITEM_ID, fillItem(node, emptySlots(items, rows), slotCeiling, patterns));
     }
 
     /** Every slot in the sized window that no already-parsed item holds, in ascending order — the fill's territory. */
@@ -281,8 +298,8 @@ public final class MenuSpecLoader {
 
     /** Build the fill item from its descriptor at {@code slots}, forcing the low fill priority over any it might declare. */
     private MenuItemSpec fillItem(
-            ConfigurationNode node, List<Integer> slots, int rows, Map<String, Pattern> patterns) {
-        MenuItemSpec parsed = parseItem(node, rows, patterns, slots);
+            ConfigurationNode node, List<Integer> slots, int slotCeiling, Map<String, Pattern> patterns) {
+        MenuItemSpec parsed = parseItem(node, slotCeiling, patterns, slots);
         return new MenuItemSpec(
                 parsed.slots(),
                 FILL_PRIORITY,
@@ -299,19 +316,24 @@ public final class MenuSpecLoader {
                 parsed.itemDrag());
     }
 
-    private MenuItemSpec parseItem(ConfigurationNode node, int rows, Map<String, Pattern> patterns) {
-        return parseItem(node, rows, patterns, null);
+    private MenuItemSpec parseItem(ConfigurationNode node, int slotCeiling, Map<String, Pattern> patterns) {
+        return parseItem(node, slotCeiling, patterns, null);
     }
 
     /**
      * Parse one item, honouring an optional layout slot override. When {@code slotOverride} is non-null the item's
      * slots come straight from the grid the menu {@code layout} drew — any {@code slot}/{@code slots} it declares is
-     * ignored, the grid position winning — otherwise its slots are parsed from its own tokens exactly as before.
+     * ignored, the grid position winning — otherwise its slots are parsed from its own tokens exactly as before. The
+     * {@code slotCeiling} is the number of addressable slots a declared index is bounds-checked against — {@code
+     * rows*9} for a plain chest, or that plus the 36 player slots for a bottom-inventory menu.
      */
     private MenuItemSpec parseItem(
-            ConfigurationNode node, int rows, Map<String, Pattern> patterns, @Nullable List<Integer> slotOverride) {
+            ConfigurationNode node,
+            int slotCeiling,
+            Map<String, Pattern> patterns,
+            @Nullable List<Integer> slotOverride) {
         ConfigurationNode item = resolvePattern(node, patterns);
-        SlotSet slots = slotOverride != null ? new SlotSet(slotOverride) : SlotSet.parse(slotTokens(item), rows * 9);
+        SlotSet slots = slotOverride != null ? new SlotSet(slotOverride) : SlotSet.parse(slotTokens(item), slotCeiling);
         return new MenuItemSpec(
                 slots,
                 item.node("priority").getInt(0),
@@ -323,7 +345,7 @@ public final class MenuSpecLoader {
                 applyViewShorthands(parseView(item.node("view")), item),
                 parseClick(item.node("click")),
                 item.node("update").getBoolean(false),
-                parseList(item.node("list"), rows, patterns),
+                parseList(item.node("list"), slotCeiling, patterns),
                 itemType(item.node("type")),
                 parseItemDrag(item.node("item-drag")));
     }
@@ -864,12 +886,12 @@ public final class MenuSpecLoader {
         return node.virtual() || node.isNull() ? Optional.empty() : Optional.of(node.getBoolean());
     }
 
-    private Optional<ListSpec> parseList(ConfigurationNode node, int rows, Map<String, Pattern> patterns) {
+    private Optional<ListSpec> parseList(ConfigurationNode node, int slotCeiling, Map<String, Pattern> patterns) {
         if (node.virtual() || node.isNull()) {
             return Optional.empty();
         }
         Ref source = Ref.parse(Objects.requireNonNull(node.node("source").getString(), "list.source"));
-        return Optional.of(new ListSpec(source, parseItem(node.node("template"), rows, patterns)));
+        return Optional.of(new ListSpec(source, parseItem(node.node("template"), slotCeiling, patterns)));
     }
 
     /**

@@ -7,10 +7,13 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.BottomSlots;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PriorityLayering;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ActionArguments;
@@ -35,6 +38,9 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class MenuRenderer {
+
+    /** The width of every inventory row, the divisor that turns a bottom-inventory menu's rows into its chest top. */
+    private static final int SLOTS_PER_ROW = 9;
 
     private final ItemRenderer itemRenderer;
     private final ConditionRegistry conditions;
@@ -80,6 +86,46 @@ public final class MenuRenderer {
         populateStatic(inv, staticItems, staticCtx, clickSink);
         for (MenuItemSpec listItem : listItems) {
             populateList(inv, listItem, ctx, clickSink, resolvedLists);
+        }
+    }
+
+    /**
+     * Paint a bottom-inventory menu's bottom items — those whose raw slot sits at or past the chest top — into the
+     * viewer's own {@code playerInv}, mapping each raw slot to its player index and recording the <em>raw</em> slot so a
+     * later click routes through the holder's click map exactly as a top slot does. The 36-slot canvas is cleared
+     * first so a re-render leaves no stale tile behind; the viewer's real items are held in the holder snapshot, not
+     * here. Static items only, resolved through the same priority/view layering the top uses, so a hidden or
+     * out-priority bottom item is treated identically — a list-backed item pages across the chest top alone, never the
+     * player inventory.
+     */
+    public void populateBottom(
+            PlayerInventory playerInv,
+            MenuSpec spec,
+            MenuContext ctx,
+            BiConsumer<Integer, RenderedSlot> clickSink,
+            Map<String, List<?>> resolvedLists) {
+        Objects.requireNonNull(playerInv, "playerInv");
+        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(clickSink, "clickSink");
+        Objects.requireNonNull(resolvedLists, "resolvedLists");
+        playerInv.setStorageContents(new ItemStack[BottomSlots.PLAYER_SLOTS]);
+        int topSize = spec.rows() * SLOTS_PER_ROW;
+        List<MenuItemSpec> staticItems = new ArrayList<>();
+        List<MenuItemSpec> listItems = new ArrayList<>();
+        for (MenuItemSpec item : spec.items().values()) {
+            (item.list().isPresent() ? listItems : staticItems).add(item);
+        }
+        MenuContext staticCtx = ctx.withPageCount(pageCount(listItems, ctx, resolvedLists));
+        Map<Integer, MenuItemSpec> placed = PriorityLayering.resolve(staticItems, it -> viewPasses(it, staticCtx));
+        for (Map.Entry<Integer, MenuItemSpec> entry : placed.entrySet()) {
+            int rawSlot = entry.getKey();
+            if (rawSlot < topSize || rawSlot >= topSize + BottomSlots.PLAYER_SLOTS) {
+                continue;
+            }
+            MenuItemSpec item = entry.getValue();
+            playerInv.setItem(BottomSlots.rawToPlayerSlot(rawSlot, topSize), itemRenderer.render(item, staticCtx));
+            clickSink.accept(rawSlot, new RenderedSlot(item, null));
         }
     }
 

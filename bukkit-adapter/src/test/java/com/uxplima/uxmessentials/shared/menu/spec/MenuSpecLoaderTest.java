@@ -1059,4 +1059,64 @@ class MenuSpecLoaderTest {
 
         assertThat(item.itemDrag()).isEmpty();
     }
+
+    @Test
+    void parsesTheBottomInventoryFlagAndAcceptsABottomSlot() {
+        String hocon = """
+                bottom-inventory = true
+                rows = 6
+                items {
+                  top { slot = 4, material = DIAMOND, name = "top" }
+                  bot { slot = 54, material = EMERALD, name = "bottom" }
+                }
+                """;
+        MenuSpec spec = new MenuSpecLoader().parse(hocon);
+
+        assertThat(spec.bottomInventory())
+                .as("the bottom-inventory flag is read from the spec")
+                .isTrue();
+        assertThat(spec.rows())
+                .as("its top is the full six-row double chest the raw-slot geometry needs")
+                .isEqualTo(6);
+        assertThat(spec.items().get("bot").slots().slots())
+                .as("a raw slot in the 54..89 bottom range is accepted only because the flag widens the ceiling")
+                .containsExactly(54);
+    }
+
+    @Test
+    void aBottomInventoryMenuIgnoresAndWarnsOnANonChestInventoryType() {
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MenuSpecLoader.class.getName());
+        java.util.List<java.util.logging.LogRecord> records = new java.util.ArrayList<>();
+        java.util.logging.Handler handler = new java.util.logging.Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+        logger.addHandler(handler);
+        try {
+            MenuSpec spec = new MenuSpecLoader().parse("""
+                            bottom-inventory = true
+                            inventory-type = hopper
+                            items { bot { slot = 60, material = EMERALD, name = "b" } }
+                            """);
+
+            assertThat(spec.bottomInventory()).isTrue();
+            assertThat(spec.inventoryType())
+                    .as("a bottom-inventory menu is chest-only, so a declared inventory-type is dropped")
+                    .isEmpty();
+            assertThat(records)
+                    .as("dropping the inventory-type is warned so the operator sees why it was ignored")
+                    .anyMatch(record -> record.getLevel() == java.util.logging.Level.WARNING
+                            && String.valueOf(record.getMessage()).contains("bottom-inventory"));
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
 }

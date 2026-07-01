@@ -27,6 +27,12 @@ import java.util.Optional;
  * clicks landing closer together than this are treated as one, so a spam-click can't double-fire an item's actions.
  * A value of {@code 0} means the menu sets no window of its own and defers to the server-wide default, so a menu
  * that declares no key behaves exactly as before.
+ *
+ * <p>The {@code bottomInventory} flag turns the menu into a 90-slot canvas: beyond the chest top it may also place
+ * items into the viewer's own 36 inventory slots, addressed as raw slots {@code rows*9 .. rows*9+35}. The Bukkit-side
+ * runtime snapshots and restores the player inventory around such a menu; here it only widens the slot-fit bound, and
+ * a bottom-inventory menu is chest-only by construction (the raw-slot geometry only holds for a chest). A menu that
+ * leaves the flag {@code false} — the default — validates and renders exactly as before.
  */
 public record MenuSpec(
         String title,
@@ -38,7 +44,8 @@ public record MenuSpec(
         Map<String, MenuItemSpec> items,
         Optional<String> inventoryType,
         Map<String, String> placeholders,
-        long clickCooldownMs) {
+        long clickCooldownMs,
+        boolean bottomInventory) {
 
     public MenuSpec {
         Objects.requireNonNull(title, "title");
@@ -55,13 +62,43 @@ public record MenuSpec(
         if (clickCooldownMs < 0) {
             throw new IllegalArgumentException("clickCooldownMs must be >= 0: " + clickCooldownMs);
         }
-        checkSlotsFit(items, rows);
+        checkSlotsFit(items, rows, bottomInventory);
+    }
+
+    /**
+     * The ten-argument shape that carries a click cooldown but paints only the chest top, kept so every existing
+     * {@code new MenuSpec(...)} call site compiles unchanged. It delegates to the canonical constructor with the
+     * bottom-inventory flag off — an ordinary chest menu that never touches the player inventory.
+     */
+    public MenuSpec(
+            String title,
+            int rows,
+            RefreshSpec refresh,
+            List<Ref> openRequirement,
+            List<Ref> openActions,
+            List<Ref> closeActions,
+            Map<String, MenuItemSpec> items,
+            Optional<String> inventoryType,
+            Map<String, String> placeholders,
+            long clickCooldownMs) {
+        this(
+                title,
+                rows,
+                refresh,
+                openRequirement,
+                openActions,
+                closeActions,
+                items,
+                inventoryType,
+                placeholders,
+                clickCooldownMs,
+                false);
     }
 
     /**
      * The nine-argument shape that carries local placeholders but no click cooldown, kept so the loader and any other
-     * with-placeholders caller compiles unchanged. It delegates to the canonical constructor with a zero cooldown — a
-     * menu that defers its anti-spam window to the server-wide default.
+     * with-placeholders caller compiles unchanged. It delegates to the ten-argument constructor with a zero cooldown —
+     * a menu that defers its anti-spam window to the server-wide default.
      */
     public MenuSpec(
             String title,
@@ -110,8 +147,14 @@ public record MenuSpec(
         this(title, rows, refresh, openRequirement, openActions, closeActions, items, Optional.empty());
     }
 
-    private static void checkSlotsFit(Map<String, MenuItemSpec> items, int rows) {
-        int capacity = rows * 9;
+    /**
+     * The count of the viewer's own inventory slots a bottom-inventory menu may additionally paint into — the 27
+     * main slots plus the 9 hotbar slots shown below the chest top.
+     */
+    private static final int BOTTOM_SLOTS = 36;
+
+    private static void checkSlotsFit(Map<String, MenuItemSpec> items, int rows, boolean bottomInventory) {
+        int capacity = rows * 9 + (bottomInventory ? BOTTOM_SLOTS : 0);
         for (MenuItemSpec item : items.values()) {
             for (int slot : item.slots().slots()) {
                 if (slot >= capacity) {

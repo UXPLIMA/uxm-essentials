@@ -621,6 +621,9 @@ public final class Menus {
         Inventory inv = createWindow(holder, spec, renderer.title(spec, ctx));
         holder.attach(inv);
         renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
+        if (spec.bottomInventory()) {
+            paintBottom(holder, spec, ctx, live);
+        }
         live.openInventory(inv);
         if (record) {
             rememberLastOpen(viewer, specId, subject, page, arguments);
@@ -754,7 +757,25 @@ public final class Menus {
             holder.clearClickMap();
             renderer.populate(
                     holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
+            if (holder.spec().bottomInventory()) {
+                // Re-paint the bottom too, but do not re-snapshot — the viewer's real items were captured on open and
+                // are held on the holder until close; populateBottom clears and redraws only the menu tiles.
+                renderer.populateBottom(
+                        p.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
+            }
         });
+    }
+
+    /**
+     * The open-time half of a bottom-inventory menu: snapshot the viewer's real 36 bottom slots onto the holder, then
+     * paint the menu's bottom items into them. The snapshot is what the close restores (and what a death drops in
+     * place of the menu tiles), so it is taken before {@code populateBottom} clears and repaints the canvas. Runs on
+     * the viewer's own entity thread — where touching the live inventory is legal — and only for a menu whose spec
+     * sets the flag; an ordinary menu never reaches here and never touches the player inventory.
+     */
+    private void paintBottom(MenuHolder holder, MenuSpec spec, MenuContext ctx, Player live) {
+        holder.setBottomSnapshot(live.getInventory().getStorageContents());
+        renderer.populateBottom(live.getInventory(), spec, ctx, holder::recordSlot, holder.resolvedLists());
     }
 
     /**

@@ -14,10 +14,12 @@ import java.util.function.LongSupplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -35,6 +37,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionR
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuItemMark;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
@@ -812,12 +815,22 @@ public final class MenuListener implements Listener {
         holder.clearClickMap();
         renderer.populate(
                 holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
+        if (holder.spec().bottomInventory()) {
+            Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
+            if (live != null) {
+                // Re-paint the bottom without re-snapshotting: the real items are held on the holder until close;
+                // populateBottom clears the 36-slot canvas and redraws only the menu tiles.
+                renderer.populateBottom(
+                        live.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
+            }
+        }
     }
 
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (event.getInventory().getHolder() instanceof MenuHolder holder) {
             closeMenu(holder);
+            restoreBottom(holder, event.getPlayer());
         }
     }
 
@@ -827,7 +840,39 @@ public final class MenuListener implements Listener {
                 event.getPlayer().getOpenInventory().getTopInventory().getHolder();
         if (open instanceof MenuHolder holder) {
             closeMenu(holder);
+            restoreBottomNow(holder, event.getPlayer());
         }
+    }
+
+    /**
+     * Keep a bottom-inventory menu's tiles out of a death's drops while dropping the viewer's real items in their
+     * place, so dying with such a menu open behaves exactly like an ordinary death. This handler lives on the menu
+     * lifecycle listener (which already reads the open holder cleanly, as {@link #onQuit} does) rather than on a
+     * separate router. When the dying player still has a bottom-inventory menu open, the marked tiles sit in their
+     * real inventory and would otherwise drop — and could be picked up as a dupe — so it strips every marked tile from
+     * the drops, adds the snapshot's real items so those drop as normal, and clears the snapshot so the paired
+     * close-restore into the respawning player becomes a no-op. The drop is then the single disposition of the real
+     * items. An ordinary menu (or none) carries no snapshot and is left untouched. Runs on the death event thread, the
+     * player's own region thread, mutating only that death's drop list.
+     */
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        InventoryHolder open =
+                event.getEntity().getOpenInventory().getTopInventory().getHolder();
+        if (!(open instanceof MenuHolder holder)) {
+            return;
+        }
+        @Nullable ItemStack @Nullable [] snapshot = holder.bottomSnapshot();
+        if (snapshot == null) {
+            return;
+        }
+        event.getDrops().removeIf(MenuItemMark::isMarked);
+        for (@Nullable ItemStack real : snapshot) {
+            if (real != null) {
+                event.getDrops().add(real);
+            }
+        }
+        holder.setBottomSnapshot(null);
     }
 
     /**
@@ -841,6 +886,44 @@ public final class MenuListener implements Listener {
      */
     private void closeMenu(MenuHolder holder) {
         holder.cancelRefresh();
+    }
+
+    /**
+     * Put the viewer's real bottom inventory back after a bottom-inventory menu closes. Mutating a player inventory
+     * inside {@link InventoryCloseEvent} is a Paper gotcha, so the restore is deferred to the player's next tick on
+     * their own region thread via the {@link Scheduler} port. The snapshot is nulled inside the deferred task — not at
+     * schedule time — so a quit that restores synchronously ({@link #restoreBottomNow}) first wins the race and this
+     * pass then no-ops, and a double close (a close immediately followed by a quit close) restores exactly once. The
+     * deferred {@code setStorageContents} overwrites the whole 36-slot canvas with the real items, so it composes with
+     * the anti-dupe close sweep regardless of order — the sweep may strip an escaped tile first, the restore then
+     * overwrites the canvas either way. An ordinary menu carries no snapshot and returns immediately.
+     */
+    private void restoreBottom(MenuHolder holder, HumanEntity human) {
+        if (holder.bottomSnapshot() == null || !(human instanceof Player player)) {
+            return;
+        }
+        PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
+        scheduler.onEntity(ref, () -> {
+            @Nullable ItemStack @Nullable [] snapshot = holder.bottomSnapshot();
+            if (snapshot != null) {
+                holder.setBottomSnapshot(null);
+                player.getInventory().setStorageContents(snapshot);
+            }
+        });
+    }
+
+    /**
+     * Put the viewer's real bottom inventory back synchronously when they quit with a bottom-inventory menu open. A
+     * deferred restore would run after the player is gone and their data saved, so on the quit path the menu tiles are
+     * replaced with the real items now, on the quit event thread (the player's own region thread), before that save.
+     * Nulling the snapshot makes the paired deferred close-restore a no-op. An ordinary menu carries no snapshot.
+     */
+    private void restoreBottomNow(MenuHolder holder, Player player) {
+        @Nullable ItemStack @Nullable [] snapshot = holder.bottomSnapshot();
+        if (snapshot != null) {
+            holder.setBottomSnapshot(null);
+            player.getInventory().setStorageContents(snapshot);
+        }
     }
 
     private static ClickKind kindOf(ClickType click) {
