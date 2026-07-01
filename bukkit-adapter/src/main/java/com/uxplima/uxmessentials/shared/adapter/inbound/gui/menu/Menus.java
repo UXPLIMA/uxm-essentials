@@ -14,22 +14,28 @@ import org.bukkit.inventory.InventoryHolder;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.SelectorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ActionArguments;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ConfirmState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ListViewState;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.SelectorState;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickHandler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ConfirmOpener;
@@ -62,6 +68,17 @@ public final class Menus {
      */
     @Nullable private final EditorRenderer editorRenderer;
 
+    /**
+     * The action registry an open runs a spec's {@code open-actions} through, and the condition registry it gates a
+     * spec's {@code open-requirement} on. Both are null on an engine wired without them — every list/spec-only test
+     * fixture — in which case an open neither gates nor fires open-actions, byte-identical to before this seam
+     * existed. Only production wiring, which has the fully populated registries, passes them; a spec with no
+     * open-requirement/open-actions is unaffected either way.
+     */
+    @Nullable private final ActionRegistry openActionRegistry;
+
+    @Nullable private final ConditionRegistry openConditionRegistry;
+
     /** Paints the two-button confirm window; stateless, so one instance serves every confirm open. */
     private final ConfirmRenderer confirmRenderer = new ConfirmRenderer();
 
@@ -88,10 +105,29 @@ public final class Menus {
             Scheduler scheduler,
             ListSourceRegistry lists,
             @Nullable EditorRenderer editorRenderer) {
+        this(renderer, scheduler, lists, editorRenderer, null, null);
+    }
+
+    /**
+     * The canonical constructor production wiring uses: the same engine plus the action and condition registries an
+     * open needs to run a spec's {@code open-actions} and gate on its {@code open-requirement}. Every other
+     * constructor delegates here with {@code null} registries, so the roughly ninety existing {@code new Menus(...)}
+     * call-sites (almost all test fixtures) compile unchanged and open exactly as before — with null registries an
+     * open skips the requirement gate and runs no open-actions. Only an engine handed real registries evaluates them.
+     */
+    public Menus(
+            MenuRenderer renderer,
+            Scheduler scheduler,
+            ListSourceRegistry lists,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable ActionRegistry openActionRegistry,
+            @Nullable ConditionRegistry openConditionRegistry) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.lists = Objects.requireNonNull(lists, "lists");
         this.editorRenderer = editorRenderer;
+        this.openActionRegistry = openActionRegistry;
+        this.openConditionRegistry = openConditionRegistry;
     }
 
     /** Registers a parsed spec under its id; a feature does this once at wiring time. */
@@ -389,13 +425,66 @@ public final class Menus {
             return;
         }
         MenuContext ctx = MenuContext.of(viewer, subject, page, arguments);
+        if (!gateOpen(spec, ctx)) {
+            return;
+        }
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
         holder.setResolvedLists(resolved);
         Inventory inv = Bukkit.createInventory(holder, spec.rows() * 9, renderer.title(spec, ctx));
         holder.attach(inv);
         renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
         live.openInventory(inv);
+        runOpenActions(spec, live, ctx);
         MenuRefresh.start(holder, scheduler, () -> reRender(holder));
+    }
+
+    /**
+     * Whether this menu may open for {@code viewer} given its {@code open-requirement}. The gate is open — the open
+     * proceeds — when the engine was wired without a condition registry (every list/spec-only test engine) or the
+     * spec names no requirement, so an engine that predates this seam behaves byte-identically. Otherwise every
+     * requirement ref is an AND gate: each is resolved against the condition registry (the same registry-aware split
+     * the click path uses, so a valued token like {@code has-money:100} reaches its handler with {@code value=100})
+     * and must test true. An unregistered or false condition fails the gate closed, so a wiring gap keeps the window
+     * shut rather than showing it — a deny message is a later, DeluxeMenus-style concern, not this simple gate.
+     */
+    private boolean gateOpen(MenuSpec spec, MenuContext ctx) {
+        ConditionRegistry conditions = openConditionRegistry;
+        if (conditions == null || spec.openRequirement().isEmpty()) {
+            return true;
+        }
+        for (Ref ref : spec.openRequirement()) {
+            Ref eff = ref.resolve(conditions::has);
+            boolean pass =
+                    conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false);
+            if (!pass) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Run the spec's {@code open-actions} in order, now that the window is open on the viewer's entity thread — where
+     * touching the live inventory is legal. Skipped when the engine was wired without an action registry (a
+     * list/spec-only test engine), so an engine that predates this seam runs nothing extra. Each ref is resolved
+     * against the action registry — the same registry-aware split the click path takes — and dispatched through a
+     * {@link MenuActionContext} carrying {@link ClickKind#LEFT} as the neutral kind (no gesture fired on an open) and
+     * the four-argument, no-control constructor, so a {@code refresh} written as an open-action is a harmless no-op
+     * rather than a null-control failure. An action's {@code %argument_<name>%} tokens are expanded from the
+     * arguments the menu was opened with, matching the click and render paths. Open-actions fire simply here; the
+     * per-action delay and chance modifiers a click action honours are a later concern.
+     */
+    private void runOpenActions(MenuSpec spec, Player live, MenuContext ctx) {
+        ActionRegistry actions = openActionRegistry;
+        if (actions == null) {
+            return;
+        }
+        for (Ref ref : spec.openActions()) {
+            Ref eff = ref.resolve(actions::has);
+            actions.get(eff.id())
+                    .ifPresent(handler -> handler.accept(new MenuActionContext(
+                            ctx, live, ClickKind.LEFT, ActionArguments.resolve(eff.args(), ctx.arguments()))));
+        }
     }
 
     /** Redraw an open menu in place on its viewer's thread, but only if that window is still this holder's. */

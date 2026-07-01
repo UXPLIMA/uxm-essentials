@@ -15,8 +15,12 @@ import java.util.regex.Pattern;
  *
  * <p>Pure and allocation-conscious: when the open carried no arguments there is nothing to expand, so the original
  * map is returned unchanged rather than copied — the common case (a menu opened without a command) pays nothing.
+ *
+ * <p>Public because two engine paths in different packages reach it: the click path ({@code MenuListener}, this
+ * package) and the open path ({@code Menus}, the parent package) both expand an action ref's arguments the same way
+ * before dispatching an open-action. It is a pure static helper with no state, so widening it leaks nothing.
  */
-final class ActionArguments {
+public final class ActionArguments {
 
     /** A single {@code %token%} placeholder; {@code group(1)} is the bare token name. Mirrors the renderer's pattern. */
     private static final Pattern PLACEHOLDER = Pattern.compile("%(\\w+)%");
@@ -31,7 +35,7 @@ final class ActionArguments {
      * argument (an unknown name yields empty, matching the renderer). Returns {@code args} unchanged when
      * {@code arguments} is empty — the identity fast-path — so a menu opened without a command allocates nothing.
      */
-    static Map<String, String> resolve(Map<String, String> args, Map<String, String> arguments) {
+    public static Map<String, String> resolve(Map<String, String> args, Map<String, String> arguments) {
         if (arguments.isEmpty()) {
             return args;
         }

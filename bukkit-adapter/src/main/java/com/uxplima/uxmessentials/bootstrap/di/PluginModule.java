@@ -261,7 +261,17 @@ public final class PluginModule {
         // uses to open a picker or a remove-confirm as an engine child window — and thread them into the editor click
         // context.
         EditorRenderer menuEditorRenderer = new EditorRenderer(guiText);
-        Menus menus = new Menus(menuRenderer, kernel.scheduler(), menuBindings.lists(), menuEditorRenderer);
+        // The action and condition registries are handed to the façade too, so an open runs a spec's open-actions and
+        // gates on its open-requirement — the same registries the click listener resolves against, so an open-action
+        // and a click action reach the identical handler. A menu's open-command opening it (see MenuOpenCommand)
+        // therefore fires that menu's open-actions on open, which is what "pre-open" command actions reduce to.
+        Menus menus = new Menus(
+                menuRenderer,
+                kernel.scheduler(),
+                menuBindings.lists(),
+                menuEditorRenderer,
+                menuBindings.actions(),
+                menuBindings.conditions());
         MenuListener menuListener = new MenuListener(
                 menuRenderer,
                 menuBindings.actions(),
