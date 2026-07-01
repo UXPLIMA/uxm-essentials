@@ -220,13 +220,19 @@ public final class MenuVocabulary {
         }
     }
 
-    /** Play {@code arg} as a sound key for the clicking player; a blank key is a no-op rather than an error. */
+    /**
+     * Play a {@code <key> [volume] [pitch]} sound for the clicking player. The optional volume and pitch default to
+     * {@code 1f} each and a malformed number falls back to that default, so a bare key still plays at full gain
+     * exactly as it always did; a blank key is a no-op rather than an error. The grammar is parsed by the shared
+     * {@link SoundActions.SoundArg} so this action and the {@code broadcast-sound} / {@code rawsound} pack read the
+     * same argument shape, and the key is lowercased through the vanilla registry as it has always been here.
+     */
     private static void playSound(MenuActionContext ctx) {
-        String key = ctx.arg();
-        if (key.isBlank()) {
+        SoundActions.SoundArg sound = SoundActions.SoundArg.parse(ctx.arg());
+        if (sound.key().isBlank()) {
             return;
         }
         var at = Objects.requireNonNull(ctx.player().getLocation(), "player location");
-        ctx.player().playSound(at, key.toLowerCase(Locale.ROOT), 1f, 1f);
+        ctx.player().playSound(at, sound.key().toLowerCase(Locale.ROOT), sound.volume(), sound.pitch());
     }
 }

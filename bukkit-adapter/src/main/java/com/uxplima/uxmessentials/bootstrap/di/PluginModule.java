@@ -97,6 +97,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocab
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
@@ -304,6 +305,11 @@ public final class PluginModule {
         // drive the very window they fire in through the MenuControl the click supplies, so they need only the shared
         // bindings and the operator logger — no live handle is threaded here.
         MenuControlActions.register(menuBindings, kernel.log());
+        // The sound slice (broadcast-sound/soundall to every online player, rawsound/raw-sound for a verbatim
+        // namespaced resource-pack key) registers alongside the other slices; like them it has its own entry point
+        // so the MenuVocabulary signature stays untouched. It shares the <key> [volume] [pitch] grammar the
+        // in-place `sound` action now reads, and needs only the shared bindings and the operator logger.
+        SoundActions.register(menuBindings, kernel.log());
         PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {
             menuListener.uninstall();

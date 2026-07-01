@@ -289,6 +289,11 @@ class FoliaThreadingDriftTest {
         allow.put(
                 pkg + "communication.adapter.inbound.listener.DeathMessageListener",
                 "RENDER_SCAN: death handler reads only roster size on the player's region/event thread");
+        allow.put(
+                pkg + "shared.adapter.inbound.gui.menu.vocab.SoundActions",
+                "RENDER_SCAN: broadcast-sound fans a clientbound sound packet to each online player on the click "
+                        + "(viewer region) thread; a sound send is client I/O, no foreign region-state mutation "
+                        + "(same shape as the tablist/nametag per-viewer packet fan-outs)");
 
         return Map.copyOf(allow);
     }
