@@ -49,6 +49,10 @@ dependencies {
     compileOnly(libs.dynmap.api)
     compileOnly(libs.dynmap.core.api)
 
+    // Floodgate/Cumulus Bedrock soft-depend — compileOnly: the Bedrock detector binds only when Floodgate is
+    // present, so the plugin runs fully on a Java-only server (Cumulus's form classes arrive transitively).
+    compileOnly(libs.floodgate.api)
+
     compileOnly(libs.bundles.configs)
     // Caffeine is supplied at runtime by the plugin loader (see UxmEssentialsLoader); compileOnly here so the tablist
     // skin-fetch cache can bind to it without re-shading a library the loader already provides.

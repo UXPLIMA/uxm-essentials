@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
@@ -52,6 +53,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable Currencies currencies;
     private @Nullable PlayerDataStore playerData;
     private @Nullable ServerConnector serverConnector;
+    private @Nullable BedrockDetector bedrock;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -158,6 +160,20 @@ public final class CloseableResources implements AutoCloseable {
     /** The proxy server connector, or null before wiring has constructed it. */
     public @Nullable ServerConnector serverConnector() {
         return serverConnector;
+    }
+
+    /**
+     * Captures the resolved {@link BedrockDetector} so the later hybrid renderer can ask whether a viewer is a
+     * Bedrock player before it opens a menu. Resolved once at wiring, when plugin presence is settled for the run:
+     * the Floodgate-backed detector when Floodgate is installed, otherwise the always-{@code false} {@code NONE}.
+     */
+    public void bedrock(BedrockDetector resolved) {
+        this.bedrock = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The resolved Bedrock detector, or null before wiring has constructed it. */
+    public @Nullable BedrockDetector bedrock() {
+        return bedrock;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */

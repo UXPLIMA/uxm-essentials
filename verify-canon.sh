@@ -28,6 +28,7 @@ REPOS=(
     "https://repo.papermc.io/repository/maven-public"
     "https://repo.codemc.org/repository/maven-public"
     "https://jitpack.io"
+    "https://repo.opencollab.dev/main"
 )
 
 # Extract the single fenced toml block that contains the version catalog.

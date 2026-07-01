@@ -15,5 +15,6 @@ allprojects {
         maven("https://jitpack.io")                                 // Vault economy API
         maven("https://repo.extendedclip.com/releases/")           // PlaceholderAPI
         maven("https://repo.mikeprimm.com/")                        // Dynmap API (squaremap API is on Maven Central)
+        maven("https://repo.opencollab.dev/main/")                  // Floodgate/Cumulus Bedrock-form API
     }
 }

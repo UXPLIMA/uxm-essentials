@@ -72,8 +72,7 @@ dependencies:
     # Menu-engine optional integrations — consumed behind the hooks SPI (shared.adapter.outbound.hooks). Each is
     # reached only past a plugin-present guard, so the menu engine (and the plugin as a whole) runs fully without
     # any of them; the no-op default carries no SDK type, so an absent one never loads an external class. Loaded
-    # before us so their head/item registries are ready when a menu renders on enable. Floodgate + Cumulus (the
-    # Bedrock-form integrations) are added in Phase 8, when their renderer lands.
+    # before us so their head/item registries are ready when a menu renders on enable.
     HeadDatabase:
       load: BEFORE
       required: false
@@ -117,6 +116,13 @@ dependencies:
       load: BEFORE
       required: false
     WorldGuard:
+      load: BEFORE
+      required: false
+    # Floodgate backs the Bedrock-form integration (shared.adapter.inbound.gui.menu.bedrock BedrockDetector). The
+    # detector binds to the Floodgate SDK only past a plugin-present guard, so the menu engine (and the plugin as a
+    # whole) runs fully on a Java-only server — an absent Floodgate never loads an org.geysermc class. Loaded before
+    # us so the guard sees it on enable; Cumulus's form classes ride along with Floodgate transitively.
+    floodgate:
       load: BEFORE
       required: false
 

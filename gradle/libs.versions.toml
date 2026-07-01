@@ -49,6 +49,10 @@ miniplaceholders = "3.2.0"      # io.github.miniplaceholders:miniplaceholders-ap
 squaremap      = "1.3.13"       # xyz.jpenilla:squaremap-api — Maven Central (verified 2026-06-10)
 dynmap         = "3.7-beta-6"   # us.dynmap:dynmap-api + :DynmapCoreAPI — repo.mikeprimm.com, NOT Maven Central (verified 2026-06-10)
 
+# Bedrock-form integration — compileOnly soft-depend; the detector binds only when Floodgate is present. Cumulus
+# (org.geysermc.cumulus.form.*) arrives transitively (compile scope) with floodgate:api, so no separate coordinate.
+floodgate      = "2.2.5-SNAPSHOT" # org.geysermc.floodgate:api — repo.opencollab.dev, NOT Maven Central (verified 2026-07-01 via rakipler/BedrockGUI + opencollab maven-metadata)
+
 # tests
 junit          = "5.12.1"
 assertj        = "3.27.3"
@@ -120,6 +124,10 @@ miniplaceholders  = { module = "io.github.miniplaceholders:miniplaceholders-api"
 squaremap-api     = { module = "xyz.jpenilla:squaremap-api",                     version.ref = "squaremap" }
 dynmap-api        = { module = "us.dynmap:dynmap-api",                           version.ref = "dynmap" }
 dynmap-core-api   = { module = "us.dynmap:DynmapCoreAPI",                        version.ref = "dynmap" }
+
+# Bedrock-form API — compileOnly soft-depend; the Bedrock detector binds to Floodgate only past a plugin-present
+# guard, and Cumulus's form classes arrive transitively, so the plugin runs fully without Floodgate installed.
+floodgate-api     = { module = "org.geysermc.floodgate:api",                     version.ref = "floodgate" }
 
 junit-bom         = { module = "org.junit:junit-bom",                            version.ref = "junit" }
 junit-jupiter     = { module = "org.junit.jupiter:junit-jupiter" }

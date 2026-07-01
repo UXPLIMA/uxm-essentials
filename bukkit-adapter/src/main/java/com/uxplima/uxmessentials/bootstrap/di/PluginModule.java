@@ -82,6 +82,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
@@ -321,6 +322,14 @@ public final class PluginModule {
         // behaviour. It is constructed before the vocab block so the same instance registers into both.
         ServerConnector menuServerConnector = new BukkitServerConnector(plugin, kernel.log());
         resources.serverConnector(menuServerConnector);
+        // The Bedrock substrate: resolve once whether Floodgate is installed and pick the detector accordingly —
+        // the Floodgate-backed one when present, otherwise the always-false NONE. Only the enabled branch of
+        // forServer names the Floodgate class, so a Java-only server never loads org.geysermc.floodgate. Held on
+        // resources.bedrock() for the later hybrid renderer, which will ask "is this viewer Bedrock?" before it
+        // opens a menu; this firing only wires the detector and does not yet redirect any open.
+        BedrockDetector bedrock = BedrockDetector.forServer(plugin.getServer());
+        resources.bedrock(bedrock);
+        kernel.log().info("event=bedrock_detector backend={}", bedrock == BedrockDetector.NONE ? "none" : "floodgate");
         MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions(), kernel.log());
         // The string slice of the condition vocabulary (contains, equals-ignorecase, regex, length, is-integer,
