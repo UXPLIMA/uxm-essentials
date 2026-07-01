@@ -10,13 +10,19 @@ import org.jspecify.annotations.Nullable;
 /**
  * The per-open data a menu binding sees: who is viewing, the optional domain subject the menu was opened for
  * (a warp, a home owner, ...), the current page, — while a list is rendered or clicked — the live list element,
- * and any typed command arguments the menu was opened with (an operator {@code command {}} block's
- * {@code %argument_<name>%} values). The engine creates it; it is public only so feature binding lambdas can read
- * it.
+ * any typed command arguments the menu was opened with (an operator {@code command {}} block's
+ * {@code %argument_<name>%} values), and the menu's own local placeholder definitions. The engine creates it; it is
+ * public only so feature binding lambdas can read it.
  *
- * <p>Immutable. {@link #withEntry}, {@link #withPage} and {@link #withPageCount} return copies rather than
- * mutating, because the same base context is reused across every slot of a list page and must not leak one
- * element's identity into the next; each copy carries the open's arguments through unchanged.
+ * <p>The {@code localPlaceholders} map is the open spec's {@code placeholders {}} block — {@code name -> template}
+ * pairs the renderer resolves local-first, so a menu can define or override a {@code %name%} token for itself alone.
+ * It is empty for a menu that declares no such block, and for every engine child window (a list/confirm/selector/
+ * editor), whose minimal spec carries none.
+ *
+ * <p>Immutable. {@link #withEntry}, {@link #withPage}, {@link #withPageCount} and {@link #withLocalPlaceholders}
+ * return copies rather than mutating, because the same base context is reused across every slot of a list page and
+ * must not leak one element's identity into the next; each copy carries the open's arguments and local placeholders
+ * through unchanged.
  */
 public final class MenuContext {
 
@@ -32,19 +38,23 @@ public final class MenuContext {
 
     private final Map<String, String> arguments;
 
+    private final Map<String, String> localPlaceholders;
+
     private MenuContext(
             PlayerRef viewer,
             @Nullable Object subject,
             int page,
             int pageCount,
             @Nullable Object entry,
-            Map<String, String> arguments) {
+            Map<String, String> arguments,
+            Map<String, String> localPlaceholders) {
         this.viewer = Objects.requireNonNull(viewer, "viewer");
         this.subject = subject;
         this.page = page;
         this.pageCount = pageCount;
         this.entry = entry;
         this.arguments = Objects.requireNonNull(arguments, "arguments");
+        this.localPlaceholders = Objects.requireNonNull(localPlaceholders, "localPlaceholders");
     }
 
     /** Opens a fresh context with no list element bound yet and a single-page count until the renderer knows better. */
@@ -55,10 +65,11 @@ public final class MenuContext {
     /**
      * Opens a fresh context carrying the typed command {@code arguments} the menu was opened with, keyed by
      * argument name so the renderer can expand {@code %argument_<name>%} in a title, name or lore. Kept separate
-     * from {@link #of(PlayerRef, Object, int)} so the many argument-less opens stay a three-argument call.
+     * from {@link #of(PlayerRef, Object, int)} so the many argument-less opens stay a three-argument call. The local
+     * placeholders start empty here; the engine attaches the open spec's block via {@link #withLocalPlaceholders}.
      */
     public static MenuContext of(PlayerRef viewer, @Nullable Object subject, int page, Map<String, String> arguments) {
-        return new MenuContext(viewer, subject, page, 1, null, Map.copyOf(arguments));
+        return new MenuContext(viewer, subject, page, 1, null, Map.copyOf(arguments), Map.of());
     }
 
     public PlayerRef viewer() {
@@ -81,6 +92,15 @@ public final class MenuContext {
      */
     public Map<String, String> arguments() {
         return arguments;
+    }
+
+    /**
+     * The open spec's own {@code placeholders {}} block, keyed by custom token name — empty for a menu that declares
+     * none. The renderer reads it to resolve a {@code %name%} local-first, ahead of the shared placeholder registry,
+     * so a menu-scoped token overrides a built-in or global custom for this menu alone; the map is immutable.
+     */
+    public Map<String, String> localPlaceholders() {
+        return localPlaceholders;
     }
 
     public Optional<Object> subjectRaw() {
@@ -114,19 +134,29 @@ public final class MenuContext {
         return type.cast(value);
     }
 
-    /** A copy bound to one list element, leaving viewer, subject, page, page count and arguments untouched. */
+    /** A copy bound to one list element, leaving viewer, subject, page, page count, arguments and locals untouched. */
     public MenuContext withEntry(Object entry) {
         Objects.requireNonNull(entry, "entry");
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders);
     }
 
     /** A copy on a new page, used when the renderer or listener advances pagination; resets nothing else. */
     public MenuContext withPage(int page) {
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders);
     }
 
     /** A copy carrying the page count the renderer computed, so a static item's {@code %max_page%} can read it. */
     public MenuContext withPageCount(int pageCount) {
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders);
+    }
+
+    /**
+     * A copy carrying the open spec's local {@code placeholders {}} block, attached by the engine when a spec menu
+     * opens so the renderer can resolve its custom tokens local-first. Every other field is untouched, and the map is
+     * copied defensively so the caller cannot mutate it afterwards.
+     */
+    public MenuContext withLocalPlaceholders(Map<String, String> localPlaceholders) {
+        Objects.requireNonNull(localPlaceholders, "localPlaceholders");
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, Map.copyOf(localPlaceholders));
     }
 }

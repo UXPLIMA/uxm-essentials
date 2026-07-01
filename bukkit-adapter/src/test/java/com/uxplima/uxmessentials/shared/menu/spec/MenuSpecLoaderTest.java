@@ -347,6 +347,36 @@ class MenuSpecLoaderTest {
     }
 
     @Test
+    void parsesTheLocalPlaceholdersBlock() {
+        MenuSpec spec = new MenuSpecLoader()
+                .parse("placeholders { header = \"<gold>The Shop\", greeting = \"Hi %player%\" }\n"
+                        + "items { x { slot = 0, material = STONE } }");
+
+        assertThat(spec.placeholders())
+                .as("the menu's own placeholders {} block parses into spec.placeholders()")
+                .containsEntry("header", "<gold>The Shop")
+                .containsEntry("greeting", "Hi %player%");
+    }
+
+    @Test
+    void aMenuWithoutAPlaceholdersBlockHasAnEmptyLocalMap() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows = 1\nitems { x { slot = 0, material = STONE } }");
+
+        assertThat(spec.placeholders())
+                .as("a menu declaring no placeholders {} block carries an empty local map")
+                .isEmpty();
+    }
+
+    @Test
+    void aMenuWithoutAPlaceholdersBlockParsesIdenticallyEachTime() {
+        String hocon = "rows = 1\nitems { x { slot = 0, material = STONE } }";
+
+        assertThat(new MenuSpecLoader().parse(hocon))
+                .as("adding the local placeholder field leaves a block-less menu byte-identical to itself")
+                .isEqualTo(new MenuSpecLoader().parse(hocon));
+    }
+
+    @Test
     void aPositiveUpdateIntervalKeyEnablesTheRefreshAtThatCadence() {
         RefreshSpec refresh = new MenuSpecLoader()
                 .parse("update-interval = 40\nrows = 1\nitems {}")

@@ -226,7 +226,7 @@ public final class Menus {
         }
         int startPage = Math.max(0, page);
         Map<String, String> args = Map.copyOf(arguments);
-        MenuContext ctx = MenuContext.of(viewer, subject, startPage, args);
+        MenuContext ctx = MenuContext.of(viewer, subject, startPage, args).withLocalPlaceholders(spec.placeholders());
         scheduler.async(() -> {
             Map<String, List<?>> resolved = resolveLists(spec, ctx);
             scheduler.onEntity(
@@ -575,7 +575,9 @@ public final class Menus {
         if (live == null || !live.isOnline()) {
             return;
         }
-        MenuContext ctx = MenuContext.of(viewer, subject, page, arguments);
+        // Attach the spec's own placeholders {} block so the renderer resolves its %name% tokens local-first; the
+        // holder carries this ctx, so a refresh/re-render reads it back and keeps the local map through the redraw.
+        MenuContext ctx = MenuContext.of(viewer, subject, page, arguments).withLocalPlaceholders(spec.placeholders());
         if (!gateOpen(spec, ctx)) {
             return;
         }

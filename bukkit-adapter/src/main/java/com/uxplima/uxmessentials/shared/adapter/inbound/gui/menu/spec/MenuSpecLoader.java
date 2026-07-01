@@ -124,7 +124,11 @@ public final class MenuSpecLoader {
                     refs(root.node("open-actions")),
                     refs(root.node("close-actions")),
                     items,
-                    inventoryType);
+                    inventoryType,
+                    // The menu's own `placeholders {}` block — custom %name% tokens scoped to this one menu, distinct
+                    // from the `patterns {}` block above and from the shared menus/placeholders.conf file. A missing
+                    // block flattens to an empty map, so a menu without it is unchanged.
+                    varMap(root.node("placeholders")));
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }

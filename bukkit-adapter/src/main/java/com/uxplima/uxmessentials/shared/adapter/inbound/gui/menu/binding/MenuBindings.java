@@ -112,36 +112,40 @@ public final class MenuBindings {
         addMissing(spec.openRequirement(), conditions::has, missing);
         addMissing(spec.openActions(), actions::has, missing);
         addMissing(spec.closeActions(), actions::has, missing);
+        // A token this menu defines in its own placeholders {} block counts as known for this menu — it resolves
+        // local-first at render — so validation accepts it just as it accepts a registered built-in.
+        Predicate<String> placeholderKnown =
+                id -> placeholders.has(id) || spec.placeholders().containsKey(id);
         for (String id : extractPlaceholders(spec.title())) {
-            if (!placeholders.has(id)) {
+            if (!placeholderKnown.test(id)) {
                 missing.add(id);
             }
         }
         for (MenuItemSpec item : spec.items().values()) {
-            collectItemMissing(item, missing);
+            collectItemMissing(item, placeholderKnown, missing);
         }
     }
 
-    private void collectItemMissing(MenuItemSpec item, Set<String> missing) {
+    private void collectItemMissing(MenuItemSpec item, Predicate<String> placeholderKnown, Set<String> missing) {
         collectViewMissing(item.view(), conditions::has, missing);
         item.click().conditions().values().forEach(refs -> addMissing(refs, conditions::has, missing));
         item.click().actions().values().forEach(refs -> addMissing(refs, actions::has, missing));
-        collectTextPlaceholders(item, missing);
+        collectTextPlaceholders(item, placeholderKnown, missing);
         item.list().ifPresent(list -> {
             if (!lists.has(list.source().id())) {
                 missing.add(list.source().id());
             }
-            collectItemMissing(list.template(), missing);
+            collectItemMissing(list.template(), placeholderKnown, missing);
         });
     }
 
-    private void collectTextPlaceholders(MenuItemSpec item, Set<String> missing) {
+    private void collectTextPlaceholders(MenuItemSpec item, Predicate<String> placeholderKnown, Set<String> missing) {
         List<String> texts = new ArrayList<>(item.lore());
         texts.add(item.material());
         texts.add(item.name());
         for (String text : texts) {
             for (String id : extractPlaceholders(text)) {
-                if (!placeholders.has(id)) {
+                if (!placeholderKnown.test(id)) {
                     missing.add(id);
                 }
             }

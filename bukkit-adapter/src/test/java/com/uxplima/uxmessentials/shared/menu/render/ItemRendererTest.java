@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.menu.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.List;
 import java.util.Map;
@@ -195,6 +196,48 @@ class ItemRendererTest {
         ItemStack it = r.render(itemNamed("@Sound: {sound}"), entryCtx);
 
         assertThat(plainName(it)).isEqualTo("Sound: Enderman Teleport");
+    }
+
+    @Test
+    void aLocalPlaceholderOverridesABuiltin() {
+        // The menu defines its own %player%, which must win over the registered built-in for this menu alone.
+        PlaceholderRegistry ph = new PlaceholderRegistry();
+        ph.register("player", c -> "REAL");
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("player", "OVERRIDDEN"));
+
+        assertThat(plainName(r.render(itemNamed("%player%"), localCtx))).isEqualTo("OVERRIDDEN");
+    }
+
+    @Test
+    void aNestedLocalTokenResolvesLocalFirst() {
+        // a -> %b% -> "X": the inner %b% must resolve against the local block, not the (empty) registry.
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry());
+        MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("a", "%b%", "b", "X"));
+
+        assertThat(plainName(r.render(itemNamed("%a%"), localCtx))).isEqualTo("X");
+    }
+
+    @Test
+    void aLocalCycleTerminatesBoundedInsteadOfOverflowing() {
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry());
+        MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("a", "%b%", "b", "%a%"));
+
+        assertThatCode(() -> r.render(itemNamed("%a%"), localCtx)).doesNotThrowAnyException();
+        assertThat(plainName(r.render(itemNamed("%a%"), localCtx)))
+                .as("a cycle stops at the depth cap and leaves an unresolved token, never a StackOverflow")
+                .contains("%");
+    }
+
+    @Test
+    void aLocalMathTemplateIsEvaluatedByTheOuterRenderPass() {
+        // The local substitute resolves the inner %coins% but leaves {math: …} for the renderer's outer math pass.
+        PlaceholderRegistry ph = new PlaceholderRegistry();
+        ph.register("coins", c -> "5");
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("doubled", "{math: %coins% * 2}"));
+
+        assertThat(plainName(r.render(itemNamed("%doubled%"), localCtx))).isEqualTo("10");
     }
 
     private static MenuItemSpec itemNamed(String name) {

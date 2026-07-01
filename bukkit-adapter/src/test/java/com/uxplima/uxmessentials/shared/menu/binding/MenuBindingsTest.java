@@ -37,4 +37,19 @@ class MenuBindingsTest {
         b.action("close", c -> {});
         assertThatThrownBy(() -> b.action("close", c -> {})).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void aMenuLocalPlaceholderCountsAsKnownForThatMenu() {
+        var b = new MenuBindings();
+        // %header% is defined by the menu itself, so it must not report as missing; %nope% is defined nowhere.
+        MenuSpec spec = new MenuSpecLoader().parse("""
+                        rows = 1
+                        placeholders { header = "<gold>The Shop" }
+                        items { x { slot = 0, material = STONE, name = "%header%", lore = ["%nope%"] } }
+                        """);
+        assertThat(b.validate(List.of(spec)))
+                .as("a token the menu defines locally is known; an undefined one is still reported")
+                .doesNotContain("header")
+                .contains("nope");
+    }
 }

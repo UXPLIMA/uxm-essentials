@@ -47,4 +47,30 @@ class MenuContextTest {
         assertThat(base.withPageCount(4).arguments()).containsEntry("target", "Steve");
         assertThat(base.withEntry("row").arguments()).containsEntry("target", "Steve");
     }
+
+    @Test
+    void aFreshContextCarriesNoLocalPlaceholders() {
+        var ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        assertThat(ctx.localPlaceholders()).isEmpty();
+    }
+
+    @Test
+    void withLocalPlaceholdersSetsTheMapImmutably() {
+        var ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0)
+                .withLocalPlaceholders(Map.of("header", "<gold>The Shop"));
+
+        assertThat(ctx.localPlaceholders()).containsEntry("header", "<gold>The Shop");
+        assertThatThrownBy(() -> ctx.localPlaceholders().put("hacked", "x"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void copiesPreserveLocalPlaceholders() {
+        var base = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0)
+                .withLocalPlaceholders(Map.of("header", "Shop"));
+
+        assertThat(base.withPage(2).localPlaceholders()).containsEntry("header", "Shop");
+        assertThat(base.withPageCount(4).localPlaceholders()).containsEntry("header", "Shop");
+        assertThat(base.withEntry("row").localPlaceholders()).containsEntry("header", "Shop");
+    }
 }

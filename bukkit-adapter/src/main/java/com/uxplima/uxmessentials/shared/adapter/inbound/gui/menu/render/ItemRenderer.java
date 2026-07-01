@@ -76,6 +76,17 @@ public final class ItemRenderer {
     /** Prefix marking a token as a typed command argument resolved from the open context rather than the registry. */
     private static final String ARGUMENT_PREFIX = "argument_";
 
+    /** The deepest a menu-local placeholder template may nest before expansion stops; a cycle simply hits this. */
+    private static final int MAX_LOCAL_DEPTH = 8;
+
+    /**
+     * Per-render recursion depth for menu-local placeholder expansion. A render is synchronous on one region/entity
+     * thread, so a thread-local counter isolates concurrent renders on different threads and needs no lock. It is
+     * incremented on each {@link #substituteLocal} entry and decremented in a {@code finally}, so a template that
+     * throws still unwinds the count. This mirrors the global {@code CustomPlaceholders} guard.
+     */
+    private static final ThreadLocal<int[]> LOCAL_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
+
     /** Default custom-effect duration in ticks when a {@code effect:amplifier} token omits the duration. */
     private static final int DEFAULT_EFFECT_TICKS = 600;
 
@@ -292,16 +303,49 @@ public final class ItemRenderer {
     }
 
     /**
-     * Resolve one bare {@code %token%} name to its text. An {@code argument_<name>} token is a typed command
-     * argument the menu was opened with, so it reads from {@link MenuContext#arguments()} (an unknown name yields
-     * empty); any other token resolves through the placeholder registry as before. This keeps command arguments a
-     * first-class placeholder source without touching the single registry fallback the PlaceholderAPI bridge owns.
+     * Resolve one bare {@code %token%} name to its text, most-specific source first. An {@code argument_<name>} token
+     * is a typed command argument the menu was opened with, so it reads from {@link MenuContext#arguments()} (an
+     * unknown name yields empty). Otherwise the menu's own {@code placeholders {}} block is consulted <em>before</em>
+     * the shared registry, so a menu-scoped {@code %name%} overrides a built-in, data reader or global custom for this
+     * menu alone; a local template is expanded through {@link #substituteLocal}. Any token the local block does not
+     * define resolves through the placeholder registry exactly as before.
      */
     private String resolveToken(String token, MenuContext ctx) {
         if (token.startsWith(ARGUMENT_PREFIX)) {
             return ctx.arguments().getOrDefault(token.substring(ARGUMENT_PREFIX.length()), "");
         }
+        String local = ctx.localPlaceholders().get(token);
+        if (local != null) {
+            return substituteLocal(local, ctx);
+        }
         return placeholders.resolve(token, ctx).orElse("");
+    }
+
+    /**
+     * Expand a menu-local placeholder template, resolving every inner {@code %token%} through {@link #resolveToken}
+     * so a nested local resolves local-first while a built-in/data/global inner token resolves via the registry. A
+     * {@code {math: …}} block and MiniMessage {@code <tags>} are left verbatim for the outer line passes that own them,
+     * so a local {@code "{math: %coins% * 2}"} becomes {@code "{math: 50 * 2}"} here and the outer {@code applyMath}
+     * evaluates it. The depth guard bounds recursion: at {@link #MAX_LOCAL_DEPTH} the template is returned unexpanded,
+     * so a cycle ({@code a=%b%}, {@code b=%a%}) terminates instead of overflowing the stack.
+     */
+    private String substituteLocal(String template, MenuContext ctx) {
+        int[] depth = LOCAL_DEPTH.get();
+        if (depth[0] >= MAX_LOCAL_DEPTH) {
+            return template;
+        }
+        depth[0]++;
+        try {
+            Matcher matcher = PLACEHOLDER.matcher(template);
+            StringBuilder out = new StringBuilder();
+            while (matcher.find()) {
+                matcher.appendReplacement(out, Matcher.quoteReplacement(resolveToken(matcher.group(1), ctx)));
+            }
+            matcher.appendTail(out);
+            return out.toString();
+        } finally {
+            depth[0]--;
+        }
     }
 
     /** Layer the spec's amount, glow, model data, item flags, and native rich meta onto the in-progress item. */
