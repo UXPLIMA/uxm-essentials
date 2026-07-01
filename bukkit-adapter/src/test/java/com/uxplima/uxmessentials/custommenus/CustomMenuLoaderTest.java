@@ -184,6 +184,45 @@ class CustomMenuLoaderTest {
     }
 
     @Test
+    void patternsConfIsExcludedFromTheMenuSweepLikeOpenersConf(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("good.conf"), GOOD);
+        Files.writeString(dir.resolve("patterns.conf"), """
+                patterns { hub-button { material = "%mat%", name = "<gold>%label%" } }
+                """);
+
+        MenuBindings bindings = new MenuBindings();
+        bindings.action("close", c -> {});
+        CustomMenuLoader loader =
+                new CustomMenuLoader(new MenuSpecLoader(), bindings, newMenus(), new RecordingLogger());
+
+        CustomMenuLoader.LoadResult result = loader.loadFrom(dir);
+
+        assertThat(result.loaded()).isEqualTo(1);
+        assertThat(result.loadedNames())
+                .as("patterns.conf is a shared-templates file, not a menu, so it is not swept in")
+                .containsExactly("good");
+        assertThat(result.skipped()).doesNotContain("patterns");
+    }
+
+    @Test
+    void aMenuReferencingAPatternStillLoadsWhenNoPatternsConfIsPresent(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("shop.conf"), """
+                rows = 1
+                items { hub { slots = [0], pattern = "hub-button", vars { mat = "DIAMOND" } } }
+                """);
+
+        CustomMenuLoader loader =
+                new CustomMenuLoader(new MenuSpecLoader(), new MenuBindings(), newMenus(), new RecordingLogger());
+
+        CustomMenuLoader.LoadResult result = loader.loadFrom(dir);
+
+        assertThat(result.loadedNames())
+                .as("shared patterns are opt-in: a missing patterns.conf is the slice-A warn path, not a skip")
+                .containsExactly("shop");
+        assertThat(result.skipped()).isEmpty();
+    }
+
+    @Test
     void missingDirIsEmptyResult(@TempDir Path dir) {
         CustomMenuLoader loader =
                 new CustomMenuLoader(new MenuSpecLoader(), new MenuBindings(), newMenus(), new RecordingLogger());

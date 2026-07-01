@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+import java.io.BufferedReader;
+import java.io.StringReader;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
@@ -20,6 +22,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requiremen
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import org.junit.jupiter.api.Test;
+import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 class MenuSpecLoaderTest {
 
@@ -598,5 +602,128 @@ class MenuSpecLoaderTest {
         // the material stays DIAMOND rather than being pulled down to STONE from the base template.
         assertThat(item.material()).isEqualTo("DIAMOND");
         assertThat(item.name()).isEqualTo("Steve");
+    }
+
+    @Test
+    void aGlobalPatternResolvesForAMenuWithNoLocalPatterns() throws Exception {
+        ConfigurationNode global = patternsNode("""
+                patterns { hub-button { material = "%mat%", name = "<gold>%label%" } }
+                """);
+        String hocon = """
+                rows = 1
+                items { hub { slots = [0], pattern = "hub-button", vars { mat = "DIAMOND", label = "Hub" } } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon, global).items().get("hub");
+
+        assertThat(item.material())
+                .as("a pattern from the shared file resolves for a menu that declares none of its own")
+                .isEqualTo("DIAMOND");
+        assertThat(item.name()).isEqualTo("<gold>Hub");
+    }
+
+    @Test
+    void aMenuLocalPatternOverridesAGlobalOfTheSameName() throws Exception {
+        ConfigurationNode global = patternsNode("""
+                patterns { button { material = STONE, name = "Global" } }
+                """);
+        String hocon = """
+                rows = 1
+                patterns { button { material = DIAMOND, name = "Local" } }
+                items { x { slot = 0, pattern = "button" } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon, global).items().get("x");
+
+        assertThat(item.material())
+                .as("the menu's own template wins the name clash with the shared one")
+                .isEqualTo("DIAMOND");
+        assertThat(item.name()).isEqualTo("Local");
+    }
+
+    @Test
+    void anUndefinedPatternWithEmptyGlobalsParsesItsOwnFieldsWithoutThrowing() throws Exception {
+        String hocon = "rows=1\nitems { x { slot = 0, pattern = \"missing\", material = EMERALD } }";
+        MenuItemSpec item =
+                new MenuSpecLoader().parse(hocon, patternsNode("")).items().get("x");
+
+        assertThat(item.material())
+                .as("no shared patterns and an undefined name is the slice-A warn path, not a throw")
+                .isEqualTo("EMERALD");
+    }
+
+    @Test
+    void theNoGlobalsOverloadEqualsTheGlobalsOverloadWithAnEmptyNode() throws Exception {
+        MenuSpec withoutGlobals = new MenuSpecLoader().parse(PATTERNS);
+        MenuSpec withEmptyGlobals = new MenuSpecLoader().parse(PATTERNS, patternsNode(""));
+
+        assertThat(withEmptyGlobals)
+                .as("passing an empty node delegates byte-identically, so the pattern-free overload is unchanged")
+                .isEqualTo(withoutGlobals);
+    }
+
+    @Test
+    void aListTemplateResolvesAGlobalPattern() throws Exception {
+        ConfigurationNode global = patternsNode("""
+                patterns { row { material = "%mat%", name = "<gray>%label%" } }
+                """);
+        String hocon = """
+                rows = 1
+                items {
+                  grid {
+                    list {
+                      source = "warps:all"
+                      template { slots = [0], pattern = "row", vars { mat = "PAPER", label = "Warp" } }
+                    }
+                  }
+                }
+                """;
+        MenuItemSpec template = new MenuSpecLoader()
+                .parse(hocon, global)
+                .items()
+                .get("grid")
+                .list()
+                .orElseThrow()
+                .template();
+
+        assertThat(template.material())
+                .as("a list template naming a shared pattern is expanded per entry from that shared pattern")
+                .isEqualTo("PAPER");
+        assertThat(template.name()).isEqualTo("<gray>Warp");
+    }
+
+    @Test
+    void aListTemplateResolvesAMenuLocalPattern() {
+        // Confirms slice-A already covers list-expansion: parseList feeds its template through parseItem with the
+        // pattern map, so a list whose template names a (here menu-local) pattern is stamped from it per entry.
+        String hocon = """
+                rows = 1
+                patterns { entry { material = "%mat%", name = "%label%" } }
+                items {
+                  grid {
+                    list {
+                      source = "warps:all"
+                      template { slots = [0], pattern = "entry", vars { mat = "MAP", label = "Home" } }
+                    }
+                  }
+                }
+                """;
+        MenuItemSpec template = new MenuSpecLoader()
+                .parse(hocon)
+                .items()
+                .get("grid")
+                .list()
+                .orElseThrow()
+                .template();
+
+        assertThat(template.material()).isEqualTo("MAP");
+        assertThat(template.name()).isEqualTo("Home");
+    }
+
+    /** Parse a HOCON document and hand back its {@code patterns} node, the shape a shared {@code patterns.conf} holds. */
+    private static ConfigurationNode patternsNode(String hocon) throws Exception {
+        return HoconConfigurationLoader.builder()
+                .source(() -> new BufferedReader(new StringReader(hocon)))
+                .build()
+                .load()
+                .node("patterns");
     }
 }

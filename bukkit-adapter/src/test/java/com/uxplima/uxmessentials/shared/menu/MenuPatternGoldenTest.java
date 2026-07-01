@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.shared.menu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,7 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -21,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -28,6 +32,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
@@ -92,6 +97,29 @@ class MenuPatternGoldenTest {
                 .containsExactly("Buy Diamonds", "Seen by Steve");
     }
 
+    @Test
+    void aMenuLoadedThroughCustomMenuLoaderResolvesTheSharedPatternsFile(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("patterns.conf"), """
+                patterns { hub-button { material = "%mat%", name = "<gold>%label%" } }
+                """);
+        Files.writeString(dir.resolve("shop.conf"), """
+                rows = 1
+                items { hub { slots = [0], pattern = "hub-button", vars { mat = "DIAMOND", label = "Hub" } } }
+                """);
+        CustomMenuLoader customLoader = new CustomMenuLoader(loader, bindings, menus, new NoopLogger());
+
+        CustomMenuLoader.LoadResult result = customLoader.loadFrom(dir);
+        assertThat(result.loadedNames())
+                .as("patterns.conf is not a menu, so only the real menu registers")
+                .containsExactly("shop");
+        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "shop", null);
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        ItemStack item = Objects.requireNonNull(inv.getItem(0), "the shared-pattern item renders at slot 0");
+        assertThat(item.getType()).isEqualTo(Material.DIAMOND);
+        assertThat(plainName(item)).isEqualTo("Hub");
+    }
+
     private Inventory open(String id, String hocon) {
         menus.registerSpec(id, loader.parse(hocon));
         menus.open(new PlayerRef(player.getUniqueId(), player.getName()), id, null);
@@ -110,6 +138,21 @@ class MenuPatternGoldenTest {
                 : lore.stream()
                         .map(line -> PlainTextComponentSerializer.plainText().serialize(line))
                         .toList();
+    }
+
+    /** Swallows the SLF4J-style lines the loader emits; the golden asserts on the rendered inventory, not the log. */
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class KeyMessages implements Messages {

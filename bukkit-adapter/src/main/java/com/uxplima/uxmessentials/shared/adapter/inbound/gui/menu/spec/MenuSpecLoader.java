@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.logging.Logger;
 
 import org.jspecify.annotations.Nullable;
+import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
@@ -39,13 +40,23 @@ public final class MenuSpecLoader {
 
     /** Parse a spec held in memory. Primarily a test seam; production loads go through {@link #load(Path)}. */
     public MenuSpec parse(String hocon) {
+        return parse(hocon, emptyNode());
+    }
+
+    /**
+     * Parse a spec held in memory, resolving its item patterns against a shared {@code globalPatterns} block as well
+     * as the menu's own {@code patterns}. A menu-local pattern of the same name wins the merge. Passing an empty node
+     * makes this behave exactly like {@link #parse(String)} — the target that overload delegates to.
+     */
+    public MenuSpec parse(String hocon, ConfigurationNode globalPatterns) {
         Objects.requireNonNull(hocon, "hocon");
+        Objects.requireNonNull(globalPatterns, "globalPatterns");
         try {
             ConfigurationNode root = HoconConfigurationLoader.builder()
                     .source(() -> new BufferedReader(new StringReader(hocon)))
                     .build()
                     .load();
-            return parseRoot(root, "<string>");
+            return parseRoot(root, "<string>", globalPatterns);
         } catch (MenuSpecException already) {
             throw already;
         } catch (Exception failure) {
@@ -55,11 +66,22 @@ public final class MenuSpecLoader {
 
     /** Load and parse a spec from disk, wrapping any I/O or parse failure with the file path. */
     public MenuSpec load(Path file) {
+        return load(file, emptyNode());
+    }
+
+    /**
+     * Load and parse a spec from disk, resolving its item patterns against a shared {@code globalPatterns} block —
+     * patterns defined once in a shared file reusable across every menu — as well as the menu's own {@code patterns}.
+     * A menu-local pattern of the same name wins the merge. Passing an empty node makes this behave exactly like
+     * {@link #load(Path)} — the target that overload delegates to.
+     */
+    public MenuSpec load(Path file, ConfigurationNode globalPatterns) {
         Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(globalPatterns, "globalPatterns");
         try {
             ConfigurationNode root =
                     HoconConfigurationLoader.builder().path(file).build().load();
-            return parseRoot(root, file.toString());
+            return parseRoot(root, file.toString(), globalPatterns);
         } catch (MenuSpecException already) {
             throw already;
         } catch (Exception failure) {
@@ -67,7 +89,12 @@ public final class MenuSpecLoader {
         }
     }
 
-    private MenuSpec parseRoot(ConfigurationNode root, String origin) {
+    /** An empty node standing in for "no shared patterns", the delegation target of the pattern-free overloads. */
+    private static ConfigurationNode emptyNode() {
+        return CommentedConfigurationNode.root();
+    }
+
+    private MenuSpec parseRoot(ConfigurationNode root, String origin, ConfigurationNode globalPatterns) {
         Optional<String> inventoryType = optionalString(root.node("inventory-type"));
         boolean chest = inventoryType.isEmpty();
         int declaredRows = root.node("rows").getInt(chest ? 0 : MAX_ROWS);
@@ -75,7 +102,7 @@ public final class MenuSpecLoader {
         // auto-sized to fit them. A non-chest sizes its window from its inventory type and keeps its declared (or
         // six-row) fallback, whose own out-of-range slots the renderer skips, so its item ceiling stays that count.
         int ceilingRows = chest ? MAX_ROWS : declaredRows;
-        Map<String, Pattern> patterns = parsePatterns(root.node("patterns"));
+        Map<String, Pattern> patterns = mergedPatterns(globalPatterns, root.node("patterns"));
         Map<String, MenuItemSpec> items = parseItems(root.node("items"), ceilingRows, origin, patterns);
         int rows = chest ? chestRows(declaredRows, items) : declaredRows;
         try {
@@ -183,11 +210,23 @@ public final class MenuSpecLoader {
     }
 
     /**
-     * Read the menu's {@code patterns} block into reusable item templates keyed by name. Each template is a deep
-     * copy of its spec node — a shared template must never be mutated when an item fills its {@code %var%}s — with
-     * the optional {@code defaults { var = value … }} child split out into that pattern's default var values and
-     * removed from the copy so it is never mistaken for an item field. An absent block yields an empty map, so a
-     * menu declaring no patterns parses exactly as it did before.
+     * Merge the shared {@code global} patterns with the menu's own {@code local} block, the menu-local definition
+     * winning a name clash. Shared patterns are declared once in a file reusable across every menu; a menu that
+     * redeclares a shared name overrides it for itself only. An empty {@code global} node leaves the menu-local
+     * patterns unchanged, so a spec loaded without shared patterns resolves exactly as it did before.
+     */
+    private Map<String, Pattern> mergedPatterns(ConfigurationNode global, ConfigurationNode local) {
+        Map<String, Pattern> patterns = new LinkedHashMap<>(parsePatterns(global));
+        patterns.putAll(parsePatterns(local));
+        return patterns;
+    }
+
+    /**
+     * Read a {@code patterns} block into reusable item templates keyed by name. Each template is a deep copy of its
+     * spec node — a shared template must never be mutated when an item fills its {@code %var%}s — with the optional
+     * {@code defaults { var = value … }} child split out into that pattern's default var values and removed from the
+     * copy so it is never mistaken for an item field. An absent block yields an empty map, so a menu declaring no
+     * patterns parses exactly as it did before.
      */
     private Map<String, Pattern> parsePatterns(ConfigurationNode node) {
         Map<String, Pattern> patterns = new LinkedHashMap<>();

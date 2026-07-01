@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecEx
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.Nullable;
+import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
@@ -36,6 +37,9 @@ public final class CustomMenuLoader {
 
     /** The reserved opener-item config file that shares the menus directory but is not a menu spec. */
     private static final String RESERVED_OPENERS_FILE = "openers.conf";
+
+    /** The reserved shared-patterns file: item templates every menu may name, loaded once per pass, not a menu spec. */
+    private static final String RESERVED_PATTERNS_FILE = "patterns.conf";
 
     private final MenuSpecLoader specLoader;
     private final MenuBindings bindings;
@@ -87,12 +91,13 @@ public final class CustomMenuLoader {
         if (!Files.isDirectory(menusDir)) {
             return new LoadResult(List.of(), List.of());
         }
+        ConfigurationNode globalPatterns = loadGlobalPatterns(menusDir);
         List<String> loaded = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
         Map<String, OpenCommandSpec> openCommands = new LinkedHashMap<>();
         try (Stream<Path> entries = Files.list(menusDir)) {
             for (Path file : confFiles(entries)) {
-                loadOne(file, loaded, skipped, openCommands);
+                loadOne(file, globalPatterns, loaded, skipped, openCommands);
             }
         } catch (java.io.IOException failure) {
             log.warn("could not list menu directory {} : {}", menusDir, String.valueOf(failure.getMessage()));
@@ -102,25 +107,54 @@ public final class CustomMenuLoader {
     }
 
     /**
-     * The {@code .conf} files directly under the menus directory that are menu specs, in a stable order.
-     * {@code openers.conf} is reserved for the opener-item config ({@code OpenerLoader}) and lives alongside the
-     * menus, so it is excluded here — parsing it as a menu spec would only skip it with a spurious warning.
+     * The {@code .conf} files directly under the menus directory that are menu specs, in a stable order. The reserved
+     * {@code openers.conf} (opener-item config, {@code OpenerLoader}) and {@code patterns.conf} (shared item templates,
+     * loaded once via {@link #loadGlobalPatterns}) live alongside the menus but are not menu specs, so both are
+     * excluded here — parsing either as a menu spec would only skip it with a spurious warning.
      */
     private static List<Path> confFiles(Stream<Path> entries) {
         return entries.filter(Files::isRegularFile)
                 .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".conf"))
-                .filter(p -> !p.getFileName().toString().equalsIgnoreCase(RESERVED_OPENERS_FILE))
+                .filter(p -> !isReserved(p.getFileName().toString()))
                 .sorted()
                 .toList();
     }
 
+    /** Whether a file name is one of the reserved non-menu configs ({@code openers.conf} / {@code patterns.conf}). */
+    private static boolean isReserved(String fileName) {
+        return fileName.equalsIgnoreCase(RESERVED_OPENERS_FILE) || fileName.equalsIgnoreCase(RESERVED_PATTERNS_FILE);
+    }
+
+    /**
+     * Read the optional shared {@code patterns.conf} once per load pass into its {@code patterns} block — a node of
+     * reusable item templates every menu in the pass may name. Shared patterns are opt-in, so a missing or unreadable
+     * file yields an empty node rather than an error. This runs once here, never on a hot path; a {@code /menu reload}
+     * re-reads it as part of the same {@link #loadFrom} re-run.
+     */
+    private ConfigurationNode loadGlobalPatterns(Path menusDir) {
+        Path file = menusDir.resolve(RESERVED_PATTERNS_FILE);
+        if (!Files.isRegularFile(file)) {
+            return CommentedConfigurationNode.root();
+        }
+        try {
+            return HoconConfigurationLoader.builder().path(file).build().load().node("patterns");
+        } catch (RuntimeException | java.io.IOException invalid) {
+            log.warn("could not read shared menu patterns {} : {}", file, String.valueOf(invalid.getMessage()));
+            return CommentedConfigurationNode.root();
+        }
+    }
+
     /** Load one file; records its id in {@code loaded} when it registered, or in {@code skipped} on a parse/ref error. */
     private void loadOne(
-            Path file, List<String> loaded, List<String> skipped, Map<String, OpenCommandSpec> openCommands) {
+            Path file,
+            ConfigurationNode globalPatterns,
+            List<String> loaded,
+            List<String> skipped,
+            Map<String, OpenCommandSpec> openCommands) {
         String id = stripConf(file.getFileName().toString());
         MenuSpec spec;
         try {
-            spec = specLoader.load(file);
+            spec = specLoader.load(file, globalPatterns);
         } catch (MenuSpecException invalid) {
             log.warn("skipped menu {} : {}", id, String.valueOf(invalid.getMessage()));
             skipped.add(id);
