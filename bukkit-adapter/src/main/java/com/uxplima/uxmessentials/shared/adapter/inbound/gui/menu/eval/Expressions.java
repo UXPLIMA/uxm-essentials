@@ -35,6 +35,16 @@ public final class Expressions {
         throw new ExpressionException("expression did not evaluate to a boolean");
     }
 
+    /**
+     * Render {@code value} the way the evaluator renders a number back into text — an integral value without a
+     * trailing {@code .0}. A caller that substitutes an evaluated number into rendered text (a {@code {math: …}}
+     * placeholder, a {@code data_number_*} reader) reuses this so its output matches the number formatting the rest
+     * of the evaluator produces, rather than re-deriving it and drifting.
+     */
+    public static String format(double value) {
+        return Values.format(value);
+    }
+
     private static Object evaluate(String expression) throws ExpressionException {
         Objects.requireNonNull(expression, "expression");
         if (expression.length() > MAX_LENGTH) {

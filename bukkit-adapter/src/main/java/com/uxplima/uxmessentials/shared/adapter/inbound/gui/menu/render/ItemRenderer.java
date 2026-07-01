@@ -38,6 +38,8 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.ExpressionException;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Expressions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
@@ -63,6 +65,13 @@ public final class ItemRenderer {
 
     /** A single {@code %token%} placeholder. {@code group(1)} is the bare token name. */
     private static final Pattern PLACEHOLDER = Pattern.compile("%(\\w+)%");
+
+    /**
+     * A {@code {math: <expr>}} block evaluated after the {@code %token%} pass; {@code group(1)} is the inner
+     * expression. The {@code math:} head and the brace-free body distinguish it from a catalog {@code {token}}
+     * argument, which carries neither a colon nor whitespace, so the two brace grammars never collide.
+     */
+    private static final Pattern MATH = Pattern.compile("\\{math:\\s*([^{}]*)\\}");
 
     /** Prefix marking a token as a typed command argument resolved from the open context rather than the registry. */
     private static final String ARGUMENT_PREFIX = "argument_";
@@ -180,7 +189,7 @@ public final class ItemRenderer {
             out.add(resolveText(spec, ctx));
             return;
         }
-        String substituted = substitutePlaceholders(spec, ctx);
+        String substituted = applyMath(substitutePlaceholders(spec, ctx));
         for (String segment : substituted.split("\n", -1)) {
             out.add(StyledText.render(segment));
         }
@@ -236,7 +245,38 @@ public final class ItemRenderer {
             // placeholders a %token% would use, so a per-entry list item shows that entry's value.
             return guiText.text(ctx.viewer(), () -> key, placeholders.resolveAll(ctx));
         }
-        return StyledText.render(substituted);
+        return StyledText.render(applyMath(substituted));
+    }
+
+    /**
+     * Evaluate every {@code {math: <expr>}} block in an already-token-substituted line, replacing each with the
+     * evaluator's formatted numeric result. Running after the {@code %token%} pass means the inner expression is
+     * already literal, so {@code {math: %coins% * 2}} evaluates the resolved number rather than the token. A line
+     * with no math block returns unchanged (the {@code indexOf} fast-path avoids allocating a matcher for the common
+     * case); a block the sandbox rejects becomes empty rather than aborting the render, the same fail-soft stance the
+     * rest of the renderer takes. Material specs never flow through here, so a {@code %token%} material is untouched.
+     */
+    private String applyMath(String text) {
+        if (text.indexOf("{math:") < 0) {
+            return text;
+        }
+        Matcher matcher = MATH.matcher(text);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            matcher.appendReplacement(out, Matcher.quoteReplacement(evaluateMath(matcher.group(1))));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /** Evaluate one substituted expression to the evaluator's formatted number, or empty when it cannot be parsed. */
+    private static String evaluateMath(String expression) {
+        try {
+            return Expressions.format(Expressions.evaluateNumber(expression));
+        } catch (ExpressionException | RuntimeException rejected) {
+            // A malformed or non-numeric math block renders blank rather than leaking the raw expression or aborting.
+            return "";
+        }
     }
 
     /** Replace every {@code %token%} in {@code source} with its resolved value (argument or registry, or empty). */

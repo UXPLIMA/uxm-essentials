@@ -31,6 +31,20 @@ final class Values {
         return value;
     }
 
+    /**
+     * Render {@code value} the way this evaluator renders a number back into text: an integral value without a
+     * trailing {@code .0} (so {@code 50.0} reads as {@code 50}), any other value in its plain decimal form. The
+     * {@code 1e15} guard keeps a value too large to hold exactly in a {@code long} on the decimal path rather than
+     * silently truncating it. Shared by {@link #stringOf} and reused by callers that substitute an evaluated
+     * number into rendered text, so a math placeholder formats identically to the rest of the evaluator.
+     */
+    static String format(double value) {
+        if (Double.isFinite(value) && value == Math.rint(value) && Math.abs(value) < 1e15) {
+            return Long.toString((long) value);
+        }
+        return Double.toString(value);
+    }
+
     static double arithmetic(double a, String op, double b) throws ExpressionException {
         double result =
                 switch (op) {
@@ -83,8 +97,8 @@ final class Values {
     }
 
     private static String stringOf(Object value) {
-        if (value instanceof Double d && Double.isFinite(d) && d == Math.rint(d) && Math.abs(d) < 1e15) {
-            return Long.toString((long) (double) d);
+        if (value instanceof Double d) {
+            return format(d);
         }
         return String.valueOf(value);
     }
