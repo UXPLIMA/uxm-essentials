@@ -38,10 +38,10 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Confirmation to the sender of {@code /menu open <name> <target>} that the menu opened for {@code {player}}. */
     MENU_OPENED_FOR("menu.opened-for"),
 
-    /** Reply for {@code /menu convert deluxemenus <path>} reporting the converted / skipped / warning counts. */
+    /** Reply for {@code /menu convert <deluxemenus|zmenu> <path>} reporting the converted / skipped / warning counts. */
     MENU_CONVERTED("menu.converted"),
 
-    /** Reply for {@code /menu convert deluxemenus <path>} when the given {@code {path}} held no DeluxeMenus YAML. */
+    /** Reply for {@code /menu convert <deluxemenus|zmenu> <path>} when the given {@code {path}} held no menu YAML. */
     MENU_CONVERT_FAILED("menu.convert-failed");
 
     private final String key;

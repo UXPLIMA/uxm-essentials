@@ -14,6 +14,8 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuOpenCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
@@ -90,11 +92,13 @@ public final class CustomMenusWiring {
             swapMenu.set(reloaded.swapMenu());
             return result;
         };
-        // The DeluxeMenus converter behind /menu convert deluxemenus <path>. It writes into the same menus/ directory
-        // the loader reads, so a converted spec is picked up on the next /menu reload (the converter never reloads).
-        DeluxeMenusConvertService convertService =
+        // The DeluxeMenus and zMenu converters behind /menu convert <deluxemenus|zmenu> <path>. Both write into the
+        // same menus/ directory the loader reads, so a converted spec is picked up on the next /menu reload (neither
+        // converter reloads itself).
+        DeluxeMenusConvertService deluxeMenusConvert =
                 new DeluxeMenusConvertService(menusDir, new DeluxeMenusConverter(), log);
-        MenuCommand command = new MenuCommand(menus, nameSupplier, reload, convertService, messages);
+        ZMenuConvertService zMenuConvert = new ZMenuConvertService(menusDir, new ZMenuConverter(), log);
+        MenuCommand command = new MenuCommand(menus, nameSupplier, reload, deluxeMenusConvert, zMenuConvert, messages);
 
         // The open commands a menu declares in its `command {}` block are built once here, from this first load,
         // and handed back for the bootstrap to register at the LifecycleEvents.COMMANDS event. Brigadier only

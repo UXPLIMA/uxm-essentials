@@ -22,6 +22,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -39,8 +40,9 @@ import org.jspecify.annotations.Nullable;
  * it for another player (gated by {@code uxmessentials.menu.open.others}, so an operator can push a menu to someone
  * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu last} reopens the last
  * custom menu the player had open (with its page and typed arguments); {@code /menu reload} re-runs the loader and
- * reports the loaded/skipped counts, and {@code /menu convert deluxemenus <path>} converts a DeluxeMenus menu YAML
- * (or a directory of them) into {@code menus/*.conf} (both gated by {@code uxmessentials.menu.admin}). The set of
+ * reports the loaded/skipped counts, and {@code /menu convert <deluxemenus|zmenu> <path>} converts a DeluxeMenus or
+ * zMenu menu YAML (or a directory of them) into {@code menus/*.conf} (both gated by {@code uxmessentials.menu.admin}).
+ * The set of
  * registered names is
  * supplied by the wiring rather than read off the engine, so the same list backs the {@code <name>} tab-completion,
  * the not-found guard, {@code /menu list}, and the still-registered check {@code /menu last} makes before reopening.
@@ -55,19 +57,22 @@ public final class MenuCommand implements CommandRegistration {
     private final Menus menus;
     private final Supplier<List<String>> menuNames;
     private final Supplier<CustomMenuLoader.LoadResult> reload;
-    private final DeluxeMenusConvertService convertService;
+    private final DeluxeMenusConvertService deluxeMenusConvert;
+    private final ZMenuConvertService zMenuConvert;
     private final CommandFeedback feedback;
 
     public MenuCommand(
             Menus menus,
             Supplier<List<String>> menuNames,
             Supplier<CustomMenuLoader.LoadResult> reload,
-            DeluxeMenusConvertService convertService,
+            DeluxeMenusConvertService deluxeMenusConvert,
+            ZMenuConvertService zMenuConvert,
             Messages messages) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
         this.reload = Objects.requireNonNull(reload, "reload");
-        this.convertService = Objects.requireNonNull(convertService, "convertService");
+        this.deluxeMenusConvert = Objects.requireNonNull(deluxeMenusConvert, "deluxeMenusConvert");
+        this.zMenuConvert = Objects.requireNonNull(zMenuConvert, "zMenuConvert");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -90,7 +95,10 @@ public final class MenuCommand implements CommandRegistration {
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .then(Commands.literal("deluxemenus")
                                 .then(Commands.argument("path", StringArgumentType.greedyString())
-                                        .executes(this::convertDeluxeMenus))))
+                                        .executes(this::convertDeluxeMenus)))
+                        .then(Commands.literal("zmenu")
+                                .then(Commands.argument("path", StringArgumentType.greedyString())
+                                        .executes(this::convertZMenu))))
                 .build();
     }
 
@@ -231,18 +239,40 @@ public final class MenuCommand implements CommandRegistration {
     private int convertDeluxeMenus(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String path = StringArgumentType.getString(ctx, "path");
-        DeluxeMenusConvertService.ConvertReport report = convertService.convert(path);
+        DeluxeMenusConvertService.ConvertReport report = deluxeMenusConvert.convert(path);
         if (!report.found()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
             return 0;
         }
+        reportConverted(sender, report.converted(), report.skipped(), report.warnings());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Convert a zMenu inventory YAML (or a directory of them) at {@code <path>} into {@code menus/*.conf}, exactly as
+     * the DeluxeMenus branch does — same path resolution, same not-found reply, same converted / skipped / warning
+     * report, same deliberate no-reload. The per-file conversion never crashes the command.
+     */
+    private int convertZMenu(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String path = StringArgumentType.getString(ctx, "path");
+        ZMenuConvertService.ConvertReport report = zMenuConvert.convert(path);
+        if (!report.found()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
+            return 0;
+        }
+        reportConverted(sender, report.converted(), report.skipped(), report.warnings());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Report the converted / skipped / warning counts a convert run tallied — shared by both converter branches. */
+    private void reportConverted(CommandSender sender, int converted, int skipped, int warnings) {
         feedback.send(
                 sender,
                 CustomMenusMessageKey.MENU_CONVERTED,
                 Map.of(
-                        "converted", String.valueOf(report.converted()),
-                        "skipped", String.valueOf(report.skipped()),
-                        "warnings", String.valueOf(report.warnings())));
-        return Command.SINGLE_SUCCESS;
+                        "converted", String.valueOf(converted),
+                        "skipped", String.valueOf(skipped),
+                        "warnings", String.valueOf(warnings)));
     }
 }

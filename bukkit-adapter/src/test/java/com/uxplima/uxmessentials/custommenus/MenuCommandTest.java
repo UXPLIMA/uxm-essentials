@@ -18,6 +18,8 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -214,6 +216,32 @@ class MenuCommandTest {
     }
 
     @Test
+    void convertZMenuWritesAConfAndReportsTheCounts() throws Exception {
+        Files.writeString(
+                menusDir.resolve("cookies.yml"),
+                "name: 'Cookies'\nsize: 36\nitems:\n  c:\n    slot: 13\n    item:\n      material: COOKIE\n");
+
+        execute("menu convert zmenu cookies.yml", player);
+
+        assertThat(messages.keys).contains("menu.converted");
+        assertThat(messages.placeholdersFor("menu.converted")).containsEntry("converted", "1");
+        assertThat(Files.exists(menusDir.resolve("cookies.conf"))).isTrue();
+    }
+
+    @Test
+    void convertZMenuRepliesFailedWhenThePathMatchesNothing() {
+        execute("menu convert zmenu ghost.yml", player);
+
+        assertThat(messages.keys).contains("menu.convert-failed");
+    }
+
+    @Test
+    void convertZMenuIsGatedByTheAdminPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no admin node, so the convert branch stays hidden
+        executeExpectingDenial("menu convert zmenu cookies.yml", plain);
+    }
+
+    @Test
     void lastReopensTheRecordedCustomMenuWithItsArguments() {
         // A subject-less open records into the tracker; the player closes it, then /menu last brings it back.
         menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of("who", "Steve"));
@@ -364,8 +392,9 @@ class MenuCommandTest {
     }
 
     private CommandDispatcher<CommandSourceStack> dispatcherFor() {
-        DeluxeMenusConvertService convertService =
+        DeluxeMenusConvertService deluxeMenusConvert =
                 new DeluxeMenusConvertService(menusDir, new DeluxeMenusConverter(), new NoopLogger());
+        ZMenuConvertService zMenuConvert = new ZMenuConvertService(menusDir, new ZMenuConverter(), new NoopLogger());
         MenuCommand command = new MenuCommand(
                 menus,
                 () -> List.copyOf(names),
@@ -373,7 +402,8 @@ class MenuCommandTest {
                     reloads.incrementAndGet();
                     return new CustomMenuLoader.LoadResult(List.of("shop", "spawn"), List.of("broken"));
                 },
-                convertService,
+                deluxeMenusConvert,
+                zMenuConvert,
                 messages);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(command.build());

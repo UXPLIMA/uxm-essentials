@@ -9,36 +9,36 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 
 /**
- * The one-shot admin service behind {@code /menu convert deluxemenus <path>}: it reads a DeluxeMenus menu YAML (or
- * every {@code .yml} in a directory), runs each through {@link DeluxeMenusConverter}, and writes the result as a
- * {@code menus/<name>.conf} the engine loads on the next {@code /menu reload}. It never reloads itself — an operator
- * reviews the emitted files first — and never crashes on a bad input: a file that fails to read or parse is counted
- * as skipped and logged, so one malformed export never aborts a whole directory convert.
+ * The one-shot admin service behind {@code /menu convert zmenu <path>}: it reads a zMenu inventory YAML (or every
+ * {@code .yml} in a directory), runs each through {@link ZMenuConverter}, and writes the result as a
+ * {@code menus/<name>.conf} the engine loads on the next {@code /menu reload}. It mirrors
+ * {@link DeluxeMenusConvertService} exactly — same file-walk through {@link MenuConvertFiles}, same write-and-tally,
+ * same never-reload / never-crash contract — differing only in the converter it drives. A file that fails to read or
+ * parse is counted as skipped and logged, so one malformed export never aborts a whole directory convert.
  *
- * <p>The path argument resolution and directory walk are shared with the sibling zMenu service through
- * {@link MenuConvertFiles}: an operator can point at a copied {@code DeluxeMenus/menus} folder anywhere on disk. This
- * reads and writes files synchronously on the caller's thread: it is an operator one-shot over a handful of small
- * files, not a hot path, so the simplicity is worth more than pushing the I/O onto the scheduler.
+ * <p>The path argument is absolute or relative to the menus directory, so an operator can point at a copied
+ * {@code zMenu/inventories} folder anywhere on disk. Runs synchronously on the caller's thread: it is an operator
+ * one-shot over a handful of small files, not a hot path.
  */
-public final class DeluxeMenusConvertService {
+public final class ZMenuConvertService {
 
     /** The output extension every converted menu is written under — the extension the engine's loader reads. */
     private static final String OUTPUT_EXTENSION = ".conf";
 
     private final Path menusDir;
-    private final DeluxeMenusConverter converter;
+    private final ZMenuConverter converter;
     private final Logger log;
 
-    public DeluxeMenusConvertService(Path menusDir, DeluxeMenusConverter converter, Logger log) {
+    public ZMenuConvertService(Path menusDir, ZMenuConverter converter, Logger log) {
         this.menusDir = Objects.requireNonNull(menusDir, "menusDir");
         this.converter = Objects.requireNonNull(converter, "converter");
         this.log = Objects.requireNonNull(log, "log");
     }
 
     /**
-     * Convert the DeluxeMenus YAML at {@code rawPath} — a single file or a directory of them — into our menus
-     * directory. A path that resolves to nothing (a missing file, a directory holding no {@code .yml}) yields a
-     * not-found report; otherwise every discovered file is converted independently and its outcome tallied.
+     * Convert the zMenu YAML at {@code rawPath} — a single file or a directory of them — into our menus directory. A
+     * path that resolves to nothing (a missing file, a directory holding no {@code .yml}) yields a not-found report;
+     * otherwise every discovered file is converted independently and its outcome tallied.
      */
     public ConvertReport convert(String rawPath) {
         Objects.requireNonNull(rawPath, "rawPath");
@@ -64,7 +64,7 @@ public final class DeluxeMenusConvertService {
     /** Convert one file, returning its warning count on success or {@code -1} when it could not be read/written. */
     private int convertOne(Path input) {
         try {
-            DeluxeMenusConverter.ConversionResult result = converter.convert(Files.readString(input));
+            ZMenuConverter.ConversionResult result = converter.convert(Files.readString(input));
             Files.createDirectories(menusDir);
             String name = MenuConvertFiles.baseName(input);
             Files.writeString(menusDir.resolve(name + OUTPUT_EXTENSION), result.hocon());
@@ -82,7 +82,7 @@ public final class DeluxeMenusConvertService {
      */
     public record ConvertReport(boolean found, int converted, int skipped, int warnings) {
 
-        /** The report for a path that matched no DeluxeMenus YAML — the command turns this into a not-found reply. */
+        /** The report for a path that matched no zMenu YAML — the command turns this into a not-found reply. */
         public static ConvertReport notFound() {
             return new ConvertReport(false, 0, 0, 0);
         }
