@@ -54,6 +54,16 @@ public record ClickSpec(
     }
 
     /**
+     * Whether any gesture carries at least one action — the test the Bedrock form renderer uses to tell a tappable
+     * button from a decorative filler. A SimpleForm button that does nothing on tap is meaningless, so an item whose
+     * click binds no action anywhere (the auto-filler, a blank border pane, any display-only item) is left off the
+     * form. Requirements and else-chains do not count: without an action there is nothing for a tap to run.
+     */
+    public boolean hasAnyAction() {
+        return actions.values().stream().anyMatch(list -> !list.isEmpty());
+    }
+
+    /**
      * The actions that should fire for {@code kind}: the gesture's own list first, then the shared {@code ANY}
      * list. The result is a fresh immutable list so callers can't mutate the underlying spec.
      */

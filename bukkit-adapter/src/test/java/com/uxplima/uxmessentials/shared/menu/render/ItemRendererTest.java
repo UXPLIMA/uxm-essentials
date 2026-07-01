@@ -110,6 +110,28 @@ class ItemRendererTest {
                 .containsExactly("some_key", "ok", "cost 10", "plain");
     }
 
+    @Test
+    void buttonTextIsNameThenLoreOnePerLineFlattened() {
+        // A Bedrock form button reads the icon's name and lore as one flat \n-separated string; formatting is dropped.
+        String text = renderer.buttonText(itemNamedWithLore("Shop", List.of("Buy items", "<gray>cheap")), ctx);
+
+        assertThat(text).isEqualTo("Shop\nBuy items\ncheap");
+    }
+
+    @Test
+    void buttonTextWithNoLoreIsJustTheName() {
+        // No lore lines means the button label is byte-identical to the bare name it always was.
+        assertThat(renderer.buttonText(itemNamedWithLore("Shop", List.of()), ctx))
+                .isEqualTo("Shop");
+    }
+
+    @Test
+    void buttonTextKeepsBlankLoreLinesAsBlankLines() {
+        // The operator's spacing carries over: a blank lore line stays a blank line in the flat label.
+        assertThat(renderer.buttonText(itemNamedWithLore("Shop", List.of("top", "", "bottom")), ctx))
+                .isEqualTo("Shop\ntop\n\nbottom");
+    }
+
     private static MenuItemSpec item(String material, ItemDecor decor) {
         return new MenuItemSpec(
                 new SlotSet(List.of(0)),
@@ -118,6 +140,21 @@ class ItemRendererTest {
                 "",
                 List.of(),
                 decor,
+                List.of(),
+                new ClickSpec(Map.of(), Map.of()),
+                false,
+                Optional.empty(),
+                ItemType.NONE);
+    }
+
+    private static MenuItemSpec itemNamedWithLore(String name, List<String> lore) {
+        return new MenuItemSpec(
+                new SlotSet(List.of(0)),
+                0,
+                "STONE",
+                name,
+                lore,
+                new ItemDecor(1, Optional.empty(), false, List.of()),
                 List.of(),
                 new ClickSpec(Map.of(), Map.of()),
                 false,

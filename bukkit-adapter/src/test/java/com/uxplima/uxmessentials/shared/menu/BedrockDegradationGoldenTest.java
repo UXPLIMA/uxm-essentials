@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
@@ -37,29 +38,23 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The proof that the hybrid Bedrock renderer at the {@code Menus.open} choke-point works end to end: a real
- * {@link MenuSpecLoader} parses the spec, a real {@link Menus} wired with the live {@link MenuBindings} action
- * registry opens it, and a fake {@link BedrockDetector} / {@link BedrockScreen} stand in for the Cumulus/Floodgate
- * SDK, which is a {@code compileOnly} soft-depend absent from the test runtime. A Bedrock viewer gets a native
- * SimpleForm (a button list) instead of the chest, tapping a button runs that item's click actions, a Java viewer
- * keeps the chest byte-identically, and a chest-only menu stays on the chest even for a Bedrock viewer.
+ * The proof that the grid→form degradation is clean: a Bedrock viewer's SimpleForm shows only the actionable buttons,
+ * each labelled with the item's name and lore, and a tap maps into that filtered list — while the Java chest keeps
+ * painting every item, decorative fillers included. A real {@link MenuSpecLoader} and {@link Menus} drive it; a fake
+ * {@link BedrockDetector} / {@link BedrockScreen} stand in for the Cumulus/Floodgate SDK, a {@code compileOnly}
+ * soft-depend absent from the test runtime.
  */
-class BedrockSimpleFormGoldenTest {
+class BedrockDegradationGoldenTest {
 
-    private static final String TWO_ITEMS = """
-            title = "My Menu"
+    // Slot 0 and slot 2 carry click actions; slot 1 is a blank pane with no click — a decorative filler.
+    private static final String SHOP = """
+            title = "Shop"
             rows = 1
             items {
-              alpha { slot = 0, material = DIAMOND, name = "Alpha", click { left { click = ["record:alpha"] } } }
-              beta  { slot = 1, material = EMERALD, name = "Beta", click { left { click = ["record:beta"] } } }
+              shop { slot = 0, material = DIAMOND, name = "Shop", lore = ["Buy items"], click { left { click = ["record:shop"] } } }
+              pane { slot = 1, material = GRAY_STAINED_GLASS_PANE, name = "" }
+              info { slot = 2, material = BOOK, name = "Info", click { left { click = ["record:info"] } } }
             }
-            """;
-
-    private static final String CHEST_ONLY = """
-            title = "Storage"
-            rows = 1
-            chest-only = true
-            items { a { slot = 0, material = CHEST, name = "A" } }
             """;
 
     private ServerMock server;
@@ -96,58 +91,66 @@ class BedrockSimpleFormGoldenTest {
     }
 
     @Test
-    void aBedrockViewerGetsAFormNotAChestAndTappingAButtonRunsThatItemsActions() {
+    void aBedrockFormShowsOnlyActionableButtonsLabelledWithNameAndLore() {
         detector.bedrock = true;
         Menus menus = engine();
-        menus.registerSpec("m", loader.parse(TWO_ITEMS));
+        menus.registerSpec("shop", loader.parse(SHOP));
 
-        open(menus, "m");
+        open(menus, "shop");
 
         assertThat(menuOpen())
-                .as("a Bedrock viewer is redirected to a form, so no chest MenuHolder is opened")
+                .as("a Bedrock viewer is redirected to a form, so no chest is opened")
                 .isFalse();
-        assertThat(screen.title)
-                .as("the form carries the menu's own title as plain text")
-                .isEqualTo("My Menu");
+        assertThat(screen.title).as("the form carries the menu's own title").isEqualTo("Shop");
         assertThat(screen.buttons)
-                .as("one button per visible static item, in slot order, labelled with the item name")
-                .containsExactly("Alpha", "Beta");
+                .as(
+                        "the blank pane has no click, so it is skipped; the two actionable items become buttons in slot order")
+                .containsExactly("Shop\nBuy items", "Info");
+    }
+
+    @Test
+    void tappingAButtonMapsIntoTheFilteredListSoTheFillerNeverShifts() {
+        detector.bedrock = true;
+        Menus menus = engine();
+        menus.registerSpec("shop", loader.parse(SHOP));
+
+        open(menus, "shop");
+
+        screen.tap(0);
+        assertThat(captured.get())
+                .as("button 0 is Shop, the first actionable item")
+                .isEqualTo("shop");
 
         screen.tap(1);
-
         assertThat(captured.get())
-                .as("tapping Beta's button runs Beta's left-click actions through the shared action registry")
-                .isEqualTo("beta");
+                .as("button 1 is Info — the filler at slot 1 was dropped, so Info moved up to index 1, not index 2")
+                .isEqualTo("info");
     }
 
     @Test
-    void aJavaViewerKeepsTheChestAndTheScreenIsNeverCalled() {
+    void aJavaViewerKeepsEveryItemInTheChestFillerIncluded() {
         detector.bedrock = false;
         Menus menus = engine();
-        menus.registerSpec("m", loader.parse(TWO_ITEMS));
+        menus.registerSpec("shop", loader.parse(SHOP));
 
-        open(menus, "m");
+        open(menus, "shop");
 
-        assertThat(menuOpen())
-                .as("a Java viewer opens the chest exactly as before")
-                .isTrue();
-        assertThat(screen.sent)
-                .as("the Bedrock screen is never asked to send a form for a Java viewer")
-                .isFalse();
-    }
+        assertThat(menuOpen()).as("a Java viewer opens the chest as before").isTrue();
+        assertThat(screen.sent).as("no form is sent for a Java viewer").isFalse();
 
-    @Test
-    void aChestOnlyMenuStaysAChestEvenForABedrockViewer() {
-        detector.bedrock = true;
-        Menus menus = engine();
-        menus.registerSpec("s", loader.parse(CHEST_ONLY));
-
-        open(menus, "s");
-
-        assertThat(menuOpen())
-                .as("a chest-only menu opts out of the form redirect, so a Bedrock viewer still gets the chest")
-                .isTrue();
-        assertThat(screen.sent).as("no form is sent for a chest-only menu").isFalse();
+        Inventory top = player.getOpenInventory().getTopInventory();
+        assertThat(top.getItem(0))
+                .extracting(item -> item == null ? null : item.getType())
+                .as("the actionable Shop icon is painted")
+                .isEqualTo(Material.DIAMOND);
+        assertThat(top.getItem(1))
+                .extracting(item -> item == null ? null : item.getType())
+                .as("the decorative filler the form dropped is still painted in the chest")
+                .isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
+        assertThat(top.getItem(2))
+                .extracting(item -> item == null ? null : item.getType())
+                .as("the actionable Info icon is painted")
+                .isEqualTo(Material.BOOK);
     }
 
     /** The production-shaped façade: action registry threaded in, plus the fake detector and screen. */
@@ -168,7 +171,7 @@ class BedrockSimpleFormGoldenTest {
         menus.open(new PlayerRef(player.getUniqueId(), player.getName()), specId, null);
     }
 
-    /** Whether the viewer is looking at one of this engine's chest windows. A gated/redirected open never opens one. */
+    /** Whether the viewer is looking at one of this engine's chest windows. A redirected open never opens one. */
     private boolean menuOpen() {
         InventoryView view = player.getOpenInventory();
         Inventory top = view == null ? null : view.getTopInventory();
@@ -191,8 +194,6 @@ class BedrockSimpleFormGoldenTest {
             this.onSelect = onSelect;
         }
 
-        // This golden exercises only the SimpleForm path; the confirm ModalForm and the text-input CustomForm each
-        // have their own golden.
         @Override
         public void sendModalForm(
                 Player player,

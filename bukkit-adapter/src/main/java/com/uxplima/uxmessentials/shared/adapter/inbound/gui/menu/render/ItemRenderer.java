@@ -131,15 +131,32 @@ public final class ItemRenderer {
     }
 
     /**
-     * The item's resolved display name as plain text — the very name {@link #render} paints onto the icon, put
-     * through the same {@code %token%}/{@code @key} resolution and then flattened of all formatting. A Bedrock
-     * SimpleForm button carries a flat label rather than a rich component, so this is what the hybrid form renderer
-     * shows on the button that stands in for this item.
+     * The item's resolved display name followed by its lore, as one flat label — what the hybrid form renderer shows
+     * on the button that stands in for this item. A Bedrock SimpleForm button carries a single {@code \n}-separated
+     * string rather than a rich icon, so the name and each spec lore line are put through the same {@code
+     * %token%}/{@code @key} resolution {@link #render} uses, flattened of formatting, and joined one per line; a
+     * Bedrock viewer then reads the same name and lore a Java viewer sees on the icon. An item with no lore yields
+     * just the name, and a blank spec lore line stays a blank line so the operator's spacing carries over. The spec
+     * lore ({@link MenuItemSpec#lore}) is used deliberately — the operator's written lore, not any lore a {@code b64:}
+     * or provider icon embeds — since that is what belongs on a form button.
      */
     public String buttonText(MenuItemSpec item, MenuContext ctx) {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(ctx, "ctx");
-        return PlainTextComponentSerializer.plainText().serialize(resolveText(item.name(), ctx));
+        StringBuilder label = new StringBuilder(plainLine(item.name(), ctx));
+        for (String line : item.lore()) {
+            label.append('\n').append(plainLine(line, ctx));
+        }
+        return label.toString();
+    }
+
+    /**
+     * One text line resolved through the same {@code %token%}/{@code @key} path an icon name or lore line takes, then
+     * flattened to plain text — a Bedrock form label is a flat string, so a button's name and lore reach it stripped
+     * of all formatting.
+     */
+    private String plainLine(String line, MenuContext ctx) {
+        return PlainTextComponentSerializer.plainText().serialize(resolveText(line, ctx));
     }
 
     /**

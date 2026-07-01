@@ -100,11 +100,15 @@ public final class MenuRenderer {
     }
 
     /**
-     * The visible static items of {@code spec}, in ascending slot order — what the hybrid renderer turns into a
+     * The actionable static items of {@code spec}, in ascending slot order — what the hybrid renderer turns into a
      * Bedrock SimpleForm's button list. Visibility is the same view-requirement rule the chest render uses (a hidden
-     * or out-priority item is dropped, resolved through {@link PriorityLayering}), so a Bedrock viewer sees exactly
-     * the items a Java viewer would. List-backed items are skipped: a form button list is a flat set of static
-     * entries in this slice, so list pagination is out of scope here and is a later item.
+     * or out-priority item is dropped, resolved through {@link PriorityLayering}), so a Bedrock viewer sees the same
+     * items a Java viewer would. On top of that, only items that carry a click action become form buttons — a
+     * decorative/filler item (the auto-filler, a blank border pane, any display-only item with no click) is omitted,
+     * since a Bedrock button that does nothing on tap is meaningless; the Java chest still paints it. A menu whose
+     * every item is decorative therefore yields an empty button list — the form still opens with just its title.
+     * List-backed items are skipped: a form button list is a flat set of static entries in this slice, so list
+     * pagination is out of scope here and is a later item.
      */
     public List<MenuItemSpec> visibleStaticItemsInSlotOrder(MenuSpec spec, MenuContext ctx) {
         Objects.requireNonNull(spec, "spec");
@@ -117,7 +121,11 @@ public final class MenuRenderer {
         }
         Map<Integer, MenuItemSpec> placed = PriorityLayering.resolve(staticItems, it -> viewPasses(it, ctx));
         List<MenuItemSpec> ordered = new ArrayList<>(placed.size());
-        new TreeMap<>(placed).forEach((slot, item) -> ordered.add(item));
+        new TreeMap<>(placed).forEach((slot, item) -> {
+            if (item.click().hasAnyAction()) {
+                ordered.add(item);
+            }
+        });
         return ordered;
     }
 
