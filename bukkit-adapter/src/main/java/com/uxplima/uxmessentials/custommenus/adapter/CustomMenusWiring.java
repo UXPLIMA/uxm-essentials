@@ -59,7 +59,12 @@ public final class CustomMenusWiring {
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(messages, "messages");
 
-        CustomMenuLoader loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, menus, log);
+        // The custom-placeholder fallback registers here, after every built-in / data / stat / papi family the main
+        // wiring registered, so a reserved-prefix custom name is still claimed by its prefix fallback first and a
+        // custom name can never shadow a built-in exact handler. The loader owns it and swaps its definitions on each
+        // load pass, so a /menu reload re-reads placeholders.conf alongside the menus and openers.
+        CustomPlaceholders customPlaceholders = new CustomPlaceholders(bindings);
+        CustomMenuLoader loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, menus, log, customPlaceholders);
         OpenerLoader openerLoader = new OpenerLoader(log);
         Path menusDir = dataFolder.resolve("menus");
         Path openersFile = menusDir.resolve("openers.conf");

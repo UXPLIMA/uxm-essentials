@@ -41,16 +41,35 @@ public final class CustomMenuLoader {
     /** The reserved shared-patterns file: item templates every menu may name, loaded once per pass, not a menu spec. */
     private static final String RESERVED_PATTERNS_FILE = "patterns.conf";
 
+    /** The reserved global-placeholders file: custom {@code %name%} definitions, loaded once per pass, not a menu spec. */
+    private static final String RESERVED_PLACEHOLDERS_FILE = "placeholders.conf";
+
     private final MenuSpecLoader specLoader;
     private final MenuBindings bindings;
     private final Menus menus;
     private final Logger log;
+    private final CustomPlaceholders customPlaceholders;
 
-    public CustomMenuLoader(MenuSpecLoader specLoader, MenuBindings bindings, Menus menus, Logger log) {
+    public CustomMenuLoader(
+            MenuSpecLoader specLoader,
+            MenuBindings bindings,
+            Menus menus,
+            Logger log,
+            CustomPlaceholders customPlaceholders) {
         this.specLoader = Objects.requireNonNull(specLoader, "specLoader");
         this.bindings = Objects.requireNonNull(bindings, "bindings");
         this.menus = Objects.requireNonNull(menus, "menus");
         this.log = Objects.requireNonNull(log, "log");
+        this.customPlaceholders = Objects.requireNonNull(customPlaceholders, "customPlaceholders");
+    }
+
+    /**
+     * The four-argument form kept for the call sites (and tests) that predate the global placeholders file. It builds
+     * a fresh {@link CustomPlaceholders} over the same {@code bindings}, which registers its fallback there, so the
+     * loader still reads {@code placeholders.conf} and validates a {@code %name%} spec without the caller threading one.
+     */
+    public CustomMenuLoader(MenuSpecLoader specLoader, MenuBindings bindings, Menus menus, Logger log) {
+        this(specLoader, bindings, menus, log, new CustomPlaceholders(bindings));
     }
 
     /**
@@ -89,9 +108,13 @@ public final class CustomMenuLoader {
     public LoadResult loadFrom(Path menusDir) {
         Objects.requireNonNull(menusDir, "menusDir");
         if (!Files.isDirectory(menusDir)) {
+            customPlaceholders.reload(Map.of());
             return new LoadResult(List.of(), List.of());
         }
         ConfigurationNode globalPatterns = loadGlobalPatterns(menusDir);
+        // Publish the custom %name% definitions before any spec is validated, so a %welcome% token a menu references
+        // is already claimed by the custom fallback when validate() checks it; a /menu reload re-reads the file here.
+        customPlaceholders.reload(loadGlobalPlaceholders(menusDir));
         List<String> loaded = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
         Map<String, OpenCommandSpec> openCommands = new LinkedHashMap<>();
@@ -107,10 +130,11 @@ public final class CustomMenuLoader {
     }
 
     /**
-     * The {@code .conf} files directly under the menus directory that are menu specs, in a stable order. The reserved
-     * {@code openers.conf} (opener-item config, {@code OpenerLoader}) and {@code patterns.conf} (shared item templates,
-     * loaded once via {@link #loadGlobalPatterns}) live alongside the menus but are not menu specs, so both are
-     * excluded here — parsing either as a menu spec would only skip it with a spurious warning.
+     * The {@code .conf} files directly under the menus directory that are menu specs, in a stable order. Three files
+     * are reserved and live alongside the menus without being specs: {@code openers.conf} (opener-item config,
+     * {@code OpenerLoader}), {@code patterns.conf} (shared item templates, loaded once via {@link #loadGlobalPatterns})
+     * and {@code placeholders.conf} (custom {@code %name%} definitions, loaded once via {@link #loadGlobalPlaceholders}).
+     * All three are excluded here — parsing any of them as a menu spec would only skip it with a spurious warning.
      */
     private static List<Path> confFiles(Stream<Path> entries) {
         return entries.filter(Files::isRegularFile)
@@ -120,9 +144,14 @@ public final class CustomMenuLoader {
                 .toList();
     }
 
-    /** Whether a file name is one of the reserved non-menu configs ({@code openers.conf} / {@code patterns.conf}). */
+    /**
+     * Whether a file name is one of the reserved non-menu configs ({@code openers.conf} / {@code patterns.conf} /
+     * {@code placeholders.conf}).
+     */
     private static boolean isReserved(String fileName) {
-        return fileName.equalsIgnoreCase(RESERVED_OPENERS_FILE) || fileName.equalsIgnoreCase(RESERVED_PATTERNS_FILE);
+        return fileName.equalsIgnoreCase(RESERVED_OPENERS_FILE)
+                || fileName.equalsIgnoreCase(RESERVED_PATTERNS_FILE)
+                || fileName.equalsIgnoreCase(RESERVED_PLACEHOLDERS_FILE);
     }
 
     /**
@@ -142,6 +171,35 @@ public final class CustomMenuLoader {
             log.warn("could not read shared menu patterns {} : {}", file, String.valueOf(invalid.getMessage()));
             return CommentedConfigurationNode.root();
         }
+    }
+
+    /**
+     * Read the optional global {@code placeholders.conf} once per load pass into a {@code name -> template} map — the
+     * custom {@code %name%} placeholders every menu in the pass may reference. Each child of the {@code placeholders}
+     * block maps its key to its string value. Custom placeholders are opt-in, so a missing or unreadable file yields
+     * an empty map rather than an error. This runs once here, never on a hot path; a {@code /menu reload} re-reads it
+     * as part of the same {@link #loadFrom} re-run.
+     */
+    private Map<String, String> loadGlobalPlaceholders(Path menusDir) {
+        Path file = menusDir.resolve(RESERVED_PLACEHOLDERS_FILE);
+        if (!Files.isRegularFile(file)) {
+            return Map.of();
+        }
+        try {
+            ConfigurationNode node =
+                    HoconConfigurationLoader.builder().path(file).build().load().node("placeholders");
+            return readPlaceholderDefinitions(node);
+        } catch (RuntimeException | java.io.IOException invalid) {
+            log.warn("could not read custom menu placeholders {} : {}", file, String.valueOf(invalid.getMessage()));
+            return Map.of();
+        }
+    }
+
+    /** Collect a {@code placeholders} node's children into a {@code name -> template} map, in declared order. */
+    private static Map<String, String> readPlaceholderDefinitions(ConfigurationNode node) {
+        Map<String, String> definitions = new LinkedHashMap<>();
+        node.childrenMap().forEach((key, child) -> definitions.put(String.valueOf(key), child.getString("")));
+        return definitions;
     }
 
     /** Load one file; records its id in {@code loaded} when it registered, or in {@code skipped} on a parse/ref error. */
