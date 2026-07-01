@@ -75,6 +75,17 @@ public record Ref(String id, Map<String, String> args, int delayTicks, double ch
     }
 
     /**
+     * A copy of this ref re-keyed to a new {@code id} and {@code args} but carrying the SAME per-action modifiers
+     * (delay, chance, deny). The runtime uses it to re-split a registry-blind {@code id:value} token the parser left
+     * whole — see {@code MenuListener.resolveEffective} — without losing the delay, chance, or deny fallback a
+     * map-form action attached. The canonical constructor is only reachable inside this record, so this is how the
+     * runtime, in another package, rebuilds a ref. Pure: no Bukkit, just the fields.
+     */
+    public Ref withIdAndArgs(String id, Map<String, String> args) {
+        return new Ref(id, args, delayTicks, chance, deny);
+    }
+
+    /**
      * Whether a chance roll of {@code roll} (expected in {@code [0, 100)}) denies this action. A ref at full
      * chance always fires, so it is never denied; otherwise a roll at or above the chance is a miss. Kept pure so
      * the runtime's deny decision can be exercised with an injected roll rather than real randomness.
@@ -87,6 +98,14 @@ public record Ref(String id, Map<String, String> args, int delayTicks, double ch
         return args.getOrDefault("value", "");
     }
 
+    /**
+     * A best-effort fast path only. {@link #parse} is registry-blind — it cannot see which action ids are actually
+     * registered — so this hardcoded allowlist just lets a handful of well-known generic prefixes split their
+     * {@code id:value} token at parse time. It is deliberately NOT exhaustive: the ~40 later generic actions are not
+     * listed here. The authoritative split lives in {@code MenuListener.resolveEffective}, which has the action
+     * registry and re-splits any {@code id:value} token whose head is a registered action. Do not "complete" this
+     * list by hand — the registry, not this set, is the source of truth.
+     */
     private static boolean isGeneric(String head) {
         return Set.of("sound", "command", "console", "message", "perm", "open", "expr", "refresh-slot")
                 .contains(head);

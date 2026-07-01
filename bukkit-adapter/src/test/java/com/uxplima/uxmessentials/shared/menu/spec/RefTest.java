@@ -73,6 +73,32 @@ class RefTest {
     }
 
     @Test
+    void withIdAndArgsReKeysButKeepsModifiers() {
+        Ref deny = Ref.parse("message:no");
+        // A registry-blind parse of a hyphenated generic leaves the whole token as the id (that is the bug the
+        // runtime's registry-aware split fixes); the modifiers ride along on it.
+        Ref whole = Ref.parse("give-money:100").withModifiers(20, 25.0, deny);
+        assertThat(whole.id()).isEqualTo("give-money:100");
+
+        Ref reKeyed = whole.withIdAndArgs("give-money", Map.of("value", "100"));
+
+        assertThat(reKeyed.id()).isEqualTo("give-money");
+        assertThat(reKeyed.value()).isEqualTo("100");
+        assertThat(reKeyed.delayTicks()).as("the delay survives the re-key").isEqualTo(20);
+        assertThat(reKeyed.chance()).as("the chance survives the re-key").isEqualTo(25.0);
+        assertThat(reKeyed.deny()).as("the deny fallback survives the re-key").contains(deny);
+    }
+
+    @Test
+    void parseSplitsAKnownGenericOnTheFirstColonOnly() {
+        // message is a known generic prefix, so it splits — and only the first colon splits, so a value that
+        // itself contains colons is preserved whole.
+        Ref r = Ref.parse("message:Steve hi:there");
+        assertThat(r.id()).isEqualTo("message");
+        assertThat(r.value()).isEqualTo("Steve hi:there");
+    }
+
+    @Test
     void deniedAtDecidesTheChanceBoundaryFromAnInjectedRoll() {
         // Full chance never rolls a miss, whatever the draw.
         assertThat(Ref.parse("give").deniedAt(0.0)).isFalse();

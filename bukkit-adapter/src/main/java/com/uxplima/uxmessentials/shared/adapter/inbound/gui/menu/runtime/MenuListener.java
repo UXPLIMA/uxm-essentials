@@ -2,7 +2,9 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -379,18 +381,48 @@ public final class MenuListener implements Listener {
      * behaves exactly as the action loop did before modifiers existed.
      */
     private void runRef(MenuHolder holder, MenuContext base, ClickKind kind, Ref ref) {
-        if (rolledDenied(ref)) {
-            ref.deny().ifPresent(fallback -> runRef(holder, base, kind, fallback));
+        Ref effective = resolveEffective(ref);
+        if (rolledDenied(effective)) {
+            effective.deny().ifPresent(fallback -> runRef(holder, base, kind, fallback));
             return;
         }
-        actions.get(ref.id()).ifPresent(handler -> {
-            if (ref.delayTicks() > 0) {
+        actions.get(effective.id()).ifPresent(handler -> {
+            if (effective.delayTicks() > 0) {
                 scheduler.asyncAfter(
-                        Duration.ofMillis(ref.delayTicks() * 50L), () -> dispatch(holder, base, kind, ref, handler));
+                        Duration.ofMillis(effective.delayTicks() * 50L),
+                        () -> dispatch(holder, base, kind, effective, handler));
             } else {
-                dispatch(holder, base, kind, ref, handler);
+                dispatch(holder, base, kind, effective, handler);
             }
         });
+    }
+
+    /**
+     * Resolve a bound ref to the effective ref the registry actually dispatches. {@link Ref#parse} is registry-blind:
+     * it only splits an {@code id:value} token when the head is one of a few well-known generic prefixes, so a
+     * later generic action written as {@code [give-money:100]} arrives here with the whole token as its id and would
+     * miss the registry (a silent no-op). This is the one place that holds the action registry, so it does the
+     * authoritative split the parser could not: when neither the whole id nor a registered head resolves, the ref is
+     * returned unchanged and misses exactly as before (no behaviour change on that path). The modifiers ride along
+     * through {@link Ref#withIdAndArgs}, so a re-split action keeps its delay/chance/deny.
+     *
+     * <p>A feature ref ({@code economy:open-bank}) and an already-split generic ({@code sound:x}) both take the early
+     * return, so their dispatch stays byte-identical. Phase 3's valued conditions will want the same registry-aware
+     * split against the condition registry.
+     */
+    private Ref resolveEffective(Ref ref) {
+        int colon = ref.id().indexOf(':');
+        if (colon < 0 || actions.has(ref.id())) {
+            return ref;
+        }
+        String head = ref.id().substring(0, colon);
+        if (!actions.has(head)) {
+            return ref;
+        }
+        // Split on the first colon only, so a value that itself carries colons ("Steve hi:there") stays whole.
+        Map<String, String> merged = new HashMap<>(ref.args());
+        merged.put("value", ref.id().substring(colon + 1));
+        return ref.withIdAndArgs(head, merged);
     }
 
     /**
