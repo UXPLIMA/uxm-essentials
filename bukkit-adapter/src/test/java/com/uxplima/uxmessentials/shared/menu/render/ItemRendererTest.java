@@ -142,10 +142,44 @@ class ItemRendererTest {
     // Assert on the renderer's own lore components, before ItemBuilder breaks any newline-bearing line into
     // visual lines on the stack; this is the layer the expansion feature owns.
     private List<String> plainLore(ItemRenderer r, MenuItemSpec spec) {
-        return r.lore(spec, ctx).stream()
+        return plainLore(r, spec, ctx);
+    }
+
+    private static List<String> plainLore(ItemRenderer r, MenuItemSpec spec, MenuContext c) {
+        return r.lore(spec, c).stream()
                 .map(line -> net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
                         .serialize(line))
                 .toList();
+    }
+
+    @Test
+    void argumentTokenExpandsFromTheOpenContextArguments() {
+        // A command opened with typed arguments carries them on the context; %argument_<name>% must render its value
+        // in a name (and lore) without needing a registered placeholder.
+        MenuContext argCtx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0, Map.of("amount", "5"));
+
+        ItemStack it = renderer.render(itemNamed("You gave %argument_amount%"), argCtx);
+
+        assertThat(plainName(it)).isEqualTo("You gave 5");
+    }
+
+    @Test
+    void anUnknownArgumentTokenRendersEmpty() {
+        MenuContext argCtx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0, Map.of("amount", "5"));
+
+        ItemStack it = renderer.render(itemNamed("[%argument_missing%]"), argCtx);
+
+        assertThat(plainName(it)).isEqualTo("[]");
+    }
+
+    @Test
+    void anArgumentTokenInLoreExpandsWhileANormalPlaceholderStillResolves() {
+        // Regression guard: adding the argument_ special-case must not shadow the registry — %icon% still resolves
+        // (registered to "DIAMOND" in setUp), and %argument_target% resolves from the context arguments.
+        MenuContext argCtx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0, Map.of("target", "Steve"));
+
+        assertThat(plainLore(renderer, itemWithLore(List.of("to %argument_target%", "icon %icon%")), argCtx))
+                .containsExactly("to Steve", "icon DIAMOND");
     }
 
     @Test

@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
@@ -36,6 +38,20 @@ class CustomMenuLoaderTest {
             rows = 1
             items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
             command { name = "shop", aliases = ["store"], permission = "srv.shop", deny-message = "<red>nope", console = true }
+            """;
+
+    private static final String WITH_ARGUMENTS = """
+            rows = 1
+            items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
+            command {
+              name = "gift"
+              usage = "/gift <target> <amount>"
+              arguments = [
+                { name = "target", type = "online-player" }
+                { name = "amount", type = "int" }
+                { name = "flavour", type = "bogus" }
+              ]
+            }
             """;
 
     @Test
@@ -75,6 +91,27 @@ class CustomMenuLoaderTest {
         assertThat(command.permission()).contains("srv.shop");
         assertThat(command.denyMessage()).contains("<red>nope");
         assertThat(command.consoleAllowed()).isTrue();
+    }
+
+    @Test
+    void parsesOrderedTypedArgumentsAndUsageAndDefaultsAnUnknownTypeToString(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("gift.conf"), WITH_ARGUMENTS);
+
+        MenuBindings bindings = new MenuBindings();
+        bindings.action("close", c -> {});
+        RecordingLogger log = new RecordingLogger();
+        CustomMenuLoader loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, newMenus(), log);
+
+        CustomMenuLoader.LoadResult result = loader.loadFrom(dir);
+
+        OpenCommandSpec command = result.openCommands().get("gift");
+        assertThat(command.name()).isEqualTo("gift");
+        assertThat(command.usage()).contains("/gift <target> <amount>");
+        assertThat(command.arguments()).extracting(ArgumentSpec::name).containsExactly("target", "amount", "flavour");
+        assertThat(command.arguments())
+                .extracting(ArgumentSpec::type)
+                .containsExactly(ArgType.ONLINE_PLAYER, ArgType.INT, ArgType.STRING);
+        assertThat(log.warnings).anyMatch(line -> line.contains("unknown type") && line.contains("bogus"));
     }
 
     @Test

@@ -13,14 +13,17 @@ import org.jspecify.annotations.NullMarked;
  * The parsed {@code command {}} block of a custom menu: the operator-declared open command a menu registers for
  * itself. {@code name} is the primary literal ({@code /shop}), {@code aliases} the extra literals it answers to
  * ({@code /store}), {@code permission} an optional node gating who may open it, {@code denyMessage} the optional
- * MiniMessage line shown when that gate fails (operator content, rendered verbatim — not a catalog key), and
- * {@code consoleAllowed} whether a non-player sender may invoke it at all.
+ * MiniMessage line shown when that gate fails (operator content, rendered verbatim — not a catalog key),
+ * {@code consoleAllowed} whether a non-player sender may invoke it at all, {@code arguments} the ordered typed
+ * positional arguments the command takes ({@code /gift <target> <amount>}), and {@code usage} the optional usage
+ * line surfaced as the command's description.
  *
  * <p>The record is the immutable value the {@link MenuOpenCommand} reads; parsing HOCON into one lives in the
  * loader. It validates at construction: {@code name} must be a single lowercase command word (no spaces), aliases
  * are normalised the same way and de-duplicated (dropping any blank, malformed, or self-referential entry), and a
- * blank {@code permission}/{@code deny-message} collapses to absent so an empty config value never gates or shows
- * an empty line.
+ * blank {@code permission}/{@code deny-message}/{@code usage} collapses to absent so an empty config value never
+ * gates or shows an empty line. The five-argument constructor keeps every call site that predates typed arguments
+ * compiling unchanged — it defaults to no arguments and no usage.
  */
 @NullMarked
 public record OpenCommandSpec(
@@ -28,7 +31,9 @@ public record OpenCommandSpec(
         List<String> aliases,
         Optional<String> permission,
         Optional<String> denyMessage,
-        boolean consoleAllowed) {
+        boolean consoleAllowed,
+        List<ArgumentSpec> arguments,
+        Optional<String> usage) {
 
     /** A Brigadier command literal: lowercase letters, digits, underscores or hyphens, with no whitespace. */
     private static final Pattern COMMAND_WORD = Pattern.compile("[a-z0-9_-]+");
@@ -40,6 +45,21 @@ public record OpenCommandSpec(
                 .map(String::strip)
                 .filter(node -> !node.isBlank());
         denyMessage = Objects.requireNonNull(denyMessage, "denyMessage").filter(line -> !line.isBlank());
+        arguments = List.copyOf(Objects.requireNonNull(arguments, "arguments"));
+        usage = Objects.requireNonNull(usage, "usage").map(String::strip).filter(line -> !line.isBlank());
+    }
+
+    /**
+     * The pre-arguments shape: a command with no typed arguments and no usage line. Kept so every call site that
+     * predates typed menu arguments constructs an {@link OpenCommandSpec} unchanged.
+     */
+    public OpenCommandSpec(
+            String name,
+            List<String> aliases,
+            Optional<String> permission,
+            Optional<String> denyMessage,
+            boolean consoleAllowed) {
+        this(name, aliases, permission, denyMessage, consoleAllowed, List.of(), Optional.empty());
     }
 
     /** Normalise a raw name to a single lowercase command word, rejecting a blank or whitespace-bearing value. */

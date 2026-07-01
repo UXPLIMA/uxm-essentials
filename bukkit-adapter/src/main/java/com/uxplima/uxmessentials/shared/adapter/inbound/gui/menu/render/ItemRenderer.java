@@ -64,6 +64,9 @@ public final class ItemRenderer {
     /** A single {@code %token%} placeholder. {@code group(1)} is the bare token name. */
     private static final Pattern PLACEHOLDER = Pattern.compile("%(\\w+)%");
 
+    /** Prefix marking a token as a typed command argument resolved from the open context rather than the registry. */
+    private static final String ARGUMENT_PREFIX = "argument_";
+
     /** Default custom-effect duration in ticks when a {@code effect:amplifier} token omits the duration. */
     private static final int DEFAULT_EFFECT_TICKS = 600;
 
@@ -190,7 +193,7 @@ public final class ItemRenderer {
      */
     private String resolveMaterialSpec(String raw, MenuContext ctx) {
         Matcher matcher = PLACEHOLDER.matcher(raw);
-        return matcher.find() ? placeholders.resolve(matcher.group(1), ctx).orElse("") : raw;
+        return matcher.find() ? resolveToken(matcher.group(1), ctx) : raw;
     }
 
     /**
@@ -236,16 +239,29 @@ public final class ItemRenderer {
         return StyledText.render(substituted);
     }
 
-    /** Replace every {@code %token%} in {@code source} with its registered placeholder value (or empty). */
+    /** Replace every {@code %token%} in {@code source} with its resolved value (argument or registry, or empty). */
     private String substitutePlaceholders(String source, MenuContext ctx) {
         Matcher matcher = PLACEHOLDER.matcher(source);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
-            String value = placeholders.resolve(matcher.group(1), ctx).orElse("");
+            String value = resolveToken(matcher.group(1), ctx);
             matcher.appendReplacement(out, Matcher.quoteReplacement(value));
         }
         matcher.appendTail(out);
         return out.toString();
+    }
+
+    /**
+     * Resolve one bare {@code %token%} name to its text. An {@code argument_<name>} token is a typed command
+     * argument the menu was opened with, so it reads from {@link MenuContext#arguments()} (an unknown name yields
+     * empty); any other token resolves through the placeholder registry as before. This keeps command arguments a
+     * first-class placeholder source without touching the single registry fallback the PlaceholderAPI bridge owns.
+     */
+    private String resolveToken(String token, MenuContext ctx) {
+        if (token.startsWith(ARGUMENT_PREFIX)) {
+            return ctx.arguments().getOrDefault(token.substring(ARGUMENT_PREFIX.length()), "");
+        }
+        return placeholders.resolve(token, ctx).orElse("");
     }
 
     /** Layer the spec's amount, glow, model data, item flags, and native rich meta onto the in-progress item. */

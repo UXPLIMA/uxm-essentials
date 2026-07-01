@@ -11,6 +11,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -146,11 +148,47 @@ public final class CustomMenuLoader {
                     stringList(command.node("aliases")),
                     optionalString(command.node("permission")),
                     optionalString(command.node("deny-message")),
-                    command.node("console").getBoolean(false)));
+                    command.node("console").getBoolean(false),
+                    parseArguments(command.node("arguments"), menuId),
+                    optionalString(command.node("usage"))));
         } catch (RuntimeException | java.io.IOException invalid) {
             log.warn("menu {} has an invalid command block : {}", menuId, String.valueOf(invalid.getMessage()));
             return Optional.empty();
         }
+    }
+
+    /**
+     * Parse the ordered {@code arguments = [{ name=..., type=... }, ...]} list of a command block. Each entry needs
+     * a non-blank {@code name}; an entry without one is logged and skipped rather than aborting the command. An
+     * unrecognised {@code type} degrades to a plain {@link ArgType#STRING} word argument with a warning, so a config
+     * typo never drops the command — it just loses the stricter parsing and autocomplete for that one argument.
+     */
+    private List<ArgumentSpec> parseArguments(ConfigurationNode node, String menuId) {
+        if (node.virtual() || node.isNull()) {
+            return List.of();
+        }
+        List<ArgumentSpec> arguments = new ArrayList<>();
+        for (ConfigurationNode entry : node.childrenList()) {
+            String name = entry.node("name").getString("");
+            if (name.isBlank()) {
+                log.warn("menu {} declares a command argument with no name; skipping it", menuId);
+                continue;
+            }
+            arguments.add(new ArgumentSpec(name, argType(entry.node("type").getString("string"), menuId, name)));
+        }
+        return List.copyOf(arguments);
+    }
+
+    /** The {@link ArgType} named by {@code token}, defaulting to {@link ArgType#STRING} with a warning when unknown. */
+    private ArgType argType(String token, String menuId, String argument) {
+        return ArgType.parse(token).orElseGet(() -> {
+            log.warn(
+                    "menu {} command argument {} has unknown type '{}'; treating it as a string",
+                    menuId,
+                    argument,
+                    token);
+            return ArgType.STRING;
+        });
     }
 
     /** The string-list value at {@code node}, or an empty list when the node is absent or not a string list. */

@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import org.junit.jupiter.api.Test;
 
@@ -71,5 +73,58 @@ class OpenCommandSpecTest {
         OpenCommandSpec spec = new OpenCommandSpec("shop", List.of("store"), Optional.empty(), Optional.empty(), false);
 
         assertThatThrownBy(() -> spec.aliases().add("hacked")).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void theFiveArgumentConstructorDefaultsToNoArgumentsAndNoUsage() {
+        OpenCommandSpec spec = new OpenCommandSpec("shop", List.of(), Optional.empty(), Optional.empty(), false);
+
+        assertThat(spec.arguments()).isEmpty();
+        assertThat(spec.usage()).isEmpty();
+    }
+
+    @Test
+    void carriesTypedArgumentsInOrderAndCollapsesABlankUsage() {
+        OpenCommandSpec spec = new OpenCommandSpec(
+                "gift",
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                List.of(new ArgumentSpec("target", ArgType.ONLINE_PLAYER), new ArgumentSpec("amount", ArgType.INT)),
+                Optional.of("   "));
+
+        assertThat(spec.arguments()).extracting(ArgumentSpec::name).containsExactly("target", "amount");
+        assertThat(spec.arguments()).extracting(ArgumentSpec::type).containsExactly(ArgType.ONLINE_PLAYER, ArgType.INT);
+        assertThat(spec.usage()).isEmpty();
+    }
+
+    @Test
+    void keepsANonBlankUsageStripped() {
+        OpenCommandSpec spec = new OpenCommandSpec(
+                "gift",
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                List.of(),
+                Optional.of("  /gift <target> <amount>  "));
+
+        assertThat(spec.usage()).contains("/gift <target> <amount>");
+    }
+
+    @Test
+    void argumentsAreImmutable() {
+        OpenCommandSpec spec = new OpenCommandSpec(
+                "gift",
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                List.of(new ArgumentSpec("amount", ArgType.INT)),
+                Optional.empty());
+
+        assertThatThrownBy(() -> spec.arguments().add(new ArgumentSpec("x", ArgType.STRING)))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 }

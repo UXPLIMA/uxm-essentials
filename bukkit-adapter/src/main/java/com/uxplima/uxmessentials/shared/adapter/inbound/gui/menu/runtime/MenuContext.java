@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -8,11 +9,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The per-open data a menu binding sees: who is viewing, the optional domain subject the menu was opened for
- * (a warp, a home owner, ...), the current page, and — while a list is rendered or clicked — the live list
- * element. The engine creates it; it is public only so feature binding lambdas can read it.
+ * (a warp, a home owner, ...), the current page, — while a list is rendered or clicked — the live list element,
+ * and any typed command arguments the menu was opened with (an operator {@code command {}} block's
+ * {@code %argument_<name>%} values). The engine creates it; it is public only so feature binding lambdas can read
+ * it.
  *
- * <p>Immutable. {@link #withEntry} and {@link #withPage} return copies rather than mutating, because the same
- * base context is reused across every slot of a list page and must not leak one element's identity into the next.
+ * <p>Immutable. {@link #withEntry}, {@link #withPage} and {@link #withPageCount} return copies rather than
+ * mutating, because the same base context is reused across every slot of a list page and must not leak one
+ * element's identity into the next; each copy carries the open's arguments through unchanged.
  */
 public final class MenuContext {
 
@@ -26,17 +30,35 @@ public final class MenuContext {
 
     @Nullable private final Object entry;
 
-    private MenuContext(PlayerRef viewer, @Nullable Object subject, int page, int pageCount, @Nullable Object entry) {
+    private final Map<String, String> arguments;
+
+    private MenuContext(
+            PlayerRef viewer,
+            @Nullable Object subject,
+            int page,
+            int pageCount,
+            @Nullable Object entry,
+            Map<String, String> arguments) {
         this.viewer = Objects.requireNonNull(viewer, "viewer");
         this.subject = subject;
         this.page = page;
         this.pageCount = pageCount;
         this.entry = entry;
+        this.arguments = Objects.requireNonNull(arguments, "arguments");
     }
 
     /** Opens a fresh context with no list element bound yet and a single-page count until the renderer knows better. */
     public static MenuContext of(PlayerRef viewer, @Nullable Object subject, int page) {
-        return new MenuContext(viewer, subject, page, 1, null);
+        return of(viewer, subject, page, Map.of());
+    }
+
+    /**
+     * Opens a fresh context carrying the typed command {@code arguments} the menu was opened with, keyed by
+     * argument name so the renderer can expand {@code %argument_<name>%} in a title, name or lore. Kept separate
+     * from {@link #of(PlayerRef, Object, int)} so the many argument-less opens stay a three-argument call.
+     */
+    public static MenuContext of(PlayerRef viewer, @Nullable Object subject, int page, Map<String, String> arguments) {
+        return new MenuContext(viewer, subject, page, 1, null, Map.copyOf(arguments));
     }
 
     public PlayerRef viewer() {
@@ -50,6 +72,15 @@ public final class MenuContext {
     /** How many pages the menu's list spans, one-based; the renderer stamps it before drawing static items. */
     public int pageCount() {
         return pageCount;
+    }
+
+    /**
+     * The typed command arguments the menu was opened with, keyed by argument name — empty for a menu not opened
+     * through an argument-carrying command. The renderer reads it to expand {@code %argument_<name>%}; the map is
+     * immutable.
+     */
+    public Map<String, String> arguments() {
+        return arguments;
     }
 
     public Optional<Object> subjectRaw() {
@@ -83,19 +114,19 @@ public final class MenuContext {
         return type.cast(value);
     }
 
-    /** A copy bound to one list element, leaving viewer, subject, page and page count untouched. */
+    /** A copy bound to one list element, leaving viewer, subject, page, page count and arguments untouched. */
     public MenuContext withEntry(Object entry) {
         Objects.requireNonNull(entry, "entry");
-        return new MenuContext(viewer, subject, page, pageCount, entry);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments);
     }
 
     /** A copy on a new page, used when the renderer or listener advances pagination; resets nothing else. */
     public MenuContext withPage(int page) {
-        return new MenuContext(viewer, subject, page, pageCount, entry);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments);
     }
 
     /** A copy carrying the page count the renderer computed, so a static item's {@code %max_page%} can read it. */
     public MenuContext withPageCount(int pageCount) {
-        return new MenuContext(viewer, subject, page, pageCount, entry);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments);
     }
 }
