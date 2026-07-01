@@ -726,4 +726,129 @@ class MenuSpecLoaderTest {
                 .load()
                 .node("patterns");
     }
+
+    private static final String BORDER_LAYOUT = """
+            layout = [
+              "GGGGGGGGG"
+              "G.......G"
+              "GGGGGGGGG"
+            ]
+            items {
+              G { material = GRAY_STAINED_GLASS_PANE, name = " " }
+            }
+            """;
+
+    @Test
+    void aLayoutCharItemTakesItsSlotsFromTheGridDrawnAroundIt() {
+        MenuSpec spec = new MenuSpecLoader().parse(BORDER_LAYOUT);
+
+        assertThat(spec.items().get("G").slots().slots())
+                .as("the char 'G' claims every border cell the layout paints, the '.' interior staying empty")
+                .containsExactly(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26);
+    }
+
+    @Test
+    void aLayoutCharWithNoMatchingItemLeavesThoseSlotsEmptyWithoutError() {
+        // 'X' is drawn but no item declares it, so nothing occupies those cells and the parse still succeeds.
+        MenuSpec spec = new MenuSpecLoader().parse("""
+                        layout = [ "XXXXX" ]
+                        items { }
+                        """);
+
+        assertThat(spec.items()).isEmpty();
+    }
+
+    @Test
+    void aLayoutPositionWinsOverAnItemsOwnDeclaredSlots() {
+        MenuSpec spec = new MenuSpecLoader().parse("""
+                        layout = [ "G........" ]
+                        items { G { material = STONE, slots = [40] } }
+                        """);
+
+        assertThat(spec.items().get("G").slots().slots())
+                .as("a layout char ignores its own slot/slots; the grid position wins, so 40 is never used")
+                .containsExactly(0);
+    }
+
+    @Test
+    void spaceAndDotAreBothEmptyCellsAndAMultiRowGridMapsRowMajor() {
+        MenuSpec spec = new MenuSpecLoader().parse("""
+                        layout = [
+                          "A A"
+                          ".B."
+                        ]
+                        items {
+                          A { material = STONE }
+                          B { material = STONE }
+                        }
+                        """);
+
+        assertThat(spec.items().get("A").slots().slots())
+                .as("both a space and a dot are empty, so 'A' skips the gap between its two ends")
+                .containsExactly(0, 2);
+        assertThat(spec.items().get("B").slots().slots())
+                .as("the second row's middle column is slot 9 + 1")
+                .containsExactly(10);
+    }
+
+    @Test
+    void aFillItemOccupiesEveryEmptySlotAtALowPriorityUnderAReservedId() {
+        MenuSpec spec = new MenuSpecLoader().parse("""
+                        rows = 3
+                        items { real { slot = 13, material = DIAMOND } }
+                        fill-item { material = BLACK_STAINED_GLASS_PANE, name = " " }
+                        """);
+
+        MenuItemSpec fill = spec.items().get("__fill__");
+        assertThat(fill).as("a fill-item is added under the reserved id").isNotNull();
+        assertThat(fill.priority())
+                .as("the fill sits at the lowest priority so any real item wins a slot they share")
+                .isEqualTo(Integer.MIN_VALUE);
+        assertThat(fill.material()).isEqualTo("BLACK_STAINED_GLASS_PANE");
+        assertThat(fill.slots().slots())
+                .as("every slot of a three-row chest except the one the real item holds")
+                .hasSize(26)
+                .doesNotContain(13)
+                .contains(0, 12, 14, 26);
+    }
+
+    @Test
+    void aMenuWithoutAFillItemAddsNoReservedEntry() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows = 1\nitems { a { slot = 0, material = STONE } }");
+
+        assertThat(spec.items()).doesNotContainKey("__fill__");
+    }
+
+    @Test
+    void aLayoutAndAFillItemTogetherCoverEverySlot() {
+        MenuSpec spec = new MenuSpecLoader().parse("""
+                        layout = [
+                          "GGGGGGGGG"
+                          "G.......G"
+                          "GGGGGGGGG"
+                        ]
+                        items { G { material = GRAY_STAINED_GLASS_PANE, name = " " } }
+                        fill-item { material = BLACK_STAINED_GLASS_PANE, name = " " }
+                        """);
+
+        assertThat(spec.items().get("__fill__").slots().slots())
+                .as("the fill takes the seven interior cells the border layout leaves empty")
+                .containsExactly(10, 11, 12, 13, 14, 15, 16);
+        java.util.Set<Integer> covered =
+                new java.util.HashSet<>(spec.items().get("G").slots().slots());
+        covered.addAll(spec.items().get("__fill__").slots().slots());
+        assertThat(covered)
+                .as("border plus interior account for every one of the 27 cells")
+                .hasSize(27);
+    }
+
+    @Test
+    void aMenuWithNeitherLayoutNorFillItemParsesItsItemsUnchanged() {
+        MenuSpec spec = new MenuSpecLoader()
+                .parse("rows = 2\nitems { border { slots = [\"0-2\"], material = STONE }, go { slot = 4 } }");
+
+        assertThat(spec.items().keySet()).containsExactlyInAnyOrder("border", "go");
+        assertThat(spec.items().get("border").slots().slots()).containsExactly(0, 1, 2);
+        assertThat(spec.items().get("go").slots().slots()).containsExactly(4);
+    }
 }

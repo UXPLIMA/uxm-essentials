@@ -5,11 +5,13 @@ import java.io.StringReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import org.jspecify.annotations.Nullable;
@@ -37,6 +39,12 @@ public final class MenuSpecLoader {
 
     /** The width of every inventory row, the divisor that turns a slot index into the row count needed to hold it. */
     private static final int SLOTS_PER_ROW = 9;
+
+    /** The reserved id the auto-fill background item is stored under; an operator item of the same id is overwritten. */
+    private static final String FILL_ITEM_ID = "__fill__";
+
+    /** The auto-fill background sits at the lowest possible priority, so any real item always wins a slot they share. */
+    private static final int FILL_PRIORITY = Integer.MIN_VALUE;
 
     /** Parse a spec held in memory. Primarily a test seam; production loads go through {@link #load(Path)}. */
     public MenuSpec parse(String hocon) {
@@ -103,8 +111,10 @@ public final class MenuSpecLoader {
         // six-row) fallback, whose own out-of-range slots the renderer skips, so its item ceiling stays that count.
         int ceilingRows = chest ? MAX_ROWS : declaredRows;
         Map<String, Pattern> patterns = mergedPatterns(globalPatterns, root.node("patterns"));
-        Map<String, MenuItemSpec> items = parseItems(root.node("items"), ceilingRows, origin, patterns);
+        Map<Character, List<Integer>> layout = layoutSlots(root.node("layout"));
+        Map<String, MenuItemSpec> items = parseItems(root.node("items"), ceilingRows, origin, patterns, layout);
         int rows = chest ? chestRows(declaredRows, items) : declaredRows;
+        addFillItem(root.node("fill-item"), items, rows, ceilingRows, patterns);
         try {
             return new MenuSpec(
                     root.node("title").getString(""),
@@ -175,14 +185,24 @@ public final class MenuSpecLoader {
         return highest;
     }
 
+    /**
+     * Parse the {@code items} block. An item whose id is a single character present in the menu's {@code layout} grid
+     * takes its slots from that grid — the drawing wins over any {@code slot}/{@code slots} it declares — while every
+     * other item keeps its own slots. A menu with no {@code layout} passes an empty grid, so no id is ever a grid
+     * character and every item parses exactly as it did before.
+     */
     private Map<String, MenuItemSpec> parseItems(
-            ConfigurationNode itemsNode, int rows, String origin, Map<String, Pattern> patterns) {
+            ConfigurationNode itemsNode,
+            int rows,
+            String origin,
+            Map<String, Pattern> patterns,
+            Map<Character, List<Integer>> layout) {
         Map<String, MenuItemSpec> items = new LinkedHashMap<>();
         for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                 itemsNode.childrenMap().entrySet()) {
             String id = String.valueOf(entry.getKey());
             try {
-                items.put(id, parseItem(entry.getValue(), rows, patterns));
+                items.put(id, parseItem(entry.getValue(), rows, patterns, layoutOverride(id, layout)));
             } catch (RuntimeException invalid) {
                 throw new MenuSpecException(
                         "invalid item '" + id + "' in " + origin + ": " + invalid.getMessage(), invalid);
@@ -191,9 +211,99 @@ public final class MenuSpecLoader {
         return items;
     }
 
+    /**
+     * Turn a menu {@code layout} of row-strings into the grid of slots each character claims. Row {@code r}, column
+     * {@code c} maps to slot {@code r * 9 + c}, and a character's positions are collected in row-major order so an item
+     * named by that single character can take its slots from the drawing. A space or a {@code '.'} is an empty cell and
+     * maps to nothing, leaving its slot for the fill item or for nothing at all. Rows past the six a chest holds and
+     * columns past the ninth are ignored, keeping every mapped slot in range; an absent or empty {@code layout} yields
+     * an empty map, so a menu that draws no grid parses exactly as before.
+     */
+    private Map<Character, List<Integer>> layoutSlots(ConfigurationNode layoutNode) {
+        Map<Character, List<Integer>> grid = new LinkedHashMap<>();
+        List<String> rows = strings(layoutNode);
+        for (int r = 0; r < rows.size() && r < MAX_ROWS; r++) {
+            String row = rows.get(r);
+            for (int c = 0; c < row.length() && c < SLOTS_PER_ROW; c++) {
+                char cell = row.charAt(c);
+                if (cell != ' ' && cell != '.') {
+                    grid.computeIfAbsent(cell, key -> new ArrayList<>()).add(r * SLOTS_PER_ROW + c);
+                }
+            }
+        }
+        return grid;
+    }
+
+    /** The grid positions a single-character item id claims, or {@code null} when the id is not a grid character so the item keeps its own declared slots. */
+    private static @Nullable List<Integer> layoutOverride(String id, Map<Character, List<Integer>> layout) {
+        return id.length() == 1 ? layout.get(id.charAt(0)) : null;
+    }
+
+    /**
+     * Add the {@code fill-item} — a background icon painted into every slot no item occupies — once every real item's
+     * slots are known. It is an ordinary static item (it may carry a name, lore, decor) built at the lowest priority and
+     * stored under {@link #FILL_ITEM_ID}, so even were an empty slot to overlap a real item the real item would still
+     * win. An absent {@code fill-item} node adds nothing, so a menu without one parses exactly as before.
+     */
+    private void addFillItem(
+            ConfigurationNode node,
+            Map<String, MenuItemSpec> items,
+            int rows,
+            int ceilingRows,
+            Map<String, Pattern> patterns) {
+        if (node.virtual() || node.isNull()) {
+            return;
+        }
+        items.put(FILL_ITEM_ID, fillItem(node, emptySlots(items, rows), ceilingRows, patterns));
+    }
+
+    /** Every slot in the sized window that no already-parsed item holds, in ascending order — the fill's territory. */
+    private static List<Integer> emptySlots(Map<String, MenuItemSpec> items, int rows) {
+        Set<Integer> occupied = new HashSet<>();
+        for (MenuItemSpec item : items.values()) {
+            occupied.addAll(item.slots().slots());
+        }
+        List<Integer> empty = new ArrayList<>();
+        for (int slot = 0; slot < rows * SLOTS_PER_ROW; slot++) {
+            if (!occupied.contains(slot)) {
+                empty.add(slot);
+            }
+        }
+        return empty;
+    }
+
+    /** Build the fill item from its descriptor at {@code slots}, forcing the low fill priority over any it might declare. */
+    private MenuItemSpec fillItem(
+            ConfigurationNode node, List<Integer> slots, int rows, Map<String, Pattern> patterns) {
+        MenuItemSpec parsed = parseItem(node, rows, patterns, slots);
+        return new MenuItemSpec(
+                parsed.slots(),
+                FILL_PRIORITY,
+                parsed.material(),
+                parsed.name(),
+                parsed.lore(),
+                parsed.decor(),
+                parsed.loreMode(),
+                parsed.view(),
+                parsed.click(),
+                parsed.update(),
+                parsed.list(),
+                parsed.type());
+    }
+
     private MenuItemSpec parseItem(ConfigurationNode node, int rows, Map<String, Pattern> patterns) {
+        return parseItem(node, rows, patterns, null);
+    }
+
+    /**
+     * Parse one item, honouring an optional layout slot override. When {@code slotOverride} is non-null the item's
+     * slots come straight from the grid the menu {@code layout} drew — any {@code slot}/{@code slots} it declares is
+     * ignored, the grid position winning — otherwise its slots are parsed from its own tokens exactly as before.
+     */
+    private MenuItemSpec parseItem(
+            ConfigurationNode node, int rows, Map<String, Pattern> patterns, @Nullable List<Integer> slotOverride) {
         ConfigurationNode item = resolvePattern(node, patterns);
-        SlotSet slots = SlotSet.parse(slotTokens(item), rows * 9);
+        SlotSet slots = slotOverride != null ? new SlotSet(slotOverride) : SlotSet.parse(slotTokens(item), rows * 9);
         return new MenuItemSpec(
                 slots,
                 item.node("priority").getInt(0),
