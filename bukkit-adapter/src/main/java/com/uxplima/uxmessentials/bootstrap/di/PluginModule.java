@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.bukkit.Material;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
@@ -82,6 +83,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApi;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -264,6 +267,14 @@ public final class PluginModule {
                 menuBindings.placeholders(),
                 IconProviders.full(plugin.getServer(), kernel.log(), hooks.capability(HeadQuery.class)));
         MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions());
+        // The public dev-API: another plugin loads MenuApi from the ServicesManager to register its own actions
+        // (which cover custom buttons), requirements, placeholders and list sources into these very bindings, and to
+        // build a menu-styled item through this same renderer. Registered at Normal so a menu that names a custom id
+        // resolves it after the owning plugin has enabled and re-validated (via /uxmess reload or /menu reload). Paper
+        // clears the ServicesManager on disable, so no explicit teardown is needed here.
+        MenuApi menuApi = new MenuApiImpl(menuBindings, menuItemRenderer);
+        plugin.getServer().getServicesManager().register(MenuApi.class, menuApi, plugin, ServicePriority.Normal);
+        kernel.log().info("event=menu_api_registered");
         // The editor renderer is the typed-property capability the same engine grows: a property editor is a
         // MenuHolder window the one listener routes and the one shutdown tears down, so the renderer is threaded into
         // both the listener (it repaints an editor after a property click) and the façade (it opens one). The façade
