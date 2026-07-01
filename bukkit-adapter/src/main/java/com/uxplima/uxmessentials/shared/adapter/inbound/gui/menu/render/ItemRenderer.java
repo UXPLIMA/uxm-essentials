@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconP
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -107,9 +108,39 @@ public final class ItemRenderer {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(ctx, "ctx");
         String materialSpec = resolveMaterialSpec(item.material(), ctx);
+        Optional<ItemStack> base = iconProviders.resolve(materialSpec, ctx);
         Component name = resolveText(item.name(), ctx);
-        return applyDecor(baseItem(materialSpec, ctx).name(name).lore(lore(item, ctx)), item.decor(), ctx)
+        List<Component> lore = combineLore(item, base, ctx);
+        return applyDecor(builderFor(base, materialSpec).name(name).lore(lore), item.decor(), ctx)
                 .build();
+    }
+
+    /**
+     * Combine the base icon's own lore with the spec lore per {@code item}'s {@link LoreMode}. REPLACE keeps only
+     * the spec lore (the historic behaviour); APPEND puts the base lore first, then the spec lore beneath it;
+     * PREPEND puts the spec lore first, then the base lore. The base lore comes from the resolved icon — a
+     * serialized {@code b64:} stack or a provider item may carry its own — so a plain material, which has no lore
+     * of its own, renders identically under any mode.
+     */
+    private List<Component> combineLore(MenuItemSpec item, Optional<ItemStack> base, MenuContext ctx) {
+        List<Component> specLore = lore(item, ctx);
+        if (item.loreMode() == LoreMode.REPLACE) {
+            return specLore;
+        }
+        List<Component> baseLore =
+                base.flatMap(icon -> Optional.ofNullable(icon.lore())).orElse(List.of());
+        if (baseLore.isEmpty()) {
+            return specLore;
+        }
+        List<Component> combined = new ArrayList<>(baseLore.size() + specLore.size());
+        if (item.loreMode() == LoreMode.APPEND) {
+            combined.addAll(baseLore);
+            combined.addAll(specLore);
+        } else {
+            combined.addAll(specLore);
+            combined.addAll(baseLore);
+        }
+        return combined;
     }
 
     /**
@@ -163,13 +194,14 @@ public final class ItemRenderer {
     }
 
     /**
-     * The base item for {@code spec}: an icon provider's stack (a skull source, the viewer's equipment, an HDB
-     * head) when one claims the spec, else a plain item of the named material. A provider that builds a head
-     * still has the item's name, lore and decor layered on top by the caller, exactly as a material item does.
+     * The {@link ItemBuilder} for a resolved {@code base}: from an icon provider's stack (a skull source, the
+     * viewer's equipment, a serialized {@code b64:} stack, an HDB head) when one claimed the spec, else a plain
+     * item of the named material. A provider's stack still has the item's name, lore and decor layered on top by
+     * the caller, exactly as a material item does. It is split out from lore-combining so the resolved base stack —
+     * whose own lore an append/prepend mode reads — stays visible to {@link #render}.
      */
-    private ItemBuilder baseItem(String spec, MenuContext ctx) {
-        Optional<ItemStack> provided = iconProviders.resolve(spec, ctx);
-        return provided.map(ItemBuilder::from).orElseGet(() -> ItemBuilder.of(materialOrStone(spec)));
+    private ItemBuilder builderFor(Optional<ItemStack> base, String spec) {
+        return base.map(ItemBuilder::from).orElseGet(() -> ItemBuilder.of(materialOrStone(spec)));
     }
 
     /**

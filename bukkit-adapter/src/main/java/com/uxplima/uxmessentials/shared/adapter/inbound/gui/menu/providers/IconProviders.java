@@ -55,11 +55,13 @@ public final class IconProviders {
     }
 
     /**
-     * The full chain the composition root wires: the skull and equipment providers, then the four custom-item
-     * providers (ItemsAdder, Oraxen, Nexo, MMOItems), then the HeadDatabase provider. The prefixes are disjoint, so
-     * order is a readability choice rather than a routing one — a spec reaches exactly the one provider that owns its
-     * prefix. Each custom-item provider reaches its plugin reflectively behind a present-guard, so on a server without
-     * that plugin its prefix resolves to empty and the renderer falls back to the plain material.
+     * The full chain the composition root wires: the skull and equipment providers, the two native special sources
+     * (a serialized {@code b64:} stack and the {@code water_bottle}/{@code light:<n>} keywords), then the four
+     * custom-item providers (ItemsAdder, Oraxen, Nexo, MMOItems), then the HeadDatabase provider. The prefixes are
+     * disjoint, so order is a readability choice rather than a routing one — a spec reaches exactly the one provider
+     * that owns its prefix. The two native sources need no external plugin; each custom-item provider reaches its
+     * plugin reflectively behind a present-guard, so on a server without that plugin its prefix resolves to empty and
+     * the renderer falls back to the plain material.
      */
     public static IconProviders full(Server server, Logger log, HeadQuery headQuery) {
         Objects.requireNonNull(server, "server");
@@ -68,6 +70,8 @@ public final class IconProviders {
         return new IconProviders(List.of(
                 new SkullIconProvider(),
                 new EquipmentIconProvider(),
+                new SerializedStackIconProvider(),
+                new SpecialItemIconProvider(),
                 new ItemsAdderIconProvider(server, log),
                 new OraxenIconProvider(server, log),
                 new NexoIconProvider(server, log),

@@ -102,6 +102,7 @@ public final class MenuSpecLoader {
                 node.node("name").getString(""),
                 strings(node.node("lore")),
                 parseDecor(node.node("decor")),
+                LoreMode.fromToken(node.node("lore-mode").getString()),
                 refs(node.node("view")),
                 parseClick(node.node("click")),
                 node.node("update").getBoolean(false),
