@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
@@ -114,6 +115,69 @@ class MenuSpecLoaderTest {
                 .decor();
 
         assertThat(decor.meta()).isEqualTo(RichMeta.NONE);
+        assertThat(decor.meta().components()).isEqualTo(DataComponents.NONE);
         assertThat(decor.amount()).isEqualTo(1);
+    }
+
+    private static final String COMPONENTS = """
+            rows = 1
+            items {
+              thing {
+                slot = 0
+                material = DIAMOND_SWORD
+                decor {
+                  rarity = EPIC
+                  tooltip-style = "minecraft:fancy"
+                  hide-tooltip = true
+                  enchant-glint = true
+                  enchantable = 10
+                  attribute-modifiers = ["generic.attack_damage:5:add_number:hand", "generic.max_health:2:add_number:any"]
+                  food { nutrition = 4, saturation = 2.4, can-always-eat = true }
+                  tool { default-mining-speed = 1.0, damage-per-block = 2 }
+                }
+              }
+            }
+            """;
+
+    @Test
+    void parsesDataComponentsIntoTokens() {
+        DataComponents components = new MenuSpecLoader()
+                .parse(COMPONENTS)
+                .items()
+                .get("thing")
+                .decor()
+                .meta()
+                .components();
+
+        assertThat(components.rarity()).contains("EPIC");
+        assertThat(components.tooltipStyle()).contains("minecraft:fancy");
+        assertThat(components.hideTooltip()).contains(true);
+        assertThat(components.enchantGlint()).contains(true);
+        assertThat(components.enchantable()).contains(10);
+        assertThat(components.attributeModifiers())
+                .containsExactly("generic.attack_damage:5:add_number:hand", "generic.max_health:2:add_number:any");
+        assertThat(components.food())
+                .contains(new DataComponents.FoodSpec(
+                        java.util.Optional.of(4), java.util.Optional.of(2.4), java.util.Optional.of(true)));
+        assertThat(components.tool())
+                .contains(new DataComponents.ToolSpec(java.util.Optional.of(1.0), java.util.Optional.of(2)));
+    }
+
+    @Test
+    void unsetToggleStaysEmptySoItNeverOverridesTheItem() {
+        DataComponents components = new MenuSpecLoader()
+                .parse("rows=1\nitems{ x{ slot=0, decor{ rarity = RARE } } }")
+                .items()
+                .get("x")
+                .decor()
+                .meta()
+                .components();
+
+        assertThat(components.rarity()).contains("RARE");
+        assertThat(components.hideTooltip()).isEmpty();
+        assertThat(components.enchantGlint()).isEmpty();
+        assertThat(components.food()).isEmpty();
+        assertThat(components.tool()).isEmpty();
+        assertThat(components.attributeModifiers()).isEmpty();
     }
 }

@@ -14,11 +14,17 @@ import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.banner.PatternType;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemFlag;
+import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ArmorMeta;
 import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.inventory.meta.components.FoodComponent;
+import org.bukkit.inventory.meta.components.ToolComponent;
 import org.bukkit.inventory.meta.trim.ArmorTrim;
 import org.bukkit.inventory.meta.trim.TrimMaterial;
 import org.bukkit.inventory.meta.trim.TrimPattern;
@@ -34,6 +40,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
@@ -268,6 +275,90 @@ public final class ItemRenderer {
         meta.trim().ifPresent(trim -> applyTrim(builder, trim));
         meta.damage().ifPresent(damage -> applyDamage(builder, damage));
         meta.itemModel().ifPresent(model -> applyItemModel(builder, model));
+        applyDataComponents(builder, meta.components());
+    }
+
+    /**
+     * Apply the native data-components the operator declared. Each one resolves and applies independently and
+     * fail-soft: an unknown rarity, a malformed tooltip-style key, an unresolved attribute/operation/slot, or a
+     * component a runtime cannot model is skipped rather than aborting the render, the same as an unknown flag.
+     */
+    private void applyDataComponents(ItemBuilder builder, DataComponents components) {
+        components
+                .rarity()
+                .flatMap(ItemRenderer::parseRarity)
+                .ifPresent(rarity -> safely(() -> builder.rarity(rarity)));
+        components.tooltipStyle().ifPresent(raw -> applyTooltipStyle(builder, raw));
+        components.hideTooltip().ifPresent(hide -> safely(() -> builder.hideTooltip(hide)));
+        components
+                .enchantGlint()
+                .ifPresent(glint -> safely(() -> builder.editMeta(meta -> meta.setEnchantmentGlintOverride(glint))));
+        components.enchantable().ifPresent(value -> safely(() -> builder.enchantable(value)));
+        applyAttributeModifiers(builder, components.attributeModifiers());
+        components.food().ifPresent(food -> applyFood(builder, food));
+        components.tool().ifPresent(tool -> applyTool(builder, tool));
+    }
+
+    /** Override the tooltip-style with a resource-pack key, skipping a malformed or unsupported key. */
+    private void applyTooltipStyle(ItemBuilder builder, String raw) {
+        NamespacedKey key = keyOf(raw);
+        if (key == null) {
+            return;
+        }
+        safely(() -> builder.tooltipStyle(key));
+    }
+
+    /** Apply each {@code attribute:amount:operation:slot} modifier, deriving a unique key per entry by its index. */
+    private void applyAttributeModifiers(ItemBuilder builder, List<String> tokens) {
+        for (int index = 0; index < tokens.size(); index++) {
+            applyAttributeModifier(builder, tokens.get(index), index);
+        }
+    }
+
+    /**
+     * Apply one {@code attribute:amount:operation:slot} modifier. The operation defaults to {@code add_number} and
+     * the slot to {@code any} when omitted; an unresolved attribute, amount, operation, or slot skips the modifier.
+     */
+    private void applyAttributeModifier(ItemBuilder builder, String token, int index) {
+        String[] parts = token.split(":", 4);
+        if (parts.length < 2) {
+            return;
+        }
+        Optional<Attribute> attribute = fromRegistry(RegistryKey.ATTRIBUTE, attributeKey(parts[0]));
+        Optional<Double> amount = parseDouble(parts[1]);
+        Optional<AttributeModifier.Operation> operation = parseOperation(parts.length > 2 ? parts[2] : "add_number");
+        Optional<EquipmentSlotGroup> slot = parseSlotGroup(parts.length > 3 ? parts[3] : "");
+        if (attribute.isEmpty() || amount.isEmpty() || operation.isEmpty() || slot.isEmpty()) {
+            return;
+        }
+        NamespacedKey key = NamespacedKey.fromString(
+                "uxmessentials:" + attribute.get().getKey().value() + "_" + index);
+        if (key == null) {
+            return;
+        }
+        AttributeModifier modifier = new AttributeModifier(key, amount.get(), operation.get(), slot.get());
+        safely(() -> builder.attribute(attribute.get(), modifier));
+    }
+
+    /** Build the food component from the declared overrides, leaving any unset field at the component's default. */
+    private void applyFood(ItemBuilder builder, DataComponents.FoodSpec spec) {
+        safely(() -> builder.editMeta(meta -> {
+            FoodComponent food = meta.getFood();
+            spec.nutrition().ifPresent(food::setNutrition);
+            spec.saturation().ifPresent(saturation -> food.setSaturation(saturation.floatValue()));
+            spec.canAlwaysEat().ifPresent(food::setCanAlwaysEat);
+            meta.setFood(food);
+        }));
+    }
+
+    /** Build the tool component from the declared overrides, leaving any unset field at the component's default. */
+    private void applyTool(ItemBuilder builder, DataComponents.ToolSpec spec) {
+        safely(() -> builder.editMeta(meta -> {
+            ToolComponent tool = meta.getTool();
+            spec.defaultMiningSpeed().ifPresent(speed -> tool.setDefaultMiningSpeed(speed.floatValue()));
+            spec.damagePerBlock().ifPresent(tool::setDamagePerBlock);
+            meta.setTool(tool);
+        }));
     }
 
     /** Map the spec's raw flag tokens to Bukkit {@link ItemFlag}s, skipping any token that is not a flag name. */
@@ -406,6 +497,51 @@ public final class ItemRenderer {
         }
     }
 
+    /** An {@link ItemRarity} by case-insensitive name (COMMON/UNCOMMON/RARE/EPIC), empty when it is not a rarity. */
+    private static Optional<ItemRarity> parseRarity(String name) {
+        try {
+            return Optional.of(ItemRarity.valueOf(name.trim().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException unknown) {
+            return Optional.empty();
+        }
+    }
+
+    /** An {@link AttributeModifier.Operation} by name ({@code add_number}/{@code add_scalar}/{@code multiply_scalar_1}). */
+    private static Optional<AttributeModifier.Operation> parseOperation(String name) {
+        try {
+            return Optional.of(AttributeModifier.Operation.valueOf(name.trim().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException unknown) {
+            return Optional.empty();
+        }
+    }
+
+    /** An {@link EquipmentSlotGroup} by name; a blank token is the whole-item {@code any}, an unknown one is skipped. */
+    private static Optional<EquipmentSlotGroup> parseSlotGroup(String name) {
+        return switch (name.trim().toLowerCase(Locale.ROOT)) {
+            case "", "any" -> Optional.of(EquipmentSlotGroup.ANY);
+            case "hand", "mainhand", "main_hand" -> Optional.of(EquipmentSlotGroup.MAINHAND);
+            case "off_hand", "offhand" -> Optional.of(EquipmentSlotGroup.OFFHAND);
+            case "feet" -> Optional.of(EquipmentSlotGroup.FEET);
+            case "legs" -> Optional.of(EquipmentSlotGroup.LEGS);
+            case "chest" -> Optional.of(EquipmentSlotGroup.CHEST);
+            case "head" -> Optional.of(EquipmentSlotGroup.HEAD);
+            case "armor" -> Optional.of(EquipmentSlotGroup.ARMOR);
+            case "body" -> Optional.of(EquipmentSlotGroup.BODY);
+            default -> Optional.empty();
+        };
+    }
+
+    /**
+     * A registry key for an attribute name. A legacy category prefix ({@code generic.}, {@code player.}, …) is
+     * stripped so the old {@code generic.attack_damage} spelling still resolves to the modern flat {@code attack_damage}
+     * key; null when the remainder is not a valid key.
+     */
+    private static @Nullable NamespacedKey attributeKey(String raw) {
+        String name = raw.trim();
+        int dot = name.lastIndexOf('.');
+        return keyOf(dot >= 0 ? name.substring(dot + 1) : name);
+    }
+
     /** The registry entry for {@code key}, empty when the key is null or the data-driven registry cannot model it. */
     private static <T extends Keyed> Optional<T> fromRegistry(RegistryKey<T> registry, @Nullable NamespacedKey key) {
         if (key == null) {
@@ -440,6 +576,15 @@ public final class ItemRenderer {
     private static Optional<Integer> parseInt(String raw) {
         try {
             return Optional.of(Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException notANumber) {
+            return Optional.empty();
+        }
+    }
+
+    /** Parse a trimmed double, empty when the value is not a number. */
+    private static Optional<Double> parseDouble(String raw) {
+        try {
+            return Optional.of(Double.parseDouble(raw.trim()));
         } catch (NumberFormatException notANumber) {
             return Optional.empty();
         }

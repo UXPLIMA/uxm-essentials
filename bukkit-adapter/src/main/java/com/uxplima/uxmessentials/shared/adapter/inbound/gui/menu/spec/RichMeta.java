@@ -17,7 +17,9 @@ import java.util.Optional;
  * {@code effect:amplifier:durationTicks}; a banner pattern is {@code pattern:dyecolor}; a colour is a
  * {@code #RRGGBB} hex, an {@code r,g,b} triple, or a named dye colour. {@code dynamicAmount}/{@code dynamicModelData}
  * carry a {@code %token%} the renderer resolves to a number on each draw, overriding the static
- * {@link ItemDecor#amount()}/{@link ItemDecor#modelData()}.
+ * {@link ItemDecor#amount()}/{@link ItemDecor#modelData()}. The {@link DataComponents} block carries the common
+ * native data-components (rarity, tooltip-style, the hide-tooltip/enchant-glint toggles, enchantability, attribute
+ * modifiers, food, tool) the same fail-soft way.
  */
 public record RichMeta(
         boolean unbreakable,
@@ -30,7 +32,8 @@ public record RichMeta(
         Optional<Integer> damage,
         Optional<String> dynamicAmount,
         Optional<String> dynamicModelData,
-        Optional<String> itemModel) {
+        Optional<String> itemModel,
+        DataComponents components) {
 
     /** The empty rich meta — the default an item carries when it declares no extra native metadata. */
     public static final RichMeta NONE = new RichMeta(
@@ -44,7 +47,8 @@ public record RichMeta(
             Optional.empty(),
             Optional.empty(),
             Optional.empty(),
-            Optional.empty());
+            Optional.empty(),
+            DataComponents.NONE);
 
     public RichMeta {
         enchantments = List.copyOf(Objects.requireNonNull(enchantments, "enchantments"));
@@ -57,6 +61,39 @@ public record RichMeta(
         Objects.requireNonNull(dynamicAmount, "dynamicAmount");
         Objects.requireNonNull(dynamicModelData, "dynamicModelData");
         Objects.requireNonNull(itemModel, "itemModel");
+        Objects.requireNonNull(components, "components");
+    }
+
+    /**
+     * The original eleven-argument form, retained so every existing call site keeps compiling unchanged: it carries
+     * no data-components ({@link DataComponents#NONE}). Only the loader builds the twelve-argument canonical form
+     * when a spec's {@code decor} block declares any of them.
+     */
+    public RichMeta(
+            boolean unbreakable,
+            List<String> enchantments,
+            List<String> storedEnchantments,
+            Optional<String> leatherColor,
+            PotionSpec potion,
+            List<String> bannerPatterns,
+            Optional<TrimSpec> trim,
+            Optional<Integer> damage,
+            Optional<String> dynamicAmount,
+            Optional<String> dynamicModelData,
+            Optional<String> itemModel) {
+        this(
+                unbreakable,
+                enchantments,
+                storedEnchantments,
+                leatherColor,
+                potion,
+                bannerPatterns,
+                trim,
+                damage,
+                dynamicAmount,
+                dynamicModelData,
+                itemModel,
+                DataComponents.NONE);
     }
 
     /**

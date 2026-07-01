@@ -146,9 +146,14 @@ public final class MenuSpecLoader {
      * {@code stored-enchantments=["mending:1"]}, {@code leather-color="#A1FF33"} (hex / {@code "r,g,b"} / named),
      * {@code potion{ type=STRENGTH, color="#00AAFF", effects=["speed:1:600"] }},
      * {@code banner{ patterns=["stripe_top:red"] }}, {@code trim{ material=diamond, pattern=sentry }},
-     * {@code damage=100}, {@code item-model="minecraft:diamond_sword"}. The {@code amount} and {@code model-data}
-     * values may instead be a {@code %placeholder%} string, in which case the literal token is carried as the
-     * dynamic override (the renderer resolves it to a number each draw) and the static default is kept.
+     * {@code damage=100}, {@code item-model="minecraft:diamond_sword"}. It also reads the native
+     * {@link DataComponents}: {@code rarity=EPIC}, {@code tooltip-style="minecraft:fancy"},
+     * {@code hide-tooltip=true}, {@code enchant-glint=true}, {@code enchantable=10},
+     * {@code attribute-modifiers=["generic.attack_damage:5:add_number:hand"]},
+     * {@code food{ nutrition=4, saturation=2.4, can-always-eat=true }},
+     * {@code tool{ default-mining-speed=1.0, damage-per-block=2 }}. The {@code amount} and {@code model-data} values
+     * may instead be a {@code %placeholder%} string, in which case the literal token is carried as the dynamic
+     * override (the renderer resolves it to a number each draw) and the static default is kept.
      */
     private ItemDecor parseDecor(ConfigurationNode node) {
         ConfigurationNode amountNode = node.node("amount");
@@ -170,8 +175,40 @@ public final class MenuSpecLoader {
                 optionalInt(node.node("damage")),
                 dynamicAmount,
                 dynamicModel,
-                optionalString(node.node("item-model")));
+                optionalString(node.node("item-model")),
+                parseDataComponents(node));
         return new ItemDecor(amount, model, node.node("glow").getBoolean(false), strings(node.node("flags")), meta);
+    }
+
+    /** Read the native data-component sub-nodes; every value stays a string/int/double/bool token for the renderer. */
+    private DataComponents parseDataComponents(ConfigurationNode node) {
+        return new DataComponents(
+                optionalString(node.node("rarity")),
+                optionalString(node.node("tooltip-style")),
+                optionalBoolean(node.node("hide-tooltip")),
+                optionalBoolean(node.node("enchant-glint")),
+                optionalInt(node.node("enchantable")),
+                strings(node.node("attribute-modifiers")),
+                parseFood(node.node("food")),
+                parseTool(node.node("tool")));
+    }
+
+    private Optional<DataComponents.FoodSpec> parseFood(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        return Optional.of(new DataComponents.FoodSpec(
+                optionalInt(node.node("nutrition")),
+                optionalDouble(node.node("saturation")),
+                optionalBoolean(node.node("can-always-eat"))));
+    }
+
+    private Optional<DataComponents.ToolSpec> parseTool(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        return Optional.of(new DataComponents.ToolSpec(
+                optionalDouble(node.node("default-mining-speed")), optionalInt(node.node("damage-per-block"))));
     }
 
     private RichMeta.PotionSpec parsePotion(ConfigurationNode node) {
@@ -215,6 +252,16 @@ public final class MenuSpecLoader {
     /** A node's int value, or empty when the node is absent. */
     private static Optional<Integer> optionalInt(ConfigurationNode node) {
         return node.virtual() || node.isNull() ? Optional.empty() : Optional.of(node.getInt());
+    }
+
+    /** A node's double value, or empty when the node is absent. */
+    private static Optional<Double> optionalDouble(ConfigurationNode node) {
+        return node.virtual() || node.isNull() ? Optional.empty() : Optional.of(node.getDouble());
+    }
+
+    /** A node's boolean value, or empty when the node is absent, so an unset toggle never overrides the item. */
+    private static Optional<Boolean> optionalBoolean(ConfigurationNode node) {
+        return node.virtual() || node.isNull() ? Optional.empty() : Optional.of(node.getBoolean());
     }
 
     private Optional<ListSpec> parseList(ConfigurationNode node, int rows) {
