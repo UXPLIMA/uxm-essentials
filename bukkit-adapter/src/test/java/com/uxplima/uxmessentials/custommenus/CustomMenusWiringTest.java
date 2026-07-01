@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -43,7 +44,8 @@ class CustomMenusWiringTest {
         Files.copy(shippedExample(), menus.resolve("example.conf"));
         Files.writeString(menus.resolve("hub.conf"), "rows = 1\nitems { x { slot = 0, material = STONE } }\n");
 
-        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(menus(), bindings(), dataFolder, log(), messages());
+        CustomMenusWiring.Wired wired =
+                CustomMenusWiring.wire(menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.commands().getFirst().build().getLiteral()).isEqualTo("menu");
@@ -59,7 +61,8 @@ class CustomMenusWiringTest {
                 command { name = "shop", aliases = ["store"] }
                 """);
 
-        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(menus(), bindings(), dataFolder, log(), messages());
+        CustomMenusWiring.Wired wired =
+                CustomMenusWiring.wire(menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
 
         assertThat(wired.commands().stream().map(c -> c.build().getLiteral())).contains("menu", "shop");
         assertThat(wired.commands().stream()
@@ -72,7 +75,8 @@ class CustomMenusWiringTest {
 
     @Test
     void anEmptyMenusFolderLoadsNothingButStillRegistersTheCommand(@TempDir Path dataFolder) {
-        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(menus(), bindings(), dataFolder, log(), messages());
+        CustomMenusWiring.Wired wired =
+                CustomMenusWiring.wire(menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.menuNames().get()).isEmpty();

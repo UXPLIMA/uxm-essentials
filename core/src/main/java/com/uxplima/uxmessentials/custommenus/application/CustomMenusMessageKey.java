@@ -26,6 +26,9 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Reply for {@code /menu list} when no operator menus are registered. */
     MENU_LIST_EMPTY("menu.list.empty"),
 
+    /** Reply for {@code /menu last} when the player has no remembered menu to reopen (or it is no longer loaded). */
+    MENU_NO_LAST("menu.no-last"),
+
     /** Reply for {@code /menu reload} reporting how many specs loaded and how many were skipped. */
     MENU_RELOADED("menu.reloaded"),
 

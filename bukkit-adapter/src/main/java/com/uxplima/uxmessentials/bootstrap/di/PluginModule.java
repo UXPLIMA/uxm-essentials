@@ -87,6 +87,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconP
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenuCleanupListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
@@ -265,13 +267,20 @@ public final class PluginModule {
         // gates on its open-requirement — the same registries the click listener resolves against, so an open-action
         // and a click action reach the identical handler. A menu's open-command opening it (see MenuOpenCommand)
         // therefore fires that menu's open-actions on open, which is what "pre-open" command actions reduce to.
+        // The reopen tracker /menu last reads: one instance owned by the engine, remembering the last subject-less
+        // (custom) menu each player had open. The façade records into it on open; a quit listener clears the entry
+        // so it never retains an offline player; and the custommenus wiring hands the same instance to the /menu
+        // command so `last` reopens what open recorded.
+        LastMenu lastMenu = new LastMenu();
         Menus menus = new Menus(
                 menuRenderer,
                 kernel.scheduler(),
                 menuBindings.lists(),
                 menuEditorRenderer,
                 menuBindings.actions(),
-                menuBindings.conditions());
+                menuBindings.conditions(),
+                lastMenu);
+        resources.addListener(new LastMenuCleanupListener(lastMenu));
         MenuListener menuListener = new MenuListener(
                 menuRenderer,
                 menuBindings.actions(),
@@ -406,7 +415,8 @@ public final class PluginModule {
                 bus.bus(),
                 guiRegistry,
                 menus,
-                menuBindings);
+                menuBindings,
+                lastMenu);
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
@@ -564,7 +574,8 @@ public final class PluginModule {
             Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            LastMenu lastMenu) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
@@ -613,7 +624,8 @@ public final class PluginModule {
                     guiRegistry,
                     textInput,
                     menus,
-                    menuBindings);
+                    menuBindings,
+                    lastMenu);
         }
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -634,7 +646,8 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            LastMenu lastMenu) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
@@ -769,7 +782,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
-            wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
+            wireCustomMenus(plugin, ctx, resources, menus, menuBindings, lastMenu);
         }
     }
 
@@ -778,7 +791,8 @@ public final class PluginModule {
             ModuleContext ctx,
             CloseableResources resources,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            LastMenu lastMenu) {
         // custommenus consumes the always-on menu engine (the façade + bindings built in PluginModule): it loads the
         // operator's menus/*.conf into the engine on enable and registers the /menu command. There is no per-context
         // repository or listener — the single menu click listener is installed once in bootstrap — so the wiring is a
@@ -788,6 +802,7 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath(),
+                lastMenu,
                 ctx.kernel().log(),
                 ctx.kernel().messages());
         wired.commands().forEach(resources::addCommand);

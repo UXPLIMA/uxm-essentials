@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuOpenCom
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -34,10 +35,12 @@ public final class CustomMenusWiring {
 
     private CustomMenusWiring() {}
 
-    public static Wired wire(Menus menus, MenuBindings bindings, Path dataFolder, Logger log, Messages messages) {
+    public static Wired wire(
+            Menus menus, MenuBindings bindings, Path dataFolder, LastMenu lastMenu, Logger log, Messages messages) {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(lastMenu, "lastMenu");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(messages, "messages");
 
@@ -52,7 +55,7 @@ public final class CustomMenusWiring {
             names.set(result.loadedNames());
             return result;
         };
-        MenuCommand command = new MenuCommand(menus, nameSupplier, reload, messages);
+        MenuCommand command = new MenuCommand(menus, nameSupplier, reload, lastMenu, messages);
 
         // The open commands a menu declares in its `command {}` block are built once here, from this first load,
         // and handed back for the bootstrap to register at the LifecycleEvents.COMMANDS event. Brigadier only

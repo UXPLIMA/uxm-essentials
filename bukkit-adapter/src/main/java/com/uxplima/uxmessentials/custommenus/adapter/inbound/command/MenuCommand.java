@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -35,10 +36,11 @@ import org.jspecify.annotations.Nullable;
  * {@code /menu} — the operator surface over the loaded custom menus. {@code /menu open <name>} opens a registered
  * spec for the clicking player (gated by {@code uxmessentials.menu.use}); {@code /menu open <name> <target>} opens
  * it for another player (gated by {@code uxmessentials.menu.open.others}, so an operator can push a menu to someone
- * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu reload} re-runs the loader
- * and reports the loaded/skipped counts (gated by {@code uxmessentials.menu.admin}). The set of registered names is
+ * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu last} reopens the last
+ * custom menu the player had open (with its page and typed arguments); {@code /menu reload} re-runs the loader and
+ * reports the loaded/skipped counts (gated by {@code uxmessentials.menu.admin}). The set of registered names is
  * supplied by the wiring rather than read off the engine, so the same list backs the {@code <name>} tab-completion,
- * the not-found guard, and {@code /menu list}.
+ * the not-found guard, {@code /menu list}, and the still-registered check {@code /menu last} makes before reopening.
  */
 @NullMarked
 public final class MenuCommand implements CommandRegistration {
@@ -50,16 +52,19 @@ public final class MenuCommand implements CommandRegistration {
     private final Menus menus;
     private final Supplier<List<String>> menuNames;
     private final Supplier<CustomMenuLoader.LoadResult> reload;
+    private final LastMenu lastMenu;
     private final CommandFeedback feedback;
 
     public MenuCommand(
             Menus menus,
             Supplier<List<String>> menuNames,
             Supplier<CustomMenuLoader.LoadResult> reload,
+            LastMenu lastMenu,
             Messages messages) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
         this.reload = Objects.requireNonNull(reload, "reload");
+        this.lastMenu = Objects.requireNonNull(lastMenu, "lastMenu");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -74,6 +79,7 @@ public final class MenuCommand implements CommandRegistration {
                                         .requires(src -> src.getSender().hasPermission(OPEN_OTHERS))
                                         .executes(this::openForOther))))
                 .then(Commands.literal("list").executes(this::list))
+                .then(Commands.literal("last").executes(this::last))
                 .then(Commands.literal("reload")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .executes(this::reload))
@@ -166,6 +172,29 @@ public final class MenuCommand implements CommandRegistration {
         for (String name : names) {
             feedback.send(sender, CustomMenusMessageKey.MENU_LIST_ENTRY, Map.of("name", name));
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Reopen the last custom menu the player had open, with the page and typed arguments it was shown with. Only a
+     * player has a remembered open, so the console is turned away with the shared players-only line. A player who
+     * never opened a menu — or whose remembered menu is no longer registered (a since-deleted or renamed spec, or
+     * one dropped by a reload) — gets the no-last line and nothing opens, rather than the loud unknown-spec failure a
+     * blind reopen would raise. The reopen goes through the same {@link Menus} facade a fresh open does, so it lands
+     * on the player's own region thread and stays Folia-safe.
+     */
+    private int last(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player player)) {
+            feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
+            return 0;
+        }
+        LastMenu.LastOpen open = lastMenu.get(player.getUniqueId()).orElse(null);
+        if (open == null || !menuNames.get().contains(open.menuId())) {
+            feedback.send(player, CustomMenusMessageKey.MENU_NO_LAST);
+            return 0;
+        }
+        menus.open(BukkitRefs.toRef(player), open.menuId(), null, open.page(), open.arguments());
         return Command.SINGLE_SUCCESS;
     }
 

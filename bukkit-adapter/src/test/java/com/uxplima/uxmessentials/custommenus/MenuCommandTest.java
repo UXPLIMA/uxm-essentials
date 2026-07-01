@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.InventoryHolder;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -21,9 +22,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSou
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenuCleanupListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -53,6 +57,7 @@ class MenuCommandTest {
     private ServerMock server;
     private PlayerMock player;
     private Menus menus;
+    private LastMenu lastMenu;
     private RecordingMessages messages;
     private final List<String> names = new ArrayList<>();
     private final AtomicInteger reloads = new AtomicInteger();
@@ -65,7 +70,10 @@ class MenuCommandTest {
         GuiText guiText = new GuiText(new KeyMessages());
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, new SyncScheduler(), new ListSourceRegistry());
+        lastMenu = new LastMenu();
+        // The engine records a subject-less open into this tracker, so /menu last has something to reopen. Null
+        // registries keep every other path byte-identical to the plain engine these command tests otherwise use.
+        menus = new Menus(renderer, new SyncScheduler(), new ListSourceRegistry(), null, null, null, lastMenu);
         MenuSpec spec = new MenuSpecLoader().parse(SPEC_HOCON);
         menus.registerSpec("shop", spec);
         names.add("shop");
@@ -158,6 +166,100 @@ class MenuCommandTest {
     }
 
     @Test
+    void lastReopensTheRecordedCustomMenuWithItsArguments() {
+        // A subject-less open records into the tracker; the player closes it, then /menu last brings it back.
+        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of("who", "Steve"));
+        player.closeInventory();
+
+        execute("menu last", player);
+
+        InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
+        assertThat(holder).isInstanceOf(MenuHolder.class);
+        assertThat(((MenuHolder) holder).specId()).isEqualTo("shop");
+        assertThat(((MenuHolder) holder).ctx().arguments()).containsEntry("who", "Steve");
+    }
+
+    @Test
+    void lastReopensOnTheRecordedPage() {
+        menus.open(BukkitRefs.toRef(player), "shop", null, 2, Map.of());
+        player.closeInventory();
+
+        execute("menu last", player);
+
+        InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
+        assertThat(((MenuHolder) holder).ctx().page()).isEqualTo(2);
+    }
+
+    @Test
+    void lastWithNothingRecordedRepliesNoLast() {
+        execute("menu last", player); // Operator opened nothing this test
+
+        assertThat(messages.keys).contains("menu.no-last");
+        assertThat(menuHolderIsOpenFor(player)).isFalse();
+    }
+
+    @Test
+    void lastIgnoresASubjectMenuAndRepliesNoLast() {
+        menus.registerSpec("warp-list", new MenuSpecLoader().parse(SPEC_HOCON));
+        names.add("warp-list");
+        // A feature menu carries a live domain subject, so the engine does not remember it for a blind reopen.
+        menus.open(BukkitRefs.toRef(player), "warp-list", "a-subject", 0, Map.of());
+        player.closeInventory();
+
+        execute("menu last", player);
+
+        assertThat(messages.keys).contains("menu.no-last");
+        assertThat(menuHolderIsOpenFor(player)).isFalse();
+    }
+
+    @Test
+    void lastWhoseMenuIsNoLongerRegisteredRepliesNoLastWithoutThrowing() {
+        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
+        player.closeInventory();
+        names.clear(); // a reload dropped the spec: it is recorded but no longer a registered name
+
+        execute("menu last", player);
+
+        assertThat(messages.keys).contains("menu.no-last");
+        assertThat(menuHolderIsOpenFor(player)).isFalse();
+    }
+
+    @Test
+    void lastFromConsoleRepliesPlayersOnly() {
+        execute("menu last", server.getConsoleSender());
+
+        assertThat(messages.keys).contains("command.players-only");
+    }
+
+    @Test
+    void quitClearsThePlayersRememberedMenu() {
+        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
+        assertThat(lastMenu.get(player.getUniqueId())).isPresent();
+
+        new LastMenuCleanupListener(lastMenu)
+                .onQuit(new PlayerQuitEvent(
+                        player, net.kyori.adventure.text.Component.empty(), PlayerQuitEvent.QuitReason.DISCONNECTED));
+
+        assertThat(lastMenu.get(player.getUniqueId())).isEmpty();
+    }
+
+    @Test
+    void anEngineWiredWithoutATrackerRecordsNothing() {
+        // The backward-compat path: a Menus built through the old ctor (no tracker) opens exactly as before and
+        // remembers no reopen target, so /menu last over a still-empty tracker replies no-last.
+        Menus plain = new Menus(
+                new MenuRenderer(
+                        new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry()),
+                        new ConditionRegistry()),
+                new SyncScheduler(),
+                new ListSourceRegistry());
+        plain.registerSpec("shop", new MenuSpecLoader().parse(SPEC_HOCON));
+        plain.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
+
+        assertThat(lastMenu.get(player.getUniqueId())).isEmpty();
+    }
+
+    @Test
     void openFromConsoleRepliesPlayersOnly() {
         execute("menu open shop", server.getConsoleSender());
 
@@ -209,6 +311,7 @@ class MenuCommandTest {
                     reloads.incrementAndGet();
                     return new CustomMenuLoader.LoadResult(List.of("shop", "spawn"), List.of("broken"));
                 },
+                lastMenu,
                 messages);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(command.build());

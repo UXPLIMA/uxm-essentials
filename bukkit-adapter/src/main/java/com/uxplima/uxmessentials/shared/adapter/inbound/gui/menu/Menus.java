@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ActionA
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ConfirmState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ListViewState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
@@ -86,6 +87,14 @@ public final class Menus {
 
     @Nullable private final ConditionRegistry openConditionRegistry;
 
+    /**
+     * The per-player reopen tracker {@code /menu last} reads. Null on every engine wired without it — every
+     * list/spec-only test fixture — in which case an open records nothing, byte-identical to before this seam
+     * existed. Only production wiring, which builds one tracker and shares it with the {@code /menu} command,
+     * passes it; and even then only a subject-less open (a custom menu) is remembered, in {@link #rememberLastOpen}.
+     */
+    @Nullable private final LastMenu lastMenu;
+
     /** Paints the two-button confirm window; stateless, so one instance serves every confirm open. */
     private final ConfirmRenderer confirmRenderer = new ConfirmRenderer();
 
@@ -116,11 +125,10 @@ public final class Menus {
     }
 
     /**
-     * The canonical constructor production wiring uses: the same engine plus the action and condition registries an
-     * open needs to run a spec's {@code open-actions} and gate on its {@code open-requirement}. Every other
-     * constructor delegates here with {@code null} registries, so the roughly ninety existing {@code new Menus(...)}
-     * call-sites (almost all test fixtures) compile unchanged and open exactly as before — with null registries an
-     * open skips the requirement gate and runs no open-actions. Only an engine handed real registries evaluates them.
+     * The action/condition-aware constructor: the same engine plus the registries an open needs to run a spec's
+     * {@code open-actions} and gate on its {@code open-requirement}. Delegates to the canonical constructor with a
+     * {@code null} reopen tracker, so every existing {@code new Menus(...)} call-site (almost all test fixtures)
+     * compiles unchanged and records no reopen target — byte-identical to before that seam existed.
      */
     public Menus(
             MenuRenderer renderer,
@@ -129,12 +137,32 @@ public final class Menus {
             @Nullable EditorRenderer editorRenderer,
             @Nullable ActionRegistry openActionRegistry,
             @Nullable ConditionRegistry openConditionRegistry) {
+        this(renderer, scheduler, lists, editorRenderer, openActionRegistry, openConditionRegistry, null);
+    }
+
+    /**
+     * The canonical constructor production wiring uses: the action/condition-aware engine plus the reopen tracker
+     * {@code /menu last} reads. Every other constructor delegates here with {@code null} for the parameters it does
+     * not carry, so the roughly ninety existing {@code new Menus(...)} call-sites compile unchanged and open exactly
+     * as before — with null registries an open skips the requirement gate and runs no open-actions, and with a null
+     * tracker it records no reopen target. Only production wiring, which has the fully populated registries and the
+     * shared tracker, passes them.
+     */
+    public Menus(
+            MenuRenderer renderer,
+            Scheduler scheduler,
+            ListSourceRegistry lists,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable ActionRegistry openActionRegistry,
+            @Nullable ConditionRegistry openConditionRegistry,
+            @Nullable LastMenu lastMenu) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.lists = Objects.requireNonNull(lists, "lists");
         this.editorRenderer = editorRenderer;
         this.openActionRegistry = openActionRegistry;
         this.openConditionRegistry = openConditionRegistry;
+        this.lastMenu = lastMenu;
     }
 
     /** Registers a parsed spec under its id; a feature does this once at wiring time. */
@@ -441,8 +469,22 @@ public final class Menus {
         holder.attach(inv);
         renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
         live.openInventory(inv);
+        rememberLastOpen(viewer, specId, subject, page, arguments);
         runOpenActions(spec, live, ctx);
         MenuRefresh.start(holder, scheduler, () -> reRender(holder));
+    }
+
+    /**
+     * Remember this open as the viewer's {@code /menu last} target — but only a subject-less one, a disk-loaded
+     * custom menu. A feature menu carries a live domain subject (a warp, a home owner) that must never be reopened
+     * blind, and it has its own command, so those are deliberately not recorded. An engine wired without a tracker
+     * (every list/spec-only fixture) records nothing, so an open there stays byte-identical to before this seam.
+     */
+    private void rememberLastOpen(
+            PlayerRef viewer, String specId, @Nullable Object subject, int page, Map<String, String> arguments) {
+        if (lastMenu != null && subject == null) {
+            lastMenu.record(viewer.uuid(), new LastMenu.LastOpen(specId, page, arguments));
+        }
     }
 
     /**
