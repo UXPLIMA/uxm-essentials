@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.geysermc.cumulus.form.CustomForm;
 import org.geysermc.cumulus.form.ModalForm;
 import org.geysermc.cumulus.form.SimpleForm;
+import org.geysermc.cumulus.util.FormImage;
 import org.geysermc.floodgate.api.FloodgateApi;
 import org.jspecify.annotations.Nullable;
 
@@ -32,7 +33,7 @@ final class CumulusBedrockScreen implements BedrockScreen {
 
     @Override
     public void sendSimpleForm(
-            Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect) {
+            Player player, String title, @Nullable String content, List<BedrockButton> buttons, IntConsumer onSelect) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(buttons, "buttons");
@@ -42,8 +43,8 @@ final class CumulusBedrockScreen implements BedrockScreen {
             if (content != null) {
                 builder.content(content);
             }
-            for (String button : buttons) {
-                builder.button(button);
+            for (BedrockButton button : buttons) {
+                addButton(builder, button);
             }
             builder.validResultHandler((form, response) -> {
                 int id = response.clickedButtonId();
@@ -54,6 +55,21 @@ final class CumulusBedrockScreen implements BedrockScreen {
             FloodgateApi.getInstance().sendForm(player.getUniqueId(), builder.build());
         } catch (RuntimeException notReady) {
             LOG.warning("event=bedrock_form_failed player=" + player.getName() + " reason=" + notReady.getMessage());
+        }
+    }
+
+    /**
+     * Add one button to a SimpleForm: with its icon as a {@link FormImage} — a {@link FormImage.Type#PATH} for a
+     * texture path, a {@link FormImage.Type#URL} for a web image the client fetches — when the button carries one,
+     * else a plain text button. This is the only place the engine's {@link BedrockImage} maps onto the Cumulus type.
+     */
+    private void addButton(SimpleForm.Builder builder, BedrockButton button) {
+        BedrockImage image = button.image();
+        if (image != null) {
+            FormImage.Type type = image.kind() == BedrockImage.Kind.PATH ? FormImage.Type.PATH : FormImage.Type.URL;
+            builder.button(button.text(), type, image.value());
+        } else {
+            builder.button(button.text());
         }
     }
 

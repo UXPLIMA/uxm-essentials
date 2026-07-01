@@ -27,8 +27,9 @@ class BedrockScreenTest {
         AtomicBoolean tapped = new AtomicBoolean(false);
         // NONE ignores every argument; the player is a bare mock it never touches, so no MockBukkit server is needed.
         Player player = mock(Player.class);
-        assertThatCode(() -> BedrockScreen.NONE.sendSimpleForm(
-                        player, "Menu", null, List.of("A", "B"), index -> tapped.set(true)))
+        List<BedrockButton> buttons = List.of(new BedrockButton("A", null), new BedrockButton("B", null));
+        assertThatCode(() ->
+                        BedrockScreen.NONE.sendSimpleForm(player, "Menu", null, buttons, index -> tapped.set(true)))
                 .doesNotThrowAnyException();
         assertThat(tapped)
                 .as("the no-op screen never invokes the select callback, since it sends no form to tap")

@@ -119,6 +119,23 @@ class ItemRendererTest {
     }
 
     @Test
+    void materialSpecExpandsAPlaceholderTokenToTheResolvedSpec() {
+        // The form renderer reads this to source a button icon; a %token% material must expand exactly as it does for
+        // the chest icon, so %icon% (registered to DIAMOND) resolves to the concrete spec the icon providers read.
+        assertThat(renderer.materialSpec(item("%icon%", new ItemDecor(1, Optional.empty(), false, List.of())), ctx))
+                .isEqualTo("DIAMOND");
+    }
+
+    @Test
+    void materialSpecPassesASkullSpecThroughVerbatim() {
+        // A literal skull spec has no %token%, so it reaches the icon path unchanged — the skull provider (and the
+        // Bedrock icon sourcing) both read this exact string.
+        assertThat(renderer.materialSpec(
+                        item("skull:Notch", new ItemDecor(1, Optional.empty(), false, List.of())), ctx))
+                .isEqualTo("skull:Notch");
+    }
+
+    @Test
     void buttonTextWithNoLoreIsJustTheName() {
         // No lore lines means the button label is byte-identical to the bare name it always was.
         assertThat(renderer.buttonText(itemNamedWithLore("Shop", List.of()), ctx))

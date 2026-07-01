@@ -16,7 +16,9 @@ import org.bukkit.inventory.InventoryView;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockImage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
@@ -120,8 +122,18 @@ class BedrockPaginationGoldenTest {
                 .isFalse();
         assertThat(screen.title).as("the form carries the menu's own title").isEqualTo("Warps");
         assertThat(screen.buttons)
+                .extracting(BedrockButton::text)
                 .as("static Home, then page 0's three warp entries, then Next — no Previous on the first page")
                 .containsExactly("Home", "w1", "w2", "w3", "gui.page.next");
+        assertThat(screen.buttons)
+                .extracting(BedrockButton::image)
+                .as("the material buttons carry texture-path icons; the form-native page control is text-only")
+                .containsExactly(
+                        new BedrockImage(BedrockImage.Kind.PATH, "textures/items/compass"),
+                        new BedrockImage(BedrockImage.Kind.PATH, "textures/items/ender_pearl"),
+                        new BedrockImage(BedrockImage.Kind.PATH, "textures/items/ender_pearl"),
+                        new BedrockImage(BedrockImage.Kind.PATH, "textures/items/ender_pearl"),
+                        null);
     }
 
     @Test
@@ -153,6 +165,7 @@ class BedrockPaginationGoldenTest {
 
         screen.tap(4);
         assertThat(screen.buttons)
+                .extracting(BedrockButton::text)
                 .as(
                         "the form is re-sent for page 1: static Home, the last two entries, then Previous — no Next on the last page")
                 .containsExactly("Home", "w4", "w5", "gui.page.previous");
@@ -164,6 +177,7 @@ class BedrockPaginationGoldenTest {
 
         screen.tap(3);
         assertThat(screen.buttons)
+                .extracting(BedrockButton::text)
                 .as("tapping Previous steps back to page 0's button list")
                 .containsExactly("Home", "w1", "w2", "w3", "gui.page.next");
     }
@@ -177,6 +191,7 @@ class BedrockPaginationGoldenTest {
         open(menus, "s");
 
         assertThat(screen.buttons)
+                .extracting(BedrockButton::text)
                 .as("no list item, so the form is just the static buttons — byte-identical to before this slice")
                 .containsExactly("Alpha", "Beta");
     }
@@ -209,12 +224,16 @@ class BedrockPaginationGoldenTest {
     /** Records the last form it was asked to send and hands the test the select callback to invoke a tap with. */
     private static final class FakeBedrockScreen implements BedrockScreen {
         private @Nullable String title;
-        private List<String> buttons = List.of();
+        private List<BedrockButton> buttons = List.of();
         private @Nullable IntConsumer onSelect;
 
         @Override
         public void sendSimpleForm(
-                Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect) {
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockButton> buttons,
+                IntConsumer onSelect) {
             this.title = title;
             this.buttons = List.copyOf(buttons);
             this.onSelect = onSelect;

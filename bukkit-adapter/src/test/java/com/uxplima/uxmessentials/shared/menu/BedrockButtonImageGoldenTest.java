@@ -10,7 +10,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
@@ -40,22 +39,21 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The proof that the grid→form degradation is clean: a Bedrock viewer's SimpleForm shows only the actionable buttons,
- * each labelled with the item's name and lore, and a tap maps into that filtered list — while the Java chest keeps
- * painting every item, decorative fillers included. A real {@link MenuSpecLoader} and {@link Menus} drive it; a fake
- * {@link BedrockDetector} / {@link BedrockScreen} stand in for the Cumulus/Floodgate SDK, a {@code compileOnly}
+ * The proof that a Bedrock form button carries an icon sourced from its item's material spec: a plain material becomes
+ * a Bedrock texture-path image, a {@code skull:} icon becomes an mc-heads avatar URL, and the icon is purely additive
+ * — a tap still routes into the item's own click actions. A real {@link MenuSpecLoader} and {@link Menus} drive it; a
+ * fake {@link BedrockDetector} / {@link BedrockScreen} stand in for the Cumulus/Floodgate SDK, a {@code compileOnly}
  * soft-depend absent from the test runtime.
  */
-class BedrockDegradationGoldenTest {
+class BedrockButtonImageGoldenTest {
 
-    // Slot 0 and slot 2 carry click actions; slot 1 is a blank pane with no click — a decorative filler.
+    // A material button (DIAMOND) and a player-head button (skull:Steve): the two icon shapes a form button sources.
     private static final String SHOP = """
             title = "Shop"
             rows = 1
             items {
-              shop { slot = 0, material = DIAMOND, name = "Shop", lore = ["Buy items"], click { left { click = ["record:shop"] } } }
-              pane { slot = 1, material = GRAY_STAINED_GLASS_PANE, name = "" }
-              info { slot = 2, material = BOOK, name = "Info", click { left { click = ["record:info"] } } }
+              buy  { slot = 0, material = DIAMOND, name = "Buy", click { left { click = ["record:buy"] } } }
+              head { slot = 1, material = "skull:Steve", name = "Steve", click { left { click = ["record:head"] } } }
             }
             """;
 
@@ -93,7 +91,7 @@ class BedrockDegradationGoldenTest {
     }
 
     @Test
-    void aBedrockFormShowsOnlyActionableButtonsLabelledWithNameAndLore() {
+    void aMaterialButtonCarriesATexturePathAndASkullButtonCarriesAnMcHeadsUrl() {
         detector.bedrock = true;
         Menus menus = engine();
         menus.registerSpec("shop", loader.parse(SHOP));
@@ -103,63 +101,35 @@ class BedrockDegradationGoldenTest {
         assertThat(menuOpen())
                 .as("a Bedrock viewer is redirected to a form, so no chest is opened")
                 .isFalse();
-        assertThat(screen.title).as("the form carries the menu's own title").isEqualTo("Shop");
         assertThat(screen.buttons)
                 .extracting(BedrockButton::text)
-                .as(
-                        "the blank pane has no click, so it is skipped; the two actionable items become buttons in slot order")
-                .containsExactly("Shop\nBuy items", "Info");
+                .as("both actionable items become buttons in slot order")
+                .containsExactly("Buy", "Steve");
         assertThat(screen.buttons)
                 .extracting(BedrockButton::image)
-                .as("each actionable material item carries a Bedrock texture-path icon")
+                .as("DIAMOND sources a Bedrock texture path; skull:Steve sources an mc-heads avatar URL")
                 .containsExactly(
                         new BedrockImage(BedrockImage.Kind.PATH, "textures/items/diamond"),
-                        new BedrockImage(BedrockImage.Kind.PATH, "textures/items/book"));
+                        new BedrockImage(BedrockImage.Kind.URL, "https://mc-heads.net/avatar/Steve"));
     }
 
     @Test
-    void tappingAButtonMapsIntoTheFilteredListSoTheFillerNeverShifts() {
+    void theIconIsAdditiveSoTappingStillRunsTheItemsActions() {
         detector.bedrock = true;
         Menus menus = engine();
         menus.registerSpec("shop", loader.parse(SHOP));
 
         open(menus, "shop");
 
-        screen.tap(0);
-        assertThat(captured.get())
-                .as("button 0 is Shop, the first actionable item")
-                .isEqualTo("shop");
-
         screen.tap(1);
         assertThat(captured.get())
-                .as("button 1 is Info — the filler at slot 1 was dropped, so Info moved up to index 1, not index 2")
-                .isEqualTo("info");
-    }
+                .as("tapping the skull button still runs its own click action — the image changed nothing else")
+                .isEqualTo("head");
 
-    @Test
-    void aJavaViewerKeepsEveryItemInTheChestFillerIncluded() {
-        detector.bedrock = false;
-        Menus menus = engine();
-        menus.registerSpec("shop", loader.parse(SHOP));
-
-        open(menus, "shop");
-
-        assertThat(menuOpen()).as("a Java viewer opens the chest as before").isTrue();
-        assertThat(screen.sent).as("no form is sent for a Java viewer").isFalse();
-
-        Inventory top = player.getOpenInventory().getTopInventory();
-        assertThat(top.getItem(0))
-                .extracting(item -> item == null ? null : item.getType())
-                .as("the actionable Shop icon is painted")
-                .isEqualTo(Material.DIAMOND);
-        assertThat(top.getItem(1))
-                .extracting(item -> item == null ? null : item.getType())
-                .as("the decorative filler the form dropped is still painted in the chest")
-                .isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
-        assertThat(top.getItem(2))
-                .extracting(item -> item == null ? null : item.getType())
-                .as("the actionable Info icon is painted")
-                .isEqualTo(Material.BOOK);
+        screen.tap(0);
+        assertThat(captured.get())
+                .as("tapping the material button runs its action")
+                .isEqualTo("buy");
     }
 
     /** The production-shaped façade: action registry threaded in, plus the fake detector and screen. */
@@ -189,8 +159,6 @@ class BedrockDegradationGoldenTest {
 
     /** Records the last form it was asked to send and hands the test the select callback to invoke a tap with. */
     private static final class FakeBedrockScreen implements BedrockScreen {
-        private boolean sent;
-        private @Nullable String title;
         private List<BedrockButton> buttons = List.of();
         private @Nullable IntConsumer onSelect;
 
@@ -201,8 +169,6 @@ class BedrockDegradationGoldenTest {
                 @Nullable String content,
                 List<BedrockButton> buttons,
                 IntConsumer onSelect) {
-            this.sent = true;
-            this.title = title;
             this.buttons = List.copyOf(buttons);
             this.onSelect = onSelect;
         }

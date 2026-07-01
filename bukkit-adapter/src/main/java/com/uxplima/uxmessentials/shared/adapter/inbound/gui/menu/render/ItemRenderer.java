@@ -151,6 +151,18 @@ public final class ItemRenderer {
     }
 
     /**
+     * The resolved icon material spec for {@code item} — the very string the icon providers and the material fallback
+     * read, with any {@code %token%} expanded ({@code %head%} → {@code skull:Notch}, or a literal {@code DIAMOND}). The
+     * hybrid Bedrock renderer reads this to source a form button's image, so a per-entry {@code skull:%player%} icon
+     * resolves against the entry's own context exactly as it would on a chest.
+     */
+    public String materialSpec(MenuItemSpec item, MenuContext ctx) {
+        Objects.requireNonNull(item, "item");
+        Objects.requireNonNull(ctx, "ctx");
+        return resolveMaterialSpec(item.material(), ctx);
+    }
+
+    /**
      * One text line resolved through the same {@code %token%}/{@code @key} path an icon name or lore line takes, then
      * flattened to plain text — a Bedrock form label is a flat string, so a button's name and lore reach it stripped
      * of all formatting.

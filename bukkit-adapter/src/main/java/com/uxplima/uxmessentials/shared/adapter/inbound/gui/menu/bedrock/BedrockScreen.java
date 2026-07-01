@@ -29,7 +29,11 @@ public interface BedrockScreen {
     BedrockScreen NONE = new BedrockScreen() {
         @Override
         public void sendSimpleForm(
-                Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect) {}
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockButton> buttons,
+                IntConsumer onSelect) {}
 
         @Override
         public void sendModalForm(
@@ -53,18 +57,19 @@ public interface BedrockScreen {
 
     /**
      * Send {@code player} a SimpleForm — a titled list of buttons — and route the tapped button back through
-     * {@code onSelect}. The {@code onSelect} callback is invoked with the zero-based index of the tapped button, an
-     * index into {@code buttons}; the caller is responsible for hopping onto the viewer's entity thread inside it,
-     * because a Cumulus response arrives off the main thread.
+     * {@code onSelect}. Each button carries a label and an optional icon ({@link BedrockButton}); the icon becomes the
+     * button's image when present, else the button is text-only. The {@code onSelect} callback is invoked with the
+     * zero-based index of the tapped button, an index into {@code buttons}; the caller is responsible for hopping onto
+     * the viewer's entity thread inside it, because a Cumulus response arrives off the main thread.
      *
      * @param player the Bedrock viewer to send the form to; never {@code null}
      * @param title the form title as plain text; never {@code null}
      * @param content optional body text shown above the buttons, or {@code null} for none
-     * @param buttons the button labels in order; never {@code null}
+     * @param buttons the buttons in order, each a label plus an optional icon; never {@code null}
      * @param onSelect invoked with the tapped button's index when the viewer taps one; never {@code null}
      */
     void sendSimpleForm(
-            Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect);
+            Player player, String title, @Nullable String content, List<BedrockButton> buttons, IntConsumer onSelect);
 
     /**
      * Send {@code player} a ModalForm — a titled window with exactly two buttons — running {@code onButton1} when the

@@ -19,6 +19,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -200,7 +201,11 @@ class BedrockModalFormGoldenTest {
 
         @Override
         public void sendSimpleForm(
-                Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect) {}
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockButton> buttons,
+                IntConsumer onSelect) {}
 
         @Override
         public void sendModalForm(

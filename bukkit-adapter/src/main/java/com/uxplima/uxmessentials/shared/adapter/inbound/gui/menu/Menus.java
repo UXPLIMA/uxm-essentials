@@ -21,7 +21,10 @@ import org.bukkit.inventory.InventoryHolder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockIcons;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockImage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
@@ -845,7 +848,7 @@ public final class Menus {
      */
     private void sendBedrockForm(Player live, MenuSpec spec, MenuContext ctx, Map<String, List<?>> resolved) {
         PlayerRef viewer = ctx.viewer();
-        List<String> buttons = new ArrayList<>();
+        List<BedrockButton> buttons = new ArrayList<>();
         List<Runnable> handlers = new ArrayList<>();
         appendStaticButtons(spec, ctx, viewer, buttons, handlers);
         int pageCount = appendListButtons(spec, ctx, viewer, resolved, buttons, handlers);
@@ -857,13 +860,23 @@ public final class Menus {
         });
     }
 
-    /** Append one button per visible actionable static item, each tapping into that item's own left-click actions. */
+    /**
+     * Append one button per visible actionable static item, each tapping into that item's own left-click actions. The
+     * button's icon is sourced from the item's own resolved material spec (a material → a Bedrock texture path, a
+     * {@code skull:} → an mc-heads avatar URL), so a form button carries the same face the chest icon would.
+     */
     private void appendStaticButtons(
-            MenuSpec spec, MenuContext ctx, PlayerRef viewer, List<String> buttons, List<Runnable> handlers) {
+            MenuSpec spec, MenuContext ctx, PlayerRef viewer, List<BedrockButton> buttons, List<Runnable> handlers) {
         for (MenuItemSpec item : renderer.visibleStaticItemsInSlotOrder(spec, ctx)) {
-            buttons.add(renderer.buttonText(item, ctx));
+            buttons.add(formButton(item, ctx, viewer));
             handlers.add(() -> scheduler.onEntity(viewer, () -> runFormActions(ctx, item)));
         }
+    }
+
+    /** A form button for {@code item} rendered against {@code ctx}: its label plus an icon sourced from its spec. */
+    private BedrockButton formButton(MenuItemSpec item, MenuContext ctx, PlayerRef viewer) {
+        BedrockImage image = BedrockIcons.forMaterialSpec(renderer.materialSpec(item, ctx), viewer.uuid());
+        return new BedrockButton(renderer.buttonText(item, ctx), image);
     }
 
     /**
@@ -878,7 +891,7 @@ public final class Menus {
             MenuContext ctx,
             PlayerRef viewer,
             Map<String, List<?>> resolved,
-            List<String> buttons,
+            List<BedrockButton> buttons,
             List<Runnable> handlers) {
         Optional<MenuItemSpec> listItem = firstListItem(spec);
         if (listItem.isEmpty()) {
@@ -892,7 +905,7 @@ public final class Menus {
                 (List<Object>) entries, listItem.get().slots().slots(), ctx.page());
         for (Map.Entry<Integer, Object> placement : page.placements()) {
             MenuContext entryCtx = ctx.withEntry(placement.getValue());
-            buttons.add(renderer.buttonText(template, entryCtx));
+            buttons.add(formButton(template, entryCtx, viewer));
             handlers.add(() -> scheduler.onEntity(viewer, () -> runFormActions(entryCtx, template)));
         }
         return page.pageCount();
@@ -900,22 +913,23 @@ public final class Menus {
 
     /**
      * Append the form-native Previous/Next buttons a paged list needs: a Previous when the viewer is past page zero,
-     * a Next when a further page exists, each re-sending the form one page over. A single-page menu (a static-only menu
-     * or a list that fits one page) adds neither, so its form is byte-identical to before this slice.
+     * a Next when a further page exists, each re-sending the form one page over. These are text-only (no icon — a page
+     * control needs none). A single-page menu (a static-only menu or a list that fits one page) adds neither, so its
+     * form is byte-identical to before this slice.
      */
     private void appendPageButtons(
             MenuSpec spec,
             MenuContext ctx,
             PlayerRef viewer,
             int pageCount,
-            List<String> buttons,
+            List<BedrockButton> buttons,
             List<Runnable> handlers) {
         if (ctx.page() > 0) {
-            buttons.add(renderer.plainMessage(viewer, GuiMessageKey.PAGE_PREVIOUS));
+            buttons.add(new BedrockButton(renderer.plainMessage(viewer, GuiMessageKey.PAGE_PREVIOUS), null));
             handlers.add(() -> resendBedrockPage(viewer, spec, ctx, ctx.page() - 1));
         }
         if (ctx.page() + 1 < pageCount) {
-            buttons.add(renderer.plainMessage(viewer, GuiMessageKey.PAGE_NEXT));
+            buttons.add(new BedrockButton(renderer.plainMessage(viewer, GuiMessageKey.PAGE_NEXT), null));
             handlers.add(() -> resendBedrockPage(viewer, spec, ctx, ctx.page() + 1));
         }
     }

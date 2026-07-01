@@ -16,7 +16,9 @@ import org.bukkit.inventory.InventoryView;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockImage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
@@ -110,8 +112,15 @@ class BedrockSimpleFormGoldenTest {
                 .as("the form carries the menu's own title as plain text")
                 .isEqualTo("My Menu");
         assertThat(screen.buttons)
+                .extracting(BedrockButton::text)
                 .as("one button per visible static item, in slot order, labelled with the item name")
                 .containsExactly("Alpha", "Beta");
+        assertThat(screen.buttons)
+                .extracting(BedrockButton::image)
+                .as("each static material item carries a Bedrock texture-path icon")
+                .containsExactly(
+                        new BedrockImage(BedrockImage.Kind.PATH, "textures/items/diamond"),
+                        new BedrockImage(BedrockImage.Kind.PATH, "textures/items/emerald"));
 
         screen.tap(1);
 
@@ -179,12 +188,16 @@ class BedrockSimpleFormGoldenTest {
     private static final class FakeBedrockScreen implements BedrockScreen {
         private boolean sent;
         private @Nullable String title;
-        private List<String> buttons = List.of();
+        private List<BedrockButton> buttons = List.of();
         private @Nullable IntConsumer onSelect;
 
         @Override
         public void sendSimpleForm(
-                Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect) {
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockButton> buttons,
+                IntConsumer onSelect) {
             this.sent = true;
             this.title = title;
             this.buttons = List.copyOf(buttons);

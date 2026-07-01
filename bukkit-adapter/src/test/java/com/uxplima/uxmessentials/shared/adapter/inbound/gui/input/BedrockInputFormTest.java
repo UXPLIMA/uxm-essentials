@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
@@ -179,7 +180,11 @@ class BedrockInputFormTest {
 
         @Override
         public void sendSimpleForm(
-                Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect) {}
+                Player player,
+                String title,
+                @Nullable String content,
+                List<BedrockButton> buttons,
+                IntConsumer onSelect) {}
 
         @Override
         public void sendModalForm(

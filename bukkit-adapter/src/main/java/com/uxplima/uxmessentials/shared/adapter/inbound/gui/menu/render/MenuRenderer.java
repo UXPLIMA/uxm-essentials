@@ -88,6 +88,18 @@ public final class MenuRenderer {
     }
 
     /**
+     * The resolved icon material spec for {@code item} — a material name or a {@code skull:}/{@code head:} value with
+     * any {@code %token%} expanded — the hybrid form renderer reads to source a button's image. Delegates to the item
+     * renderer, which owns the material resolution, so a form button sources its icon from the exact spec a chest icon
+     * renders from.
+     */
+    public String materialSpec(MenuItemSpec item, MenuContext ctx) {
+        Objects.requireNonNull(item, "item");
+        Objects.requireNonNull(ctx, "ctx");
+        return itemRenderer.materialSpec(item, ctx);
+    }
+
+    /**
      * A shared {@link MessageKey} resolved for {@code viewer} and flattened to plain text — a label (a confirm
      * window's yes/no) the hybrid form renderer needs as a flat string where the chest paints wordless wool.
      * Delegates to the item renderer, which owns the catalog lookup, so the label honours the viewer's locale exactly
