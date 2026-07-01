@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
@@ -26,6 +27,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
@@ -345,11 +347,37 @@ public final class MenuListener implements Listener {
         }
         RequirementSpec requirement = rs.item().click().requirementFor(kind);
         if (!evaluateRequirements(holder, base, kind, requirement)) {
-            runEach(holder, base, kind, requirement.deny());
+            Optional<ClickBranch> elseChain = rs.item().click().elseFor(kind);
+            if (elseChain.isPresent()) {
+                evaluateBranch(holder, base, kind, elseChain.get());
+            } else {
+                runEach(holder, base, kind, requirement.deny());
+            }
             return;
         }
         for (Ref ref : rs.item().click().actionsFor(kind)) {
             runRef(holder, base, kind, ref);
+        }
+    }
+
+    /**
+     * Walk one node of a gesture's else-chain: the fallback ladder tried once its main requirement block has already
+     * failed. The rule mirrors an if / else-if / else ladder. If this branch's own requirement passes, its actions run
+     * and the walk stops — the first satisfied branch wins. Otherwise the walk continues to the next {@code orElse}
+     * branch; when there is none, this branch's own block {@code deny} runs, so the tail of a ladder still has a deny
+     * arm. A terminal else parses with {@link RequirementSpec#NONE}, which always passes, so its actions run
+     * unconditionally as the "otherwise" arm. Each branch's own per-requirement success/deny actions fire inside
+     * {@link #evaluateRequirements} exactly as a top-level block's do, and every action routes through {@link #runEach}
+     * so modifiers and the viewer's-entity-thread hop are honoured. The recursion depth is bounded by the config's
+     * nesting, which the loader builds from a finite document.
+     */
+    private void evaluateBranch(MenuHolder holder, MenuContext base, ClickKind kind, ClickBranch branch) {
+        if (evaluateRequirements(holder, base, kind, branch.requirement())) {
+            runEach(holder, base, kind, branch.actions());
+        } else if (branch.orElse().isPresent()) {
+            evaluateBranch(holder, base, kind, branch.orElse().get());
+        } else {
+            runEach(holder, base, kind, branch.requirement().deny());
         }
     }
 

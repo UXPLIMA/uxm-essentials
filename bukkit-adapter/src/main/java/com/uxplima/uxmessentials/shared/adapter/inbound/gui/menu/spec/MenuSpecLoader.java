@@ -162,38 +162,70 @@ public final class MenuSpecLoader {
      * per-requirement structure; {@code minimum} defaults to {@code 0} (all must pass); {@code stop-at-success} short-
      * circuits once the minimum is met; block-level {@code deny} is the action list run when the block fails. A bare
      * list yields {@link RequirementSpec#NONE}, so it behaves exactly as it did before requirement blocks existed.
+     *
+     * <p>A gesture map may also carry an {@code else} block — a fallback branch tried when the main requirement fails:
+     * {@code else = { requirements = [...], click|actions|do = [...], minimum, stop-at-success, deny = [...], else = {
+     * ... } }}. Its requirements gate it exactly like the main block, its actions run when that gate passes, and its own
+     * nested {@code else} is the next branch tried if it fails — an if / else-if / else ladder. A terminal {@code else}
+     * with no {@code requirements} always passes, so it is the unconditional "otherwise" arm.
      */
     private ClickSpec parseClick(ConfigurationNode node) {
         Map<ClickKind, List<Ref>> actions = new EnumMap<>(ClickKind.class);
         Map<ClickKind, RequirementSpec> requirements = new EnumMap<>(ClickKind.class);
+        Map<ClickKind, ClickBranch> orElse = new EnumMap<>(ClickKind.class);
         if (!node.virtual() && !node.isNull()) {
             for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                     node.childrenMap().entrySet()) {
                 ClickKind kind = CLICK_KEYS.get(String.valueOf(entry.getKey()).toLowerCase(java.util.Locale.ROOT));
                 if (kind != null) {
-                    parseClickEntry(entry.getValue(), kind, actions, requirements);
+                    parseClickEntry(entry.getValue(), kind, actions, requirements, orElse);
                 }
             }
         }
         // v1 keeps per-gesture conditions empty; visibility is gated by the item-level `view` list instead.
-        return new ClickSpec(actions, Map.of(), requirements);
+        return new ClickSpec(actions, Map.of(), requirements, orElse);
     }
 
-    /** One gesture's value: a map carries actions plus a requirement block, a bare list carries actions only. */
+    /**
+     * One gesture's value: a map carries actions, a requirement block, and an optional {@code else} fallback chain; a
+     * bare list carries actions only. The {@code else} branch, when present, becomes the head of the gesture's
+     * else-chain, tried at runtime when the main requirement block fails.
+     */
     private void parseClickEntry(
             ConfigurationNode value,
             ClickKind kind,
             Map<ClickKind, List<Ref>> actions,
-            Map<ClickKind, RequirementSpec> requirements) {
+            Map<ClickKind, RequirementSpec> requirements,
+            Map<ClickKind, ClickBranch> orElse) {
         if (value.isMap()) {
             actions.put(kind, refs(clickActionsNode(value)));
             RequirementSpec block = parseRequirementSpec(value);
             if (block != RequirementSpec.NONE) {
                 requirements.put(kind, block);
             }
+            parseElseBranch(value.node("else")).ifPresent(branch -> orElse.put(kind, branch));
         } else {
             actions.put(kind, refs(value));
         }
+    }
+
+    /**
+     * Parse an {@code else} node into a {@link ClickBranch}, recursing on its own nested {@code else} so a fallback
+     * ladder of any depth builds bottom-up. A branch reads its gate as a full requirement block — the same {@code
+     * requirements}/{@code minimum}/{@code deny}/{@code stop-at-success} grammar the main block uses, via {@link
+     * #parseRequirementSpec} — its actions from {@code click}/{@code actions}/{@code do}, and its {@code orElse} from
+     * the next {@code else}. A branch that names no requirements resolves to {@link RequirementSpec#NONE}, which always
+     * passes: that is the terminal else, the unconditional "otherwise" arm. A missing or non-map {@code else} node
+     * yields no branch, so a plain gesture (and the tail of a chain) simply has no fallback.
+     */
+    private Optional<ClickBranch> parseElseBranch(ConfigurationNode elseNode) {
+        if (elseNode.virtual() || elseNode.isNull() || !elseNode.isMap()) {
+            return Optional.empty();
+        }
+        return Optional.of(new ClickBranch(
+                parseRequirementSpec(elseNode),
+                refs(clickActionsNode(elseNode)),
+                parseElseBranch(elseNode.node("else"))));
     }
 
     /** The action list of a map-form gesture: the first present of {@code click}, {@code actions}, or {@code do}. */
