@@ -93,6 +93,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuLis
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.InfoPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources;
@@ -322,6 +323,11 @@ public final class PluginModule {
         // condition fails closed. The general numeric comparators/arithmetic are already reachable through expr.
         NumericSpatialConditions.register(menuBindings, kernel.log());
         MenuVocabulary.registerPlaceholders(menuBindings);
+        // The built-in time/inventory/statistic placeholder pack (%server_date%, %world_time%, %empty_slots%,
+        // %held_item%, %stat_<NAME>%, ...) every custom menu can read the viewer's live state with. Each read is the
+        // viewer's own entity/world state resolved on the render thread that already owns it, so no scheduler hop is
+        // needed; the stat_ prefix fallback sits beside the disjoint papi_/data_ families on the shared registry.
+        InfoPlaceholders.register(menuBindings);
         // The two ready-made live roster sources (online-players, worlds) every custom menu can page with no code.
         // They reuse the engine's own Scheduler so a source can hop onto the global region thread to snapshot live
         // server state before serving it back to the off-tick list resolver — the entity/world API is off-limits on
