@@ -799,6 +799,7 @@ public final class PluginModule {
         // loader run plus the command. The console-dispatch flag is read once in PluginModule and threaded into the
         // engine's action vocabulary there, not here.
         CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
+                plugin,
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath(),
@@ -806,6 +807,7 @@ public final class PluginModule {
                 ctx.kernel().log(),
                 ctx.kernel().messages());
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
     }
 
     private static void wireTeleport(

@@ -34,6 +34,9 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  */
 public final class CustomMenuLoader {
 
+    /** The reserved opener-item config file that shares the menus directory but is not a menu spec. */
+    private static final String RESERVED_OPENERS_FILE = "openers.conf";
+
     private final MenuSpecLoader specLoader;
     private final MenuBindings bindings;
     private final Menus menus;
@@ -98,10 +101,15 @@ public final class CustomMenuLoader {
         return new LoadResult(loaded, skipped, openCommands);
     }
 
-    /** The {@code .conf} files directly under the menus directory, in a stable order. */
+    /**
+     * The {@code .conf} files directly under the menus directory that are menu specs, in a stable order.
+     * {@code openers.conf} is reserved for the opener-item config ({@code OpenerLoader}) and lives alongside the
+     * menus, so it is excluded here — parsing it as a menu spec would only skip it with a spurious warning.
+     */
     private static List<Path> confFiles(Stream<Path> entries) {
         return entries.filter(Files::isRegularFile)
                 .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".conf"))
+                .filter(p -> !p.getFileName().toString().equalsIgnoreCase(RESERVED_OPENERS_FILE))
                 .sorted()
                 .toList();
     }

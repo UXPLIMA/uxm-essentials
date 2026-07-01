@@ -4,11 +4,19 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
+
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuOpenCommand;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerJoinListener;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.OpenerItems;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.OpenerSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -20,15 +28,20 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Constructs the custommenus context's adapters over the shared menu engine: a {@link CustomMenuLoader} that reads
- * the operator's {@code menus/*.conf} into {@link Menus}, run once on enable, the {@code /menu} command, and one
- * {@link MenuOpenCommand} per menu that declared its own {@code command {}} block ({@code /shop}, {@code /store}).
- * This is the one place the context is wired — nothing else news up its classes.
+ * the operator's {@code menus/*.conf} into {@link Menus}, run once on enable, the {@code /menu} command, one
+ * {@link MenuOpenCommand} per menu that declared its own {@code command {}} block ({@code /shop}, {@code /store}),
+ * and the opener-item listeners loaded from {@code menus/openers.conf}. This is the one place the context is wired —
+ * nothing else news up its classes.
  *
  * <p>The loaded menu names are held in an {@link AtomicReference} the {@code /menu list} and tab-completion read and
  * {@code /menu reload} swaps atomically: a reload re-runs the loader (re-registering specs into the engine,
  * overwriting the previous ones) and publishes the fresh name set in one assignment, so a reader sees either the old
- * or the new list, never a half-applied one. A disabled module never reaches this wiring, so it loads no menus and
- * registers no command.
+ * or the new list, never a half-applied one. The parsed openers are held in a second {@link AtomicReference} swapped
+ * the same way, so a {@code /menu reload} also re-reads {@code openers.conf} — the join listener reads the fresh list
+ * on the next join, and the interact listener reads the fresh menu-name set. (Open commands are the one exception:
+ * Brigadier only registers at startup, so a reload cannot add or drop a {@code /shop}-style command — that needs a
+ * restart, as in DeluxeMenus.) A disabled module never reaches this wiring, so it loads no menus and registers
+ * nothing.
  */
 @NullMarked
 public final class CustomMenusWiring {
@@ -36,7 +49,14 @@ public final class CustomMenusWiring {
     private CustomMenusWiring() {}
 
     public static Wired wire(
-            Menus menus, MenuBindings bindings, Path dataFolder, LastMenu lastMenu, Logger log, Messages messages) {
+            Plugin plugin,
+            Menus menus,
+            MenuBindings bindings,
+            Path dataFolder,
+            LastMenu lastMenu,
+            Logger log,
+            Messages messages) {
+        Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
@@ -45,14 +65,21 @@ public final class CustomMenusWiring {
         Objects.requireNonNull(messages, "messages");
 
         CustomMenuLoader loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, menus, log);
+        OpenerLoader openerLoader = new OpenerLoader(log);
         Path menusDir = dataFolder.resolve("menus");
+        Path openersFile = menusDir.resolve("openers.conf");
+
         CustomMenuLoader.LoadResult first = loader.loadFrom(menusDir);
         AtomicReference<List<String>> names = new AtomicReference<>(first.loadedNames());
+        AtomicReference<List<OpenerSpec>> openers =
+                new AtomicReference<>(openerLoader.loadFrom(openersFile, Set.copyOf(first.loadedNames())));
 
         Supplier<List<String>> nameSupplier = names::get;
+        Supplier<List<OpenerSpec>> openerSupplier = openers::get;
         Supplier<CustomMenuLoader.LoadResult> reload = () -> {
             CustomMenuLoader.LoadResult result = loader.loadFrom(menusDir);
             names.set(result.loadedNames());
+            openers.set(openerLoader.loadFrom(openersFile, Set.copyOf(result.loadedNames())));
             return result;
         };
         MenuCommand command = new MenuCommand(menus, nameSupplier, reload, lastMenu, messages);
@@ -67,18 +94,26 @@ public final class CustomMenusWiring {
         commands.add(command);
         first.openCommands()
                 .forEach((menuId, spec) -> commands.add(new MenuOpenCommand(menus, menuId, spec, messages)));
-        return new Wired(commands, nameSupplier);
+
+        OpenerItems openerItems = new OpenerItems(plugin);
+        List<Listener> listeners = List.of(
+                new MenuOpenerInteractListener(menus, nameSupplier, openerItems),
+                new MenuOpenerJoinListener(openerSupplier, openerItems));
+        return new Wired(commands, nameSupplier, listeners);
     }
 
     /**
-     * The wired custommenus adapters handed back to bootstrap: the {@code /menu} command and the loaded-menu-names
-     * supplier (so a later consumer — e.g. a management hub entry — can read the current set). There is no stop hook:
-     * the loader registers specs into the shared engine, which the bootstrap tears down centrally on disable.
+     * The wired custommenus adapters handed back to bootstrap: the {@code /menu} command (plus any open commands),
+     * the loaded-menu-names supplier (so a later consumer — e.g. a management hub entry — can read the current set),
+     * and the two opener-item listeners. There is no stop hook: the loader registers specs into the shared engine,
+     * which the bootstrap tears down centrally on disable.
      */
-    public record Wired(List<CommandRegistration> commands, Supplier<List<String>> menuNames) {
+    public record Wired(
+            List<CommandRegistration> commands, Supplier<List<String>> menuNames, List<Listener> listeners) {
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(menuNames, "menuNames");
+            listeners = List.copyOf(listeners);
         }
     }
 }

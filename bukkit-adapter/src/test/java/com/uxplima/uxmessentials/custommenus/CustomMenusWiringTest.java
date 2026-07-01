@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 
+import org.bukkit.plugin.Plugin;
+
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -27,8 +29,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 /**
  * Wiring-level smoke for the custommenus context: building the wiring over the real generic menu vocabulary loads the
@@ -38,6 +43,19 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class CustomMenusWiringTest {
 
+    private Plugin plugin;
+
+    @BeforeEach
+    void setUp() {
+        MockBukkit.mock();
+        plugin = MockBukkit.createMockPlugin();
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
+    }
+
     @Test
     void wiringLoadsOperatorMenusAndRegistersTheCommand(@TempDir Path dataFolder) throws Exception {
         Path menus = Files.createDirectories(dataFolder.resolve("menus"));
@@ -45,11 +63,12 @@ class CustomMenusWiringTest {
         Files.writeString(menus.resolve("hub.conf"), "rows = 1\nitems { x { slot = 0, material = STONE } }\n");
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.commands().getFirst().build().getLiteral()).isEqualTo("menu");
         assertThat(wired.menuNames().get()).contains("example", "hub");
+        assertThat(wired.listeners()).hasSize(2);
     }
 
     @Test
@@ -62,7 +81,7 @@ class CustomMenusWiringTest {
                 """);
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
 
         assertThat(wired.commands().stream().map(c -> c.build().getLiteral())).contains("menu", "shop");
         assertThat(wired.commands().stream()
@@ -74,12 +93,32 @@ class CustomMenusWiringTest {
     }
 
     @Test
-    void anEmptyMenusFolderLoadsNothingButStillRegistersTheCommand(@TempDir Path dataFolder) {
+    void anEmptyMenusFolderLoadsNothingButStillRegistersTheCommandAndListeners(@TempDir Path dataFolder) {
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.menuNames().get()).isEmpty();
+        assertThat(wired.listeners()).hasSize(2);
+    }
+
+    @Test
+    void anOpenersConfFileLivingBesideTheMenusIsNotLoadedAsAMenu(@TempDir Path dataFolder) throws Exception {
+        Path menus = Files.createDirectories(dataFolder.resolve("menus"));
+        Files.writeString(menus.resolve("hub.conf"), "rows = 1\nitems { x { slot = 0, material = STONE } }\n");
+        Files.writeString(menus.resolve("openers.conf"), """
+                openers = [
+                  { menu = "hub", slot = 4, give-on-join = "first", item { material = "COMPASS", name = "<gold>Menu" } }
+                ]
+                """);
+
+        CustomMenusWiring.Wired wired =
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, new LastMenu(), log(), messages());
+
+        // openers.conf is reserved for opener config: it must not appear as a loaded menu name, and it arms the
+        // two opener listeners rather than being skipped as a malformed menu spec.
+        assertThat(wired.menuNames().get()).containsExactly("hub");
+        assertThat(wired.listeners()).hasSize(2);
     }
 
     /** The generic vocabulary registry exactly as PluginModule installs it at startup (console dispatch off). */
