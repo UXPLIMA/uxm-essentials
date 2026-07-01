@@ -89,6 +89,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
@@ -153,7 +154,9 @@ import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
+import com.uxplima.uxmlib.advancement.Toasts;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -262,6 +265,12 @@ public final class PluginModule {
         MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions(), kernel.log());
         MenuVocabulary.registerPlaceholders(menuBindings);
+        // The messaging slice of the vocabulary (message-to/whisper, broadcast(+json/legacy), action-bar, title,
+        // toast, log) registers alongside the generic actions; its own registration entry point keeps the
+        // MenuVocabulary signature untouched. The toast action pops through uxmLib's advancement-toast service,
+        // which routes its cleanup through the library's Folia-aware scheduler.
+        Toasts menuToasts = new Toasts(plugin, new PaperScheduler(plugin));
+        MessagingActions.register(menuBindings, menuToasts, kernel.log());
         PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {
             menuListener.uninstall();
