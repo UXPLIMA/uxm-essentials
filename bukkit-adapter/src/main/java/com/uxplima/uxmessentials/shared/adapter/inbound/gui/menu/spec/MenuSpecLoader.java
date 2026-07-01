@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -26,6 +27,9 @@ public final class MenuSpecLoader {
 
     /** Maps the HOCON click keys (both snake and kebab spellings) onto the {@link ClickKind} enum. */
     private static final Map<String, ClickKind> CLICK_KEYS = clickKeys();
+
+    /** Operator-facing diagnostics for a spec that parses but has a skippable defect (a modifier map with no action). */
+    private static final Logger LOG = Logger.getLogger(MenuSpecLoader.class.getName());
 
     /** Parse a spec held in memory. Primarily a test seam; production loads go through {@link #load(Path)}. */
     public MenuSpec parse(String hocon) {
@@ -273,12 +277,69 @@ public final class MenuSpecLoader {
         return Optional.of(new ListSpec(source, parseItem(node.node("template"), rows)));
     }
 
+    /**
+     * A ref list, where every entry is either a compact scalar token (the historic form, unchanged) or a map
+     * carrying an action token plus per-action modifiers. A list of scalars round-trips exactly as before; a map
+     * entry reads its {@code do}/{@code action} token and layers {@code delay}/{@code chance}/{@code deny} on top.
+     */
     private List<Ref> refs(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return List.of();
+        }
         List<Ref> refs = new ArrayList<>();
-        for (String raw : strings(node)) {
-            refs.add(Ref.parse(raw));
+        if (node.isList()) {
+            for (ConfigurationNode child : node.childrenList()) {
+                refEntry(child).ifPresent(refs::add);
+            }
+        } else {
+            refEntry(node).ifPresent(refs::add);
         }
         return refs;
+    }
+
+    /** One ref-list entry: a map form goes through {@link #modifiedRef}, otherwise it is a plain scalar token. */
+    private Optional<Ref> refEntry(ConfigurationNode entry) {
+        if (entry.isMap()) {
+            return modifiedRef(entry);
+        }
+        String raw = entry.getString();
+        return raw == null ? Optional.empty() : Optional.of(Ref.parse(raw));
+    }
+
+    /**
+     * A map-form action entry: {@code do} (or its {@code action} alias) is the action token, and the optional
+     * {@code delay} (ticks), {@code chance} (percent), and {@code deny} (a fallback action token) modify it. An
+     * entry with no action token is a config mistake — logged and skipped so one bad button does not abort the menu.
+     */
+    private Optional<Ref> modifiedRef(ConfigurationNode entry) {
+        String token = actionToken(entry);
+        if (token == null || token.isBlank()) {
+            LOG.warning("skipping menu action map without a do/action token at " + entry.path());
+            return Optional.empty();
+        }
+        Ref base = Ref.parse(token);
+        int delay = entry.node("delay").getInt(0);
+        double chance = entry.node("chance").getDouble(100.0);
+        return Optional.of(base.withModifiers(delay, chance, denyRef(entry)));
+    }
+
+    /** The action token of a map entry: {@code do} takes precedence, then its {@code action} alias, else none. */
+    private static @Nullable String actionToken(ConfigurationNode entry) {
+        ConfigurationNode explicit = entry.node("do");
+        if (!explicit.virtual() && !explicit.isNull()) {
+            return explicit.getString();
+        }
+        return entry.node("action").getString();
+    }
+
+    /** The deny fallback of a map entry: a single scalar action token, or {@code null} when the key is absent. */
+    private static @Nullable Ref denyRef(ConfigurationNode entry) {
+        ConfigurationNode deny = entry.node("deny");
+        if (deny.virtual() || deny.isNull()) {
+            return null;
+        }
+        String raw = deny.getString();
+        return raw == null || raw.isBlank() ? null : Ref.parse(raw);
     }
 
     private List<String> strings(ConfigurationNode node) {

@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
@@ -340,7 +342,7 @@ public final class MenuListener implements Listener {
             return;
         }
         for (Ref ref : rs.item().click().actionsFor(kind)) {
-            actions.get(ref.id()).ifPresent(handler -> runAction(holder, base, kind, ref, handler));
+            runRef(holder, base, kind, ref);
         }
     }
 
@@ -369,8 +371,42 @@ public final class MenuListener implements Listener {
         return all;
     }
 
+    /**
+     * Run one bound action ref, applying its per-action modifiers. A failed chance roll denies the action: its
+     * {@code deny} fallback (if any) runs through this same path and the main action is skipped. An action that
+     * survives the roll is dispatched now, or after its delay — waited off-tick, then hopped back to the viewer's
+     * entity thread. A ref with no modifiers (fires immediately, always, no fallback) takes the direct dispatch and
+     * behaves exactly as the action loop did before modifiers existed.
+     */
+    private void runRef(MenuHolder holder, MenuContext base, ClickKind kind, Ref ref) {
+        if (rolledDenied(ref)) {
+            ref.deny().ifPresent(fallback -> runRef(holder, base, kind, fallback));
+            return;
+        }
+        actions.get(ref.id()).ifPresent(handler -> {
+            if (ref.delayTicks() > 0) {
+                scheduler.asyncAfter(
+                        Duration.ofMillis(ref.delayTicks() * 50L), () -> dispatch(holder, base, kind, ref, handler));
+            } else {
+                dispatch(holder, base, kind, ref, handler);
+            }
+        });
+    }
+
+    /**
+     * Whether {@code ref}'s chance roll denied it. A full-chance ref never rolls (so it never denies); otherwise a
+     * single {@code [0, 100)} draw decides, delegating the boundary to the pure {@link Ref#deniedAt} so the runtime
+     * keeps no probability logic of its own.
+     */
+    private boolean rolledDenied(Ref ref) {
+        if (ref.chance() >= 100.0) {
+            return false;
+        }
+        return ref.deniedAt(ThreadLocalRandom.current().nextDouble(100.0));
+    }
+
     /** Hop to the viewer's entity thread, re-resolve the live player, and run one bound action there. */
-    private void runAction(
+    private void dispatch(
             MenuHolder holder, MenuContext base, ClickKind kind, Ref ref, Consumer<MenuActionContext> handler) {
         scheduler.onEntity(holder.ctx().viewer(), () -> {
             Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());

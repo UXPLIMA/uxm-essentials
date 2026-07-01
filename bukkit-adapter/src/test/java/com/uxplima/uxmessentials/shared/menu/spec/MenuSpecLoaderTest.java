@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.shared.menu.spec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
@@ -161,6 +163,73 @@ class MenuSpecLoaderTest {
                         java.util.Optional.of(4), java.util.Optional.of(2.4), java.util.Optional.of(true)));
         assertThat(components.tool())
                 .contains(new DataComponents.ToolSpec(java.util.Optional.of(1.0), java.util.Optional.of(2)));
+    }
+
+    private static final String MODIFIERS = """
+            rows = 1
+            items {
+              b {
+                slot = 0
+                material = DIAMOND
+                click {
+                  left = [
+                    { do = "command:eco give 100", delay = 20, chance = 25, deny = "message:none" }
+                    "sound:UI_BUTTON_CLICK"
+                  ]
+                }
+              }
+            }
+            """;
+
+    @Test
+    void parsesTheMapFormWithDelayChanceAndDenyAlongsidePlainScalars() {
+        List<Ref> actions =
+                new MenuSpecLoader().parse(MODIFIERS).items().get("b").click().actionsFor(ClickKind.LEFT);
+
+        assertThat(actions).hasSize(2);
+
+        Ref first = actions.get(0);
+        assertThat(first.id()).isEqualTo("command");
+        assertThat(first.value()).isEqualTo("eco give 100");
+        assertThat(first.delayTicks()).isEqualTo(20);
+        assertThat(first.chance()).isEqualTo(25.0);
+        assertThat(first.deny()).map(Ref::id).contains("message");
+
+        // The scalar entry parses exactly as before — no modifiers.
+        Ref second = actions.get(1);
+        assertThat(second.id()).isEqualTo("sound");
+        assertThat(second.delayTicks()).isZero();
+        assertThat(second.chance()).isEqualTo(100.0);
+        assertThat(second.deny()).isEmpty();
+    }
+
+    @Test
+    void mapEntryWithoutAnActionTokenIsSkipped() {
+        List<Ref> actions = new MenuSpecLoader()
+                .parse("rows=1\nitems{ b{ slot=0, click{ left = [ { chance = 50 }, \"close\" ] } } }")
+                .items()
+                .get("b")
+                .click()
+                .actionsFor(ClickKind.LEFT);
+
+        assertThat(actions).extracting(Ref::id).containsExactly("close");
+    }
+
+    @Test
+    void aPlainStringListStillParsesUnchanged() {
+        List<Ref> actions = new MenuSpecLoader()
+                .parse("rows=1\nitems{ b{ slot=0, click{ left = [\"give\", \"close\"] } } }")
+                .items()
+                .get("b")
+                .click()
+                .actionsFor(ClickKind.LEFT);
+
+        assertThat(actions).extracting(Ref::id).containsExactly("give", "close");
+        assertThat(actions).allSatisfy(ref -> {
+            assertThat(ref.delayTicks()).isZero();
+            assertThat(ref.chance()).isEqualTo(100.0);
+            assertThat(ref.deny()).isEmpty();
+        });
     }
 
     @Test
