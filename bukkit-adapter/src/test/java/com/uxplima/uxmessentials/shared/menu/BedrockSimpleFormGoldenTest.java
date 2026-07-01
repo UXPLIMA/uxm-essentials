@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 import org.bukkit.entity.Player;
@@ -190,7 +191,8 @@ class BedrockSimpleFormGoldenTest {
             this.onSelect = onSelect;
         }
 
-        // This golden exercises only the SimpleForm path; the confirm ModalForm has its own golden.
+        // This golden exercises only the SimpleForm path; the confirm ModalForm and the text-input CustomForm each
+        // have their own golden.
         @Override
         public void sendModalForm(
                 Player player,
@@ -200,6 +202,15 @@ class BedrockSimpleFormGoldenTest {
                 String button2,
                 Runnable onButton1,
                 Runnable onButton2) {}
+
+        @Override
+        public void sendInputForm(
+                Player player,
+                String title,
+                String inputLabel,
+                @Nullable String initial,
+                Consumer<String> onSubmit,
+                Runnable onClose) {}
 
         void tap(int index) {
             if (onSelect != null) {

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 import org.bukkit.Material;
@@ -218,6 +219,16 @@ class BedrockModalFormGoldenTest {
             this.onButton1 = onButton1;
             this.onButton2 = onButton2;
         }
+
+        // This golden exercises only the confirm ModalForm path; the text-input CustomForm has its own golden.
+        @Override
+        public void sendInputForm(
+                Player player,
+                String title,
+                String inputLabel,
+                @Nullable String initial,
+                Consumer<String> onSubmit,
+                Runnable onClose) {}
 
         void tapButton1() {
             if (onButton1 != null) {

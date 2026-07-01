@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.entity.Player;
 
@@ -45,5 +46,22 @@ class BedrockScreenTest {
         assertThat(button)
                 .as("the no-op screen runs neither button callback, since it sends no form to tap")
                 .hasValue(0);
+    }
+
+    @Test
+    void noneSendsNoInputFormAndNeverThrows() {
+        AtomicReference<String> submitted = new AtomicReference<>();
+        AtomicBoolean closed = new AtomicBoolean(false);
+        // NONE ignores every argument; the player is a bare mock it never touches, so no MockBukkit server is needed.
+        Player player = mock(Player.class);
+        assertThatCode(() -> BedrockScreen.NONE.sendInputForm(
+                        player, "Rename", "New name", "old", submitted::set, () -> closed.set(true)))
+                .doesNotThrowAnyException();
+        assertThat(submitted)
+                .as("the no-op screen never invokes the submit callback, since it sends no form to fill")
+                .hasValue(null);
+        assertThat(closed)
+                .as("the no-op screen never invokes the close callback, since it sends no form to dismiss")
+                .isFalse();
     }
 }

@@ -2,11 +2,13 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.logging.Logger;
 
 import org.bukkit.entity.Player;
 
+import org.geysermc.cumulus.form.CustomForm;
 import org.geysermc.cumulus.form.ModalForm;
 import org.geysermc.cumulus.form.SimpleForm;
 import org.geysermc.floodgate.api.FloodgateApi;
@@ -82,6 +84,30 @@ final class CumulusBedrockScreen implements BedrockScreen {
             FloodgateApi.getInstance().sendForm(player.getUniqueId(), builder.build());
         } catch (RuntimeException notReady) {
             LOG.warning("event=bedrock_modal_failed player=" + player.getName() + " reason=" + notReady.getMessage());
+        }
+    }
+
+    @Override
+    public void sendInputForm(
+            Player player,
+            String title,
+            String inputLabel,
+            @Nullable String initial,
+            Consumer<String> onSubmit,
+            Runnable onClose) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(inputLabel, "inputLabel");
+        Objects.requireNonNull(onSubmit, "onSubmit");
+        Objects.requireNonNull(onClose, "onClose");
+        try {
+            CustomForm.Builder builder = CustomForm.builder().title(title);
+            builder.input(inputLabel, "", initial != null ? initial : "");
+            builder.validResultHandler((form, response) -> onSubmit.accept(response.asInput(0)));
+            builder.closedOrInvalidResultHandler(onClose);
+            FloodgateApi.getInstance().sendForm(player.getUniqueId(), builder.build());
+        } catch (RuntimeException notReady) {
+            LOG.warning("event=bedrock_input_failed player=" + player.getName() + " reason=" + notReady.getMessage());
         }
     }
 }

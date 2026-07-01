@@ -7,8 +7,11 @@ import java.util.function.Consumer;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -30,6 +33,13 @@ import org.jspecify.annotations.NullMarked;
  * <p><b>Folia.</b> The backend may report on an async thread (chat) or the region thread (anvil); the seam hops both
  * the submit and the cancel branch onto the viewer's entity region before the callback runs, so a call site's callback
  * always executes where it can safely touch the player and reopen a GUI. The call site no longer hops for itself.
+ *
+ * <p><b>Bedrock.</b> A Floodgate viewer has no anvil or chat prompt worth showing, so when {@link BedrockDetector}
+ * reports the viewer is a Bedrock player the seam sends a native Cumulus CustomForm with a single text input instead.
+ * Its submitted value and its close both flow through the same {@link #route} policy as the anvil/chat backends, so the
+ * cancel-keyword check and the entity-thread hop live in one place regardless of which prompt the viewer saw. A Java
+ * viewer keeps the anvil/chat prompt byte-identically. Both defaults are the Java-only no-ops, so an engine wired
+ * without Floodgate never redirects.
  */
 @NullMarked
 public final class TextInput {
@@ -39,18 +49,37 @@ public final class TextInput {
     private final Scheduler scheduler;
     private final AnvilTextBackend anvilBackend;
     private final ChatTextBackend chatBackend;
+    private final BedrockDetector bedrock;
+    private final BedrockScreen bedrockScreen;
 
+    /**
+     * As the seven-argument constructor, but with no Bedrock redirect: every viewer gets the anvil or chat prompt.
+     * Kept so the tests and any wiring that predates the Bedrock seam stay a delegating call.
+     */
     public TextInput(
             InputSettings settings,
             GuiText guiText,
             Scheduler scheduler,
             AnvilTextBackend anvilBackend,
             ChatTextBackend chatBackend) {
+        this(settings, guiText, scheduler, anvilBackend, chatBackend, BedrockDetector.NONE, BedrockScreen.NONE);
+    }
+
+    public TextInput(
+            InputSettings settings,
+            GuiText guiText,
+            Scheduler scheduler,
+            AnvilTextBackend anvilBackend,
+            ChatTextBackend chatBackend,
+            BedrockDetector bedrock,
+            BedrockScreen bedrockScreen) {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.anvilBackend = Objects.requireNonNull(anvilBackend, "anvilBackend");
         this.chatBackend = Objects.requireNonNull(chatBackend, "chatBackend");
+        this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
+        this.bedrockScreen = Objects.requireNonNull(bedrockScreen, "bedrockScreen");
     }
 
     /**
@@ -71,6 +100,10 @@ public final class TextInput {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(onSubmit, "onSubmit");
         Objects.requireNonNull(onCancel, "onCancel");
+        if (bedrock.isBedrock(viewer.uuid())) {
+            sendInputForm(player, viewer, request, onSubmit, onCancel);
+            return;
+        }
         InputMode mode = settings.modeFor(request.key());
         TextInputBackend backend = mode == InputMode.CHAT ? chatBackend : anvilBackend;
         Component prompt = buildPrompt(viewer, request.label(), request.placeholders(), mode);
@@ -80,6 +113,27 @@ public final class TextInput {
                 prompt,
                 request.initialText(),
                 result -> scheduler.onEntity(viewer, () -> route(player, viewer, result, onSubmit, onCancel)));
+    }
+
+    /**
+     * Render the request as a Cumulus CustomForm for a Bedrock viewer. The label resolves to plain text through the
+     * same unprefixed {@link #buildPrompt} shape the anvil uses (no chat brand prefix in a form title), and serves as
+     * both the form title and the single input's label. The submit and the close both re-enter {@link #route} on the
+     * viewer's entity thread, so the cancel-keyword policy and the Folia hop are shared with the anvil/chat backends.
+     */
+    private void sendInputForm(
+            Player player, PlayerRef viewer, InputRequest request, Consumer<String> onSubmit, Runnable onCancel) {
+        Component label = buildPrompt(viewer, request.label(), request.placeholders(), InputMode.ANVIL);
+        String plain = PlainTextComponentSerializer.plainText().serialize(label);
+        bedrockScreen.sendInputForm(
+                player,
+                plain,
+                plain,
+                request.initialText(),
+                value -> scheduler.onEntity(
+                        viewer, () -> route(player, viewer, new InputResult.Submitted(value), onSubmit, onCancel)),
+                () -> scheduler.onEntity(
+                        viewer, () -> route(player, viewer, InputResult.Cancelled.INSTANCE, onSubmit, onCancel)));
     }
 
     private Component buildPrompt(

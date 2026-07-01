@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
@@ -54,6 +55,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable PlayerDataStore playerData;
     private @Nullable ServerConnector serverConnector;
     private @Nullable BedrockDetector bedrock;
+    private @Nullable BedrockScreen bedrockScreen;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -174,6 +176,20 @@ public final class CloseableResources implements AutoCloseable {
     /** The resolved Bedrock detector, or null before wiring has constructed it. */
     public @Nullable BedrockDetector bedrock() {
         return bedrock;
+    }
+
+    /**
+     * Captures the resolved {@link BedrockScreen} so a later consumer — the text-input seam — can render a Bedrock
+     * viewer's prompt as a native Cumulus form. Resolved once at wiring alongside {@link #bedrock(BedrockDetector)}:
+     * the Cumulus-backed screen when Floodgate is installed, otherwise the no-op {@code NONE}.
+     */
+    public void bedrockScreen(BedrockScreen resolved) {
+        this.bedrockScreen = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The resolved Bedrock screen, or null before wiring has constructed it. */
+    public @Nullable BedrockScreen bedrockScreen() {
+        return bedrockScreen;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */

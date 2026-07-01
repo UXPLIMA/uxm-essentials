@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 import org.bukkit.Server;
@@ -39,6 +40,15 @@ public interface BedrockScreen {
                 String button2,
                 Runnable onButton1,
                 Runnable onButton2) {}
+
+        @Override
+        public void sendInputForm(
+                Player player,
+                String title,
+                String inputLabel,
+                @Nullable String initial,
+                Consumer<String> onSubmit,
+                Runnable onClose) {}
     };
 
     /**
@@ -78,6 +88,28 @@ public interface BedrockScreen {
             String button2,
             Runnable onButton1,
             Runnable onButton2);
+
+    /**
+     * Send {@code player} a CustomForm carrying a single text input, running {@code onSubmit} with the typed value on
+     * submit and {@code onClose} when the viewer closes or dismisses the form without submitting. The engine's
+     * text-input prompt renders here for a Bedrock viewer instead of the anvil or chat prompt a Java player sees. Like
+     * the other forms, both callbacks fire off the main thread when the viewer responds, so the caller wraps each in
+     * its own entity-thread hop before it touches the world.
+     *
+     * @param player the Bedrock viewer to send the form to; never {@code null}
+     * @param title the form title as plain text; never {@code null}
+     * @param inputLabel the label shown above the input field as plain text; never {@code null}
+     * @param initial the field's pre-fill, or {@code null} for an empty field
+     * @param onSubmit invoked with the typed value when the viewer submits; never {@code null}
+     * @param onClose invoked when the viewer closes or dismisses the form without submitting; never {@code null}
+     */
+    void sendInputForm(
+            Player player,
+            String title,
+            String inputLabel,
+            @Nullable String initial,
+            Consumer<String> onSubmit,
+            Runnable onClose);
 
     /**
      * Selects the screen for this server: the Cumulus-backed one when the {@code floodgate} plugin is enabled,

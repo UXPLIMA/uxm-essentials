@@ -291,6 +291,7 @@ public final class PluginModule {
         resources.bedrock(bedrock);
         kernel.log().info("event=bedrock_detector backend={}", bedrock == BedrockDetector.NONE ? "none" : "floodgate");
         BedrockScreen bedrockScreen = BedrockScreen.forServer(plugin.getServer());
+        resources.bedrockScreen(bedrockScreen);
         kernel.log().info("event=bedrock_screen backend={}", bedrockScreen == BedrockScreen.NONE ? "none" : "cumulus");
         Menus menus = new Menus(
                 menuRenderer,
@@ -645,13 +646,20 @@ public final class PluginModule {
         // The unified text-input seam: one entry point every GUI uses to capture a line of text, with the operator
         // choosing anvil-or-chat per input point in text-input.conf. It wraps the shared anvil above as one backend
         // and installs a single shared chat listener as the other, replacing the per-context chat-prompt listeners.
+        // The Bedrock detector and screen are the same instances the Menus façade holds (captured on resources in
+        // wire()); a Bedrock viewer's prompt renders as a Cumulus CustomForm instead. Both fall back to the no-ops if
+        // wiring has not captured them, so a Java-only server always gets the anvil/chat path.
+        BedrockDetector resolvedBedrock = resources.bedrock();
+        BedrockScreen resolvedScreen = resources.bedrockScreen();
         TextInputInstaller.Installed input = TextInputInstaller.install(
                 plugin,
                 plugin.getDataFolder().toPath(),
                 anvil,
                 new GuiText(kernel.messages()),
                 kernel.scheduler(),
-                kernel.log());
+                kernel.log(),
+                resolvedBedrock == null ? BedrockDetector.NONE : resolvedBedrock,
+                resolvedScreen == null ? BedrockScreen.NONE : resolvedScreen);
         resources.onClose(input.uninstall());
         TextInput textInput = input.textInput();
         // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
