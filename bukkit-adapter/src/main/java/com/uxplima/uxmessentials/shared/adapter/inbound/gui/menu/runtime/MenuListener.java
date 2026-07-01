@@ -33,6 +33,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuClickEvent;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
@@ -46,6 +47,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDragSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemRuleSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
@@ -242,7 +244,43 @@ public final class MenuListener implements Listener {
             handleListClick(holder, list, slot);
             return;
         }
-        holder.clickAt(slot).ifPresent(rs -> routeSpecClick(holder, rs, event));
+        Player clicker = (Player) event.getWhoClicked();
+        holder.clickAt(slot).ifPresent(rs -> {
+            if (!clickVetoed(holder, rs, slot, clicker)) {
+                routeSpecClick(holder, rs, event);
+            }
+        });
+    }
+
+    /**
+     * Fire the public, cancellable {@link MenuClickEvent} for a spec-slot click and report whether a listener vetoed
+     * it. A veto stops the whole click-handling — the item-drag flow, conditions, requirements and actions alike —
+     * before any of it runs; the engine's own hook, fired at the click choke-point right before {@link #routeSpecClick}.
+     * It is independent of the vanilla {@link InventoryClickEvent}, which is already cancelled either way so the item
+     * never moves — cancelling this one does not un-cancel that one. The nav (next/previous/jump) branch lives inside
+     * {@link #handleClick}, downstream of here, so this fires for a pagination-button click too; a listener that only
+     * cares about real button clicks can read {@link MenuClickEvent#getItemId()}. Fires on the viewer's own region
+     * thread the click already runs on.
+     */
+    private boolean clickVetoed(MenuHolder holder, RenderedSlot rs, int slot, Player viewer) {
+        MenuClickEvent event = new MenuClickEvent(viewer, holder.specId(), slot, itemIdOf(holder, rs));
+        Bukkit.getPluginManager().callEvent(event);
+        return event.isCancelled();
+    }
+
+    /**
+     * Best-effort stable id of the item spec that produced the clicked slot: the operator's own key for it in the
+     * menu's {@code items {}} block, found by identity. A list cell renders the list's nested template, which is not a
+     * top-level entry and so carries no such key — such a click resolves to {@code null}, and the event still fires,
+     * just without an id.
+     */
+    @Nullable private static String itemIdOf(MenuHolder holder, RenderedSlot rs) {
+        for (Map.Entry<String, MenuItemSpec> entry : holder.spec().items().entrySet()) {
+            if (entry.getValue() == rs.item()) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
     /**

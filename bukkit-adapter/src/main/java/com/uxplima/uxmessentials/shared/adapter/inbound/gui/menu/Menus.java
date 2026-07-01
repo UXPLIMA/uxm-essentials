@@ -22,6 +22,7 @@ import org.bukkit.inventory.InventoryHolder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuOpenEvent;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockIcons;
@@ -678,6 +679,18 @@ public final class Menus {
         return resolved;
     }
 
+    /**
+     * Fire the public, cancellable {@link MenuOpenEvent} and report whether a listener vetoed the open. Called at the
+     * very top of the one open choke-point every open — a fresh open, a {@code back} step, a reopen-last — funnels
+     * through, before the Bedrock form branches and the chest build alike, so a cancelled open shows the viewer
+     * neither a native form nor a chest. It fires on the viewer's own region thread the open already runs on.
+     */
+    private static boolean openVetoed(Player live, String specId, int page) {
+        MenuOpenEvent event = new MenuOpenEvent(live, specId, page);
+        Bukkit.getPluginManager().callEvent(event);
+        return event.isCancelled();
+    }
+
     /** On the viewer's entity thread: build the holder-backed window, cache the lists, render, show, arm refresh. */
     private void openResolved(
             PlayerRef viewer,
@@ -691,6 +704,9 @@ public final class Menus {
             boolean record) {
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live == null || !live.isOnline()) {
+            return;
+        }
+        if (openVetoed(live, specId, page)) {
             return;
         }
         // Attach the spec's own placeholders {} block so the renderer resolves its %name% tokens local-first, and the
