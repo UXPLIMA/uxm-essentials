@@ -75,7 +75,8 @@ public final class MenuSpecLoader {
         // auto-sized to fit them. A non-chest sizes its window from its inventory type and keeps its declared (or
         // six-row) fallback, whose own out-of-range slots the renderer skips, so its item ceiling stays that count.
         int ceilingRows = chest ? MAX_ROWS : declaredRows;
-        Map<String, MenuItemSpec> items = parseItems(root.node("items"), ceilingRows, origin);
+        Map<String, Pattern> patterns = parsePatterns(root.node("patterns"));
+        Map<String, MenuItemSpec> items = parseItems(root.node("items"), ceilingRows, origin, patterns);
         int rows = chest ? chestRows(declaredRows, items) : declaredRows;
         try {
             return new MenuSpec(
@@ -147,13 +148,14 @@ public final class MenuSpecLoader {
         return highest;
     }
 
-    private Map<String, MenuItemSpec> parseItems(ConfigurationNode itemsNode, int rows, String origin) {
+    private Map<String, MenuItemSpec> parseItems(
+            ConfigurationNode itemsNode, int rows, String origin, Map<String, Pattern> patterns) {
         Map<String, MenuItemSpec> items = new LinkedHashMap<>();
         for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                 itemsNode.childrenMap().entrySet()) {
             String id = String.valueOf(entry.getKey());
             try {
-                items.put(id, parseItem(entry.getValue(), rows));
+                items.put(id, parseItem(entry.getValue(), rows, patterns));
             } catch (RuntimeException invalid) {
                 throw new MenuSpecException(
                         "invalid item '" + id + "' in " + origin + ": " + invalid.getMessage(), invalid);
@@ -162,22 +164,147 @@ public final class MenuSpecLoader {
         return items;
     }
 
-    private MenuItemSpec parseItem(ConfigurationNode node, int rows) {
-        SlotSet slots = SlotSet.parse(slotTokens(node), rows * 9);
+    private MenuItemSpec parseItem(ConfigurationNode node, int rows, Map<String, Pattern> patterns) {
+        ConfigurationNode item = resolvePattern(node, patterns);
+        SlotSet slots = SlotSet.parse(slotTokens(item), rows * 9);
         return new MenuItemSpec(
                 slots,
-                node.node("priority").getInt(0),
-                node.node("material").getString("STONE"),
-                node.node("name").getString(""),
-                strings(node.node("lore")),
-                parseDecor(node.node("decor")),
-                LoreMode.fromToken(node.node("lore-mode").getString()),
-                parseView(node.node("view")),
-                parseClick(node.node("click")),
-                node.node("update").getBoolean(false),
-                parseList(node.node("list"), rows),
-                itemType(node.node("type")));
+                item.node("priority").getInt(0),
+                item.node("material").getString("STONE"),
+                item.node("name").getString(""),
+                strings(item.node("lore")),
+                parseDecor(item.node("decor")),
+                LoreMode.fromToken(item.node("lore-mode").getString()),
+                parseView(item.node("view")),
+                parseClick(item.node("click")),
+                item.node("update").getBoolean(false),
+                parseList(item.node("list"), rows, patterns),
+                itemType(item.node("type")));
     }
+
+    /**
+     * Read the menu's {@code patterns} block into reusable item templates keyed by name. Each template is a deep
+     * copy of its spec node — a shared template must never be mutated when an item fills its {@code %var%}s — with
+     * the optional {@code defaults { var = value … }} child split out into that pattern's default var values and
+     * removed from the copy so it is never mistaken for an item field. An absent block yields an empty map, so a
+     * menu declaring no patterns parses exactly as it did before.
+     */
+    private Map<String, Pattern> parsePatterns(ConfigurationNode node) {
+        Map<String, Pattern> patterns = new LinkedHashMap<>();
+        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
+                node.childrenMap().entrySet()) {
+            ConfigurationNode template = entry.getValue().copy();
+            Map<String, String> defaults = varMap(template.node("defaults"));
+            template.removeChild("defaults");
+            patterns.put(String.valueOf(entry.getKey()), new Pattern(template, defaults));
+        }
+        return patterns;
+    }
+
+    /**
+     * Expand a {@code pattern = "<name>"} item into its effective node. An item with no {@code pattern} key is
+     * returned unchanged, so a pattern-free spec parses byte-identically; a {@code pattern} naming no declared
+     * template is warned about and the item parsed from its own fields (its {@code pattern}/{@code vars} keys are
+     * simply not among the fields read). Otherwise the effective node is the template with the item's own fields
+     * overlaid — the item wins, its {@code name}/{@code slots}/{@code click} replacing the template's — and every
+     * {@code %var%} then filled from the item's {@code vars} merged over the pattern's {@code defaults}. Overlaying
+     * before substituting is deliberate: it lets an item's own override reference a {@code %var%} too (the worked
+     * grammar's {@code name = "<aqua>%label% (deal)"}). Resolution runs once, on the raw item — never on the node it
+     * returns — so a {@code pattern} key on the template itself is ignored: patterns nest one level only.
+     */
+    private ConfigurationNode resolvePattern(ConfigurationNode itemNode, Map<String, Pattern> templates) {
+        ConfigurationNode ref = itemNode.node("pattern");
+        if (ref.virtual() || ref.isNull()) {
+            return itemNode;
+        }
+        String name = ref.getString("");
+        Pattern pattern = templates.get(name);
+        if (pattern == null) {
+            LOG.warning("menu item at " + itemNode.path() + " names unknown pattern '" + name
+                    + "'; parsing its own fields");
+            return itemNode;
+        }
+        ConfigurationNode effective = pattern.template().copy();
+        overlay(effective, itemNode);
+        substituteVars(effective, mergedVars(pattern.defaults(), itemNode.node("vars")));
+        return effective;
+    }
+
+    /**
+     * Copy the item's own fields onto the template, the item winning: for every key except {@code pattern} and
+     * {@code vars} the item's node replaces the template's node at that key. The granularity is per top-level key —
+     * an item {@code click { right = […] }} replaces the template's whole {@code click} (its {@code left} included)
+     * rather than merging gesture-by-gesture — which keeps the override rule simple and predictable.
+     */
+    private static void overlay(ConfigurationNode base, ConfigurationNode overrides) {
+        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
+                overrides.childrenMap().entrySet()) {
+            String key = String.valueOf(entry.getKey());
+            if (!key.equals("pattern") && !key.equals("vars")) {
+                base.node(key).from(entry.getValue());
+            }
+        }
+    }
+
+    /** The item's {@code vars} layered over the pattern's {@code defaults}, so an item-supplied var wins a clash. */
+    private static Map<String, String> mergedVars(Map<String, String> defaults, ConfigurationNode varsNode) {
+        Map<String, String> vars = new LinkedHashMap<>(defaults);
+        vars.putAll(varMap(varsNode));
+        return vars;
+    }
+
+    /** Flatten a {@code { name = value … }} node into a plain var map, keeping every value as its string token. */
+    private static Map<String, String> varMap(ConfigurationNode node) {
+        Map<String, String> vars = new LinkedHashMap<>();
+        if (node.virtual() || node.isNull()) {
+            return vars;
+        }
+        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
+                node.childrenMap().entrySet()) {
+            String value = entry.getValue().getString();
+            if (value != null) {
+                vars.put(String.valueOf(entry.getKey()), value);
+            }
+        }
+        return vars;
+    }
+
+    /**
+     * Fill every {@code %var%} in the node tree in place, recursing maps and lists. At a scalar leaf it substitutes
+     * only {@code %token%}s whose {@code token} is a known var; an unknown {@code %placeholder%} (a registry token, a
+     * PAPI expansion, a {@code %argument_%}) is left verbatim so it still resolves at render time. A pattern can thus
+     * freely mix {@code %var%} (filled now) and {@code %placeholder%} (filled per draw).
+     */
+    private static void substituteVars(ConfigurationNode node, Map<String, String> vars) {
+        if (node.isMap()) {
+            node.childrenMap().values().forEach(child -> substituteVars(child, vars));
+        } else if (node.isList()) {
+            node.childrenList().forEach(child -> substituteVars(child, vars));
+        } else {
+            String raw = node.getString();
+            if (raw != null) {
+                String filled = substituteScalar(raw, vars);
+                if (!filled.equals(raw)) {
+                    node.raw(filled);
+                }
+            }
+        }
+    }
+
+    /** Replace each known {@code %var%} token in a scalar; an unrecognised {@code %token%} is left untouched. */
+    private static String substituteScalar(String raw, Map<String, String> vars) {
+        if (raw.indexOf('%') < 0) {
+            return raw;
+        }
+        String result = raw;
+        for (Map.Entry<String, String> var : vars.entrySet()) {
+            result = result.replace("%" + var.getKey() + "%", var.getValue());
+        }
+        return result;
+    }
+
+    /** A menu-local item template: a deep copy of its spec node plus the default values for its {@code %var%}s. */
+    private record Pattern(ConfigurationNode template, Map<String, String> defaults) {}
 
     private List<String> slotTokens(ConfigurationNode node) {
         ConfigurationNode slots = node.node("slots");
@@ -517,12 +644,12 @@ public final class MenuSpecLoader {
         return node.virtual() || node.isNull() ? Optional.empty() : Optional.of(node.getBoolean());
     }
 
-    private Optional<ListSpec> parseList(ConfigurationNode node, int rows) {
+    private Optional<ListSpec> parseList(ConfigurationNode node, int rows, Map<String, Pattern> patterns) {
         if (node.virtual() || node.isNull()) {
             return Optional.empty();
         }
         Ref source = Ref.parse(Objects.requireNonNull(node.node("source").getString(), "list.source"));
-        return Optional.of(new ListSpec(source, parseItem(node.node("template"), rows)));
+        return Optional.of(new ListSpec(source, parseItem(node.node("template"), rows, patterns)));
     }
 
     /**

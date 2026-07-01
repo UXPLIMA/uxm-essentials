@@ -7,8 +7,10 @@ import static org.assertj.core.api.Assertions.tuple;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
@@ -452,5 +454,149 @@ class MenuSpecLoaderTest {
         // loader's fail-fast slot check and the six-row ceiling the auto-sizer parses against — it is a loud error.
         assertThatThrownBy(() -> new MenuSpecLoader().parse("items { a { slot = 60, material = STONE } }"))
                 .isInstanceOf(MenuSpecException.class);
+    }
+
+    private static final String PATTERNS = """
+            rows = 1
+            patterns {
+              shop-button {
+                material = "%mat%"
+                name = "<gold>%label%"
+                lore = ["<gray>Click to buy %label%", "<gray>Price: %price%"]
+                click { left = ["open:%target%"] }
+                defaults { mat = "STONE", price = "0" }
+              }
+            }
+            items {
+              diamonds {
+                pattern = "shop-button"
+                slots = [0]
+                vars { mat = "DIAMOND", label = "Diamonds", target = "diamond-shop", price = "5" }
+                name = "<aqua>%label% (deal)"
+              }
+            }
+            """;
+
+    @Test
+    void aPatternResolvesItsVarsIntoTheItemAndTheItemFieldWins() {
+        MenuItemSpec item = new MenuSpecLoader().parse(PATTERNS).items().get("diamonds");
+
+        assertThat(item.material()).isEqualTo("DIAMOND");
+        assertThat(item.name())
+                .as("the item's own name overrides the pattern's, and its own %label% is filled too")
+                .isEqualTo("<aqua>Diamonds (deal)");
+        assertThat(item.lore()).containsExactly("<gray>Click to buy Diamonds", "<gray>Price: 5");
+        assertThat(item.click().actionsFor(ClickKind.LEFT))
+                .extracting(Ref::id, Ref::value)
+                .containsExactly(tuple("open", "diamond-shop"));
+        assertThat(item.slots().slots()).containsExactly(0);
+    }
+
+    @Test
+    void anOmittedVarFallsBackToThePatternDefault() {
+        String hocon = """
+                rows = 1
+                patterns { p { name = "Price: %price%", defaults { price = "0" } } }
+                items { x { slot = 0, pattern = "p", vars { } } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon).items().get("x");
+
+        assertThat(item.name())
+                .as("price omitted from vars falls back to the pattern default")
+                .isEqualTo("Price: 0");
+    }
+
+    @Test
+    void anUnknownTokenIsLeftVerbatimForRenderTime() {
+        String hocon = """
+                rows = 1
+                patterns { p { material = STONE, lore = ["<gray>%player_name%", "<gray>%label%"] } }
+                items { x { slot = 0, pattern = "p", vars { label = "Hi" } } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon).items().get("x");
+
+        assertThat(item.lore())
+                .as("a declared var is filled now; an undeclared %placeholder% stays for the renderer")
+                .containsExactly("<gray>%player_name%", "<gray>Hi");
+    }
+
+    @Test
+    void substitutionRecursesIntoNestedMapsAndLists() {
+        String hocon = """
+                rows = 1
+                patterns {
+                  p {
+                    material = "%mat%"
+                    decor { potion { type = "%ptype%", effects = ["%effect%"] } }
+                  }
+                }
+                items { x { slot = 0, pattern = "p",
+                            vars { mat = "POTION", ptype = "STRENGTH", effect = "speed:1:600" } } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon).items().get("x");
+
+        assertThat(item.material()).isEqualTo("POTION");
+        assertThat(item.decor().meta().potion().type()).contains("STRENGTH");
+        assertThat(item.decor().meta().potion().effects()).containsExactly("speed:1:600");
+    }
+
+    @Test
+    void anItemClickOverrideReplacesTheTemplateClickWholesale() {
+        String hocon = """
+                rows = 1
+                patterns { p { material = STONE, click { left = ["close"], right = ["open:a"] } } }
+                items { x { slot = 0, pattern = "p", click { right = ["open:b"] } } }
+                """;
+        ClickSpec click = new MenuSpecLoader().parse(hocon).items().get("x").click();
+
+        assertThat(click.actionsFor(ClickKind.RIGHT))
+                .extracting(Ref::id, Ref::value)
+                .containsExactly(tuple("open", "b"));
+        assertThat(click.actionsFor(ClickKind.LEFT))
+                .as("an item click block replaces the whole template click, so the template's left gesture is gone")
+                .isEmpty();
+    }
+
+    @Test
+    void anItemNamingAnUnknownPatternParsesFromItsOwnFields() {
+        String hocon = "rows=1\nitems { x { slot = 0, pattern = \"nope\", material = EMERALD, name = \"Own\" } }";
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon).items().get("x");
+
+        assertThat(item.material())
+                .as("an unknown pattern name is warned about, not fatal; the item parses its own fields")
+                .isEqualTo("EMERALD");
+        assertThat(item.name()).isEqualTo("Own");
+    }
+
+    @Test
+    void aPatternBlockDoesNotAffectAnItemThatDoesNotReferenceIt() {
+        String hocon = """
+                rows = 1
+                patterns { p { material = DIAMOND } }
+                items { plain { slot = 0, material = STONE, name = "Plain" } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon).items().get("plain");
+
+        assertThat(item.material()).isEqualTo("STONE");
+        assertThat(item.name()).isEqualTo("Plain");
+        assertThat(item.slots().slots()).containsExactly(0);
+    }
+
+    @Test
+    void aNestedPatternKeyOnATemplateIsIgnoredResolvingOnlyOneLevel() {
+        String hocon = """
+                rows = 1
+                patterns {
+                  base { material = STONE }
+                  derived { pattern = "base", material = DIAMOND, name = "%who%" }
+                }
+                items { x { slot = 0, pattern = "derived", vars { who = "Steve" } } }
+                """;
+        MenuItemSpec item = new MenuSpecLoader().parse(hocon).items().get("x");
+
+        // Resolution runs one level only: 'derived' is used as written — its own pattern="base" key is ignored — so
+        // the material stays DIAMOND rather than being pulled down to STONE from the base template.
+        assertThat(item.material()).isEqualTo("DIAMOND");
+        assertThat(item.name()).isEqualTo("Steve");
     }
 }
