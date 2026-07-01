@@ -88,10 +88,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
@@ -271,6 +273,12 @@ public final class PluginModule {
         // which routes its cleanup through the library's Folia-aware scheduler.
         Toasts menuToasts = new Toasts(plugin, new PaperScheduler(plugin));
         MessagingActions.register(menuBindings, menuToasts, kernel.log());
+        // The player/command slice (chat-as-player, command-as-op, commandevent, command/console-random) registers
+        // alongside the generic actions; like the messaging slice it has its own entry point so the MenuVocabulary
+        // signature stays untouched. It reuses the same stateless click-command runner npc/holograms build, so the
+        // temporary-op elevation is not reimplemented here; its two elevated actions honour the same allow-console
+        // gate as the generic console action.
+        CommandActions.register(menuBindings, new BukkitClickCommandRunner(), allowMenuConsole, kernel.log());
         PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {
             menuListener.uninstall();
