@@ -17,8 +17,9 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
  * result from every provider means no provider claimed the spec, so the renderer treats it as a material name.
  *
  * <p>Two shapes are wired at the composition root. {@link #defaults()} carries only the providers that need no
- * external plugin — skull sources and viewer equipment — and is what the plain {@code ItemRenderer(GuiText,
- * PlaceholderRegistry)} constructor uses, so every existing call site gains skulls and equipment for free.
+ * external plugin — the raw-entry stack provider, skull sources and viewer equipment — and is what the plain
+ * {@code ItemRenderer(GuiText, PlaceholderRegistry)} constructor uses, so every existing call site gains those
+ * for free.
  * {@link #withHeadDatabase(HeadQuery)} additionally chains the HeadDatabase provider, built from the Phase-0
  * {@link HeadQuery} hook; bootstrap uses it so {@code hdb:<id>} resolves when HeadDatabase is installed and
  * degrades to a plain head (the material fallback) when it is not. {@link #full(Server, Logger, HeadQuery)} is the
@@ -38,9 +39,10 @@ public final class IconProviders {
         this.providers = List.copyOf(Objects.requireNonNull(providers, "providers"));
     }
 
-    /** Skull sources plus viewer equipment — the providers that need no external plugin. */
+    /** Skull sources, viewer equipment, and the raw-entry stack provider — the providers that need no external plugin. */
     public static IconProviders defaults() {
-        return new IconProviders(List.of(new SkullIconProvider(), new EquipmentIconProvider()));
+        return new IconProviders(
+                List.of(new EntryStackIconProvider(), new SkullIconProvider(), new EquipmentIconProvider()));
     }
 
     /**
@@ -50,13 +52,17 @@ public final class IconProviders {
      */
     public static IconProviders withHeadDatabase(HeadQuery headQuery) {
         Objects.requireNonNull(headQuery, "headQuery");
-        return new IconProviders(
-                List.of(new SkullIconProvider(), new EquipmentIconProvider(), new HeadDatabaseIconProvider(headQuery)));
+        return new IconProviders(List.of(
+                new EntryStackIconProvider(),
+                new SkullIconProvider(),
+                new EquipmentIconProvider(),
+                new HeadDatabaseIconProvider(headQuery)));
     }
 
     /**
-     * The full chain the composition root wires: the skull and equipment providers, the two native special sources
-     * (a serialized {@code b64:} stack and the {@code water_bottle}/{@code light:<n>} keywords), then the four
+     * The full chain the composition root wires: the raw-entry stack provider, the skull and equipment providers,
+     * the two native special sources (a serialized {@code b64:} stack and the {@code water_bottle}/{@code light:<n>}
+     * keywords), then the four
      * custom-item providers (ItemsAdder, Oraxen, Nexo, MMOItems), then the HeadDatabase provider. The prefixes are
      * disjoint, so order is a readability choice rather than a routing one — a spec reaches exactly the one provider
      * that owns its prefix. The two native sources need no external plugin; each custom-item provider reaches its
@@ -68,6 +74,7 @@ public final class IconProviders {
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(headQuery, "headQuery");
         return new IconProviders(List.of(
+                new EntryStackIconProvider(),
                 new SkullIconProvider(),
                 new EquipmentIconProvider(),
                 new SerializedStackIconProvider(),

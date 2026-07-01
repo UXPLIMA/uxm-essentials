@@ -13,25 +13,37 @@ import java.util.function.Supplier;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Two ready-made, read-only roster sources every custom menu can page without a line of code: {@code online-players}
- * (each online player, auto-skinned when the template uses {@code %online_player_skull%}) and {@code worlds} (each
- * loaded world, with {@code %worlds_icon%} auto-picking an environment block). Each source is a list handler plus the
- * per-entry {@code %token%} placeholders a template reads to draw one row, all registered once at startup into the
- * shared {@link MenuBindings} — a spec's {@code list { source = online-players, template { … } }} then resolves the
- * same way a code-registered feature source does.
+ * Ready-made, read-only sources every custom menu can page without a line of code. Two are server-global rosters:
+ * {@code online-players} (each online player, auto-skinned when the template uses {@code %online_player_skull%}) and
+ * {@code worlds} (each loaded world, with {@code %worlds_icon%} auto-picking an environment block). Two more reflect
+ * the viewer's own storage as live tiles: {@code self-inventory} (the non-empty stacks in their inventory) and
+ * {@code self-enderchest} (their ender chest), each entry being the actual {@link ItemStack} so a template's
+ * {@code material = "entry"} draws the real item. Each source is a list handler plus the per-entry {@code %token%}
+ * placeholders a template reads to draw one row, all registered once at startup into the shared {@link MenuBindings}
+ * — a spec's {@code list { source = self-inventory, template { … } }} then resolves the same way a code-registered
+ * feature source does.
+ *
+ * <p>The two storage sources are strictly read-only: they snapshot clones and never touch a target other than the
+ * viewer, so they respect the engine's cancel-every-click invariant. A mutable take/give viewer is a separate,
+ * deliberately non-engine concern (the {@code /invsee} / {@code /endersee} inventory leaves and the future
+ * storage-menu click mechanics), never built here.
  *
  * <p>The Folia constraint shapes the whole design. A list source runs on an async thread — {@code Menus} resolves a
  * spec's lists off the tick thread — and there the entity/world API is off-limits: {@code player.getWorld()},
- * {@code getPing()}, {@code getGameMode()}, {@code world.getPlayers()} all touch region state that is unsafe off the
- * owning region thread. So each source snapshots live server state on the global region thread into immutable value
- * records and hands those records back; nothing Bukkit-live crosses to the async thread, and the per-entry
- * placeholders read only the captured record.
+ * {@code getPing()}, {@code getGameMode()}, {@code world.getPlayers()} and a player's own {@code getInventory()} all
+ * touch region state that is unsafe off the owning region thread. So the roster sources snapshot on the global region
+ * thread and the storage sources snapshot on the <em>viewer's</em> entity region thread, each returning immutable
+ * values (records, or defensively cloned stacks); nothing Bukkit-live crosses to the async thread, and the per-entry
+ * placeholders read only the captured snapshot.
  */
 public final class LiveDataSources {
 
@@ -51,8 +63,11 @@ public final class LiveDataSources {
         Objects.requireNonNull(scheduler, "scheduler");
         bindings.list("online-players", ctx -> snapshot(scheduler, LiveDataSources::onlinePlayers));
         bindings.list("worlds", ctx -> snapshot(scheduler, LiveDataSources::loadedWorlds));
+        bindings.list("self-inventory", ctx -> selfStorage(scheduler, ctx.viewer(), Player::getInventory));
+        bindings.list("self-enderchest", ctx -> selfStorage(scheduler, ctx.viewer(), Player::getEnderChest));
         registerOnlinePlayerPlaceholders(bindings);
         registerWorldPlaceholders(bindings);
+        registerStackPlaceholders(bindings);
     }
 
     /** The {@code %online_player_*%} placeholders, each reading one field off the bound player entry. */
@@ -77,6 +92,13 @@ public final class LiveDataSources {
         bindings.placeholder("worlds_icon", ctx -> world(ctx, entry -> environmentIcon(entry.environment())));
     }
 
+    /** The {@code %entry_*%} placeholders, each reading one field off the bound item-stack entry. */
+    private static void registerStackPlaceholders(MenuBindings bindings) {
+        bindings.placeholder(
+                "entry_type", ctx -> stack(ctx, item -> item.getType().name()));
+        bindings.placeholder("entry_amount", ctx -> stack(ctx, item -> String.valueOf(item.getAmount())));
+    }
+
     /**
      * Take a snapshot of live server state on the global region thread and return it to the async caller. When the
      * caller already owns the global thread (the deadlock guard — a global-thread invocation, or a test scheduler
@@ -98,6 +120,40 @@ public final class LiveDataSources {
             holder.set(supplier.get());
             done.countDown();
         });
+        return awaitSnapshot(done, holder);
+    }
+
+    /**
+     * Snapshot the viewer's own storage — the inventory or the ender chest {@code pick} selects — on the viewer's
+     * entity region thread, where a player's inventory is safe to read. When the async caller already owns that
+     * region (the deadlock guard, and the path a synchronous test scheduler takes) the read runs inline; otherwise
+     * it hops onto the entity thread and this thread waits on a latch for the clones to come back.
+     *
+     * <p>The three-argument {@link Scheduler#onEntity(PlayerRef, Runnable, Runnable) onEntity} is used so a viewer
+     * who has just logged off (a retired entity the scheduler silently drops) still releases the latch through the
+     * {@code retired} callback — the wait then returns an empty list rather than hanging for the full timeout. As in
+     * the roster snapshot, this wait is on the async list-resolution thread, never the main thread, so it is legal:
+     * the forbidden rule is blocking the <em>main</em> thread. No {@code CompletableFuture} is used.
+     */
+    private static List<ItemStack> selfStorage(
+            Scheduler scheduler, PlayerRef viewer, Function<Player, Inventory> pick) {
+        if (scheduler.ownsEntity(viewer)) {
+            return readStacks(viewer, pick);
+        }
+        AtomicReference<List<ItemStack>> holder = new AtomicReference<>(List.of());
+        CountDownLatch done = new CountDownLatch(1);
+        scheduler.onEntity(
+                viewer,
+                () -> {
+                    holder.set(readStacks(viewer, pick));
+                    done.countDown();
+                },
+                done::countDown);
+        return awaitSnapshot(done, holder);
+    }
+
+    /** Wait for a scheduled snapshot to fill {@code holder}, serving an empty list on timeout or interruption. */
+    private static <T> List<T> awaitSnapshot(CountDownLatch done, AtomicReference<List<T>> holder) {
         try {
             if (!done.await(SNAPSHOT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 return List.of();
@@ -107,6 +163,25 @@ public final class LiveDataSources {
             Thread.currentThread().interrupt();
             return List.of();
         }
+    }
+
+    /**
+     * The viewer's non-empty stacks from the chosen inventory, each defensively cloned, in slot order. A null or AIR
+     * slot is skipped so the rendered grid holds only real items, and an offline viewer yields an empty list. Runs on
+     * the viewer's entity thread, so touching the inventory here is Folia-safe.
+     */
+    private static List<ItemStack> readStacks(PlayerRef viewer, Function<Player, Inventory> pick) {
+        Player player = Bukkit.getPlayer(viewer.uuid());
+        if (player == null) {
+            return List.of();
+        }
+        List<ItemStack> stacks = new ArrayList<>();
+        for (ItemStack item : pick.apply(player).getContents()) {
+            if (item != null && !item.getType().isAir()) {
+                stacks.add(item.clone());
+            }
+        }
+        return stacks;
     }
 
     /** One entry per online player, captured on the global thread where the entity API is safe to touch. */
@@ -150,6 +225,15 @@ public final class LiveDataSources {
         return ctx.entry()
                 .filter(WorldEntry.class::isInstance)
                 .map(WorldEntry.class::cast)
+                .map(field)
+                .orElse("");
+    }
+
+    /** Read one field off the bound item-stack entry, or empty when the placeholder is used off such a list. */
+    private static String stack(MenuContext ctx, Function<ItemStack, String> field) {
+        return ctx.entry()
+                .filter(ItemStack.class::isInstance)
+                .map(ItemStack.class::cast)
                 .map(field)
                 .orElse("");
     }

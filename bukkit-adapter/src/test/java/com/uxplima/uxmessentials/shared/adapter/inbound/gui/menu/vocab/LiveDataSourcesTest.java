@@ -6,6 +6,9 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.function.Function;
 
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources.OnlinePlayerEntry;
@@ -14,6 +17,8 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
 
 /**
  * Pure unit coverage for the two ready-made live sources' Bukkit-free surface: the environment→icon mapping, the
@@ -61,11 +66,26 @@ class LiveDataSourcesTest {
     }
 
     @Test
+    void stackPlaceholdersReadTheBoundItemStack() {
+        ServerMock server = MockBukkit.mock();
+        try {
+            assertThat(server).isNotNull();
+            ItemStack stack = new ItemStack(Material.DIAMOND, 5);
+            assertThat(resolve("entry_type", stack)).isEqualTo("DIAMOND");
+            assertThat(resolve("entry_amount", stack)).isEqualTo("5");
+        } finally {
+            MockBukkit.unmock();
+        }
+    }
+
+    @Test
     void placeholderOffAnyListReturnsEmpty() {
         // No entry is bound (the placeholder was written on a static item), so it must render empty, not throw.
         MenuContext ctx = MenuContext.of(VIEWER, null, 0);
         assertThat(handler("online_player_name").apply(ctx)).isEmpty();
         assertThat(handler("worlds_name").apply(ctx)).isEmpty();
+        assertThat(handler("entry_type").apply(ctx)).isEmpty();
+        assertThat(handler("entry_amount").apply(ctx)).isEmpty();
     }
 
     @Test
@@ -74,6 +94,9 @@ class LiveDataSourcesTest {
         assertThat(resolve("worlds_name", new OnlinePlayerEntry("Alice", ENTRY_UUID, "world", 0, "SURVIVAL")))
                 .isEmpty();
         assertThat(resolve("online_player_name", new WorldEntry("world", "NORMAL", 0, true)))
+                .isEmpty();
+        // An item-stack placeholder bound to a non-stack entry must also degrade to empty rather than throw.
+        assertThat(resolve("entry_type", new WorldEntry("world", "NORMAL", 0, true)))
                 .isEmpty();
     }
 
