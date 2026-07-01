@@ -10,6 +10,8 @@ import java.util.function.Function;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProvider;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
@@ -21,7 +23,9 @@ import org.jspecify.annotations.NullMarked;
  * same registries the renderer and click listener resolve against — so a handler registered through the façade is
  * seen by the already-built engine, and a duplicate id throws just as an internal registration would. {@link
  * #buildItem} defers to the composition-root {@link ItemRenderer}, so a custom-built item resolves its material
- * providers and placeholders identically to a menu icon.
+ * providers and placeholders identically to a menu icon. {@link #registerIconProvider} appends to the same live
+ * {@link IconProviderRegistry} the composition-root renderer's chain consults, so a custom material-spec prefix
+ * registered here resolves on the very next render.
  */
 @NullMarked
 public final class MenuApiImpl implements MenuApi {
@@ -30,9 +34,12 @@ public final class MenuApiImpl implements MenuApi {
 
     private final ItemRenderer itemRenderer;
 
-    public MenuApiImpl(MenuBindings bindings, ItemRenderer itemRenderer) {
+    private final IconProviderRegistry iconProviders;
+
+    public MenuApiImpl(MenuBindings bindings, ItemRenderer itemRenderer, IconProviderRegistry iconProviders) {
         this.bindings = Objects.requireNonNull(bindings, "bindings");
         this.itemRenderer = Objects.requireNonNull(itemRenderer, "itemRenderer");
+        this.iconProviders = Objects.requireNonNull(iconProviders, "iconProviders");
     }
 
     @Override
@@ -61,6 +68,12 @@ public final class MenuApiImpl implements MenuApi {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(handler, "handler");
         bindings.list(id, handler);
+    }
+
+    @Override
+    public void registerIconProvider(IconProvider provider) {
+        Objects.requireNonNull(provider, "provider");
+        iconProviders.register(provider);
     }
 
     @Override

@@ -27,6 +27,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
@@ -76,7 +78,9 @@ class MenuApiGoldenTest {
 
         bindings = new MenuBindings();
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        IconProviderRegistry runtimeIcons = new IconProviderRegistry();
+        ItemRenderer itemRenderer = new ItemRenderer(
+                guiText, bindings.placeholders(), IconProviders.defaults().withRuntime(runtimeIcons));
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
         loader = new MenuSpecLoader();
@@ -86,7 +90,7 @@ class MenuApiGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
 
         // Register the façade exactly as bootstrap does, so every test loads it back the way a consumer would.
-        MenuApi api = new MenuApiImpl(bindings, itemRenderer);
+        MenuApi api = new MenuApiImpl(bindings, itemRenderer, runtimeIcons);
         server.getServicesManager().register(MenuApi.class, api, plugin, ServicePriority.Normal);
     }
 

@@ -8,6 +8,7 @@ import java.util.function.Function;
 
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProvider;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
@@ -87,6 +88,20 @@ public interface MenuApi {
      * @throws IllegalStateException if a list source is already registered under {@code id}
      */
     void registerListSource(String id, Function<MenuContext, List<?>> handler);
+
+    /**
+     * Register a custom icon source. The provider claims its own material-spec prefix (say {@code myplugin:<id>})
+     * and returns the base {@link ItemStack} for a spec it owns, or {@link java.util.Optional#empty()} for one it
+     * does not, so a menu item written {@code material = "myplugin:foo"} renders through it. It is consulted
+     * <em>after</em> the built-in providers (skull, equipment, HeadDatabase, the item-plugin integrations), so it
+     * only adds new prefixes and can never shadow a built-in.
+     *
+     * <p>Register on your own plugin's enable, the same register-on-enable contract the other {@code register*}
+     * methods carry; a provider registered after this host has enabled is still seen, on the next render. The
+     * provider's {@link IconProvider#icon} is invoked on the viewer's own region thread (the render thread on
+     * Folia), so it must read only the viewer's state and never block.
+     */
+    void registerIconProvider(IconProvider provider);
 
     /**
      * Render {@code spec} to the {@link ItemStack} a viewer would see, resolving its material spec through the icon

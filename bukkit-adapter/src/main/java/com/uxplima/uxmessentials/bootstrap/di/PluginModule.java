@@ -88,6 +88,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
@@ -261,18 +262,23 @@ public final class PluginModule {
         // and the HeadDatabase provider over the just-resolved hook. So skull:/itemsadder:/hdb: etc. resolve when
         // the backing plugin is installed and degrade to the plain material when it is not. The plain two-arg
         // ItemRenderer used by feature menus uses only the no-dependency default chain (skull + equipment); this
-        // composition-root renderer adds the plugin-backed sources.
+        // composition-root renderer adds the plugin-backed sources. The runtime tail is the seam the dev-API adds
+        // to: one shared IconProviderRegistry the renderer's chain consults after every built-in, so a plugin that
+        // registers a custom material-spec prefix through MenuApi resolves on the very next render — and, being
+        // last, can never shadow a built-in prefix.
+        IconProviderRegistry runtimeIcons = new IconProviderRegistry();
         ItemRenderer menuItemRenderer = new ItemRenderer(
                 guiText,
                 menuBindings.placeholders(),
-                IconProviders.full(plugin.getServer(), kernel.log(), hooks.capability(HeadQuery.class)));
+                IconProviders.full(plugin.getServer(), kernel.log(), hooks.capability(HeadQuery.class))
+                        .withRuntime(runtimeIcons));
         MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions());
         // The public dev-API: another plugin loads MenuApi from the ServicesManager to register its own actions
-        // (which cover custom buttons), requirements, placeholders and list sources into these very bindings, and to
-        // build a menu-styled item through this same renderer. Registered at Normal so a menu that names a custom id
-        // resolves it after the owning plugin has enabled and re-validated (via /uxmess reload or /menu reload). Paper
-        // clears the ServicesManager on disable, so no explicit teardown is needed here.
-        MenuApi menuApi = new MenuApiImpl(menuBindings, menuItemRenderer);
+        // (which cover custom buttons), requirements, placeholders, list sources and icon providers into these very
+        // bindings, and to build a menu-styled item through this same renderer. Registered at Normal so a menu that
+        // names a custom id resolves it after the owning plugin has enabled and re-validated (via /uxmess reload or
+        // /menu reload). Paper clears the ServicesManager on disable, so no explicit teardown is needed here.
+        MenuApi menuApi = new MenuApiImpl(menuBindings, menuItemRenderer, runtimeIcons);
         plugin.getServer().getServicesManager().register(MenuApi.class, menuApi, plugin, ServicePriority.Normal);
         kernel.log().info("event=menu_api_registered");
         // The editor renderer is the typed-property capability the same engine grows: a property editor is a
