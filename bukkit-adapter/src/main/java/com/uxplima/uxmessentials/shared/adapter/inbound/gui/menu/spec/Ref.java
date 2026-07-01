@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.jspecify.annotations.Nullable;
 
@@ -83,6 +85,36 @@ public record Ref(String id, Map<String, String> args, int delayTicks, double ch
      */
     public Ref withIdAndArgs(String id, Map<String, String> args) {
         return new Ref(id, args, delayTicks, chance, deny);
+    }
+
+    /**
+     * Resolve this ref against a registry of ids, doing the split {@link #parse} is too registry-blind to do. When the
+     * whole id is already registered, or it carries no colon, the ref is returned unchanged — a feature ref
+     * ({@code economy:open-bank}) and an already-split generic ({@code sound:x}) both take that path, so their identity
+     * is preserved byte-for-byte. Otherwise the token is split on its first colon, and when the head is a registered id
+     * this returns a copy re-keyed to that head with the tail carried as {@code value} (the per-action modifiers ride
+     * along through {@link #withIdAndArgs}); when neither the whole id nor the head is known, the ref is returned
+     * unchanged so it misses the registry exactly as it would have.
+     *
+     * <p>Pure by design: the caller supplies {@code isRegistered} — an action registry's or a condition registry's
+     * {@code has} — so this stays Bukkit-free and is shared by both the runtime's action path and the three condition
+     * sites (startup validation, click gating, view gating). A valued condition written {@code has-money:100} therefore
+     * resolves the same way {@code give-money:100} does on the action side.
+     */
+    public Ref resolve(Predicate<String> isRegistered) {
+        Objects.requireNonNull(isRegistered, "isRegistered");
+        int colon = id.indexOf(':');
+        if (colon < 0 || isRegistered.test(id)) {
+            return this;
+        }
+        String head = id.substring(0, colon);
+        if (!isRegistered.test(head)) {
+            return this;
+        }
+        // Split on the first colon only, so a value that itself carries colons ("Steve hi:there") stays whole.
+        Map<String, String> merged = new HashMap<>(args);
+        merged.put("value", id.substring(colon + 1));
+        return withIdAndArgs(head, merged);
     }
 
     /**

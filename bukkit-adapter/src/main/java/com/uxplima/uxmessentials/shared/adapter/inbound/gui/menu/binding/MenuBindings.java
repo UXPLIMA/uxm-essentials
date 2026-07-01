@@ -146,9 +146,15 @@ public final class MenuBindings {
         }
     }
 
+    /**
+     * Collect the refs in {@code refs} whose id no registry knows. A ref is first resolved against {@code known}
+     * (the matching registry's {@code has}), so a valued token written {@code has-money:100} counts as known when its
+     * head {@code has-money} is registered — the same registry-aware split the runtime does at dispatch/render time.
+     * The original written token is reported when it is still unknown, so an operator sees exactly what they typed.
+     */
     private void addMissing(List<Ref> refs, Predicate<String> known, Set<String> missing) {
         for (Ref ref : refs) {
-            if (!known.test(ref.id())) {
+            if (!known.test(ref.resolve(known).id())) {
                 missing.add(ref.id());
             }
         }

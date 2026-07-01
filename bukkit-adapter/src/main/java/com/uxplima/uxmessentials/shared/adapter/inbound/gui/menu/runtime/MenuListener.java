@@ -2,9 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -351,11 +349,14 @@ public final class MenuListener implements Listener {
     /**
      * Whether every condition the spec bound to this gesture passes. Both the gesture's own conditions and the
      * shared {@link ClickKind#ANY} list must hold; an unregistered condition fails closed so a wiring gap blocks
-     * the click rather than silently running it. An empty condition list always passes.
+     * the click rather than silently running it. An empty condition list always passes. Each ref is first resolved
+     * against the condition registry, so a valued condition written {@code has-money:100} splits its head off and the
+     * handler sees {@code value=100} in its args — the same registry-aware split the action path takes.
      */
     private boolean clickConditionsPass(ClickSpec click, ClickKind kind, MenuContext ctx) {
         for (Ref ref : merged(click.conditions().get(kind), click.conditions().get(ClickKind.ANY))) {
-            if (!conditions.get(ref.id()).map(p -> p.test(ctx, ref.args())).orElse(false)) {
+            Ref eff = ref.resolve(conditions::has);
+            if (!conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false)) {
                 return false;
             }
         }
@@ -399,30 +400,16 @@ public final class MenuListener implements Listener {
 
     /**
      * Resolve a bound ref to the effective ref the registry actually dispatches. {@link Ref#parse} is registry-blind:
-     * it only splits an {@code id:value} token when the head is one of a few well-known generic prefixes, so a
-     * later generic action written as {@code [give-money:100]} arrives here with the whole token as its id and would
-     * miss the registry (a silent no-op). This is the one place that holds the action registry, so it does the
-     * authoritative split the parser could not: when neither the whole id nor a registered head resolves, the ref is
-     * returned unchanged and misses exactly as before (no behaviour change on that path). The modifiers ride along
-     * through {@link Ref#withIdAndArgs}, so a re-split action keeps its delay/chance/deny.
-     *
-     * <p>A feature ref ({@code economy:open-bank}) and an already-split generic ({@code sound:x}) both take the early
-     * return, so their dispatch stays byte-identical. Phase 3's valued conditions will want the same registry-aware
-     * split against the condition registry.
+     * it only splits an {@code id:value} token when the head is one of a few well-known generic prefixes, so a later
+     * generic action written as {@code [give-money:100]} arrives here with the whole token as its id and would miss the
+     * registry (a silent no-op). The authoritative split now lives on {@link Ref#resolve(java.util.function.Predicate)},
+     * which this hands the action registry's {@code has}: a registered head re-splits (modifiers riding along), and a
+     * feature ref ({@code economy:open-bank}) or an already-split generic ({@code sound:x}) is returned unchanged so its
+     * dispatch stays byte-identical. The very same {@code Ref.resolve} gates the condition sites against the condition
+     * registry, so a valued condition ({@code has-money:100}) reaches its handler the same way.
      */
     private Ref resolveEffective(Ref ref) {
-        int colon = ref.id().indexOf(':');
-        if (colon < 0 || actions.has(ref.id())) {
-            return ref;
-        }
-        String head = ref.id().substring(0, colon);
-        if (!actions.has(head)) {
-            return ref;
-        }
-        // Split on the first colon only, so a value that itself carries colons ("Steve hi:there") stays whole.
-        Map<String, String> merged = new HashMap<>(ref.args());
-        merged.put("value", ref.id().substring(colon + 1));
-        return ref.withIdAndArgs(head, merged);
+        return ref.resolve(actions::has);
     }
 
     /**

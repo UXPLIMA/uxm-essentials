@@ -97,6 +97,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocab
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -347,6 +348,13 @@ public final class PluginModule {
         PlayerMeta menuPlayerMeta = new PlayerMeta(plugin);
         ItemActions.register(menuBindings, kernel.log());
         DataActions.register(menuBindings, playerData, menuPlayerMeta, kernel.log());
+        // The requirement slice of the condition vocabulary (has-money/exp/level/item/meta/empty-slots,
+        // check-inventory) registers alongside the generic conditions; like the action slices it has its own entry
+        // point so the MenuVocabulary.registerConditions signature stays untouched. It reads the same multi-currency
+        // façade the economy actions do and the same PDC accessor the meta actions do, and every condition fails
+        // closed. Registered into the live MenuBindings before the specs are validated, so a valued condition
+        // resolves at startup.
+        RequirementConditions.register(menuBindings, menuCurrencies, menuPlayerMeta, kernel.log());
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import org.junit.jupiter.api.Test;
@@ -96,6 +97,66 @@ class RefTest {
         Ref r = Ref.parse("message:Steve hi:there");
         assertThat(r.id()).isEqualTo("message");
         assertThat(r.value()).isEqualTo("Steve hi:there");
+    }
+
+    @Test
+    void resolveLeavesARegisteredWholeTokenUnchanged() {
+        // A feature ref whose whole id is registered (colon and all) resolves to itself — same identity, not re-split.
+        Ref feature = Ref.parse("economy:open-bank");
+        Ref resolved = feature.resolve(Set.of("economy:open-bank")::contains);
+        assertThat(resolved).isSameAs(feature);
+        assertThat(resolved.id()).isEqualTo("economy:open-bank");
+        assertThat(resolved.value()).isEmpty();
+    }
+
+    @Test
+    void resolveSplitsWhenOnlyTheHeadIsRegistered() {
+        // has-money is registered but has-money:100 is not, so the head splits off and the tail becomes the value.
+        Ref whole = Ref.parse("has-money:100");
+        assertThat(whole.id()).as("the parser left it whole").isEqualTo("has-money:100");
+
+        Ref resolved = whole.resolve(Set.of("has-money")::contains);
+
+        assertThat(resolved.id()).isEqualTo("has-money");
+        assertThat(resolved.value()).isEqualTo("100");
+    }
+
+    @Test
+    void resolveSplitsOnTheFirstColonOnly() {
+        Ref resolved = Ref.parse("has-money:50 coinsengine:gold").resolve(Set.of("has-money")::contains);
+        assertThat(resolved.id()).isEqualTo("has-money");
+        assertThat(resolved.value())
+                .as("only the first colon splits, so a valued sub-spec survives")
+                .isEqualTo("50 coinsengine:gold");
+    }
+
+    @Test
+    void resolveLeavesATokenUnchangedWhenNeitherWholeNorHeadIsRegistered() {
+        Ref unknown = Ref.parse("mystery:thing");
+        Ref resolved = unknown.resolve(Set.of("has-money")::contains);
+        assertThat(resolved)
+                .as("neither the whole id nor its head resolves, so it misses just as before")
+                .isSameAs(unknown);
+    }
+
+    @Test
+    void resolveLeavesAColonFreeTokenUnchanged() {
+        Ref bare = Ref.parse("has-prev");
+        assertThat(bare.resolve(Set.<String>of()::contains)).isSameAs(bare);
+    }
+
+    @Test
+    void resolveKeepsTheModifiersThroughTheSplit() {
+        Ref deny = Ref.parse("message:no");
+        Ref whole = Ref.parse("has-money:100").withModifiers(20, 25.0, deny);
+
+        Ref resolved = whole.resolve(Set.of("has-money")::contains);
+
+        assertThat(resolved.id()).isEqualTo("has-money");
+        assertThat(resolved.value()).isEqualTo("100");
+        assertThat(resolved.delayTicks()).isEqualTo(20);
+        assertThat(resolved.chance()).isEqualTo(25.0);
+        assertThat(resolved.deny()).contains(deny);
     }
 
     @Test
