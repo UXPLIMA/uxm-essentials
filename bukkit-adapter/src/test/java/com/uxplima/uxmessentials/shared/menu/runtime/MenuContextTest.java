@@ -73,4 +73,45 @@ class MenuContextTest {
         assertThat(base.withPageCount(4).localPlaceholders()).containsEntry("header", "Shop");
         assertThat(base.withEntry("row").localPlaceholders()).containsEntry("header", "Shop");
     }
+
+    @Test
+    void aFreshContextAttributesTheOpenToTheViewer() {
+        var viewer = new PlayerRef(UUID.randomUUID(), "Viewer");
+        var ctx = MenuContext.of(viewer, null, 0);
+
+        assertThat(ctx.executor())
+                .as("a self-open's executor defaults to the viewer")
+                .isEqualTo(viewer);
+    }
+
+    @Test
+    void withExecutorSetsTheOpener() {
+        var viewer = new PlayerRef(UUID.randomUUID(), "Target");
+        var opener = new PlayerRef(UUID.randomUUID(), "Opener");
+        var ctx = MenuContext.of(viewer, null, 0).withExecutor(opener);
+
+        assertThat(ctx.executor()).isEqualTo(opener);
+        assertThat(ctx.viewer())
+                .as("the viewer is untouched — only who triggered the open changes")
+                .isEqualTo(viewer);
+    }
+
+    @Test
+    void copiesPreserveTheExecutor() {
+        var viewer = new PlayerRef(UUID.randomUUID(), "Target");
+        var opener = new PlayerRef(UUID.randomUUID(), "Opener");
+        var base = MenuContext.of(viewer, null, 0).withExecutor(opener);
+
+        assertThat(base.withPage(2).executor()).isEqualTo(opener);
+        assertThat(base.withPageCount(4).executor()).isEqualTo(opener);
+        assertThat(base.withEntry("row").executor()).isEqualTo(opener);
+        assertThat(base.withLocalPlaceholders(Map.of("header", "Shop")).executor())
+                .isEqualTo(opener);
+    }
+
+    @Test
+    void withExecutorRejectsNull() {
+        var ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        assertThatThrownBy(() -> ctx.withExecutor(null)).isInstanceOf(NullPointerException.class);
+    }
 }

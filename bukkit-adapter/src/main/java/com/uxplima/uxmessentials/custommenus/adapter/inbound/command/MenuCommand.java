@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -129,8 +130,11 @@ public final class MenuCommand implements CommandRegistration {
      * not-found line the self-open does before any target work. The target is resolved from the single-player
      * selector; a selector that matches nobody draws the shared unknown-player line rather than opening an empty
      * window. The sender may be a player or the console — this never opens for the sender, only for the resolved
-     * target, so the console can legitimately push a menu to a real player. The menu itself opens on the target's
-     * own region thread through the {@link Menus} facade, so cross-region opens stay Folia-safe.
+     * target, so the console can legitimately push a menu to a real player. The open is attributed to the sender as
+     * the executor so the opened menu can show {@code %executor%} distinct from {@code %player%} (the target): a player
+     * sender becomes that executor, and a console sender — which carries no {@link PlayerRef} — falls back to the
+     * target, so {@code %executor%} still resolves to a real name rather than an empty token. The menu itself opens on
+     * the target's own region thread through the {@link Menus} facade, so cross-region opens stay Folia-safe.
      */
     private int openForOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         CommandSender sender = ctx.getSource().getSender();
@@ -144,7 +148,8 @@ public final class MenuCommand implements CommandRegistration {
             feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
             return 0;
         }
-        menus.open(BukkitRefs.toRef(target), name, null);
+        PlayerRef executor = sender instanceof Player p ? BukkitRefs.toRef(p) : BukkitRefs.toRef(target);
+        menus.open(BukkitRefs.toRef(target), name, null, 0, Map.of(), executor);
         feedback.send(sender, CustomMenusMessageKey.MENU_OPENED_FOR, Map.of("player", target.getName()));
         return Command.SINGLE_SUCCESS;
     }

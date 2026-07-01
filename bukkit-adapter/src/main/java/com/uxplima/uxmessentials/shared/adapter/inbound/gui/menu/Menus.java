@@ -200,15 +200,36 @@ public final class Menus {
      */
     public void open(
             PlayerRef viewer, String specId, @Nullable Object subject, int page, Map<String, String> arguments) {
-        openInternal(viewer, specId, subject, page, arguments, true);
+        openInternal(viewer, specId, subject, page, arguments, viewer, true);
+    }
+
+    /**
+     * Open the spec for {@code viewer}, the player who <em>sees</em> the menu, while attributing the open to
+     * {@code executor}, the player who <em>triggered</em> it — the overload {@code /menu open <name> <target>} reaches
+     * for. The viewer is the target, so {@code %player%} and every player-scoped placeholder still resolve against the
+     * target as with any open; the executor rides the {@link MenuContext} so the menu the target sees can expand
+     * {@code %executor%} to the opener, distinct from {@code %player%}. An ordinary self-open passes the viewer as the
+     * executor (the other overloads do this for you), so the two read the same. A negative page is clamped to zero; an
+     * unknown spec id fails loudly here.
+     */
+    public void open(
+            PlayerRef viewer,
+            String specId,
+            @Nullable Object subject,
+            int page,
+            Map<String, String> arguments,
+            PlayerRef executor) {
+        openInternal(viewer, specId, subject, page, arguments, executor, true);
     }
 
     /**
      * The shared open body every public {@link #open} overload and the internal {@link #reopen} route through. It
      * resolves the spec, clamps the page, resolves list sources off the tick thread, then shows the window on the
-     * viewer's entity thread. {@code record} decides whether the open joins the viewer's {@code /menu last} / back
-     * history: a fresh open records (subject permitting), a back-step or reopen-last replays an already-recorded open
-     * and must not push it again — otherwise stepping back would immediately re-stack what it just popped.
+     * viewer's entity thread. {@code executor} is who triggered the open — the viewer itself for a self-open, the
+     * opener for an open-for-another — carried through so {@code %executor%} can name it distinctly from the viewer's
+     * {@code %player%}. {@code record} decides whether the open joins the viewer's {@code /menu last} / back history: a
+     * fresh open records (subject permitting), a back-step or reopen-last replays an already-recorded open and must not
+     * push it again — otherwise stepping back would immediately re-stack what it just popped.
      */
     private void openInternal(
             PlayerRef viewer,
@@ -216,21 +237,26 @@ public final class Menus {
             @Nullable Object subject,
             int page,
             Map<String, String> arguments,
+            PlayerRef executor,
             boolean record) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(specId, "specId");
         Objects.requireNonNull(arguments, "arguments");
+        Objects.requireNonNull(executor, "executor");
         MenuSpec spec = specs.get(specId);
         if (spec == null) {
             throw new IllegalArgumentException("no menu spec registered under id: " + specId);
         }
         int startPage = Math.max(0, page);
         Map<String, String> args = Map.copyOf(arguments);
-        MenuContext ctx = MenuContext.of(viewer, subject, startPage, args).withLocalPlaceholders(spec.placeholders());
+        MenuContext ctx = MenuContext.of(viewer, subject, startPage, args)
+                .withLocalPlaceholders(spec.placeholders())
+                .withExecutor(executor);
         scheduler.async(() -> {
             Map<String, List<?>> resolved = resolveLists(spec, ctx);
             scheduler.onEntity(
-                    viewer, () -> openResolved(viewer, specId, spec, subject, resolved, startPage, args, record));
+                    viewer,
+                    () -> openResolved(viewer, specId, spec, subject, resolved, startPage, args, executor, record));
         });
     }
 
@@ -269,9 +295,14 @@ public final class Menus {
         return last.isPresent();
     }
 
-    /** Replay a recorded open — same page and typed arguments, always subject-less — without recording it again. */
+    /**
+     * Replay a recorded open — same page and typed arguments, always subject-less — without recording it again. The
+     * back history does not track who originally triggered the open, so the reopen is attributed to the viewer (the
+     * player stepping back is looking at their own menu); a menu that leaned on {@code %executor%} would read the
+     * viewer here rather than the long-gone original opener.
+     */
     private void reopen(PlayerRef viewer, LastMenu.LastOpen open) {
-        openInternal(viewer, open.menuId(), null, open.page(), open.arguments(), false);
+        openInternal(viewer, open.menuId(), null, open.page(), open.arguments(), viewer, false);
     }
 
     /** Close whatever window {@code viewer} has open, on their entity thread — the back-step to nothing / null-history path. */
@@ -570,14 +601,18 @@ public final class Menus {
             Map<String, List<?>> resolved,
             int page,
             Map<String, String> arguments,
+            PlayerRef executor,
             boolean record) {
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live == null || !live.isOnline()) {
             return;
         }
-        // Attach the spec's own placeholders {} block so the renderer resolves its %name% tokens local-first; the
-        // holder carries this ctx, so a refresh/re-render reads it back and keeps the local map through the redraw.
-        MenuContext ctx = MenuContext.of(viewer, subject, page, arguments).withLocalPlaceholders(spec.placeholders());
+        // Attach the spec's own placeholders {} block so the renderer resolves its %name% tokens local-first, and the
+        // executor so %executor% names the opener; the holder carries this ctx, so a refresh/re-render reads it back
+        // and keeps both the local map and the executor through the redraw.
+        MenuContext ctx = MenuContext.of(viewer, subject, page, arguments)
+                .withLocalPlaceholders(spec.placeholders())
+                .withExecutor(executor);
         if (!gateOpen(spec, ctx)) {
             return;
         }

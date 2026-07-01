@@ -167,14 +167,19 @@ public final class MenuVocabulary {
     }
 
     /**
-     * Register the generic placeholders into {@code bindings}. {@code player} expands to the viewer's name,
-     * {@code page} to the one-based current page number for display ({@code ctx.page()} is zero-based), and
-     * {@code max_page} to the total page count the renderer stamps onto the context before drawing static items, so a
-     * "Page %page%/%max_page%" indicator reads the same count its list paginates across.
+     * Register the generic placeholders into {@code bindings}. {@code player} expands to the viewer's name — the
+     * player the menu is rendered for, whom every player-scoped placeholder resolves against, so on a menu opened for
+     * another player it is that target; {@code executor} expands to the name of whoever triggered the open, which is
+     * the same player for an ordinary self-open (so {@code %executor%} then reads identically to {@code %player%}) and
+     * the opener when the menu was opened for another player; {@code page} to the one-based current page number for
+     * display ({@code ctx.page()} is zero-based); and {@code max_page} to the total page count the renderer stamps onto
+     * the context before drawing static items, so a "Page %page%/%max_page%" indicator reads the same count its list
+     * paginates across.
      */
     public static void registerPlaceholders(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
         bindings.placeholder("player", ctx -> ctx.viewer().name());
+        bindings.placeholder("executor", ctx -> ctx.executor().name());
         bindings.placeholder("page", ctx -> String.valueOf(ctx.page() + 1));
         bindings.placeholder("max_page", ctx -> String.valueOf(ctx.pageCount()));
     }

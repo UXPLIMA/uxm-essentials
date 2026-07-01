@@ -11,18 +11,26 @@ import org.jspecify.annotations.Nullable;
  * The per-open data a menu binding sees: who is viewing, the optional domain subject the menu was opened for
  * (a warp, a home owner, ...), the current page, — while a list is rendered or clicked — the live list element,
  * any typed command arguments the menu was opened with (an operator {@code command {}} block's
- * {@code %argument_<name>%} values), and the menu's own local placeholder definitions. The engine creates it; it is
- * public only so feature binding lambdas can read it.
+ * {@code %argument_<name>%} values), the menu's own local placeholder definitions, and who triggered the open.
+ * The engine creates it; it is public only so feature binding lambdas can read it.
+ *
+ * <p>The {@code viewer} is who <em>sees</em> the menu — the player it is rendered for and the one every
+ * player-scoped placeholder ({@code %player%}, {@code %stat_*%}, {@code %data_*%}, inventory, PAPI) resolves
+ * against. The {@code executor} is who <em>triggered</em> the open. They are the same player for an ordinary
+ * self-open, so {@code %executor%} then reads identically to {@code %player%}. They diverge only when a menu is
+ * opened for another player — {@code /menu open <name> <target>} — where the viewer is the target and the executor
+ * is the opener, so a menu the target sees can show "opened for you by {@code %executor%}" distinct from the target
+ * named by {@code %player%}. The executor defaults to the viewer, so every existing open is unaffected.
  *
  * <p>The {@code localPlaceholders} map is the open spec's {@code placeholders {}} block — {@code name -> template}
  * pairs the renderer resolves local-first, so a menu can define or override a {@code %name%} token for itself alone.
  * It is empty for a menu that declares no such block, and for every engine child window (a list/confirm/selector/
  * editor), whose minimal spec carries none.
  *
- * <p>Immutable. {@link #withEntry}, {@link #withPage}, {@link #withPageCount} and {@link #withLocalPlaceholders}
- * return copies rather than mutating, because the same base context is reused across every slot of a list page and
- * must not leak one element's identity into the next; each copy carries the open's arguments and local placeholders
- * through unchanged.
+ * <p>Immutable. {@link #withEntry}, {@link #withPage}, {@link #withPageCount}, {@link #withLocalPlaceholders} and
+ * {@link #withExecutor} return copies rather than mutating, because the same base context is reused across every slot
+ * of a list page and must not leak one element's identity into the next; each copy carries the open's arguments,
+ * local placeholders and executor through unchanged.
  */
 public final class MenuContext {
 
@@ -40,6 +48,8 @@ public final class MenuContext {
 
     private final Map<String, String> localPlaceholders;
 
+    private final PlayerRef executor;
+
     private MenuContext(
             PlayerRef viewer,
             @Nullable Object subject,
@@ -47,7 +57,8 @@ public final class MenuContext {
             int pageCount,
             @Nullable Object entry,
             Map<String, String> arguments,
-            Map<String, String> localPlaceholders) {
+            Map<String, String> localPlaceholders,
+            PlayerRef executor) {
         this.viewer = Objects.requireNonNull(viewer, "viewer");
         this.subject = subject;
         this.page = page;
@@ -55,6 +66,7 @@ public final class MenuContext {
         this.entry = entry;
         this.arguments = Objects.requireNonNull(arguments, "arguments");
         this.localPlaceholders = Objects.requireNonNull(localPlaceholders, "localPlaceholders");
+        this.executor = Objects.requireNonNull(executor, "executor");
     }
 
     /** Opens a fresh context with no list element bound yet and a single-page count until the renderer knows better. */
@@ -69,11 +81,20 @@ public final class MenuContext {
      * placeholders start empty here; the engine attaches the open spec's block via {@link #withLocalPlaceholders}.
      */
     public static MenuContext of(PlayerRef viewer, @Nullable Object subject, int page, Map<String, String> arguments) {
-        return new MenuContext(viewer, subject, page, 1, null, Map.copyOf(arguments), Map.of());
+        return new MenuContext(viewer, subject, page, 1, null, Map.copyOf(arguments), Map.of(), viewer);
     }
 
     public PlayerRef viewer() {
         return viewer;
+    }
+
+    /**
+     * Who triggered this open — the same player as {@link #viewer()} for an ordinary self-open, and the opener when a
+     * menu was opened for another player. The renderer reads it to expand {@code %executor%}; unlike {@code %player%}
+     * (the viewer, whom every player-scoped placeholder resolves against) this is never re-pointed at the subject.
+     */
+    public PlayerRef executor() {
+        return executor;
     }
 
     public int page() {
@@ -134,20 +155,20 @@ public final class MenuContext {
         return type.cast(value);
     }
 
-    /** A copy bound to one list element, leaving viewer, subject, page, page count, arguments and locals untouched. */
+    /** A copy bound to one list element, leaving viewer, subject, page, page count, arguments, locals and executor untouched. */
     public MenuContext withEntry(Object entry) {
         Objects.requireNonNull(entry, "entry");
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
     }
 
     /** A copy on a new page, used when the renderer or listener advances pagination; resets nothing else. */
     public MenuContext withPage(int page) {
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
     }
 
     /** A copy carrying the page count the renderer computed, so a static item's {@code %max_page%} can read it. */
     public MenuContext withPageCount(int pageCount) {
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders);
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
     }
 
     /**
@@ -157,6 +178,18 @@ public final class MenuContext {
      */
     public MenuContext withLocalPlaceholders(Map<String, String> localPlaceholders) {
         Objects.requireNonNull(localPlaceholders, "localPlaceholders");
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, Map.copyOf(localPlaceholders));
+        return new MenuContext(
+                viewer, subject, page, pageCount, entry, arguments, Map.copyOf(localPlaceholders), executor);
+    }
+
+    /**
+     * A copy attributing the open to {@code executor} — who triggered it — while leaving the viewer and every other
+     * field untouched. The engine attaches this when a menu is opened for another player so {@code %executor%} names
+     * the opener while {@code %player%} still names the viewing target; an ordinary self-open never calls it and keeps
+     * the executor defaulted to the viewer.
+     */
+    public MenuContext withExecutor(PlayerRef executor) {
+        Objects.requireNonNull(executor, "executor");
+        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
     }
 }

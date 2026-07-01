@@ -117,6 +117,20 @@ class MenuCommandTest {
     }
 
     @Test
+    void openForOtherAttributesTheOpenToTheCommandSender() {
+        PlayerMock steve = server.addPlayer("Steve");
+
+        execute("menu open shop Steve", player);
+
+        MenuHolder holder =
+                (MenuHolder) steve.getOpenInventory().getTopInventory().getHolder();
+        // The viewer is the target (so %player% and every player-scoped placeholder resolve against Steve), while the
+        // executor is the operator who ran the command (so %executor% names the opener, distinct from %player%).
+        assertThat(holder.ctx().viewer().name()).isEqualTo("Steve");
+        assertThat(holder.ctx().executor().name()).isEqualTo("Operator");
+    }
+
+    @Test
     void openForOtherIsHiddenWithoutTheOthersNodeButSelfOpenStillWorks() {
         PlayerMock plain = server.addPlayer("Plain"); // holds use but not the open.others node
         plain.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.menu.use", true);
