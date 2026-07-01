@@ -89,6 +89,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
@@ -106,6 +107,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.NbtApiHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
@@ -305,7 +307,13 @@ public final class PluginModule {
         // with no explicit currency spec falls back to. Phase-2/3 vocab reads this façade from resources.currencies().
         String defaultCurrency =
                 config.scoped(ModuleId.of("custommenus").configRoot()).getString("default-currency", "vault");
-        resources.currencies(new Currencies(hooks, plugin.getServer(), kernel.log(), defaultCurrency));
+        Currencies menuCurrencies = new Currencies(hooks, plugin.getServer(), kernel.log(), defaultCurrency);
+        resources.currencies(menuCurrencies);
+        // The economy slice of the vocabulary (give/take/set-money, give/take exp|levels|permission, points) is the
+        // first consumer of that façade; it also grants/revokes permission nodes through the Vault permission seam,
+        // a graceful no-op when Vault is absent. Registered here, after the currencies exist, into the same live
+        // MenuBindings the earlier slices wrote to — its actions() registry is shared, so a click sees it at once.
+        EconomyActions.register(menuBindings, menuCurrencies, hooks.capability(PermissionQuery.class), kernel.log());
 
         // The persistent player-data store reuses the plugin database (the same Flyway+jOOQ pattern every context
         // uses, V68's menu_player_data table) behind an in-memory cache, so the Phase-2 data actions and the Phase-6
