@@ -128,7 +128,10 @@ public final class MenuSpecLoader {
                     // The menu's own `placeholders {}` block — custom %name% tokens scoped to this one menu, distinct
                     // from the `patterns {}` block above and from the shared menus/placeholders.conf file. A missing
                     // block flattens to an empty map, so a menu without it is unchanged.
-                    varMap(root.node("placeholders")));
+                    varMap(root.node("placeholders")),
+                    // The per-menu click-cooldown in milliseconds. Absent → 0 → the menu defers to the server-wide
+                    // default, so a menu without the key opens and behaves exactly as before.
+                    root.node("click-cooldown").getLong(0));
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }
@@ -891,6 +894,12 @@ public final class MenuSpecLoader {
         keys.put("shift_right", ClickKind.SHIFT_RIGHT);
         keys.put("shift-right", ClickKind.SHIFT_RIGHT);
         keys.put("middle", ClickKind.MIDDLE);
+        keys.put("drop", ClickKind.DROP);
+        keys.put("control_drop", ClickKind.CONTROL_DROP);
+        keys.put("control-drop", ClickKind.CONTROL_DROP);
+        keys.put("ctrl_drop", ClickKind.CONTROL_DROP);
+        keys.put("double_click", ClickKind.DOUBLE_CLICK);
+        keys.put("double-click", ClickKind.DOUBLE_CLICK);
         keys.put("any", ClickKind.ANY);
         return Map.copyOf(keys);
     }

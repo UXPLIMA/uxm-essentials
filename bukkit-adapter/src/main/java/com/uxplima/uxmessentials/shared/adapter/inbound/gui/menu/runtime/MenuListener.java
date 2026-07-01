@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -91,6 +92,19 @@ public final class MenuListener implements Listener {
     /** Re-paints an entity list's page on a nav click; stateless, so one instance serves every list this routes. */
     private final ListViewRenderer listViewRenderer = new ListViewRenderer();
 
+    /**
+     * The server-wide click-cooldown floor in milliseconds. A menu that sets its own {@code click-cooldown} overrides
+     * this; a menu that sets none (or sets {@code 0}) inherits it. {@code 0} here as well means no throttling at all,
+     * which is the default, so an engine wired without an operator floor behaves exactly as before.
+     */
+    private final long defaultClickCooldownMs;
+
+    /**
+     * The wall-clock source the anti-spam window measures against, injected so the cooldown is deterministically
+     * testable. Production wires {@code System::currentTimeMillis}; a test hands a clock it advances by hand.
+     */
+    private final LongSupplier clock;
+
     public MenuListener(
             MenuRenderer renderer,
             ActionRegistry actions,
@@ -130,6 +144,35 @@ public final class MenuListener implements Listener {
             @Nullable EditorRenderer editorRenderer,
             @Nullable SelectorOpener selectorOpener,
             @Nullable ConfirmOpener confirmOpener) {
+        this(
+                renderer,
+                actions,
+                conditions,
+                scheduler,
+                plugin,
+                editorRenderer,
+                selectorOpener,
+                confirmOpener,
+                0L,
+                System::currentTimeMillis);
+    }
+
+    /**
+     * The canonical constructor, carrying the anti-spam cooldown floor and its clock. The eight shorter forms above
+     * delegate here with no floor and the real system clock, so every existing construction and test is unchanged;
+     * only an engine wanting a server-wide floor, or a test wanting a deterministic clock, reaches for this shape.
+     */
+    public MenuListener(
+            MenuRenderer renderer,
+            ActionRegistry actions,
+            ConditionRegistry conditions,
+            Scheduler scheduler,
+            Plugin plugin,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable SelectorOpener selectorOpener,
+            @Nullable ConfirmOpener confirmOpener,
+            long defaultClickCooldownMs,
+            LongSupplier clock) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
@@ -138,6 +181,11 @@ public final class MenuListener implements Listener {
         this.editorRenderer = editorRenderer;
         this.selectorOpener = selectorOpener;
         this.confirmOpener = confirmOpener;
+        if (defaultClickCooldownMs < 0) {
+            throw new IllegalArgumentException("defaultClickCooldownMs must be >= 0: " + defaultClickCooldownMs);
+        }
+        this.defaultClickCooldownMs = defaultClickCooldownMs;
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /** Registers this listener with the server. Called once when the menu engine starts. */
@@ -341,6 +389,9 @@ public final class MenuListener implements Listener {
             navigate(holder, type);
             return;
         }
+        if (throttled(holder)) {
+            return;
+        }
         ClickKind kind = kindOf(click);
         MenuContext base = rs.entry() == null ? holder.ctx() : holder.ctx().withEntry(rs.entry());
         if (!clickConditionsPass(rs.item().click(), kind, base)) {
@@ -359,6 +410,27 @@ public final class MenuListener implements Listener {
         for (Ref ref : rs.item().click().actionsFor(kind)) {
             runRef(holder, base, kind, ref);
         }
+    }
+
+    /**
+     * Whether this click lands inside the anti-spam window and should be swallowed. The effective cooldown is the
+     * menu's own {@code click-cooldown} when it sets a positive one, otherwise the server-wide default; when both are
+     * zero there is no throttle and every click passes. A click closer to the last passed click than the cooldown is
+     * dropped silently — a "slow down" message would itself spam the chat, so nothing is sent — and only a passing
+     * click advances the per-holder stamp, so the window is always measured from the last click that actually fired.
+     * Runs on the viewer's own entity thread, so the read-then-stamp is single-threaded per holder and needs no lock.
+     */
+    private boolean throttled(MenuHolder holder) {
+        long cooldown = holder.spec().clickCooldownMs() > 0 ? holder.spec().clickCooldownMs() : defaultClickCooldownMs;
+        if (cooldown <= 0) {
+            return false;
+        }
+        long now = clock.getAsLong();
+        if (now - holder.lastClickMs() < cooldown) {
+            return true;
+        }
+        holder.lastClickMs(now);
+        return false;
     }
 
     /**
@@ -656,6 +728,9 @@ public final class MenuListener implements Listener {
             case SHIFT_LEFT -> ClickKind.SHIFT_LEFT;
             case SHIFT_RIGHT -> ClickKind.SHIFT_RIGHT;
             case MIDDLE -> ClickKind.MIDDLE;
+            case DROP -> ClickKind.DROP;
+            case CONTROL_DROP -> ClickKind.CONTROL_DROP;
+            case DOUBLE_CLICK -> ClickKind.DOUBLE_CLICK;
             default -> ClickKind.LEFT;
         };
     }

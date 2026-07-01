@@ -881,4 +881,60 @@ class MenuSpecLoaderTest {
         assertThat(spec.items().get("border").slots().slots()).containsExactly(0, 1, 2);
         assertThat(spec.items().get("go").slots().slots()).containsExactly(4);
     }
+
+    @Test
+    void bindsTheDropAndDoubleClickGestures() {
+        String hocon = """
+                rows = 1
+                items { x { slot = 0, material = DIAMOND, name = "x", click {
+                  drop = ["close"]
+                  ctrl_drop = ["open:a"]
+                  double_click = ["open:b"]
+                } } }
+                """;
+        ClickSpec click = new MenuSpecLoader().parse(hocon).items().get("x").click();
+
+        assertThat(click.actionsFor(ClickKind.DROP)).extracting(Ref::id).containsExactly("close");
+        assertThat(click.actionsFor(ClickKind.CONTROL_DROP))
+                .extracting(Ref::value)
+                .containsExactly("a");
+        assertThat(click.actionsFor(ClickKind.DOUBLE_CLICK))
+                .extracting(Ref::value)
+                .containsExactly("b");
+    }
+
+    @Test
+    void acceptsBothKebabAndSnakeSpellingsOfTheNewGestures() {
+        String hocon = """
+                rows = 1
+                items { x { slot = 0, material = DIAMOND, name = "x", click {
+                  control-drop = ["open:a"]
+                  double-click = ["open:b"]
+                } } }
+                """;
+        ClickSpec click = new MenuSpecLoader().parse(hocon).items().get("x").click();
+
+        assertThat(click.actionsFor(ClickKind.CONTROL_DROP))
+                .extracting(Ref::value)
+                .containsExactly("a");
+        assertThat(click.actionsFor(ClickKind.DOUBLE_CLICK))
+                .extracting(Ref::value)
+                .containsExactly("b");
+    }
+
+    @Test
+    void readsThePerMenuClickCooldown() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows = 1\nclick-cooldown = 500\nitems {}");
+
+        assertThat(spec.clickCooldownMs()).isEqualTo(500L);
+    }
+
+    @Test
+    void aMenuWithNoClickCooldownKeyDefersToTheGlobalDefault() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows = 1\nitems {}");
+
+        assertThat(spec.clickCooldownMs())
+                .as("no key means zero, i.e. inherit the server-wide default rather than set a per-menu window")
+                .isZero();
+    }
 }

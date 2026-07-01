@@ -286,6 +286,12 @@ public final class PluginModule {
                 menuBindings.conditions(),
                 lastMenu);
         resources.addListener(new LastMenuCleanupListener(lastMenu));
+        // The server-wide click-cooldown floor (milliseconds), read from modules/custommenus/config.conf. Zero (the
+        // default, opt-in) means no throttling, so menus open byte-identically until an operator sets a floor; a menu
+        // may raise it further with its own click-cooldown key. The system clock is threaded in explicitly so the
+        // anti-spam window is the same code path tests drive with a hand-advanced clock.
+        long menuClickCooldownMs =
+                config.scoped(ModuleId.of("custommenus").configRoot()).getLong("click-cooldown-ms", 0L);
         MenuListener menuListener = new MenuListener(
                 menuRenderer,
                 menuBindings.actions(),
@@ -294,7 +300,9 @@ public final class PluginModule {
                 plugin,
                 menuEditorRenderer,
                 menus.selectorOpener(),
-                menus.confirmOpener());
+                menus.confirmOpener(),
+                menuClickCooldownMs,
+                System::currentTimeMillis);
         menuListener.install();
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —

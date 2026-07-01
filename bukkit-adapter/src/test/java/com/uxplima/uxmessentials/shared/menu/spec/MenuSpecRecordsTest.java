@@ -32,4 +32,28 @@ class MenuSpecRecordsTest {
                         new MenuSpec("t", 7, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void menuSpecDefaultsClickCooldownToZero() {
+        var spec = new MenuSpec("t", 1, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
+        assertThat(spec.clickCooldownMs())
+                .as("a menu built through the historic ctors sets no cooldown and defers to the global default")
+                .isZero();
+    }
+
+    @Test
+    void menuSpecRejectsNegativeClickCooldown() {
+        assertThatThrownBy(() -> new MenuSpec(
+                        "t",
+                        1,
+                        new RefreshSpec(false, 0),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        Map.of(),
+                        java.util.Optional.empty(),
+                        Map.of(),
+                        -1L))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -42,6 +42,14 @@ public final class MenuHolder implements InventoryHolder {
     @Nullable private Inventory inventory;
 
     /**
+     * The clock reading of the last click this menu let through the anti-spam window, or {@code 0} before the first.
+     * It lives on the holder — GC'd with the open menu on close — so the throttle needs no player-keyed side map and
+     * nothing leaks when a viewer quits. Read and written only on the viewer's own entity thread inside the click
+     * handler, so the check-and-stamp is single-threaded per holder and needs no lock.
+     */
+    private long lastClickMs;
+
+    /**
      * Set only on the editor path: the editor's per-open property/subject state and its slot routing. A spec menu
      * leaves this null and routes clicks through {@link #clickMap}; an editor sets it and routes through it instead,
      * so the one listener tells the two apart by its presence.
@@ -169,6 +177,16 @@ public final class MenuHolder implements InventoryHolder {
     /** The list-view state if this holder backs an entity list, or empty for any other menu kind. */
     public Optional<ListViewState> listView() {
         return Optional.ofNullable(listView);
+    }
+
+    /** The clock reading of the last click that passed this menu's anti-spam window, or {@code 0} before the first. */
+    public long lastClickMs() {
+        return lastClickMs;
+    }
+
+    /** Records the clock reading of a click the anti-spam window just let through. */
+    public void lastClickMs(long now) {
+        this.lastClickMs = now;
     }
 
     public void setRefreshHandle(Cancellable handle) {

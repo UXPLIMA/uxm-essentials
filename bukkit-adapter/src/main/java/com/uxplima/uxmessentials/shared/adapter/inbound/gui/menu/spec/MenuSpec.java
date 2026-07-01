@@ -22,6 +22,11 @@ import java.util.Optional;
  * renderer to expand, and is resolved local-first — a menu-scoped token overrides the shared registry (built-ins,
  * data readers, the global custom-placeholder file) for this menu alone. Empty for a menu that declares no block, so
  * such a menu renders byte-identically to before this field existed.
+ *
+ * <p>The {@code clickCooldownMs} is the menu's own {@code click-cooldown} anti-spam window in milliseconds: two
+ * clicks landing closer together than this are treated as one, so a spam-click can't double-fire an item's actions.
+ * A value of {@code 0} means the menu sets no window of its own and defers to the server-wide default, so a menu
+ * that declares no key behaves exactly as before.
  */
 public record MenuSpec(
         String title,
@@ -32,7 +37,8 @@ public record MenuSpec(
         List<Ref> closeActions,
         Map<String, MenuItemSpec> items,
         Optional<String> inventoryType,
-        Map<String, String> placeholders) {
+        Map<String, String> placeholders,
+        long clickCooldownMs) {
 
     public MenuSpec {
         Objects.requireNonNull(title, "title");
@@ -46,7 +52,28 @@ public record MenuSpec(
         items = Map.copyOf(Objects.requireNonNull(items, "items"));
         Objects.requireNonNull(inventoryType, "inventoryType");
         placeholders = Map.copyOf(Objects.requireNonNull(placeholders, "placeholders"));
+        if (clickCooldownMs < 0) {
+            throw new IllegalArgumentException("clickCooldownMs must be >= 0: " + clickCooldownMs);
+        }
         checkSlotsFit(items, rows);
+    }
+
+    /**
+     * The nine-argument shape that carries local placeholders but no click cooldown, kept so the loader and any other
+     * with-placeholders caller compiles unchanged. It delegates to the canonical constructor with a zero cooldown — a
+     * menu that defers its anti-spam window to the server-wide default.
+     */
+    public MenuSpec(
+            String title,
+            int rows,
+            RefreshSpec refresh,
+            List<Ref> openRequirement,
+            List<Ref> openActions,
+            List<Ref> closeActions,
+            Map<String, MenuItemSpec> items,
+            Optional<String> inventoryType,
+            Map<String, String> placeholders) {
+        this(title, rows, refresh, openRequirement, openActions, closeActions, items, inventoryType, placeholders, 0L);
     }
 
     /**
