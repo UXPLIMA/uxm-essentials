@@ -49,6 +49,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -138,6 +140,18 @@ public final class ItemRenderer {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(ctx, "ctx");
         return PlainTextComponentSerializer.plainText().serialize(resolveText(item.name(), ctx));
+    }
+
+    /**
+     * A shared {@link MessageKey} resolved for {@code viewer} and flattened to plain text — the label a Bedrock form
+     * needs where the chest paints a wordless icon (a confirm window's yes/no wool). Goes through the same
+     * {@link GuiText} catalog path an item name takes, so the label honours the viewer's locale, then drops all
+     * formatting to a flat string.
+     */
+    public String plainMessage(PlayerRef viewer, MessageKey key) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        return PlainTextComponentSerializer.plainText().serialize(guiText.text(viewer, key));
     }
 
     public ItemStack render(MenuItemSpec item, MenuContext ctx) {

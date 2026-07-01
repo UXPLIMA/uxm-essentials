@@ -24,6 +24,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -83,6 +85,18 @@ public final class MenuRenderer {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(ctx, "ctx");
         return itemRenderer.buttonText(item, ctx);
+    }
+
+    /**
+     * A shared {@link MessageKey} resolved for {@code viewer} and flattened to plain text — a label (a confirm
+     * window's yes/no) the hybrid form renderer needs as a flat string where the chest paints wordless wool.
+     * Delegates to the item renderer, which owns the catalog lookup, so the label honours the viewer's locale exactly
+     * as a menu title or item name does.
+     */
+    public String plainMessage(PlayerRef viewer, MessageKey key) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        return itemRenderer.plainMessage(viewer, key);
     }
 
     /**

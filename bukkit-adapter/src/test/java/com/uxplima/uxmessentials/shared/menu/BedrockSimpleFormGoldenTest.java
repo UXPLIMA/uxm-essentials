@@ -190,6 +190,17 @@ class BedrockSimpleFormGoldenTest {
             this.onSelect = onSelect;
         }
 
+        // This golden exercises only the SimpleForm path; the confirm ModalForm has its own golden.
+        @Override
+        public void sendModalForm(
+                Player player,
+                String title,
+                @Nullable String content,
+                String button1,
+                String button2,
+                Runnable onButton1,
+                Runnable onButton2) {}
+
         void tap(int index) {
             if (onSelect != null) {
                 onSelect.accept(index);

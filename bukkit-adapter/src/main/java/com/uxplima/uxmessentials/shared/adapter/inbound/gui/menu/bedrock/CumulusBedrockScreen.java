@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 import org.bukkit.entity.Player;
 
+import org.geysermc.cumulus.form.ModalForm;
 import org.geysermc.cumulus.form.SimpleForm;
 import org.geysermc.floodgate.api.FloodgateApi;
 import org.jspecify.annotations.Nullable;
@@ -51,6 +52,36 @@ final class CumulusBedrockScreen implements BedrockScreen {
             FloodgateApi.getInstance().sendForm(player.getUniqueId(), builder.build());
         } catch (RuntimeException notReady) {
             LOG.warning("event=bedrock_form_failed player=" + player.getName() + " reason=" + notReady.getMessage());
+        }
+    }
+
+    @Override
+    public void sendModalForm(
+            Player player,
+            String title,
+            @Nullable String content,
+            String button1,
+            String button2,
+            Runnable onButton1,
+            Runnable onButton2) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(button1, "button1");
+        Objects.requireNonNull(button2, "button2");
+        Objects.requireNonNull(onButton1, "onButton1");
+        Objects.requireNonNull(onButton2, "onButton2");
+        try {
+            ModalForm.Builder builder = ModalForm.builder().title(title);
+            if (content != null) {
+                builder.content(content);
+            }
+            builder.button1(button1);
+            builder.button2(button2);
+            builder.validResultHandler(
+                    (form, response) -> (response.clickedButtonId() == 0 ? onButton1 : onButton2).run());
+            FloodgateApi.getInstance().sendForm(player.getUniqueId(), builder.build());
+        } catch (RuntimeException notReady) {
+            LOG.warning("event=bedrock_modal_failed player=" + player.getName() + " reason=" + notReady.getMessage());
         }
     }
 }

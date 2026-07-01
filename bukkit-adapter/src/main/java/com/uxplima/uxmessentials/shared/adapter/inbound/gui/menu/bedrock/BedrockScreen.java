@@ -24,8 +24,22 @@ import org.jspecify.annotations.Nullable;
  */
 public interface BedrockScreen {
 
-    /** The Java-only default: sending a form is a no-op, and no {@code org.geysermc} class is referenced. */
-    BedrockScreen NONE = (player, title, content, buttons, onSelect) -> {};
+    /** The Java-only default: sending any form is a no-op, and no {@code org.geysermc} class is referenced. */
+    BedrockScreen NONE = new BedrockScreen() {
+        @Override
+        public void sendSimpleForm(
+                Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect) {}
+
+        @Override
+        public void sendModalForm(
+                Player player,
+                String title,
+                @Nullable String content,
+                String button1,
+                String button2,
+                Runnable onButton1,
+                Runnable onButton2) {}
+    };
 
     /**
      * Send {@code player} a SimpleForm — a titled list of buttons — and route the tapped button back through
@@ -41,6 +55,29 @@ public interface BedrockScreen {
      */
     void sendSimpleForm(
             Player player, String title, @Nullable String content, List<String> buttons, IntConsumer onSelect);
+
+    /**
+     * Send {@code player} a ModalForm — a titled window with exactly two buttons — running {@code onButton1} when the
+     * first button is tapped and {@code onButton2} when the second is. The engine's two-button confirm window renders
+     * here for a Bedrock viewer instead of the confirm chest. The callbacks fire off the main thread when the viewer
+     * responds, so the caller wraps each in its own entity-thread hop before it touches the world.
+     *
+     * @param player the Bedrock viewer to send the form to; never {@code null}
+     * @param title the form title as plain text; never {@code null}
+     * @param content optional body text shown above the buttons, or {@code null} for none
+     * @param button1 the first (confirm) button's label; never {@code null}
+     * @param button2 the second (cancel) button's label; never {@code null}
+     * @param onButton1 invoked when the viewer taps the first button; never {@code null}
+     * @param onButton2 invoked when the viewer taps the second button; never {@code null}
+     */
+    void sendModalForm(
+            Player player,
+            String title,
+            @Nullable String content,
+            String button1,
+            String button2,
+            Runnable onButton1,
+            Runnable onButton2);
 
     /**
      * Selects the screen for this server: the Cumulus-backed one when the {@code floodgate} plugin is enabled,

@@ -19,6 +19,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
@@ -50,6 +51,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickH
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ConfirmOpener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpener;
+import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
@@ -520,6 +522,10 @@ public final class Menus {
         if (live == null || !live.isOnline()) {
             return;
         }
+        if (bedrock.isBedrock(viewer.uuid())) {
+            sendConfirmModal(live, viewer, title, onYes, onNo);
+            return;
+        }
         MenuContext ctx = MenuContext.of(viewer, null, 0);
         MenuHolder holder = new MenuHolder("confirm", confirmMenuSpec(), ctx);
         holder.attachConfirm(new ConfirmState(ConfirmRenderer.YES_SLOT, ConfirmRenderer.NO_SLOT, onYes, onNo));
@@ -527,6 +533,28 @@ public final class Menus {
         holder.attach(inv);
         confirmRenderer.populate(inv);
         live.openInventory(inv);
+    }
+
+    /**
+     * The Bedrock render of the confirm window: a native ModalForm (the caller's title plus a yes/no button pair)
+     * instead of the confirm chest, whose lime/red wool carries no text a form could show — so the button labels come
+     * from the shared {@link GuiMessageKey} catalog in the viewer's locale. A confirm is always safe to render as a
+     * form (it is a plain two-choice prompt, not an item-display menu), so this redirect is unconditional for a Bedrock
+     * viewer and never gated on {@code chestOnly}. Cumulus fires the response off the main thread, so each choice is
+     * wrapped in a hop back to the viewer's entity thread before {@code onYes}/{@code onNo} runs.
+     */
+    private void sendConfirmModal(Player live, PlayerRef viewer, Component title, Runnable onYes, Runnable onNo) {
+        String plainTitle = PlainTextComponentSerializer.plainText().serialize(title);
+        String yes = renderer.plainMessage(viewer, GuiMessageKey.CONFIRM_YES);
+        String no = renderer.plainMessage(viewer, GuiMessageKey.CONFIRM_NO);
+        bedrockScreen.sendModalForm(
+                live,
+                plainTitle,
+                null,
+                yes,
+                no,
+                () -> scheduler.onEntity(viewer, onYes),
+                () -> scheduler.onEntity(viewer, onNo));
     }
 
     /** The minimal {@link MenuSpec} a confirm holder carries: three rows, refresh off, no items — clicks ride state. */

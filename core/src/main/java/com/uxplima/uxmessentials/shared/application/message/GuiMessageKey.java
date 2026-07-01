@@ -28,6 +28,10 @@ public enum GuiMessageKey implements MessageKey {
     INPUT_CANCELLED("gui.input.cancelled"),
     INPUT_CANCEL_HINT("gui.input.cancel-hint"),
 
+    // the shared confirm window — the two button labels a Bedrock ModalForm needs (the chest paints wordless wool)
+    CONFIRM_YES("gui.confirm.yes"),
+    CONFIRM_NO("gui.confirm.no"),
+
     // the shared colour-picker widget — its chrome buttons
     COLOUR_PICKER_TITLE("gui.colour-picker.title"),
     COLOUR_PICKER_CUSTOM("gui.colour-picker.custom"),

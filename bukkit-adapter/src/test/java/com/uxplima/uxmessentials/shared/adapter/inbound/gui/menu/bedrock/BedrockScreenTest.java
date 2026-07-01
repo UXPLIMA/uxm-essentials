@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.entity.Player;
 
@@ -31,5 +32,18 @@ class BedrockScreenTest {
         assertThat(tapped)
                 .as("the no-op screen never invokes the select callback, since it sends no form to tap")
                 .isFalse();
+    }
+
+    @Test
+    void noneSendsNoModalFormAndNeverThrows() {
+        AtomicInteger button = new AtomicInteger(0);
+        // NONE ignores every argument; the player is a bare mock it never touches, so no MockBukkit server is needed.
+        Player player = mock(Player.class);
+        assertThatCode(() -> BedrockScreen.NONE.sendModalForm(
+                        player, "Confirm", null, "Yes", "No", () -> button.set(1), () -> button.set(2)))
+                .doesNotThrowAnyException();
+        assertThat(button)
+                .as("the no-op screen runs neither button callback, since it sends no form to tap")
+                .hasValue(0);
     }
 }
