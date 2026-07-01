@@ -107,6 +107,10 @@ public final class MenuSpecLoader {
 
     private MenuSpec parseRoot(ConfigurationNode root, String origin, ConfigurationNode globalPatterns) {
         boolean bottomInventory = root.node("bottom-inventory").getBoolean(false);
+        // Whether this menu opts out of the Bedrock form redirect and stays on the chest render path even for a
+        // Floodgate viewer. A form is a flat button list, so a menu that shows or edits real item stacks (the
+        // inventory viewer, a storage-style grid) sets this to keep its Bedrock viewers on the chest too.
+        boolean chestOnly = root.node("chest-only").getBoolean(false);
         Optional<String> declaredType = optionalString(root.node("inventory-type"));
         // A bottom-inventory menu paints into the player's own 36 slots below a full 54-slot chest top, and that
         // raw-slot geometry only lines up for a chest. So it ignores any inventory-type the author also set (warning
@@ -148,7 +152,8 @@ public final class MenuSpecLoader {
                     // The per-menu click-cooldown in milliseconds. Absent → 0 → the menu defers to the server-wide
                     // default, so a menu without the key opens and behaves exactly as before.
                     root.node("click-cooldown").getLong(0),
-                    bottomInventory);
+                    bottomInventory,
+                    chestOnly);
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }

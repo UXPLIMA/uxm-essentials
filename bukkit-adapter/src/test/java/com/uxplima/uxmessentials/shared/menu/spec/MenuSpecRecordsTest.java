@@ -75,6 +75,14 @@ class MenuSpecRecordsTest {
     }
 
     @Test
+    void menuSpecDefaultsChestOnlyToFalseThroughTheHistoricConstructor() {
+        var spec = new MenuSpec("t", 1, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
+        assertThat(spec.chestOnly())
+                .as("a menu built through the historic ctors is a form candidate for a Bedrock viewer")
+                .isFalse();
+    }
+
+    @Test
     void checkSlotsFitAcceptsABottomSlotOnlyWhenTheFlagIsSet() {
         Map<String, MenuItemSpec> items = Map.of("bot", itemAt(89));
         assertThatCode(() -> bottomMenu(items))

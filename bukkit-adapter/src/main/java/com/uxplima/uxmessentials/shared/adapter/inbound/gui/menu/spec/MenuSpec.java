@@ -33,6 +33,13 @@ import java.util.Optional;
  * runtime snapshots and restores the player inventory around such a menu; here it only widens the slot-fit bound, and
  * a bottom-inventory menu is chest-only by construction (the raw-slot geometry only holds for a chest). A menu that
  * leaves the flag {@code false} — the default — validates and renders exactly as before.
+ *
+ * <p>The {@code chestOnly} flag keeps the menu on the chest render path even for a Bedrock viewer the hybrid form
+ * renderer would otherwise redirect. A form is a flat button list, so a menu that displays or edits real item stacks
+ * (the inventory viewer, a storage-style grid) cannot be represented as one; setting this flag opts such a menu out
+ * of the redirect so its Bedrock viewers still get the chest. It is purely a routing hint here — a plain boolean the
+ * Bukkit-side façade reads — so this model stays pure and plain-JUnit testable. A menu that leaves it {@code false} —
+ * the default — is redirected to a form for a Bedrock viewer and renders exactly as before for a Java one.
  */
 public record MenuSpec(
         String title,
@@ -45,7 +52,8 @@ public record MenuSpec(
         Optional<String> inventoryType,
         Map<String, String> placeholders,
         long clickCooldownMs,
-        boolean bottomInventory) {
+        boolean bottomInventory,
+        boolean chestOnly) {
 
     public MenuSpec {
         Objects.requireNonNull(title, "title");
@@ -63,6 +71,39 @@ public record MenuSpec(
             throw new IllegalArgumentException("clickCooldownMs must be >= 0: " + clickCooldownMs);
         }
         checkSlotsFit(items, rows, bottomInventory);
+    }
+
+    /**
+     * The eleven-argument shape that carries a bottom-inventory flag but no chest-only routing hint, kept so every
+     * existing {@code new MenuSpec(...)} call site — the loader's older path and the record test fixtures — compiles
+     * unchanged. It delegates to the canonical constructor with the chest-only flag off, so the menu is a form
+     * candidate for a Bedrock viewer exactly as before this hint existed.
+     */
+    public MenuSpec(
+            String title,
+            int rows,
+            RefreshSpec refresh,
+            List<Ref> openRequirement,
+            List<Ref> openActions,
+            List<Ref> closeActions,
+            Map<String, MenuItemSpec> items,
+            Optional<String> inventoryType,
+            Map<String, String> placeholders,
+            long clickCooldownMs,
+            boolean bottomInventory) {
+        this(
+                title,
+                rows,
+                refresh,
+                openRequirement,
+                openActions,
+                closeActions,
+                items,
+                inventoryType,
+                placeholders,
+                clickCooldownMs,
+                bottomInventory,
+                false);
     }
 
     /**

@@ -362,6 +362,24 @@ class MenuSpecLoaderTest {
     }
 
     @Test
+    void parsesTheChestOnlyFlagFromTheMenuRoot() {
+        MenuSpec spec = new MenuSpecLoader().parse("chest-only = true\nrows=1\nitems{ x{ slot=0, material=STONE } }");
+
+        assertThat(spec.chestOnly())
+                .as("chest-only = true opts the menu out of the Bedrock form redirect")
+                .isTrue();
+    }
+
+    @Test
+    void anAbsentChestOnlyFlagIsFalse() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows=1\nitems{ x{ slot=0, material=STONE } }");
+
+        assertThat(spec.chestOnly())
+                .as("no chest-only node means the menu is a form candidate for a Bedrock viewer")
+                .isFalse();
+    }
+
+    @Test
     void parsesTheInventoryTypeTokenFromTheMenuRoot() {
         MenuSpec spec = new MenuSpecLoader().parse("inventory-type = \"hopper\"\nitems{ x{ slot=0, material=STONE } }");
 

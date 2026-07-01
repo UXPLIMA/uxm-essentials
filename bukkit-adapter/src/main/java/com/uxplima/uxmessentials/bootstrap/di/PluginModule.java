@@ -83,6 +83,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
@@ -279,6 +280,18 @@ public final class PluginModule {
         // so it never retains an offline player; and the custommenus wiring hands the same instance to the /menu
         // command so `last` reopens what open recorded.
         LastMenu lastMenu = new LastMenu();
+        // The Bedrock hybrid seam: resolve once whether Floodgate is installed and pick the detector and the form
+        // screen accordingly — the Floodgate/Cumulus-backed pair when present, otherwise the always-false NONE
+        // detector and the no-op NONE screen. Only the enabled branch of each forServer names an org.geysermc class,
+        // so a Java-only server never loads Floodgate or Cumulus. Both are threaded into the façade so the open
+        // choke-point can redirect a Bedrock viewer to a native SimpleForm; the detector is also held on
+        // resources.bedrock() for any other consumer. A Java viewer (isBedrock false) opens the chest exactly as
+        // before.
+        BedrockDetector bedrock = BedrockDetector.forServer(plugin.getServer());
+        resources.bedrock(bedrock);
+        kernel.log().info("event=bedrock_detector backend={}", bedrock == BedrockDetector.NONE ? "none" : "floodgate");
+        BedrockScreen bedrockScreen = BedrockScreen.forServer(plugin.getServer());
+        kernel.log().info("event=bedrock_screen backend={}", bedrockScreen == BedrockScreen.NONE ? "none" : "cumulus");
         Menus menus = new Menus(
                 menuRenderer,
                 kernel.scheduler(),
@@ -286,7 +299,9 @@ public final class PluginModule {
                 menuEditorRenderer,
                 menuBindings.actions(),
                 menuBindings.conditions(),
-                lastMenu);
+                lastMenu,
+                bedrock,
+                bedrockScreen);
         resources.addListener(new LastMenuCleanupListener(lastMenu));
         // Defence-in-depth over the engine's cancel-all-clicks invariant: strip a marked menu display item that ever
         // escapes into a player's real inventory (close-sweep + join-sweep). A separate listener from the menu router,
@@ -322,14 +337,6 @@ public final class PluginModule {
         // behaviour. It is constructed before the vocab block so the same instance registers into both.
         ServerConnector menuServerConnector = new BukkitServerConnector(plugin, kernel.log());
         resources.serverConnector(menuServerConnector);
-        // The Bedrock substrate: resolve once whether Floodgate is installed and pick the detector accordingly —
-        // the Floodgate-backed one when present, otherwise the always-false NONE. Only the enabled branch of
-        // forServer names the Floodgate class, so a Java-only server never loads org.geysermc.floodgate. Held on
-        // resources.bedrock() for the later hybrid renderer, which will ask "is this viewer Bedrock?" before it
-        // opens a menu; this firing only wires the detector and does not yet redirect any open.
-        BedrockDetector bedrock = BedrockDetector.forServer(plugin.getServer());
-        resources.bedrock(bedrock);
-        kernel.log().info("event=bedrock_detector backend={}", bedrock == BedrockDetector.NONE ? "none" : "floodgate");
         MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions(), kernel.log());
         // The string slice of the condition vocabulary (contains, equals-ignorecase, regex, length, is-integer,

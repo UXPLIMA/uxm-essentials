@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.function.BiConsumer;
 
 import org.bukkit.inventory.Inventory;
@@ -11,6 +12,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.BottomSlots;
@@ -59,6 +61,50 @@ public final class MenuRenderer {
         Objects.requireNonNull(spec, "spec");
         Objects.requireNonNull(ctx, "ctx");
         return itemRenderer.title(spec.title(), ctx);
+    }
+
+    /**
+     * The menu's title as plain text — the same title {@link #title} resolves, flattened of all formatting. A
+     * Bedrock form title is a flat string, so the hybrid form renderer reads the title through here rather than as
+     * a rich component.
+     */
+    public String titleText(MenuSpec spec, MenuContext ctx) {
+        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(ctx, "ctx");
+        return PlainTextComponentSerializer.plainText().serialize(title(spec, ctx));
+    }
+
+    /**
+     * The button label the hybrid form renderer shows in place of {@code item} — its resolved display name as plain
+     * text. Delegates to the item renderer, which owns the name resolution, so a form button reads the exact name a
+     * chest icon would carry.
+     */
+    public String buttonText(MenuItemSpec item, MenuContext ctx) {
+        Objects.requireNonNull(item, "item");
+        Objects.requireNonNull(ctx, "ctx");
+        return itemRenderer.buttonText(item, ctx);
+    }
+
+    /**
+     * The visible static items of {@code spec}, in ascending slot order — what the hybrid renderer turns into a
+     * Bedrock SimpleForm's button list. Visibility is the same view-requirement rule the chest render uses (a hidden
+     * or out-priority item is dropped, resolved through {@link PriorityLayering}), so a Bedrock viewer sees exactly
+     * the items a Java viewer would. List-backed items are skipped: a form button list is a flat set of static
+     * entries in this slice, so list pagination is out of scope here and is a later item.
+     */
+    public List<MenuItemSpec> visibleStaticItemsInSlotOrder(MenuSpec spec, MenuContext ctx) {
+        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(ctx, "ctx");
+        List<MenuItemSpec> staticItems = new ArrayList<>();
+        for (MenuItemSpec item : spec.items().values()) {
+            if (item.list().isEmpty()) {
+                staticItems.add(item);
+            }
+        }
+        Map<Integer, MenuItemSpec> placed = PriorityLayering.resolve(staticItems, it -> viewPasses(it, ctx));
+        List<MenuItemSpec> ordered = new ArrayList<>(placed.size());
+        new TreeMap<>(placed).forEach((slot, item) -> ordered.add(item));
+        return ordered;
     }
 
     /**

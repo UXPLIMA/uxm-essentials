@@ -35,6 +35,7 @@ import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
@@ -125,6 +126,18 @@ public final class ItemRenderer {
         Objects.requireNonNull(rawTitle, "rawTitle");
         Objects.requireNonNull(ctx, "ctx");
         return resolveText(rawTitle, ctx);
+    }
+
+    /**
+     * The item's resolved display name as plain text — the very name {@link #render} paints onto the icon, put
+     * through the same {@code %token%}/{@code @key} resolution and then flattened of all formatting. A Bedrock
+     * SimpleForm button carries a flat label rather than a rich component, so this is what the hybrid form renderer
+     * shows on the button that stands in for this item.
+     */
+    public String buttonText(MenuItemSpec item, MenuContext ctx) {
+        Objects.requireNonNull(item, "item");
+        Objects.requireNonNull(ctx, "ctx");
+        return PlainTextComponentSerializer.plainText().serialize(resolveText(item.name(), ctx));
     }
 
     public ItemStack render(MenuItemSpec item, MenuContext ctx) {

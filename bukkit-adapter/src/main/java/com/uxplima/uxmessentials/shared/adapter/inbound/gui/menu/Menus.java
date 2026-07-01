@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +20,8 @@ import org.bukkit.inventory.InventoryHolder;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
@@ -96,6 +99,21 @@ public final class Menus {
      */
     @Nullable private final LastMenu lastMenu;
 
+    /**
+     * Whether a viewer is a Bedrock (Floodgate) player, so an engine menu can be redirected to a native form for them
+     * rather than a chest. Defaults to {@link BedrockDetector#NONE} — always Java — on every engine wired without it,
+     * so an open there falls straight through to the chest path, byte-identical to before this seam existed. Only
+     * production wiring, on a server with Floodgate, passes a detector that ever answers {@code true}.
+     */
+    private final BedrockDetector bedrock;
+
+    /**
+     * The screen that sends a Bedrock viewer a native Cumulus form. Defaults to {@link BedrockScreen#NONE} — a no-op
+     * carrying no SDK reference — on every engine wired without it, and it is only ever reached after {@link #bedrock}
+     * has confirmed a Bedrock viewer, so a Java-only engine never sends a form and never loads the Cumulus SDK.
+     */
+    private final BedrockScreen bedrockScreen;
+
     /** Paints the two-button confirm window; stateless, so one instance serves every confirm open. */
     private final ConfirmRenderer confirmRenderer = new ConfirmRenderer();
 
@@ -142,12 +160,11 @@ public final class Menus {
     }
 
     /**
-     * The canonical constructor production wiring uses: the action/condition-aware engine plus the reopen tracker
-     * {@code /menu last} reads. Every other constructor delegates here with {@code null} for the parameters it does
-     * not carry, so the roughly ninety existing {@code new Menus(...)} call-sites compile unchanged and open exactly
-     * as before — with null registries an open skips the requirement gate and runs no open-actions, and with a null
-     * tracker it records no reopen target. Only production wiring, which has the fully populated registries and the
-     * shared tracker, passes them.
+     * The reopen-tracker constructor, kept so every existing {@code new Menus(...)} call-site (almost all test
+     * fixtures) compiles unchanged. It delegates to the canonical constructor with the Java-only Bedrock defaults —
+     * {@link BedrockDetector#NONE} and {@link BedrockScreen#NONE} — so an open there never redirects to a form and
+     * stays byte-identical to before the Bedrock seam existed. Only production wiring passes the resolved detector
+     * and screen.
      */
     public Menus(
             MenuRenderer renderer,
@@ -157,6 +174,38 @@ public final class Menus {
             @Nullable ActionRegistry openActionRegistry,
             @Nullable ConditionRegistry openConditionRegistry,
             @Nullable LastMenu lastMenu) {
+        this(
+                renderer,
+                scheduler,
+                lists,
+                editorRenderer,
+                openActionRegistry,
+                openConditionRegistry,
+                lastMenu,
+                BedrockDetector.NONE,
+                BedrockScreen.NONE);
+    }
+
+    /**
+     * The canonical constructor production wiring uses: the action/condition-aware engine, the reopen tracker
+     * {@code /menu last} reads, and the Bedrock detector/screen the open choke-point consults to redirect a Floodgate
+     * viewer to a native form. Every other constructor delegates here with {@code null} for the parameters it does not
+     * carry and the Java-only Bedrock defaults, so the roughly ninety existing {@code new Menus(...)} call-sites
+     * compile unchanged and open exactly as before — with null registries an open skips the requirement gate and runs
+     * no open-actions, with a null tracker it records no reopen target, and with the {@code NONE} Bedrock defaults it
+     * never redirects to a form. Only production wiring, which has the fully populated registries, the shared tracker,
+     * and the resolved Bedrock detector/screen, passes them.
+     */
+    public Menus(
+            MenuRenderer renderer,
+            Scheduler scheduler,
+            ListSourceRegistry lists,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable ActionRegistry openActionRegistry,
+            @Nullable ConditionRegistry openConditionRegistry,
+            @Nullable LastMenu lastMenu,
+            BedrockDetector bedrock,
+            BedrockScreen bedrockScreen) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.lists = Objects.requireNonNull(lists, "lists");
@@ -164,6 +213,8 @@ public final class Menus {
         this.openActionRegistry = openActionRegistry;
         this.openConditionRegistry = openConditionRegistry;
         this.lastMenu = lastMenu;
+        this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
+        this.bedrockScreen = Objects.requireNonNull(bedrockScreen, "bedrockScreen");
     }
 
     /** Registers a parsed spec under its id; a feature does this once at wiring time. */
@@ -616,6 +667,14 @@ public final class Menus {
         if (!gateOpen(spec, ctx)) {
             return;
         }
+        // A Bedrock viewer gets a native Cumulus form instead of the chest, unless the menu opts out (chest-only, for
+        // an item-display menu a form cannot represent). The open-actions and last-open recording that follow the
+        // chest build are deliberately skipped for a form in this slice — it is an alternative render at the open
+        // choke-point, not a second window; a Java viewer (isBedrock false) falls straight through unchanged.
+        if (bedrock.isBedrock(viewer.uuid()) && !spec.chestOnly()) {
+            sendBedrockForm(live, spec, ctx);
+            return;
+        }
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
         holder.setResolvedLists(resolved);
         Inventory inv = createWindow(holder, spec, renderer.title(spec, ctx));
@@ -737,6 +796,55 @@ public final class Menus {
             return;
         }
         for (Ref ref : spec.openActions()) {
+            Ref eff = ref.resolve(actions::has);
+            actions.get(eff.id())
+                    .ifPresent(handler -> handler.accept(new MenuActionContext(
+                            ctx, live, ClickKind.LEFT, ActionArguments.resolve(eff.args(), ctx.arguments()))));
+        }
+    }
+
+    /**
+     * Send the Bedrock viewer a native Cumulus SimpleForm standing in for the chest menu: one button per visible
+     * static item, in slot order, labelled with the item's own name, and tapping a button runs that item's click
+     * actions. This is the alternative render the open choke-point takes for a Floodgate viewer; list-backed items are
+     * out of scope in this slice, so only the spec's static items become buttons and the resolved list cache is not
+     * read here. The form send is on the viewer's entity thread (the open path already hopped here); the tap response
+     * arrives off-thread and hops back via the scheduler before the actions run.
+     */
+    private void sendBedrockForm(Player live, MenuSpec spec, MenuContext ctx) {
+        PlayerRef viewer = ctx.viewer();
+        List<MenuItemSpec> visibleItems = renderer.visibleStaticItemsInSlotOrder(spec, ctx);
+        List<String> buttons = new ArrayList<>(visibleItems.size());
+        for (MenuItemSpec item : visibleItems) {
+            buttons.add(renderer.buttonText(item, ctx));
+        }
+        bedrockScreen.sendSimpleForm(live, renderer.titleText(spec, ctx), null, buttons, index -> {
+            if (index < 0 || index >= visibleItems.size()) {
+                return;
+            }
+            scheduler.onEntity(viewer, () -> runFormActions(ctx, visibleItems.get(index)));
+        });
+    }
+
+    /**
+     * Run the tapped item's left-click actions against {@code ctx}, on the viewer's entity thread the caller already
+     * hopped onto. A tap is a plain click, so it runs the item's {@code actionsFor(LEFT)} chain — which already merges
+     * the shared {@link ClickKind#ANY} block — through the very {@link ActionRegistry} the click listener resolves
+     * against (production hands both the same {@code MenuBindings.actions()} instance), with the same registry-aware
+     * ref split, so a form tap reaches the identical handler a chest click would. Skipped when the engine was wired
+     * without an action registry (a list/spec-only test engine), matching {@link #runOpenActions}. Per-click
+     * requirements and deny routing are a later item; this slice runs the actions only.
+     */
+    private void runFormActions(MenuContext ctx, MenuItemSpec item) {
+        ActionRegistry actions = openActionRegistry;
+        if (actions == null) {
+            return;
+        }
+        Player live = Bukkit.getPlayer(ctx.viewer().uuid());
+        if (live == null || !live.isOnline()) {
+            return;
+        }
+        for (Ref ref : item.click().actionsFor(ClickKind.LEFT)) {
             Ref eff = ref.resolve(actions::has);
             actions.get(eff.id())
                     .ifPresent(handler -> handler.accept(new MenuActionContext(
