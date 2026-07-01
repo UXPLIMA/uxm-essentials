@@ -181,6 +181,10 @@ class FoliaThreadingDriftTest {
                 pkg + "shared.adapter.inbound.gui.menu.Menus",
                 "GLOBAL: engine shutdown() closes open menus inside scheduler.onGlobal");
         allow.put(
+                pkg + "shared.adapter.inbound.gui.menu.vocab.LiveDataSources",
+                "GLOBAL: online-players menu source snapshots the roster inside scheduler.onGlobal (guarded by "
+                        + "onGlobalThread), copying name/uuid/world/ping/gamemode into immutable records served async");
+        allow.put(
                 pkg + "economy.adapter.inbound.gui.EconomyBulkMenu",
                 "GLOBAL: give-all/reset-all roster snapshot taken inside scheduler.onGlobal, then applied async");
         allow.put(

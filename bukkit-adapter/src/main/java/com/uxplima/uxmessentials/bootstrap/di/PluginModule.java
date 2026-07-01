@@ -95,6 +95,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActio
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuControlActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MessagingActions;
@@ -318,6 +319,11 @@ public final class PluginModule {
         // condition fails closed. The general numeric comparators/arithmetic are already reachable through expr.
         NumericSpatialConditions.register(menuBindings, kernel.log());
         MenuVocabulary.registerPlaceholders(menuBindings);
+        // The two ready-made live roster sources (online-players, worlds) every custom menu can page with no code.
+        // They reuse the engine's own Scheduler so a source can hop onto the global region thread to snapshot live
+        // server state before serving it back to the off-tick list resolver — the entity/world API is off-limits on
+        // the async thread a source runs on, so the global snapshot is the Folia-safe seam.
+        LiveDataSources.register(menuBindings, kernel.scheduler());
         // The messaging slice of the vocabulary (message-to/whisper, broadcast(+json/legacy), action-bar, title,
         // toast, log) registers alongside the generic actions; its own registration entry point keeps the
         // MenuVocabulary signature untouched. The toast action pops through uxmLib's advancement-toast service,
