@@ -128,6 +128,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityC
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitAccessPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.MenusMenuPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPlaceholders;
@@ -641,6 +642,11 @@ public final class PluginModule {
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
         // from this enable (a reload restarts it) rather than the whole JVM's age.
         links.placeholders.serverMetrics(new BukkitServerMetrics(plugin.getServer(), Instant.now()));
+        // The menu-engine source seam belongs to no feature context either — it reads the always-present engine's
+        // own runtime state (whether the requester is in a menu, which one, its page/rows, and a typed argument) so
+        // scoreboards and tab can read %uxmessentials_menu_*%. Wired unconditionally over the same Menus façade the
+        // modules opened their menus through.
+        links.placeholders.menu(new MenusMenuPlaceholders(menus));
         return links.placeholders.build();
     }
 

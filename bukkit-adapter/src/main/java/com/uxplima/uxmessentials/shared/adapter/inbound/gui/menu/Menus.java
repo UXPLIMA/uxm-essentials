@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
@@ -281,6 +282,52 @@ public final class Menus {
                 live.closeInventory();
             }
         });
+    }
+
+    /**
+     * The menu {@code viewer} currently has open, as a plain {@link OpenMenuInfo} value, or empty when they are in
+     * no engine menu — what the outbound {@code menu_*} placeholder source reads. It is a best-effort live read: it
+     * resolves the online player and inspects the holder backing their open top inventory, which is the engine's
+     * single source of truth for an open menu (no player-keyed side map is kept, so nothing can leak and there is
+     * nothing else to consult). The read is authoritative when the placeholder resolves on the viewer's own
+     * region/main context; a cross-region read on Folia would touch another region's player and is caught and
+     * degraded to empty, so a stray off-region request reads "not in a menu" rather than throwing.
+     */
+    public Optional<OpenMenuInfo> currentMenu(UUID viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        try {
+            Player live = Bukkit.getPlayer(viewer);
+            if (live == null) {
+                return Optional.empty();
+            }
+            InventoryHolder holder = live.getOpenInventory().getTopInventory().getHolder();
+            return holder instanceof MenuHolder menu ? Optional.of(openMenuInfo(menu)) : Optional.empty();
+        } catch (RuntimeException offRegion) {
+            return Optional.empty();
+        }
+    }
+
+    /** Read the open menu's id, its 1-based page (the context page is 0-based), row count and typed arguments. */
+    private static OpenMenuInfo openMenuInfo(MenuHolder holder) {
+        return new OpenMenuInfo(
+                holder.specId(),
+                holder.ctx().page() + 1,
+                holder.spec().rows(),
+                holder.ctx().arguments());
+    }
+
+    /**
+     * The id of the most-recently-opened menu in {@code viewer}'s history — the {@code /menu last} target — which
+     * persists after that menu closes, unlike {@link #currentMenu}. Read from the thread-safe {@link LastMenu}, so
+     * it needs no Bukkit read and answers the same on any thread. Empty when the engine was wired without a history
+     * tracker (every list/spec-only fixture) or the viewer has opened no custom menu yet.
+     */
+    public Optional<String> lastMenuId(UUID viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        if (lastMenu == null) {
+            return Optional.empty();
+        }
+        return lastMenu.get(viewer).map(LastMenu.LastOpen::menuId);
     }
 
     /**

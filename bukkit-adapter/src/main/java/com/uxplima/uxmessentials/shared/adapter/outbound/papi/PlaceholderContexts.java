@@ -35,6 +35,7 @@ public final class PlaceholderContexts {
     private final @Nullable ScoreboardPlaceholders scoreboard;
     private final @Nullable ServerMetricsPlaceholders serverMetrics;
     private final @Nullable WorldsPlaceholders worldsPlaceholders;
+    private final @Nullable MenuPlaceholders menu;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -56,6 +57,7 @@ public final class PlaceholderContexts {
         this.scoreboard = builder.scoreboard;
         this.serverMetrics = builder.serverMetrics;
         this.worldsPlaceholders = builder.worldsPlaceholders;
+        this.menu = builder.menu;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -139,6 +141,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(worldsPlaceholders);
     }
 
+    public Optional<MenuPlaceholders> menu() {
+        return Optional.ofNullable(menu);
+    }
+
     /** True when no context registered a seam — registering the expansion would surface nothing. */
     public boolean isEmpty() {
         return homes == null
@@ -184,6 +190,7 @@ public final class PlaceholderContexts {
         private @Nullable ScoreboardPlaceholders scoreboard;
         private @Nullable ServerMetricsPlaceholders serverMetrics;
         private @Nullable WorldsPlaceholders worldsPlaceholders;
+        private @Nullable MenuPlaceholders menu;
 
         private Builder() {}
 
@@ -279,6 +286,11 @@ public final class PlaceholderContexts {
 
         public Builder worlds(WorldsPlaceholders seam) {
             this.worldsPlaceholders = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder menu(MenuPlaceholders seam) {
+            this.menu = java.util.Objects.requireNonNull(seam, "seam");
             return this;
         }
 

@@ -58,6 +58,7 @@ class PlaceholderInventoryDriftTest {
             "communication_",
             "scoreboard_",
             "worlds_",
+            "menu_",
             "server_");
 
     /** The bare (un-prefixed) keys the resolver dispatches in its terminal switch. */
@@ -180,7 +181,42 @@ class PlaceholderInventoryDriftTest {
                 .scoreboard(who -> true)
                 .worlds(worlds())
                 .serverMetrics(serverMetrics())
+                .menu(menu())
                 .build();
+    }
+
+    private static MenuPlaceholders menu() {
+        return new MenuPlaceholders() {
+            @Override
+            public boolean inMenu(UUID player) {
+                return false;
+            }
+
+            @Override
+            public Optional<String> openedMenu(UUID player) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> lastMenu(UUID player) {
+                return Optional.empty();
+            }
+
+            @Override
+            public OptionalInt page(UUID player) {
+                return OptionalInt.empty();
+            }
+
+            @Override
+            public OptionalInt rows(UUID player) {
+                return OptionalInt.empty();
+            }
+
+            @Override
+            public Optional<String> argument(UUID player, String name) {
+                return Optional.empty();
+            }
+        };
     }
 
     private static HomesPlaceholders homes() {

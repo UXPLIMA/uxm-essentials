@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -61,6 +62,8 @@ public final class PlaceholderResolver {
     private static final String COMMUNICATION_PREFIX = "communication_";
     private static final String SCOREBOARD_PREFIX = "scoreboard_";
     private static final String WORLDS_PREFIX = "worlds_";
+    private static final String MENU_PREFIX = "menu_";
+    private static final String MENU_ARGUMENT_PREFIX = "argument_";
     private static final String SERVER_PREFIX = "server_";
     private static final String SERVER_WORLD_PLAYERS_PREFIX = "world_players_";
     private static final String VOTES_PREFIX = "votes_";
@@ -148,6 +151,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(WORLDS_PREFIX)) {
             return Optional.of(worldsFamily(normalized.substring(WORLDS_PREFIX.length())));
+        }
+        if (normalized.startsWith(MENU_PREFIX)) {
+            return Optional.of(menuFamily(who, normalized.substring(MENU_PREFIX.length())));
         }
         if (normalized.startsWith(SERVER_PREFIX)) {
             return Optional.of(serverMetric(normalized.substring(SERVER_PREFIX.length())));
@@ -550,6 +556,40 @@ public final class PlaceholderResolver {
             case "default_players" -> Integer.toString(worlds.defaultWorldPlayers());
             default -> EMPTY;
         };
+    }
+
+    /**
+     * Resolve a {@code menu_*} tail against the menu-engine seam — the reverse of the inbound PAPI bridge, reading
+     * the requesting player's own live engine state. {@code is_in_menu} answers yes/no; {@code opened} is the
+     * current menu's spec id and {@code last} the most-recently-opened id from history, which persists after the
+     * menu closes (so it differs from {@code opened} once a menu is shut); {@code page} and {@code rows} are the
+     * current menu's 1-based page and row count; {@code argument_<name>} is the value of a typed command argument
+     * the current menu was opened with. The engine is always wired, but a resolver built without the seam (a test
+     * bundle) degrades {@code is_in_menu} to "no" and every other key to the dash rather than the raw token.
+     */
+    private String menuFamily(PlayerRef who, String tail) {
+        Optional<MenuPlaceholders> seam = contexts.menu();
+        if (seam.isEmpty()) {
+            return tail.equals("is_in_menu") ? NO : EMPTY;
+        }
+        MenuPlaceholders menu = seam.get();
+        UUID uuid = who.uuid();
+        if (tail.startsWith(MENU_ARGUMENT_PREFIX)) {
+            return menu.argument(uuid, tail.substring(MENU_ARGUMENT_PREFIX.length()))
+                    .orElse(EMPTY);
+        }
+        return switch (tail) {
+            case "is_in_menu" -> bool(menu.inMenu(uuid));
+            case "opened" -> menu.openedMenu(uuid).orElse(EMPTY);
+            case "last" -> menu.lastMenu(uuid).orElse(EMPTY);
+            case "page" -> optionalIntOr(menu.page(uuid));
+            case "rows" -> optionalIntOr(menu.rows(uuid));
+            default -> EMPTY;
+        };
+    }
+
+    private static String optionalIntOr(OptionalInt value) {
+        return value.isPresent() ? Integer.toString(value.getAsInt()) : EMPTY;
     }
 
     /**
