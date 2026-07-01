@@ -109,6 +109,16 @@ dependencies:
     zEssentials:
       load: BEFORE
       required: false
+    # Integration condition back-ends the menu engine gates on (shared.adapter.inbound.gui.menu.vocab
+    # IntegrationConditions). Both are reached purely by reflection past a plugin-present guard — job:<name> against
+    # JobsReborn and worldguard-region:<id> against WorldGuard — so the menu engine runs fully without either and an
+    # absent one loads no class. Loaded before us so the guard sees them on enable.
+    Jobs:
+      load: BEFORE
+      required: false
+    WorldGuard:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with

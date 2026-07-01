@@ -91,6 +91,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuLis
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuControlActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
@@ -369,6 +370,20 @@ public final class PluginModule {
         // closed. Registered into the live MenuBindings before the specs are validated, so a valued condition
         // resolves at startup.
         RequirementConditions.register(menuBindings, menuCurrencies, menuPlayerMeta, kernel.log());
+        // The integration slice of the condition vocabulary (has-group/has-points/weather/cooldown, job,
+        // worldguard-region) plus the paired set-cooldown action registers alongside the generic conditions; like the
+        // other slices it has its own entry point so the MenuVocabulary.registerConditions signature stays untouched.
+        // has-group rides the Vault permission seam (LuckPerms/etc. through Vault), has-points the same PlayerPoints
+        // currency the economy actions reach, and cooldown/set-cooldown the shared PDC-backed Cooldowns port; job and
+        // worldguard-region are soft-depends reached purely by reflection past a plugin-present guard (an absent one
+        // loads no SDK class). Weather reads only the viewer's own world, and every condition fails closed.
+        IntegrationConditions.register(
+                menuBindings,
+                hooks.capability(PermissionQuery.class),
+                menuCurrencies,
+                kernel.cooldowns(),
+                plugin.getServer(),
+                kernel.log());
 
         PlaceholderContexts placeholders = wireModules(
                 plugin,
