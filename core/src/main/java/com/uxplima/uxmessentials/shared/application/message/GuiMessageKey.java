@@ -32,6 +32,10 @@ public enum GuiMessageKey implements MessageKey {
     CONFIRM_YES("gui.confirm.yes"),
     CONFIRM_NO("gui.confirm.no"),
 
+    // the shared paged form — the Previous/Next nav buttons a Bedrock SimpleForm adds when a list spans pages
+    PAGE_PREVIOUS("gui.page.previous"),
+    PAGE_NEXT("gui.page.next"),
+
     // the shared colour-picker widget — its chrome buttons
     COLOUR_PICKER_TITLE("gui.colour-picker.title"),
     COLOUR_PICKER_CUSTOM("gui.colour-picker.custom"),

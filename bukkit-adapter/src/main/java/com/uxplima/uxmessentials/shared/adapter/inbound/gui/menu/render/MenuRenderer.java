@@ -107,8 +107,8 @@ public final class MenuRenderer {
      * decorative/filler item (the auto-filler, a blank border pane, any display-only item with no click) is omitted,
      * since a Bedrock button that does nothing on tap is meaningless; the Java chest still paints it. A menu whose
      * every item is decorative therefore yields an empty button list — the form still opens with just its title.
-     * List-backed items are skipped: a form button list is a flat set of static entries in this slice, so list
-     * pagination is out of scope here and is a later item.
+     * List-backed items are skipped here: this method returns only the static buttons, and the form path pages a
+     * list's own entries into buttons after them.
      */
     public List<MenuItemSpec> visibleStaticItemsInSlotOrder(MenuSpec spec, MenuContext ctx) {
         Objects.requireNonNull(spec, "spec");

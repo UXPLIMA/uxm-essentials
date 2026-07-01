@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.Bedrock
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
@@ -698,9 +699,10 @@ public final class Menus {
         // A Bedrock viewer gets a native Cumulus form instead of the chest, unless the menu opts out (chest-only, for
         // an item-display menu a form cannot represent). The open-actions and last-open recording that follow the
         // chest build are deliberately skipped for a form in this slice — it is an alternative render at the open
-        // choke-point, not a second window; a Java viewer (isBedrock false) falls straight through unchanged.
+        // choke-point, not a second window; a Java viewer (isBedrock false) falls straight through unchanged. The
+        // resolved list cache is threaded through so a list-backed menu's entries page as form buttons.
         if (bedrock.isBedrock(viewer.uuid()) && !spec.chestOnly()) {
-            sendBedrockForm(live, spec, ctx);
+            sendBedrockForm(live, spec, ctx, resolved);
             return;
         }
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
@@ -832,25 +834,118 @@ public final class Menus {
     }
 
     /**
-     * Send the Bedrock viewer a native Cumulus SimpleForm standing in for the chest menu: one button per visible
-     * static item, in slot order, labelled with the item's own name, and tapping a button runs that item's click
-     * actions. This is the alternative render the open choke-point takes for a Floodgate viewer; list-backed items are
-     * out of scope in this slice, so only the spec's static items become buttons and the resolved list cache is not
-     * read here. The form send is on the viewer's entity thread (the open path already hopped here); the tap response
-     * arrives off-thread and hops back via the scheduler before the actions run.
+     * Send the Bedrock viewer a native Cumulus SimpleForm standing in for the chest menu. The button list is built in
+     * three runs — the spec's visible static items, then the current page's list entries (the list template stamped
+     * per entry), then form-native Previous/Next buttons when the list spans more than one page — each button paired
+     * with a {@link Runnable} handler at the same index. The {@code onSelect} callback simply dispatches by index, so
+     * every button's own handler owns its threading: a static or entry tap runs that item's click actions on the
+     * viewer's entity thread, a page button re-resolves the list off-thread and re-sends. The form send is on the
+     * viewer's entity thread (the open path already hopped here); the tap response arrives off-thread, and each handler
+     * makes its own hop. The resolved list cache is threaded in so a list-backed menu shows its entries.
      */
-    private void sendBedrockForm(Player live, MenuSpec spec, MenuContext ctx) {
+    private void sendBedrockForm(Player live, MenuSpec spec, MenuContext ctx, Map<String, List<?>> resolved) {
         PlayerRef viewer = ctx.viewer();
-        List<MenuItemSpec> visibleItems = renderer.visibleStaticItemsInSlotOrder(spec, ctx);
-        List<String> buttons = new ArrayList<>(visibleItems.size());
-        for (MenuItemSpec item : visibleItems) {
-            buttons.add(renderer.buttonText(item, ctx));
-        }
+        List<String> buttons = new ArrayList<>();
+        List<Runnable> handlers = new ArrayList<>();
+        appendStaticButtons(spec, ctx, viewer, buttons, handlers);
+        int pageCount = appendListButtons(spec, ctx, viewer, resolved, buttons, handlers);
+        appendPageButtons(spec, ctx, viewer, pageCount, buttons, handlers);
         bedrockScreen.sendSimpleForm(live, renderer.titleText(spec, ctx), null, buttons, index -> {
-            if (index < 0 || index >= visibleItems.size()) {
-                return;
+            if (index >= 0 && index < handlers.size()) {
+                handlers.get(index).run();
             }
-            scheduler.onEntity(viewer, () -> runFormActions(ctx, visibleItems.get(index)));
+        });
+    }
+
+    /** Append one button per visible actionable static item, each tapping into that item's own left-click actions. */
+    private void appendStaticButtons(
+            MenuSpec spec, MenuContext ctx, PlayerRef viewer, List<String> buttons, List<Runnable> handlers) {
+        for (MenuItemSpec item : renderer.visibleStaticItemsInSlotOrder(spec, ctx)) {
+            buttons.add(renderer.buttonText(item, ctx));
+            handlers.add(() -> scheduler.onEntity(viewer, () -> runFormActions(ctx, item)));
+        }
+    }
+
+    /**
+     * Append one button per list entry on the current page, labelling each with the list template stamped for that
+     * entry and routing a tap through the template's click actions bound to that entry — the form stand-in for a chest
+     * list cell's {@code RenderedSlot(template, entry)}. Only the first list-backed item is paged (a spec pairs one
+     * scrollable list with its controls, mirroring the chest renderer's page-count rule); a static-only menu has none
+     * and stays a single page. Returns the page count so the caller knows whether to add page-nav buttons.
+     */
+    private int appendListButtons(
+            MenuSpec spec,
+            MenuContext ctx,
+            PlayerRef viewer,
+            Map<String, List<?>> resolved,
+            List<String> buttons,
+            List<Runnable> handlers) {
+        Optional<MenuItemSpec> listItem = firstListItem(spec);
+        if (listItem.isEmpty()) {
+            return 1;
+        }
+        var listSpec = listItem.get().list().orElseThrow();
+        List<?> entries = resolved.getOrDefault(listSpec.source().id(), List.of());
+        MenuItemSpec template = listSpec.template();
+        @SuppressWarnings("unchecked") // a list source's element type is opaque to the engine; entries flow as Object
+        Pagination.Page<Object> page = Pagination.paginate(
+                (List<Object>) entries, listItem.get().slots().slots(), ctx.page());
+        for (Map.Entry<Integer, Object> placement : page.placements()) {
+            MenuContext entryCtx = ctx.withEntry(placement.getValue());
+            buttons.add(renderer.buttonText(template, entryCtx));
+            handlers.add(() -> scheduler.onEntity(viewer, () -> runFormActions(entryCtx, template)));
+        }
+        return page.pageCount();
+    }
+
+    /**
+     * Append the form-native Previous/Next buttons a paged list needs: a Previous when the viewer is past page zero,
+     * a Next when a further page exists, each re-sending the form one page over. A single-page menu (a static-only menu
+     * or a list that fits one page) adds neither, so its form is byte-identical to before this slice.
+     */
+    private void appendPageButtons(
+            MenuSpec spec,
+            MenuContext ctx,
+            PlayerRef viewer,
+            int pageCount,
+            List<String> buttons,
+            List<Runnable> handlers) {
+        if (ctx.page() > 0) {
+            buttons.add(renderer.plainMessage(viewer, GuiMessageKey.PAGE_PREVIOUS));
+            handlers.add(() -> resendBedrockPage(viewer, spec, ctx, ctx.page() - 1));
+        }
+        if (ctx.page() + 1 < pageCount) {
+            buttons.add(renderer.plainMessage(viewer, GuiMessageKey.PAGE_NEXT));
+            handlers.add(() -> resendBedrockPage(viewer, spec, ctx, ctx.page() + 1));
+        }
+    }
+
+    /** The first list-backed item in a spec, the one whose entries page as form buttons; empty for a static-only menu. */
+    private static Optional<MenuItemSpec> firstListItem(MenuSpec spec) {
+        for (MenuItemSpec item : spec.items().values()) {
+            if (item.list().isPresent()) {
+                return Optional.of(item);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Re-send the Bedrock form one page over — the target a Previous/Next form button runs. Because a list source may
+     * read a database, the list is re-resolved off the tick thread for the new page, then the render hops back onto the
+     * viewer's entity thread, the very async-resolve→entity-render discipline the initial open takes. The viewer may
+     * have gone offline between the tap and the re-render, so the online player is re-fetched and a missing one skipped.
+     */
+    private void resendBedrockPage(PlayerRef viewer, MenuSpec spec, MenuContext baseCtx, int page) {
+        MenuContext newCtx = baseCtx.withPage(Math.max(0, page));
+        scheduler.async(() -> {
+            Map<String, List<?>> resolved = resolveLists(spec, newCtx);
+            scheduler.onEntity(viewer, () -> {
+                Player p = Bukkit.getPlayer(viewer.uuid());
+                if (p != null) {
+                    sendBedrockForm(p, spec, newCtx, resolved);
+                }
+            });
         });
     }
 
