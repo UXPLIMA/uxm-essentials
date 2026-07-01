@@ -13,6 +13,11 @@ import org.jspecify.annotations.Nullable;
  * Brigadier node used to read and autocomplete it. A {@code /gift <target> <amount>} command declares two of these
  * — {@code {name="target", type="online-player"}} and {@code {name="amount", type="int"}} — in order.
  *
+ * <p>The {@code greedy} flag marks a final {@link ArgType#STRING} argument that should capture the rest of the
+ * input including spaces (a {@code /say <message>} chat line) rather than a single word. Brigadier can only read
+ * the remaining input on a terminal node, so greedy is honoured only on the last argument and only for a string
+ * type; a greedy flag anywhere else falls back to a single-word read.
+ *
  * <p>Immutable and validated at construction: {@code name} must be non-blank (it becomes both a Brigadier argument
  * name and a placeholder key). An unrecognised type string is not this record's concern — the loader maps a config
  * token to an {@link ArgType} via {@link ArgType#parse(String)} and falls back to {@link ArgType#STRING} with a
@@ -20,7 +25,7 @@ import org.jspecify.annotations.Nullable;
  * dropping the command.
  */
 @NullMarked
-public record ArgumentSpec(String name, ArgType type) {
+public record ArgumentSpec(String name, ArgType type, boolean greedy) {
 
     public ArgumentSpec {
         name = Objects.requireNonNull(name, "name").strip();
@@ -28,6 +33,14 @@ public record ArgumentSpec(String name, ArgType type) {
             throw new IllegalArgumentException("menu command argument name must not be blank");
         }
         Objects.requireNonNull(type, "type");
+    }
+
+    /**
+     * The pre-greedy shape: a non-greedy argument. Kept as a delegating constructor so every call site that
+     * predates last-argument-captures-rest constructs an {@link ArgumentSpec} unchanged.
+     */
+    public ArgumentSpec(String name, ArgType type) {
+        this(name, type, false);
     }
 
     /**

@@ -24,6 +24,16 @@ class ArgumentSpecTest {
     }
 
     @Test
+    void theTwoArgumentConstructorDefaultsToNonGreedy() {
+        assertThat(new ArgumentSpec("message", ArgType.STRING).greedy()).isFalse();
+    }
+
+    @Test
+    void keepsAnExplicitGreedyFlag() {
+        assertThat(new ArgumentSpec("message", ArgType.STRING, true).greedy()).isTrue();
+    }
+
+    @Test
     void parsesEveryKnownTypeTokenCaseAndSeparatorInsensitively() {
         assertThat(ArgType.parse("string")).contains(ArgType.STRING);
         assertThat(ArgType.parse("int")).contains(ArgType.INT);

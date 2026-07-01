@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -517,7 +518,13 @@ public final class MenuListener implements Listener {
         return ref.deniedAt(ThreadLocalRandom.current().nextDouble(100.0));
     }
 
-    /** Hop to the viewer's entity thread, re-resolve the live player, and run one bound action there. */
+    /**
+     * Hop to the viewer's entity thread, re-resolve the live player, and run one bound action there. Before the
+     * action context is built, each of the ref's argument values has its {@code %argument_<name>%} tokens expanded
+     * from the arguments the menu was opened with — the same first-class substitution rendered menu TEXT already
+     * gets — so an action written {@code give-money:%argument_amount%} actually acts on the opened amount. A menu
+     * opened without command arguments takes the identity fast-path and passes the ref's args through unchanged.
+     */
     private void dispatch(
             MenuHolder holder, MenuContext base, ClickKind kind, Ref ref, Consumer<MenuActionContext> handler) {
         scheduler.onEntity(holder.ctx().viewer(), () -> {
@@ -525,7 +532,8 @@ public final class MenuListener implements Listener {
             if (live == null) {
                 return;
             }
-            handler.accept(new MenuActionContext(base, live, kind, ref.args(), new HolderControl(holder)));
+            Map<String, String> args = ActionArguments.resolve(ref.args(), base.arguments());
+            handler.accept(new MenuActionContext(base, live, kind, args, new HolderControl(holder)));
         });
     }
 

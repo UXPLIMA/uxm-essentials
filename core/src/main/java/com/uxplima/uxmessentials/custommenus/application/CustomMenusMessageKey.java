@@ -30,7 +30,10 @@ public enum CustomMenusMessageKey implements MessageKey {
     MENU_RELOADED("menu.reloaded"),
 
     /** Reply when a console (or other non-player) invokes a menu open command whose block forbids the console. */
-    MENU_CONSOLE_DENIED("menu.console-denied");
+    MENU_CONSOLE_DENIED("menu.console-denied"),
+
+    /** Confirmation to the sender of {@code /menu open <name> <target>} that the menu opened for {@code {player}}. */
+    MENU_OPENED_FOR("menu.opened-for");
 
     private final String key;
 

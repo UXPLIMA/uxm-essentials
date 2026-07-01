@@ -95,6 +95,44 @@ class MenuCommandTest {
     }
 
     @Test
+    void openForOtherOpensTheMenuForTheNamedTarget() {
+        PlayerMock steve = server.addPlayer("Steve");
+
+        execute("menu open shop Steve", player);
+
+        var top = steve.getOpenInventory().getTopInventory();
+        assertThat(top.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(((MenuHolder) top.getHolder()).specId()).isEqualTo("shop");
+        // The invoking operator opens it for the target, not for themselves.
+        assertThat(menuHolderIsOpenFor(player)).isFalse();
+        assertThat(messages.keys).contains("menu.opened-for");
+    }
+
+    @Test
+    void openForOtherIsHiddenWithoutTheOthersNodeButSelfOpenStillWorks() {
+        PlayerMock plain = server.addPlayer("Plain"); // holds use but not the open.others node
+        plain.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.menu.use", true);
+        server.addPlayer("Steve");
+
+        // The target branch is invisible without the others node, so open-for-other fails to parse.
+        executeExpectingDenial("menu open shop Steve", plain);
+        // But opening the menu for oneself still works.
+        execute("menu open shop", plain);
+
+        assertThat(menuHolderIsOpenFor(plain)).isTrue();
+    }
+
+    @Test
+    void openForOtherWithAnUnknownMenuNameRepliesNotFound() {
+        PlayerMock steve = server.addPlayer("Steve");
+
+        execute("menu open ghost Steve", player);
+
+        assertThat(messages.keys).contains("menu.not-found");
+        assertThat(menuHolderIsOpenFor(steve)).isFalse();
+    }
+
+    @Test
     void listSurfacesTheRegisteredNames() {
         execute("menu list", player);
 

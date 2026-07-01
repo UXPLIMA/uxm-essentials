@@ -174,9 +174,30 @@ public final class CustomMenuLoader {
                 log.warn("menu {} declares a command argument with no name; skipping it", menuId);
                 continue;
             }
-            arguments.add(new ArgumentSpec(name, argType(entry.node("type").getString("string"), menuId, name)));
+            boolean greedy = entry.node("greedy").getBoolean(false);
+            arguments.add(
+                    new ArgumentSpec(name, argType(entry.node("type").getString("string"), menuId, name), greedy));
         }
+        warnOnNonTerminalGreedy(arguments, menuId);
         return List.copyOf(arguments);
+    }
+
+    /**
+     * Warn when a {@code greedy} flag sits on any argument other than the last. Brigadier can only capture the
+     * remainder of the input on a terminal node, so a greedy flag before a further argument is silently ignored at
+     * build time — surfacing it here lets an operator reorder the arguments rather than wonder why only one word was
+     * read. The spec itself is left as declared; the command builder is what honours greedy only on the final node.
+     */
+    private void warnOnNonTerminalGreedy(List<ArgumentSpec> arguments, String menuId) {
+        for (int i = 0; i < arguments.size() - 1; i++) {
+            if (arguments.get(i).greedy()) {
+                log.warn(
+                        "menu {} command argument {} is greedy but not the last argument; greedy is only honoured "
+                                + "on the final argument",
+                        menuId,
+                        arguments.get(i).name());
+            }
+        }
     }
 
     /** The {@link ArgType} named by {@code token}, defaulting to {@link ArgType#STRING} with a warning when unknown. */

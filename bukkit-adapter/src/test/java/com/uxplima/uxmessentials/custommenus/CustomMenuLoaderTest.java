@@ -54,6 +54,27 @@ class CustomMenuLoaderTest {
             }
             """;
 
+    private static final String WITH_GREEDY = """
+            rows = 1
+            items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
+            command {
+              name = "say"
+              arguments = [ { name = "message", type = "string", greedy = true } ]
+            }
+            """;
+
+    private static final String WITH_NON_LAST_GREEDY = """
+            rows = 1
+            items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
+            command {
+              name = "gift"
+              arguments = [
+                { name = "note", type = "string", greedy = true }
+                { name = "amount", type = "int" }
+              ]
+            }
+            """;
+
     @Test
     void loadsValidSpecAndSkipsInvalidOnes(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("good.conf"), GOOD);
@@ -112,6 +133,39 @@ class CustomMenuLoaderTest {
                 .extracting(ArgumentSpec::type)
                 .containsExactly(ArgType.ONLINE_PLAYER, ArgType.INT, ArgType.STRING);
         assertThat(log.warnings).anyMatch(line -> line.contains("unknown type") && line.contains("bogus"));
+    }
+
+    @Test
+    void parsesAGreedyFlagOnTheLastStringArgument(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("say.conf"), WITH_GREEDY);
+
+        MenuBindings bindings = new MenuBindings();
+        bindings.action("close", c -> {});
+        CustomMenuLoader loader =
+                new CustomMenuLoader(new MenuSpecLoader(), bindings, newMenus(), new RecordingLogger());
+
+        CustomMenuLoader.LoadResult result = loader.loadFrom(dir);
+
+        OpenCommandSpec command = result.openCommands().get("say");
+        assertThat(command.arguments()).singleElement().satisfies(arg -> {
+            assertThat(arg.name()).isEqualTo("message");
+            assertThat(arg.type()).isEqualTo(ArgType.STRING);
+            assertThat(arg.greedy()).isTrue();
+        });
+    }
+
+    @Test
+    void warnsWhenAGreedyFlagIsNotOnTheLastArgument(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("gift.conf"), WITH_NON_LAST_GREEDY);
+
+        MenuBindings bindings = new MenuBindings();
+        bindings.action("close", c -> {});
+        RecordingLogger log = new RecordingLogger();
+        CustomMenuLoader loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, newMenus(), log);
+
+        loader.loadFrom(dir);
+
+        assertThat(log.warnings).anyMatch(line -> line.contains("greedy") && line.contains("note"));
     }
 
     @Test

@@ -10,11 +10,14 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
@@ -26,19 +29,23 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /menu} — the operator surface over the loaded custom menus. {@code /menu open <name>} opens a registered
- * spec for the clicking player (gated by {@code uxmessentials.menu.use}); {@code /menu list} prints the loaded menu
- * names; {@code /menu reload} re-runs the loader and reports the loaded/skipped counts (gated by
- * {@code uxmessentials.menu.admin}). The set of registered names is supplied by the wiring rather than read off the
- * engine, so the same list backs the {@code <name>} tab-completion, the not-found guard, and {@code /menu list}.
+ * spec for the clicking player (gated by {@code uxmessentials.menu.use}); {@code /menu open <name> <target>} opens
+ * it for another player (gated by {@code uxmessentials.menu.open.others}, so an operator can push a menu to someone
+ * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu reload} re-runs the loader
+ * and reports the loaded/skipped counts (gated by {@code uxmessentials.menu.admin}). The set of registered names is
+ * supplied by the wiring rather than read off the engine, so the same list backs the {@code <name>} tab-completion,
+ * the not-found guard, and {@code /menu list}.
  */
 @NullMarked
 public final class MenuCommand implements CommandRegistration {
 
     private static final String USE = "uxmessentials.menu.use";
     private static final String ADMIN = "uxmessentials.menu.admin";
+    private static final String OPEN_OTHERS = "uxmessentials.menu.open.others";
 
     private final Menus menus;
     private final Supplier<List<String>> menuNames;
@@ -60,7 +67,12 @@ public final class MenuCommand implements CommandRegistration {
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("menu")
                 .requires(src -> src.getSender().hasPermission(USE))
-                .then(Commands.literal("open").then(nameArgument().executes(this::open)))
+                .then(Commands.literal("open")
+                        .then(nameArgument()
+                                .executes(this::open)
+                                .then(targetArgument()
+                                        .requires(src -> src.getSender().hasPermission(OPEN_OTHERS))
+                                        .executes(this::openForOther))))
                 .then(Commands.literal("list").executes(this::list))
                 .then(Commands.literal("reload")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
@@ -103,6 +115,44 @@ public final class MenuCommand implements CommandRegistration {
         }
         menus.open(BukkitRefs.toRef(player), name, null);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** The {@code <target>} player argument, present only for a sender holding {@code uxmessentials.menu.open.others}. */
+    private RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> targetArgument() {
+        return Commands.argument("target", ArgumentTypes.player());
+    }
+
+    /**
+     * Open a loaded menu for another player. The menu name is checked first, so an unknown name draws the same
+     * not-found line the self-open does before any target work. The target is resolved from the single-player
+     * selector; a selector that matches nobody draws the shared unknown-player line rather than opening an empty
+     * window. The sender may be a player or the console — this never opens for the sender, only for the resolved
+     * target, so the console can legitimately push a menu to a real player. The menu itself opens on the target's
+     * own region thread through the {@link Menus} facade, so cross-region opens stay Folia-safe.
+     */
+    private int openForOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (!menuNames.get().contains(name)) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", name));
+            return 0;
+        }
+        Player target = resolveTarget(ctx);
+        if (target == null) {
+            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+            return 0;
+        }
+        menus.open(BukkitRefs.toRef(target), name, null);
+        feedback.send(sender, CustomMenusMessageKey.MENU_OPENED_FOR, Map.of("player", target.getName()));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Resolve the single target the {@code <target>} selector names, or null when it matched none (or more than one). */
+    private static @Nullable Player resolveTarget(CommandContext<CommandSourceStack> ctx)
+            throws CommandSyntaxException {
+        PlayerSelectorArgumentResolver resolver = ctx.getArgument("target", PlayerSelectorArgumentResolver.class);
+        List<Player> resolved = resolver.resolve(ctx.getSource());
+        return resolved.size() == 1 ? resolved.get(0) : null;
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {

@@ -101,19 +101,31 @@ public final class MenuOpenCommand implements CommandRegistration {
      */
     private ArgumentBuilder<CommandSourceStack, ?> argumentChain(List<ArgumentSpec> args) {
         int last = args.size() - 1;
-        RequiredArgumentBuilder<CommandSourceStack, ?> node = argumentNode(args.get(last));
+        RequiredArgumentBuilder<CommandSourceStack, ?> node = argumentNode(args.get(last), true);
         node.executes(this::open);
         for (int i = last - 1; i >= 0; i--) {
-            node = argumentNode(args.get(i)).then(node);
+            node = argumentNode(args.get(i), false).then(node);
         }
         return node;
     }
 
-    /** Build one typed Brigadier argument node with its autocomplete for {@code arg}. */
-    private RequiredArgumentBuilder<CommandSourceStack, ?> argumentNode(ArgumentSpec arg) {
-        RequiredArgumentBuilder<CommandSourceStack, ?> node = Commands.argument(arg.name(), argumentType(arg.type()));
+    /** Build one typed Brigadier argument node with its autocomplete for {@code arg}; {@code last} gates greedy capture. */
+    private RequiredArgumentBuilder<CommandSourceStack, ?> argumentNode(ArgumentSpec arg, boolean last) {
+        RequiredArgumentBuilder<CommandSourceStack, ?> node = Commands.argument(arg.name(), argumentType(arg, last));
         suggestionsFor(arg.type()).ifPresent(node::suggests);
         return node;
+    }
+
+    /**
+     * The Brigadier argument type for {@code arg}. A greedy final {@link ArgType#STRING} reads the rest of the input
+     * (spaces included) through {@link StringArgumentType#greedyString()}; because Brigadier can only capture the
+     * remainder on a terminal node, a greedy flag on any non-last argument is ignored and falls back to a word.
+     */
+    private static ArgumentType<?> argumentType(ArgumentSpec arg, boolean last) {
+        if (last && arg.greedy() && arg.type() == ArgType.STRING) {
+            return StringArgumentType.greedyString();
+        }
+        return argumentType(arg.type());
     }
 
     /** The Brigadier argument type for {@code type}; the word-typed kinds ({@code PLAYER}/material/world) suggest separately. */

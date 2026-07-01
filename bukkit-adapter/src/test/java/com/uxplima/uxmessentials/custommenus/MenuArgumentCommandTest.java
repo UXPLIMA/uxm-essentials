@@ -15,6 +15,8 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestion;
 import com.mojang.brigadier.suggestion.Suggestions;
@@ -69,6 +71,12 @@ class MenuArgumentCommandTest {
             items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
             """;
 
+    private static final String SAY_SPEC = """
+            rows = 1
+            title = "%argument_message%"
+            items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
+            """;
+
     private ServerMock server;
     private Menus menus;
     private MenuRenderer renderer;
@@ -84,6 +92,7 @@ class MenuArgumentCommandTest {
         menus = new Menus(renderer, new SyncScheduler(), new ListSourceRegistry());
         menus.registerSpec("gift", new MenuSpecLoader().parse(ARG_SPEC));
         menus.registerSpec("shop", new MenuSpecLoader().parse(BARE_SPEC));
+        menus.registerSpec("say", new MenuSpecLoader().parse(SAY_SPEC));
         messages = new KeyMessages();
     }
 
@@ -165,6 +174,65 @@ class MenuArgumentCommandTest {
         LiteralCommandNode<CommandSourceStack> warpto = warptoCommand().build();
         assertThat(customSuggestions(warpto.getChild("mat"))).isNotNull();
         assertThat(customSuggestions(warpto.getChild("mat").getChild("dest"))).isNotNull();
+    }
+
+    @Test
+    void aGreedyLastStringArgumentCapturesTheRestOfTheInputIncludingSpaces() {
+        PlayerMock player = server.addPlayer("Speaker");
+
+        execute(sayCommand(true), "say hello there world", player);
+
+        MenuHolder holder = openHolder(player);
+        assertThat(holder.ctx().arguments()).containsEntry("message", "hello there world");
+        // And the greedy value flows into rendered TEXT the same as any other argument.
+        assertThat(PLAIN.serialize(renderer.title(holder.spec(), holder.ctx()))).isEqualTo("hello there world");
+    }
+
+    @Test
+    void aNonGreedyStringArgumentCapturesOnlyASingleWord() {
+        PlayerMock player = server.addPlayer("Speaker");
+
+        execute(sayCommand(false), "say hello", player);
+
+        assertThat(openHolder(player).ctx().arguments()).containsEntry("message", "hello");
+    }
+
+    @Test
+    void aGreedyLastStringArgumentBuildsAGreedyBrigadierNode() {
+        CommandNode<CommandSourceStack> node = sayCommand(true).build().getChild("message");
+        ArgumentType<?> type = ((ArgumentCommandNode<?, ?>) node).getType();
+
+        assertThat(type).isInstanceOf(StringArgumentType.class);
+        assertThat(((StringArgumentType) type).getType()).isEqualTo(StringArgumentType.StringType.GREEDY_PHRASE);
+    }
+
+    @Test
+    void aGreedyFlagOnANonLastArgumentIsIgnoredAndFallsBackToASingleWord() {
+        OpenCommandSpec spec = new OpenCommandSpec(
+                "say",
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                List.of(new ArgumentSpec("message", ArgType.STRING, true), new ArgumentSpec("amount", ArgType.INT)),
+                Optional.empty());
+        CommandNode<CommandSourceStack> node =
+                new MenuOpenCommand(menus, "say", spec, messages).build().getChild("message");
+        ArgumentType<?> type = ((ArgumentCommandNode<?, ?>) node).getType();
+
+        assertThat(((StringArgumentType) type).getType()).isEqualTo(StringArgumentType.StringType.SINGLE_WORD);
+    }
+
+    private MenuOpenCommand sayCommand(boolean greedy) {
+        OpenCommandSpec spec = new OpenCommandSpec(
+                "say",
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                List.of(new ArgumentSpec("message", ArgType.STRING, greedy)),
+                Optional.empty());
+        return new MenuOpenCommand(menus, "say", spec, messages);
     }
 
     private MenuOpenCommand giftCommand() {
