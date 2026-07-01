@@ -100,6 +100,64 @@ class MenuSpecLoaderTest {
         assertThat(view).isEqualTo(RequirementSpec.NONE);
     }
 
+    @Test
+    void thePermissionShorthandAppendsAMandatoryPermRequirement() {
+        RequirementSpec view = new MenuSpecLoader()
+                .parse("rows=1\nitems{ x{ slot=0, material=STONE, permission = \"a.b\" } }")
+                .items()
+                .get("x")
+                .view();
+
+        assertThat(view.minimum())
+                .as("a shorthand-only view is still an all-mandatory AND")
+                .isZero();
+        assertThat(view.requirements())
+                .extracting(r -> r.condition().id(), r -> r.condition().value(), Requirement::inverted)
+                .containsExactly(tuple("perm", "a.b", false));
+    }
+
+    @Test
+    void thePagesShorthandAppendsAMandatoryOnPageRequirement() {
+        RequirementSpec view = new MenuSpecLoader()
+                .parse("rows=1\nitems{ x{ slot=0, material=STONE, pages = \"2-3\" } }")
+                .items()
+                .get("x")
+                .view();
+
+        assertThat(view.requirements())
+                .extracting(r -> r.condition().id(), r -> r.condition().value(), Requirement::inverted)
+                .containsExactly(tuple("on-page", "2-3", false));
+    }
+
+    @Test
+    void aViewBlockAndAPermissionShorthandBothLandInTheViewAsMandatory() {
+        RequirementSpec view = new MenuSpecLoader()
+                .parse("rows=1\nitems{ x{ slot=0, material=STONE, view=[\"has-money:100\"], permission = \"a.b\" } }")
+                .items()
+                .get("x")
+                .view();
+
+        assertThat(view.minimum())
+                .as("appending to an AND view keeps it an AND")
+                .isZero();
+        assertThat(view.requirements())
+                .extracting(r -> r.condition().id(), Requirement::inverted)
+                .containsExactly(tuple("has-money:100", false), tuple("perm", false));
+    }
+
+    @Test
+    void withoutAShorthandTheViewIsUnchanged() {
+        RequirementSpec view = new MenuSpecLoader()
+                .parse("rows=1\nitems{ x{ slot=0, material=STONE, view=[\"has-money:100\"] } }")
+                .items()
+                .get("x")
+                .view();
+
+        assertThat(view)
+                .as("an item declaring no permission/pages key parses its view byte-identically to before")
+                .isEqualTo(RequirementSpec.allOf(List.of(Ref.parse("has-money:100"))));
+    }
+
     private static final String RICH = """
             rows = 1
             items {

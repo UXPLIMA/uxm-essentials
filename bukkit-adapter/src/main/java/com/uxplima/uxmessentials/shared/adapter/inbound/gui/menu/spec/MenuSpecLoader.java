@@ -320,7 +320,7 @@ public final class MenuSpecLoader {
                 strings(item.node("lore")),
                 parseDecor(item.node("decor")),
                 LoreMode.fromToken(item.node("lore-mode").getString()),
-                parseView(item.node("view")),
+                applyViewShorthands(parseView(item.node("view")), item),
                 parseClick(item.node("click")),
                 item.node("update").getBoolean(false),
                 parseList(item.node("list"), rows, patterns),
@@ -529,6 +529,39 @@ public final class MenuSpecLoader {
                     List.of());
         }
         return new RequirementSpec(parseRequirements(node), 0, List.of());
+    }
+
+    /**
+     * Fold the two operator convenience shorthands into an item's {@code view} gate. {@code permission = "<node>"}
+     * makes the item visible only to a viewer holding that node ({@code perm:<node>}); {@code pages = "<ranges>"} makes
+     * it visible only on the listed one-based pages ({@code on-page:<ranges>}, e.g. {@code "1-3,5"}). Each present key
+     * becomes a mandatory {@link Requirement} appended to the view's requirement list, so a NONE or all-mandatory (AND)
+     * view ANDs cleanly with the shorthand. An item declaring neither key returns the view unchanged, byte-identical to
+     * before this seam.
+     *
+     * <p>Edge case: a view with a positive {@code minimum} (an OR / N-of-M block) folds the appended shorthand into that
+     * same pool rather than nesting an outer AND — so for such a view an operator should place the permission inside the
+     * {@code view} block instead. The shorthand is designed for the common no-view / AND-view case.
+     */
+    private RequirementSpec applyViewShorthands(RequirementSpec view, ConfigurationNode item) {
+        String permission = item.node("permission").getString();
+        String pages = item.node("pages").getString();
+        if (permission == null && pages == null) {
+            return view;
+        }
+        List<Requirement> merged = new ArrayList<>(view.requirements());
+        if (permission != null) {
+            merged.add(shorthandRequirement("perm", permission));
+        }
+        if (pages != null) {
+            merged.add(shorthandRequirement("on-page", pages));
+        }
+        return new RequirementSpec(merged, view.minimum(), view.deny(), view.stopAtSuccess());
+    }
+
+    /** A mandatory view requirement gating on {@code condition} with {@code value}, built as the same valued ref config produces. */
+    private static Requirement shorthandRequirement(String condition, String value) {
+        return new Requirement(Ref.of(condition, Map.of("value", value)), false);
     }
 
     /**

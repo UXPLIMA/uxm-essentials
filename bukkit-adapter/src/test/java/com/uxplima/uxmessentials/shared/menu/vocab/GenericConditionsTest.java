@@ -21,7 +21,8 @@ import org.junit.jupiter.api.Test;
  * Plain-JUnit coverage of the generic menu conditions and placeholders. The {@code perm} condition reads the
  * permission node from the condition ref's arguments — the same arg-carrier actions use — so a spec writes
  * {@code perm:some.node} and the engine threads {@code some.node} through to the {@link Permissions} port. The
- * {@code player} and {@code page} placeholders expand against the per-open {@link MenuContext}.
+ * {@code on-page} condition reads the open context's one-based page against a range spec, and the {@code player} and
+ * {@code page} placeholders expand against the per-open {@link MenuContext}.
  */
 class GenericConditionsTest {
 
@@ -35,6 +36,42 @@ class GenericConditionsTest {
 
         assertThat(perm.test(ctx, Map.of("value", "x.allow"))).isTrue();
         assertThat(perm.test(ctx, Map.of("value", "x.deny"))).isFalse();
+    }
+
+    @Test
+    void onPageConditionMatchesOneBasedPagesFromTheContext() {
+        MenuBindings bindings = new MenuBindings();
+        MenuVocabulary.registerConditions(bindings, new GrantOnly("x.allow"), new NoopLogger());
+        BiPredicate<MenuContext, Map<String, String>> onPage =
+                bindings.condition("on-page").orElseThrow(() -> new AssertionError("on-page condition not registered"));
+
+        // page() is zero-based; the condition reads it one-based to match %page%, so index 1 is page 2.
+        assertThat(onPage.test(MenuContext.of(viewer("V"), null, 1), Map.of("value", "2")))
+                .isTrue();
+        assertThat(onPage.test(MenuContext.of(viewer("V"), null, 0), Map.of("value", "2")))
+                .isFalse();
+        // A blank spec fails closed on every page.
+        assertThat(onPage.test(MenuContext.of(viewer("V"), null, 1), Map.of())).isFalse();
+    }
+
+    @Test
+    void pageInRangesParsesSinglesRangesAndFailsClosedOnGarbage() {
+        // Inclusive A-B ranges.
+        assertThat(MenuVocabulary.pageInRanges(2, "1-3")).isTrue();
+        assertThat(MenuVocabulary.pageInRanges(4, "1-3")).isFalse();
+        // A comma-separated mix of a single and a range.
+        assertThat(MenuVocabulary.pageInRanges(1, "1,3-5")).isTrue();
+        assertThat(MenuVocabulary.pageInRanges(2, "1,3-5")).isFalse();
+        assertThat(MenuVocabulary.pageInRanges(4, "1,3-5")).isTrue();
+        // A bare single page matches only itself.
+        assertThat(MenuVocabulary.pageInRanges(2, "2")).isTrue();
+        assertThat(MenuVocabulary.pageInRanges(3, "2")).isFalse();
+        // Whitespace around the numbers and the dash is tolerated.
+        assertThat(MenuVocabulary.pageInRanges(2, " 1 - 3 ")).isTrue();
+        // Blank and malformed specs match nothing — fail closed.
+        assertThat(MenuVocabulary.pageInRanges(2, "")).isFalse();
+        assertThat(MenuVocabulary.pageInRanges(2, "x")).isFalse();
+        assertThat(MenuVocabulary.pageInRanges(3, "3-")).isFalse();
     }
 
     @Test

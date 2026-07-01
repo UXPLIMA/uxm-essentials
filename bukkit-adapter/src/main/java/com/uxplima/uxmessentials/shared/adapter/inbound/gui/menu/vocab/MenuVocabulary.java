@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
 
+import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
@@ -35,6 +36,9 @@ public final class MenuVocabulary {
 
     /** A {@code %token%} placeholder inside a {@code papi-compare} operand; {@code group(1)} is the bare id. */
     private static final Pattern PLACEHOLDER = Pattern.compile("%([a-zA-Z0-9_]+)%");
+
+    /** Splits an {@code on-page} range spec on its commas; each token is a single page or an {@code A-B} range. */
+    private static final Splitter COMMAS = Splitter.on(',');
 
     private MenuVocabulary() {}
 
@@ -71,9 +75,10 @@ public final class MenuVocabulary {
      * three named args ({@code left}, {@code op}, {@code right}) and compares the two operands after expanding any
      * {@code %token%} in them, so a spec gates on a (PlaceholderAPI-bridged) value such as a balance or vote count.
      * {@code has-prev} / {@code has-next} read the render-time page position so a paginated menu can hide its
-     * previous/next arrow on the first/last page rather than showing a dead button. {@code expr} expands the
-     * {@code %token%}s in its expression then runs it through the sandboxed evaluator, so a spec can gate on a
-     * computed condition such as {@code expr:"%balance% >= 1000"}.
+     * previous/next arrow on the first/last page rather than showing a dead button. {@code on-page} reads that same
+     * position so an item can show only on the pages an operator lists (e.g. {@code on-page:1-3,5}), one-based to line
+     * up with {@code %page%}. {@code expr} expands the {@code %token%}s in its expression then runs it through the
+     * sandboxed evaluator, so a spec can gate on a computed condition such as {@code expr:"%balance% >= 1000"}.
      */
     public static void registerConditions(MenuBindings bindings, Permissions permissions, Logger log) {
         Objects.requireNonNull(bindings, "bindings");
@@ -82,6 +87,7 @@ public final class MenuVocabulary {
         bindings.condition("perm", (ctx, args) -> permissions.has(ctx.viewer(), args.getOrDefault("value", "")));
         bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
         bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
+        bindings.condition("on-page", (ctx, args) -> pageInRanges(ctx.page() + 1, args.getOrDefault("value", "")));
         PlaceholderRegistry placeholders = bindings.placeholders();
         bindings.condition("papi-compare", (ctx, args) -> compare(ctx, args, placeholders));
         bindings.condition("expr", exprCondition(placeholders, log));
@@ -164,6 +170,39 @@ public final class MenuVocabulary {
         } catch (NumberFormatException notNumeric) {
             return OptionalDouble.empty();
         }
+    }
+
+    /**
+     * Whether the one-based {@code page} falls inside {@code spec} — a comma-separated list of {@code N} single pages
+     * and {@code A-B} inclusive ranges, with whitespace around any number tolerated (so {@code " 1 - 3 "} and
+     * {@code "1-3"} read alike). Pages are one-based to line up with the {@code %page%} placeholder an operator reads,
+     * so {@code pages = "2"} shows only on the page {@code %page%} renders as {@code 2}. A blank or malformed spec
+     * matches nothing and fails closed: a typo hides the item rather than showing it on every page, the safer default
+     * for a visibility gate. Pure and Bukkit-free so a plain-JUnit test can exercise the grammar directly.
+     */
+    public static boolean pageInRanges(int page, String spec) {
+        Objects.requireNonNull(spec, "spec");
+        for (String token : COMMAS.split(spec)) {
+            String range = token.strip();
+            if (range.isEmpty()) {
+                continue;
+            }
+            int dash = range.indexOf('-');
+            try {
+                if (dash < 0 && Integer.parseInt(range) == page) {
+                    return true;
+                }
+                if (dash > 0
+                        && page >= Integer.parseInt(range.substring(0, dash).strip())
+                        && page <= Integer.parseInt(range.substring(dash + 1).strip())) {
+                    return true;
+                }
+            } catch (NumberFormatException malformed) {
+                // A malformed page token fails closed: skip it so a typo hides the item rather than matching every
+                // page.
+            }
+        }
+        return false;
     }
 
     /**
