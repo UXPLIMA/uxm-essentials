@@ -18,14 +18,28 @@ import java.util.Objects;
  * {@link #effectiveMinimum()} folds those rules into the concrete count the runtime compares its pass tally against,
  * so the runtime carries no combinator logic of its own.
  *
+ * <p>{@code stopAtSuccess} short-circuits evaluation once the {@link #minimum} is met: the runtime stops evaluating
+ * further requirements (and stops running their per-requirement actions) as soon as enough have passed. It only means
+ * anything with a positive {@code minimum} — with the default AND minimum every requirement must be looked at anyway —
+ * and it defaults to {@code false}, so a block that does not ask for it evaluates every requirement exactly as before.
+ *
  * <p>Pure by design: which requirements actually pass is decided in the runtime (it holds the condition registry);
  * this record only says how they combine, so it stays Bukkit-free for plain-JUnit testing. {@link #NONE} is the empty
  * block that always passes and denies nothing — the value a gesture with no requirement block resolves to.
  */
-public record RequirementSpec(List<Requirement> requirements, int minimum, List<Ref> deny) {
+public record RequirementSpec(List<Requirement> requirements, int minimum, List<Ref> deny, boolean stopAtSuccess) {
 
-    /** The empty block: no requirements (so it always passes) and no deny actions. */
+    /** The empty block: no requirements (so it always passes), no deny actions, and no short-circuit. */
     public static final RequirementSpec NONE = new RequirementSpec(List.of(), 0, List.of());
+
+    /**
+     * The historic three-argument form. It forwards to the canonical constructor with {@code stopAtSuccess} off, so
+     * every existing {@code new RequirementSpec(requirements, minimum, deny)} call-site keeps compiling unchanged —
+     * only the loader reaches for the four-argument form to opt a block into short-circuit evaluation.
+     */
+    public RequirementSpec(List<Requirement> requirements, int minimum, List<Ref> deny) {
+        this(requirements, minimum, deny, false);
+    }
 
     public RequirementSpec {
         requirements = List.copyOf(Objects.requireNonNull(requirements, "requirements"));

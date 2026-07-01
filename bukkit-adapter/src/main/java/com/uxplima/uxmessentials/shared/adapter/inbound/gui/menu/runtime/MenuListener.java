@@ -344,10 +344,8 @@ public final class MenuListener implements Listener {
             return;
         }
         RequirementSpec requirement = rs.item().click().requirementFor(kind);
-        if (!requirementsPass(requirement, base)) {
-            for (Ref denied : requirement.deny()) {
-                runRef(holder, base, kind, denied);
-            }
+        if (!evaluateRequirements(holder, base, kind, requirement)) {
+            runEach(holder, base, kind, requirement.deny());
             return;
         }
         for (Ref ref : rs.item().click().actionsFor(kind)) {
@@ -356,25 +354,61 @@ public final class MenuListener implements Listener {
     }
 
     /**
-     * Whether {@code requirement}'s block passes for this click: at least {@link RequirementSpec#effectiveMinimum()} of
-     * its requirements must hold, which gives AND / OR / N-of-M from one {@code minimum}. Each requirement's condition
-     * is resolved against the condition registry (so a valued token like {@code has-money:100} reaches its handler with
-     * {@code value=100}, the same registry-aware split the action path takes) and then negated when the requirement was
-     * written with a leading {@code !}. An unregistered condition evaluates {@code false} — fail-closed — so a wiring
-     * gap denies the click rather than silently granting it. An empty block passes: {@link RequirementSpec#NONE}
-     * tallies zero passes against an effective minimum of zero.
+     * Evaluate {@code spec}'s block for this click, running each requirement's own success/deny actions as it goes and
+     * reporting whether the block as a whole passes. The pass/fail rule is driven by {@code minimum}:
+     *
+     * <ul>
+     *   <li>{@code minimum <= 0} (the default) — every <em>mandatory</em> (non-optional) requirement must pass. An
+     *       optional requirement failing does not fail the block, yet its per-requirement {@code deny} still runs.</li>
+     *   <li>{@code minimum > 0} — at least N of <em>all</em> requirements (optional included) must pass.</li>
+     * </ul>
+     *
+     * <p>With {@link RequirementSpec#stopAtSuccess()} and a positive {@code minimum}, the loop breaks the moment the
+     * minimum is met, so later requirements are not evaluated and their per-requirement actions do not run. This is
+     * backward-compatible with the slice-1 model: a block with no optional and no per-requirement actions yields
+     * {@code !mandatoryFail} (all passed) at {@code minimum <= 0} and {@code passes >= min} at {@code minimum > 0},
+     * exactly as the old pass tally did.
      */
-    private boolean requirementsPass(RequirementSpec requirement, MenuContext ctx) {
+    private boolean evaluateRequirements(MenuHolder holder, MenuContext base, ClickKind kind, RequirementSpec spec) {
         int passes = 0;
-        for (Requirement r : requirement.requirements()) {
-            Ref eff = r.condition().resolve(conditions::has);
-            boolean pass =
-                    conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false);
-            if (pass != r.inverted()) {
+        boolean mandatoryFail = false;
+        int min = spec.minimum();
+        int cap = Math.min(min, spec.requirements().size());
+        for (Requirement r : spec.requirements()) {
+            if (evaluateOne(holder, base, kind, r)) {
                 passes++;
+            } else if (!r.optional()) {
+                mandatoryFail = true;
+            }
+            if (spec.stopAtSuccess() && min > 0 && passes >= cap) {
+                break;
             }
         }
-        return passes >= requirement.effectiveMinimum();
+        return min <= 0 ? !mandatoryFail : passes >= cap;
+    }
+
+    /**
+     * Evaluate one requirement, run its per-requirement success or deny actions as a side effect, and report whether it
+     * passed. The condition is resolved against the condition registry (so a valued token like {@code has-money:100}
+     * reaches its handler with {@code value=100}, the same registry-aware split the action path takes) and then negated
+     * when the requirement was written with a leading {@code !}. An unregistered condition evaluates {@code false} —
+     * fail-closed — so a wiring gap denies rather than silently granting. Both branches route their refs through
+     * {@link #runRef}, so per-requirement actions honour the same modifiers and viewer's-entity-thread hop as the
+     * click's own actions.
+     */
+    private boolean evaluateOne(MenuHolder holder, MenuContext base, ClickKind kind, Requirement r) {
+        Ref eff = r.condition().resolve(conditions::has);
+        boolean result =
+                conditions.get(eff.id()).map(p -> p.test(base, eff.args())).orElse(false) != r.inverted();
+        runEach(holder, base, kind, result ? r.success() : r.deny());
+        return result;
+    }
+
+    /** Run each ref in {@code refs} through {@link #runRef}, so a per-requirement or block deny list honours modifiers. */
+    private void runEach(MenuHolder holder, MenuContext base, ClickKind kind, List<Ref> refs) {
+        for (Ref ref : refs) {
+            runRef(holder, base, kind, ref);
+        }
     }
 
     /**

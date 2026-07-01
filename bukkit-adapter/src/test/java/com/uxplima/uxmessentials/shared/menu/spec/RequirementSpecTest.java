@@ -48,6 +48,26 @@ class RequirementSpecTest {
         assertThat(RequirementSpec.NONE.effectiveMinimum()).isZero();
         assertThat(RequirementSpec.NONE.requirements()).isEmpty();
         assertThat(RequirementSpec.NONE.deny()).isEmpty();
+        assertThat(RequirementSpec.NONE.stopAtSuccess())
+                .as("the empty block never short-circuits")
+                .isFalse();
+    }
+
+    @Test
+    void theDelegatingTwoArgRequirementIsMandatoryWithNoPerRequirementActions() {
+        Requirement r = new Requirement(Ref.parse("a:1"), true);
+        assertThat(r.inverted()).isTrue();
+        assertThat(r.optional()).as("a slice-1 requirement is mandatory").isFalse();
+        assertThat(r.success()).isEmpty();
+        assertThat(r.deny()).isEmpty();
+    }
+
+    @Test
+    void theDelegatingThreeArgRequirementSpecDoesNotStopAtSuccess() {
+        RequirementSpec spec = new RequirementSpec(List.of(req("a:1")), 1, List.of(Ref.parse("deny")));
+        assertThat(spec.stopAtSuccess())
+                .as("the three-argument form keeps the historic non-short-circuit behaviour")
+                .isFalse();
     }
 
     @Test

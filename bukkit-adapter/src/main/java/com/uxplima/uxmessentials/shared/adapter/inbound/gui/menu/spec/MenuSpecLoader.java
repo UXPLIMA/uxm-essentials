@@ -134,10 +134,12 @@ public final class MenuSpecLoader {
      * Parse the {@code click} block. Each gesture key ({@code left}, {@code shift-right}, {@code any}, …) maps to
      * either a bare action list — the historic form, unchanged — or a map that adds a requirement block:
      * {@code { click|actions|do = [...], requirements = ["has-money:100", "!has-empty-slots:1"], minimum = 1,
-     * deny = ["message:no"] }}. The actions come from whichever of {@code click}/{@code actions}/{@code do} is present;
-     * the requirements are tokens with an optional leading {@code !} (negate); {@code minimum} defaults to {@code 0}
-     * (all must pass); {@code deny} is the action list run when the block fails. A bare list yields
-     * {@link RequirementSpec#NONE}, so it behaves exactly as it did before requirement blocks existed.
+     * deny = ["message:no"], stop-at-success = false }}. The actions come from whichever of {@code click}/
+     * {@code actions}/{@code do} is present; a requirements entry is either a token with an optional leading {@code !}
+     * (negate) or a map {@code { require = "<token>", optional = bool, success = [...], deny = [...] }} adding
+     * per-requirement structure; {@code minimum} defaults to {@code 0} (all must pass); {@code stop-at-success} short-
+     * circuits once the minimum is met; block-level {@code deny} is the action list run when the block fails. A bare
+     * list yields {@link RequirementSpec#NONE}, so it behaves exactly as it did before requirement blocks existed.
      */
     private ClickSpec parseClick(ConfigurationNode node) {
         Map<ClickKind, List<Ref>> actions = new EnumMap<>(ClickKind.class);
@@ -190,16 +192,78 @@ public final class MenuSpecLoader {
         if (reqs.isEmpty() && deny.isEmpty()) {
             return RequirementSpec.NONE;
         }
-        return new RequirementSpec(reqs, value.node("minimum").getInt(0), deny);
+        return new RequirementSpec(reqs, value.node("minimum").getInt(0), deny, stopAtSuccess(value));
     }
 
-    /** Parse the {@code requirements} tokens into a requirement list, skipping any that are blank. */
+    /** The {@code stop-at-success} (or {@code stop_at_success}) toggle of a requirement block; {@code false} when unset. */
+    private static boolean stopAtSuccess(ConfigurationNode value) {
+        ConfigurationNode kebab = value.node("stop-at-success");
+        if (!kebab.virtual() && !kebab.isNull()) {
+            return kebab.getBoolean(false);
+        }
+        return value.node("stop_at_success").getBoolean(false);
+    }
+
+    /**
+     * Parse the {@code requirements} entries into a requirement list. An entry is either a compact string token (the
+     * historic form: an optional leading {@code !} negates the rest) or a map that adds per-requirement structure —
+     * {@code { require|requirement = "<token>", optional = bool, success = [...], deny = [...] }}. Blank or
+     * {@code require}-less entries are skipped, mirroring the map-without-action skip on the action path.
+     */
     private List<Requirement> parseRequirements(ConfigurationNode node) {
         List<Requirement> reqs = new ArrayList<>();
-        for (String token : strings(node)) {
-            parseRequirement(token).ifPresent(reqs::add);
+        if (node.virtual() || node.isNull()) {
+            return reqs;
+        }
+        if (node.isList()) {
+            for (ConfigurationNode child : node.childrenList()) {
+                requirementEntry(child).ifPresent(reqs::add);
+            }
+        } else {
+            requirementEntry(node).ifPresent(reqs::add);
         }
         return reqs;
+    }
+
+    /** One requirements entry: a map form carries per-requirement structure, otherwise it is a plain condition token. */
+    private Optional<Requirement> requirementEntry(ConfigurationNode entry) {
+        if (entry.isMap()) {
+            return mapRequirement(entry);
+        }
+        String raw = entry.getString();
+        return raw == null ? Optional.empty() : parseRequirement(raw);
+    }
+
+    /**
+     * A map-form requirement: {@code require} (or its {@code requirement} alias) is the condition token (a leading
+     * {@code !} negates it, as in the string form), {@code optional} marks it non-blocking, and {@code success}/
+     * {@code deny} are the per-requirement action lists run on its own pass or failure. An entry with no condition token
+     * is a config mistake — logged and skipped so one bad requirement does not abort the menu.
+     */
+    private Optional<Requirement> mapRequirement(ConfigurationNode entry) {
+        String token = requireToken(entry);
+        String trimmed = token == null ? "" : token.strip();
+        boolean inverted = trimmed.startsWith("!");
+        String body = inverted ? trimmed.substring(1).strip() : trimmed;
+        if (body.isEmpty()) {
+            LOG.warning("skipping menu requirement map without a require token at " + entry.path());
+            return Optional.empty();
+        }
+        return Optional.of(new Requirement(
+                Ref.parse(body),
+                inverted,
+                entry.node("optional").getBoolean(false),
+                refs(entry.node("success")),
+                refs(entry.node("deny"))));
+    }
+
+    /** The condition token of a map requirement: {@code require} takes precedence, then its {@code requirement} alias. */
+    private static @Nullable String requireToken(ConfigurationNode entry) {
+        ConfigurationNode explicit = entry.node("require");
+        if (!explicit.virtual() && !explicit.isNull()) {
+            return explicit.getString();
+        }
+        return entry.node("requirement").getString();
     }
 
     /** One requirement token: a leading {@code !} (after trimming) negates the condition, and the rest is a ref. */
