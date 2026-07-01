@@ -236,7 +236,7 @@ class WorldsWiringSmokeTest {
     @Test
     void closeableResourcesRoundTripsTheCapturedResolver() {
         WorldGeneratorResolver resolver = resolver();
-        CloseableResources resources = new CloseableResources();
+        CloseableResources resources = new CloseableResources(java.util.logging.Logger.getAnonymousLogger());
 
         assertThat(resources.worldGeneratorResolver()).isNull(); // null until worlds wires
         resources.worldGeneratorResolver(resolver);

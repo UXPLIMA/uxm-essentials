@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.bukkit.event.Listener;
 
@@ -45,6 +47,7 @@ public final class CloseableResources implements AutoCloseable {
     private final Deque<Runnable> stopHooks = new ArrayDeque<>();
     private final List<CommandRegistration> commands = new ArrayList<>();
     private final List<Listener> listeners = new ArrayList<>();
+    private final Logger log;
     private @Nullable LocaleBinding localeBinding;
     private @Nullable CatalogBinding catalogBinding;
     private @Nullable GuiRootBinding guiRootBinding;
@@ -56,6 +59,28 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable ServerConnector serverConnector;
     private @Nullable BedrockDetector bedrock;
     private @Nullable BedrockScreen bedrockScreen;
+
+    /**
+     * @param log the operator logger a failing teardown hook or rolled-back module reports to, so one bad
+     *     {@code stop()} is surfaced and skipped rather than aborting the rest of the chain.
+     */
+    public CloseableResources(Logger log) {
+        this.log = Objects.requireNonNull(log, "log");
+    }
+
+    /**
+     * Routes teardown/rollback diagnostics to a silent logger. Wiring tests that never drive a throwing hook
+     * use this so they need not thread a logger through; production wiring always passes the plugin logger.
+     */
+    CloseableResources() {
+        this(silentLogger());
+    }
+
+    private static Logger silentLogger() {
+        Logger logger = Logger.getLogger(CloseableResources.class.getName() + ".silent");
+        logger.setUseParentHandlers(false);
+        return logger;
+    }
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -233,9 +258,47 @@ public final class CloseableResources implements AutoCloseable {
     @Override
     public void close() {
         while (!stopHooks.isEmpty()) {
-            stopHooks.pop().run();
+            runGuarded(stopHooks.pop());
         }
         commands.clear();
         listeners.clear();
+    }
+
+    /**
+     * Runs one teardown hook, swallowing a {@link RuntimeException} so a single failing {@code stop()} cannot
+     * abandon the rest of the chain. The pool hook is pushed first and popped last, so it must still run even
+     * when an earlier module's stop throws; the failure is logged with its cause for the operator.
+     */
+    private void runGuarded(Runnable hook) {
+        try {
+            hook.run();
+        } catch (RuntimeException failure) {
+            log.log(Level.SEVERE, "event=module_teardown_failed", failure);
+        }
+    }
+
+    /** A checkpoint of the registration depth, taken before a module wires so a failed start can be undone. */
+    record Scope(int stopHooks, int commands, int listeners) {}
+
+    /** Marks the current registration depth so {@link #rollbackTo(Scope)} can undo a module that fails to wire. */
+    Scope openScope() {
+        return new Scope(stopHooks.size(), commands.size(), listeners.size());
+    }
+
+    /**
+     * Undoes everything a module registered since {@code scope} was opened: its stop-hooks run newest-first
+     * (releasing what it half-acquired) and are dropped, then the command and listener entries it appended are
+     * removed. Guarded so a throwing rolled-back hook cannot abort the rollback of the rest.
+     */
+    void rollbackTo(Scope scope) {
+        while (stopHooks.size() > scope.stopHooks()) {
+            runGuarded(stopHooks.pop());
+        }
+        while (commands.size() > scope.commands()) {
+            commands.remove(commands.size() - 1);
+        }
+        while (listeners.size() > scope.listeners()) {
+            listeners.remove(listeners.size() - 1);
+        }
     }
 }

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -213,7 +214,7 @@ public final class PluginModule {
         // The hand-wired hub registry every module's management GUI plugs into. Built once here and handed to
         // the hub command below; module wiring (SP1+) registers each module's opener into it. Empty until then.
         ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
-        CloseableResources resources = new CloseableResources();
+        CloseableResources resources = new CloseableResources(log);
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
         resources.localeBinding(new LocaleBinding(wiredKernel.localeStore(), wiredKernel.serverDefault()));
         // A bare arg-only command answers with its usage instead of Brigadier's red parse error; injected
@@ -682,11 +683,11 @@ public final class PluginModule {
         // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
         // here with the data folder so every GUI-using context loads its layout the same way.
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
-        for (FeatureModule module : registry.enabledModules(config)) {
+        loadModulesIsolated(registry.enabledModules(config), resources, log, module -> {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);
             if (skippedByCapability(module, ctx, log)) {
-                continue;
+                return;
             }
             startModule(module, ctx, resources, log);
             wireAdapters(
@@ -702,7 +703,7 @@ public final class PluginModule {
                     textInput,
                     menus,
                     menuBindings);
-        }
+        });
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
         // from this enable (a reload restarts it) rather than the whole JVM's age.
@@ -1824,6 +1825,34 @@ public final class PluginModule {
             return true;
         }
         return false;
+    }
+
+    /** The per-module wiring body, isolated behind an interface so the load policy is testable on its own. */
+    @FunctionalInterface
+    interface ModuleLoader {
+        void load(FeatureModule module);
+    }
+
+    /**
+     * Loads each module inside its own fault boundary. A module that throws while starting or wiring is rolled
+     * back to the checkpoint taken before it ran and skipped, leaving every sibling module — and the plugin —
+     * up; the failure is logged with its cause. A capability-skipped module registers nothing, so its clean
+     * skip inside the loader needs no rollback.
+     */
+    static void loadModulesIsolated(
+            Iterable<FeatureModule> modules, CloseableResources resources, Logger log, ModuleLoader loader) {
+        for (FeatureModule module : modules) {
+            CloseableResources.Scope scope = resources.openScope();
+            try {
+                loader.load(module);
+            } catch (RuntimeException failure) {
+                resources.rollbackTo(scope);
+                log.log(
+                        Level.SEVERE,
+                        "module " + module.id() + " failed to load — skipped; other modules unaffected",
+                        failure);
+            }
+        }
     }
 
     private static void startModule(FeatureModule module, ModuleContext ctx, CloseableResources resources, Logger log) {

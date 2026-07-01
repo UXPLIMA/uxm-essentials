@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.bootstrap;
 
+import java.util.logging.Level;
+
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -54,12 +56,36 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         getLogger().info("[3/4] Registering command handlers...");
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             var registrar = event.registrar();
-            wired.commands()
-                    .forEach(command -> registrar.register(command.build(), command.description(), command.aliases()));
+            // Guard each publish so one malformed command (a broken build() or a duplicate literal) is logged
+            // and skipped instead of aborting the whole batch and leaving every later command unregistered.
+            wired.commands().forEach(command -> {
+                try {
+                    registrar.register(command.build(), command.description(), command.aliases());
+                } catch (RuntimeException failure) {
+                    getLogger()
+                            .log(
+                                    Level.SEVERE,
+                                    "failed to register command "
+                                            + command.getClass().getSimpleName() + " — skipped",
+                                    failure);
+                }
+            });
         });
 
         getLogger().info("[4/4] Registering listener hooks...");
-        wired.listeners().forEach(listener -> getServer().getPluginManager().registerEvents(listener, this));
+        // Same isolation on the listener side: one listener that throws on registration must not stop the rest.
+        wired.listeners().forEach(listener -> {
+            try {
+                getServer().getPluginManager().registerEvents(listener, this);
+            } catch (RuntimeException failure) {
+                getLogger()
+                        .log(
+                                Level.SEVERE,
+                                "failed to register listener "
+                                        + listener.getClass().getSimpleName() + " — skipped",
+                                failure);
+            }
+        });
 
         // Initialize bStats Metrics
         int pluginId = 31811;
