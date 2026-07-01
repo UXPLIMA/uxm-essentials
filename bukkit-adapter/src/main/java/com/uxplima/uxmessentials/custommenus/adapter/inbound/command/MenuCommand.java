@@ -22,6 +22,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
@@ -40,8 +41,8 @@ import org.jspecify.annotations.Nullable;
  * it for another player (gated by {@code uxmessentials.menu.open.others}, so an operator can push a menu to someone
  * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu last} reopens the last
  * custom menu the player had open (with its page and typed arguments); {@code /menu reload} re-runs the loader and
- * reports the loaded/skipped counts, and {@code /menu convert <deluxemenus|zmenu> <path>} converts a DeluxeMenus or
- * zMenu menu YAML (or a directory of them) into {@code menus/*.conf} (both gated by {@code uxmessentials.menu.admin}).
+ * reports the loaded/skipped counts, and {@code /menu convert <deluxemenus|zmenu|ogui> <path>} converts a DeluxeMenus,
+ * zMenu or OGUI menu YAML (or a directory of them) into {@code menus/*.conf} (all gated by {@code uxmessentials.menu.admin}).
  * The set of
  * registered names is
  * supplied by the wiring rather than read off the engine, so the same list backs the {@code <name>} tab-completion,
@@ -59,6 +60,7 @@ public final class MenuCommand implements CommandRegistration {
     private final Supplier<CustomMenuLoader.LoadResult> reload;
     private final DeluxeMenusConvertService deluxeMenusConvert;
     private final ZMenuConvertService zMenuConvert;
+    private final OguiConvertService oguiConvert;
     private final CommandFeedback feedback;
 
     public MenuCommand(
@@ -67,12 +69,14 @@ public final class MenuCommand implements CommandRegistration {
             Supplier<CustomMenuLoader.LoadResult> reload,
             DeluxeMenusConvertService deluxeMenusConvert,
             ZMenuConvertService zMenuConvert,
+            OguiConvertService oguiConvert,
             Messages messages) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
         this.reload = Objects.requireNonNull(reload, "reload");
         this.deluxeMenusConvert = Objects.requireNonNull(deluxeMenusConvert, "deluxeMenusConvert");
         this.zMenuConvert = Objects.requireNonNull(zMenuConvert, "zMenuConvert");
+        this.oguiConvert = Objects.requireNonNull(oguiConvert, "oguiConvert");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -98,7 +102,10 @@ public final class MenuCommand implements CommandRegistration {
                                         .executes(this::convertDeluxeMenus)))
                         .then(Commands.literal("zmenu")
                                 .then(Commands.argument("path", StringArgumentType.greedyString())
-                                        .executes(this::convertZMenu))))
+                                        .executes(this::convertZMenu)))
+                        .then(Commands.literal("ogui")
+                                .then(Commands.argument("path", StringArgumentType.greedyString())
+                                        .executes(this::convertOgui))))
                 .build();
     }
 
@@ -265,7 +272,24 @@ public final class MenuCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
-    /** Report the converted / skipped / warning counts a convert run tallied — shared by both converter branches. */
+    /**
+     * Convert an OGUI GUI YAML (or a directory of them) at {@code <path>} into {@code menus/*.conf}, exactly as the
+     * DeluxeMenus and zMenu branches do — same path resolution, same not-found reply, same converted / skipped /
+     * warning report, same deliberate no-reload. The per-file conversion never crashes the command.
+     */
+    private int convertOgui(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String path = StringArgumentType.getString(ctx, "path");
+        OguiConvertService.ConvertReport report = oguiConvert.convert(path);
+        if (!report.found()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
+            return 0;
+        }
+        reportConverted(sender, report.converted(), report.skipped(), report.warnings());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Report the converted / skipped / warning counts a convert run tallied — shared by all converter branches. */
     private void reportConverted(CommandSender sender, int converted, int skipped, int warnings) {
         feedback.send(
                 sender,

@@ -18,6 +18,8 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
@@ -242,6 +244,32 @@ class MenuCommandTest {
     }
 
     @Test
+    void convertOguiWritesAConfAndReportsTheCounts() throws Exception {
+        Files.writeString(
+                menusDir.resolve("shop.yml"),
+                "shop:\n  title: 'Shop'\n  rows: 3\n  items:\n    '10':\n      material: DIAMOND\n");
+
+        execute("menu convert ogui shop.yml", player);
+
+        assertThat(messages.keys).contains("menu.converted");
+        assertThat(messages.placeholdersFor("menu.converted")).containsEntry("converted", "1");
+        assertThat(Files.exists(menusDir.resolve("shop.conf"))).isTrue();
+    }
+
+    @Test
+    void convertOguiRepliesFailedWhenThePathMatchesNothing() {
+        execute("menu convert ogui ghost.yml", player);
+
+        assertThat(messages.keys).contains("menu.convert-failed");
+    }
+
+    @Test
+    void convertOguiIsGatedByTheAdminPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no admin node, so the convert branch stays hidden
+        executeExpectingDenial("menu convert ogui shop.yml", plain);
+    }
+
+    @Test
     void lastReopensTheRecordedCustomMenuWithItsArguments() {
         // A subject-less open records into the tracker; the player closes it, then /menu last brings it back.
         menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of("who", "Steve"));
@@ -395,6 +423,7 @@ class MenuCommandTest {
         DeluxeMenusConvertService deluxeMenusConvert =
                 new DeluxeMenusConvertService(menusDir, new DeluxeMenusConverter(), new NoopLogger());
         ZMenuConvertService zMenuConvert = new ZMenuConvertService(menusDir, new ZMenuConverter(), new NoopLogger());
+        OguiConvertService oguiConvert = new OguiConvertService(menusDir, new OguiConverter(), new NoopLogger());
         MenuCommand command = new MenuCommand(
                 menus,
                 () -> List.copyOf(names),
@@ -404,6 +433,7 @@ class MenuCommandTest {
                 },
                 deluxeMenusConvert,
                 zMenuConvert,
+                oguiConvert,
                 messages);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(command.build());

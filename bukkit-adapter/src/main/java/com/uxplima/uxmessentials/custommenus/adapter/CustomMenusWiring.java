@@ -14,6 +14,8 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
@@ -92,13 +94,15 @@ public final class CustomMenusWiring {
             swapMenu.set(reloaded.swapMenu());
             return result;
         };
-        // The DeluxeMenus and zMenu converters behind /menu convert <deluxemenus|zmenu> <path>. Both write into the
-        // same menus/ directory the loader reads, so a converted spec is picked up on the next /menu reload (neither
-        // converter reloads itself).
+        // The DeluxeMenus, zMenu and OGUI converters behind /menu convert <deluxemenus|zmenu|ogui> <path>. Each writes
+        // into the same menus/ directory the loader reads, so a converted spec is picked up on the next /menu reload
+        // (none of the converters reloads itself).
         DeluxeMenusConvertService deluxeMenusConvert =
                 new DeluxeMenusConvertService(menusDir, new DeluxeMenusConverter(), log);
         ZMenuConvertService zMenuConvert = new ZMenuConvertService(menusDir, new ZMenuConverter(), log);
-        MenuCommand command = new MenuCommand(menus, nameSupplier, reload, deluxeMenusConvert, zMenuConvert, messages);
+        OguiConvertService oguiConvert = new OguiConvertService(menusDir, new OguiConverter(), log);
+        MenuCommand command =
+                new MenuCommand(menus, nameSupplier, reload, deluxeMenusConvert, zMenuConvert, oguiConvert, messages);
 
         // The open commands a menu declares in its `command {}` block are built once here, from this first load,
         // and handed back for the bootstrap to register at the LifecycleEvents.COMMANDS event. Brigadier only
