@@ -62,7 +62,13 @@ public final class MenuSpecLoader {
     }
 
     private MenuSpec parseRoot(ConfigurationNode root, String origin) {
-        int rows = root.node("rows").getInt(0);
+        Optional<String> inventoryType = optionalString(root.node("inventory-type"));
+        // A chest still requires an explicit 1..6 rows (unchanged). A non-chest menu sizes its window from its
+        // inventory type, not rows, so a spec author need not name rows; default it to the largest chest so the
+        // load-time slot check stays permissive (no vanilla non-chest window exceeds 54 slots) and the type's own
+        // out-of-range slots are skipped later at render, and so the chest fallback — used only if the type rejects
+        // a custom window — is a full six rows rather than an empty one.
+        int rows = root.node("rows").getInt(inventoryType.isPresent() ? 6 : 0);
         ConfigurationNode refresh = root.node("refresh");
         RefreshSpec refreshSpec = new RefreshSpec(
                 refresh.node("enabled").getBoolean(false),
@@ -76,7 +82,8 @@ public final class MenuSpecLoader {
                     refs(root.node("open-requirement")),
                     refs(root.node("open-actions")),
                     refs(root.node("close-actions")),
-                    items);
+                    items,
+                    inventoryType);
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }

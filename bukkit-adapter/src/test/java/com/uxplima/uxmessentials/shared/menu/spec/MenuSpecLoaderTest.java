@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
@@ -293,5 +294,49 @@ class MenuSpecLoaderTest {
         assertThat(components.food()).isEmpty();
         assertThat(components.tool()).isEmpty();
         assertThat(components.attributeModifiers()).isEmpty();
+    }
+
+    @Test
+    void parsesTheInventoryTypeTokenFromTheMenuRoot() {
+        MenuSpec spec = new MenuSpecLoader().parse("inventory-type = \"hopper\"\nitems{ x{ slot=0, material=STONE } }");
+
+        assertThat(spec.inventoryType()).contains("hopper");
+    }
+
+    @Test
+    void anAbsentInventoryTypeIsAnEmptyOptionalAndTheMenuIsAChest() {
+        MenuSpec spec = new MenuSpecLoader().parse("rows=1\nitems{ x{ slot=0, material=STONE } }");
+
+        assertThat(spec.inventoryType())
+                .as("no inventory-type node means the default rows-based chest")
+                .isEmpty();
+    }
+
+    @Test
+    void aBlankInventoryTypeIsAnEmptyOptional() {
+        MenuSpec spec = new MenuSpecLoader().parse("inventory-type = \"\"\nrows=1\nitems{ x{ slot=0 } }");
+
+        assertThat(spec.inventoryType()).isEmpty();
+    }
+
+    @Test
+    void aNonChestMenuNeedNotDeclareRowsAndKeepsOversizeSlotsForRenderToSkip() {
+        // A hopper spec omits rows: the loader defaults rows to the largest chest so slot 8 loads (it exceeds the
+        // hopper's five slots but not the chest fallback), to be skipped later at render rather than rejected here.
+        MenuSpec spec = new MenuSpecLoader()
+                .parse("inventory-type = \"hopper\"\nitems{ a{ slots=[\"0-4\"], material=STONE }, b{ slot=8 } }");
+
+        assertThat(spec.rows()).isEqualTo(6);
+        assertThat(spec.items().get("b").slots().slots()).containsExactly(8);
+    }
+
+    @Test
+    void theDelegatingConstructorDefaultsTheInventoryTypeToEmpty() {
+        MenuSpec spec =
+                new MenuSpec("t", 1, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), java.util.Map.of());
+
+        assertThat(spec.inventoryType())
+                .as("the seven-argument constructor keeps every existing call-site on the default chest")
+                .isEmpty();
     }
 }

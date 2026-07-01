@@ -114,6 +114,9 @@ public final class MenuRenderer {
         Map<Integer, MenuItemSpec> placed = PriorityLayering.resolve(staticItems, it -> viewPasses(it, ctx));
         for (Map.Entry<Integer, MenuItemSpec> entry : placed.entrySet()) {
             int slot = entry.getKey();
+            if (!fits(inv, slot)) {
+                continue;
+            }
             MenuItemSpec item = entry.getValue();
             inv.setItem(slot, itemRenderer.render(item, ctx));
             clickSink.accept(slot, new RenderedSlot(item, null));
@@ -135,14 +138,29 @@ public final class MenuRenderer {
         // Clear every content slot first so a re-render into a reused window — a page flip to a shorter page, or a
         // refresh that dropped entries — leaves no stale tile behind in a slot this page does not fill.
         for (int slot : contentSlots) {
-            inv.setItem(slot, null);
+            if (fits(inv, slot)) {
+                inv.setItem(slot, null);
+            }
         }
         MenuItemSpec template = listSpec.template();
         for (Map.Entry<Integer, Object> placement : page.placements()) {
+            int slot = placement.getKey();
+            if (!fits(inv, slot)) {
+                continue;
+            }
             MenuContext entryCtx = ctx.withEntry(placement.getValue());
-            inv.setItem(placement.getKey(), itemRenderer.render(template, entryCtx));
-            clickSink.accept(placement.getKey(), new RenderedSlot(template, placement.getValue()));
+            inv.setItem(slot, itemRenderer.render(template, entryCtx));
+            clickSink.accept(slot, new RenderedSlot(template, placement.getValue()));
         }
+    }
+
+    /**
+     * Whether {@code slot} is addressable in {@code inv}. Every chest slot a validated spec declares fits by
+     * construction, so this only ever excludes a slot that overflows a smaller non-chest window (say slot 8 in a
+     * five-slot hopper), which is skipped rather than throwing an out-of-bounds error and blanking the menu.
+     */
+    private static boolean fits(Inventory inv, int slot) {
+        return slot >= 0 && slot < inv.getSize();
     }
 
     /**

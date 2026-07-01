@@ -2,13 +2,17 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
@@ -56,6 +60,9 @@ import org.jspecify.annotations.Nullable;
  * window alone, so no player-keyed side map is needed.
  */
 public final class Menus {
+
+    /** Operator diagnostics for a menu that names an inventory type the server rejects — logged, then a chest opens. */
+    private static final Logger LOG = Logger.getLogger(Menus.class.getName());
 
     private final MenuRenderer renderer;
     private final Scheduler scheduler;
@@ -430,12 +437,58 @@ public final class Menus {
         }
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
         holder.setResolvedLists(resolved);
-        Inventory inv = Bukkit.createInventory(holder, spec.rows() * 9, renderer.title(spec, ctx));
+        Inventory inv = createWindow(holder, spec, renderer.title(spec, ctx));
         holder.attach(inv);
         renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
         live.openInventory(inv);
         runOpenActions(spec, live, ctx);
         MenuRefresh.start(holder, scheduler, () -> reRender(holder));
+    }
+
+    /**
+     * Build the window a spec opens into: its declared non-chest {@link InventoryType} when it names one the server
+     * accepts, else the default {@code rows}-based chest. A non-chest shape is best-effort — some types reject a
+     * custom holder or title on some servers — so a thrown build is caught, logged once, and downgraded to the chest,
+     * meaning a bad {@code inventory-type} never leaves the viewer with a blank or missing window.
+     */
+    private Inventory createWindow(MenuHolder holder, MenuSpec spec, Component title) {
+        Optional<InventoryType> type = spec.inventoryType().flatMap(Menus::resolveInventoryType);
+        if (type.isEmpty()) {
+            return Bukkit.createInventory(holder, spec.rows() * 9, title);
+        }
+        try {
+            return Bukkit.createInventory(holder, type.get(), title);
+        } catch (RuntimeException rejected) {
+            LOG.warning("menu inventory type '" + spec.inventoryType().orElse("")
+                    + "' could not be created, falling back to a chest: " + rejected.getMessage());
+            return Bukkit.createInventory(holder, spec.rows() * 9, title);
+        }
+    }
+
+    /**
+     * Map an operator-friendly inventory-type token to the Bukkit {@link InventoryType} that shapes the window.
+     * {@code chest}, a blank token, or any name not listed here resolves to empty, i.e. the default {@code rows}-based
+     * chest — an unknown type is a soft miss, not a failure. A couple of obvious aliases are accepted so a spec author
+     * can write the block name they know ({@code shulker}/{@code shulker_box}, {@code ender}/{@code ender_chest},
+     * {@code workbench}/{@code crafting}).
+     */
+    private static Optional<InventoryType> resolveInventoryType(String name) {
+        return switch (name.strip().toLowerCase(Locale.ROOT)) {
+            case "hopper" -> Optional.of(InventoryType.HOPPER);
+            case "dropper" -> Optional.of(InventoryType.DROPPER);
+            case "dispenser" -> Optional.of(InventoryType.DISPENSER);
+            case "furnace" -> Optional.of(InventoryType.FURNACE);
+            case "anvil" -> Optional.of(InventoryType.ANVIL);
+            case "brewing", "brewing_stand" -> Optional.of(InventoryType.BREWING);
+            case "beacon" -> Optional.of(InventoryType.BEACON);
+            case "shulker", "shulker_box" -> Optional.of(InventoryType.SHULKER_BOX);
+            case "barrel" -> Optional.of(InventoryType.BARREL);
+            case "lectern" -> Optional.of(InventoryType.LECTERN);
+            case "loom" -> Optional.of(InventoryType.LOOM);
+            case "ender", "ender_chest", "enderchest" -> Optional.of(InventoryType.ENDER_CHEST);
+            case "workbench", "crafting", "crafting_table" -> Optional.of(InventoryType.WORKBENCH);
+            default -> Optional.empty();
+        };
     }
 
     /**
