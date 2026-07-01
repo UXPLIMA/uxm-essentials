@@ -99,6 +99,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementA
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
@@ -283,6 +284,12 @@ public final class PluginModule {
         resources.serverConnector(menuServerConnector);
         MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions(), kernel.log());
+        // The string slice of the condition vocabulary (contains, equals-ignorecase, regex, length, is-integer,
+        // is-double, is-object) registers alongside the generic conditions; like the action slices it has its own
+        // entry point so the MenuVocabulary.registerConditions signature stays untouched. It reads the placeholder
+        // registry off the shared bindings internally to expand its operands, needs nothing else, and every
+        // condition fails closed.
+        StringConditions.register(menuBindings, kernel.log());
         MenuVocabulary.registerPlaceholders(menuBindings);
         // The messaging slice of the vocabulary (message-to/whisper, broadcast(+json/legacy), action-bar, title,
         // toast, log) registers alongside the generic actions; its own registration entry point keeps the
