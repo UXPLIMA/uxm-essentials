@@ -130,19 +130,84 @@ public final class MenuSpecLoader {
         return ItemType.valueOf(raw.strip().toUpperCase(java.util.Locale.ROOT));
     }
 
+    /**
+     * Parse the {@code click} block. Each gesture key ({@code left}, {@code shift-right}, {@code any}, …) maps to
+     * either a bare action list — the historic form, unchanged — or a map that adds a requirement block:
+     * {@code { click|actions|do = [...], requirements = ["has-money:100", "!has-empty-slots:1"], minimum = 1,
+     * deny = ["message:no"] }}. The actions come from whichever of {@code click}/{@code actions}/{@code do} is present;
+     * the requirements are tokens with an optional leading {@code !} (negate); {@code minimum} defaults to {@code 0}
+     * (all must pass); {@code deny} is the action list run when the block fails. A bare list yields
+     * {@link RequirementSpec#NONE}, so it behaves exactly as it did before requirement blocks existed.
+     */
     private ClickSpec parseClick(ConfigurationNode node) {
         Map<ClickKind, List<Ref>> actions = new EnumMap<>(ClickKind.class);
+        Map<ClickKind, RequirementSpec> requirements = new EnumMap<>(ClickKind.class);
         if (!node.virtual() && !node.isNull()) {
             for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                     node.childrenMap().entrySet()) {
                 ClickKind kind = CLICK_KEYS.get(String.valueOf(entry.getKey()).toLowerCase(java.util.Locale.ROOT));
                 if (kind != null) {
-                    actions.put(kind, refs(entry.getValue()));
+                    parseClickEntry(entry.getValue(), kind, actions, requirements);
                 }
             }
         }
         // v1 keeps per-gesture conditions empty; visibility is gated by the item-level `view` list instead.
-        return new ClickSpec(actions, Map.of());
+        return new ClickSpec(actions, Map.of(), requirements);
+    }
+
+    /** One gesture's value: a map carries actions plus a requirement block, a bare list carries actions only. */
+    private void parseClickEntry(
+            ConfigurationNode value,
+            ClickKind kind,
+            Map<ClickKind, List<Ref>> actions,
+            Map<ClickKind, RequirementSpec> requirements) {
+        if (value.isMap()) {
+            actions.put(kind, refs(clickActionsNode(value)));
+            RequirementSpec block = parseRequirementSpec(value);
+            if (block != RequirementSpec.NONE) {
+                requirements.put(kind, block);
+            }
+        } else {
+            actions.put(kind, refs(value));
+        }
+    }
+
+    /** The action list of a map-form gesture: the first present of {@code click}, {@code actions}, or {@code do}. */
+    private static ConfigurationNode clickActionsNode(ConfigurationNode value) {
+        for (String key : List.of("click", "actions", "do")) {
+            ConfigurationNode candidate = value.node(key);
+            if (!candidate.virtual() && !candidate.isNull()) {
+                return candidate;
+            }
+        }
+        return value.node("click");
+    }
+
+    /** The requirement block of a map-form gesture, or {@link RequirementSpec#NONE} when it names neither requirements nor deny. */
+    private RequirementSpec parseRequirementSpec(ConfigurationNode value) {
+        List<Requirement> reqs = parseRequirements(value.node("requirements"));
+        List<Ref> deny = refs(value.node("deny"));
+        if (reqs.isEmpty() && deny.isEmpty()) {
+            return RequirementSpec.NONE;
+        }
+        return new RequirementSpec(reqs, value.node("minimum").getInt(0), deny);
+    }
+
+    /** Parse the {@code requirements} tokens into a requirement list, skipping any that are blank. */
+    private List<Requirement> parseRequirements(ConfigurationNode node) {
+        List<Requirement> reqs = new ArrayList<>();
+        for (String token : strings(node)) {
+            parseRequirement(token).ifPresent(reqs::add);
+        }
+        return reqs;
+    }
+
+    /** One requirement token: a leading {@code !} (after trimming) negates the condition, and the rest is a ref. */
+    private static Optional<Requirement> parseRequirement(String token) {
+        String trimmed = token.strip();
+        boolean inverted = trimmed.startsWith("!");
+        String body = inverted ? trimmed.substring(1).strip() : trimmed;
+        return body.isEmpty() ? Optional.empty() : Optional.of(new Requirement(Ref.parse(body), inverted));
     }
 
     /**

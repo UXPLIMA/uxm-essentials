@@ -30,6 +30,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickHandler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ConfirmOpener;
@@ -341,9 +343,38 @@ public final class MenuListener implements Listener {
         if (!clickConditionsPass(rs.item().click(), kind, base)) {
             return;
         }
+        RequirementSpec requirement = rs.item().click().requirementFor(kind);
+        if (!requirementsPass(requirement, base)) {
+            for (Ref denied : requirement.deny()) {
+                runRef(holder, base, kind, denied);
+            }
+            return;
+        }
         for (Ref ref : rs.item().click().actionsFor(kind)) {
             runRef(holder, base, kind, ref);
         }
+    }
+
+    /**
+     * Whether {@code requirement}'s block passes for this click: at least {@link RequirementSpec#effectiveMinimum()} of
+     * its requirements must hold, which gives AND / OR / N-of-M from one {@code minimum}. Each requirement's condition
+     * is resolved against the condition registry (so a valued token like {@code has-money:100} reaches its handler with
+     * {@code value=100}, the same registry-aware split the action path takes) and then negated when the requirement was
+     * written with a leading {@code !}. An unregistered condition evaluates {@code false} — fail-closed — so a wiring
+     * gap denies the click rather than silently granting it. An empty block passes: {@link RequirementSpec#NONE}
+     * tallies zero passes against an effective minimum of zero.
+     */
+    private boolean requirementsPass(RequirementSpec requirement, MenuContext ctx) {
+        int passes = 0;
+        for (Requirement r : requirement.requirements()) {
+            Ref eff = r.condition().resolve(conditions::has);
+            boolean pass =
+                    conditions.get(eff.id()).map(p -> p.test(ctx, eff.args())).orElse(false);
+            if (pass != r.inverted()) {
+                passes++;
+            }
+        }
+        return passes >= requirement.effectiveMinimum();
     }
 
     /**
