@@ -54,6 +54,10 @@ dependencies {
     compileOnly(libs.floodgate.api)
 
     compileOnly(libs.bundles.configs)
+    // Configurate YAML — the DeluxeMenus menu converter reads competitor menu YAML; compileOnly because the
+    // Paper library loader already provisions configurate-yaml at runtime (see UxmEssentialsLoader), the same
+    // way the :migration module reads EssentialsX YAML.
+    compileOnly(libs.configurate.yaml)
     // Caffeine is supplied at runtime by the plugin loader (see UxmEssentialsLoader); compileOnly here so the tablist
     // skin-fetch cache can bind to it without re-shading a library the loader already provides.
     compileOnly(libs.caffeine)

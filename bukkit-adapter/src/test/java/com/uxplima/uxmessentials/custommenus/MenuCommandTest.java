@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.custommenus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,8 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -36,6 +40,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
@@ -61,6 +66,9 @@ class MenuCommandTest {
     private RecordingMessages messages;
     private final List<String> names = new ArrayList<>();
     private final AtomicInteger reloads = new AtomicInteger();
+
+    @TempDir
+    Path menusDir;
 
     @BeforeEach
     void setUp() {
@@ -177,6 +185,32 @@ class MenuCommandTest {
 
         assertThat(reloads.get()).isEqualTo(1);
         assertThat(messages.keys).contains("menu.reloaded");
+    }
+
+    @Test
+    void convertDeluxeMenusWritesAConfAndReportsTheCounts() throws Exception {
+        Files.writeString(
+                menusDir.resolve("shop.yml"),
+                "menu_title: 'Shop'\nsize: 9\nitems:\n  a:\n    material: STONE\n    slot: 0\n");
+
+        execute("menu convert deluxemenus shop.yml", player);
+
+        assertThat(messages.keys).contains("menu.converted");
+        assertThat(messages.placeholdersFor("menu.converted")).containsEntry("converted", "1");
+        assertThat(Files.exists(menusDir.resolve("shop.conf"))).isTrue();
+    }
+
+    @Test
+    void convertDeluxeMenusRepliesFailedWhenThePathMatchesNothing() {
+        execute("menu convert deluxemenus ghost.yml", player);
+
+        assertThat(messages.keys).contains("menu.convert-failed");
+    }
+
+    @Test
+    void convertDeluxeMenusIsGatedByTheAdminPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no admin node, so the convert branch stays hidden
+        executeExpectingDenial("menu convert deluxemenus shop.yml", plain);
     }
 
     @Test
@@ -330,6 +364,8 @@ class MenuCommandTest {
     }
 
     private CommandDispatcher<CommandSourceStack> dispatcherFor() {
+        DeluxeMenusConvertService convertService =
+                new DeluxeMenusConvertService(menusDir, new DeluxeMenusConverter(), new NoopLogger());
         MenuCommand command = new MenuCommand(
                 menus,
                 () -> List.copyOf(names),
@@ -337,6 +373,7 @@ class MenuCommandTest {
                     reloads.incrementAndGet();
                     return new CustomMenuLoader.LoadResult(List.of("shop", "spawn"), List.of("broken"));
                 },
+                convertService,
                 messages);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(command.build());
@@ -368,6 +405,21 @@ class MenuCommandTest {
         Map<String, String> placeholdersFor(String key) {
             return byKey.getOrDefault(key, Map.of());
         }
+    }
+
+    /** A no-op logger for the convert service the command holds; these tests never exercise the convert path. */
+    private static final class NoopLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /** A pass-through messages double for the GuiText the renderer leans on (titles/names resolve to their key). */

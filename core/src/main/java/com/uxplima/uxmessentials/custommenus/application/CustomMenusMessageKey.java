@@ -36,7 +36,13 @@ public enum CustomMenusMessageKey implements MessageKey {
     MENU_CONSOLE_DENIED("menu.console-denied"),
 
     /** Confirmation to the sender of {@code /menu open <name> <target>} that the menu opened for {@code {player}}. */
-    MENU_OPENED_FOR("menu.opened-for");
+    MENU_OPENED_FOR("menu.opened-for"),
+
+    /** Reply for {@code /menu convert deluxemenus <path>} reporting the converted / skipped / warning counts. */
+    MENU_CONVERTED("menu.converted"),
+
+    /** Reply for {@code /menu convert deluxemenus <path>} when the given {@code {path}} held no DeluxeMenus YAML. */
+    MENU_CONVERT_FAILED("menu.convert-failed");
 
     private final String key;
 

@@ -21,6 +21,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -38,7 +39,9 @@ import org.jspecify.annotations.Nullable;
  * it for another player (gated by {@code uxmessentials.menu.open.others}, so an operator can push a menu to someone
  * and the console can too); {@code /menu list} prints the loaded menu names; {@code /menu last} reopens the last
  * custom menu the player had open (with its page and typed arguments); {@code /menu reload} re-runs the loader and
- * reports the loaded/skipped counts (gated by {@code uxmessentials.menu.admin}). The set of registered names is
+ * reports the loaded/skipped counts, and {@code /menu convert deluxemenus <path>} converts a DeluxeMenus menu YAML
+ * (or a directory of them) into {@code menus/*.conf} (both gated by {@code uxmessentials.menu.admin}). The set of
+ * registered names is
  * supplied by the wiring rather than read off the engine, so the same list backs the {@code <name>} tab-completion,
  * the not-found guard, {@code /menu list}, and the still-registered check {@code /menu last} makes before reopening.
  */
@@ -52,16 +55,19 @@ public final class MenuCommand implements CommandRegistration {
     private final Menus menus;
     private final Supplier<List<String>> menuNames;
     private final Supplier<CustomMenuLoader.LoadResult> reload;
+    private final DeluxeMenusConvertService convertService;
     private final CommandFeedback feedback;
 
     public MenuCommand(
             Menus menus,
             Supplier<List<String>> menuNames,
             Supplier<CustomMenuLoader.LoadResult> reload,
+            DeluxeMenusConvertService convertService,
             Messages messages) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
         this.reload = Objects.requireNonNull(reload, "reload");
+        this.convertService = Objects.requireNonNull(convertService, "convertService");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -80,6 +86,11 @@ public final class MenuCommand implements CommandRegistration {
                 .then(Commands.literal("reload")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .executes(this::reload))
+                .then(Commands.literal("convert")
+                        .requires(src -> src.getSender().hasPermission(ADMIN))
+                        .then(Commands.literal("deluxemenus")
+                                .then(Commands.argument("path", StringArgumentType.greedyString())
+                                        .executes(this::convertDeluxeMenus))))
                 .build();
     }
 
@@ -208,6 +219,30 @@ public final class MenuCommand implements CommandRegistration {
                         String.valueOf(result.loaded()),
                         "skipped",
                         String.valueOf(result.skipped().size())));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Convert a DeluxeMenus menu YAML (or a directory of them) at {@code <path>} into {@code menus/*.conf}. The path is
+     * absolute or relative to the menus directory; a path that matches no DeluxeMenus YAML replies not-found, otherwise
+     * the converted / skipped / warning counts are reported. Deliberately does not reload — an operator reviews the
+     * emitted files, then runs {@code /menu reload} — and the per-file conversion never crashes the command.
+     */
+    private int convertDeluxeMenus(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String path = StringArgumentType.getString(ctx, "path");
+        DeluxeMenusConvertService.ConvertReport report = convertService.convert(path);
+        if (!report.found()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
+            return 0;
+        }
+        feedback.send(
+                sender,
+                CustomMenusMessageKey.MENU_CONVERTED,
+                Map.of(
+                        "converted", String.valueOf(report.converted()),
+                        "skipped", String.valueOf(report.skipped()),
+                        "warnings", String.valueOf(report.warnings())));
         return Command.SINGLE_SUCCESS;
     }
 }
