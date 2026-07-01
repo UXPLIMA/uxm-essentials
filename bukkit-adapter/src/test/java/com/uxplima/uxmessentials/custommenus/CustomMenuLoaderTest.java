@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -31,6 +32,12 @@ class CustomMenuLoaderTest {
             items { x { slot = 0, material = STONE, name = "", click { left = ["nope:x"] } } }
             """;
 
+    private static final String WITH_COMMAND = """
+            rows = 1
+            items { x { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
+            command { name = "shop", aliases = ["store"], permission = "srv.shop", deny-message = "<red>nope", console = true }
+            """;
+
     @Test
     void loadsValidSpecAndSkipsInvalidOnes(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("good.conf"), GOOD);
@@ -47,6 +54,42 @@ class CustomMenuLoaderTest {
         assertThat(result.loadedNames()).containsExactly("good");
         assertThat(result.skipped()).containsExactly("bad");
         assertThat(log.warnings).anyMatch(line -> line.contains("bad"));
+    }
+
+    @Test
+    void parsesTheCommandBlockIntoAnOpenCommandSpecKeyedByMenuId(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("catalog.conf"), WITH_COMMAND);
+
+        MenuBindings bindings = new MenuBindings();
+        bindings.action("close", c -> {});
+        CustomMenuLoader loader =
+                new CustomMenuLoader(new MenuSpecLoader(), bindings, newMenus(), new RecordingLogger());
+
+        CustomMenuLoader.LoadResult result = loader.loadFrom(dir);
+
+        assertThat(result.loadedNames()).containsExactly("catalog");
+        assertThat(result.openCommands()).containsOnlyKeys("catalog");
+        OpenCommandSpec command = result.openCommands().get("catalog");
+        assertThat(command.name()).isEqualTo("shop");
+        assertThat(command.aliases()).containsExactly("store");
+        assertThat(command.permission()).contains("srv.shop");
+        assertThat(command.denyMessage()).contains("<red>nope");
+        assertThat(command.consoleAllowed()).isTrue();
+    }
+
+    @Test
+    void aMenuWithoutACommandBlockContributesNoOpenCommand(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("good.conf"), GOOD);
+
+        MenuBindings bindings = new MenuBindings();
+        bindings.action("close", c -> {});
+        CustomMenuLoader loader =
+                new CustomMenuLoader(new MenuSpecLoader(), bindings, newMenus(), new RecordingLogger());
+
+        CustomMenuLoader.LoadResult result = loader.loadFrom(dir);
+
+        assertThat(result.loadedNames()).containsExactly("good");
+        assertThat(result.openCommands()).isEmpty();
     }
 
     @Test

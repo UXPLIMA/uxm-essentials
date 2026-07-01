@@ -3,17 +3,24 @@ package com.uxplima.uxmessentials.custommenus.adapter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import org.jspecify.annotations.Nullable;
+import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * Reads the operator's {@code menus/*.conf} files into the running menu engine. Each top-level {@code .conf}
@@ -38,20 +45,30 @@ public final class CustomMenuLoader {
     }
 
     /**
-     * The outcome of one load pass: how many specs registered, and the ids skipped over a parse or ref error. The
-     * convenience constructor keeps the older {@code (count, skipped)} shape for callers and tests that only need the
-     * counts; {@link #loadedNames()} carries the registered ids so {@code /menu list} can name what is open.
+     * The outcome of one load pass: how many specs registered, the ids skipped over a parse or ref error, and the
+     * operator-declared open commands the survivors carry (keyed by menu id, from each file's {@code command {}}
+     * block). {@link #loadedNames()} carries the registered ids so {@code /menu list} can name what is open, and
+     * {@link #openCommands()} lets the wiring register a {@code /shop}-style command per menu that declared one; a
+     * menu with no {@code command {}} block contributes no entry. The two convenience constructors keep the older
+     * {@code (loadedNames, skipped)} shape working for callers and tests that predate open commands.
      */
-    public record LoadResult(int loaded, List<String> loadedNames, List<String> skipped) {
+    public record LoadResult(
+            int loaded, List<String> loadedNames, List<String> skipped, Map<String, OpenCommandSpec> openCommands) {
 
         public LoadResult {
             loadedNames = List.copyOf(Objects.requireNonNull(loadedNames, "loadedNames"));
             skipped = List.copyOf(Objects.requireNonNull(skipped, "skipped"));
+            openCommands = Map.copyOf(Objects.requireNonNull(openCommands, "openCommands"));
         }
 
-        /** Build a result from the registered ids and the skipped ids, deriving the loaded count from the former. */
+        /** Build a result from the registered ids, the skipped ids, and the parsed open commands. */
+        public LoadResult(List<String> loadedNames, List<String> skipped, Map<String, OpenCommandSpec> openCommands) {
+            this(loadedNames.size(), loadedNames, skipped, openCommands);
+        }
+
+        /** Build a result from the registered ids and the skipped ids, with no open commands. */
         public LoadResult(List<String> loadedNames, List<String> skipped) {
-            this(loadedNames.size(), loadedNames, skipped);
+            this(loadedNames, skipped, Map.of());
         }
     }
 
@@ -67,15 +84,16 @@ public final class CustomMenuLoader {
         }
         List<String> loaded = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
+        Map<String, OpenCommandSpec> openCommands = new LinkedHashMap<>();
         try (Stream<Path> entries = Files.list(menusDir)) {
             for (Path file : confFiles(entries)) {
-                loadOne(file, loaded, skipped);
+                loadOne(file, loaded, skipped, openCommands);
             }
         } catch (java.io.IOException failure) {
             log.warn("could not list menu directory {} : {}", menusDir, String.valueOf(failure.getMessage()));
         }
         log.info("loaded {} custom menus, skipped {}", loaded.size(), skipped.size());
-        return new LoadResult(loaded, skipped);
+        return new LoadResult(loaded, skipped, openCommands);
     }
 
     /** The {@code .conf} files directly under the menus directory, in a stable order. */
@@ -87,7 +105,8 @@ public final class CustomMenuLoader {
     }
 
     /** Load one file; records its id in {@code loaded} when it registered, or in {@code skipped} on a parse/ref error. */
-    private void loadOne(Path file, List<String> loaded, List<String> skipped) {
+    private void loadOne(
+            Path file, List<String> loaded, List<String> skipped, Map<String, OpenCommandSpec> openCommands) {
         String id = stripConf(file.getFileName().toString());
         MenuSpec spec;
         try {
@@ -105,6 +124,55 @@ public final class CustomMenuLoader {
         }
         menus.registerSpec(id, spec);
         loaded.add(id);
+        parseOpenCommand(file, id).ifPresent(command -> openCommands.put(id, command));
+    }
+
+    /**
+     * Read the optional top-level {@code command {}} block of a menu file into an {@link OpenCommandSpec}. A file
+     * with no such block contributes no open command. A malformed block — a name with spaces, an unreadable file —
+     * is logged and skipped without touching the already-registered menu, which still opens through
+     * {@code /menu open <id>}; one bad command block never hides its menu. The file is read a second time here rather
+     * than threading the node out of {@link MenuSpecLoader}: this runs once on enable / reload, never on a hot path.
+     */
+    private Optional<OpenCommandSpec> parseOpenCommand(Path file, String menuId) {
+        try {
+            ConfigurationNode command =
+                    HoconConfigurationLoader.builder().path(file).build().load().node("command");
+            if (command.virtual() || command.isNull()) {
+                return Optional.empty();
+            }
+            return Optional.of(new OpenCommandSpec(
+                    command.node("name").getString(menuId),
+                    stringList(command.node("aliases")),
+                    optionalString(command.node("permission")),
+                    optionalString(command.node("deny-message")),
+                    command.node("console").getBoolean(false)));
+        } catch (RuntimeException | java.io.IOException invalid) {
+            log.warn("menu {} has an invalid command block : {}", menuId, String.valueOf(invalid.getMessage()));
+            return Optional.empty();
+        }
+    }
+
+    /** The string-list value at {@code node}, or an empty list when the node is absent or not a string list. */
+    private static List<String> stringList(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return List.of();
+        }
+        try {
+            @Nullable List<String> values = node.getList(String.class);
+            return values == null ? List.of() : List.copyOf(values);
+        } catch (org.spongepowered.configurate.serialize.SerializationException malformed) {
+            return List.of();
+        }
+    }
+
+    /** The verbatim non-blank string at {@code node} wrapped in an Optional, or empty when absent or blank. */
+    private static Optional<String> optionalString(ConfigurationNode node) {
+        if (node.virtual() || node.isNull()) {
+            return Optional.empty();
+        }
+        String value = node.getString("");
+        return value.isBlank() ? Optional.empty() : Optional.of(value);
     }
 
     private static String stripConf(String fileName) {

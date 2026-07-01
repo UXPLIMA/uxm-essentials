@@ -27,7 +27,10 @@ public enum CustomMenusMessageKey implements MessageKey {
     MENU_LIST_EMPTY("menu.list.empty"),
 
     /** Reply for {@code /menu reload} reporting how many specs loaded and how many were skipped. */
-    MENU_RELOADED("menu.reloaded");
+    MENU_RELOADED("menu.reloaded"),
+
+    /** Reply when a console (or other non-player) invokes a menu open command whose block forbids the console. */
+    MENU_CONSOLE_DENIED("menu.console-denied");
 
     private final String key;
 

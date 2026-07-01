@@ -51,6 +51,26 @@ class CustomMenusWiringTest {
     }
 
     @Test
+    void aMenuDeclaringACommandBlockAlsoRegistersItsOpenCommand(@TempDir Path dataFolder) throws Exception {
+        Path menus = Files.createDirectories(dataFolder.resolve("menus"));
+        Files.writeString(menus.resolve("shop.conf"), """
+                rows = 1
+                items { x { slot = 0, material = STONE, click { left = ["close"] } } }
+                command { name = "shop", aliases = ["store"] }
+                """);
+
+        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(menus(), bindings(), dataFolder, log(), messages());
+
+        assertThat(wired.commands().stream().map(c -> c.build().getLiteral())).contains("menu", "shop");
+        assertThat(wired.commands().stream()
+                        .filter(c -> c.build().getLiteral().equals("shop"))
+                        .findFirst()
+                        .orElseThrow()
+                        .aliases())
+                .containsExactly("store");
+    }
+
+    @Test
     void anEmptyMenusFolderLoadsNothingButStillRegistersTheCommand(@TempDir Path dataFolder) {
         CustomMenusWiring.Wired wired = CustomMenusWiring.wire(menus(), bindings(), dataFolder, log(), messages());
 
