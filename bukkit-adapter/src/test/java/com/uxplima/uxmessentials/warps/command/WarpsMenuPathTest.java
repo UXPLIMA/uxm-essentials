@@ -200,7 +200,8 @@ class WarpsMenuPathTest {
         WarpTeleporter teleporter = new RecordingTeleporter();
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         Clock clock = Clock.systemUTC();
-        UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
+        UseWarp useWarp =
+                new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions, new SyncScheduler());
         // The browse menu is a WarpServices collaborator these command-path tests never open, so it stands up over a
         // bare test engine façade with no spec registered.
         WarpBrowseMenu warpMenu = new WarpBrowseMenu(

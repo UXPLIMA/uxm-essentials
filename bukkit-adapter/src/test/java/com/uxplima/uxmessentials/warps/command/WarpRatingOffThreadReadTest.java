@@ -147,7 +147,8 @@ class WarpRatingOffThreadReadTest {
         WarpNotifier notifier = new WarpNotifier(messages, sink);
         Permissions permissions = new AllowAllPermissions();
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
-        UseWarp useWarp = new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions);
+        UseWarp useWarp =
+                new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions, scheduler);
         // The browse menu is a WarpServices collaborator this rating test never opens, so it stands up over a bare
         // test engine façade with no spec registered.
         WarpBrowseMenu warpMenu = new WarpBrowseMenu(

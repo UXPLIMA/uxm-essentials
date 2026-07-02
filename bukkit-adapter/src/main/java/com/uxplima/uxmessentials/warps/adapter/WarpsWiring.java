@@ -119,7 +119,8 @@ public final class WarpsWiring {
                 teleporter,
                 notifier,
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
-                kernel.permissions());
+                kernel.permissions(),
+                kernel.scheduler());
         // The per-warp editor hub now renders through the menu engine: a declarative spec over the edited warp as its
         // subject. The manager opens it on a warp click, the /warp editor command and the create flow open it, and the
         // sub-screen back buttons reopen it. Its category/welcome/sound/particle sub-screens are all engine now and

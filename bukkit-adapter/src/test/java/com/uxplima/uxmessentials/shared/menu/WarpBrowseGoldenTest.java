@@ -230,7 +230,8 @@ class WarpBrowseGoldenTest {
         Permissions permissions = new AllowAllPermissions();
         WarpNotifier notifier = new WarpNotifier(new KeyMessages(), (v, text) -> {});
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
-        UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier, position -> true, permissions);
+        UseWarp useWarp =
+                new UseWarp(repository, access, teleporter, notifier, position -> true, permissions, scheduler);
         WarpBrowseMenu menu = new WarpBrowseMenu(engine.menus(), scheduler, useWarp, new KeyMessages(), categories);
         menu.register(engine.bindings(), dataFolder, NOOP);
         return menu;

@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -35,6 +36,7 @@ public final class UseWarp {
     private final WarpNotifier notifier;
     private final WarpSafetyChecker safetyChecker;
     private final Permissions permissions;
+    private final Scheduler scheduler;
 
     public UseWarp(
             WarpRepository repository,
@@ -42,13 +44,15 @@ public final class UseWarp {
             WarpTeleporter teleporter,
             WarpNotifier notifier,
             WarpSafetyChecker safetyChecker,
-            Permissions permissions) {
+            Permissions permissions,
+            Scheduler scheduler) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.safetyChecker = Objects.requireNonNull(safetyChecker, "safetyChecker");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     /** Teleport {@code who} to the warp {@code name} themselves, gating access and cost first. */
@@ -130,9 +134,12 @@ public final class UseWarp {
                     actor, WarpsMessageKey.WARP_SENT, Map.of("warp", warp.name().value(), "player", recipient.name()));
         }
 
-        // Increment visitor counter
+        // Increment the visitor counter. The write persists to the DB (a single-writer SQLite by default),
+        // so it is handed to the async scheduler rather than run on the caller's region thread — the counter
+        // is a display statistic the teleport does not depend on, and the in-memory {@code updated} warp
+        // already carries the new count for the hop below.
         Warp updated = warp.incrementedVisitors();
-        repository.save(updated);
+        scheduler.async(() -> repository.save(updated));
 
         teleporter.teleportTo(recipient, updated);
         return Result.ok();

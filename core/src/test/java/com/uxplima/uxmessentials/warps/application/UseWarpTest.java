@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.warps.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +14,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -91,9 +93,73 @@ class UseWarpTest {
         assertThat(sink.textFor(actor)).doesNotContain(WarpsMessageKey.WARP_SENT.key());
     }
 
+    @Test
+    void visitorCounterWriteIsDeferredToTheAsyncSchedulerNotTheCallingThread() {
+        repository.save(warp("shop"));
+        permissions.grant(recipient, WarpName.of("shop").useNode());
+        CapturingScheduler scheduler = new CapturingScheduler();
+        UseWarp useWarp = new UseWarp(
+                repository,
+                new WarpAccess(permissions, Optional.empty()),
+                teleporter,
+                notifier,
+                pos -> true,
+                permissions,
+                scheduler);
+
+        useWarp.useFor(actor, recipient, WarpName.of("shop"));
+
+        // The teleport ran on the calling thread; the DB write did not — it was handed to scheduler.async, so the
+        // counter is still unwritten until that queued task runs off the region thread.
+        assertThat(teleporter.lastWho).isEqualTo(recipient);
+        assertThat(repository.find(WarpName.of("shop")).orElseThrow().visitors())
+                .isZero();
+
+        scheduler.runAll();
+
+        assertThat(repository.find(WarpName.of("shop")).orElseThrow().visitors())
+                .isEqualTo(1L);
+    }
+
     private UseWarp useWarp() {
         WarpAccess access = new WarpAccess(permissions, Optional.empty());
-        return new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
+        return new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions, new InlineScheduler());
+    }
+
+    /** Runs region/entity/global work inline but captures {@code async} tasks so a test can prove deferral. */
+    private static final class CapturingScheduler implements Scheduler {
+        private final List<Runnable> asyncTasks = new ArrayList<>();
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            asyncTasks.add(task);
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            asyncTasks.add(task);
+        }
+
+        void runAll() {
+            List<Runnable> pending = List.copyOf(asyncTasks);
+            asyncTasks.clear();
+            pending.forEach(Runnable::run);
+        }
     }
 
     private Warp warp(String name) {

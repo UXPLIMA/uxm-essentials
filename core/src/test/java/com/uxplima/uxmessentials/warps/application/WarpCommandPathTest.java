@@ -167,7 +167,7 @@ class WarpCommandPathTest {
 
     private UseWarp useWarp(Optional<WarpEconomy> economy) {
         WarpAccess access = new WarpAccess(permissions, economy);
-        return new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
+        return new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions, new InlineScheduler());
     }
 
     private Warp priced(String name, BigDecimal amount) {
