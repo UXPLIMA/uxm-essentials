@@ -5,11 +5,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -38,11 +40,13 @@ public final class SafeSearchValidator {
     private final Scheduler scheduler;
     private final SafeSearchPolicy policy;
     private final Clock clock;
+    private final Logger log;
 
-    public SafeSearchValidator(Scheduler scheduler, SafeSearchPolicy policy, Clock clock) {
+    public SafeSearchValidator(Scheduler scheduler, SafeSearchPolicy policy, Clock clock, Logger log) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.policy = Objects.requireNonNull(policy, "policy");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Try one random candidate in {@code area}; the future completes empty when the candidate fails. */
@@ -51,8 +55,24 @@ public final class SafeSearchValidator {
         double[] xz = randomPoint(area);
         Position probe = Position.of(area.world(), xz[0], 320.0, xz[1]);
         CompletableFuture<Optional<RtpSafeLocation>> result = new CompletableFuture<>();
-        scheduler.onRegion(probe, () -> result.complete(inspect(area, xz[0], xz[1])));
+        scheduler.onRegion(probe, () -> completeGuarded(result, () -> inspect(area, xz[0], xz[1])));
         return result;
+    }
+
+    /**
+     * Complete {@code result} with the probe's verdict, or empty if the region read threw. A candidate probe
+     * touches live chunk/biome/block state; a throw there must still complete the future, or the refill loop
+     * awaiting it would hang and lose that slot forever. A failed probe simply means "no safe spot here" — the
+     * loop tries another candidate — so the throw is logged and the future completes empty, never orphaned.
+     */
+    void completeGuarded(
+            CompletableFuture<Optional<RtpSafeLocation>> result, Supplier<Optional<RtpSafeLocation>> probe) {
+        try {
+            result.complete(probe.get());
+        } catch (RuntimeException failure) {
+            log.error("event=rtp_probe_failed", failure);
+            result.complete(Optional.empty());
+        }
     }
 
     private Optional<RtpSafeLocation> inspect(SafeSearchArea area, double x, double z) {

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.economy.adapter.treasury;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -15,6 +16,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BoundedAwait;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -175,9 +177,12 @@ public final class TreasuryEconomyAdapter implements EconomyProvider {
         return EconomyTransactionInitiator.createInitiator(EconomyTransactionInitiator.Type.PLAYER, owner.uuid());
     }
 
+    /** Bound the wait on the foreign Treasury provider so a stalled backend can never hang the caller. */
+    private static final Duration TREASURY_AWAIT_TIMEOUT = Duration.ofSeconds(10);
+
     private static <T> T await(java.util.function.Consumer<EconomySubscriber<T>> call) {
         CompletableFuture<T> future = EconomySubscriber.asFuture(call);
-        return future.join();
+        return BoundedAwait.get(future, TREASURY_AWAIT_TIMEOUT, "Treasury economy provider");
     }
 
     private static BigDecimal read(java.util.function.Consumer<EconomySubscriber<BigDecimal>> call) {

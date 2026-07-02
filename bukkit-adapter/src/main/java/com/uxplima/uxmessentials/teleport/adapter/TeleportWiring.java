@@ -185,8 +185,8 @@ public final class TeleportWiring {
 
     private static PrewarmedSafeLocationQueue rtpQueue(
             KernelPorts kernel, ConfigStore config, TeleportSettings settings, AtomicBoolean running) {
-        SafeSearchValidator validator =
-                new SafeSearchValidator(kernel.scheduler(), settings.safeSearchPolicy(), Clock.systemUTC());
+        SafeSearchValidator validator = new SafeSearchValidator(
+                kernel.scheduler(), settings.safeSearchPolicy(), Clock.systemUTC(), kernel.log());
         return new PrewarmedSafeLocationQueue(
                 kernel.scheduler(), validator, RtpWorldSettings.from(config), kernel.log(), running::get);
     }
