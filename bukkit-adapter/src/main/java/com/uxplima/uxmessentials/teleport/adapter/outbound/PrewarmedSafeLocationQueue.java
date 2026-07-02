@@ -1,13 +1,10 @@
 package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -19,7 +16,7 @@ import org.bukkit.WorldBorder;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
+import com.uxplima.uxmessentials.teleport.application.BudgetedSafeSearch;
 import com.uxplima.uxmessentials.teleport.application.port.SafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
@@ -32,12 +29,18 @@ import org.jspecify.annotations.NullMarked;
  * {@code compareAndSet}-guarded flag so concurrent {@code /rtp}s never launch N refills. A polled location
  * that no longer fits the world's current border/radius is discarded on serve and the next is polled.
  *
- * <p>The urgent path ({@link #urgentSearch(WorldRef)}) serves the queue first and, only when empty, runs a
- * bounded search via {@link AsyncSafeLocationFinder}, whose probe loads each candidate's chunk asynchronously
- * (never a synchronous chunk load on a tick thread); the worker blocks on that off-thread result for a short
- * timeout, never the tick thread. Durable restart-survival of the queue (the {@code rtp_queue} mirror, ADR 0010 §7)
- * is the persistence-adapter's concern and is a documented stub here — this queue is in-memory and
- * cold-starts empty, warming on the first refill.
+ * <p>The refill launches {@link BudgetedSafeSearch}es one at a time until the queue reaches its target size
+ * or a per-cycle cap is hit — <strong>none of which blocks a thread</strong>. Each search chains its own
+ * attempts through the scheduler (budget-bounded and tick-sliced) and completes a future; the refill composes
+ * onto it with {@code thenAccept} rather than parking a worker on a {@code .get()} the way the pre-P1 loop did.
+ * Durable restart-survival of the queue (the {@code rtp_queue} mirror, ADR 0010 §7) is the persistence-adapter's
+ * concern and is a documented stub here — this queue is in-memory and cold-starts empty, warming on the first
+ * refill.
+ *
+ * <p>The urgent path ({@link #urgentSearch(WorldRef)}) serves the queue and, when it is momentarily drained,
+ * kicks a non-blocking refill and reports empty rather than blocking the caller on an inline search. Routing
+ * respawn / first-join RTP fully through the async engine is a later phase; here the caller shows the clear
+ * no-location message and the queue warms for the next attempt.
  *
  * <p>The active tuning sits behind an {@link AtomicReference} so {@code /settpr} can reset the search radii at
  * runtime ({@link #updateRadii}); the swap is whole-record, and the queue is dropped on swap so refills
@@ -45,17 +48,15 @@ import org.jspecify.annotations.NullMarked;
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. {@code ready} holds a {@link ConcurrentLinkedQueue} per world;
- * {@code refilling} holds one {@link AtomicBoolean} per world so at most one refill task is outstanding.
+ * {@code refilling} holds one {@link AtomicBoolean} per world so at most one refill cycle is outstanding.
  * {@code settings} is an {@link AtomicReference} read lock-free on every serve/refill and replaced whole by
- * {@code /settpr}. The {@code running} flag is observed by the refill loop, which exits when the module stops.
+ * {@code /settpr}. The {@code running} flag is observed by the refill chain, which exits when the module stops.
  */
 @NullMarked
 public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
-    private static final Duration URGENT_TIMEOUT = Duration.ofMillis(1500);
-
     private final Scheduler scheduler;
-    private final AsyncSafeLocationFinder finder;
+    private final BudgetedSafeSearch search;
     private final AtomicReference<RtpWorldSettings> settings;
     private final Logger log;
     private final BooleanSupplier running;
@@ -64,12 +65,12 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
     public PrewarmedSafeLocationQueue(
             Scheduler scheduler,
-            AsyncSafeLocationFinder finder,
+            BudgetedSafeSearch search,
             RtpWorldSettings settings,
             Logger log,
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.finder = Objects.requireNonNull(finder, "finder");
+        this.search = Objects.requireNonNull(search, "search");
         this.settings = new AtomicReference<>(Objects.requireNonNull(settings, "settings"));
         this.log = Objects.requireNonNull(log, "log");
         this.running = Objects.requireNonNull(running, "running");
@@ -108,10 +109,12 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
     public Optional<RtpSafeLocation> urgentSearch(WorldRef world) {
         Objects.requireNonNull(world, "world");
         Optional<RtpSafeLocation> queued = poll(world);
-        if (queued.isPresent()) {
-            return queued;
+        if (queued.isEmpty()) {
+            // No inline search on the caller's thread — warm the queue and let the caller show the no-location
+            // message; the budgeted search runs off-thread for the next attempt.
+            requestRefill(world);
         }
-        return area(world).flatMap(this::boundedSearch);
+        return queued;
     }
 
     @Override
@@ -133,56 +136,49 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         AtomicBoolean guard = refilling.computeIfAbsent(world.uid(), id -> new AtomicBoolean());
         if (guard.compareAndSet(false, true)) {
-            scheduler.async(() -> runRefill(world, queue, guard));
+            scheduler.async(() -> launchSearch(world, queue, guard, 0));
         }
     }
 
-    private void runRefill(WorldRef world, ConcurrentLinkedQueue<RtpSafeLocation> queue, AtomicBoolean guard) {
+    private void launchSearch(
+            WorldRef world, ConcurrentLinkedQueue<RtpSafeLocation> queue, AtomicBoolean guard, int launched) {
+        RtpWorldSettings current = settings();
+        Optional<SafeSearchArea> area = area(world);
+        if (!running.getAsBoolean()
+                || queue.size() >= current.targetSize()
+                || launched >= current.targetSize()
+                || area.isEmpty()) {
+            finishRefill(world, queue, guard, launched);
+            return;
+        }
         try {
-            int attempts = 0;
-            while (running.getAsBoolean()
-                    && queue.size() < settings().targetSize()
-                    && attempts < settings().attemptBudget()) {
-                attempts++;
-                Optional<SafeSearchArea> area = area(world);
-                if (area.isEmpty()) {
-                    return;
-                }
-                awaitCandidate(area.get()).ifPresent(queue::offer);
-            }
-            if (queue.isEmpty()) {
-                log.debug("rtp refill produced no location for world {} in {} attempts", world.name(), attempts);
-            }
-        } finally {
+            var ignored = search.search(area.get(), current.searchBudget())
+                    .thenAccept(found -> afterSearch(world, queue, guard, launched, found));
+        } catch (RuntimeException failure) {
+            log.warn(
+                    "rtp refill search failed to start for world {}: {}",
+                    world.name(),
+                    String.valueOf(failure.getMessage()));
             guard.set(false);
         }
     }
 
-    private Optional<RtpSafeLocation> boundedSearch(SafeSearchArea area) {
-        for (int attempt = 0; attempt < settings().attemptBudget(); attempt++) {
-            Optional<RtpSafeLocation> found = awaitCandidate(area);
-            if (found.isPresent()) {
-                return found;
-            }
-        }
-        return Optional.empty();
+    private void afterSearch(
+            WorldRef world,
+            ConcurrentLinkedQueue<RtpSafeLocation> queue,
+            AtomicBoolean guard,
+            int launched,
+            Optional<RtpSafeLocation> found) {
+        found.ifPresent(queue::offer);
+        launchSearch(world, queue, guard, launched + 1);
     }
 
-    private Optional<RtpSafeLocation> awaitCandidate(SafeSearchArea area) {
-        try {
-            return finder.find(area).get(URGENT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
-        } catch (TimeoutException timedOut) {
-            return Optional.empty();
-        } catch (java.util.concurrent.ExecutionException failed) {
-            log.warn(
-                    "rtp candidate validation failed for world {}: {}",
-                    area.world().name(),
-                    String.valueOf(failed.getMessage()));
-            return Optional.empty();
+    private void finishRefill(
+            WorldRef world, ConcurrentLinkedQueue<RtpSafeLocation> queue, AtomicBoolean guard, int launched) {
+        if (queue.isEmpty() && launched > 0) {
+            log.debug("rtp refill produced no location for world {} after {} searches", world.name(), launched);
         }
+        guard.set(false);
     }
 
     private static Optional<RtpSafeLocation> pollWithin(

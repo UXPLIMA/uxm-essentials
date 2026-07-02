@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.teleport.adapter;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,6 +41,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
+import com.uxplima.uxmessentials.teleport.application.BudgetedSafeSearch;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
@@ -66,6 +68,10 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class TeleportWiring {
+
+    // A couple of ticks between rescheduled RTP search attempts — enough to slice a long search across ticks so
+    // it never fires every candidate at once or monopolises an async worker.
+    private static final Duration RTP_RETRY_INTERVAL = Duration.ofMillis(100);
 
     private TeleportWiring() {}
 
@@ -187,13 +193,17 @@ public final class TeleportWiring {
     private static PrewarmedSafeLocationQueue rtpQueue(
             Plugin plugin, KernelPorts kernel, ConfigStore config, TeleportSettings settings, AtomicBoolean running) {
         // The safe-search probe loads each candidate's chunk asynchronously through BukkitChunkAccess, so no RTP
-        // probe generates a far chunk on a tick thread and every probed-but-unserved chunk is released again.
+        // probe generates a far chunk on a tick thread and every probed-but-unserved chunk is released again. The
+        // budgeted search wraps the finder so a single search terminates within its budget and tick-slices its
+        // retries through the scheduler — no worker blocks on a candidate any more.
         AsyncSafeLocationFinder finder = new AsyncSafeLocationFinder(
                 new BukkitChunkAccess(plugin.getServer(), kernel.log()),
                 settings.safeSearchPolicy(),
                 Clock.systemUTC());
+        BudgetedSafeSearch search =
+                new BudgetedSafeSearch(finder, kernel.scheduler(), Clock.systemUTC(), RTP_RETRY_INTERVAL);
         return new PrewarmedSafeLocationQueue(
-                kernel.scheduler(), finder, RtpWorldSettings.from(config), kernel.log(), running::get);
+                kernel.scheduler(), search, RtpWorldSettings.from(config), kernel.log(), running::get);
     }
 
     private static SpawnDirectory spawns(Plugin plugin, Persistence persistence) {

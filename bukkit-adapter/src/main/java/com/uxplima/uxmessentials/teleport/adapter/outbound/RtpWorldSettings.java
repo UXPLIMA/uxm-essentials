@@ -3,24 +3,26 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.teleport.domain.SearchBudget;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The per-world random-teleport tuning read from the teleport config: the search radius, the queue's
- * target size and low-water mark, and the per-refill attempt budget. A world with no explicit block
- * inherits the {@code rtp} defaults, so a minimal config still yields a working queue.
+ * target size and low-water mark, and the {@link SearchBudget} bounding a single safe-search. A world with
+ * no explicit block inherits the {@code rtp} defaults, so a minimal config still yields a working queue.
  *
  * @param minRadius the inner radius candidates must clear
  * @param maxRadius the operator's outer search radius
  * @param targetSize how many pre-validated locations the queue aims to hold per world
  * @param lowWaterMark the size below which a refill is fired
- * @param attemptBudget the maximum candidate validations one refill cycle runs before yielding
+ * @param searchBudget the per-search ceiling (attempts, chunk loads, wall-clock ms) every safe-search obeys
  */
 @NullMarked
 public record RtpWorldSettings(
-        double minRadius, double maxRadius, int targetSize, int lowWaterMark, int attemptBudget) {
+        double minRadius, double maxRadius, int targetSize, int lowWaterMark, SearchBudget searchBudget) {
 
     public RtpWorldSettings {
+        Objects.requireNonNull(searchBudget, "searchBudget");
         if (maxRadius < minRadius) {
             throw new IllegalArgumentException("maxRadius must be >= minRadius");
         }
@@ -30,19 +32,16 @@ public record RtpWorldSettings(
         if (lowWaterMark < 0 || lowWaterMark > targetSize) {
             throw new IllegalArgumentException("lowWaterMark must be within [0, targetSize]");
         }
-        if (attemptBudget < 1) {
-            throw new IllegalArgumentException("attemptBudget must be >= 1: " + attemptBudget);
-        }
     }
 
     /**
-     * A copy of this tuning with new search radii, leaving the queue sizing and attempt budget untouched. This
+     * A copy of this tuning with new search radii, leaving the queue sizing and search budget untouched. This
      * is the {@code /settpr} runtime path — an operator resets the zone without disturbing how big the
-     * pre-warmed queue is or how hard a refill tries. The compact constructor still enforces
+     * pre-warmed queue is or how hard a single search tries. The compact constructor still enforces
      * {@code maxRadius >= minRadius}.
      */
     public RtpWorldSettings withRadii(double newMinRadius, double newMaxRadius) {
-        return new RtpWorldSettings(newMinRadius, newMaxRadius, targetSize, lowWaterMark, attemptBudget);
+        return new RtpWorldSettings(newMinRadius, newMaxRadius, targetSize, lowWaterMark, searchBudget);
     }
 
     /** Read the RTP tuning from {@code config}, applying the documented defaults. */
@@ -55,6 +54,13 @@ public record RtpWorldSettings(
                 Math.max(1, config.getInt("rtp.max-radius", 5000)),
                 target,
                 low,
-                Math.max(1, config.getInt("rtp.attempt-budget", 32)));
+                searchBudget(config));
+    }
+
+    private static SearchBudget searchBudget(ConfigStore config) {
+        return new SearchBudget(
+                Math.max(1, config.getInt("rtp.max-attempts", 40)),
+                Math.max(1, config.getInt("rtp.max-chunk-loads", 30)),
+                Math.max(1, config.getInt("rtp.max-wall-clock-ms", 2500)));
     }
 }
