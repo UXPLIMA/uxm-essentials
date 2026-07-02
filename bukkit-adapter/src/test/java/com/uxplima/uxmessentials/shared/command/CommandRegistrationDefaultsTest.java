@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -12,7 +13,10 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +55,8 @@ class CommandRegistrationDefaultsTest {
 
     @Test
     void localeWrapperPreservesIdAndDefaults() {
-        LocaleBinding binding = new LocaleBinding(new NoOverrides(), Locale.ENGLISH);
+        LocaleBinding binding =
+                new LocaleBinding(new NoOverrides(), Locale.ENGLISH, new FixedMessages(), new NoOpLog());
         CommandRegistration wrapped = binding.wrap(new StubRegistration());
 
         assertThat(wrapped.commandId()).isEqualTo("foo");
@@ -87,5 +92,26 @@ class CommandRegistrationDefaultsTest {
 
         @Override
         public void clearOverride(PlayerRef player) {}
+    }
+
+    private static final class FixedMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return key.key();
+        }
+    }
+
+    private static final class NoOpLog implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

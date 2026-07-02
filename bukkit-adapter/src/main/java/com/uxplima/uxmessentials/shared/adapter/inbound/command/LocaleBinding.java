@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -12,11 +13,15 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.LocaleScope;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -36,16 +41,28 @@ import org.jspecify.annotations.NullMarked;
  * <p>It wraps a built Brigadier tree by rebuilding each node with the same requirement and a
  * scope-binding {@link Command}, so the binding applies uniformly to every executor in the command —
  * the root and every argument leaf — rather than each handler opening its own scope.
+ *
+ * <p>Being the one wrapper every published command passes through, this is also the last line of defence
+ * against a handler bug. An unexpected {@link RuntimeException} from an executor would otherwise reach
+ * Paper's dispatcher and leave the player with a raw red "unexpected error" plus a console stacktrace; here
+ * it is caught, recorded for the operator with the offending input, and answered with the localized
+ * {@link SharedMessageKey#COMMAND_ERROR} line, reporting the command handled so Brigadier adds no usage spam.
+ * A {@link CommandSyntaxException} is Brigadier's own control flow (usage / parse failures) and is always
+ * rethrown unchanged.
  */
 @NullMarked
 public final class LocaleBinding {
 
     private final LocaleStore overrides;
     private final Locale serverDefault;
+    private final CommandFeedback feedback;
+    private final Logger log;
 
-    public LocaleBinding(LocaleStore overrides, Locale serverDefault) {
+    public LocaleBinding(LocaleStore overrides, Locale serverDefault, Messages messages, Logger log) {
         this.overrides = Objects.requireNonNull(overrides, "overrides");
         this.serverDefault = Objects.requireNonNull(serverDefault, "serverDefault");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Wrap {@code registration} so every executor in its tree runs with the locale bound. */
@@ -88,27 +105,53 @@ public final class LocaleBinding {
     }
 
     private int runBound(CommandContext<CommandSourceStack> ctx, Command<CommandSourceStack> delegate)
-            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
-        if (!(ctx.getSource().getSender() instanceof Player player)) {
-            return delegate.run(ctx); // console / command block has no client locale to bind
+            throws CommandSyntaxException {
+        if (ctx.getSource().getSender() instanceof Player player) {
+            return runInLocale(ctx, delegate, player);
         }
+        try {
+            return delegate.run(ctx); // console / command block has no client locale to bind
+        } catch (RuntimeException bug) {
+            // CommandSyntaxException is checked, so it slips past this catch and surfaces as Brigadier expects.
+            return reportFailure(ctx, ctx.getSource().getSender(), bug);
+        }
+    }
+
+    private int runInLocale(CommandContext<CommandSourceStack> ctx, Command<CommandSourceStack> delegate, Player player)
+            throws CommandSyntaxException {
         Locale resolved = resolveFor(player);
         int[] result = new int[1];
-        boolean[] thrown = new boolean[1];
-        com.mojang.brigadier.exceptions.CommandSyntaxException[] failure =
-                new com.mojang.brigadier.exceptions.CommandSyntaxException[1];
+        CommandSyntaxException[] syntax = new CommandSyntaxException[1];
+        RuntimeException[] bug = new RuntimeException[1];
         LocaleScope.runWith(resolved, () -> {
             try {
                 result[0] = delegate.run(ctx);
-            } catch (com.mojang.brigadier.exceptions.CommandSyntaxException syntax) {
-                thrown[0] = true;
-                failure[0] = syntax;
+            } catch (CommandSyntaxException control) {
+                syntax[0] = control; // Brigadier control flow — rethrown untouched below.
+            } catch (RuntimeException failure) {
+                bug[0] = failure;
+                feedback.send(player, SharedMessageKey.COMMAND_ERROR); // in scope: renders in the bound locale
+                result[0] = Command.SINGLE_SUCCESS;
             }
         });
-        if (thrown[0]) {
-            throw failure[0];
+        if (syntax[0] != null) {
+            throw syntax[0];
+        }
+        if (bug[0] != null) {
+            logFailure(ctx, bug[0]); // the player already saw the friendly reply inside the scope
         }
         return result[0];
+    }
+
+    /** Answer a non-player source with the friendly line, record the fault, and report the command handled. */
+    private int reportFailure(CommandContext<CommandSourceStack> ctx, CommandSender sender, RuntimeException bug) {
+        feedback.send(sender, SharedMessageKey.COMMAND_ERROR);
+        logFailure(ctx, bug);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void logFailure(CommandContext<CommandSourceStack> ctx, RuntimeException bug) {
+        log.error("event=command_failed input=" + ctx.getInput(), bug);
     }
 
     private Locale resolveFor(Player player) {

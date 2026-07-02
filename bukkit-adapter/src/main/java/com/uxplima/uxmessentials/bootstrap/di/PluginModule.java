@@ -216,7 +216,8 @@ public final class PluginModule {
         ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
         CloseableResources resources = new CloseableResources(log);
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
-        resources.localeBinding(new LocaleBinding(wiredKernel.localeStore(), wiredKernel.serverDefault()));
+        resources.localeBinding(new LocaleBinding(
+                wiredKernel.localeStore(), wiredKernel.serverDefault(), kernel.messages(), kernel.log()));
         // A bare arg-only command answers with its usage instead of Brigadier's red parse error; injected
         // between the catalog and the locale wrap so the usage line resolves in the player's language.
         resources.usageBinding(new UsageBinding(kernel.messages()));

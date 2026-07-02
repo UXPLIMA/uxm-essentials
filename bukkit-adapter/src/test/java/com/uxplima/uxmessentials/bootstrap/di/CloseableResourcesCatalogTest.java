@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.AfterEach;
@@ -81,7 +82,8 @@ class CloseableResourcesCatalogTest {
         resources.addCommand(new StubRegistration("home", List.of("h")));
         resources.catalogBinding(new CatalogBinding(
                 Map.of("home", new EffectiveCommand(new CommandId("home"), "ev", List.of("e"), true, true))));
-        resources.localeBinding(new LocaleBinding(new NoOverrideLocaleStore(), Locale.ENGLISH));
+        resources.localeBinding(
+                new LocaleBinding(new NoOverrideLocaleStore(), Locale.ENGLISH, new SuffixMessages(), new NoOpLog()));
 
         List<CommandRegistration> out = resources.commands();
 
@@ -95,7 +97,8 @@ class CloseableResourcesCatalogTest {
         resources.addCommand(new BareArgRegistration("gamemode"));
         resources.addCommand(new StubRegistration("home", List.of("h")));
         resources.usageBinding(new UsageBinding(new SuffixMessages()));
-        resources.localeBinding(new LocaleBinding(new NoOverrideLocaleStore(), Locale.ENGLISH));
+        resources.localeBinding(
+                new LocaleBinding(new NoOverrideLocaleStore(), Locale.ENGLISH, new SuffixMessages(), new NoOpLog()));
 
         List<CommandRegistration> out = resources.commands();
 
@@ -174,6 +177,20 @@ class CloseableResourcesCatalogTest {
             this.placeholders = Map.copyOf(placeholders);
             return key.key();
         }
+    }
+
+    private static final class NoOpLog implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class NoOverrideLocaleStore implements LocaleStore {
