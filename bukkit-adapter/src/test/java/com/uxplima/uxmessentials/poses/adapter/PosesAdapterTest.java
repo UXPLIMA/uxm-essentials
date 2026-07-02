@@ -31,6 +31,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCooldownNotice;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.CrawlMoveListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PlayerSitInteractListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PoseCancelListener;
@@ -42,6 +43,7 @@ import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSnores;
 import com.uxplima.uxmessentials.poses.adapter.outbound.PdcPlayerSitPreferences;
 import com.uxplima.uxmessentials.poses.application.AllowAllRegionGate;
 import com.uxplima.uxmessentials.poses.application.CrawlSessions;
+import com.uxplima.uxmessentials.poses.application.PoseCooldown;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.StartCrawl;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
@@ -129,8 +131,17 @@ class PosesAdapterTest {
         posePort = new BukkitPacketPosePort(server, scheduler, mock(NpcPackets.class), new NoopLogger(), 1, 30f);
         snores = new BukkitSnores(server, scheduler, new NoopLogger(), "minecraft:entity.fox.sleep", 0.5f, 1.0f, 20);
 
-        startSit =
-                new StartSit(sessions, seats, new AllowAllRegionGate(), locator, events, Clock.systemUTC(), true, true);
+        PoseCooldownNotice cooldownNotice = new PoseCooldownNotice(PoseCooldown.unlimited(), new KeyMessages());
+        startSit = new StartSit(
+                sessions,
+                seats,
+                new AllowAllRegionGate(),
+                locator,
+                events,
+                Clock.systemUTC(),
+                true,
+                true,
+                PoseCooldown.unlimited());
         startPose = new StartPose(
                 sessions,
                 seats,
@@ -142,7 +153,8 @@ class PosesAdapterTest {
                 true,
                 true,
                 true,
-                true);
+                true,
+                PoseCooldown.unlimited());
         startCrawl = new StartCrawl(
                 sessions,
                 crawlSessions,
@@ -151,7 +163,8 @@ class PosesAdapterTest {
                 new AllowAllRegionGate(),
                 events,
                 Clock.systemUTC(),
-                true);
+                true,
+                PoseCooldown.unlimited());
         playerSitPreferences = new PdcPlayerSitPreferences();
         StartPlayerSit startPlayerSit = new StartPlayerSit(
                 sessions,
@@ -161,7 +174,8 @@ class PosesAdapterTest {
                 locator,
                 events,
                 Clock.systemUTC(),
-                true);
+                true,
+                PoseCooldown.unlimited());
         togglePlayerSit = new TogglePlayerSit(playerSitPreferences);
         stopPose = new StopPose(
                 sessions,
@@ -173,8 +187,9 @@ class PosesAdapterTest {
                 new BukkitPoseReturn(plugin, scheduler),
                 events,
                 true);
-        interactListener = new SeatInteractListener(startSit, seats, sittableBlocks, new KeyMessages(), true, 5.0);
-        playerSitInteractListener = new PlayerSitInteractListener(startPlayerSit, new KeyMessages());
+        interactListener =
+                new SeatInteractListener(startSit, seats, sittableBlocks, new KeyMessages(), cooldownNotice, true, 5.0);
+        playerSitInteractListener = new PlayerSitInteractListener(startPlayerSit, new KeyMessages(), cooldownNotice);
         cancelListener = new PoseCancelListener(stopPose, sessions);
         crawlMoveListener = new CrawlMoveListener(sessions, crawlSessions, crawlView);
         placeholders = new StorePosesPlaceholders(sessions, playerSitPreferences);

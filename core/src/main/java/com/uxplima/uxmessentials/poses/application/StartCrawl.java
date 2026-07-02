@@ -37,6 +37,7 @@ public final class StartCrawl {
     private final DomainEventPublisher events;
     private final Clock clock;
     private final boolean crawlEnabled;
+    private final PoseCooldown cooldown;
 
     public StartCrawl(
             PoseSessions sessions,
@@ -46,7 +47,8 @@ public final class StartCrawl {
             PoseRegionGate regionGate,
             DomainEventPublisher events,
             Clock clock,
-            boolean crawlEnabled) {
+            boolean crawlEnabled,
+            PoseCooldown cooldown) {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.crawlSessions = Objects.requireNonNull(crawlSessions, "crawlSessions");
         this.crawlView = Objects.requireNonNull(crawlView, "crawlView");
@@ -55,6 +57,7 @@ public final class StartCrawl {
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.crawlEnabled = crawlEnabled;
+        this.cooldown = Objects.requireNonNull(cooldown, "cooldown");
     }
 
     /**
@@ -73,7 +76,11 @@ public final class StartCrawl {
         if (sessions.isPosing(who)) {
             return CrawlOutcome.ALREADY_POSING;
         }
+        if (cooldown.remaining(who).isPresent()) {
+            return CrawlOutcome.ON_COOLDOWN;
+        }
         beginCrawl(who, feet);
+        cooldown.stamp(who);
         return CrawlOutcome.STARTED;
     }
 
@@ -102,6 +109,9 @@ public final class StartCrawl {
         DENIED_REGION,
 
         /** The player already holds a pose; the one-session invariant turns the crawl away. */
-        ALREADY_POSING
+        ALREADY_POSING,
+
+        /** The player is still inside the pose cooldown window; the crawl is refused and nothing is stamped. */
+        ON_COOLDOWN
     }
 }

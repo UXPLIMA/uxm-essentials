@@ -44,6 +44,7 @@ public final class StartPlayerSit {
     private final DomainEventPublisher events;
     private final Clock clock;
     private final boolean playerSitEnabled;
+    private final PoseCooldown cooldown;
 
     public StartPlayerSit(
             PoseSessions sessions,
@@ -53,7 +54,8 @@ public final class StartPlayerSit {
             PlayerLocator locator,
             DomainEventPublisher events,
             Clock clock,
-            boolean playerSitEnabled) {
+            boolean playerSitEnabled,
+            PoseCooldown cooldown) {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.seats = Objects.requireNonNull(seats, "seats");
         this.preferences = Objects.requireNonNull(preferences, "preferences");
@@ -62,6 +64,7 @@ public final class StartPlayerSit {
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.playerSitEnabled = playerSitEnabled;
+        this.cooldown = Objects.requireNonNull(cooldown, "cooldown");
     }
 
     /** Seat {@code who} on {@code target}. Returns the outcome the adapter renders feedback from. */
@@ -85,7 +88,11 @@ public final class StartPlayerSit {
         if (!regionGate.canPose(who, at, PoseType.PLAYER_SIT)) {
             return PlayerSitOutcome.DENIED_REGION;
         }
+        if (cooldown.remaining(who).isPresent()) {
+            return PlayerSitOutcome.ON_COOLDOWN;
+        }
         mountAndRecord(who, target, at);
+        cooldown.stamp(who);
         return PlayerSitOutcome.STARTED;
     }
 
@@ -116,6 +123,9 @@ public final class StartPlayerSit {
         ALREADY_POSING,
 
         /** The rider tried to sit on themselves. */
-        SELF
+        SELF,
+
+        /** The rider is still inside the pose cooldown window; the attempt is refused and nothing is stamped. */
+        ON_COOLDOWN
     }
 }

@@ -14,6 +14,7 @@ import org.bukkit.inventory.EquipmentSlot;
 
 import com.uxplima.uxmessentials.poses.adapter.inbound.SeatGeometry;
 import com.uxplima.uxmessentials.poses.adapter.inbound.SeatGeometry.SeatTarget;
+import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCooldownNotice;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.poses.application.StartSit;
 import com.uxplima.uxmessentials.poses.application.StartSit.SitOutcome;
@@ -22,6 +23,7 @@ import com.uxplima.uxmessentials.poses.domain.SittableBlocks;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 
@@ -39,6 +41,7 @@ public final class SeatInteractListener implements Listener {
     private final SeatPort seats;
     private final SittableBlocks sittableBlocks;
     private final CommandFeedback feedback;
+    private final PoseCooldownNotice cooldownNotice;
     private final boolean sitOnBlocks;
     private final double maxDistance;
 
@@ -47,12 +50,14 @@ public final class SeatInteractListener implements Listener {
             SeatPort seats,
             SittableBlocks sittableBlocks,
             Messages messages,
+            PoseCooldownNotice cooldownNotice,
             boolean sitOnBlocks,
             double maxDistance) {
         this.startSit = Objects.requireNonNull(startSit, "startSit");
         this.seats = Objects.requireNonNull(seats, "seats");
         this.sittableBlocks = Objects.requireNonNull(sittableBlocks, "sittableBlocks");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.cooldownNotice = Objects.requireNonNull(cooldownNotice, "cooldownNotice");
         this.sitOnBlocks = sitOnBlocks;
         this.maxDistance = maxDistance;
     }
@@ -82,10 +87,12 @@ public final class SeatInteractListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        SitOutcome outcome = startSit.start(BukkitRefs.toRef(player), seat, target.yaw(), false);
+        PlayerRef who = BukkitRefs.toRef(player);
+        SitOutcome outcome = startSit.start(who, seat, target.yaw(), false);
         switch (outcome) {
             case STARTED -> event.setCancelled(true);
             case DENIED_REGION -> feedback.send(player, PosesMessageKey.POSES_CANNOT_HERE);
+            case ON_COOLDOWN -> cooldownNotice.send(player, who);
             // A player who is already posing, or with sitting switched off, gets no nag on a stray right-click.
             case ALREADY_POSING, DISABLED -> {}
         }

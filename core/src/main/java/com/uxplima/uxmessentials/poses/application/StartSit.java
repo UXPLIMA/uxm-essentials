@@ -34,6 +34,7 @@ public final class StartSit {
     private final Clock clock;
     private final boolean sitEnabled;
     private final boolean returnToStart;
+    private final PoseCooldown cooldown;
 
     public StartSit(
             PoseSessions sessions,
@@ -43,7 +44,8 @@ public final class StartSit {
             DomainEventPublisher events,
             Clock clock,
             boolean sitEnabled,
-            boolean returnToStart) {
+            boolean returnToStart,
+            PoseCooldown cooldown) {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.seats = Objects.requireNonNull(seats, "seats");
         this.regionGate = Objects.requireNonNull(regionGate, "regionGate");
@@ -52,6 +54,7 @@ public final class StartSit {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.sitEnabled = sitEnabled;
         this.returnToStart = returnToStart;
+        this.cooldown = Objects.requireNonNull(cooldown, "cooldown");
     }
 
     /**
@@ -71,7 +74,11 @@ public final class StartSit {
         if (sessions.isPosing(who)) {
             return SitOutcome.ALREADY_POSING;
         }
+        if (cooldown.remaining(who).isPresent()) {
+            return SitOutcome.ON_COOLDOWN;
+        }
         seatAndRecord(who, seat, yaw, inPlace);
+        cooldown.stamp(who);
         return SitOutcome.STARTED;
     }
 
@@ -105,6 +112,9 @@ public final class StartSit {
         DENIED_REGION,
 
         /** The player already holds a pose; the one-session invariant turns the second attempt away. */
-        ALREADY_POSING
+        ALREADY_POSING,
+
+        /** The player is still inside the pose cooldown window; the attempt is refused and nothing is stamped. */
+        ON_COOLDOWN
     }
 }

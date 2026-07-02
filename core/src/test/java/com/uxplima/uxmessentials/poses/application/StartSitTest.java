@@ -108,7 +108,15 @@ class StartSitTest {
 
     private StartSit newStartSit(PoseRegionGate gate, boolean sitEnabled, boolean returnToStart) {
         return new StartSit(
-                sessions, seats, gate, who -> Optional.of(STANDING), events, clock, sitEnabled, returnToStart);
+                sessions,
+                seats,
+                gate,
+                who -> Optional.of(STANDING),
+                events,
+                clock,
+                sitEnabled,
+                returnToStart,
+                PoseCooldown.unlimited());
     }
 
     private static PoseRegionGate gateAllowing(boolean allow) {

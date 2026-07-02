@@ -868,12 +868,18 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
             wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("poses"))) {
-            wirePoses(plugin, ctx, resources, links);
+            wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         }
     }
 
     private static void wirePoses(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry,
+            Menus menus) {
         // Sit on blocks (/sit) and, when features.player-sit is on, sit on players (right-click, /poses toggle to
         // opt out). The seat is a real, tagged, non-persistent marker armour stand for block-sits; a player-sit has
         // no seat entity — the rider mounts straight onto the carrier and addPassenger chains for stacking.
@@ -883,8 +889,10 @@ public final class PluginModule {
         // player-sit opt-out feed the poses_sitting / poses_toggle placeholder seams. The region gate now respects
         // land claims (the shared ClaimService) and WorldGuard's sit/playersit/pose/crawl flags, governed by the
         // respect-claims / respect-worldguard config toggles; the WorldGuard flags themselves are registered at load
-        // (UxmEssentialsPlugin.onLoad), before WorldGuard locks its registry.
-        PosesWiring.Wired wired = PosesWiring.wire(plugin, ctx);
+        // (UxmEssentialsPlugin.onLoad), before WorldGuard locks its registry. A bare /poses opens a personal
+        // settings/status panel (also on the /uxmess gui hub), and every pose start passes an optional shared
+        // uxmessentials.poses.cooldown.<seconds> gate before it begins.
+        PosesWiring.Wired wired = PosesWiring.wire(plugin, ctx, guiLayouts, guiRegistry, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.seats().sweepOrphans();

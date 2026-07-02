@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 
@@ -42,6 +43,7 @@ public final class PoseCommand implements CommandRegistration {
     private final String description;
     private final StartPose startPose;
     private final CommandFeedback feedback;
+    private final PoseCooldownNotice cooldownNotice;
 
     public PoseCommand(
             String literal,
@@ -50,7 +52,8 @@ public final class PoseCommand implements CommandRegistration {
             MessageKey startedKey,
             String description,
             StartPose startPose,
-            Messages messages) {
+            Messages messages,
+            PoseCooldownNotice cooldownNotice) {
         this.literal = Objects.requireNonNull(literal, "literal");
         this.permission = Objects.requireNonNull(permission, "permission");
         this.pose = Objects.requireNonNull(pose, "pose");
@@ -58,6 +61,7 @@ public final class PoseCommand implements CommandRegistration {
         this.description = Objects.requireNonNull(description, "description");
         this.startPose = Objects.requireNonNull(startPose, "startPose");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.cooldownNotice = Objects.requireNonNull(cooldownNotice, "cooldownNotice");
     }
 
     @Override
@@ -79,19 +83,22 @@ public final class PoseCommand implements CommandRegistration {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
         }
+        PlayerRef who = BukkitRefs.toRef(player);
         Location location = Objects.requireNonNull(player.getLocation(), "player location");
         Position feet = BukkitRefs.toPosition(location);
-        PoseOutcome outcome = startPose.start(BukkitRefs.toRef(player), pose, feet, feet.yaw());
-        feedback.send(player, feedbackFor(outcome));
+        PoseOutcome outcome = startPose.start(who, pose, feet, feet.yaw());
+        render(player, who, outcome);
         return Command.SINGLE_SUCCESS;
     }
 
-    private MessageKey feedbackFor(PoseOutcome outcome) {
-        return switch (outcome) {
-            case STARTED -> startedKey;
-            case DISABLED -> PosesMessageKey.POSES_POSE_DISABLED;
-            case DENIED_REGION -> PosesMessageKey.POSES_CANNOT_HERE;
-            case ALREADY_POSING -> PosesMessageKey.POSES_ALREADY_POSING;
-        };
+    /** Render the outcome: the plain lines resolve one catalog key; ON_COOLDOWN carries the remaining seconds. */
+    private void render(Player player, PlayerRef who, PoseOutcome outcome) {
+        switch (outcome) {
+            case STARTED -> feedback.send(player, startedKey);
+            case DISABLED -> feedback.send(player, PosesMessageKey.POSES_POSE_DISABLED);
+            case DENIED_REGION -> feedback.send(player, PosesMessageKey.POSES_CANNOT_HERE);
+            case ALREADY_POSING -> feedback.send(player, PosesMessageKey.POSES_ALREADY_POSING);
+            case ON_COOLDOWN -> cooldownNotice.send(player, who);
+        }
     }
 }

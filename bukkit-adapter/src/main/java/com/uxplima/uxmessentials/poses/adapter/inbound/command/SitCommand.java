@@ -23,9 +23,9 @@ import com.uxplima.uxmessentials.poses.domain.SittableBlocks;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 
@@ -43,6 +43,7 @@ public final class SitCommand implements CommandRegistration {
     private final StartSit startSit;
     private final SittableBlocks sittableBlocks;
     private final CommandFeedback feedback;
+    private final PoseCooldownNotice cooldownNotice;
     private final boolean sitOnBlocks;
     private final int reach;
 
@@ -50,11 +51,13 @@ public final class SitCommand implements CommandRegistration {
             StartSit startSit,
             SittableBlocks sittableBlocks,
             Messages messages,
+            PoseCooldownNotice cooldownNotice,
             boolean sitOnBlocks,
             double maxDistance) {
         this.startSit = Objects.requireNonNull(startSit, "startSit");
         this.sittableBlocks = Objects.requireNonNull(sittableBlocks, "sittableBlocks");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.cooldownNotice = Objects.requireNonNull(cooldownNotice, "cooldownNotice");
         this.sitOnBlocks = sitOnBlocks;
         this.reach = Math.max(1, (int) Math.ceil(maxDistance));
     }
@@ -78,9 +81,10 @@ public final class SitCommand implements CommandRegistration {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
         }
+        PlayerRef who = BukkitRefs.toRef(player);
         Spot spot = resolveSpot(player);
-        SitOutcome outcome = startSit.start(BukkitRefs.toRef(player), spot.position(), spot.yaw(), spot.inPlace());
-        feedback.send(player, feedbackFor(outcome));
+        SitOutcome outcome = startSit.start(who, spot.position(), spot.yaw(), spot.inPlace());
+        render(player, who, outcome);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -100,13 +104,15 @@ public final class SitCommand implements CommandRegistration {
         return new Spot(feet, feet.yaw(), true);
     }
 
-    private static MessageKey feedbackFor(SitOutcome outcome) {
-        return switch (outcome) {
-            case STARTED -> PosesMessageKey.POSES_SITTING;
-            case DISABLED -> PosesMessageKey.POSES_SIT_DISABLED;
-            case DENIED_REGION -> PosesMessageKey.POSES_CANNOT_HERE;
-            case ALREADY_POSING -> PosesMessageKey.POSES_ALREADY_POSING;
-        };
+    /** Render the outcome: the plain refusals resolve one catalog key; ON_COOLDOWN carries the remaining seconds. */
+    private void render(Player player, PlayerRef who, SitOutcome outcome) {
+        switch (outcome) {
+            case STARTED -> feedback.send(player, PosesMessageKey.POSES_SITTING);
+            case DISABLED -> feedback.send(player, PosesMessageKey.POSES_SIT_DISABLED);
+            case DENIED_REGION -> feedback.send(player, PosesMessageKey.POSES_CANNOT_HERE);
+            case ALREADY_POSING -> feedback.send(player, PosesMessageKey.POSES_ALREADY_POSING);
+            case ON_COOLDOWN -> cooldownNotice.send(player, who);
+        }
     }
 
     private record Spot(Position position, float yaw, boolean inPlace) {}

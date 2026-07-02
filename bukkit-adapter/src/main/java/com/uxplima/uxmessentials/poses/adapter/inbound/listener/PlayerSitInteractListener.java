@@ -8,12 +8,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.inventory.EquipmentSlot;
 
+import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCooldownNotice;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit.PlayerSitOutcome;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -30,10 +32,13 @@ public final class PlayerSitInteractListener implements Listener {
 
     private final StartPlayerSit startPlayerSit;
     private final CommandFeedback feedback;
+    private final PoseCooldownNotice cooldownNotice;
 
-    public PlayerSitInteractListener(StartPlayerSit startPlayerSit, Messages messages) {
+    public PlayerSitInteractListener(
+            StartPlayerSit startPlayerSit, Messages messages, PoseCooldownNotice cooldownNotice) {
         this.startPlayerSit = Objects.requireNonNull(startPlayerSit, "startPlayerSit");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.cooldownNotice = Objects.requireNonNull(cooldownNotice, "cooldownNotice");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -49,12 +54,14 @@ public final class PlayerSitInteractListener implements Listener {
     }
 
     private void seat(PlayerInteractEntityEvent event, Player rider, Player target) {
-        PlayerSitOutcome outcome = startPlayerSit.start(BukkitRefs.toRef(rider), BukkitRefs.toRef(target));
+        PlayerRef who = BukkitRefs.toRef(rider);
+        PlayerSitOutcome outcome = startPlayerSit.start(who, BukkitRefs.toRef(target));
         switch (outcome) {
             case STARTED -> event.setCancelled(true);
             case DENIED_REGION -> feedback.send(rider, PosesMessageKey.POSES_CANNOT_HERE);
             case TARGET_REFUSES -> feedback.send(rider, PosesMessageKey.POSES_PLAYERSIT_TARGET_REFUSES);
             case SELF -> feedback.send(rider, PosesMessageKey.POSES_CANNOT_SIT_ON_SELF);
+            case ON_COOLDOWN -> cooldownNotice.send(rider, who);
             // Already posing, or player-sit switched off: no nag on a stray right-click of a player.
             case ALREADY_POSING, DISABLED -> {}
         }

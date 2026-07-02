@@ -44,8 +44,18 @@ public enum PosesMessageKey implements MessageKey {
     POSES_PLAYERSIT_NOW_ALLOWED("poses.playersit-now-allowed"),
     POSES_PLAYERSIT_NOW_REFUSED("poses.playersit-now-refused"),
 
-    // The bare /poses root's usage line, until Phase 6 turns it into the settings GUI.
-    POSES_USAGE("poses.usage");
+    // The bare /poses root's usage line — shown to a non-player sender who cannot open the GUI.
+    POSES_USAGE("poses.usage"),
+
+    // The /poses settings & status panel: the title, the shared value line, the on/off values, and the two button
+    // labels — the current-pose status display and the player-sit opt-out.
+    POSES_GUI_TITLE("poses.gui.title"),
+    POSES_GUI_BACK("poses.gui.back"),
+    POSES_GUI_VALUE_LORE("poses.gui.value-lore"),
+    POSES_GUI_VALUE_ON("poses.gui.value-on"),
+    POSES_GUI_VALUE_OFF("poses.gui.value-off"),
+    POSES_GUI_STATUS("poses.gui.status"),
+    POSES_GUI_PLAYERSIT("poses.gui.playersit");
 
     private final String key;
 

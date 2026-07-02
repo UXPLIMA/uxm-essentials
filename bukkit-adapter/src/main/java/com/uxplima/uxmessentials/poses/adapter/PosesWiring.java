@@ -4,13 +4,16 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 
+import org.bukkit.Material;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.poses.adapter.inbound.command.CrawlCommand;
 import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCommand;
+import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCooldownNotice;
 import com.uxplima.uxmessentials.poses.adapter.inbound.command.PosesCommand;
 import com.uxplima.uxmessentials.poses.adapter.inbound.command.SitCommand;
+import com.uxplima.uxmessentials.poses.adapter.inbound.gui.PosesSettingsView;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.CrawlMoveListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PlayerSitInteractListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PoseCancelListener;
@@ -25,6 +28,7 @@ import com.uxplima.uxmessentials.poses.adapter.outbound.PdcPlayerSitPreferences;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlags;
 import com.uxplima.uxmessentials.poses.application.ClaimAwareRegionGate;
 import com.uxplima.uxmessentials.poses.application.CrawlSessions;
+import com.uxplima.uxmessentials.poses.application.PoseCooldown;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.PosesConfig;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
@@ -40,6 +44,11 @@ import com.uxplima.uxmessentials.poses.application.port.PoseRegionGate;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.poses.domain.SittableBlocks;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
@@ -86,14 +95,20 @@ public final class PosesWiring {
     private PosesWiring() {}
 
     /** Build the poses adapters and use cases from {@code plugin} and {@code ctx}, ready to register. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, ManagementGuiRegistry guiRegistry, Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
+        Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         PosesConfig config = PosesConfig.from(ctx.config());
         PoseSessions sessions = new PoseSessions();
         CrawlSessions crawlSessions = new CrawlSessions();
         SittableBlocks sittableBlocks = new SittableBlocks(config.sittableMaterials());
+        PoseCooldown poseCooldown = PoseCooldown.backedBy(kernel.cooldowns());
+        PoseCooldownNotice cooldownNotice = new PoseCooldownNotice(poseCooldown, kernel.messages());
         BukkitSeatPort seats = new BukkitSeatPort(plugin, kernel.scheduler(), kernel.log());
         ClaimService claims = buildClaimService(plugin, kernel, config.respectClaims());
         PoseRegionFlags regionFlags = new WorldGuardPoseFlags(plugin.getServer(), kernel.log());
@@ -124,7 +139,8 @@ public final class PosesWiring {
                 kernel.events(),
                 Clock.systemUTC(),
                 config.features().sit(),
-                config.returnToStart());
+                config.returnToStart(),
+                poseCooldown);
         StartPlayerSit startPlayerSit = new StartPlayerSit(
                 sessions,
                 seats,
@@ -133,7 +149,8 @@ public final class PosesWiring {
                 kernel.playerLocator(),
                 kernel.events(),
                 Clock.systemUTC(),
-                config.features().playerSit());
+                config.features().playerSit(),
+                poseCooldown);
         StartPose startPose = new StartPose(
                 sessions,
                 seats,
@@ -145,7 +162,8 @@ public final class PosesWiring {
                 config.features().lay(),
                 config.features().bellyflop(),
                 config.features().spin(),
-                config.snore());
+                config.snore(),
+                poseCooldown);
         StartCrawl startCrawl = new StartCrawl(
                 sessions,
                 crawlSessions,
@@ -154,7 +172,8 @@ public final class PosesWiring {
                 regionGate,
                 kernel.events(),
                 Clock.systemUTC(),
-                config.features().crawl());
+                config.features().crawl(),
+                poseCooldown);
         TogglePlayerSit togglePlayerSit = new TogglePlayerSit(playerSitPreferences);
         StopPose stopPose = new StopPose(
                 sessions,
@@ -167,8 +186,34 @@ public final class PosesWiring {
                 kernel.events(),
                 config.returnToStart());
 
+        // The personal settings/status panel rides the shared SP0 GUI framework, reading the live session registry
+        // and flipping the player-sit opt-out through the same TogglePlayerSit the /poses toggle command uses. The
+        // poses entry on the /uxmess gui hub opens the same panel (gated uxmessentials.poses.gui).
+        GuiText guiText = new GuiText(kernel.messages());
+        PosesSettingsView settingsView = new PosesSettingsView(
+                guiText,
+                kernel.scheduler(),
+                guiLayouts,
+                kernel.messages(),
+                menus,
+                sessions,
+                playerSitPreferences,
+                togglePlayerSit);
+        guiRegistry.register(new ManagementGuiEntry(
+                "poses",
+                PosesMessageKey.POSES_GUI_TITLE,
+                Material.ARMOR_STAND,
+                "uxmessentials.poses.gui",
+                settingsView::open));
+
         List<CommandRegistration> commands = List.of(
-                new SitCommand(startSit, sittableBlocks, kernel.messages(), config.sitOnBlocks(), config.maxDistance()),
+                new SitCommand(
+                        startSit,
+                        sittableBlocks,
+                        kernel.messages(),
+                        cooldownNotice,
+                        config.sitOnBlocks(),
+                        config.maxDistance()),
                 new PoseCommand(
                         "lay",
                         "uxmessentials.lay.use",
@@ -176,7 +221,8 @@ public final class PosesWiring {
                         PosesMessageKey.POSES_NOW_LAYING,
                         "Lie down where you stand.",
                         startPose,
-                        kernel.messages()),
+                        kernel.messages(),
+                        cooldownNotice),
                 new PoseCommand(
                         "bellyflop",
                         "uxmessentials.bellyflop.use",
@@ -184,7 +230,8 @@ public final class PosesWiring {
                         PosesMessageKey.POSES_NOW_BELLYFLOPPING,
                         "Flop onto your front where you stand.",
                         startPose,
-                        kernel.messages()),
+                        kernel.messages(),
+                        cooldownNotice),
                 new PoseCommand(
                         "spin",
                         "uxmessentials.spin.use",
@@ -192,13 +239,20 @@ public final class PosesWiring {
                         PosesMessageKey.POSES_NOW_SPINNING,
                         "Sit and spin in place.",
                         startPose,
-                        kernel.messages()),
-                new CrawlCommand(startCrawl, stopPose, sessions, kernel.messages()),
-                new PosesCommand(togglePlayerSit, kernel.messages()));
+                        kernel.messages(),
+                        cooldownNotice),
+                new CrawlCommand(startCrawl, stopPose, sessions, kernel.messages(), cooldownNotice),
+                new PosesCommand(togglePlayerSit, settingsView, kernel.messages()));
         List<Listener> listeners = List.of(
                 new SeatInteractListener(
-                        startSit, seats, sittableBlocks, kernel.messages(), config.sitOnBlocks(), config.maxDistance()),
-                new PlayerSitInteractListener(startPlayerSit, kernel.messages()),
+                        startSit,
+                        seats,
+                        sittableBlocks,
+                        kernel.messages(),
+                        cooldownNotice,
+                        config.sitOnBlocks(),
+                        config.maxDistance()),
+                new PlayerSitInteractListener(startPlayerSit, kernel.messages(), cooldownNotice),
                 new PoseCancelListener(stopPose, sessions),
                 new CrawlMoveListener(sessions, crawlSessions, crawlView),
                 new PoseCleanupListener(seats));

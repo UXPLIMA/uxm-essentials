@@ -23,7 +23,6 @@ import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -47,12 +46,19 @@ public final class CrawlCommand implements CommandRegistration {
     private final StopPose stopPose;
     private final PoseSessions sessions;
     private final CommandFeedback feedback;
+    private final PoseCooldownNotice cooldownNotice;
 
-    public CrawlCommand(StartCrawl startCrawl, StopPose stopPose, PoseSessions sessions, Messages messages) {
+    public CrawlCommand(
+            StartCrawl startCrawl,
+            StopPose stopPose,
+            PoseSessions sessions,
+            Messages messages,
+            PoseCooldownNotice cooldownNotice) {
         this.startCrawl = Objects.requireNonNull(startCrawl, "startCrawl");
         this.stopPose = Objects.requireNonNull(stopPose, "stopPose");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.cooldownNotice = Objects.requireNonNull(cooldownNotice, "cooldownNotice");
     }
 
     @Override
@@ -84,7 +90,7 @@ public final class CrawlCommand implements CommandRegistration {
         Location location = Objects.requireNonNull(player.getLocation(), "player location");
         Position feet = BukkitRefs.toPosition(location);
         CrawlOutcome outcome = startCrawl.start(who, feet);
-        feedback.send(player, feedbackFor(outcome));
+        render(player, who, outcome);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -93,12 +99,14 @@ public final class CrawlCommand implements CommandRegistration {
         return session.isPresent() && session.get().type() == PoseType.CRAWL;
     }
 
-    private static MessageKey feedbackFor(CrawlOutcome outcome) {
-        return switch (outcome) {
-            case STARTED -> PosesMessageKey.POSES_NOW_CRAWLING;
-            case DISABLED -> PosesMessageKey.POSES_CRAWL_DISABLED;
-            case DENIED_REGION -> PosesMessageKey.POSES_CANNOT_HERE;
-            case ALREADY_POSING -> PosesMessageKey.POSES_ALREADY_POSING;
-        };
+    /** Render the start outcome: the plain lines resolve one catalog key; ON_COOLDOWN carries the seconds left. */
+    private void render(Player player, PlayerRef who, CrawlOutcome outcome) {
+        switch (outcome) {
+            case STARTED -> feedback.send(player, PosesMessageKey.POSES_NOW_CRAWLING);
+            case DISABLED -> feedback.send(player, PosesMessageKey.POSES_CRAWL_DISABLED);
+            case DENIED_REGION -> feedback.send(player, PosesMessageKey.POSES_CANNOT_HERE);
+            case ALREADY_POSING -> feedback.send(player, PosesMessageKey.POSES_ALREADY_POSING);
+            case ON_COOLDOWN -> cooldownNotice.send(player, who);
+        }
     }
 }

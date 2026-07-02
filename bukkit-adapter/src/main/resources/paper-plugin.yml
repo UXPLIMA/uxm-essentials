@@ -1130,7 +1130,9 @@ permissions:
     default: op
   # poses context (docs/permissions.md "Poses"). Built-in GSit-parity sitting and posing (/sit, player-sit, /lay,
   # /bellyflop, /spin, /crawl). Each pose verb is a self-service use node (default true). The module node is the
-  # reload/inspect tier for the module as a whole.
+  # reload/inspect tier for the module as a whole. The cooldown tier uxmessentials.poses.cooldown.<seconds> is an
+  # open value space (lowest matching wins, shared across all poses) and is intentionally not enumerated here; only
+  # the base and bypass nodes are declared.
   uxmessentials.sit.use:
     description: '/sit and right-click-to-sit — sit down where you stand or on a sittable block.'
     default: true
@@ -1152,6 +1154,12 @@ permissions:
   uxmessentials.poses.toggle:
     description: '/poses toggle — allow or refuse other players sitting on you.'
     default: true
+  uxmessentials.poses.gui:
+    description: '/poses (or /poses gui) — open your personal poses settings & status panel.'
+    default: true
+  uxmessentials.poses.cooldown.bypass:
+    description: 'Skip the cooldown between starting poses.'
+    default: op
   uxmessentials.module.poses:
     description: 'Hot-reload / inspect the poses module (built-in GSit-parity sitting and posing).'
     default: op

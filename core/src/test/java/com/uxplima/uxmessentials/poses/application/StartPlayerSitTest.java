@@ -93,7 +93,8 @@ class StartPlayerSitTest {
                 who -> Optional.of(RIDER_STANDING),
                 events,
                 clock,
-                true);
+                true,
+                PoseCooldown.unlimited());
 
         assertThat(startPlayerSit.start(RIDER, TARGET)).isEqualTo(PlayerSitOutcome.DENIED_REGION);
         assertThat(seats.mountedOn).isEmpty();
@@ -109,7 +110,15 @@ class StartPlayerSitTest {
             return true;
         };
         StartPlayerSit startPlayerSit = new StartPlayerSit(
-                sessions, seats, preferences, recording, who -> Optional.of(RIDER_STANDING), events, clock, true);
+                sessions,
+                seats,
+                preferences,
+                recording,
+                who -> Optional.of(RIDER_STANDING),
+                events,
+                clock,
+                true,
+                PoseCooldown.unlimited());
 
         startPlayerSit.start(RIDER, TARGET);
 
@@ -140,7 +149,8 @@ class StartPlayerSitTest {
                 who -> Optional.of(RIDER_STANDING),
                 events,
                 clock,
-                playerSitEnabled);
+                playerSitEnabled,
+                PoseCooldown.unlimited());
     }
 
     private record Mount(PlayerRef rider, PlayerRef target) {}

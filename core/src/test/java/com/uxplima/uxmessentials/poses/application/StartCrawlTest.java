@@ -104,7 +104,8 @@ class StartCrawlTest {
     }
 
     private StartCrawl newStartCrawl(PoseRegionGate gate, boolean crawlEnabled) {
-        return new StartCrawl(sessions, crawlSessions, crawlView, poses, gate, events, clock, crawlEnabled);
+        return new StartCrawl(
+                sessions, crawlSessions, crawlView, poses, gate, events, clock, crawlEnabled, PoseCooldown.unlimited());
     }
 
     private static PoseRegionGate gateAllowing(boolean allow) {

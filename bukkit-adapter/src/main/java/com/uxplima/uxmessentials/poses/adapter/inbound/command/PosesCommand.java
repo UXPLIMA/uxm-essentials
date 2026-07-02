@@ -11,6 +11,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.poses.adapter.inbound.gui.PosesSettingsView;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.poses.application.TogglePlayerSit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
@@ -21,21 +22,25 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /poses}: the poses context's own root command. Its {@code toggle} subcommand
- * ({@code uxmessentials.poses.toggle}) flips whether other players may sit on you, and the bare {@code /poses}
- * prints a short usage line pointing at it. Phase 6 turns the bare root into the settings/status GUI; for now it
- * only hosts {@code toggle}.
+ * {@code /poses}: the poses context's own root command. A bare {@code /poses} (and the explicit {@code /poses gui}
+ * subcommand) opens the personal settings/status panel — the current-pose status and the player-sit opt-out — gated
+ * by the self-service {@code uxmessentials.poses.gui}; a non-player sender who cannot open a GUI gets the usage line
+ * instead. The {@code toggle} subcommand ({@code uxmessentials.poses.toggle}) flips the opt-out from chat, the same
+ * flip the panel's button makes.
  */
 @NullMarked
 public final class PosesCommand implements CommandRegistration {
 
     private static final String TOGGLE_PERMISSION = "uxmessentials.poses.toggle";
+    private static final String GUI_PERMISSION = "uxmessentials.poses.gui";
 
     private final TogglePlayerSit togglePlayerSit;
+    private final PosesSettingsView settingsView;
     private final CommandFeedback feedback;
 
-    public PosesCommand(TogglePlayerSit togglePlayerSit, Messages messages) {
+    public PosesCommand(TogglePlayerSit togglePlayerSit, PosesSettingsView settingsView, Messages messages) {
         this.togglePlayerSit = Objects.requireNonNull(togglePlayerSit, "togglePlayerSit");
+        this.settingsView = Objects.requireNonNull(settingsView, "settingsView");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -45,13 +50,16 @@ public final class PosesCommand implements CommandRegistration {
                 .then(Commands.literal("toggle")
                         .requires(src -> src.getSender().hasPermission(TOGGLE_PERMISSION))
                         .executes(this::toggle))
-                .executes(this::usage)
+                .then(Commands.literal("gui")
+                        .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
+                        .executes(this::openGui))
+                .executes(this::open)
                 .build();
     }
 
     @Override
     public String description() {
-        return "Poses settings — /poses toggle to allow or refuse others sitting on you.";
+        return "Open your poses panel; /poses toggle to allow or refuse others sitting on you.";
     }
 
     private int toggle(CommandContext<CommandSourceStack> ctx) {
@@ -67,8 +75,24 @@ public final class PosesCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
-    private int usage(CommandContext<CommandSourceStack> ctx) {
-        feedback.send(ctx.getSource().getSender(), PosesMessageKey.POSES_USAGE);
+    /** The bare {@code /poses}: open the panel for a player, or fall back to the usage line for the console. */
+    private int open(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player player) || !player.hasPermission(GUI_PERMISSION)) {
+            feedback.send(sender, PosesMessageKey.POSES_USAGE);
+            return Command.SINGLE_SUCCESS;
+        }
+        settingsView.open(player, BukkitRefs.toRef(player));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int openGui(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player player)) {
+            feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
+            return 0;
+        }
+        settingsView.open(player, BukkitRefs.toRef(player));
         return Command.SINGLE_SUCCESS;
     }
 }

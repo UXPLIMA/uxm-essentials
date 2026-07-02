@@ -39,6 +39,7 @@ public final class StartPose {
     private final boolean bellyflopEnabled;
     private final boolean spinEnabled;
     private final boolean snoreEnabled;
+    private final PoseCooldown cooldown;
 
     public StartPose(
             PoseSessions sessions,
@@ -51,7 +52,8 @@ public final class StartPose {
             boolean layEnabled,
             boolean bellyflopEnabled,
             boolean spinEnabled,
-            boolean snoreEnabled) {
+            boolean snoreEnabled,
+            PoseCooldown cooldown) {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.seats = Objects.requireNonNull(seats, "seats");
         this.regionGate = Objects.requireNonNull(regionGate, "regionGate");
@@ -63,6 +65,7 @@ public final class StartPose {
         this.bellyflopEnabled = bellyflopEnabled;
         this.spinEnabled = spinEnabled;
         this.snoreEnabled = snoreEnabled;
+        this.cooldown = Objects.requireNonNull(cooldown, "cooldown");
     }
 
     /**
@@ -84,7 +87,11 @@ public final class StartPose {
         if (sessions.isPosing(who)) {
             return PoseOutcome.ALREADY_POSING;
         }
+        if (cooldown.remaining(who).isPresent()) {
+            return PoseOutcome.ON_COOLDOWN;
+        }
         anchorAndRecord(who, pose, at, yaw);
+        cooldown.stamp(who);
         return PoseOutcome.STARTED;
     }
 
@@ -124,6 +131,9 @@ public final class StartPose {
         DENIED_REGION,
 
         /** The player already holds a pose; the one-session invariant turns the second attempt away. */
-        ALREADY_POSING
+        ALREADY_POSING,
+
+        /** The player is still inside the pose cooldown window; the attempt is refused and nothing is stamped. */
+        ON_COOLDOWN
     }
 }

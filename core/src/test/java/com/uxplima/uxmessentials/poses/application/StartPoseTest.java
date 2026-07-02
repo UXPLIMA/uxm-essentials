@@ -129,7 +129,19 @@ class StartPoseTest {
     }
 
     private StartPose newStartPose(PoseRegionGate gate, boolean lay, boolean bellyflop, boolean spin, boolean snore) {
-        return new StartPose(sessions, seats, gate, posePort, snores, events, clock, lay, bellyflop, spin, snore);
+        return new StartPose(
+                sessions,
+                seats,
+                gate,
+                posePort,
+                snores,
+                events,
+                clock,
+                lay,
+                bellyflop,
+                spin,
+                snore,
+                PoseCooldown.unlimited());
     }
 
     private static PoseRegionGate gateAllowing(boolean allow) {
