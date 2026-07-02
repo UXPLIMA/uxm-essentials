@@ -105,6 +105,18 @@ public final class ClaimPolicy {
     }
 
     /**
+     * Whether ({@code blockX}, {@code blockZ}) in {@code world} falls inside <em>any</em> claim — the
+     * player-agnostic presence check, independent of owner, trust, and every placement knob. An inactive
+     * provider (no claim plugin) reports {@code false}. This is what {@link ClaimService#isProtected} answers
+     * for random-teleport, whose shared pool has no owning player to run {@link #canPlace}/{@link #canAccess}
+     * against.
+     */
+    public boolean isWithinClaim(WorldRef world, int blockX, int blockZ) {
+        Objects.requireNonNull(world, "world");
+        return provider.active() && provider.claimAt(world, blockX, blockZ).isPresent();
+    }
+
+    /**
      * Scans the chunk grid in the range {@code [-distance, distance]} around the base chunk of
      * ({@code blockX}, {@code blockZ}), skipping the centre. If any chunk contains a claim the
      * player is not trusted in, returns {@code DENIED_TOO_CLOSE}.

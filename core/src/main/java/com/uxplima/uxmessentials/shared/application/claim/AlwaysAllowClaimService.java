@@ -23,4 +23,10 @@ public final class AlwaysAllowClaimService implements ClaimService {
     public ClaimDecision canAccess(PlayerRef who, Position at) {
         return ClaimDecision.ALLOWED;
     }
+
+    @Override
+    public boolean isProtected(Position at) {
+        // No claim plugin is active, so no land is claimed — nothing to keep random-teleport out of.
+        return false;
+    }
 }

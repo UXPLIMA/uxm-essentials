@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.teleport.domain;
 
 /**
  * Why the {@link SafeSearchPolicy} rejected a random-teleport candidate. Surfaced to the refill loop's
- * diagnostics (a world that keeps rejecting on {@link #INSIDE_CLAIM} is claim-saturated and will not
+ * diagnostics (a world that keeps rejecting on {@link #INSIDE_CLAIM} is claim/region-saturated and will not
  * fill — that is logged, not spun on) rather than to a player.
  */
 public enum SafeRejection {
@@ -16,7 +16,7 @@ public enum SafeRejection {
     /** The resolved column has no safe footing or breathable space. */
     UNSAFE_GROUND,
 
-    /** The candidate falls inside a protected claim. */
+    /** The candidate falls on protected land — inside a land claim or a WorldGuard region. */
     INSIDE_CLAIM,
 
     /** The block the player would land on is on the operator's avoid list (lava, magma, …). */

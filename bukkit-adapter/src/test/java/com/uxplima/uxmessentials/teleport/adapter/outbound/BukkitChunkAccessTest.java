@@ -14,8 +14,14 @@ import org.bukkit.ChunkSnapshot;
 import org.bukkit.Material;
 import org.bukkit.World;
 
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
+import com.uxplima.uxmessentials.teleport.application.ClaimAwareProtectedLand;
+import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import com.uxplima.uxmessentials.teleport.domain.BiomeName;
 import com.uxplima.uxmessentials.teleport.domain.BlockTypeName;
 import com.uxplima.uxmessentials.teleport.domain.SafeCandidate;
@@ -46,7 +52,9 @@ class BukkitChunkAccessTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        access = new BukkitChunkAccess(server, new NoOpLogger());
+        // The terrain-read and chunk-lifecycle tests do not care about protection: never-protected keeps the
+        // candidate's insideClaim flag false, isolating those assertions from the claim/region seam.
+        access = new BukkitChunkAccess(server, new NoOpLogger(), ProtectedLand.NONE);
     }
 
     @AfterEach
@@ -125,6 +133,102 @@ class BukkitChunkAccessTest {
         access.releaseIfProbed(world, 3, -2, true);
 
         verify(world, never()).unloadChunkRequest(anyInt(), anyInt());
+    }
+
+    @Test
+    void flagsAClaimedColumnAsProtectedFromTheClaimSeamOnTheRegionThread() {
+        WorldMock world = server.addSimpleWorld("rtp");
+        int blockX = 24;
+        int blockZ = 24;
+        // The claimed land is exactly this column; a candidate built there must carry insideClaim=true so the
+        // pure policy can reject it. WorldGuard is absent on MockBukkit, so only the claim seam contributes.
+        BukkitChunkAccess claimAware = accessProtectedBy(claimServiceCovering(blockX, blockZ), new NoOpLogger());
+
+        SafeCandidate candidate = claimAware.readCandidate(
+                refOf(world),
+                snapshotAt(world, blockX, blockZ),
+                world.getMinHeight(),
+                world.getMaxHeight(),
+                blockX,
+                blockZ);
+
+        assertThat(candidate.insideClaim()).isTrue();
+    }
+
+    @Test
+    void leavesAWildernessColumnUnprotected() {
+        WorldMock world = server.addSimpleWorld("rtp");
+        int blockX = 24;
+        int blockZ = 24;
+        // The claim seam covers a different column, so this one is wilderness; with WorldGuard also absent the
+        // candidate is unprotected.
+        BukkitChunkAccess claimAware =
+                accessProtectedBy(claimServiceCovering(blockX + 64, blockZ + 64), new NoOpLogger());
+
+        SafeCandidate candidate = claimAware.readCandidate(
+                refOf(world),
+                snapshotAt(world, blockX, blockZ),
+                world.getMinHeight(),
+                world.getMaxHeight(),
+                blockX,
+                blockZ);
+
+        assertThat(candidate.insideClaim()).isFalse();
+    }
+
+    @Test
+    void leavesTheColumnUnprotectedWhenWorldGuardIsAbsentAndNoClaim() {
+        WorldMock world = server.addSimpleWorld("rtp");
+        int blockX = 8;
+        int blockZ = 8;
+        // No claim service objects and WorldGuard is not installed: the reflective region check short-circuits on
+        // the present-guard (loading no com.sk89q class) and reports not-protected, so the candidate is free.
+        ProtectedLand land = new ClaimAwareProtectedLand(
+                claimServiceCovering(-1, -1), new WorldGuardRegions(server, new NoOpLogger()), true, true);
+        BukkitChunkAccess access = new BukkitChunkAccess(server, new NoOpLogger(), land);
+
+        SafeCandidate candidate = access.readCandidate(
+                refOf(world),
+                snapshotAt(world, blockX, blockZ),
+                world.getMinHeight(),
+                world.getMaxHeight(),
+                blockX,
+                blockZ);
+
+        assertThat(candidate.insideClaim()).isFalse();
+    }
+
+    private BukkitChunkAccess accessProtectedBy(ClaimService claims, Logger log) {
+        ProtectedLand land = new ClaimAwareProtectedLand(claims, new WorldGuardRegions(server, log), true, true);
+        return new BukkitChunkAccess(server, log, land);
+    }
+
+    private static ChunkSnapshot snapshotAt(WorldMock world, int blockX, int blockZ) {
+        return world.getChunkAt(blockX >> 4, blockZ >> 4).getChunkSnapshot(true, true, false);
+    }
+
+    private static WorldRef refOf(WorldMock world) {
+        return new WorldRef(world.getUID(), world.getName());
+    }
+
+    /** A claim service that reports exactly one block column claimed; every {@code canPlace}/{@code canAccess} allows. */
+    private static ClaimService claimServiceCovering(int blockX, int blockZ) {
+        return new ClaimService() {
+            @Override
+            public ClaimDecision canPlace(PlayerRef who, Position at) {
+                return ClaimDecision.ALLOWED;
+            }
+
+            @Override
+            public ClaimDecision canAccess(PlayerRef who, Position at) {
+                return ClaimDecision.ALLOWED;
+            }
+
+            @Override
+            public boolean isProtected(Position at) {
+                return at.blockX() == blockX && at.blockZ() == blockZ;
+            }
+        };
     }
 
     private static final class NoOpLogger implements Logger {

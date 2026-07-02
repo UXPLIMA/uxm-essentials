@@ -157,6 +157,35 @@ class ClaimPolicyTest {
     }
 
     // -----------------------------------------------------------------------
+    // isWithinClaim — the player-agnostic "is this land claimed at all" check RTP uses
+    // -----------------------------------------------------------------------
+
+    @Test
+    void inactiveProvider_isWithinClaim_isFalse() {
+        provider.addClaim(0, 0, OWNER, false);
+        provider.setActive(false);
+        ClaimPolicy policy = new ClaimPolicy(provider, ClaimPolicySettings.defaults());
+
+        assertThat(policy.isWithinClaim(WORLD, 0, 0)).isFalse();
+    }
+
+    @Test
+    void aClaimedBlock_isWithinClaim_isTrueRegardlessOfOwnerOrSettings() {
+        // Owned by someone else, and every placement knob is inert: presence-of-claim is all that matters.
+        provider.addClaim(0, 0, OWNER, false);
+        ClaimPolicy policy = new ClaimPolicy(provider, ClaimPolicySettings.defaults());
+
+        assertThat(policy.isWithinClaim(WORLD, 0, 0)).isTrue();
+    }
+
+    @Test
+    void unclaimedWilderness_isWithinClaim_isFalse() {
+        ClaimPolicy policy = new ClaimPolicy(provider, ClaimPolicySettings.defaults());
+
+        assertThat(policy.isWithinClaim(WORLD, 0, 0)).isFalse();
+    }
+
+    // -----------------------------------------------------------------------
     // Fake provider
     // -----------------------------------------------------------------------
 

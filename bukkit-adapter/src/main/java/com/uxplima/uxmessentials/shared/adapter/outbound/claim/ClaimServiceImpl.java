@@ -43,4 +43,10 @@ public final class ClaimServiceImpl implements ClaimService {
         Objects.requireNonNull(at, "at");
         return policy.canAccess(who.uuid(), at.world(), at.blockX(), at.blockZ());
     }
+
+    @Override
+    public boolean isProtected(Position at) {
+        Objects.requireNonNull(at, "at");
+        return policy.isWithinClaim(at.world(), at.blockX(), at.blockZ());
+    }
 }

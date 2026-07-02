@@ -18,8 +18,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
+import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
+import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
@@ -44,10 +49,12 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalEffect
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.WorldGuardRegions;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
 import com.uxplima.uxmessentials.teleport.application.BudgetedSafeSearch;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
+import com.uxplima.uxmessentials.teleport.application.ClaimAwareProtectedLand;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
@@ -61,6 +68,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
+import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
@@ -247,8 +255,17 @@ public final class TeleportWiring {
         // probe generates a far chunk on a tick thread and every probed-but-unserved chunk is released again. The
         // budgeted search wraps the finder so a single search terminates within its budget and tick-slices its
         // retries through the scheduler — no worker blocks on a candidate any more.
+        //
+        // The claim + WorldGuard protection check rides along on the probe's region-thread snapshot callback (no
+        // extra hop), setting each candidate's insideClaim flag so the pure policy keeps the shared pool out of
+        // claimed land and regions. Both checks are folded behind the respect-claims / respect-worldguard toggles.
+        ProtectedLand protectedLand = new ClaimAwareProtectedLand(
+                buildClaimService(plugin, kernel, settings.respectClaims()),
+                new WorldGuardRegions(plugin.getServer(), kernel.log()),
+                settings.respectClaims(),
+                settings.respectWorldguard());
         AsyncSafeLocationFinder finder = new AsyncSafeLocationFinder(
-                new BukkitChunkAccess(plugin.getServer(), kernel.log()),
+                new BukkitChunkAccess(plugin.getServer(), kernel.log(), protectedLand),
                 settings.safeSearchPolicy(),
                 Clock.systemUTC());
         BudgetedSafeSearch search =
@@ -277,6 +294,21 @@ public final class TeleportWiring {
                 kernel.log(),
                 running::get);
         return new RtpBundle(queue, warmup);
+    }
+
+    /**
+     * The claim seam the RTP protection check consults, resolved just like the poses gate: the shared provider
+     * detection bound to a {@link ClaimServiceImpl}, or the no-op {@link AlwaysAllowClaimService} when
+     * {@code respect-claims} is off (nothing to detect, nothing to log). RTP asks only the player-agnostic
+     * {@link ClaimService#isProtected} — is any claim here — so the placement knobs are left at their inert
+     * defaults; only presence-of-claim matters.
+     */
+    private static ClaimService buildClaimService(Plugin plugin, KernelPorts kernel, boolean respectClaims) {
+        if (!respectClaims) {
+            return new AlwaysAllowClaimService();
+        }
+        return new ClaimServiceImpl(
+                ClaimProviders.detect(plugin, plugin.getServer(), kernel.log()), ClaimPolicySettings.defaults());
     }
 
     /** The wired RTP engine: the servable queue and, when the pool is persisted, the enable-time warmup. */

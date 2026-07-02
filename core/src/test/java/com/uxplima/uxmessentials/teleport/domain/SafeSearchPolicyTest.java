@@ -79,4 +79,34 @@ class SafeSearchPolicyTest {
 
         assertThat(policy.accept(AREA, noLanding, NOW).isOk()).isTrue();
     }
+
+    @Test
+    void aCandidateOnProtectedLandIsRejectedWhenAvoidProtectedIsOn() {
+        SafeSearchPolicy policy = new SafeSearchPolicy(Set.of(), Set.of(), YBand.unbounded(), true);
+        SafeCandidate onProtectedLand =
+                new SafeCandidate(new Position(WORLD, 100.5, 70.0, 100.5, 0f, 0f), BiomeName.of("plains"), true, true);
+
+        Result<RtpSafeLocation, SafeRejection> result = policy.accept(AREA, onProtectedLand, NOW);
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(SafeRejection.INSIDE_CLAIM);
+    }
+
+    @Test
+    void aCandidateInWildernessIsAcceptedWhenAvoidProtectedIsOn() {
+        SafeSearchPolicy policy = new SafeSearchPolicy(Set.of(), Set.of(), YBand.unbounded(), true);
+        SafeCandidate wilderness =
+                new SafeCandidate(new Position(WORLD, 100.5, 70.0, 100.5, 0f, 0f), BiomeName.of("plains"), true, false);
+
+        assertThat(policy.accept(AREA, wilderness, NOW).isOk()).isTrue();
+    }
+
+    @Test
+    void aCandidateOnProtectedLandIsAcceptedWhenAvoidProtectedIsOff() {
+        SafeSearchPolicy policy = new SafeSearchPolicy(Set.of(), Set.of(), YBand.unbounded(), false);
+        SafeCandidate onProtectedLand =
+                new SafeCandidate(new Position(WORLD, 100.5, 70.0, 100.5, 0f, 0f), BiomeName.of("plains"), true, true);
+
+        assertThat(policy.accept(AREA, onProtectedLand, NOW).isOk()).isTrue();
+    }
 }

@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.ChunkAccess;
+import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import com.uxplima.uxmessentials.teleport.domain.BiomeName;
 import com.uxplima.uxmessentials.teleport.domain.BlockTypeName;
 import com.uxplima.uxmessentials.teleport.domain.SafeCandidate;
@@ -41,6 +42,14 @@ import org.jspecify.annotations.Nullable;
  *       lifecycle. The winning location's chunk is reloaded later by the teleport itself.</li>
  * </ol>
  *
+ * <p><strong>Claim / region avoidance.</strong> The candidate build also asks {@link ProtectedLand} whether the
+ * spot is inside a land claim or a WorldGuard region and records it on the candidate's {@code insideClaim} flag —
+ * so the pure policy can keep the shared pool out of protected land. This lookup piggybacks on the snapshot
+ * callback, which already runs on the candidate chunk's owning region thread (claim providers are not thread-safe,
+ * so the region thread is where they must be read), adding <em>no</em> extra scheduler hop per candidate. It is a
+ * cheap in-memory spatial check, never a chunk load. Both the {@code respect-claims} and {@code respect-worldguard}
+ * toggles are folded into the injected {@link ProtectedLand}, so a disabled check simply reports "not protected".
+ *
  * <p>Every failure path — absent world, a load that fails, a read that throws — completes the future with
  * {@link Optional#empty()} rather than exceptionally or not at all, honouring the {@link ChunkAccess}
  * contract the finder relies on.
@@ -54,10 +63,12 @@ public final class BukkitChunkAccess implements ChunkAccess {
 
     private final Server server;
     private final Logger log;
+    private final ProtectedLand protectedLand;
 
-    public BukkitChunkAccess(Server server, Logger log) {
+    public BukkitChunkAccess(Server server, Logger log, ProtectedLand protectedLand) {
         this.server = Objects.requireNonNull(server, "server");
         this.log = Objects.requireNonNull(log, "log");
+        this.protectedLand = Objects.requireNonNull(protectedLand, "protectedLand");
     }
 
     @Override
@@ -119,8 +130,10 @@ public final class BukkitChunkAccess implements ChunkAccess {
 
     /**
      * Build the pure candidate from the chunk snapshot copy: the highest non-air ground, the biome there, a
-     * solid-non-liquid-ground-plus-two-air standing check, and the landing block. Reads only the snapshot, so
-     * the live chunk is no longer needed once this runs.
+     * solid-non-liquid-ground-plus-two-air standing check, the claim/region protection read, and the landing
+     * block. Reads only the snapshot for the terrain facts; the protection read is a cheap in-memory spatial
+     * lookup on the region thread this already runs on, never a chunk load. Once this runs the live chunk is no
+     * longer needed.
      */
     SafeCandidate readCandidate(
             WorldRef worldRef, ChunkSnapshot snapshot, int minHeight, int maxHeight, int blockX, int blockZ) {
@@ -132,8 +145,9 @@ public final class BukkitChunkAccess implements ChunkAccess {
                 BiomeName.of(snapshot.getBiome(lx, groundY, lz).getKey().getKey());
         Material ground = materialAt(snapshot, lx, groundY, lz, minHeight, maxHeight);
         boolean standingSafe = standingSafe(snapshot, ground, lx, groundY, lz, minHeight, maxHeight);
+        boolean insideClaim = protectedLand.isProtected(position);
         BlockTypeName landing = BlockTypeName.of(ground.getKey().getKey());
-        return new SafeCandidate(position, biome, standingSafe, false, landing);
+        return new SafeCandidate(position, biome, standingSafe, insideClaim, landing);
     }
 
     /** Request the chunk's unload only when our probe is what loaded it — the chunk-lifecycle ownership rule. */

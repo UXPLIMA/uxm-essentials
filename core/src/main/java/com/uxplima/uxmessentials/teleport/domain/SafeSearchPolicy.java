@@ -10,10 +10,10 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 /**
  * The pure decision logic of the random-teleport safe-location search: given a world's {@link
  * SafeSearchArea}, its excluded biomes, avoided landing blocks, the permitted Y band, and the
- * claim-awareness flag, decide whether one {@link SafeCandidate} the adapter validated off-thread is
+ * avoid-protected-land flag, decide whether one {@link SafeCandidate} the adapter validated off-thread is
  * acceptable. This is the queue's <em>refill primitive</em>'s verdict step — the random-point generation,
- * async chunk load, biome read, material read, and safe-Y resolution all happen in the adapter; the policy
- * only judges the resulting facts.
+ * async chunk load, biome read, material read, safe-Y resolution, and the claim/region protection read all
+ * happen in the adapter; the policy only judges the resulting facts.
  *
  * <p>The policy is deliberately side-effect-free and clock-injected ({@link #accept} takes the
  * validation {@code Instant}) so it is trivially unit-testable and never touches Bukkit. The ordering
@@ -23,10 +23,12 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * @param excludedBiomes biomes a candidate may not land in (lower-cased {@link BiomeName})
  * @param avoidBlocks materials a candidate may not land on (lower-cased {@link BlockTypeName})
  * @param yBand the vertical band a candidate's landing Y must fall within
- * @param claimAware whether candidates inside protected claims are rejected
+ * @param avoidProtected whether candidates on protected land — inside a claim or a WorldGuard region — are
+ *     rejected; the adapter folds the {@code respect-claims} / {@code respect-worldguard} toggles into the
+ *     candidate's {@link SafeCandidate#insideClaim} flag, and this gate decides whether that flag vetoes
  */
 public record SafeSearchPolicy(
-        Set<BiomeName> excludedBiomes, Set<BlockTypeName> avoidBlocks, YBand yBand, boolean claimAware) {
+        Set<BiomeName> excludedBiomes, Set<BlockTypeName> avoidBlocks, YBand yBand, boolean avoidProtected) {
 
     public SafeSearchPolicy {
         Objects.requireNonNull(excludedBiomes, "excludedBiomes");
@@ -36,9 +38,9 @@ public record SafeSearchPolicy(
         avoidBlocks = Set.copyOf(avoidBlocks);
     }
 
-    /** A policy with only excluded biomes and claim-awareness — no avoid-blocks, no Y clamp. */
-    public SafeSearchPolicy(Set<BiomeName> excludedBiomes, boolean claimAware) {
-        this(excludedBiomes, Set.of(), YBand.unbounded(), claimAware);
+    /** A policy with only excluded biomes and protected-land avoidance — no avoid-blocks, no Y clamp. */
+    public SafeSearchPolicy(Set<BiomeName> excludedBiomes, boolean avoidProtected) {
+        this(excludedBiomes, Set.of(), YBand.unbounded(), avoidProtected);
     }
 
     /** A policy that excludes no biomes, avoids no blocks, clamps no Y, and ignores claims. */
@@ -80,7 +82,7 @@ public record SafeSearchPolicy(
         if (landsOnAvoidedBlock(candidate)) {
             return Optional.of(SafeRejection.AVOIDED_BLOCK);
         }
-        if (claimAware && candidate.insideClaim()) {
+        if (avoidProtected && candidate.insideClaim()) {
             return Optional.of(SafeRejection.INSIDE_CLAIM);
         }
         return Optional.empty();

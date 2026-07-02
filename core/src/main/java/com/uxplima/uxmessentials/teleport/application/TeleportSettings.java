@@ -214,7 +214,7 @@ public final class TeleportSettings {
         return Math.max(0, config.getInt("back.death-delay-seconds", 0));
     }
 
-    /** The safe-search policy (excluded biomes, avoided blocks, Y band, claim-awareness) across worlds. */
+    /** The safe-search policy (excluded biomes, avoided blocks, Y band, protected-land avoidance) across worlds. */
     public SafeSearchPolicy safeSearchPolicy() {
         List<String> excluded = config.getStringList("rtp.excluded-biomes", List.of("ocean", "deep_ocean", "river"));
         List<String> avoid = config.getStringList("rtp.avoid-blocks", List.of("lava", "magma_block", "fire", "cactus"));
@@ -222,7 +222,24 @@ public final class TeleportSettings {
                 excluded.stream().map(BiomeName::of).collect(java.util.stream.Collectors.toSet()),
                 avoid.stream().map(BlockTypeName::of).collect(java.util.stream.Collectors.toSet()),
                 rtpYBand(),
-                config.getBoolean("rtp.claim-aware", true));
+                respectClaims() || respectWorldguard());
+    }
+
+    /**
+     * Whether {@code /rtp} avoids landing inside land claims ({@code rtp.respect-claims}, default {@code true}). When
+     * off, the claim seam is skipped and claimed land is treated as unprotected — the graceful default a server with
+     * no claim plugin also lands on.
+     */
+    public boolean respectClaims() {
+        return config.getBoolean("rtp.respect-claims", true);
+    }
+
+    /**
+     * Whether {@code /rtp} avoids landing inside WorldGuard regions ({@code rtp.respect-worldguard}, default {@code
+     * true}). When off, or when WorldGuard is absent, region land is treated as unprotected.
+     */
+    public boolean respectWorldguard() {
+        return config.getBoolean("rtp.respect-worldguard", true);
     }
 
     /** The min/max landing-Y band an RTP candidate must fall within; unbounded when neither key is set. */
