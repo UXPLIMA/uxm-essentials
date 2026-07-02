@@ -28,17 +28,18 @@ import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListen
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.TeleportListeners;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.AsyncTeleportExecutor;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitChunkAccess;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryBackLocationStore;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PrewarmedSafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.RtpWorldSettings;
-import com.uxplima.uxmessentials.teleport.adapter.outbound.SafeSearchValidator;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalEffects;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
+import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
@@ -155,7 +156,7 @@ public final class TeleportWiring {
                 settings::teleportToCenter,
                 arrivalHud,
                 arrivalEffects);
-        PrewarmedSafeLocationQueue rtpQueue = rtpQueue(kernel, config, settings, running);
+        PrewarmedSafeLocationQueue rtpQueue = rtpQueue(plugin, kernel, config, settings, running);
         Warmups warmups = new TrackingWarmups(
                 kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock);
         TeleportEngine engine = new TeleportEngine(
@@ -184,11 +185,15 @@ public final class TeleportWiring {
     }
 
     private static PrewarmedSafeLocationQueue rtpQueue(
-            KernelPorts kernel, ConfigStore config, TeleportSettings settings, AtomicBoolean running) {
-        SafeSearchValidator validator = new SafeSearchValidator(
-                kernel.scheduler(), settings.safeSearchPolicy(), Clock.systemUTC(), kernel.log());
+            Plugin plugin, KernelPorts kernel, ConfigStore config, TeleportSettings settings, AtomicBoolean running) {
+        // The safe-search probe loads each candidate's chunk asynchronously through BukkitChunkAccess, so no RTP
+        // probe generates a far chunk on a tick thread and every probed-but-unserved chunk is released again.
+        AsyncSafeLocationFinder finder = new AsyncSafeLocationFinder(
+                new BukkitChunkAccess(plugin.getServer(), kernel.log()),
+                settings.safeSearchPolicy(),
+                Clock.systemUTC());
         return new PrewarmedSafeLocationQueue(
-                kernel.scheduler(), validator, RtpWorldSettings.from(config), kernel.log(), running::get);
+                kernel.scheduler(), finder, RtpWorldSettings.from(config), kernel.log(), running::get);
     }
 
     private static SpawnDirectory spawns(Plugin plugin, Persistence persistence) {

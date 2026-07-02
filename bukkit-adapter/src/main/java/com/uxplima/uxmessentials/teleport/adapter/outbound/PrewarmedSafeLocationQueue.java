@@ -19,6 +19,7 @@ import org.bukkit.WorldBorder;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
 import com.uxplima.uxmessentials.teleport.application.port.SafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
@@ -32,8 +33,9 @@ import org.jspecify.annotations.NullMarked;
  * that no longer fits the world's current border/radius is discarded on serve and the next is polled.
  *
  * <p>The urgent path ({@link #urgentSearch(WorldRef)}) serves the queue first and, only when empty, runs a
- * bounded off-thread search via {@link SafeSearchValidator}, blocking that worker (never the tick thread)
- * for a short timeout. Durable restart-survival of the queue (the {@code rtp_queue} mirror, ADR 0010 §7)
+ * bounded search via {@link AsyncSafeLocationFinder}, whose probe loads each candidate's chunk asynchronously
+ * (never a synchronous chunk load on a tick thread); the worker blocks on that off-thread result for a short
+ * timeout, never the tick thread. Durable restart-survival of the queue (the {@code rtp_queue} mirror, ADR 0010 §7)
  * is the persistence-adapter's concern and is a documented stub here — this queue is in-memory and
  * cold-starts empty, warming on the first refill.
  *
@@ -53,7 +55,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
     private static final Duration URGENT_TIMEOUT = Duration.ofMillis(1500);
 
     private final Scheduler scheduler;
-    private final SafeSearchValidator validator;
+    private final AsyncSafeLocationFinder finder;
     private final AtomicReference<RtpWorldSettings> settings;
     private final Logger log;
     private final BooleanSupplier running;
@@ -62,12 +64,12 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
     public PrewarmedSafeLocationQueue(
             Scheduler scheduler,
-            SafeSearchValidator validator,
+            AsyncSafeLocationFinder finder,
             RtpWorldSettings settings,
             Logger log,
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.validator = Objects.requireNonNull(validator, "validator");
+        this.finder = Objects.requireNonNull(finder, "finder");
         this.settings = new AtomicReference<>(Objects.requireNonNull(settings, "settings"));
         this.log = Objects.requireNonNull(log, "log");
         this.running = Objects.requireNonNull(running, "running");
@@ -168,7 +170,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
     private Optional<RtpSafeLocation> awaitCandidate(SafeSearchArea area) {
         try {
-            return validator.tryOne(area).get(URGENT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            return finder.find(area).get(URGENT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return Optional.empty();
