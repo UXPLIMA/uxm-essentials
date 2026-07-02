@@ -57,6 +57,7 @@ class PlaceholderInventoryDriftTest {
             "holograms_",
             "communication_",
             "scoreboard_",
+            "poses_",
             "worlds_",
             "menu_",
             "server_");
@@ -179,6 +180,7 @@ class PlaceholderInventoryDriftTest {
                 .holograms(() -> 0)
                 .communication(communication())
                 .scoreboard(who -> true)
+                .poses(who -> false)
                 .worlds(worlds())
                 .serverMetrics(serverMetrics())
                 .menu(menu())

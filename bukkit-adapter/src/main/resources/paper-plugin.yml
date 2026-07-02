@@ -1129,8 +1129,11 @@ permissions:
     description: '/menu reload to re-read the menus/ folder from disk.'
     default: op
   # poses context (docs/permissions.md "Poses"). Built-in GSit-parity sitting and posing (/sit, player-sit, /lay,
-  # /bellyflop, /spin, /crawl). The per-verb use nodes (uxmessentials.sit.use, …) arrive with their behaviour phases;
-  # this Phase-0 node is the reload/inspect tier for the module as a whole.
+  # /bellyflop, /spin, /crawl). Each pose verb is a self-service use node (default true); the remaining verbs' nodes
+  # arrive with their behaviour phases. The module node is the reload/inspect tier for the module as a whole.
+  uxmessentials.sit.use:
+    description: '/sit and right-click-to-sit — sit down where you stand or on a sittable block.'
+    default: true
   uxmessentials.module.poses:
     description: 'Hot-reload / inspect the poses module (built-in GSit-parity sitting and posing).'
     default: op

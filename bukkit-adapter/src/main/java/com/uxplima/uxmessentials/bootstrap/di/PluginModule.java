@@ -70,8 +70,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
-import com.uxplima.uxmessentials.poses.application.PoseSessions;
-import com.uxplima.uxmessentials.poses.application.PosesConfig;
+import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
@@ -155,6 +154,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StaffStaffPlacehol
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreCommunicationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreDiscordlinkPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePosesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
@@ -868,21 +868,23 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
             wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("poses"))) {
-            wirePoses(ctx, resources);
+            wirePoses(plugin, ctx, resources, links);
         }
     }
 
-    private static void wirePoses(ModuleContext ctx, CloseableResources resources) {
-        // Phase 0 stands up the poses context's runtime state and settings so the later behaviour phases can hang the
-        // /sit surface, the interact/quit listeners, and the seat entities off them. PoseSessions is the single
-        // source of truth for who is posing; it is cleared on disable so a reload leaves zero residual state
-        // (the FeatureModule quiescent-stop contract). The typed config is resolved once here, atomic per enable, and
-        // logged at debug so an operator troubleshooting can confirm which pose verbs the bundled config enables. No
-        // command or listener is registered yet — those arrive as their phases land.
-        PosesConfig config = PosesConfig.from(ctx.config());
-        PoseSessions sessions = new PoseSessions();
-        ctx.kernel().log().debug("poses context wired (features: {})", config.features());
-        resources.onClose(sessions::clear);
+    private static void wirePoses(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+        // Phase 1 stands up /sit: the seat is a real, tagged, non-persistent marker armour stand the rider sits on.
+        // sweepOrphans() runs on enable to reap any seat a prior crash left behind (ghost-prevention), and stop()
+        // drains every live seat and clears the registry so a disable or reload leaves zero residual state and no
+        // ghost entity. PoseSessions is the single source of truth for who is posing; it also feeds the
+        // poses_sitting placeholder seam. The region gate is the permissive AllowAllRegionGate until Phase 5.
+        PosesWiring.Wired wired = PosesWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        wired.seats().sweepOrphans();
+        resources.onClose(wired::stop);
+        links.placeholders.poses(new StorePosesPlaceholders(wired.sessions()));
     }
 
     private static void wireCustomMenus(

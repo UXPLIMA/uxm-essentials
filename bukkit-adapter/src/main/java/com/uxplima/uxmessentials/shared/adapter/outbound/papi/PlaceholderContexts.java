@@ -36,6 +36,7 @@ public final class PlaceholderContexts {
     private final @Nullable ServerMetricsPlaceholders serverMetrics;
     private final @Nullable WorldsPlaceholders worldsPlaceholders;
     private final @Nullable MenuPlaceholders menu;
+    private final @Nullable PosesPlaceholders poses;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -58,6 +59,7 @@ public final class PlaceholderContexts {
         this.serverMetrics = builder.serverMetrics;
         this.worldsPlaceholders = builder.worldsPlaceholders;
         this.menu = builder.menu;
+        this.poses = builder.poses;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -145,6 +147,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(menu);
     }
 
+    public Optional<PosesPlaceholders> poses() {
+        return Optional.ofNullable(poses);
+    }
+
     /** True when no context registered a seam — registering the expansion would surface nothing. */
     public boolean isEmpty() {
         return homes == null
@@ -165,7 +171,8 @@ public final class PlaceholderContexts {
                 && communication == null
                 && scoreboard == null
                 && serverMetrics == null
-                && worldsPlaceholders == null;
+                && worldsPlaceholders == null
+                && poses == null;
     }
 
     /** Mutable collector for the seams, filled as each context's adapters are wired in bootstrap. */
@@ -191,6 +198,7 @@ public final class PlaceholderContexts {
         private @Nullable ServerMetricsPlaceholders serverMetrics;
         private @Nullable WorldsPlaceholders worldsPlaceholders;
         private @Nullable MenuPlaceholders menu;
+        private @Nullable PosesPlaceholders poses;
 
         private Builder() {}
 
@@ -291,6 +299,11 @@ public final class PlaceholderContexts {
 
         public Builder menu(MenuPlaceholders seam) {
             this.menu = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder poses(PosesPlaceholders seam) {
+            this.poses = java.util.Objects.requireNonNull(seam, "seam");
             return this;
         }
 

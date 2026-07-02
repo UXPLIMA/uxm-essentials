@@ -19,7 +19,12 @@ public enum PosesMessageKey implements MessageKey {
     POSES_STOOD_UP("poses.stood-up"),
 
     // Refusal — the pose could not begin here (a protected region, a disabled sub-feature, or nothing to sit on).
-    POSES_CANNOT_HERE("poses.cannot-here");
+    POSES_CANNOT_HERE("poses.cannot-here"),
+
+    // Refusal — sitting is switched off, the player already holds a pose, or the seat is already taken.
+    POSES_SIT_DISABLED("poses.sit-disabled"),
+    POSES_ALREADY_POSING("poses.already-posing"),
+    POSES_SEAT_OCCUPIED("poses.seat-occupied");
 
     private final String key;
 

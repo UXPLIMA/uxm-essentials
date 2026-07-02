@@ -129,6 +129,10 @@ class FoliaThreadingDriftTest {
                 pkg + "itemworld.adapter.outbound.BukkitEntityPurger",
                 "GLOBAL: world purge snapshots world.getEntities() inside onGlobal, then hops each removal to onRegion");
         allow.put(
+                pkg + "poses.adapter.outbound.BukkitSeatPort",
+                "GLOBAL: sweepOrphans snapshots world.getEntities() inside onGlobal then hops each removal to onRegion; "
+                        + "the chunk/world unload cleanup reads run on the unload event's own owning region thread");
+        allow.put(
                 pkg + "itemworld.adapter.inbound.command.ShowItemCommand",
                 "GLOBAL: /showitem broadcast wrapped in scheduler.onGlobal");
         allow.put(

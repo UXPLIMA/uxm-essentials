@@ -61,6 +61,7 @@ public final class PlaceholderResolver {
     private static final String HOLOGRAMS_PREFIX = "holograms_";
     private static final String COMMUNICATION_PREFIX = "communication_";
     private static final String SCOREBOARD_PREFIX = "scoreboard_";
+    private static final String POSES_PREFIX = "poses_";
     private static final String WORLDS_PREFIX = "worlds_";
     private static final String MENU_PREFIX = "menu_";
     private static final String MENU_ARGUMENT_PREFIX = "argument_";
@@ -148,6 +149,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(SCOREBOARD_PREFIX)) {
             return Optional.of(scoreboard(who, online, normalized.substring(SCOREBOARD_PREFIX.length())));
+        }
+        if (normalized.startsWith(POSES_PREFIX)) {
+            return Optional.of(poses(who, online, normalized.substring(POSES_PREFIX.length())));
         }
         if (normalized.startsWith(WORLDS_PREFIX)) {
             return Optional.of(worldsFamily(normalized.substring(WORLDS_PREFIX.length())));
@@ -830,6 +834,19 @@ public final class PlaceholderResolver {
             return EMPTY;
         }
         return key.equals("visible") ? bool(seam.get().visible(who)) : EMPTY;
+    }
+
+    /**
+     * Resolve a {@code poses_}-stripped key against the poses seam. {@code sitting} reports whether the requester is
+     * currently sitting ({@code yes}/{@code no}). A pose is live session state, so a disabled module or an offline
+     * requester degrades the key to the dash.
+     */
+    private String poses(PlayerRef who, boolean online, String key) {
+        Optional<PosesPlaceholders> seam = contexts.poses();
+        if (seam.isEmpty() || !online) {
+            return EMPTY;
+        }
+        return key.equals("sitting") ? bool(seam.get().sitting(who)) : EMPTY;
     }
 
     /**
