@@ -47,6 +47,7 @@ public enum TeleportMessageKey implements MessageKey {
     RTP_DISALLOWED("teleport.rtp.disallowed"),
     RTP_NO_LOCATION("teleport.rtp.no-location"),
     RTP_EXHAUSTED("teleport.rtp.exhausted"),
+    RTP_CANT_AFFORD("teleport.rtp.cant-afford"),
 
     // /settpr — set the rtp zone at runtime
     SETTPR_SET("teleport.settpr.set"),

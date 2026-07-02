@@ -25,6 +25,8 @@ import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TpSettingsCommand;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.ArrivalGraceGuard;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.FirstJoinRtpListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpirySweep;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.TeleportListeners;
@@ -58,9 +60,11 @@ import com.uxplima.uxmessentials.teleport.application.RtpPoolWriter;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
+import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
+import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -90,13 +94,15 @@ public final class TeleportWiring {
             Persistence persistence,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            Menus menus) {
+            Menus menus,
+            TeleportFee fee) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(fee, "fee");
         ConfigStore config = ctx.config();
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -112,12 +118,34 @@ public final class TeleportWiring {
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
         SpawnDirectory spawns = spawns(plugin, persistence);
         RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running);
-        TeleportServices services =
-                assemble(plugin, kernel, settings, notifier, warmupTracker, jailGate, spawns, clock, rtp.queue());
+        // The post-arrival grace shields an /rtp landing (Resistance + Slow-Falling + a no-fall-damage window);
+        // it is both the engine's ArrivalGrace port and the fall-damage listener, so it is registered below.
+        ArrivalGraceGuard graceGuard =
+                new ArrivalGraceGuard(plugin.getServer(), kernel.scheduler(), settings::arrivalGrace, clock);
+        TeleportServices services = assemble(
+                plugin,
+                kernel,
+                settings,
+                notifier,
+                warmupTracker,
+                jailGate,
+                spawns,
+                clock,
+                rtp.queue(),
+                fee,
+                graceGuard);
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
-        RespawnListener respawnListener =
-                new RespawnListener(new ResolveRespawn(settings), spawns, homeRespawnLocator, plugin.getServer());
+        RespawnListener respawnListener = new RespawnListener(
+                new ResolveRespawn(settings),
+                spawns,
+                homeRespawnLocator,
+                plugin.getServer(),
+                services.rtpQueue(),
+                graceGuard,
+                settings::rtpOnRespawnWorlds);
+        FirstJoinRtpListener firstJoinListener =
+                new FirstJoinRtpListener(services.resolveRtp(), settings::rtpOnFirstJoin);
         // The per-player settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder
         // layout loader. It reads and writes the same TeleportFlags the /tptoggle and /tpauto commands do, so
         // /tpsettings, the panel, and the commands all see one switch. The teleport entry on the /uxmess gui hub
@@ -137,12 +165,13 @@ public final class TeleportWiring {
         return new Wired(
                 services,
                 commands,
-                listeners(services, config, respawnListener),
+                listeners(services, config, respawnListener, firstJoinListener, graceGuard),
                 sweep,
                 jailGate,
                 homeRespawnLocator,
                 running,
-                rtp.warmup());
+                rtp.warmup(),
+                graceGuard);
     }
 
     private static TeleportServices assemble(
@@ -154,7 +183,9 @@ public final class TeleportWiring {
             MutableJailGate jailGate,
             SpawnDirectory spawns,
             Clock clock,
-            PrewarmedSafeLocationQueue rtpQueue) {
+            PrewarmedSafeLocationQueue rtpQueue,
+            TeleportFee fee,
+            ArrivalGrace grace) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
         InMemoryRequestRegistry requests = new InMemoryRequestRegistry(settings.singleRequestDisplace());
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
@@ -174,7 +205,7 @@ public final class TeleportWiring {
         Warmups warmups = new TrackingWarmups(
                 kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock);
         TeleportEngine engine = new TeleportEngine(
-                kernel.cooldowns(), warmups, executor, notifier, kernel.events(), settings, jailGate);
+                kernel.cooldowns(), warmups, executor, notifier, kernel.events(), settings, jailGate, fee, grace);
         return new TeleportServices.Builder()
                 .engine(engine)
                 .notifier(notifier)
@@ -260,14 +291,20 @@ public final class TeleportWiring {
     }
 
     private static List<Listener> listeners(
-            TeleportServices services, ConfigStore config, RespawnListener respawnListener) {
+            TeleportServices services,
+            ConfigStore config,
+            RespawnListener respawnListener,
+            FirstJoinRtpListener firstJoinListener,
+            ArrivalGraceGuard graceGuard) {
         return List.of(
                 new TeleportListeners(
                         services.warmupTracker(),
                         services.captureBack(),
                         config,
                         services.settings()::backCapturePolicy),
-                respawnListener);
+                respawnListener,
+                firstJoinListener,
+                graceGuard);
     }
 
     /**
@@ -283,6 +320,7 @@ public final class TeleportWiring {
      * @param homeRespawnLocator the rebindable home-respawn seam homes rebinds when it lands
      * @param running the flag flipped false on stop so the sweep and refill loops exit
      * @param poolWarmup the enable-time RTP pool pre-warm, or {@code null} when the persisted pool is disabled
+     * @param graceGuard the post-arrival grace / fall-damage guard, cleared on stop
      */
     public record Wired(
             TeleportServices services,
@@ -292,7 +330,8 @@ public final class TeleportWiring {
             MutableJailGate jailGate,
             MutableHomeRespawnLocator homeRespawnLocator,
             AtomicBoolean running,
-            @Nullable RtpPoolWarmup poolWarmup) {
+            @Nullable RtpPoolWarmup poolWarmup,
+            ArrivalGraceGuard graceGuard) {
 
         public Wired {
             Objects.requireNonNull(services, "services");
@@ -302,6 +341,7 @@ public final class TeleportWiring {
             Objects.requireNonNull(jailGate, "jailGate");
             Objects.requireNonNull(homeRespawnLocator, "homeRespawnLocator");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(graceGuard, "graceGuard");
         }
 
         /**
@@ -319,6 +359,7 @@ public final class TeleportWiring {
         public void stop() {
             running.set(false);
             services.drain();
+            graceGuard.clear();
         }
     }
 }

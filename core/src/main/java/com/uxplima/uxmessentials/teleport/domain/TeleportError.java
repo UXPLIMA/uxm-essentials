@@ -49,6 +49,9 @@ public enum TeleportError {
     /** The safe-location queue is momentarily empty and no urgent fallback produced a location. */
     RTP_NO_SAFE_LOCATION(TeleportMessageKey.RTP_NO_LOCATION),
 
+    /** The player cannot afford the configured random-teleport cost — rejected before any search runs. */
+    RTP_CANT_AFFORD(TeleportMessageKey.RTP_CANT_AFFORD),
+
     /** No spawn (named, mirrored, or default) resolves for the requested world. */
     SPAWN_UNRESOLVED(TeleportMessageKey.SPAWN_UNRESOLVED),
 

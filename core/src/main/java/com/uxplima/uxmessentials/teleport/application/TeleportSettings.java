@@ -1,11 +1,14 @@
 package com.uxplima.uxmessentials.teleport.application;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.domain.ArrivalGraceSettings;
 import com.uxplima.uxmessentials.teleport.domain.BackCapturePolicy;
 import com.uxplima.uxmessentials.teleport.domain.BiomeName;
 import com.uxplima.uxmessentials.teleport.domain.BlockTypeName;
@@ -249,5 +252,36 @@ public final class TeleportSettings {
         Objects.requireNonNull(world, "world");
         String name = config.getString("rtp.fallback-world." + world.name(), "");
         return name.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(name);
+    }
+
+    /**
+     * The cost of a manual {@code /rtp} in the default currency; {@code 0} (the default) makes it free. The
+     * amount is checked before the search ({@code canAfford}) and withdrawn only after a successful landing.
+     */
+    public BigDecimal rtpCost() {
+        return BigDecimal.valueOf(Math.max(0.0, config.getDouble("rtp.cost", 0.0)));
+    }
+
+    /**
+     * The post-arrival grace tuning for an {@code /rtp} landing: how long the shield lasts and which of
+     * Resistance, Slow-Falling, and the no-fall-damage guard are on. Defaults to a 5-second window with all
+     * three enabled, so a fresh drop into far terrain does not kill the player before it renders.
+     */
+    public ArrivalGraceSettings arrivalGrace() {
+        return new ArrivalGraceSettings(
+                Math.max(0, config.getInt("rtp.grace-seconds", 5)),
+                config.getBoolean("rtp.grace-resistance", true),
+                config.getBoolean("rtp.grace-slow-falling", true),
+                config.getBoolean("rtp.grace-block-fall-damage", true));
+    }
+
+    /** The worlds whose players are random-teleported from the pre-warmed pool on death respawn; empty by default. */
+    public Set<String> rtpOnRespawnWorlds() {
+        return Set.copyOf(config.getStringList("rtp.rtp-on-respawn", List.of()));
+    }
+
+    /** Whether a brand-new player is random-teleported from the pre-warmed pool on their first join; default off. */
+    public boolean rtpOnFirstJoin() {
+        return config.getBoolean("rtp.rtp-on-first-join", false);
     }
 }

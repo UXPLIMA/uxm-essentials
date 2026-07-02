@@ -22,4 +22,19 @@ public interface TeleportExecutor {
      * and publishes {@code PlayerTeleported} on arrival.
      */
     void teleport(PlayerRef who, Destination destination, TeleportKind kind);
+
+    /**
+     * The same hop, but run {@code onLanded} on the player's region thread once the async teleport resolves
+     * to an actual landing — never on a refusal (Paper returning {@code false}) or an error. This is the
+     * single seam the gated flow uses so the cooldown stamp, the RTP charge, and the arrival grace fire only
+     * after the player truly arrives.
+     *
+     * <p>The default treats a dispatched teleport as landed, which suits executors that cannot report an
+     * arrival (test fakes, simple positional hops); the real async executor overrides it to invoke
+     * {@code onLanded} only when {@code teleportAsync} completes {@code true}.
+     */
+    default void teleport(PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded) {
+        teleport(who, destination, kind);
+        onLanded.run();
+    }
 }

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.teleport.application;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
@@ -16,8 +17,10 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
+import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import com.uxplima.uxmessentials.teleport.domain.CooldownStartPhase;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
@@ -48,6 +51,8 @@ public final class TeleportEngine {
     private final DomainEventPublisher events;
     private final TeleportSettings settings;
     private final JailGate jail;
+    private final TeleportFee fee;
+    private final ArrivalGrace grace;
 
     public TeleportEngine(
             Cooldowns cooldowns,
@@ -57,6 +62,19 @@ public final class TeleportEngine {
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail) {
+        this(cooldowns, warmups, executor, notifier, events, settings, jail, TeleportFee.FREE, ArrivalGrace.NONE);
+    }
+
+    public TeleportEngine(
+            Cooldowns cooldowns,
+            Warmups warmups,
+            TeleportExecutor executor,
+            PlayerNotifier notifier,
+            DomainEventPublisher events,
+            TeleportSettings settings,
+            JailGate jail,
+            TeleportFee fee,
+            ArrivalGrace grace) {
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.warmups = Objects.requireNonNull(warmups, "warmups");
         this.executor = Objects.requireNonNull(executor, "executor");
@@ -64,6 +82,8 @@ public final class TeleportEngine {
         this.events = Objects.requireNonNull(events, "events");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.jail = Objects.requireNonNull(jail, "jail");
+        this.fee = Objects.requireNonNull(fee, "fee");
+        this.grace = Objects.requireNonNull(grace, "grace");
     }
 
     /**
@@ -97,21 +117,90 @@ public final class TeleportEngine {
      * gate (an accepted {@code tpa}) reuses the warmup wiring without re-checking.
      */
     public WarmupHandle beginGatedWarmup(PlayerRef mover, Destination destination, TeleportKind kind) {
+        return beginWarmup(mover, destination, kind, TeleportEngine::noPostArrival);
+    }
+
+    private static void noPostArrival() {
+        // The default gated teleport (home/warp/spawn/back) has no per-arrival side effect beyond the cooldown
+        // stamp the engine always folds in; only RTP adds a charge and a grace window on top.
+    }
+
+    /**
+     * Gate an {@code /rtp} <em>before</em> the safe-search runs: the jail gate, the shared cooldown, and — when
+     * a cost is configured — affordability. A player who is jailed, on cooldown, or short on funds is rejected
+     * here (with the matching notice) so the pre-warmed queue is never even consulted for them; the money is not
+     * touched, only checked. On {@code ok} the caller may serve a location and hand it to {@link #launchRandom}.
+     */
+    public Result<Unit, TeleportError> gateRandom(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        if (jail.isJailed(who)) {
+            notifier.send(who, TeleportMessageKey.JAILED);
+            return Result.err(TeleportError.JAILED);
+        }
+        Result<Unit, Duration> gate = cooldowns.check(who, randomCooldownKind());
+        if (gate.isErr()) {
+            notifyCooldown(who, gate.errorOrThrow());
+            return Result.err(TeleportError.ON_COOLDOWN);
+        }
+        BigDecimal cost = settings.rtpCost();
+        if (cost.signum() > 0 && !fee.canAfford(who, cost)) {
+            notifier.send(who, TeleportMessageKey.RTP_CANT_AFFORD, Map.of("cost", cost.toPlainString()));
+            return Result.err(TeleportError.RTP_CANT_AFFORD);
+        }
+        return Result.ok();
+    }
+
+    /**
+     * Begin the move-cancellable warmup for an already-gated {@code /rtp}; on a successful landing the cooldown
+     * is stamped, the cost (if any) is withdrawn, and the arrival grace window is applied — all only after the
+     * player has truly arrived, never for a warmup that is move-cancelled or a teleport Paper refuses.
+     */
+    public void launchRandom(PlayerRef who, Destination destination) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(destination, "destination");
+        beginWarmup(who, destination, TeleportKind.RANDOM, () -> onRandomArrived(who));
+    }
+
+    /**
+     * Serve an immediate {@code /rtp} landing with no warmup, cooldown, or charge — the respawn / first-join
+     * path. The grace window still applies on arrival, since a fresh drop into unexplored terrain is exactly
+     * where it matters most. There is no move-cancel because these teleports are involuntary and instant.
+     */
+    public void arriveRandomImmediately(PlayerRef who, Destination destination) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(destination, "destination");
+        executor.teleport(who, destination, TeleportKind.RANDOM, () -> grace.applyOnArrival(who));
+    }
+
+    private void onRandomArrived(PlayerRef who) {
+        BigDecimal cost = settings.rtpCost();
+        if (cost.signum() > 0) {
+            fee.charge(who, cost);
+        }
+        grace.applyOnArrival(who);
+    }
+
+    private WarmupHandle beginWarmup(
+            PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);
         return warmups.begin(
                 mover,
                 warmupKind,
-                () -> onWarmupComplete(mover, destination, kind),
+                () -> onWarmupComplete(mover, destination, kind, postArrival),
                 () -> onWarmupCancelled(mover, kind));
     }
 
-    private void onWarmupComplete(PlayerRef mover, Destination destination, TeleportKind kind) {
-        executor.teleport(mover, destination, kind);
+    private void onWarmupComplete(PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {
+        executor.teleport(mover, destination, kind, () -> onLanded(mover, destination, kind, postArrival));
+    }
+
+    private void onLanded(PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {
         if (settings.cooldownStartPhase() == CooldownStartPhase.TELEPORT) {
             cooldowns.stamp(mover, cooldownKind(kind, destination));
         }
+        postArrival.run();
     }
 
     private void onWarmupCancelled(PlayerRef mover, TeleportKind kind) {
@@ -158,6 +247,20 @@ public final class TeleportEngine {
             return new CooldownKind(FEATURE, settings.defaultCooldownSeconds(), phase);
         }
         return CooldownKind.scoped(FEATURE, FEATURE + "." + verbScope(kind), override, phase);
+    }
+
+    /**
+     * The {@code /rtp} cooldown identity used by {@link #gateRandom} before a destination exists. A random
+     * teleport never carries a destination-level override, so this matches {@link #cooldownKind} for a
+     * RANDOM destination exactly — the pre-search check and the post-arrival stamp resolve the same key.
+     */
+    private CooldownKind randomCooldownKind() {
+        long override = settings.verbCooldownOverrideSeconds(TeleportKind.RANDOM);
+        Cooldowns.CooldownStartPhase phase = mapPhase(settings.cooldownStartPhase());
+        if (override < 0) {
+            return new CooldownKind(FEATURE, settings.defaultCooldownSeconds(), phase);
+        }
+        return CooldownKind.scoped(FEATURE, FEATURE + "." + verbScope(TeleportKind.RANDOM), override, phase);
     }
 
     private static String verbScope(TeleportKind kind) {

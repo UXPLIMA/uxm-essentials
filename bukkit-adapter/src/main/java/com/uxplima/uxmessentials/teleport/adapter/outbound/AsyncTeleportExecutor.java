@@ -68,13 +68,24 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
 
     @Override
     public void teleport(PlayerRef who, Destination destination, TeleportKind kind) {
+        // A plain hop (admin /tp, positional) has no post-landing side effect.
+        teleport(who, destination, kind, AsyncTeleportExecutor::noOnLanded);
+    }
+
+    private static void noOnLanded() {
+        // Nothing hangs off a plain hop's arrival.
+    }
+
+    @Override
+    public void teleport(PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(destination, "destination");
         Objects.requireNonNull(kind, "kind");
-        scheduler.onEntity(who, () -> hop(who, destination, kind));
+        Objects.requireNonNull(onLanded, "onLanded");
+        scheduler.onEntity(who, () -> hop(who, destination, kind, onLanded));
     }
 
-    private void hop(PlayerRef who, Destination destination, TeleportKind kind) {
+    private void hop(PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded) {
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null || !player.isOnline()) {
             return; // despawned between launch and hop — nothing to move
@@ -89,21 +100,31 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         captureBack(who, from);
         // teleportAsync retains passengers and vehicles by default and performs the region hop and async
         // chunk load internally; the entity scheduler is already on the player's region thread.
-        var ignored = player.teleportAsync(to).whenComplete((ok, err) -> onArrival(who, kind, from, target, ok, err));
+        var ignored = player.teleportAsync(to)
+                .whenComplete((ok, err) -> onArrival(who, kind, from, target, ok, err, onLanded));
     }
 
-    private void onArrival(PlayerRef who, TeleportKind kind, Position from, Position to, Boolean ok, Throwable err) {
+    private void onArrival(
+            PlayerRef who,
+            TeleportKind kind,
+            Position from,
+            Position to,
+            Boolean ok,
+            Throwable err,
+            Runnable onLanded) {
         if (err != null) {
             log.warn("teleport failed for {}: {}", who.name(), String.valueOf(err.getMessage()));
             return;
         }
         if (Boolean.FALSE.equals(ok)) {
-            return; // Paper refused the hop (e.g. unloaded target); the player stayed put
+            return; // Paper refused the hop (e.g. unloaded target); the player stayed put — no landed callback
         }
         scheduler.onEntity(who, () -> {
             events.publish(new PlayerTeleported(who, kind, from, to));
             arrivalHud.arrived(who, kind);
             arrivalEffects.arrived(who, kind);
+            // The cooldown stamp / RTP charge / arrival grace hang off a real landing only — never a refusal.
+            onLanded.run();
         });
     }
 

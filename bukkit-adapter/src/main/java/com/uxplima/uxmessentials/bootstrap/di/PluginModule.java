@@ -178,6 +178,7 @@ import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
 import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
@@ -931,7 +932,16 @@ public final class PluginModule {
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus) {
-        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry, menus);
+        // The /rtp cost bridges to the resolved economy provider lazily: teleport is wired before economy, so the
+        // provider/currency are read through suppliers at charge time (free until economy is up, free for good when
+        // economy is disabled), mirroring the worlds entry fee. The affordability is checked before the search and the
+        // debit is dispatched off-tick only after a successful landing.
+        LinkedTeleportFee fee = new LinkedTeleportFee(
+                () -> links.economyProvider,
+                () -> links.economyCurrency,
+                ctx.kernel().scheduler(),
+                ctx.kernel().log());
+        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry, menus, fee);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.teleport.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,10 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
 import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
+import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
+import com.uxplima.uxmessentials.teleport.application.port.SafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
+import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +46,8 @@ class RespawnListenerTest {
     private WorldRef worldRef;
     private FakeHomeLocator homes;
     private FakeSpawnDirectory spawns;
+    private FakeQueue queue;
+    private RecordingGrace grace;
 
     @BeforeEach
     void setUp() {
@@ -50,6 +56,8 @@ class RespawnListenerTest {
         worldRef = BukkitRefs.toRef(world);
         homes = new FakeHomeLocator();
         spawns = new FakeSpawnDirectory();
+        queue = new FakeQueue();
+        grace = new RecordingGrace();
     }
 
     @AfterEach
@@ -98,8 +106,48 @@ class RespawnListenerTest {
         assertThat(event.getRespawnLocation()).isEqualTo(vanilla);
     }
 
+    @Test
+    void randomTeleportsFromThePoolWhenTheWorldIsListedForRespawnRtp() {
+        Position pooled = new Position(worldRef, 300, 72, 400, 0f, 0f);
+        queue.next = Optional.of(new RtpSafeLocation(pooled, 500.0, Instant.EPOCH));
+        RespawnListener listener = listener(rtpOnRespawn(world.getName()));
+
+        PlayerMock player = server.addPlayer("Dax");
+        PlayerRespawnEvent event = respawnEvent(player);
+        listener.onRespawn(event);
+
+        assertThat(event.getRespawnLocation()).isEqualTo(BukkitRefs.toLocation(world, pooled));
+        assertThat(queue.polls).isEqualTo(1); // served O(1) from the pool, never a synchronous search
+        assertThat(queue.refills).isEqualTo(1);
+        assertThat(grace.applied).isEqualTo(1); // the arrival grace shields the random respawn
+    }
+
+    @Test
+    void leavesVanillaRespawnWhenTheRtpPoolIsDrained() {
+        queue.next = Optional.empty();
+        RespawnListener listener = listener(rtpOnRespawn(world.getName()));
+
+        PlayerMock player = server.addPlayer("Eve");
+        Location vanilla = world.getSpawnLocation().clone().add(3, 0, 3);
+        PlayerRespawnEvent event = respawnEventAt(player, vanilla);
+        listener.onRespawn(event);
+
+        assertThat(event.getRespawnLocation()).isEqualTo(vanilla); // no location served — vanilla respawn stands
+        assertThat(queue.polls).isEqualTo(1);
+        assertThat(queue.refills).isEqualTo(1); // ...but the pool is warmed for next time
+        assertThat(grace.applied).isZero();
+    }
+
     private RespawnListener listener(ConfigStore config) {
-        return new RespawnListener(new ResolveRespawn(new TeleportSettings(config)), spawns, homes, server);
+        TeleportSettings settings = new TeleportSettings(config);
+        return new RespawnListener(
+                new ResolveRespawn(settings), spawns, homes, server, queue, grace, settings::rtpOnRespawnWorlds);
+    }
+
+    private ConfigStore rtpOnRespawn(String worldName) {
+        MapConfigStore config = new MapConfigStore();
+        config.lists.put("rtp.rtp-on-respawn", List.of(worldName));
+        return config;
     }
 
     private PlayerRespawnEvent respawnEvent(PlayerMock player) {
@@ -142,6 +190,44 @@ class RespawnListenerTest {
         @Override
         public List<String> getStringList(String path, List<String> fallback) {
             return lists.getOrDefault(path, fallback);
+        }
+    }
+
+    /** A pre-warmed pool whose serve is a plain queue poll — never a synchronous search. */
+    private static final class FakeQueue implements SafeLocationQueue {
+        private Optional<RtpSafeLocation> next = Optional.empty();
+        private int polls;
+        private int refills;
+
+        @Override
+        public Optional<RtpSafeLocation> poll(WorldRef world) {
+            polls++;
+            return next;
+        }
+
+        @Override
+        public Optional<RtpSafeLocation> urgentSearch(WorldRef world) {
+            return poll(world);
+        }
+
+        @Override
+        public boolean hasQueue(WorldRef world) {
+            return true;
+        }
+
+        @Override
+        public void requestRefill(WorldRef world) {
+            refills++;
+        }
+    }
+
+    /** Records how many arrival-grace windows were opened. */
+    private static final class RecordingGrace implements ArrivalGrace {
+        private int applied;
+
+        @Override
+        public void applyOnArrival(PlayerRef who) {
+            applied++;
         }
     }
 
