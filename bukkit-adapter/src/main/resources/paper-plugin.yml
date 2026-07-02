@@ -1134,6 +1134,15 @@ permissions:
   uxmessentials.sit.use:
     description: '/sit and right-click-to-sit — sit down where you stand or on a sittable block.'
     default: true
+  uxmessentials.lay.use:
+    description: '/lay — lie down on your back where you stand.'
+    default: true
+  uxmessentials.bellyflop.use:
+    description: '/bellyflop — flop onto your front where you stand.'
+    default: true
+  uxmessentials.spin.use:
+    description: '/spin — sit and spin in place.'
+    default: true
   uxmessentials.playersit.use:
     description: 'Right-click another player to sit on them (the stacking pose), when player-sit is enabled.'
     default: true

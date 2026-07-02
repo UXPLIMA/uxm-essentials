@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.poses.application;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.poses.application.port.PosePort;
 import com.uxplima.uxmessentials.poses.application.port.PoseReturn;
 import com.uxplima.uxmessentials.poses.application.port.SeatHandle;
 import com.uxplima.uxmessentials.poses.application.port.SeatPort;
+import com.uxplima.uxmessentials.poses.application.port.Snores;
 import com.uxplima.uxmessentials.poses.domain.PoseSession;
 import com.uxplima.uxmessentials.poses.domain.event.PoseEnded;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -14,8 +16,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 /**
  * Ends a player's pose — by their own command, or because they moved, took damage, dismounted, teleported, or
  * quit. It pulls the active {@link PoseSession} from the registry (a player who is not posing is a safe no-op),
- * removes the seat entity the session recorded so no ghost is left behind, optionally returns the player to where
- * the pose began, clears the session, and publishes {@link PoseEnded}.
+ * removes the seat entity the session recorded so no ghost is left behind, clears any free-pose render and snore,
+ * optionally returns the player to where the pose began, clears the session, and publishes {@link PoseEnded}.
+ *
+ * <p>The free-pose render and the snore loop are cleared through the {@link PosePort} and {@link Snores} on every
+ * exit, unconditionally: a plain block-sit or a player-sit never applied either, so both calls are safe no-ops for
+ * those sessions, which keeps this exit free of pose-type branching.
  *
  * <p>The {@code return-to-start} teleport is suppressed on the exits where it would be wrong: a quit (the player
  * is gone) and a teleport (returning them would fight the teleport that ended the pose) call
@@ -26,6 +32,8 @@ public final class StopPose {
 
     private final PoseSessions sessions;
     private final SeatPort seats;
+    private final PosePort poses;
+    private final Snores snores;
     private final PoseReturn poseReturn;
     private final DomainEventPublisher events;
     private final boolean returnToStart;
@@ -33,11 +41,15 @@ public final class StopPose {
     public StopPose(
             PoseSessions sessions,
             SeatPort seats,
+            PosePort poses,
+            Snores snores,
             PoseReturn poseReturn,
             DomainEventPublisher events,
             boolean returnToStart) {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.seats = Objects.requireNonNull(seats, "seats");
+        this.poses = Objects.requireNonNull(poses, "poses");
+        this.snores = Objects.requireNonNull(snores, "snores");
         this.poseReturn = Objects.requireNonNull(poseReturn, "poseReturn");
         this.events = Objects.requireNonNull(events, "events");
         this.returnToStart = returnToStart;
@@ -67,6 +79,10 @@ public final class StopPose {
             // A block/in-place sit rides a spawned seat: removing it dismounts the rider and leaves no ghost.
             seats.removeSeat(SeatHandle.of(session.seatHandle()));
         }
+        // Undo any free-pose render (the lie-down body pose, a running spin) and stop the snore loop. Both are safe
+        // no-ops for a plain sit or player-sit, which never applied either, so no pose-type branch is needed here.
+        poses.clearPose(who);
+        snores.stopSnoring(who);
         if (allowReturn && returnToStart) {
             poseReturn.returnTo(who, session.returnLocation());
         }

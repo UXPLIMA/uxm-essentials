@@ -195,6 +195,16 @@ class PlaceholderInventoryDriftTest {
             }
 
             @Override
+            public boolean posing(PlayerRef who) {
+                return false;
+            }
+
+            @Override
+            public String pose(PlayerRef who) {
+                return "none";
+            }
+
+            @Override
             public boolean allowsSitting(PlayerRef who) {
                 return true;
             }

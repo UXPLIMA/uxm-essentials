@@ -26,6 +26,12 @@ public enum PosesMessageKey implements MessageKey {
     POSES_ALREADY_POSING("poses.already-posing"),
     POSES_SEAT_OCCUPIED("poses.seat-occupied"),
 
+    // Free poses — /lay, /bellyflop, /spin feedback and the shared "this pose is switched off" refusal.
+    POSES_NOW_LAYING("poses.now-laying"),
+    POSES_NOW_BELLYFLOPPING("poses.now-bellyflopping"),
+    POSES_NOW_SPINNING("poses.now-spinning"),
+    POSES_POSE_DISABLED("poses.pose-disabled"),
+
     // Player-sit (stacking) — sitting on another player's shoulders and the personal opt-out toggle.
     POSES_PLAYERSIT_DISABLED("poses.playersit-disabled"),
     POSES_PLAYERSIT_TARGET_REFUSES("poses.playersit-target-refuses"),

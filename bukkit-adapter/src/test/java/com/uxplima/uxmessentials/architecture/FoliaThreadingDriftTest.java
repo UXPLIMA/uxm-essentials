@@ -133,6 +133,11 @@ class FoliaThreadingDriftTest {
                 "GLOBAL: sweepOrphans snapshots world.getEntities() inside onGlobal then hops each removal to onRegion; "
                         + "the chunk/world unload cleanup reads run on the unload event's own owning region thread");
         allow.put(
+                pkg + "poses.adapter.outbound.BukkitPacketPosePort",
+                "GLOBAL: the lie-down pose packet fans out to the poser's world roster inside scheduler.onGlobal, "
+                        + "where getOnlinePlayers() is coherent; the spin loop only iterates its own set and hops each "
+                        + "seat rotation to onEntity");
+        allow.put(
                 pkg + "itemworld.adapter.inbound.command.ShowItemCommand",
                 "GLOBAL: /showitem broadcast wrapped in scheduler.onGlobal");
         allow.put(

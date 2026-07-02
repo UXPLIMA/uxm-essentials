@@ -7,9 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.poses.application.port.PosePort;
 import com.uxplima.uxmessentials.poses.application.port.PoseReturn;
 import com.uxplima.uxmessentials.poses.application.port.SeatHandle;
 import com.uxplima.uxmessentials.poses.application.port.SeatPort;
+import com.uxplima.uxmessentials.poses.application.port.Snores;
 import com.uxplima.uxmessentials.poses.domain.PoseSession;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.poses.domain.event.PoseEnded;
@@ -34,13 +36,15 @@ class StopPoseTest {
 
     private final PoseSessions sessions = new PoseSessions();
     private final RecordingSeatPort seats = new RecordingSeatPort();
+    private final RecordingPosePort poses = new RecordingPosePort();
+    private final RecordingSnores snores = new RecordingSnores();
     private final RecordingReturn poseReturn = new RecordingReturn();
     private final RecordingEvents events = new RecordingEvents();
 
     @Test
     void dismountsRemovesReturnsClearsAndFires() {
         seed("h1");
-        StopPose stopPose = new StopPose(sessions, seats, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isPresent();
 
@@ -51,11 +55,25 @@ class StopPoseTest {
     }
 
     @Test
+    void clearsTheFreePoseRenderAndStopsSnoringOnEveryExit() {
+        // A laying player carries a free-pose render and a snore; ending the pose must undo both, whatever the exit.
+        sessions.start(new PoseSession(WHO, PoseType.LAY, RETURN, "h1", null, Instant.parse("2026-07-02T00:00:00Z")));
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, poseReturn, events, true);
+
+        assertThat(stopPose.stop(WHO)).isPresent();
+
+        assertThat(poses.cleared).containsExactly(WHO);
+        assertThat(snores.stopped).containsExactly(WHO);
+        assertThat(seats.removed).containsExactly("h1");
+        assertThat(sessions.isPosing(WHO)).isFalse();
+    }
+
+    @Test
     void dismountsTheRiderRatherThanRemovingASeatForAPlayerSit() {
         // A player-sit rides a carrier, not a seat entity, so stopping it dismounts the rider — no seat is removed.
         sessions.start(new PoseSession(
                 WHO, PoseType.PLAYER_SIT, RETURN, "player-sit", CARRIER, Instant.parse("2026-07-02T00:00:00Z")));
-        StopPose stopPose = new StopPose(sessions, seats, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isPresent();
 
@@ -67,7 +85,7 @@ class StopPoseTest {
 
     @Test
     void isASafeNoOpWhenThePlayerIsNotPosing() {
-        StopPose stopPose = new StopPose(sessions, seats, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isEmpty();
         assertThat(seats.removed).isEmpty();
@@ -78,7 +96,7 @@ class StopPoseTest {
     @Test
     void suppressesTheReturnWhenTheExitDisallowsIt() {
         seed("h1");
-        StopPose stopPose = new StopPose(sessions, seats, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, poseReturn, events, true);
 
         stopPose.stop(WHO, false);
 
@@ -90,7 +108,7 @@ class StopPoseTest {
     @Test
     void skipsTheReturnWhenReturnToStartIsOff() {
         seed("h1");
-        StopPose stopPose = new StopPose(sessions, seats, poseReturn, events, false);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, poseReturn, events, false);
 
         stopPose.stop(WHO);
 
@@ -136,6 +154,32 @@ class StopPoseTest {
         @Override
         public int sweepOrphans() {
             return 0;
+        }
+    }
+
+    /** Records who the pose port was asked to clear. */
+    private static final class RecordingPosePort implements PosePort {
+        private final List<PlayerRef> cleared = new ArrayList<>();
+
+        @Override
+        public void applyPose(PlayerRef who, PoseType pose) {}
+
+        @Override
+        public void clearPose(PlayerRef who) {
+            cleared.add(who);
+        }
+    }
+
+    /** Records who was asked to stop snoring. */
+    private static final class RecordingSnores implements Snores {
+        private final List<PlayerRef> stopped = new ArrayList<>();
+
+        @Override
+        public void startSnoring(PlayerRef who) {}
+
+        @Override
+        public void stopSnoring(PlayerRef who) {
+            stopped.add(who);
         }
     }
 

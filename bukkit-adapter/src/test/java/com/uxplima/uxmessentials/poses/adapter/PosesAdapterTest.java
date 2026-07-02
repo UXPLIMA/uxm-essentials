@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.poses.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -31,15 +32,19 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PlayerSitInteractListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PoseCancelListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.SeatInteractListener;
+import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitPacketPosePort;
 import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitPoseReturn;
 import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSeatPort;
+import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSnores;
 import com.uxplima.uxmessentials.poses.adapter.outbound.PdcPlayerSitPreferences;
 import com.uxplima.uxmessentials.poses.application.AllowAllRegionGate;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
+import com.uxplima.uxmessentials.poses.application.StartPose;
 import com.uxplima.uxmessentials.poses.application.StartSit;
 import com.uxplima.uxmessentials.poses.application.StopPose;
 import com.uxplima.uxmessentials.poses.application.TogglePlayerSit;
+import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.poses.domain.SittableBlocks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePosesPlaceholders;
@@ -51,6 +56,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLocator;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.packet.npc.NpcPackets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,7 +85,10 @@ class PosesAdapterTest {
 
     private PoseSessions sessions;
     private BukkitSeatPort seats;
+    private BukkitPacketPosePort posePort;
+    private BukkitSnores snores;
     private StartSit startSit;
+    private StartPose startPose;
     private StopPose stopPose;
     private SeatInteractListener interactListener;
     private PlayerSitInteractListener playerSitInteractListener;
@@ -103,13 +112,31 @@ class PosesAdapterTest {
                 .map(p -> BukkitRefs.toPosition(Objects.requireNonNull(p.getLocation(), "location")));
         DomainEventPublisher events = event -> {};
 
+        // A spin step of 30 degrees per pass makes the seat's yaw advance visibly across the ticks the spin test
+        // drives; the snore loop is exercised only through isSnoring/tick, so its sound is a soft fox-sleep default.
+        posePort = new BukkitPacketPosePort(server, scheduler, mock(NpcPackets.class), new NoopLogger(), 1, 30f);
+        snores = new BukkitSnores(server, scheduler, new NoopLogger(), "minecraft:entity.fox.sleep", 0.5f, 1.0f, 20);
+
         startSit =
                 new StartSit(sessions, seats, new AllowAllRegionGate(), locator, events, Clock.systemUTC(), true, true);
+        startPose = new StartPose(
+                sessions,
+                seats,
+                new AllowAllRegionGate(),
+                posePort,
+                snores,
+                events,
+                Clock.systemUTC(),
+                true,
+                true,
+                true,
+                true);
         playerSitPreferences = new PdcPlayerSitPreferences();
         StartPlayerSit startPlayerSit =
                 new StartPlayerSit(sessions, seats, playerSitPreferences, locator, events, Clock.systemUTC(), true);
         togglePlayerSit = new TogglePlayerSit(playerSitPreferences);
-        stopPose = new StopPose(sessions, seats, new BukkitPoseReturn(plugin, scheduler), events, true);
+        stopPose =
+                new StopPose(sessions, seats, posePort, snores, new BukkitPoseReturn(plugin, scheduler), events, true);
         interactListener = new SeatInteractListener(startSit, seats, sittableBlocks, new KeyMessages(), true, 5.0);
         playerSitInteractListener = new PlayerSitInteractListener(startPlayerSit, new KeyMessages());
         cancelListener = new PoseCancelListener(stopPose, sessions);
@@ -213,6 +240,81 @@ class PosesAdapterTest {
 
         stopPose.stop(who);
         assertThat(placeholders.sitting(who)).isFalse();
+    }
+
+    @Test
+    void layingAnchorsThePlayerOnATaggedSeatAndThePlaceholdersReport() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+
+        List<Entity> tagged = taggedSeats();
+        assertThat(tagged).hasSize(1);
+        assertThat(tagged.get(0)).isInstanceOf(ArmorStand.class);
+        assertThat(tagged.get(0).getPassengers()).contains(player);
+        assertThat(sessions.current(who).orElseThrow().type()).isEqualTo(PoseType.LAY);
+        // The free-pose placeholders report the live pose; the plain-sit placeholder stays false for a lay.
+        assertThat(placeholders.posing(who)).isTrue();
+        assertThat(placeholders.pose(who)).isEqualTo("lay");
+        assertThat(placeholders.sitting(who)).isFalse();
+    }
+
+    @Test
+    void spinningAdvancesTheSeatYawAcrossTicksAndStoppingCancelsIt() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.SPIN, feet, feet.yaw());
+        ArmorStand seat = (ArmorStand) taggedSeats().get(0);
+        assertThat(seat.getPassengers()).contains(player);
+        assertThat(posePort.isSpinning(player.getUniqueId())).isTrue();
+
+        posePort.tick();
+        float afterOne = Objects.requireNonNull(seat.getLocation(), "location").getYaw();
+        posePort.tick();
+        float afterTwo = Objects.requireNonNull(seat.getLocation(), "location").getYaw();
+        // The repeating pass turns the seat a little more each tick, so the yaw strictly advances.
+        assertThat(afterTwo).isGreaterThan(afterOne);
+
+        stopPose.stop(who);
+
+        // Stopping cancels the spin (no lingering rotation) and removes the seat (no ghost).
+        assertThat(posePort.isSpinning(player.getUniqueId())).isFalse();
+        assertThat(taggedSeats()).isEmpty();
+        posePort.tick(); // a further pass is a harmless no-op — the player is no longer in the spin set
+    }
+
+    @Test
+    void snoringStartsOnLayAndStopsOnStop() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+        assertThat(snores.isSnoring(player.getUniqueId())).isTrue();
+        snores.tick(); // the loop runs without throwing — it plays the snore sound at the laying player
+
+        stopPose.stop(who);
+        assertThat(snores.isSnoring(player.getUniqueId())).isFalse();
+    }
+
+    @Test
+    void sneakingEndsAFreePoseClearsItAndRemovesTheSeat() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+        assertThat(taggedSeats()).hasSize(1);
+
+        cancelListener.onSneak(new PlayerToggleSneakEvent(player, true));
+
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(taggedSeats()).isEmpty(); // no ghost seat left behind
+        assertThat(placeholders.posing(who)).isFalse();
+        assertThat(snores.isSnoring(player.getUniqueId())).isFalse();
     }
 
     @Test
@@ -337,6 +439,13 @@ class PosesAdapterTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+
+        @Override
+        public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+            // The spin and snore loops are driven deterministically by the tests (via posePort.tick() /
+            // snores.tick()), so the repeating registration is a no-op that hands back a closeable to cancel.
+            return () -> {};
         }
     }
 

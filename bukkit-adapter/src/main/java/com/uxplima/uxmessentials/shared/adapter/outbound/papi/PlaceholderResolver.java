@@ -842,9 +842,10 @@ public final class PlaceholderResolver {
 
     /**
      * Resolve a {@code poses_}-stripped key against the poses seam. {@code sitting} reports whether the requester is
-     * currently sitting ({@code yes}/{@code no}); {@code toggle} reports whether they let others sit on them
-     * ({@code allow}/{@code refuse}). Both are live per-player reads, so a disabled module or an offline requester
-     * degrades the key to the dash.
+     * currently sitting ({@code yes}/{@code no}); {@code posing} whether they hold a free pose — lay/bellyflop/spin —
+     * ({@code yes}/{@code no}); {@code pose} the current pose name ({@code sit}/{@code lay}/{@code bellyflop}/{@code
+     * spin}/{@code none}); and {@code toggle} whether they let others sit on them ({@code allow}/{@code refuse}). All
+     * are live per-player reads, so a disabled module or an offline requester degrades the key to the dash.
      */
     private String poses(PlayerRef who, boolean online, String key) {
         Optional<PosesPlaceholders> seam = contexts.poses();
@@ -853,6 +854,8 @@ public final class PlaceholderResolver {
         }
         return switch (key) {
             case "sitting" -> bool(seam.get().sitting(who));
+            case "posing" -> bool(seam.get().posing(who));
+            case "pose" -> seam.get().pose(who);
             case "toggle" -> seam.get().allowsSitting(who) ? ALLOW : REFUSE;
             default -> EMPTY;
         };
