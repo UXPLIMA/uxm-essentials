@@ -100,6 +100,12 @@ class RtpPoolWriterTest {
         }
 
         @Override
+        public List<RtpColumn> loadByBiome(
+                WorldRef world, com.uxplima.uxmessentials.teleport.domain.BiomeName biome, int limit) {
+            return List.of();
+        }
+
+        @Override
         public int deleteStale(Duration olderThan) {
             return 0;
         }

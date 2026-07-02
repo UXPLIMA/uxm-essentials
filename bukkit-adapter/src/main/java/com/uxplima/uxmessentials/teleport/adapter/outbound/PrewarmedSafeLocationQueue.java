@@ -6,12 +6,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
-
-import org.bukkit.Bukkit;
-import org.bukkit.World;
-import org.bukkit.WorldBorder;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -49,22 +44,23 @@ import org.jspecify.annotations.NullMarked;
  * respawn / first-join RTP fully through the async engine is a later phase; here the caller shows the clear
  * no-location message and the queue warms for the next attempt.
  *
- * <p>The active tuning sits behind an {@link AtomicReference} so {@code /settpr} can reset the search radii at
- * runtime ({@link #updateRadii}); the swap is whole-record, and the queue is dropped on swap so refills
- * re-validate against the new zone rather than serving stale candidates.
+ * <p>The active tuning sits behind the shared {@link BukkitRtpAreaSource} so {@code /settpr} can reset the search
+ * radii at runtime ({@link #updateRadii}); the swap is whole-record, and the queue is dropped on swap so refills
+ * re-validate against the new zone rather than serving stale candidates. The same area source feeds the
+ * {@code /rtp biome} search, so both paths share one live zone.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. {@code ready} holds a {@link ConcurrentLinkedQueue} per world;
  * {@code refilling} holds one {@link AtomicBoolean} per world so at most one refill cycle is outstanding.
- * {@code settings} is an {@link AtomicReference} read lock-free on every serve/refill and replaced whole by
- * {@code /settpr}. The {@code running} flag is observed by the refill chain, which exits when the module stops.
+ * The tuning is read lock-free through {@code areaSource} and replaced whole by {@code /settpr}. The {@code running}
+ * flag is observed by the refill chain, which exits when the module stops.
  */
 @NullMarked
 public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
     private final Scheduler scheduler;
     private final BudgetedSafeSearch search;
-    private final AtomicReference<RtpWorldSettings> settings;
+    private final BukkitRtpAreaSource areaSource;
     private final Logger log;
     private final BooleanSupplier running;
     private final RtpPoolSink poolSink;
@@ -74,35 +70,32 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
     public PrewarmedSafeLocationQueue(
             Scheduler scheduler,
             BudgetedSafeSearch search,
-            RtpWorldSettings settings,
+            BukkitRtpAreaSource areaSource,
             Logger log,
             BooleanSupplier running,
             RtpPoolSink poolSink) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.search = Objects.requireNonNull(search, "search");
-        this.settings = new AtomicReference<>(Objects.requireNonNull(settings, "settings"));
+        this.areaSource = Objects.requireNonNull(areaSource, "areaSource");
         this.log = Objects.requireNonNull(log, "log");
         this.running = Objects.requireNonNull(running, "running");
         this.poolSink = Objects.requireNonNull(poolSink, "poolSink");
     }
 
     /**
-     * Swap the live search radii used by {@code /rtp} (the {@code /settpr} runtime path), keeping the queue
-     * tuning untouched, then drop every pre-warmed location so refills re-validate against the new zone rather
-     * than serving candidates from the old one. The swap is a single {@link AtomicReference#set} so an in-flight
-     * {@code /rtp} reads either the whole previous tuning or the whole new one.
+     * Swap the live search radii used by {@code /rtp} (the {@code /settpr} runtime path) through the shared area
+     * source, keeping the queue tuning untouched, then drop every pre-warmed location so refills re-validate against
+     * the new zone rather than serving candidates from the old one. The swap is a single whole-record set so an
+     * in-flight {@code /rtp} reads either the whole previous tuning or the whole new one.
      */
     public RtpWorldSettings updateRadii(double minRadius, double maxRadius) {
-        RtpWorldSettings updated = settings().withRadii(minRadius, maxRadius);
-        settings.set(updated);
+        RtpWorldSettings updated = areaSource.updateRadii(minRadius, maxRadius);
         clear();
         return updated;
     }
 
     private RtpWorldSettings settings() {
-        // The reference is seeded non-null at construction and only ever replaced with a non-null value, so the
-        // get is never null; the requireNonNull makes that contract explicit for the null checker.
-        return Objects.requireNonNull(settings.get(), "settings");
+        return areaSource.current();
     }
 
     @Override
@@ -231,21 +224,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
     }
 
     private Optional<SafeSearchArea> area(WorldRef worldRef) {
-        World world = Bukkit.getWorld(worldRef.uid());
-        if (world == null) {
-            return Optional.empty();
-        }
-        WorldBorder border = world.getWorldBorder();
-        double borderRadius = border.getSize() / 2.0;
-        double centerX = border.getCenter().getX();
-        double centerZ = border.getCenter().getZ();
-        RtpWorldSettings current = settings();
-        double max = Math.min(current.maxRadius(), borderRadius);
-        if (max < current.minRadius()) {
-            return Optional.empty();
-        }
-        return Optional.of(
-                new SafeSearchArea(worldRef, centerX, centerZ, current.minRadius(), current.maxRadius(), borderRadius));
+        return areaSource.areaFor(worldRef);
     }
 
     /** Drop every queue and refill guard on module stop. */

@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.domain.BiomeName;
 import com.uxplima.uxmessentials.teleport.domain.RtpColumn;
 
 /**
@@ -33,6 +34,14 @@ public interface RtpPoolStore {
      * startup pre-warm to re-probe. Never blocks the tick thread — the caller dispatches it async.
      */
     List<RtpColumn> load(WorldRef world, int limit);
+
+    /**
+     * The freshest up-to {@code limit} persisted columns for {@code world} that validated in {@code biome}, newest
+     * validation first — the per-biome pool slice a {@code /rtp biome <biome>} serves from before it falls back to a
+     * live biome-targeted search. Only columns whose stored biome equals {@code biome} are returned (a column with no
+     * recorded biome never matches). Never blocks the tick thread — the caller dispatches it async.
+     */
+    List<RtpColumn> loadByBiome(WorldRef world, BiomeName biome, int limit);
 
     /**
      * Remove every column across all worlds whose validation is older than {@code olderThan}, returning how

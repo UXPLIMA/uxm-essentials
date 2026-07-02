@@ -77,6 +77,24 @@ class JooqRtpPoolRepositoryTest {
     }
 
     @Test
+    void loadByBiomeReturnsOnlyThatBiomeNewestFirst() {
+        JooqRtpPoolRepository repo = repo(100);
+        repo.save(
+                WORLD,
+                List.of(
+                        new RtpColumn(WORLD, 100, 100, BiomeName.of("plains"), NOW.minusSeconds(90)),
+                        new RtpColumn(WORLD, 200, 200, BiomeName.of("desert"), NOW.minusSeconds(60)),
+                        new RtpColumn(WORLD, 300, 300, BiomeName.of("desert"), NOW.minusSeconds(30)),
+                        new RtpColumn(WORLD, 400, 400, NOW))); // no recorded biome — never matches
+
+        List<RtpColumn> desert = repo.loadByBiome(WORLD, BiomeName.of("desert"), 10);
+
+        assertThat(desert).extracting(RtpColumn::x).containsExactly(300, 200); // only desert, newest first
+        assertThat(desert).allSatisfy(column -> assertThat(column.biomeName()).contains(BiomeName.of("desert")));
+        assertThat(repo.loadByBiome(WORLD, BiomeName.of("jungle"), 10)).isEmpty();
+    }
+
+    @Test
     void aNullBiomeRoundTripsAsAbsent() {
         JooqRtpPoolRepository repo = repo(100);
         repo.save(WORLD, List.of(new RtpColumn(WORLD, 5, 5, NOW)));

@@ -13,6 +13,9 @@ public enum SafeRejection {
     /** The biome is on the operator's excluded list (ocean, deep ocean, …). */
     EXCLUDED_BIOME,
 
+    /** The candidate's biome is not the one a {@code /rtp biome <biome>} search targeted. */
+    BIOME_MISMATCH,
+
     /** The resolved column has no safe footing or breathable space. */
     UNSAFE_GROUND,
 

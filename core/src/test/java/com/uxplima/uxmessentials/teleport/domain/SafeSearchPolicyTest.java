@@ -102,6 +102,49 @@ class SafeSearchPolicyTest {
     }
 
     @Test
+    void aBiomeTargetedAreaAcceptsOnlyAMatchingBiome() {
+        SafeSearchPolicy policy = SafeSearchPolicy.permissive();
+        SafeSearchArea desertArea = AREA.withTargetBiome(BiomeName.of("desert"));
+
+        Result<RtpSafeLocation, SafeRejection> match = policy.accept(desertArea, candidate(70, "desert", "sand"), NOW);
+
+        assertThat(match.isOk()).isTrue();
+    }
+
+    @Test
+    void aBiomeTargetedAreaRejectsAMismatchedBiome() {
+        SafeSearchPolicy policy = SafeSearchPolicy.permissive();
+        SafeSearchArea desertArea = AREA.withTargetBiome(BiomeName.of("desert"));
+
+        Result<RtpSafeLocation, SafeRejection> mismatch =
+                policy.accept(desertArea, candidate(70, "plains", "grass_block"), NOW);
+
+        assertThat(mismatch.isErr()).isTrue();
+        assertThat(mismatch.errorOrThrow()).isEqualTo(SafeRejection.BIOME_MISMATCH);
+    }
+
+    @Test
+    void anUntargetedAreaAcceptsAnyBiome() {
+        SafeSearchPolicy policy = SafeSearchPolicy.permissive();
+
+        // AREA carries no target biome, so a plains candidate is accepted regardless of what biome it landed in.
+        assertThat(policy.accept(AREA, candidate(70, "jungle", "grass_block"), NOW)
+                        .isOk())
+                .isTrue();
+    }
+
+    @Test
+    void aBiomeTargetedAcceptedLocationCarriesTheValidatedBiome() {
+        SafeSearchPolicy policy = SafeSearchPolicy.permissive();
+        SafeSearchArea desertArea = AREA.withTargetBiome(BiomeName.of("desert"));
+
+        RtpSafeLocation landed =
+                policy.accept(desertArea, candidate(70, "desert", "sand"), NOW).orElseThrow();
+
+        assertThat(landed.biomeName()).contains(BiomeName.of("desert"));
+    }
+
+    @Test
     void aCandidateOnProtectedLandIsAcceptedWhenAvoidProtectedIsOff() {
         SafeSearchPolicy policy = new SafeSearchPolicy(Set.of(), Set.of(), YBand.unbounded(), false);
         SafeCandidate onProtectedLand =

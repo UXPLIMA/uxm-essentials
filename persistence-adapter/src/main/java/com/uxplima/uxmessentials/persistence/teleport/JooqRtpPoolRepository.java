@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.RtpPoolRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
+import com.uxplima.uxmessentials.teleport.domain.BiomeName;
 import com.uxplima.uxmessentials.teleport.domain.RtpColumn;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -67,6 +68,22 @@ public final class JooqRtpPoolRepository extends JooqRepository implements RtpPo
         }
         return read(dsl -> dsl.selectFrom(RTP_POOL)
                 .where(RTP_POOL.WORLD_UUID.eq(world.uid().toString()))
+                .orderBy(RTP_POOL.VALIDATED_AT.desc(), RTP_POOL.ID.desc())
+                .limit(limit)
+                .fetch()
+                .map(row -> RtpPoolRows.toColumn(world, row)));
+    }
+
+    @Override
+    public List<RtpColumn> loadByBiome(WorldRef world, BiomeName biome, int limit) {
+        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(biome, "biome");
+        if (limit <= 0) {
+            return List.of();
+        }
+        return read(dsl -> dsl.selectFrom(RTP_POOL)
+                .where(RTP_POOL.WORLD_UUID.eq(world.uid().toString()))
+                .and(RTP_POOL.BIOME.eq(biome.value()))
                 .orderBy(RTP_POOL.VALIDATED_AT.desc(), RTP_POOL.ID.desc())
                 .limit(limit)
                 .fetch()

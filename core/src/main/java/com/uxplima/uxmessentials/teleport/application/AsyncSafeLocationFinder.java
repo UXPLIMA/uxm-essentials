@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
+import com.uxplima.uxmessentials.teleport.application.port.BiomeHotspots;
 import com.uxplima.uxmessentials.teleport.application.port.ChunkAccess;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.SafeCandidate;
@@ -26,20 +27,29 @@ import com.uxplima.uxmessentials.teleport.domain.SafeSearchPolicy;
  * verdict runs on whatever thread the port completes on and the caller gets a plain future back. Because the
  * port always completes (empty on any failure), the finder's future is never orphaned either.
  *
- * <p>The sampling is deliberately unchanged from the previous engine: {@code r = sqrt(rand·(max² − min²) +
- * min²)} with an independent uniform angle draws points uniformly over the annulus (a naive uniform radius
- * would clump them toward the centre).
+ * <p>Sampling is delegated to a {@link HotspotBiasedSampler}: an ordinary search draws uniformly over the annulus
+ * ({@code r = sqrt(rand·(max² − min²) + min²)} with an independent uniform angle, so points do not clump toward the
+ * centre), while a biome-targeted {@link SafeSearchArea} biases the draw toward a learned rare-biome hotspot. Both
+ * paths run through this one finder; an untargeted area samples exactly as the previous engine did.
  */
 public final class AsyncSafeLocationFinder {
 
     private final ChunkAccess chunkAccess;
     private final SafeSearchPolicy policy;
     private final Clock clock;
+    private final HotspotBiasedSampler sampler;
 
+    /** An untargeted finder with plain uniform sampling — no rare-biome hotspot bias. */
     public AsyncSafeLocationFinder(ChunkAccess chunkAccess, SafeSearchPolicy policy, Clock clock) {
+        this(chunkAccess, policy, clock, new HotspotBiasedSampler(BiomeHotspots.NONE, 0.0, 1));
+    }
+
+    public AsyncSafeLocationFinder(
+            ChunkAccess chunkAccess, SafeSearchPolicy policy, Clock clock, HotspotBiasedSampler sampler) {
         this.chunkAccess = Objects.requireNonNull(chunkAccess, "chunkAccess");
         this.policy = Objects.requireNonNull(policy, "policy");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.sampler = Objects.requireNonNull(sampler, "sampler");
     }
 
     /**
@@ -49,7 +59,7 @@ public final class AsyncSafeLocationFinder {
      */
     public CompletableFuture<Optional<RtpSafeLocation>> find(SafeSearchArea area) {
         Objects.requireNonNull(area, "area");
-        double[] xz = randomPoint(area);
+        double[] xz = sampler.sample(area, ThreadLocalRandom.current());
         int blockX = (int) Math.floor(xz[0]);
         int blockZ = (int) Math.floor(xz[1]);
         return probeColumn(area, blockX, blockZ);
@@ -71,16 +81,5 @@ public final class AsyncSafeLocationFinder {
 
     private Optional<RtpSafeLocation> judge(SafeSearchArea area, Optional<SafeCandidate> candidate) {
         return candidate.flatMap(c -> policy.accept(area, c, clock.instant()).asValue());
-    }
-
-    private static double[] randomPoint(SafeSearchArea area) {
-        double max = area.maxRadius();
-        double min = area.minRadius();
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        double angle = random.nextDouble(0, 2 * Math.PI);
-        double radius = Math.sqrt(random.nextDouble(min * min, max * max));
-        double x = area.centerX() + (radius * Math.cos(angle));
-        double z = area.centerZ() + (radius * Math.sin(angle));
-        return new double[] {x, z};
     }
 }

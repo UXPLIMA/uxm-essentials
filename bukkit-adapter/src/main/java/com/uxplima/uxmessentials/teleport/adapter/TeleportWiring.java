@@ -31,13 +31,16 @@ import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportComman
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TpSettingsCommand;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.ArrivalGraceGuard;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.BiomeHotspotListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.FirstJoinRtpListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpirySweep;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.TeleportListeners;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.AsyncTeleportExecutor;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitBiomeCatalog;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitChunkAccess;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitRtpAreaSource;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryBackLocationStore;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
@@ -52,12 +55,17 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnD
 import com.uxplima.uxmessentials.teleport.adapter.outbound.WorldGuardRegions;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
+import com.uxplima.uxmessentials.teleport.application.BiomePoolSlice;
+import com.uxplima.uxmessentials.teleport.application.BiomeTargetedSearch;
 import com.uxplima.uxmessentials.teleport.application.BudgetedSafeSearch;
+import com.uxplima.uxmessentials.teleport.application.CappedBiomeHotspots;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ClaimAwareProtectedLand;
+import com.uxplima.uxmessentials.teleport.application.HotspotBiasedSampler;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
+import com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
@@ -68,11 +76,14 @@ import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
+import com.uxplima.uxmessentials.teleport.application.port.BiomeCatalog;
+import com.uxplima.uxmessentials.teleport.application.port.BiomeHotspots;
 import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
+import com.uxplima.uxmessentials.teleport.domain.SearchBudget;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -92,6 +103,17 @@ public final class TeleportWiring {
     // A couple of ticks between rescheduled RTP search attempts — enough to slice a long search across ticks so
     // it never fires every candidate at once or monopolises an async worker.
     private static final Duration RTP_RETRY_INTERVAL = Duration.ofMillis(100);
+
+    // How far (blocks) a biome-targeted sample may sit from a known hotspot chunk — wide enough to spread candidates
+    // over a biome patch, tight enough that the sample stays in the target biome most of the time.
+    private static final int BIOME_HOTSPOT_RADIUS = 512;
+
+    // The bounded window of chunk keys the hotspot listener remembers so it scans each chunk once; reset wholesale
+    // when it fills so it can never grow without limit on a long-lived, heavily-explored server.
+    private static final int BIOME_SEEN_CHUNK_CAP = 8_192;
+
+    // How many persisted per-biome columns a /rtp biome tries (re-probing each) before it falls back to a live search.
+    private static final int BIOME_POOL_SLICE_LIMIT = 16;
 
     private TeleportWiring() {}
 
@@ -131,17 +153,7 @@ public final class TeleportWiring {
         ArrivalGraceGuard graceGuard =
                 new ArrivalGraceGuard(plugin.getServer(), kernel.scheduler(), settings::arrivalGrace, clock);
         TeleportServices services = assemble(
-                plugin,
-                kernel,
-                settings,
-                notifier,
-                warmupTracker,
-                jailGate,
-                spawns,
-                clock,
-                rtp.queue(),
-                fee,
-                graceGuard);
+                plugin, kernel, settings, notifier, warmupTracker, jailGate, spawns, clock, rtp, fee, graceGuard);
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener = new RespawnListener(
@@ -173,7 +185,7 @@ public final class TeleportWiring {
         return new Wired(
                 services,
                 commands,
-                listeners(services, config, respawnListener, firstJoinListener, graceGuard),
+                listeners(services, config, respawnListener, firstJoinListener, graceGuard, rtp.hotspotListener()),
                 sweep,
                 jailGate,
                 homeRespawnLocator,
@@ -191,7 +203,7 @@ public final class TeleportWiring {
             MutableJailGate jailGate,
             SpawnDirectory spawns,
             Clock clock,
-            PrewarmedSafeLocationQueue rtpQueue,
+            RtpBundle rtp,
             TeleportFee fee,
             ArrivalGrace grace) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
@@ -214,6 +226,17 @@ public final class TeleportWiring {
                 kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock);
         TeleportEngine engine = new TeleportEngine(
                 kernel.cooldowns(), warmups, executor, notifier, kernel.events(), settings, jailGate, fee, grace);
+        // The /rtp biome use case shares the engine (so it charges after success like a normal RTP), the live area
+        // source (so /settpr moves both zones at once), and the biome-targeted search built in buildRtp.
+        ResolveBiomeRtp resolveBiomeRtp = new ResolveBiomeRtp(
+                rtp.biomeCatalog(),
+                rtp.areaSource(),
+                kernel.worldLookup(),
+                settings,
+                engine,
+                rtp.biomeSearch(),
+                notifier,
+                kernel.scheduler());
         return new TeleportServices.Builder()
                 .engine(engine)
                 .notifier(notifier)
@@ -222,7 +245,7 @@ public final class TeleportWiring {
                 .requests(requests)
                 .backStore(backStore)
                 .flags(flags)
-                .rtpQueue(rtpQueue)
+                .rtpQueue(rtp.queue())
                 .executor(executor)
                 .players(kernel.playerLookup())
                 .worlds(kernel.worldLookup())
@@ -232,7 +255,9 @@ public final class TeleportWiring {
                 .acceptTeleport(new AcceptTeleport(requests, engine, notifier, kernel.events(), clock))
                 .listPendingRequests(new ListPendingRequests(requests, notifier))
                 .captureBack(new CaptureBack(backStore, engine, notifier, kernel.events(), clock))
-                .resolveRtp(new ResolveRtp(rtpQueue, kernel.worldLookup(), engine, notifier, settings))
+                .resolveRtp(new ResolveRtp(rtp.queue(), kernel.worldLookup(), engine, notifier, settings))
+                .resolveBiomeRtp(resolveBiomeRtp)
+                .biomeCatalog(rtp.biomeCatalog())
                 .resolveSpawn(new ResolveSpawn(spawns, kernel.worldLookup(), engine, notifier))
                 .build();
     }
@@ -264,23 +289,47 @@ public final class TeleportWiring {
                 new WorldGuardRegions(plugin.getServer(), kernel.log()),
                 settings.respectClaims(),
                 settings.respectWorldguard());
+        // The passive rare-biome registry (enabled only when biome-targeting is on) biases the biome-targeted
+        // sampler toward learned hotspots; an ordinary /rtp area carries no target biome, so its sampling is
+        // unchanged. The registry is fed by the BiomeHotspotListener below and bounded per biome.
+        BiomeHotspots hotspots = settings.biomeTargeting()
+                ? new CappedBiomeHotspots(settings.biomeHotspotRegistrySize())
+                : BiomeHotspots.NONE;
+        HotspotBiasedSampler sampler =
+                new HotspotBiasedSampler(hotspots, settings.biomeHotspotWeight(), BIOME_HOTSPOT_RADIUS);
         AsyncSafeLocationFinder finder = new AsyncSafeLocationFinder(
                 new BukkitChunkAccess(plugin.getServer(), kernel.log(), protectedLand),
                 settings.safeSearchPolicy(),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                sampler);
         BudgetedSafeSearch search =
                 new BudgetedSafeSearch(finder, kernel.scheduler(), Clock.systemUTC(), RTP_RETRY_INTERVAL);
         RtpWorldSettings worldSettings = RtpWorldSettings.from(config);
         RtpPoolSettings poolSettings = RtpPoolSettings.from(config);
+        BukkitRtpAreaSource areaSource = new BukkitRtpAreaSource(plugin.getServer(), worldSettings);
+        BiomeCatalog biomeCatalog = new BukkitBiomeCatalog();
+        Listener hotspotListener =
+                settings.biomeTargeting() ? new BiomeHotspotListener(hotspots, BIOME_SEEN_CHUNK_CAP) : null;
+        java.util.function.Supplier<SearchBudget> budget =
+                () -> areaSource.current().searchBudget();
         if (!poolSettings.persist()) {
             PrewarmedSafeLocationQueue queue = new PrewarmedSafeLocationQueue(
-                    kernel.scheduler(), search, worldSettings, kernel.log(), running::get, RtpPoolSink.NONE);
-            return new RtpBundle(queue, null);
+                    kernel.scheduler(), search, areaSource, kernel.log(), running::get, RtpPoolSink.NONE);
+            BiomeTargetedSearch biomeSearch = new BiomeTargetedSearch(
+                    BiomePoolSlice.EMPTY,
+                    finder,
+                    search,
+                    budget,
+                    kernel.scheduler(),
+                    kernel.log(),
+                    RTP_RETRY_INTERVAL,
+                    BIOME_POOL_SLICE_LIMIT);
+            return new RtpBundle(queue, null, areaSource, biomeCatalog, biomeSearch, hotspotListener);
         }
         RtpPoolStore store = RtpPoolStores.cached(persistence, poolSettings.maxPerWorld(), Clock.systemUTC());
         RtpPoolWriter writer = new RtpPoolWriter(store, kernel.scheduler(), kernel.log());
         PrewarmedSafeLocationQueue queue = new PrewarmedSafeLocationQueue(
-                kernel.scheduler(), search, worldSettings, kernel.log(), running::get, writer);
+                kernel.scheduler(), search, areaSource, kernel.log(), running::get, writer);
         RtpPoolPrewarm prewarm =
                 new RtpPoolPrewarm(store, finder, kernel.scheduler(), kernel.log(), RTP_RETRY_INTERVAL);
         RtpPoolWarmup warmup = new RtpPoolWarmup(
@@ -293,7 +342,16 @@ public final class TeleportWiring {
                 worldSettings.targetSize(),
                 kernel.log(),
                 running::get);
-        return new RtpBundle(queue, warmup);
+        BiomeTargetedSearch biomeSearch = new BiomeTargetedSearch(
+                store::loadByBiome,
+                finder,
+                search,
+                budget,
+                kernel.scheduler(),
+                kernel.log(),
+                RTP_RETRY_INTERVAL,
+                BIOME_POOL_SLICE_LIMIT);
+        return new RtpBundle(queue, warmup, areaSource, biomeCatalog, biomeSearch, hotspotListener);
     }
 
     /**
@@ -311,9 +369,18 @@ public final class TeleportWiring {
                 ClaimProviders.detect(plugin, plugin.getServer(), kernel.log()), ClaimPolicySettings.defaults());
     }
 
-    /** The wired RTP engine: the servable queue and, when the pool is persisted, the enable-time warmup. */
+    /**
+     * The wired RTP engine: the servable queue and, when the pool is persisted, the enable-time warmup, plus the
+     * biome-targeting pieces — the shared area source, the biome-key catalog, the {@code /rtp biome} search, and
+     * (when biome-targeting is on) the passive rare-biome chunk-load listener.
+     */
     private record RtpBundle(
-            PrewarmedSafeLocationQueue queue, @Nullable RtpPoolWarmup warmup) {}
+            PrewarmedSafeLocationQueue queue,
+            @Nullable RtpPoolWarmup warmup,
+            BukkitRtpAreaSource areaSource,
+            BiomeCatalog biomeCatalog,
+            BiomeTargetedSearch biomeSearch,
+            @Nullable Listener hotspotListener) {}
 
     private static SpawnDirectory spawns(Plugin plugin, Persistence persistence) {
         // The durable jOOQ store holds the per-world spawns, the main spawn, named spawns and mirror
@@ -327,8 +394,9 @@ public final class TeleportWiring {
             ConfigStore config,
             RespawnListener respawnListener,
             FirstJoinRtpListener firstJoinListener,
-            ArrivalGraceGuard graceGuard) {
-        return List.of(
+            ArrivalGraceGuard graceGuard,
+            @Nullable Listener hotspotListener) {
+        List<Listener> listeners = new java.util.ArrayList<>(List.of(
                 new TeleportListeners(
                         services.warmupTracker(),
                         services.captureBack(),
@@ -336,7 +404,12 @@ public final class TeleportWiring {
                         services.settings()::backCapturePolicy),
                 respawnListener,
                 firstJoinListener,
-                graceGuard);
+                graceGuard));
+        if (hotspotListener != null) {
+            // Registered only when biome-targeting is on, so a disabled feature wires no ChunkLoadEvent listener.
+            listeners.add(hotspotListener);
+        }
+        return List.copyOf(listeners);
     }
 
     /**

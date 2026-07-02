@@ -15,10 +15,12 @@ import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
+import com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
+import com.uxplima.uxmessentials.teleport.application.port.BiomeCatalog;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import org.jspecify.annotations.NullMarked;
 
@@ -37,6 +39,8 @@ public final class TeleportServices {
     private final ListPendingRequests listPendingRequests;
     private final CaptureBack captureBack;
     private final ResolveRtp resolveRtp;
+    private final ResolveBiomeRtp resolveBiomeRtp;
+    private final BiomeCatalog biomeCatalog;
     private final ResolveSpawn resolveSpawn;
     private final TeleportEngine engine;
     private final PlayerNotifier notifier;
@@ -57,6 +61,8 @@ public final class TeleportServices {
         this.listPendingRequests = Objects.requireNonNull(builder.listPendingRequests, "listPendingRequests");
         this.captureBack = Objects.requireNonNull(builder.captureBack, "captureBack");
         this.resolveRtp = Objects.requireNonNull(builder.resolveRtp, "resolveRtp");
+        this.resolveBiomeRtp = Objects.requireNonNull(builder.resolveBiomeRtp, "resolveBiomeRtp");
+        this.biomeCatalog = Objects.requireNonNull(builder.biomeCatalog, "biomeCatalog");
         this.resolveSpawn = Objects.requireNonNull(builder.resolveSpawn, "resolveSpawn");
         this.engine = Objects.requireNonNull(builder.engine, "engine");
         this.notifier = Objects.requireNonNull(builder.notifier, "notifier");
@@ -90,6 +96,16 @@ public final class TeleportServices {
 
     public ResolveRtp resolveRtp() {
         return resolveRtp;
+    }
+
+    /** The {@code /rtp biome <biome>} use case. */
+    public ResolveBiomeRtp resolveBiomeRtp() {
+        return resolveBiomeRtp;
+    }
+
+    /** The biome-key catalog, for the {@code /rtp biome} argument's tab completion. */
+    public BiomeCatalog biomeCatalog() {
+        return biomeCatalog;
     }
 
     public ResolveSpawn resolveSpawn() {
@@ -161,6 +177,8 @@ public final class TeleportServices {
         private @org.jspecify.annotations.Nullable ListPendingRequests listPendingRequests;
         private @org.jspecify.annotations.Nullable CaptureBack captureBack;
         private @org.jspecify.annotations.Nullable ResolveRtp resolveRtp;
+        private @org.jspecify.annotations.Nullable ResolveBiomeRtp resolveBiomeRtp;
+        private @org.jspecify.annotations.Nullable BiomeCatalog biomeCatalog;
         private @org.jspecify.annotations.Nullable ResolveSpawn resolveSpawn;
         private @org.jspecify.annotations.Nullable TeleportEngine engine;
         private @org.jspecify.annotations.Nullable PlayerNotifier notifier;
@@ -197,6 +215,16 @@ public final class TeleportServices {
 
         public Builder resolveRtp(ResolveRtp value) {
             this.resolveRtp = value;
+            return this;
+        }
+
+        public Builder resolveBiomeRtp(ResolveBiomeRtp value) {
+            this.resolveBiomeRtp = value;
+            return this;
+        }
+
+        public Builder biomeCatalog(BiomeCatalog value) {
+            this.biomeCatalog = value;
             return this;
         }
 

@@ -198,6 +198,9 @@ permissions:
   uxmessentials.rtp.use:
     description: '/rtp random teleport from the pre-warmed safe-location queue.'
     default: true
+  uxmessentials.rtp.biome:
+    description: '/rtp biome <biome> to random teleport into a specific biome.'
+    default: true
   uxmessentials.teleport.settpr:
     description: '/settpr <minRange> <maxRange> to set the /rtp search zone at runtime.'
     default: op

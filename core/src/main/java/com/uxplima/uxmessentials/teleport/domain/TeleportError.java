@@ -52,6 +52,12 @@ public enum TeleportError {
     /** The player cannot afford the configured random-teleport cost — rejected before any search runs. */
     RTP_CANT_AFFORD(TeleportMessageKey.RTP_CANT_AFFORD),
 
+    /** {@code /rtp biome <biome>} named a biome the server's registry does not know. */
+    RTP_BIOME_UNKNOWN(TeleportMessageKey.RTP_BIOME_UNKNOWN),
+
+    /** {@code /rtp biome <biome>} found no landing in the target biome within the search budget. */
+    RTP_BIOME_NOT_FOUND(TeleportMessageKey.RTP_BIOME_NOT_FOUND),
+
     /** No spawn (named, mirrored, or default) resolves for the requested world. */
     SPAWN_UNRESOLVED(TeleportMessageKey.SPAWN_UNRESOLVED),
 

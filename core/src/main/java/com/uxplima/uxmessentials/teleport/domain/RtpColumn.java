@@ -43,8 +43,9 @@ public record RtpColumn(
 
     /**
      * The durable column form of a servable {@link RtpSafeLocation}: its world and block x/z with the
-     * validation instant, dropping the resolved Y (recomputed live on pre-warm) and the radius (an
-     * on-serve guard, not persisted). Biome is left unset — the servable location does not carry it in P2.
+     * validation instant and the biome it validated in, dropping the resolved Y (recomputed live on pre-warm)
+     * and the radius (an on-serve guard, not persisted). The biome is threaded through so the persisted pool can
+     * be sliced per biome (the P5 {@code /rtp biome} path); it is {@code null} only when the location carried none.
      */
     public static RtpColumn of(RtpSafeLocation location) {
         Objects.requireNonNull(location, "location");
@@ -52,7 +53,7 @@ public record RtpColumn(
                 location.world(),
                 location.position().blockX(),
                 location.position().blockZ(),
-                null,
+                location.biome(),
                 location.validatedAt());
     }
 

@@ -8,6 +8,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
+import com.uxplima.uxmessentials.teleport.domain.BiomeName;
 import com.uxplima.uxmessentials.teleport.domain.RtpColumn;
 import org.jspecify.annotations.NullMarked;
 
@@ -47,6 +48,11 @@ public final class CachedRtpPoolStore implements RtpPoolStore {
     @Override
     public List<RtpColumn> load(WorldRef world, int limit) {
         return delegate.load(world, limit);
+    }
+
+    @Override
+    public List<RtpColumn> loadByBiome(WorldRef world, BiomeName biome, int limit) {
+        return delegate.loadByBiome(world, biome, limit);
     }
 
     @Override

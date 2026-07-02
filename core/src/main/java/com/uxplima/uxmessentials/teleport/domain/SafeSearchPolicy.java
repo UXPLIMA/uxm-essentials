@@ -63,7 +63,7 @@ public record SafeSearchPolicy(
             return Result.err(rejection.get());
         }
         double radius = area.radiusOf(candidate.x(), candidate.z());
-        return Result.ok(new RtpSafeLocation(candidate.position(), radius, validatedAt));
+        return Result.ok(new RtpSafeLocation(candidate.position(), radius, candidate.biome(), validatedAt));
     }
 
     private Optional<SafeRejection> firstFailure(SafeSearchArea area, SafeCandidate candidate) {
@@ -75,6 +75,9 @@ public record SafeSearchPolicy(
         }
         if (excludedBiomes.contains(candidate.biome())) {
             return Optional.of(SafeRejection.EXCLUDED_BIOME);
+        }
+        if (biomeMismatch(area, candidate)) {
+            return Optional.of(SafeRejection.BIOME_MISMATCH);
         }
         if (!candidate.standingSafe()) {
             return Optional.of(SafeRejection.UNSAFE_GROUND);
@@ -90,6 +93,13 @@ public record SafeSearchPolicy(
 
     private boolean landsOnAvoidedBlock(SafeCandidate candidate) {
         return candidate.landing().map(avoidBlocks::contains).orElse(false);
+    }
+
+    /** True when the area targets a biome the candidate did not validate in — the {@code /rtp biome} gate. */
+    private static boolean biomeMismatch(SafeSearchArea area, SafeCandidate candidate) {
+        return area.targetBiomeName()
+                .map(target -> !target.equals(candidate.biome()))
+                .orElse(false);
     }
 
     /** True when {@code biome} is excluded — exposed for the cheap on-serve revalidation. */

@@ -292,6 +292,29 @@ public final class TeleportSettings {
                 config.getBoolean("rtp.grace-block-fall-damage", true));
     }
 
+    /**
+     * Whether {@code /rtp biome <biome>} learns rare-biome hotspots passively (the {@code ChunkLoadEvent} registry)
+     * and biases its search toward them ({@code rtp.biome-targeting}, default {@code true}). When off, the biome
+     * search still runs but samples uniformly, so a rare biome is feasible only by luck; the registry and its
+     * listener are not wired at all.
+     */
+    public boolean biomeTargeting() {
+        return config.getBoolean("rtp.biome-targeting", true);
+    }
+
+    /** The most hotspot chunks the passive rare-biome registry keeps per biome ({@code rtp.biome-hotspot-registry-size}). */
+    public int biomeHotspotRegistrySize() {
+        return Math.max(1, config.getInt("rtp.biome-hotspot-registry-size", 30));
+    }
+
+    /**
+     * The share of biome-targeted samples drawn near a known hotspot ({@code rtp.biome-hotspot-weight}, clamped to
+     * {@code [0, 1]}, default {@code 0.7}); the remainder are uniform so the search never gets stuck on stale hotspots.
+     */
+    public double biomeHotspotWeight() {
+        return Math.max(0.0, Math.min(1.0, config.getDouble("rtp.biome-hotspot-weight", 0.7)));
+    }
+
     /** The worlds whose players are random-teleported from the pre-warmed pool on death respawn; empty by default. */
     public Set<String> rtpOnRespawnWorlds() {
         return Set.copyOf(config.getStringList("rtp.rtp-on-respawn", List.of()));
