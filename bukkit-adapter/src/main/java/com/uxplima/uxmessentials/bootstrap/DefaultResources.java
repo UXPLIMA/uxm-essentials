@@ -55,6 +55,7 @@ final class DefaultResources {
             "modules/staff/config.conf",
             "modules/npc/config.conf",
             "modules/custommenus/config.conf",
+            "modules/poses/config.conf",
             "modules/migration/config.conf",
             "modules/communication/gui/announcement-editor-list.conf",
             "modules/communication/gui/announcement-editor.conf",

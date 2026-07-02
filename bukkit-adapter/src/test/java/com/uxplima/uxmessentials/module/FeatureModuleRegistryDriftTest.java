@@ -71,6 +71,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("staff"))).isPresent();
         assertThat(registry.byId(ModuleId.of("npc"))).isPresent();
         assertThat(registry.byId(ModuleId.of("custommenus"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("poses"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -95,7 +96,8 @@ class FeatureModuleRegistryDriftTest {
                         "nametags",
                         "staff",
                         "npc",
-                        "custommenus");
+                        "custommenus",
+                        "poses");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -519,13 +521,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void customMenusIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+    void customMenusShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule custommenus = registry.byId(ModuleId.of("custommenus"))
                 .orElseThrow(() -> new AssertionError("custommenus is not registered"));
 
-        // custommenus is the 22nd context — the operator surface over the menu engine (/menu) — registered last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("custommenus");
+        // custommenus is the 22nd context — the operator surface over the menu engine (/menu). The later poses context
+        // now lands last, so custommenus must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("custommenus"))).isPresent();
 
         // It ships ENABLED but inert (a steady-state feature — nothing opens until a player runs /menu open): with no
         // modules.conf override it is on, and disabling exactly custommenus removes only it while every sibling stays
@@ -549,6 +552,35 @@ class FeatureModuleRegistryDriftTest {
                 custommenus.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactly("menu");
         assertThat(custommenus.migrations()).isEmpty();
+    }
+
+    @Test
+    void posesIsTheLastModuleShipsEnabledAndPublishesNoCommandSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule poses =
+                registry.byId(ModuleId.of("poses")).orElseThrow(() -> new AssertionError("poses is not registered"));
+
+        // poses is the 23rd context — built-in GSit-parity sitting and posing — registered last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("poses");
+
+        // It ships ENABLED (a steady-state feature — the common poses are on out of the box, player-sit is opt-in):
+        // with no modules.conf override it is on, and disabling exactly poses removes only it while every sibling
+        // stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("poses", "teleport", "economy", "holograms", "custommenus");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.poses.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("poses");
+        assertThat(off).contains("teleport", "holograms", "custommenus");
+
+        // Phase 0 is the wired-but-inert skeleton: the pose verbs (/sit, /lay, /bellyflop, /spin, /crawl) and their
+        // listeners land with the later behaviour phases, so the module publishes no command yet, and it persists
+        // nothing (a pose is transient in-memory state held in PoseSessions), so it declares no MigrationSet.
+        assertThat(poses.commands()).isEmpty();
+        assertThat(poses.migrations()).isEmpty();
     }
 
     @Test

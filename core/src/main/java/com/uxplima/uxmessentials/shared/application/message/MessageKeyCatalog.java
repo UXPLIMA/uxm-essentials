@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
+import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
@@ -65,7 +66,8 @@ public final class MessageKeyCatalog {
             DiscordlinkMessageKey.values(),
             StaffMessageKey.values(),
             NpcMessageKey.values(),
-            CustomMenusMessageKey.values());
+            CustomMenusMessageKey.values(),
+            PosesMessageKey.values());
 
     private MessageKeyCatalog() {}
 

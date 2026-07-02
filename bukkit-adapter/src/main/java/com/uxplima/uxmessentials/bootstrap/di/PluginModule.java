@@ -70,6 +70,8 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
+import com.uxplima.uxmessentials.poses.application.PoseSessions;
+import com.uxplima.uxmessentials.poses.application.PosesConfig;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
@@ -865,7 +867,22 @@ public final class PluginModule {
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
             wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
+        } else if (module.id().equals(ModuleId.of("poses"))) {
+            wirePoses(ctx, resources);
         }
+    }
+
+    private static void wirePoses(ModuleContext ctx, CloseableResources resources) {
+        // Phase 0 stands up the poses context's runtime state and settings so the later behaviour phases can hang the
+        // /sit surface, the interact/quit listeners, and the seat entities off them. PoseSessions is the single
+        // source of truth for who is posing; it is cleared on disable so a reload leaves zero residual state
+        // (the FeatureModule quiescent-stop contract). The typed config is resolved once here, atomic per enable, and
+        // logged at debug so an operator troubleshooting can confirm which pose verbs the bundled config enables. No
+        // command or listener is registered yet — those arrive as their phases land.
+        PosesConfig config = PosesConfig.from(ctx.config());
+        PoseSessions sessions = new PoseSessions();
+        ctx.kernel().log().debug("poses context wired (features: {})", config.features());
+        resources.onClose(sessions::clear);
     }
 
     private static void wireCustomMenus(

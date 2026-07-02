@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.nametags.application.NametagsModule;
 import com.uxplima.uxmessentials.npc.application.NpcModule;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
+import com.uxplima.uxmessentials.poses.application.PoseModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
@@ -147,6 +148,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // built in bootstrap), and like the steady-state features ships ENABLED but inert until an operator authors a
         // menu, so it lands last after npc.
         delegate.register(new CustomMenusModule());
+        // poses is the 23rd context — built-in GSit-parity sitting and posing (/sit, player-sit, /lay, /bellyflop,
+        // /spin, /crawl). It carries no hard dependency edge (its collaborators are the shared Scheduler, messages,
+        // permissions, and event ports, plus the claim/region gate it consults through a soft-couple in a later
+        // phase), and like the steady-state features it ships ENABLED, so it lands last after custommenus.
+        delegate.register(new PoseModule());
         // The shared kernel is not a module and never appears here.
     }
 

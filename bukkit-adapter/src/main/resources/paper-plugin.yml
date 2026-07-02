@@ -1128,3 +1128,9 @@ permissions:
   uxmessentials.menu.admin:
     description: '/menu reload to re-read the menus/ folder from disk.'
     default: op
+  # poses context (docs/permissions.md "Poses"). Built-in GSit-parity sitting and posing (/sit, player-sit, /lay,
+  # /bellyflop, /spin, /crawl). The per-verb use nodes (uxmessentials.sit.use, …) arrive with their behaviour phases;
+  # this Phase-0 node is the reload/inspect tier for the module as a whole.
+  uxmessentials.module.poses:
+    description: 'Hot-reload / inspect the poses module (built-in GSit-parity sitting and posing).'
+    default: op

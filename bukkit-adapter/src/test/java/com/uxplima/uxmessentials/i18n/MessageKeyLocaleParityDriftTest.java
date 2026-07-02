@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
@@ -121,7 +122,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(CommunicationMessageKey.values(), List.of("communication")),
                 Map.entry(HologramsMessageKey.values(), List.of("hologram")),
                 Map.entry(StaffMessageKey.values(), List.of("staff")),
-                Map.entry(CustomMenusMessageKey.values(), List.of("menu")));
+                Map.entry(CustomMenusMessageKey.values(), List.of("menu")),
+                Map.entry(PosesMessageKey.values(), List.of("poses")));
     }
 
     @Test
