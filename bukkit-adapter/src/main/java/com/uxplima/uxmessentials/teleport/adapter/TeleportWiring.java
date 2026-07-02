@@ -10,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.teleport.RtpPoolStores;
 import com.uxplima.uxmessentials.persistence.teleport.SpawnDirectories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -34,6 +35,8 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryBackLocationS
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PrewarmedSafeLocationQueue;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.RtpPoolSettings;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.RtpPoolWarmup;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.RtpWorldSettings;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalEffects;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
@@ -49,12 +52,17 @@ import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
+import com.uxplima.uxmessentials.teleport.application.RtpPoolPrewarm;
+import com.uxplima.uxmessentials.teleport.application.RtpPoolSink;
+import com.uxplima.uxmessentials.teleport.application.RtpPoolWriter;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
+import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the teleport context's adapters and use cases over the injected kernel ports, and produces
@@ -103,8 +111,9 @@ public final class TeleportWiring {
         // so a HOME step in a configured respawn chain falls through whenever homes is disabled.
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
         SpawnDirectory spawns = spawns(plugin, persistence);
+        RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running);
         TeleportServices services =
-                assemble(plugin, kernel, config, settings, notifier, warmupTracker, jailGate, spawns, clock, running);
+                assemble(plugin, kernel, settings, notifier, warmupTracker, jailGate, spawns, clock, rtp.queue());
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener =
@@ -132,20 +141,20 @@ public final class TeleportWiring {
                 sweep,
                 jailGate,
                 homeRespawnLocator,
-                running);
+                running,
+                rtp.warmup());
     }
 
     private static TeleportServices assemble(
             Plugin plugin,
             KernelPorts kernel,
-            ConfigStore config,
             TeleportSettings settings,
             PlayerNotifier notifier,
             WarmupTracker warmupTracker,
             MutableJailGate jailGate,
             SpawnDirectory spawns,
             Clock clock,
-            AtomicBoolean running) {
+            PrewarmedSafeLocationQueue rtpQueue) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
         InMemoryRequestRegistry requests = new InMemoryRequestRegistry(settings.singleRequestDisplace());
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
@@ -162,7 +171,6 @@ public final class TeleportWiring {
                 settings::teleportToCenter,
                 arrivalHud,
                 arrivalEffects);
-        PrewarmedSafeLocationQueue rtpQueue = rtpQueue(plugin, kernel, config, settings, running);
         Warmups warmups = new TrackingWarmups(
                 kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock);
         TeleportEngine engine = new TeleportEngine(
@@ -190,8 +198,20 @@ public final class TeleportWiring {
                 .build();
     }
 
-    private static PrewarmedSafeLocationQueue rtpQueue(
-            Plugin plugin, KernelPorts kernel, ConfigStore config, TeleportSettings settings, AtomicBoolean running) {
+    /**
+     * Assemble the RTP engine: the async finder, the budgeted search, the in-memory pre-warmed queue, and — when the
+     * persisted pool is enabled in config — the durable {@link RtpPoolStore}, the persist-on-validate {@link
+     * RtpPoolWriter} the queue records through, and the enable-time {@link RtpPoolWarmup} that pre-warms each world's
+     * queue from disk. With the pool disabled the sink is {@link RtpPoolSink#NONE} and there is no warmup, so the
+     * queue runs purely in memory.
+     */
+    private static RtpBundle buildRtp(
+            Plugin plugin,
+            KernelPorts kernel,
+            ConfigStore config,
+            TeleportSettings settings,
+            Persistence persistence,
+            AtomicBoolean running) {
         // The safe-search probe loads each candidate's chunk asynchronously through BukkitChunkAccess, so no RTP
         // probe generates a far chunk on a tick thread and every probed-but-unserved chunk is released again. The
         // budgeted search wraps the finder so a single search terminates within its budget and tick-slices its
@@ -202,9 +222,35 @@ public final class TeleportWiring {
                 Clock.systemUTC());
         BudgetedSafeSearch search =
                 new BudgetedSafeSearch(finder, kernel.scheduler(), Clock.systemUTC(), RTP_RETRY_INTERVAL);
-        return new PrewarmedSafeLocationQueue(
-                kernel.scheduler(), search, RtpWorldSettings.from(config), kernel.log(), running::get);
+        RtpWorldSettings worldSettings = RtpWorldSettings.from(config);
+        RtpPoolSettings poolSettings = RtpPoolSettings.from(config);
+        if (!poolSettings.persist()) {
+            PrewarmedSafeLocationQueue queue = new PrewarmedSafeLocationQueue(
+                    kernel.scheduler(), search, worldSettings, kernel.log(), running::get, RtpPoolSink.NONE);
+            return new RtpBundle(queue, null);
+        }
+        RtpPoolStore store = RtpPoolStores.cached(persistence, poolSettings.maxPerWorld(), Clock.systemUTC());
+        RtpPoolWriter writer = new RtpPoolWriter(store, kernel.scheduler(), kernel.log());
+        PrewarmedSafeLocationQueue queue = new PrewarmedSafeLocationQueue(
+                kernel.scheduler(), search, worldSettings, kernel.log(), running::get, writer);
+        RtpPoolPrewarm prewarm =
+                new RtpPoolPrewarm(store, finder, kernel.scheduler(), kernel.log(), RTP_RETRY_INTERVAL);
+        RtpPoolWarmup warmup = new RtpPoolWarmup(
+                store,
+                prewarm,
+                queue,
+                plugin.getServer(),
+                kernel.scheduler(),
+                poolSettings,
+                worldSettings.targetSize(),
+                kernel.log(),
+                running::get);
+        return new RtpBundle(queue, warmup);
     }
+
+    /** The wired RTP engine: the servable queue and, when the pool is persisted, the enable-time warmup. */
+    private record RtpBundle(
+            PrewarmedSafeLocationQueue queue, @Nullable RtpPoolWarmup warmup) {}
 
     private static SpawnDirectory spawns(Plugin plugin, Persistence persistence) {
         // The durable jOOQ store holds the per-world spawns, the main spawn, named spawns and mirror
@@ -236,6 +282,7 @@ public final class TeleportWiring {
      * @param jailGate the rebindable jail gate moderation rebinds when it lands
      * @param homeRespawnLocator the rebindable home-respawn seam homes rebinds when it lands
      * @param running the flag flipped false on stop so the sweep and refill loops exit
+     * @param poolWarmup the enable-time RTP pool pre-warm, or {@code null} when the persisted pool is disabled
      */
     public record Wired(
             TeleportServices services,
@@ -244,7 +291,8 @@ public final class TeleportWiring {
             RequestExpirySweep expirySweep,
             MutableJailGate jailGate,
             MutableHomeRespawnLocator homeRespawnLocator,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            @Nullable RtpPoolWarmup poolWarmup) {
 
         public Wired {
             Objects.requireNonNull(services, "services");
@@ -256,9 +304,15 @@ public final class TeleportWiring {
             Objects.requireNonNull(running, "running");
         }
 
-        /** Arm the expiry sweep; call after the listeners and commands are registered. */
+        /**
+         * Arm the expiry sweep and, when the persisted pool is enabled, pre-warm each world's RTP queue from disk;
+         * call after the listeners and commands are registered.
+         */
         public void startBackgroundWork() {
             expirySweep.start();
+            if (poolWarmup != null) {
+                poolWarmup.start();
+            }
         }
 
         /** Flip the running flag and drain the in-memory stores. Called on module stop. */

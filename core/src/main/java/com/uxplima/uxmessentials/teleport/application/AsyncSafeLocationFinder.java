@@ -52,6 +52,20 @@ public final class AsyncSafeLocationFinder {
         double[] xz = randomPoint(area);
         int blockX = (int) Math.floor(xz[0]);
         int blockZ = (int) Math.floor(xz[1]);
+        return probeColumn(area, blockX, blockZ);
+    }
+
+    /**
+     * Re-probe a <em>specific</em> column {@code (blockX, blockZ)} rather than a random sample, running the
+     * exact same async probe and pure-policy verdict as {@link #find}. This is the startup pre-warm's primitive:
+     * a persisted {@link RtpSafeLocation}'s column is trusted only as a horizontal coordinate, so it is re-probed
+     * here — a fresh landing Y is resolved and the full {@link SafeSearchPolicy} is re-run off the async chunk read
+     * — before it re-enters the servable queue. A known-good column almost always still passes (one cheap probe),
+     * but a column the world changed under (a rollback, a regenerated chunk, a shrunk border) resolves to {@link
+     * Optional#empty()} and is dropped, never served stale.
+     */
+    public CompletableFuture<Optional<RtpSafeLocation>> probeColumn(SafeSearchArea area, int blockX, int blockZ) {
+        Objects.requireNonNull(area, "area");
         return chunkAccess.probe(area, blockX, blockZ).thenApply(candidate -> judge(area, candidate));
     }
 

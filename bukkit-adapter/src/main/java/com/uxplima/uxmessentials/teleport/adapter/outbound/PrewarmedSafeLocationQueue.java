@@ -17,7 +17,10 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.BudgetedSafeSearch;
+import com.uxplima.uxmessentials.teleport.application.RtpPoolPrewarm;
+import com.uxplima.uxmessentials.teleport.application.RtpPoolSink;
 import com.uxplima.uxmessentials.teleport.application.port.SafeLocationQueue;
+import com.uxplima.uxmessentials.teleport.domain.RtpColumn;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
 import org.jspecify.annotations.NullMarked;
@@ -33,9 +36,13 @@ import org.jspecify.annotations.NullMarked;
  * or a per-cycle cap is hit — <strong>none of which blocks a thread</strong>. Each search chains its own
  * attempts through the scheduler (budget-bounded and tick-sliced) and completes a future; the refill composes
  * onto it with {@code thenAccept} rather than parking a worker on a {@code .get()} the way the pre-P1 loop did.
- * Durable restart-survival of the queue (the {@code rtp_queue} mirror, ADR 0010 §7) is the persistence-adapter's
- * concern and is a documented stub here — this queue is in-memory and cold-starts empty, warming on the first
- * refill.
+ *
+ * <p>Durable restart-survival is wired through the {@link RtpPoolSink}: every location a refill validates is recorded,
+ * and the world's batch is flushed to the {@code rtp_pool} table off-tick once the refill cycle ends (ADR 0010 §7).
+ * On enable, {@link #prewarm} re-loads a world's persisted columns and re-probes each — a fresh Y and full safety
+ * revalidation — offering the still-valid ones straight into the queue, so the first {@code /rtp} after a restart
+ * serves from a warm queue instead of paying for a cold search storm. When the persisted pool is switched off, the
+ * sink is {@link RtpPoolSink#NONE} and {@link #prewarm} is never called, so the queue runs purely in memory as before.
  *
  * <p>The urgent path ({@link #urgentSearch(WorldRef)}) serves the queue and, when it is momentarily drained,
  * kicks a non-blocking refill and reports empty rather than blocking the caller on an inline search. Routing
@@ -60,6 +67,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
     private final AtomicReference<RtpWorldSettings> settings;
     private final Logger log;
     private final BooleanSupplier running;
+    private final RtpPoolSink poolSink;
     private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RtpSafeLocation>> ready = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, AtomicBoolean> refilling = new ConcurrentHashMap<>();
 
@@ -68,12 +76,14 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
             BudgetedSafeSearch search,
             RtpWorldSettings settings,
             Logger log,
-            BooleanSupplier running) {
+            BooleanSupplier running,
+            RtpPoolSink poolSink) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.search = Objects.requireNonNull(search, "search");
         this.settings = new AtomicReference<>(Objects.requireNonNull(settings, "settings"));
         this.log = Objects.requireNonNull(log, "log");
         this.running = Objects.requireNonNull(running, "running");
+        this.poolSink = Objects.requireNonNull(poolSink, "poolSink");
     }
 
     /**
@@ -169,7 +179,12 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
             AtomicBoolean guard,
             int launched,
             Optional<RtpSafeLocation> found) {
-        found.ifPresent(queue::offer);
+        found.ifPresent(location -> {
+            queue.offer(location);
+            // Persist the validated column so the queue survives a restart; the sink buffers it and the world's
+            // batch is flushed off-tick when this refill cycle ends (finishRefill), never one row per candidate.
+            poolSink.record(RtpColumn.of(location));
+        });
         launchSearch(world, queue, guard, launched + 1);
     }
 
@@ -178,7 +193,30 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         if (queue.isEmpty() && launched > 0) {
             log.debug("rtp refill produced no location for world {} after {} searches", world.name(), launched);
         }
+        poolSink.flush(world);
         guard.set(false);
+    }
+
+    /**
+     * Re-populate {@code world}'s queue from the persisted pool on enable: load up to {@code limit} columns and
+     * re-probe each through {@code prewarm}, offering every re-validated location straight into the queue. A no-op
+     * when the module is stopping or the world has no valid RTP area. The re-probe (fresh Y + full safety check)
+     * is what keeps a stale persisted column from ever being served — only columns that still pass rejoin the queue.
+     */
+    public void prewarm(RtpPoolPrewarm prewarm, WorldRef world, int limit) {
+        Objects.requireNonNull(prewarm, "prewarm");
+        Objects.requireNonNull(world, "world");
+        if (!running.getAsBoolean()) {
+            return;
+        }
+        area(world).ifPresent(a -> prewarm.prewarm(a, limit, location -> offerPrewarmed(world, location)));
+    }
+
+    private void offerPrewarmed(WorldRef world, RtpSafeLocation location) {
+        if (!running.getAsBoolean()) {
+            return;
+        }
+        ready.computeIfAbsent(world.uid(), id -> new ConcurrentLinkedQueue<>()).offer(location);
     }
 
     private static Optional<RtpSafeLocation> pollWithin(
