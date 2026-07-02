@@ -66,6 +66,17 @@ public record SafeSearchArea(
         return new SafeSearchArea(world, centerX, centerZ, minRadius, configuredMaxRadius, borderRadius, biome);
     }
 
+    /**
+     * A copy of this area whose configured outer radius is {@code newConfiguredMaxRadius}, floored at the inner
+     * radius so the compact constructor's {@code maxRadius >= minRadius} invariant always holds. This is the
+     * per-permission {@code uxmessentials.rtp.radius.<n>} tier's seam: the resolved radius becomes the player's
+     * effective search bound, still clamped to the world border on serve by {@link #maxRadius()}.
+     */
+    public SafeSearchArea withConfiguredMaxRadius(double newConfiguredMaxRadius) {
+        double clamped = Math.max(minRadius, newConfiguredMaxRadius);
+        return new SafeSearchArea(world, centerX, centerZ, minRadius, clamped, borderRadius, targetBiome);
+    }
+
     /** The biome a candidate must land in, when this is a biome-targeted search. */
     public Optional<BiomeName> targetBiomeName() {
         return Optional.ofNullable(targetBiome);

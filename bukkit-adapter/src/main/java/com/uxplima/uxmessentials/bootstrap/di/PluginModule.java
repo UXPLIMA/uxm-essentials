@@ -737,7 +737,7 @@ public final class PluginModule {
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
-            wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus);
+            wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
             wireWorlds(
                     plugin,
@@ -931,7 +931,8 @@ public final class PluginModule {
             ContextLinks links,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            Menus menus) {
+            Menus menus,
+            MenuBindings menuBindings) {
         // The /rtp cost bridges to the resolved economy provider lazily: teleport is wired before economy, so the
         // provider/currency are read through suppliers at charge time (free until economy is up, free for good when
         // economy is disabled), mirroring the worlds entry fee. The affordability is checked before the search and the
@@ -941,7 +942,8 @@ public final class PluginModule {
                 () -> links.economyCurrency,
                 ctx.kernel().scheduler(),
                 ctx.kernel().log());
-        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry, menus, fee);
+        TeleportWiring.Wired wired =
+                TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry, menus, menuBindings, fee);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

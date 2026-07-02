@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
@@ -27,8 +28,10 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.command.RtpCommand;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TpSettingsCommand;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.ArrivalGraceGuard;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.BiomeHotspotListener;
@@ -72,6 +75,7 @@ import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
 import com.uxplima.uxmessentials.teleport.application.RtpPoolPrewarm;
 import com.uxplima.uxmessentials.teleport.application.RtpPoolSink;
 import com.uxplima.uxmessentials.teleport.application.RtpPoolWriter;
+import com.uxplima.uxmessentials.teleport.application.RtpRadiusTier;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
@@ -125,6 +129,7 @@ public final class TeleportWiring {
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
+            MenuBindings menuBindings,
             TeleportFee fee) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
@@ -132,6 +137,7 @@ public final class TeleportWiring {
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(fee, "fee");
         ConfigStore config = ctx.config();
         KernelPorts kernel = ctx.kernel();
@@ -179,8 +185,14 @@ public final class TeleportWiring {
                 org.bukkit.Material.ENDER_PEARL,
                 "uxmessentials.teleport.gui",
                 settingsView::open));
+        // The /rtp menu-engine world picker (opened by /rtp gui). Registered with the shared menu bindings — its
+        // list source, tile placeholders, and world-click action — so the shipped rtp.conf spec resolves cleanly.
+        RtpMenu rtpMenu = new RtpMenu(menus, kernel.scheduler(), kernel.messages(), plugin.getServer(), services);
+        rtpMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         List<CommandRegistration> commands =
                 new java.util.ArrayList<>(TeleportCommands.all(services, kernel.messages()));
+        // /rtp is built here (not in TeleportCommands.all) because it needs the RTP menu opener wired above.
+        commands.add(new RtpCommand(services, kernel.messages(), rtpMenu));
         commands.add(new TpSettingsCommand(services, kernel.messages(), settingsView));
         return new Wired(
                 services,
@@ -236,7 +248,8 @@ public final class TeleportWiring {
                 engine,
                 rtp.biomeSearch(),
                 notifier,
-                kernel.scheduler());
+                kernel.scheduler(),
+                new RtpRadiusTier(kernel.permissions()));
         return new TeleportServices.Builder()
                 .engine(engine)
                 .notifier(notifier)

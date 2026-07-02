@@ -50,6 +50,17 @@ public enum TeleportMessageKey implements MessageKey {
     RTP_CANT_AFFORD("teleport.rtp.cant-afford"),
     RTP_BIOME_UNKNOWN("teleport.rtp.biome-unknown"),
     RTP_BIOME_NOT_FOUND("teleport.rtp.biome-not-found"),
+    // /rtp <player> and /rtp <world> — the argument names neither an online player nor a loaded world
+    RTP_UNKNOWN_TARGET("teleport.rtp.unknown-target"),
+
+    // /rtp gui — the menu-engine world picker
+    RTP_GUI_TITLE("teleport.rtp.gui.title"),
+    RTP_GUI_WORLD_NAME("teleport.rtp.gui.world-name"),
+    RTP_GUI_WORLD_LORE("teleport.rtp.gui.world-lore"),
+    RTP_GUI_BIOME_HINT("teleport.rtp.gui.biome-hint"),
+    RTP_GUI_BIOME_HINT_LORE("teleport.rtp.gui.biome-hint-lore"),
+    RTP_GUI_PREV("teleport.rtp.gui.prev"),
+    RTP_GUI_NEXT("teleport.rtp.gui.next"),
 
     // /settpr — set the rtp zone at runtime
     SETTPR_SET("teleport.settpr.set"),

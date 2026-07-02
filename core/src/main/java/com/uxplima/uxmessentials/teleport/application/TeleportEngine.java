@@ -44,6 +44,11 @@ public final class TeleportEngine {
 
     private static final String FEATURE = "tp";
 
+    // /rtp resolves its own cooldown tier — uxmessentials.rtp.cooldown.<seconds> — rather than riding the shared tp
+    // tier, so an operator can rate-limit random-teleport independently. The pre-search check (gateRandom) and the
+    // post-arrival stamp (onLanded) both resolve this same feature, so the two never key different nodes.
+    private static final String RTP_FEATURE = "rtp";
+
     private final Cooldowns cooldowns;
     private final Warmups warmups;
     private final TeleportExecutor executor;
@@ -236,6 +241,11 @@ public final class TeleportEngine {
      * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour.
      */
     private CooldownKind cooldownKind(TeleportKind kind, Destination destination) {
+        if (kind == TeleportKind.RANDOM && destination.cooldownOverride().isEmpty()) {
+            // A random teleport carries no destination-level override, so its stamp resolves the same rtp-specific
+            // tier the pre-search gate checked — keeping gateRandom's check and onLanded's stamp on one node.
+            return randomCooldownKind();
+        }
         if (destination.cooldownOverride().isPresent()) {
             long seconds = destination.cooldownOverride().get().toSeconds();
             return CooldownKind.scoped(
@@ -253,14 +263,16 @@ public final class TeleportEngine {
      * The {@code /rtp} cooldown identity used by {@link #gateRandom} before a destination exists. A random
      * teleport never carries a destination-level override, so this matches {@link #cooldownKind} for a
      * RANDOM destination exactly — the pre-search check and the post-arrival stamp resolve the same key.
+     *
+     * <p>RTP keys its own {@code rtp} tier ({@code uxmessentials.rtp.cooldown.<seconds>}) with its own stamp, so
+     * a {@code /rtp} cooldown is independent of the shared {@code tp} tier. The config default is the per-verb
+     * {@code cooldowns.rtp} override when set, else the shared {@code default-cooldown}; the numbered tier still
+     * refines it through the shared min-reducer (the shortest tier the player holds wins).
      */
     private CooldownKind randomCooldownKind() {
         long override = settings.verbCooldownOverrideSeconds(TeleportKind.RANDOM);
-        Cooldowns.CooldownStartPhase phase = mapPhase(settings.cooldownStartPhase());
-        if (override < 0) {
-            return new CooldownKind(FEATURE, settings.defaultCooldownSeconds(), phase);
-        }
-        return CooldownKind.scoped(FEATURE, FEATURE + "." + verbScope(TeleportKind.RANDOM), override, phase);
+        long defaultSeconds = override < 0 ? settings.defaultCooldownSeconds() : override;
+        return new CooldownKind(RTP_FEATURE, defaultSeconds, mapPhase(settings.cooldownStartPhase()));
     }
 
     private static String verbScope(TeleportKind kind) {

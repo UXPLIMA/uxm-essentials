@@ -201,6 +201,12 @@ permissions:
   uxmessentials.rtp.biome:
     description: '/rtp biome <biome> to random teleport into a specific biome.'
     default: true
+  uxmessentials.rtp.others:
+    description: '/rtp <player> to force another online player to random teleport (staff).'
+    default: op
+  uxmessentials.rtp.gui:
+    description: '/rtp gui to open the random-teleport world picker.'
+    default: true
   uxmessentials.teleport.settpr:
     description: '/settpr <minRange> <maxRange> to set the /rtp search zone at runtime.'
     default: op

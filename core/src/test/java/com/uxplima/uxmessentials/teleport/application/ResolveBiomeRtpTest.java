@@ -18,6 +18,8 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
+import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
@@ -153,7 +155,26 @@ class ResolveBiomeRtpTest {
                 engine,
                 search,
                 notifier,
-                scheduler);
+                scheduler,
+                new RtpRadiusTier(new NoTierPermissions()));
+    }
+
+    /** A permissions fake with no radius tier: {@code resolveQuota} echoes the config default, so the area is unchanged. */
+    private static final class NoTierPermissions
+            implements com.uxplima.uxmessentials.shared.application.port.Permissions {
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return false;
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who,
+                QuotaFamily family,
+                @org.jspecify.annotations.Nullable WorldRef world,
+                long configDefault) {
+            return QuotaResult.limited(configDefault);
+        }
     }
 
     /** Resolves only {@code desert}; every other key is unknown. */

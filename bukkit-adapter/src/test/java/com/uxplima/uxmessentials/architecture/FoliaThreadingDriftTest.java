@@ -250,6 +250,9 @@ class FoliaThreadingDriftTest {
                 pkg + "shared.adapter.inbound.command.CommandSuggestions",
                 "OFFTICK: Brigadier suggestion provider (player-name type-ahead)");
         allow.put(
+                pkg + "teleport.adapter.inbound.command.RtpCommand",
+                "OFFTICK: Brigadier suggestion provider (/rtp <target> player-or-world type-ahead)");
+        allow.put(
                 pkg + "vaults.adapter.inbound.command.VaultCommand",
                 "OFFTICK: Brigadier suggestion provider (player-name type-ahead)");
         allow.put(

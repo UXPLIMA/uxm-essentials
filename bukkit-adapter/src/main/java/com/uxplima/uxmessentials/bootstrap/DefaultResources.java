@@ -115,6 +115,7 @@ final class DefaultResources {
             "modules/staff/gui/staff-examine.conf",
             "modules/staff/gui/staff-list.conf",
             "modules/staff/gui/staff-navigator.conf",
+            "modules/teleport/gui/rtp.conf",
             "modules/teleport/gui/teleport-settings.conf",
             "modules/vaults/gui/vault-selector.conf",
             "modules/warps/gui/warp-browse.conf",

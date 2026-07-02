@@ -41,6 +41,7 @@ public final class ResolveBiomeRtp {
     private final BiomeTargetedSearch search;
     private final PlayerNotifier notifier;
     private final Scheduler scheduler;
+    private final RtpRadiusTier radiusTier;
 
     public ResolveBiomeRtp(
             BiomeCatalog catalog,
@@ -50,7 +51,8 @@ public final class ResolveBiomeRtp {
             TeleportEngine engine,
             BiomeTargetedSearch search,
             PlayerNotifier notifier,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            RtpRadiusTier radiusTier) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.areas = Objects.requireNonNull(areas, "areas");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
@@ -59,6 +61,7 @@ public final class ResolveBiomeRtp {
         this.search = Objects.requireNonNull(search, "search");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.radiusTier = Objects.requireNonNull(radiusTier, "radiusTier");
     }
 
     /**
@@ -90,7 +93,10 @@ public final class ResolveBiomeRtp {
             return Result.err(TeleportError.RTP_NO_SAFE_LOCATION);
         }
         notifier.send(who, TeleportMessageKey.RTP_SEARCHING);
-        launch(who, area.get().withTargetBiome(biome.get()), biome.get());
+        // Bound the live search to this player's rtp.radius tier before constraining it to the biome; the shared
+        // pool paths (plain /rtp, /rtp <world>) serve world-wide and carry no per-player radius.
+        SafeSearchArea clamped = radiusTier.clamp(who, area.get());
+        launch(who, clamped.withTargetBiome(biome.get()), biome.get());
         return Result.ok();
     }
 
