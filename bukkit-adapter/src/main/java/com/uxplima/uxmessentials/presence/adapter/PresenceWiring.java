@@ -85,6 +85,7 @@ public final class PresenceWiring {
                 kernel.scheduler(),
                 store,
                 services.markAfk(),
+                kernel.log(),
                 settings.sweepInterval(),
                 settings.idleThreshold(),
                 running::get,

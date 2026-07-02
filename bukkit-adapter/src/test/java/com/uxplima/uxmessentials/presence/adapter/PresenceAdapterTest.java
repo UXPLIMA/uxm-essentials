@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.presence.domain.PlayerPresence;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -128,7 +129,14 @@ class PresenceAdapterTest {
         store.current(ref); // seed an active presence stamped at the fixed clock
         MarkAfk markAfk = new MarkAfk(store, new OnlineAudience(), notifier, events, clock);
         AfkSweep sweep = new AfkSweep(
-                scheduler, store, markAfk, Duration.ofSeconds(15), Duration.ofMinutes(5), oneShot(), clock);
+                scheduler,
+                store,
+                markAfk,
+                new NoopLogger(),
+                Duration.ofSeconds(15),
+                Duration.ofMinutes(5),
+                oneShot(),
+                clock);
 
         clock.advance(Duration.ofMinutes(6)); // push past the idle threshold
         sweep.start(); // the inline scheduler runs the single delayed sweep immediately
@@ -145,7 +153,14 @@ class PresenceAdapterTest {
         store.current(ref);
         MarkAfk markAfk = new MarkAfk(store, new OnlineAudience(), notifier, events, clock);
         AfkSweep sweep = new AfkSweep(
-                scheduler, store, markAfk, Duration.ofSeconds(15), Duration.ofMinutes(5), oneShot(), clock);
+                scheduler,
+                store,
+                markAfk,
+                new NoopLogger(),
+                Duration.ofSeconds(15),
+                Duration.ofMinutes(5),
+                oneShot(),
+                clock);
 
         clock.advance(Duration.ofMinutes(2)); // still within the threshold
         sweep.start();
@@ -278,5 +293,19 @@ class PresenceAdapterTest {
         public void deliver(PlayerRef viewer, String renderedText) {
             // discarded: delivery is not under test here
         }
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

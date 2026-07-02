@@ -9,6 +9,7 @@ import java.util.function.BooleanSupplier;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.presence.domain.PlayerPresence;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -36,6 +37,7 @@ public final class AfkSweep {
     private final Scheduler scheduler;
     private final PresenceStore store;
     private final MarkAfk markAfk;
+    private final Logger log;
     private final Duration interval;
     private final Duration idleThreshold;
     private final BooleanSupplier running;
@@ -45,6 +47,7 @@ public final class AfkSweep {
             Scheduler scheduler,
             PresenceStore store,
             MarkAfk markAfk,
+            Logger log,
             Duration interval,
             Duration idleThreshold,
             BooleanSupplier running,
@@ -52,6 +55,7 @@ public final class AfkSweep {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.store = Objects.requireNonNull(store, "store");
         this.markAfk = Objects.requireNonNull(markAfk, "markAfk");
+        this.log = Objects.requireNonNull(log, "log");
         this.interval = Objects.requireNonNull(interval, "interval");
         this.idleThreshold = Objects.requireNonNull(idleThreshold, "idleThreshold");
         this.running = Objects.requireNonNull(running, "running");
@@ -74,7 +78,12 @@ public final class AfkSweep {
         if (!running.getAsBoolean()) {
             return;
         }
-        flipIdlePlayers();
+        try {
+            flipIdlePlayers();
+        } catch (RuntimeException failure) {
+            // A throwing scan must not skip the reschedule below, or auto-AFK would stop sweeping until a reload.
+            log.error("auto-afk sweep failed", failure);
+        }
         scheduleNext();
     }
 

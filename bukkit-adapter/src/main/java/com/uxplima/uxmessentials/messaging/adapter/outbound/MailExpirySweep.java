@@ -65,7 +65,12 @@ public final class MailExpirySweep {
         if (!running.getAsBoolean()) {
             return;
         }
-        purgeExpired();
+        try {
+            purgeExpired();
+        } catch (RuntimeException failure) {
+            // A throwing delete must not skip the reschedule below, or expiry would stall and mailboxes grow forever.
+            log.error("mail expiry sweep failed", failure);
+        }
         scheduleNext();
     }
 

@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
@@ -39,6 +40,7 @@ public final class NametagRenderTask {
     private final Scheduler scheduler;
     private final PacketNametagPresenter presenter;
     private final AnimationRegistry animations;
+    private final Logger log;
     private final Supplier<Duration> interval;
     private final BooleanSupplier running;
 
@@ -46,11 +48,13 @@ public final class NametagRenderTask {
             Scheduler scheduler,
             PacketNametagPresenter presenter,
             AnimationRegistry animations,
+            Logger log,
             Supplier<Duration> interval,
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.presenter = Objects.requireNonNull(presenter, "presenter");
         this.animations = Objects.requireNonNull(animations, "animations");
+        this.log = Objects.requireNonNull(log, "log");
         this.interval = Objects.requireNonNull(interval, "interval");
         this.running = Objects.requireNonNull(running, "running");
     }
@@ -71,11 +75,16 @@ public final class NametagRenderTask {
         if (!running.getAsBoolean()) {
             return;
         }
-        // Advance the global animation clock once, on this loop thread, before fanning out so every per-wearer text
-        // callback the lib invokes this period reads the same frame.
-        animations.advance();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            scheduler.onEntity(BukkitRefs.toRef(player), () -> presenter.update(player));
+        try {
+            // Advance the global animation clock once, on this loop thread, before fanning out so every per-wearer text
+            // callback the lib invokes this period reads the same frame.
+            animations.advance();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                scheduler.onEntity(BukkitRefs.toRef(player), () -> presenter.update(player));
+            }
+        } catch (RuntimeException failure) {
+            // A throwing tick must not skip the reschedule below, or nametags would stop reconciling until a reload.
+            log.error("nametag reconcile tick failed", failure);
         }
         scheduleNext();
     }

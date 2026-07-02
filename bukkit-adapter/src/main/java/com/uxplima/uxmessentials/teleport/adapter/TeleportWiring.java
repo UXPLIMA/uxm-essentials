@@ -99,7 +99,7 @@ public final class TeleportWiring {
         TeleportServices services =
                 assemble(plugin, kernel, config, settings, notifier, warmupTracker, jailGate, spawns, clock, running);
         RequestExpirySweep sweep = new RequestExpirySweep(
-                kernel.scheduler(), services.requests(), services.acceptTeleport(), running::get);
+                kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener =
                 new RespawnListener(new ResolveRespawn(settings), spawns, homeRespawnLocator, plugin.getServer());
         // The per-player settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder

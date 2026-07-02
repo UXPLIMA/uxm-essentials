@@ -56,7 +56,7 @@ public final class BusWiring {
         // lifecycle below — a disabled backend builds neither.
         ClusterPeers peers = new ClusterPeers(network.peerLivenessWindow());
         registry.register(peers.listener());
-        ClusterHeartbeat heartbeat = new ClusterHeartbeat(core, scheduler, network.heartbeatInterval());
+        ClusterHeartbeat heartbeat = new ClusterHeartbeat(core, scheduler, network.heartbeatInterval(), log);
         return new Wired(
                 new Bus(core, registry), new Lifecycle(core, heartbeat, log, network), peers, network, scheduler);
     }

@@ -71,7 +71,12 @@ public final class VaultCleanupSweep {
         if (!running.getAsBoolean()) {
             return;
         }
-        purgeInactive();
+        try {
+            purgeInactive();
+        } catch (RuntimeException failure) {
+            // A throwing purge must not skip the reschedule below, or cleanup would stop reclaiming until a reload.
+            log.error("vault cleanup sweep failed", failure);
+        }
         scheduleNext();
     }
 

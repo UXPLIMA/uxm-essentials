@@ -87,7 +87,7 @@ public final class ScoreboardWiring {
         ScoreboardNotifier notifier = new ScoreboardNotifier(kernel.messages(), kernel.messageSink());
         ToggleScoreboard toggle = new ToggleScoreboard(visibility, notifier, kernel.events());
         ScoreboardRenderTask renderTask = new ScoreboardRenderTask(
-                kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
+                kernel.scheduler(), renderer, animations, kernel.log(), settings::refreshInterval, running::get);
 
         // The settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader.
         // It carries the single show/hide toggle the /scoreboard command flips (the board a viewer sees is resolved

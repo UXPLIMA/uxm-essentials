@@ -96,6 +96,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupp
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmlib.hologram.HologramManager;
@@ -251,7 +252,7 @@ public final class HologramsWiring {
                     .getPluginManager()
                     .registerEvents(new DamageIndicatorListener(damageIndicators, kernel.scheduler()), plugin);
         }
-        AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer);
+        AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer, kernel.log());
         // The cached repository's all() is the authoritative in-memory set after the one warm load, so reading
         // names off it per keystroke is allocation-light and never touches the database — safe on the tick thread.
         java.util.function.Supplier<java.util.List<String>> hologramNames = () -> repository.all().stream()
@@ -351,10 +352,10 @@ public final class HologramsWiring {
     }
 
     private static AutoCloseable scheduleRefresh(
-            Scheduler scheduler, HologramRepository repository, HologramRenderer renderer) {
+            Scheduler scheduler, HologramRepository repository, HologramRenderer renderer, Logger log) {
         // A single global timer ticks every second and re-renders only the holograms whose interval is due, so
         // a server with no refreshing hologram pays just the empty iteration. The handle is closed on stop.
-        HologramRefreshTask task = new HologramRefreshTask(repository::all, renderer::refresh, REFRESH_BASE_TICKS);
+        HologramRefreshTask task = new HologramRefreshTask(repository::all, renderer::refresh, log, REFRESH_BASE_TICKS);
         return scheduler.repeatGlobal(task::tick, REFRESH_BASE, REFRESH_BASE);
     }
 

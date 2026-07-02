@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -27,7 +28,8 @@ class ClusterHeartbeatTest {
     @Test
     void startSchedulesTheFirstTickAfterOneInterval() {
         RecordingScheduler scheduler = new RecordingScheduler();
-        ClusterHeartbeat heartbeat = new ClusterHeartbeat(new CapturingPublisher(SELF), scheduler, INTERVAL, () -> 1L);
+        ClusterHeartbeat heartbeat =
+                new ClusterHeartbeat(new CapturingPublisher(SELF), scheduler, INTERVAL, new CountingLogger(), () -> 1L);
 
         heartbeat.start();
 
@@ -39,7 +41,8 @@ class ClusterHeartbeatTest {
     void aFiredTickPublishesAServerPingWithThisBackendsIdAndTheClock() {
         RecordingScheduler scheduler = new RecordingScheduler();
         CapturingPublisher publisher = new CapturingPublisher(SELF);
-        ClusterHeartbeat heartbeat = new ClusterHeartbeat(publisher, scheduler, INTERVAL, () -> 42L);
+        ClusterHeartbeat heartbeat =
+                new ClusterHeartbeat(publisher, scheduler, INTERVAL, new CountingLogger(), () -> 42L);
 
         heartbeat.start();
         scheduler.fireNext();
@@ -50,7 +53,8 @@ class ClusterHeartbeatTest {
     @Test
     void eachTickReschedulesTheNext() {
         RecordingScheduler scheduler = new RecordingScheduler();
-        ClusterHeartbeat heartbeat = new ClusterHeartbeat(new CapturingPublisher(SELF), scheduler, INTERVAL, () -> 7L);
+        ClusterHeartbeat heartbeat =
+                new ClusterHeartbeat(new CapturingPublisher(SELF), scheduler, INTERVAL, new CountingLogger(), () -> 7L);
 
         heartbeat.start();
         scheduler.fireNext();
@@ -64,7 +68,8 @@ class ClusterHeartbeatTest {
     void aStoppedHeartbeatPublishesNothingFurther() {
         RecordingScheduler scheduler = new RecordingScheduler();
         CapturingPublisher publisher = new CapturingPublisher(SELF);
-        ClusterHeartbeat heartbeat = new ClusterHeartbeat(publisher, scheduler, INTERVAL, () -> 1L);
+        ClusterHeartbeat heartbeat =
+                new ClusterHeartbeat(publisher, scheduler, INTERVAL, new CountingLogger(), () -> 1L);
 
         heartbeat.start();
         heartbeat.stop();
@@ -75,10 +80,28 @@ class ClusterHeartbeatTest {
     }
 
     @Test
+    void aTickWhosePublishThrowsStillReschedulesAndLogsOneError() {
+        RecordingScheduler scheduler = new RecordingScheduler();
+        CountingLogger log = new CountingLogger();
+        // A transport hiccup makes the publish throw; the heartbeat must not stop ticking because of it.
+        ClusterHeartbeat heartbeat =
+                new ClusterHeartbeat(new ThrowingPublisher(SELF), scheduler, INTERVAL, log, () -> 1L);
+
+        heartbeat.start();
+        scheduler.fireNext();
+
+        assertThat(scheduler.pending)
+                .as("the next ping is still armed after a throwing publish")
+                .isNotNull();
+        assertThat(scheduler.scheduleCount).isEqualTo(2);
+        assertThat(log.errors).as("the failure is logged exactly once").isEqualTo(1);
+    }
+
+    @Test
     void aHeartbeatThatWasNeverStartedPublishesNothing() {
         RecordingScheduler scheduler = new RecordingScheduler();
         CapturingPublisher publisher = new CapturingPublisher(SELF);
-        new ClusterHeartbeat(publisher, scheduler, INTERVAL, () -> 1L);
+        new ClusterHeartbeat(publisher, scheduler, INTERVAL, new CountingLogger(), () -> 1L);
 
         assertThat(scheduler.scheduleCount).isZero();
         assertThat(publisher.published).isEmpty();
@@ -138,5 +161,44 @@ class ClusterHeartbeatTest {
         public String serverId() {
             return serverId;
         }
+    }
+
+    /** A publisher that always throws, standing in for a transport hiccup mid-tick. */
+    private static final class ThrowingPublisher implements BusPublisher {
+
+        private final String serverId;
+
+        ThrowingPublisher(String serverId) {
+            this.serverId = serverId;
+        }
+
+        @Override
+        public void publish(NetworkMessage message) {
+            throw new IllegalStateException("transport down");
+        }
+
+        @Override
+        public String serverId() {
+            return serverId;
+        }
+    }
+
+    /** A logger that counts the error lines the guard emits. */
+    private static final class CountingLogger implements Logger {
+        private int errors;
+
+        @Override
+        public void error(String message, Throwable cause) {
+            errors++;
+        }
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

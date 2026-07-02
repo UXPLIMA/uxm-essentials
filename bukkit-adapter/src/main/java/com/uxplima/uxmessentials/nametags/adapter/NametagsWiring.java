@@ -91,7 +91,7 @@ public final class NametagsWiring {
                 nameVisibility,
                 settings::hideVanillaName);
         NametagRenderTask renderTask = new NametagRenderTask(
-                kernel.scheduler(), presenter, animations, settings::refreshInterval, running::get);
+                kernel.scheduler(), presenter, animations, kernel.log(), settings::refreshInterval, running::get);
 
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new NametagLifecycleListener(presenter, kernel.scheduler()));

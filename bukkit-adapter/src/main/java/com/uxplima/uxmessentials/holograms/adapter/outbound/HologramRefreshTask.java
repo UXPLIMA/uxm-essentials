@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -25,12 +26,15 @@ public final class HologramRefreshTask {
 
     private final Supplier<List<Hologram>> holograms;
     private final Consumer<Hologram> refresh;
+    private final Logger log;
     private final int baseTicks;
     private long elapsedTicks;
 
-    public HologramRefreshTask(Supplier<List<Hologram>> holograms, Consumer<Hologram> refresh, int baseTicks) {
+    public HologramRefreshTask(
+            Supplier<List<Hologram>> holograms, Consumer<Hologram> refresh, Logger log, int baseTicks) {
         this.holograms = Objects.requireNonNull(holograms, "holograms");
         this.refresh = Objects.requireNonNull(refresh, "refresh");
+        this.log = Objects.requireNonNull(log, "log");
         if (baseTicks <= 0) {
             throw new IllegalArgumentException("baseTicks must be positive: " + baseTicks);
         }
@@ -42,8 +46,17 @@ public final class HologramRefreshTask {
         elapsedTicks += baseTicks;
         for (Hologram hologram : holograms.get()) {
             if (isDue(hologram)) {
-                refresh.accept(hologram);
+                refreshOne(hologram);
             }
+        }
+    }
+
+    private void refreshOne(Hologram hologram) {
+        try {
+            refresh.accept(hologram);
+        } catch (RuntimeException failure) {
+            // One hologram that throws on refresh must not abort the rest of this tick's due holograms.
+            log.error("hologram refresh failed", failure);
         }
     }
 

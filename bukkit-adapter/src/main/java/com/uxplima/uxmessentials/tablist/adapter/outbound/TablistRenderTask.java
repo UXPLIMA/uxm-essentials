@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,6 +35,7 @@ public final class TablistRenderTask {
     private final Scheduler scheduler;
     private final TablistRenderer renderer;
     private final AnimationRegistry animations;
+    private final Logger log;
     private final Supplier<Duration> interval;
     private final BooleanSupplier running;
 
@@ -41,11 +43,13 @@ public final class TablistRenderTask {
             Scheduler scheduler,
             TablistRenderer renderer,
             AnimationRegistry animations,
+            Logger log,
             Supplier<Duration> interval,
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.animations = Objects.requireNonNull(animations, "animations");
+        this.log = Objects.requireNonNull(log, "log");
         this.interval = Objects.requireNonNull(interval, "interval");
         this.running = Objects.requireNonNull(running, "running");
     }
@@ -66,11 +70,16 @@ public final class TablistRenderTask {
         if (!running.getAsBoolean()) {
             return;
         }
-        // Advance the global animation clock once, on this loop thread, before fanning out. Every per-player render
-        // below then reads the same frame for this tick.
-        animations.advance();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            scheduler.onEntity(BukkitRefs.toRef(player), () -> renderer.renderFor(player));
+        try {
+            // Advance the global animation clock once, on this loop thread, before fanning out. Every per-player render
+            // below then reads the same frame for this tick.
+            animations.advance();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                scheduler.onEntity(BukkitRefs.toRef(player), () -> renderer.renderFor(player));
+            }
+        } catch (RuntimeException failure) {
+            // A throwing tick must not skip the reschedule below, or the tablist would freeze until a reload.
+            log.error("tablist render tick failed", failure);
         }
         scheduleNext();
     }

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
@@ -26,16 +27,19 @@ public final class RequestExpirySweep {
     private final Scheduler scheduler;
     private final InMemoryRequestRegistry requests;
     private final AcceptTeleport acceptTeleport;
+    private final Logger log;
     private final BooleanSupplier running;
 
     public RequestExpirySweep(
             Scheduler scheduler,
             InMemoryRequestRegistry requests,
             AcceptTeleport acceptTeleport,
+            Logger log,
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.requests = Objects.requireNonNull(requests, "requests");
         this.acceptTeleport = Objects.requireNonNull(acceptTeleport, "acceptTeleport");
+        this.log = Objects.requireNonNull(log, "log");
         this.running = Objects.requireNonNull(running, "running");
     }
 
@@ -55,7 +59,12 @@ public final class RequestExpirySweep {
         if (!running.getAsBoolean()) {
             return;
         }
-        requests.snapshot().forEach(acceptTeleport::expireIfDue);
+        try {
+            requests.snapshot().forEach(acceptTeleport::expireIfDue);
+        } catch (RuntimeException failure) {
+            // A throwing expiry must not skip the reschedule below, or stale /tpa requests would never clear.
+            log.error("tpa request-expiry sweep failed", failure);
+        }
         scheduleNext();
     }
 }

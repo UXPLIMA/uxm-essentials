@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.function.LongSupplier;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
 import org.jspecify.annotations.NullMarked;
@@ -29,18 +30,20 @@ public final class ClusterHeartbeat {
 
     private final BusPublisher publisher;
     private final Scheduler scheduler;
+    private final Logger log;
     private final Duration interval;
     private final LongSupplier clock;
     private volatile boolean running;
 
     /** Heartbeat publishing through {@code publisher} every {@code interval}, reading the wall clock for each stamp. */
-    public ClusterHeartbeat(BusPublisher publisher, Scheduler scheduler, Duration interval) {
-        this(publisher, scheduler, interval, System::currentTimeMillis);
+    public ClusterHeartbeat(BusPublisher publisher, Scheduler scheduler, Duration interval, Logger log) {
+        this(publisher, scheduler, interval, log, System::currentTimeMillis);
     }
 
-    ClusterHeartbeat(BusPublisher publisher, Scheduler scheduler, Duration interval, LongSupplier clock) {
+    ClusterHeartbeat(BusPublisher publisher, Scheduler scheduler, Duration interval, Logger log, LongSupplier clock) {
         this.publisher = Objects.requireNonNull(publisher, "publisher");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
         this.interval = Objects.requireNonNull(interval, "interval");
         this.clock = Objects.requireNonNull(clock, "clock");
         if (interval.isNegative() || interval.isZero()) {
@@ -70,7 +73,13 @@ public final class ClusterHeartbeat {
         if (!running) {
             return;
         }
-        publisher.publish(new ServerPing(publisher.serverId(), clock.getAsLong()));
+        try {
+            publisher.publish(new ServerPing(publisher.serverId(), clock.getAsLong()));
+        } catch (RuntimeException failure) {
+            // A throwing publish must not skip the reschedule below, or this backend would drop off every peer's
+            // roster.
+            log.error("cluster heartbeat publish failed", failure);
+        }
         scheduleNext();
     }
 }

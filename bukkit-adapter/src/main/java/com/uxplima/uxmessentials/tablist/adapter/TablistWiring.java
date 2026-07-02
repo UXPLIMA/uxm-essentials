@@ -102,7 +102,7 @@ public final class TablistWiring {
                 kernel.scheduler(),
                 suppression);
         TablistRenderTask renderTask = new TablistRenderTask(
-                kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
+                kernel.scheduler(), renderer, animations, kernel.log(), settings::refreshInterval, running::get);
 
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new TablistConnectionListener(renderer));
