@@ -29,6 +29,7 @@ class StopPoseTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
     private static final PlayerRef WHO = new PlayerRef(UUID.randomUUID(), "Steve");
+    private static final PlayerRef CARRIER = new PlayerRef(UUID.randomUUID(), "Carrier");
     private static final Position RETURN = new Position(WORLD, 11.0, 64.0, 21.0, 0f, 0f);
 
     private final PoseSessions sessions = new PoseSessions();
@@ -45,6 +46,21 @@ class StopPoseTest {
 
         assertThat(seats.removed).containsExactly("h1");
         assertThat(poseReturn.returns).containsExactly(RETURN);
+        assertThat(sessions.isPosing(WHO)).isFalse();
+        assertThat(events.published).singleElement().isInstanceOf(PoseEnded.class);
+    }
+
+    @Test
+    void dismountsTheRiderRatherThanRemovingASeatForAPlayerSit() {
+        // A player-sit rides a carrier, not a seat entity, so stopping it dismounts the rider — no seat is removed.
+        sessions.start(new PoseSession(
+                WHO, PoseType.PLAYER_SIT, RETURN, "player-sit", CARRIER, Instant.parse("2026-07-02T00:00:00Z")));
+        StopPose stopPose = new StopPose(sessions, seats, poseReturn, events, true);
+
+        assertThat(stopPose.stop(WHO)).isPresent();
+
+        assertThat(seats.dismounted).containsExactly(WHO);
+        assertThat(seats.removed).isEmpty();
         assertThat(sessions.isPosing(WHO)).isFalse();
         assertThat(events.published).singleElement().isInstanceOf(PoseEnded.class);
     }
@@ -86,9 +102,10 @@ class StopPoseTest {
         sessions.start(new PoseSession(WHO, PoseType.SIT, RETURN, handle, null, Instant.parse("2026-07-02T00:00:00Z")));
     }
 
-    /** Records the handles the port was asked to remove. */
+    /** Records the handles the port was asked to remove and the riders it was asked to dismount. */
     private static final class RecordingSeatPort implements SeatPort {
         private final List<String> removed = new ArrayList<>();
+        private final List<PlayerRef> dismounted = new ArrayList<>();
 
         @Override
         public SeatHandle spawnSeat(Position seat, float yaw) {
@@ -97,6 +114,14 @@ class StopPoseTest {
 
         @Override
         public void mount(PlayerRef rider, SeatHandle seat) {}
+
+        @Override
+        public void mountOnPlayer(PlayerRef rider, PlayerRef target) {}
+
+        @Override
+        public void dismount(PlayerRef rider) {
+            dismounted.add(rider);
+        }
 
         @Override
         public void removeSeat(SeatHandle seat) {

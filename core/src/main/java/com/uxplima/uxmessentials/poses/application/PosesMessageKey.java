@@ -24,7 +24,17 @@ public enum PosesMessageKey implements MessageKey {
     // Refusal — sitting is switched off, the player already holds a pose, or the seat is already taken.
     POSES_SIT_DISABLED("poses.sit-disabled"),
     POSES_ALREADY_POSING("poses.already-posing"),
-    POSES_SEAT_OCCUPIED("poses.seat-occupied");
+    POSES_SEAT_OCCUPIED("poses.seat-occupied"),
+
+    // Player-sit (stacking) — sitting on another player's shoulders and the personal opt-out toggle.
+    POSES_PLAYERSIT_DISABLED("poses.playersit-disabled"),
+    POSES_PLAYERSIT_TARGET_REFUSES("poses.playersit-target-refuses"),
+    POSES_CANNOT_SIT_ON_SELF("poses.cannot-sit-on-self"),
+    POSES_PLAYERSIT_NOW_ALLOWED("poses.playersit-now-allowed"),
+    POSES_PLAYERSIT_NOW_REFUSED("poses.playersit-now-refused"),
+
+    // The bare /poses root's usage line, until Phase 6 turns it into the settings GUI.
+    POSES_USAGE("poses.usage");
 
     private final String key;
 

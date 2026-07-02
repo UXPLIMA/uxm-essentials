@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.poses.application;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,6 +52,20 @@ public final class PoseSessions {
     public boolean isPosing(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         return sessions.containsKey(who.uuid());
+    }
+
+    /**
+     * The players currently sitting <em>on</em> {@code target} — the subjects of the {@link
+     * com.uxplima.uxmessentials.poses.domain.PoseType#PLAYER_SIT} sessions whose target is {@code target}. Used to
+     * end each rider's pose when their carrier logs out or is removed, so no rider is left with a stuck session once
+     * the carrier is gone. The returned list is a snapshot, safe to iterate while stopping each rider.
+     */
+    public List<PlayerRef> ridersOf(PlayerRef target) {
+        Objects.requireNonNull(target, "target");
+        return sessions.values().stream()
+                .filter(session -> target.equals(session.target()))
+                .map(PoseSession::subject)
+                .toList();
     }
 
     /** How many players are posing right now. */

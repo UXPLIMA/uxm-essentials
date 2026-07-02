@@ -60,7 +60,13 @@ public final class StopPose {
             return Optional.empty();
         }
         PoseSession session = ended.get();
-        seats.removeSeat(SeatHandle.of(session.seatHandle()));
+        if (session.target() != null) {
+            // A player-sit rides a carrier, not a seat entity: take the rider off the carrier directly.
+            seats.dismount(who);
+        } else {
+            // A block/in-place sit rides a spawned seat: removing it dismounts the rider and leaves no ghost.
+            seats.removeSeat(SeatHandle.of(session.seatHandle()));
+        }
         if (allowReturn && returnToStart) {
             poseReturn.returnTo(who, session.returnLocation());
         }

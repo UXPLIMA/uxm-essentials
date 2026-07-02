@@ -142,6 +142,12 @@ class StartSitTest {
         }
 
         @Override
+        public void mountOnPlayer(PlayerRef rider, PlayerRef target) {}
+
+        @Override
+        public void dismount(PlayerRef rider) {}
+
+        @Override
         public void removeSeat(SeatHandle seat) {}
 
         @Override

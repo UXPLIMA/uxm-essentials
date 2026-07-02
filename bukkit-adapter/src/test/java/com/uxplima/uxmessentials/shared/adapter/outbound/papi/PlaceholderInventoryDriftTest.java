@@ -180,11 +180,25 @@ class PlaceholderInventoryDriftTest {
                 .holograms(() -> 0)
                 .communication(communication())
                 .scoreboard(who -> true)
-                .poses(who -> false)
+                .poses(poses())
                 .worlds(worlds())
                 .serverMetrics(serverMetrics())
                 .menu(menu())
                 .build();
+    }
+
+    private static PosesPlaceholders poses() {
+        return new PosesPlaceholders() {
+            @Override
+            public boolean sitting(PlayerRef who) {
+                return false;
+            }
+
+            @Override
+            public boolean allowsSitting(PlayerRef who) {
+                return true;
+            }
+        };
     }
 
     private static MenuPlaceholders menu() {

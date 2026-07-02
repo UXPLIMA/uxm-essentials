@@ -23,6 +23,11 @@ import org.jspecify.annotations.NullMarked;
  * teleport exits pass {@code allowReturn = false} — the player is leaving or already moving, so the
  * {@code return-to-start} teleport would be wrong there; the others return the player when the server is
  * configured to. Every branch is guarded by the session registry so a non-posing player is untouched.
+ *
+ * <p>A quit also ends the pose of anyone stacked <em>on</em> the leaver: when a player-sit carrier logs out, Bukkit
+ * drops the rider as a passenger, but the rider's {@link PoseSession} would linger unless it is ended too. The quit
+ * handler stops each of the carrier's direct riders, so no rider is left with a stuck session once its carrier is
+ * gone (a rider stacked on that rider is in turn stopped when its own carrier's session ends).
  */
 @NullMarked
 public final class PoseCancelListener implements Listener {
@@ -37,8 +42,14 @@ public final class PoseCancelListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        PlayerRef who = BukkitRefs.toRef(event.getPlayer());
         // Always attempt cleanup on quit so a seat can never outlive the player; no return teleport for a leaver.
-        stopPose.stop(BukkitRefs.toRef(event.getPlayer()), false);
+        stopPose.stop(who, false);
+        // End the pose of anyone stacked on the leaver too, so no rider is left with a session once its carrier is
+        // gone. Snapshot first, then stop each — stopping mutates the registry ridersOf reads.
+        for (PlayerRef rider : sessions.ridersOf(who)) {
+            stopPose.stop(rider, false);
+        }
     }
 
     @EventHandler

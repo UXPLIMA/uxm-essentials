@@ -1134,6 +1134,12 @@ permissions:
   uxmessentials.sit.use:
     description: '/sit and right-click-to-sit — sit down where you stand or on a sittable block.'
     default: true
+  uxmessentials.playersit.use:
+    description: 'Right-click another player to sit on them (the stacking pose), when player-sit is enabled.'
+    default: true
+  uxmessentials.poses.toggle:
+    description: '/poses toggle — allow or refuse other players sitting on you.'
+    default: true
   uxmessentials.module.poses:
     description: 'Hot-reload / inspect the poses module (built-in GSit-parity sitting and posing).'
     default: op

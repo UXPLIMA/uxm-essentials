@@ -23,8 +23,21 @@ public interface SeatPort {
     /** Seat {@code rider} on the seat identified by {@code seat}; a no-op if the seat is already gone. */
     void mount(PlayerRef rider, SeatHandle seat);
 
+    /**
+     * Seat {@code rider} directly on {@code target} — the player-sit stacking pose, which spawns no seat entity.
+     * The adapter runs {@code target.addPassenger(rider)} on the carrier's own region thread; because
+     * {@code addPassenger} chains, a rider on a rider on a player just works. A no-op if either player is offline.
+     */
+    void mountOnPlayer(PlayerRef rider, PlayerRef target);
+
     /** Remove the seat identified by {@code seat}, dismounting whoever rides it; a no-op if already removed. */
     void removeSeat(SeatHandle seat);
+
+    /**
+     * Dismount {@code rider} from whatever they ride — the player-sit end path, where there is no seat entity to
+     * remove, so the rider is taken off their carrier directly. A no-op when the rider is offline or not riding.
+     */
+    void dismount(PlayerRef rider);
 
     /** Whether a live seat already sits on {@code seat}'s block, so a second player cannot claim it. */
     boolean isOccupied(Position seat);

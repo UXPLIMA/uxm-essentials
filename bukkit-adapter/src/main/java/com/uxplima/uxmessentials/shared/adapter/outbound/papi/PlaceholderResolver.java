@@ -38,6 +38,10 @@ public final class PlaceholderResolver {
 
     private static final String YES = "yes";
     private static final String NO = "no";
+    /** The player-sit toggle renders its own words rather than yes/no, so it reads as an opt-out state. */
+    private static final String ALLOW = "allow";
+
+    private static final String REFUSE = "refuse";
     private static final String KIT_PREFIX = "kit_";
     private static final String KIT_COOLDOWN_PREFIX = "cooldown_";
     private static final String KIT_AVAILABLE_PREFIX = "available_";
@@ -838,15 +842,20 @@ public final class PlaceholderResolver {
 
     /**
      * Resolve a {@code poses_}-stripped key against the poses seam. {@code sitting} reports whether the requester is
-     * currently sitting ({@code yes}/{@code no}). A pose is live session state, so a disabled module or an offline
-     * requester degrades the key to the dash.
+     * currently sitting ({@code yes}/{@code no}); {@code toggle} reports whether they let others sit on them
+     * ({@code allow}/{@code refuse}). Both are live per-player reads, so a disabled module or an offline requester
+     * degrades the key to the dash.
      */
     private String poses(PlayerRef who, boolean online, String key) {
         Optional<PosesPlaceholders> seam = contexts.poses();
         if (seam.isEmpty() || !online) {
             return EMPTY;
         }
-        return key.equals("sitting") ? bool(seam.get().sitting(who)) : EMPTY;
+        return switch (key) {
+            case "sitting" -> bool(seam.get().sitting(who));
+            case "toggle" -> seam.get().allowsSitting(who) ? ALLOW : REFUSE;
+            default -> EMPTY;
+        };
     }
 
     /**

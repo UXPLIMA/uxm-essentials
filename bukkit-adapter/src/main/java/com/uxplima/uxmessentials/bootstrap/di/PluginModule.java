@@ -874,17 +874,20 @@ public final class PluginModule {
 
     private static void wirePoses(
             JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
-        // Phase 1 stands up /sit: the seat is a real, tagged, non-persistent marker armour stand the rider sits on.
+        // Sit on blocks (/sit) and, when features.player-sit is on, sit on players (right-click, /poses toggle to
+        // opt out). The seat is a real, tagged, non-persistent marker armour stand for block-sits; a player-sit has
+        // no seat entity — the rider mounts straight onto the carrier and addPassenger chains for stacking.
         // sweepOrphans() runs on enable to reap any seat a prior crash left behind (ghost-prevention), and stop()
         // drains every live seat and clears the registry so a disable or reload leaves zero residual state and no
-        // ghost entity. PoseSessions is the single source of truth for who is posing; it also feeds the
-        // poses_sitting placeholder seam. The region gate is the permissive AllowAllRegionGate until Phase 5.
+        // ghost entity. PoseSessions is the single source of truth for who is posing; it plus the PDC-backed
+        // player-sit opt-out feed the poses_sitting / poses_toggle placeholder seams. The region gate is the
+        // permissive AllowAllRegionGate until Phase 5.
         PosesWiring.Wired wired = PosesWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.seats().sweepOrphans();
         resources.onClose(wired::stop);
-        links.placeholders.poses(new StorePosesPlaceholders(wired.sessions()));
+        links.placeholders.poses(new StorePosesPlaceholders(wired.sessions(), wired.playerSitPreferences()));
     }
 
     private static void wireCustomMenus(

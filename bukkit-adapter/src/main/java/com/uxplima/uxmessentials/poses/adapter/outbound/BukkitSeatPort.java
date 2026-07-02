@@ -114,6 +114,21 @@ public final class BukkitSeatPort implements SeatPort {
     }
 
     @Override
+    public void mountOnPlayer(PlayerRef rider, PlayerRef target) {
+        Objects.requireNonNull(rider, "rider");
+        Objects.requireNonNull(target, "target");
+        // No seat entity for a player-sit: mount straight onto the carrier on the carrier's own entity thread (Folia).
+        // addPassenger chains, so a rider on a rider on a player just works.
+        scheduler.onEntity(target, () -> {
+            Player carrier = plugin.getServer().getPlayer(target.uuid());
+            Player passenger = plugin.getServer().getPlayer(rider.uuid());
+            if (carrier != null && carrier.isValid() && passenger != null) {
+                carrier.addPassenger(passenger);
+            }
+        });
+    }
+
+    @Override
     public void removeSeat(SeatHandle seat) {
         Objects.requireNonNull(seat, "seat");
         LiveSeat entry = live.remove(seat.id());
@@ -121,6 +136,19 @@ public final class BukkitSeatPort implements SeatPort {
             return;
         }
         scheduler.onRegion(entry.position(), () -> removeIfValid(entry.entity()));
+    }
+
+    @Override
+    public void dismount(PlayerRef rider) {
+        Objects.requireNonNull(rider, "rider");
+        // Take the rider off whatever they ride, on the rider's own entity thread; a no-op if already off (Bukkit
+        // drops a passenger when the carrier is removed, so a carrier-quit cleanup often finds nothing left to do).
+        scheduler.onEntity(rider, () -> {
+            Player player = plugin.getServer().getPlayer(rider.uuid());
+            if (player != null && player.isInsideVehicle()) {
+                player.leaveVehicle();
+            }
+        });
     }
 
     @Override
