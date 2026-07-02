@@ -32,6 +32,11 @@ public enum PosesMessageKey implements MessageKey {
     POSES_NOW_SPINNING("poses.now-spinning"),
     POSES_POSE_DISABLED("poses.pose-disabled"),
 
+    // Crawl — /crawl is a toggle, so it has both a start and a stop line plus its own disabled refusal.
+    POSES_NOW_CRAWLING("poses.now-crawling"),
+    POSES_CRAWL_STOPPED("poses.crawl-stopped"),
+    POSES_CRAWL_DISABLED("poses.crawl-disabled"),
+
     // Player-sit (stacking) — sitting on another player's shoulders and the personal opt-out toggle.
     POSES_PLAYERSIT_DISABLED("poses.playersit-disabled"),
     POSES_PLAYERSIT_TARGET_REFUSES("poses.playersit-target-refuses"),

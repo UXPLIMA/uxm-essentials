@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -21,6 +22,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
@@ -29,6 +31,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.poses.adapter.inbound.listener.CrawlMoveListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PlayerSitInteractListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PoseCancelListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.SeatInteractListener;
@@ -38,12 +41,15 @@ import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSeatPort;
 import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSnores;
 import com.uxplima.uxmessentials.poses.adapter.outbound.PdcPlayerSitPreferences;
 import com.uxplima.uxmessentials.poses.application.AllowAllRegionGate;
+import com.uxplima.uxmessentials.poses.application.CrawlSessions;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
+import com.uxplima.uxmessentials.poses.application.StartCrawl;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
 import com.uxplima.uxmessentials.poses.application.StartPose;
 import com.uxplima.uxmessentials.poses.application.StartSit;
 import com.uxplima.uxmessentials.poses.application.StopPose;
 import com.uxplima.uxmessentials.poses.application.TogglePlayerSit;
+import com.uxplima.uxmessentials.poses.application.port.CrawlView;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.poses.domain.SittableBlocks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -84,15 +90,19 @@ class PosesAdapterTest {
     private NamespacedKey seatKey;
 
     private PoseSessions sessions;
+    private CrawlSessions crawlSessions;
     private BukkitSeatPort seats;
     private BukkitPacketPosePort posePort;
     private BukkitSnores snores;
+    private RecordingCrawlView crawlView;
     private StartSit startSit;
     private StartPose startPose;
+    private StartCrawl startCrawl;
     private StopPose stopPose;
     private SeatInteractListener interactListener;
     private PlayerSitInteractListener playerSitInteractListener;
     private PoseCancelListener cancelListener;
+    private CrawlMoveListener crawlMoveListener;
     private PdcPlayerSitPreferences playerSitPreferences;
     private TogglePlayerSit togglePlayerSit;
     private StorePosesPlaceholders placeholders;
@@ -106,6 +116,8 @@ class PosesAdapterTest {
 
         Scheduler scheduler = new InlineScheduler();
         sessions = new PoseSessions();
+        crawlSessions = new CrawlSessions();
+        crawlView = new RecordingCrawlView();
         seats = new BukkitSeatPort(plugin, scheduler, new NoopLogger());
         SittableBlocks sittableBlocks = new SittableBlocks(List.of("*_STAIRS", "*_SLAB", "*_CARPET"));
         PlayerLocator locator = who -> Optional.ofNullable(server.getPlayer(who.uuid()))
@@ -131,15 +143,33 @@ class PosesAdapterTest {
                 true,
                 true,
                 true);
+        startCrawl = new StartCrawl(
+                sessions,
+                crawlSessions,
+                crawlView,
+                posePort,
+                new AllowAllRegionGate(),
+                events,
+                Clock.systemUTC(),
+                true);
         playerSitPreferences = new PdcPlayerSitPreferences();
         StartPlayerSit startPlayerSit =
                 new StartPlayerSit(sessions, seats, playerSitPreferences, locator, events, Clock.systemUTC(), true);
         togglePlayerSit = new TogglePlayerSit(playerSitPreferences);
-        stopPose =
-                new StopPose(sessions, seats, posePort, snores, new BukkitPoseReturn(plugin, scheduler), events, true);
+        stopPose = new StopPose(
+                sessions,
+                crawlSessions,
+                seats,
+                posePort,
+                snores,
+                crawlView,
+                new BukkitPoseReturn(plugin, scheduler),
+                events,
+                true);
         interactListener = new SeatInteractListener(startSit, seats, sittableBlocks, new KeyMessages(), true, 5.0);
         playerSitInteractListener = new PlayerSitInteractListener(startPlayerSit, new KeyMessages());
         cancelListener = new PoseCancelListener(stopPose, sessions);
+        crawlMoveListener = new CrawlMoveListener(sessions, crawlSessions, crawlView);
         placeholders = new StorePosesPlaceholders(sessions, playerSitPreferences);
     }
 
@@ -387,6 +417,139 @@ class PosesAdapterTest {
         assertThat(taggedSeats()).isEmpty();
     }
 
+    @Test
+    void crawlingRecordsACrawlSessionShowsTheFakeBlockAndReportsThePosePlaceholder() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position head = CrawlSessions.headBlockAbove(feetOf(player));
+
+        startCrawl.start(who, feetOf(player));
+
+        // The crawl fakes a block a block above the head and records a CRAWL session — no seat entity is spawned.
+        assertThat(crawlView.shown).containsExactly(head);
+        assertThat(taggedSeats()).isEmpty();
+        assertThat(sessions.current(who).orElseThrow().type()).isEqualTo(PoseType.CRAWL);
+        assertThat(crawlSessions.current(who)).contains(head);
+        // The pose placeholders read the crawl: posing yes, pose "crawl", and the plain-sit placeholder stays false.
+        assertThat(placeholders.posing(who)).isTrue();
+        assertThat(placeholders.pose(who)).isEqualTo("crawl");
+        assertThat(placeholders.sitting(who)).isFalse();
+    }
+
+    @Test
+    void movingToANewBlockRestoresTheOldHeadAndShowsTheNewOne() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position oldHead = CrawlSessions.headBlockAbove(feetOf(player));
+        startCrawl.start(who, feetOf(player));
+
+        Location from = Objects.requireNonNull(player.getLocation(), "location");
+        Location to = new Location(world, 1.5, 64, 0.5);
+        Position newHead = CrawlSessions.headBlockAbove(BukkitRefs.toPosition(to));
+        crawlMoveListener.onMove(new PlayerMoveEvent(player, from, to));
+
+        // The fake block follows the player: the block just left is restored, a new one is shown above the new head.
+        assertThat(crawlView.restored).containsExactly(oldHead);
+        assertThat(crawlView.shown).containsExactly(oldHead, newHead);
+        assertThat(crawlSessions.current(who)).contains(newHead);
+    }
+
+    @Test
+    void aLookOnlyMoveWithinTheSameBlockDoesNotDisturbTheCrawl() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        startCrawl.start(who, feetOf(player));
+        crawlView.restored.clear();
+        crawlView.shown.clear();
+
+        Location from = Objects.requireNonNull(player.getLocation(), "location");
+        Location to = new Location(world, 0.6, 64, 0.6, 45f, 10f); // same block, only a small turn/step
+        crawlMoveListener.onMove(new PlayerMoveEvent(player, from, to));
+
+        // No block boundary crossed, so nothing is restored or re-faked — the hot path skips the follow work.
+        assertThat(crawlView.restored).isEmpty();
+        assertThat(crawlView.shown).isEmpty();
+    }
+
+    @Test
+    void aSecondCrawlRestoresTheRealBlockAndClearsTheSession() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position head = CrawlSessions.headBlockAbove(feetOf(player));
+        startCrawl.start(who, feetOf(player));
+
+        // A second /crawl toggles off through StopPose (the command's toggle-off path).
+        stopPose.stop(who);
+
+        assertThat(crawlView.restored).containsExactly(head);
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(crawlSessions.current(who)).isEmpty();
+    }
+
+    @Test
+    void quittingWhileCrawlingRestoresTheBlockAndLeavesNoLingeringFake() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position head = CrawlSessions.headBlockAbove(feetOf(player));
+        startCrawl.start(who, feetOf(player));
+
+        cancelListener.onQuit(
+                new PlayerQuitEvent(player, Component.text("bye"), PlayerQuitEvent.QuitReason.DISCONNECTED));
+
+        // The phantom-block-prevention proof: the real block is restored at the last fake position and no crawl
+        // state lingers, so the leaver's client is never left with a stranded fake block.
+        assertThat(crawlView.restored).containsExactly(head);
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(crawlSessions.current(who)).isEmpty();
+    }
+
+    @Test
+    void teleportingWhileCrawlingRestoresTheBlockAndClearsTheSession() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position head = CrawlSessions.headBlockAbove(feetOf(player));
+        startCrawl.start(who, feetOf(player));
+
+        cancelListener.onTeleport(
+                new PlayerTeleportEvent(player, new Location(world, 0.5, 64, 0.5), new Location(world, 40, 70, 40)));
+
+        assertThat(crawlView.restored).containsExactly(head);
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(crawlSessions.current(who)).isEmpty();
+    }
+
+    @Test
+    void sneakingWhileCrawlingDoesNotEndItUnlikeASit() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        startCrawl.start(who, feetOf(player));
+
+        cancelListener.onSneak(new PlayerToggleSneakEvent(player, true));
+
+        // A crawler actively moves and may sneak without meaning to stand up, so sneak leaves the crawl running —
+        // the contrast with a sit, which ends on sneak (sneakingEndsThePoseAndReturnsThePlayerToWhereTheySat).
+        assertThat(sessions.current(who).orElseThrow().type()).isEqualTo(PoseType.CRAWL);
+        assertThat(crawlView.restored).isEmpty();
+    }
+
+    @Test
+    void takingDamageWhileCrawlingDoesNotEndIt() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerMock attacker = server.addPlayer("Attacker");
+        PlayerRef who = BukkitRefs.toRef(player);
+        startCrawl.start(who, feetOf(player));
+
+        EntityDamageEvent damage = player.simulateDamage(1.0, attacker);
+        cancelListener.onDamage(damage);
+
+        assertThat(sessions.current(who).orElseThrow().type()).isEqualTo(PoseType.CRAWL);
+        assertThat(crawlView.restored).isEmpty();
+    }
+
+    private static Position feetOf(PlayerMock player) {
+        return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+    }
+
     private PlayerMock playerAt(double x, double y, double z) {
         PlayerMock player = server.addPlayer("Steve");
         player.teleport(new Location(world, x, y, z));
@@ -446,6 +609,26 @@ class PosesAdapterTest {
             // The spin and snore loops are driven deterministically by the tests (via posePort.tick() /
             // snores.tick()), so the repeating registration is a no-op that hands back a closeable to cancel.
             return () -> {};
+        }
+    }
+
+    /**
+     * Records the head positions the crawl was asked to fake and to restore. Routed through the port so the test
+     * never touches {@code Player.sendBlockChange}, which MockBukkit does not implement — the recorded show/restore
+     * calls are the phantom-block-prevention probe.
+     */
+    private static final class RecordingCrawlView implements CrawlView {
+        private final List<Position> shown = new ArrayList<>();
+        private final List<Position> restored = new ArrayList<>();
+
+        @Override
+        public void showFakeBlockAbove(PlayerRef who, Position headBlock) {
+            shown.add(headBlock);
+        }
+
+        @Override
+        public void restoreRealBlock(PlayerRef who, Position headBlock) {
+            restored.add(headBlock);
         }
     }
 

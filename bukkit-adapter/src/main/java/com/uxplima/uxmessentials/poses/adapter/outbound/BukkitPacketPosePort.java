@@ -20,10 +20,11 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@link PosePort} over uxmLib's packet layer — the same {@link NpcPackets} metadata seam the {@code npc} module
- * uses to freeze a fake player in a body pose, aimed here at a <em>real</em> player. A {@code /lay} or
- * {@code /bellyflop} overrides the player's {@code DATA_POSE} to {@link NpcPose#SWIMMING} so their body lies flat;
- * a {@code /spin} instead rotates the invisible seat the player rides (a real entity, so vanilla tracking carries
- * the rotation to viewers on its own) on a repeating scheduler pass.
+ * uses to freeze a fake player in a body pose, aimed here at a <em>real</em> player. A {@code /lay}, {@code
+ * /bellyflop}, or {@code /crawl} overrides the player's {@code DATA_POSE} to {@link NpcPose#SWIMMING} so their body
+ * lies flat (crawl pairs this with a client-only fake block above the head, handled by the {@code CrawlView}); a
+ * {@code /spin} instead rotates the invisible seat the player rides (a real entity, so vanilla tracking carries the
+ * rotation to viewers on its own) on a repeating scheduler pass.
  *
  * <p>Because the server never itself sends a swimming pose for a seated player, the lie-down is a client override:
  * the metadata packet is broadcast to everyone in the poser's world (the poser included, so they see their own pose
@@ -72,7 +73,7 @@ public final class BukkitPacketPosePort implements PosePort {
         UUID id = who.uuid();
         active.put(id, pose);
         switch (pose) {
-            case LAY, BELLYFLOP -> broadcastPose(id, NpcPose.SWIMMING);
+            case LAY, BELLYFLOP, CRAWL -> broadcastPose(id, NpcPose.SWIMMING);
             case SPIN -> spinning.put(id, 0f);
             default ->
                 throw new IllegalArgumentException("BukkitPacketPosePort renders only the free poses, not " + pose);
