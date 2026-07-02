@@ -52,6 +52,7 @@ public final class PlayerSitInteractListener implements Listener {
         PlayerSitOutcome outcome = startPlayerSit.start(BukkitRefs.toRef(rider), BukkitRefs.toRef(target));
         switch (outcome) {
             case STARTED -> event.setCancelled(true);
+            case DENIED_REGION -> feedback.send(rider, PosesMessageKey.POSES_CANNOT_HERE);
             case TARGET_REFUSES -> feedback.send(rider, PosesMessageKey.POSES_PLAYERSIT_TARGET_REFUSES);
             case SELF -> feedback.send(rider, PosesMessageKey.POSES_CANNOT_SIT_ON_SELF);
             // Already posing, or player-sit switched off: no nag on a stray right-click of a player.

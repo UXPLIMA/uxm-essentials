@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit.PlayerSitOutcome;
 import com.uxplima.uxmessentials.poses.application.port.PlayerSitPreferences;
+import com.uxplima.uxmessentials.poses.application.port.PoseRegionGate;
 import com.uxplima.uxmessentials.poses.application.port.SeatHandle;
 import com.uxplima.uxmessentials.poses.application.port.SeatPort;
 import com.uxplima.uxmessentials.poses.domain.PoseSession;
@@ -25,10 +26,10 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@link StartPlayerSit}: the four refusals ({@code features.player-sit} off, sitting on yourself, being
- * already posed, and a target who refuses) leave no mount and no session, and a success mounts the rider onto the
- * carrier and records a {@link PoseType#PLAYER_SIT} session carrying the target, publishing {@link PoseStarted}.
- * All ports are fakes — no Bukkit.
+ * Pins {@link StartPlayerSit}: the five refusals ({@code features.player-sit} off, sitting on yourself, being
+ * already posed, a target who refuses, and the region gate) leave no mount and no session, and a success mounts the
+ * rider onto the carrier and records a {@link PoseType#PLAYER_SIT} session carrying the target, publishing
+ * {@link PoseStarted}. All ports are fakes — no Bukkit.
  */
 class StartPlayerSitTest {
 
@@ -83,6 +84,39 @@ class StartPlayerSitTest {
     }
 
     @Test
+    void deniesWhenTheRegionGateRefuses() {
+        StartPlayerSit startPlayerSit = new StartPlayerSit(
+                sessions,
+                seats,
+                preferences,
+                (who, where, type) -> false,
+                who -> Optional.of(RIDER_STANDING),
+                events,
+                clock,
+                true);
+
+        assertThat(startPlayerSit.start(RIDER, TARGET)).isEqualTo(PlayerSitOutcome.DENIED_REGION);
+        assertThat(seats.mountedOn).isEmpty();
+        assertThat(sessions.isPosing(RIDER)).isFalse();
+        assertThat(events.published).isEmpty();
+    }
+
+    @Test
+    void gatesThePlayerSitWithThePlayerSitPoseType() {
+        List<PoseType> consulted = new ArrayList<>();
+        PoseRegionGate recording = (who, where, type) -> {
+            consulted.add(type);
+            return true;
+        };
+        StartPlayerSit startPlayerSit = new StartPlayerSit(
+                sessions, seats, preferences, recording, who -> Optional.of(RIDER_STANDING), events, clock, true);
+
+        startPlayerSit.start(RIDER, TARGET);
+
+        assertThat(consulted).containsExactly(PoseType.PLAYER_SIT);
+    }
+
+    @Test
     void mountsTheRiderOntoTheTargetAndRecordsAPlayerSitSession() {
         StartPlayerSit startPlayerSit = newStartPlayerSit(true);
 
@@ -99,7 +133,14 @@ class StartPlayerSitTest {
 
     private StartPlayerSit newStartPlayerSit(boolean playerSitEnabled) {
         return new StartPlayerSit(
-                sessions, seats, preferences, who -> Optional.of(RIDER_STANDING), events, clock, playerSitEnabled);
+                sessions,
+                seats,
+                preferences,
+                (who, where, type) -> true,
+                who -> Optional.of(RIDER_STANDING),
+                events,
+                clock,
+                playerSitEnabled);
     }
 
     private record Mount(PlayerRef rider, PlayerRef target) {}

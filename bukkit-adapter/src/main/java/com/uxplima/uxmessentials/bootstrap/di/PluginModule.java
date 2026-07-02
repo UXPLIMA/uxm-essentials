@@ -880,8 +880,10 @@ public final class PluginModule {
         // sweepOrphans() runs on enable to reap any seat a prior crash left behind (ghost-prevention), and stop()
         // drains every live seat and clears the registry so a disable or reload leaves zero residual state and no
         // ghost entity. PoseSessions is the single source of truth for who is posing; it plus the PDC-backed
-        // player-sit opt-out feed the poses_sitting / poses_toggle placeholder seams. The region gate is the
-        // permissive AllowAllRegionGate until Phase 5.
+        // player-sit opt-out feed the poses_sitting / poses_toggle placeholder seams. The region gate now respects
+        // land claims (the shared ClaimService) and WorldGuard's sit/playersit/pose/crawl flags, governed by the
+        // respect-claims / respect-worldguard config toggles; the WorldGuard flags themselves are registered at load
+        // (UxmEssentialsPlugin.onLoad), before WorldGuard locks its registry.
         PosesWiring.Wired wired = PosesWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);

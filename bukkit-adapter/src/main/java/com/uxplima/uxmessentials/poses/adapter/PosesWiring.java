@@ -22,7 +22,8 @@ import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitPoseReturn;
 import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSeatPort;
 import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSnores;
 import com.uxplima.uxmessentials.poses.adapter.outbound.PdcPlayerSitPreferences;
-import com.uxplima.uxmessentials.poses.application.AllowAllRegionGate;
+import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlags;
+import com.uxplima.uxmessentials.poses.application.ClaimAwareRegionGate;
 import com.uxplima.uxmessentials.poses.application.CrawlSessions;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.PosesConfig;
@@ -34,12 +35,18 @@ import com.uxplima.uxmessentials.poses.application.StartSit;
 import com.uxplima.uxmessentials.poses.application.StopPose;
 import com.uxplima.uxmessentials.poses.application.TogglePlayerSit;
 import com.uxplima.uxmessentials.poses.application.port.PlayerSitPreferences;
+import com.uxplima.uxmessentials.poses.application.port.PoseRegionFlags;
 import com.uxplima.uxmessentials.poses.application.port.PoseRegionGate;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.poses.domain.SittableBlocks;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
+import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
+import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmlib.npc.ChannelResolver;
 import com.uxplima.uxmlib.npc.PacketSender;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
@@ -49,9 +56,10 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Constructs the poses context's adapters and use cases over the injected kernel ports, and produces the {@code
  * /sit} and {@code /poses} commands plus the listeners the plugin registers. The seat port is a real, tagged,
- * non-persistent seat entity ({@link BukkitSeatPort}); the region gate is the permissive Phase-1
- * {@link AllowAllRegionGate} (the Phase-5 claim/WorldGuard gate slots in here with no reach into the use cases); the
- * player-sit opt-out is PDC-backed ({@link PdcPlayerSitPreferences}). The context persists nothing — a pose is
+ * non-persistent seat entity ({@link BukkitSeatPort}); the region gate is the real {@link ClaimAwareRegionGate},
+ * composing the shared {@link ClaimService} (land claims) with the {@link WorldGuardPoseFlags} WorldGuard seam behind
+ * the {@code respect-claims} / {@code respect-worldguard} config toggles; the player-sit opt-out is PDC-backed
+ * ({@link PdcPlayerSitPreferences}). The context persists nothing — a pose is
  * transient state in {@link PoseSessions} — so there is no repository or migration.
  *
  * <p>On enable the caller runs {@link BukkitSeatPort#sweepOrphans()} to reap any seat a previous run's crash left
@@ -87,7 +95,10 @@ public final class PosesWiring {
         CrawlSessions crawlSessions = new CrawlSessions();
         SittableBlocks sittableBlocks = new SittableBlocks(config.sittableMaterials());
         BukkitSeatPort seats = new BukkitSeatPort(plugin, kernel.scheduler(), kernel.log());
-        PoseRegionGate regionGate = new AllowAllRegionGate();
+        ClaimService claims = buildClaimService(plugin, kernel, config.respectClaims());
+        PoseRegionFlags regionFlags = new WorldGuardPoseFlags(plugin.getServer(), kernel.log());
+        PoseRegionGate regionGate =
+                new ClaimAwareRegionGate(claims, regionFlags, config.respectClaims(), config.respectWorldguard());
         BukkitPoseReturn poseReturn = new BukkitPoseReturn(plugin, kernel.scheduler());
         BukkitCrawlView crawlView = new BukkitCrawlView(plugin.getServer());
         PlayerSitPreferences playerSitPreferences = new PdcPlayerSitPreferences();
@@ -118,6 +129,7 @@ public final class PosesWiring {
                 sessions,
                 seats,
                 playerSitPreferences,
+                regionGate,
                 kernel.playerLocator(),
                 kernel.events(),
                 Clock.systemUTC(),
@@ -191,6 +203,21 @@ public final class PosesWiring {
                 new CrawlMoveListener(sessions, crawlSessions, crawlView),
                 new PoseCleanupListener(seats));
         return new Wired(commands, listeners, seats, posePort, snores, sessions, crawlSessions, playerSitPreferences);
+    }
+
+    /**
+     * The claim seam the region gate consults: the shared provider detection bound to a {@link ClaimServiceImpl}, or
+     * the no-op {@link AlwaysAllowClaimService} when {@code respect-claims} is off (nothing to detect, nothing to log).
+     * Poses gate on {@link ClaimService#canAccess canAccess}, which reads only the trust of the claim covering the
+     * spot, so the placement knobs (require-a-claim, foreign-block, proximity) are left at their inert defaults and
+     * only teleport-access checking is enabled.
+     */
+    private static ClaimService buildClaimService(Plugin plugin, KernelPorts kernel, boolean respectClaims) {
+        if (!respectClaims) {
+            return new AlwaysAllowClaimService();
+        }
+        ClaimPolicySettings settings = new ClaimPolicySettings(false, true, 0, true);
+        return new ClaimServiceImpl(ClaimProviders.detect(plugin, plugin.getServer(), kernel.log()), settings);
     }
 
     /**

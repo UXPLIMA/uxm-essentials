@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.poses.application.port.PlayerSitPreferences;
+import com.uxplima.uxmessentials.poses.application.port.PoseRegionGate;
 import com.uxplima.uxmessentials.poses.application.port.SeatPort;
 import com.uxplima.uxmessentials.poses.domain.PoseSession;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
@@ -18,11 +19,13 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * player). Unlike a block-sit there is no seat entity: the rider is mounted straight onto the carrier through the
  * {@link SeatPort#mountOnPlayer port}, and because {@code addPassenger} chains, A-on-B-on-C stacking just works.
  *
- * <p>Four gates turn an attempt away before anything is mounted: the {@code features.player-sit} switch (the
+ * <p>Five gates turn an attempt away before anything is mounted: the {@code features.player-sit} switch (the
  * operator's master toggle, off by default), sitting on yourself, being already posed (the one-session-per-player
- * invariant), and a target whose personal {@link PlayerSitPreferences} refuses. On success it records a
- * {@link PoseType#PLAYER_SIT} session carrying the {@code target} and the rider's captured standing position (so
- * standing up returns them there), and publishes {@link PoseStarted}.
+ * invariant), a target whose personal {@link PlayerSitPreferences} refuses, and the {@link PoseRegionGate} — a
+ * player-sit is gated at the rider's spot with the {@code playersit} region flag, so a claim or WorldGuard veto turns
+ * it away just as it does a block-sit. On success it records a {@link PoseType#PLAYER_SIT} session carrying the
+ * {@code target} and the rider's captured standing position (so standing up returns them there), and publishes
+ * {@link PoseStarted}.
  */
 public final class StartPlayerSit {
 
@@ -36,6 +39,7 @@ public final class StartPlayerSit {
     private final PoseSessions sessions;
     private final SeatPort seats;
     private final PlayerSitPreferences preferences;
+    private final PoseRegionGate regionGate;
     private final PlayerLocator locator;
     private final DomainEventPublisher events;
     private final Clock clock;
@@ -45,6 +49,7 @@ public final class StartPlayerSit {
             PoseSessions sessions,
             SeatPort seats,
             PlayerSitPreferences preferences,
+            PoseRegionGate regionGate,
             PlayerLocator locator,
             DomainEventPublisher events,
             Clock clock,
@@ -52,6 +57,7 @@ public final class StartPlayerSit {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.seats = Objects.requireNonNull(seats, "seats");
         this.preferences = Objects.requireNonNull(preferences, "preferences");
+        this.regionGate = Objects.requireNonNull(regionGate, "regionGate");
         this.locator = Objects.requireNonNull(locator, "locator");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -74,14 +80,17 @@ public final class StartPlayerSit {
         if (!preferences.allowsSitting(target)) {
             return PlayerSitOutcome.TARGET_REFUSES;
         }
-        mountAndRecord(who, target);
+        Position at = locator.locate(who)
+                .orElseThrow(() -> new IllegalStateException("cannot player-sit an unlocatable rider: " + who.uuid()));
+        if (!regionGate.canPose(who, at, PoseType.PLAYER_SIT)) {
+            return PlayerSitOutcome.DENIED_REGION;
+        }
+        mountAndRecord(who, target, at);
         return PlayerSitOutcome.STARTED;
     }
 
-    private void mountAndRecord(PlayerRef who, PlayerRef target) {
+    private void mountAndRecord(PlayerRef who, PlayerRef target, Position returnLocation) {
         seats.mountOnPlayer(who, target);
-        Position returnLocation = locator.locate(who)
-                .orElseThrow(() -> new IllegalStateException("cannot player-sit an unlocatable rider: " + who.uuid()));
         PoseSession session =
                 new PoseSession(who, PoseType.PLAYER_SIT, returnLocation, NO_SEAT_HANDLE, target, clock.instant());
         sessions.start(session);
@@ -96,6 +105,9 @@ public final class StartPlayerSit {
 
         /** {@code features.player-sit} is off — sitting on players is not offered. */
         DISABLED,
+
+        /** The region gate refused the pose here (a claim or WorldGuard veto on the {@code playersit} flag). */
+        DENIED_REGION,
 
         /** The target refuses being sat on (their {@code /poses toggle} opt-out). */
         TARGET_REFUSES,

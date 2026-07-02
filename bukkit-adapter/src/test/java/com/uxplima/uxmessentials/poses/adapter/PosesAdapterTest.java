@@ -153,8 +153,15 @@ class PosesAdapterTest {
                 Clock.systemUTC(),
                 true);
         playerSitPreferences = new PdcPlayerSitPreferences();
-        StartPlayerSit startPlayerSit =
-                new StartPlayerSit(sessions, seats, playerSitPreferences, locator, events, Clock.systemUTC(), true);
+        StartPlayerSit startPlayerSit = new StartPlayerSit(
+                sessions,
+                seats,
+                playerSitPreferences,
+                new AllowAllRegionGate(),
+                locator,
+                events,
+                Clock.systemUTC(),
+                true);
         togglePlayerSit = new TogglePlayerSit(playerSitPreferences);
         stopPose = new StopPose(
                 sessions,

@@ -6,9 +6,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
 /**
- * The permissive {@link PoseRegionGate} wired in Phase 1: posing is allowed everywhere. Phase 5 replaces it with
- * the claim- and WorldGuard-aware gate; keeping the seam here from the start means that swap never touches the use
- * cases. A server with no region plugin also keeps this behaviour — a pose is allowed when nothing forbids it.
+ * The permissive {@link PoseRegionGate}: posing is allowed everywhere. Production wires the claim- and
+ * WorldGuard-aware {@link ClaimAwareRegionGate}; this remains the "nothing forbids a pose" gate — the behaviour a
+ * server with no region plugin lands on, and the fixture the use-case tests gate with when region checks are not
+ * under test.
  */
 public final class AllowAllRegionGate implements PoseRegionGate {
 
