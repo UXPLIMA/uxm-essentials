@@ -64,7 +64,7 @@ class RtpCommandTest {
         when(services.resolveRtp()).thenReturn(resolveRtp);
         when(services.worlds()).thenReturn(worlds);
         when(services.notifier()).thenReturn(new PlayerNotifier(new KeyMessages(), sink));
-        command = new RtpCommand(services, new KeyMessages(), mock(RtpMenu.class));
+        command = new RtpCommand(services, new KeyMessages(), mock(RtpMenu.class), true);
     }
 
     @AfterEach
@@ -126,6 +126,32 @@ class RtpCommandTest {
 
         verify(resolveRtp, never()).background(any(), any());
         assertThat(sink.delivered).contains("teleport.rtp.unknown-target");
+    }
+
+    @Test
+    void aBareRtpOpensTheWorldPickerByDefault() {
+        RtpMenu menu = mock(RtpMenu.class);
+        RtpCommand cmd = new RtpCommand(services, new KeyMessages(), menu, true);
+        PlayerMock sender = server.addPlayer("Wanderer");
+
+        cmd.bare(sender);
+
+        verify(menu).open(new PlayerRef(sender.getUniqueId(), sender.getName()));
+        verify(resolveRtp, never()).background(any(), any()); // opening the GUI does not teleport on its own
+    }
+
+    @Test
+    void aBareRtpTeleportsInPlaceWhenTheGuiToggleIsOff() {
+        RtpMenu menu = mock(RtpMenu.class);
+        RtpCommand cmd = new RtpCommand(services, new KeyMessages(), menu, false);
+        PlayerMock sender = server.addPlayer("Wanderer");
+
+        cmd.bare(sender);
+
+        verify(resolveRtp)
+                .background(new PlayerRef(sender.getUniqueId(), sender.getName()), BukkitRefs.toRef(sender.getWorld()));
+        verify(menu, never()).open(any());
+        assertThat(sink.delivered).contains("teleport.rtp.searching");
     }
 
     private static final class FakeWorlds implements WorldLookup {

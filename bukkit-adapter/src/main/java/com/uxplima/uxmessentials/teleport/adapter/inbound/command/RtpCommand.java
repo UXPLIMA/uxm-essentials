@@ -34,9 +34,11 @@ import org.jspecify.annotations.NullMarked;
  * {@link com.uxplima.uxmessentials.teleport.application.ResolveRtp}; the requester never waits on a chunk
  * load — the queue is polled and a refill is fired asynchronously.
  *
- * <p>{@code /rtp biome <biome>} (gated {@code uxmessentials.rtp.biome}) targets a specific biome through
- * {@link com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp}; {@code /rtp gui} (gated
- * {@code uxmessentials.rtp.gui}) opens the menu-engine world picker.
+ * <p>The bare {@code /rtp} follows the {@code rtp.command-opens-gui} config toggle (default {@code true}): on it opens
+ * the menu-engine world picker; off it random-teleports the sender within their current world. {@code /rtp gui} (gated
+ * {@code uxmessentials.rtp.gui}) always opens the picker regardless of the toggle, and {@code /rtp biome <biome>}
+ * (gated {@code uxmessentials.rtp.biome}) targets a specific biome through
+ * {@link com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp}.
  *
  * <p>{@code /rtp <target>} carries a single greedy word that is disambiguated at execution: an online player name
  * (with {@code uxmessentials.rtp.others}) forces <em>that player</em> to random-teleport within their own world; a
@@ -54,16 +56,20 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
 
     private final RtpMenu menu;
 
-    public RtpCommand(TeleportServices services, Messages messages, RtpMenu menu) {
+    /** When true, a bare {@code /rtp} opens the picker; when false it random-teleports in place. */
+    private final boolean openGuiOnBare;
+
+    public RtpCommand(TeleportServices services, Messages messages, RtpMenu menu, boolean openGuiOnBare) {
         super(services, messages);
         this.menu = Objects.requireNonNull(menu, "menu");
+        this.openGuiOnBare = openGuiOnBare;
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("rtp")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(this::run)
+                .executes(this::runBare)
                 .then(Commands.literal("gui")
                         .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
                         .executes(this::openGui))
@@ -88,16 +94,33 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
         return List.of("wild");
     }
 
-    private int run(CommandContext<CommandSourceStack> ctx) {
+    private int runBare(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
+        bare(sender);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * The bare {@code /rtp} behaviour: open the world-picker GUI when {@code command-opens-gui} is set (the default),
+     * otherwise random-teleport {@code sender} within their current world.
+     */
+    void bare(Player sender) {
+        if (openGuiOnBare) {
+            menu.open(ref(sender));
+        } else {
+            rtpHere(sender);
+        }
+    }
+
+    /** Random-teleport {@code sender} within their current world through the pre-warmed pool. */
+    private void rtpHere(Player sender) {
         PlayerRef who = ref(sender);
         WorldRef world = BukkitRefs.toRef(sender.getWorld());
         services.notifier().send(who, TeleportMessageKey.RTP_SEARCHING);
         services.resolveRtp().background(who, world);
-        return Command.SINGLE_SUCCESS;
     }
 
     private int openGui(CommandContext<CommandSourceStack> ctx) {

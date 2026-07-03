@@ -191,8 +191,10 @@ public final class TeleportWiring {
         rtpMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         List<CommandRegistration> commands =
                 new java.util.ArrayList<>(TeleportCommands.all(services, kernel.messages()));
-        // /rtp is built here (not in TeleportCommands.all) because it needs the RTP menu opener wired above.
-        commands.add(new RtpCommand(services, kernel.messages(), rtpMenu));
+        // /rtp is built here (not in TeleportCommands.all) because it needs the RTP menu opener wired above. The bare
+        // command opens that picker by default; an operator can flip it back to an in-place teleport via config.
+        boolean rtpOpensGui = config.getBoolean("rtp.command-opens-gui", true);
+        commands.add(new RtpCommand(services, kernel.messages(), rtpMenu, rtpOpensGui));
         commands.add(new TpSettingsCommand(services, kernel.messages(), settingsView));
         return new Wired(
                 services,
