@@ -918,6 +918,7 @@ public final class PluginModule {
                 menuBindings,
                 plugin.getDataFolder().toPath(),
                 ctx.kernel().log(),
+                ctx.kernel().scheduler(),
                 ctx.kernel().messages());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);

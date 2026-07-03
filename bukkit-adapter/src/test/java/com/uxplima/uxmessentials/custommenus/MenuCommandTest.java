@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -25,7 +26,11 @@ import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConverter;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
@@ -83,6 +88,7 @@ class MenuCommandTest {
     private CustomMenuLoader loader;
     private RecordingMessages messages;
     private final List<String> names = new ArrayList<>();
+    private final Map<String, OpenCommandSpec> openCommands = new java.util.HashMap<>();
     private final AtomicInteger reloads = new AtomicInteger();
     private final AtomicReference<String> executedFor = new AtomicReference<>();
     private final AtomicReference<String> executedArg = new AtomicReference<>();
@@ -343,6 +349,71 @@ class MenuCommandTest {
         execute("menu meta ghost", player);
 
         assertThat(messages.keys).contains("menu.not-found");
+    }
+
+    @Test
+    void saveRewritesTheRegisteredSpecToAFileThatReloadsEqual() throws Exception {
+        MenuSpec original = menus.registeredSpec("shop").orElseThrow();
+
+        execute("menu save shop", player);
+
+        assertThat(messages.keys).contains("menu.saved");
+        assertThat(messages.placeholdersFor("menu.saved")).containsEntry("name", "shop");
+        Path file = menusDir.resolve("shop.conf");
+        assertThat(Files.exists(file)).isTrue();
+        assertThat(new MenuSpecLoader().parse(Files.readString(file))).isEqualTo(original);
+    }
+
+    @Test
+    void saveRoundTripsThroughTheRealLoaderIncludingTheCommandBlock() {
+        OpenCommandSpec command = new OpenCommandSpec(
+                "shop",
+                List.of("store"),
+                Optional.of("menu.shop"),
+                Optional.of("<red>no"),
+                false,
+                List.of(new ArgumentSpec("target", ArgumentSpec.ArgType.ONLINE_PLAYER)),
+                Optional.of("/shop"));
+        openCommands.put("shop", command);
+        MenuSpec original = menus.registeredSpec("shop").orElseThrow();
+
+        execute("menu save shop", player);
+
+        // The written file, re-read through the real loader, reproduces both the spec and its command {} block.
+        CustomMenuLoader.LoadResult result = loader.loadFrom(menusDir);
+        assertThat(menus.registeredSpec("shop")).contains(original);
+        assertThat(result.openCommands().get("shop")).isEqualTo(command);
+    }
+
+    @Test
+    void saveOfAnUnknownMenuRepliesNotFound() {
+        execute("menu save ghost", player);
+
+        assertThat(messages.keys).contains("menu.not-found");
+        assertThat(Files.exists(menusDir.resolve("ghost.conf"))).isFalse();
+    }
+
+    @Test
+    void saveOfASpecWithUnknownRefsIsRefusedAndWritesNoFile() {
+        menus.registerSpec(
+                "bad",
+                new MenuSpecLoader()
+                        .parse("rows = 1\nitems { x { slot = 0, material = STONE, click { left = [\"ghost\"] } } }"));
+        names.add("bad");
+
+        execute("menu save bad", player);
+
+        assertThat(messages.keys).contains("menu.save-invalid");
+        assertThat(messages.placeholdersFor("menu.save-invalid")).containsEntry("missing", "ghost");
+        assertThat(Files.exists(menusDir.resolve("bad.conf"))).isFalse();
+    }
+
+    @Test
+    void saveIsGatedByTheAdminPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no admin node, so the save branch stays hidden
+        executeExpectingDenial("menu save shop", plain);
+
+        assertThat(Files.exists(menusDir.resolve("shop.conf"))).isFalse();
     }
 
     @Test
@@ -614,6 +685,7 @@ class MenuCommandTest {
         OguiConvertService oguiConvert = new OguiConvertService(menusDir, new OguiConverter(), new NoopLogger());
         GuiPlusConvertService guiPlusConvert =
                 new GuiPlusConvertService(menusDir, new GuiPlusConverter(), new NoopLogger());
+        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuSpecWriter(), bindings, new NoopLogger());
         MenuCommand command = new MenuCommand(
                 menus,
                 () -> List.copyOf(names),
@@ -626,6 +698,10 @@ class MenuCommandTest {
                 zMenuConvert,
                 oguiConvert,
                 guiPlusConvert,
+                persistence,
+                name -> java.util.Optional.ofNullable(openCommands.get(name)),
+                menusDir,
+                new SyncScheduler(),
                 messages);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(command.build());

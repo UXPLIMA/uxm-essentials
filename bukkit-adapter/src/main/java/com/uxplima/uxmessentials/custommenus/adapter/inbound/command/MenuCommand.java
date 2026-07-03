@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.custommenus.adapter.inbound.command;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +31,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertS
 import com.uxplima.uxmessentials.custommenus.adapter.convert.GuiPlusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -40,6 +42,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -75,6 +78,10 @@ public final class MenuCommand implements CommandRegistration {
     private final ZMenuConvertService zMenuConvert;
     private final OguiConvertService oguiConvert;
     private final GuiPlusConvertService guiPlusConvert;
+    private final MenuSpecPersistence persistence;
+    private final Function<String, Optional<OpenCommandSpec>> openCommandFor;
+    private final Path menusDir;
+    private final Scheduler scheduler;
     private final CommandFeedback feedback;
 
     public MenuCommand(
@@ -86,6 +93,10 @@ public final class MenuCommand implements CommandRegistration {
             ZMenuConvertService zMenuConvert,
             OguiConvertService oguiConvert,
             GuiPlusConvertService guiPlusConvert,
+            MenuSpecPersistence persistence,
+            Function<String, Optional<OpenCommandSpec>> openCommandFor,
+            Path menusDir,
+            Scheduler scheduler,
             Messages messages) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
@@ -95,6 +106,10 @@ public final class MenuCommand implements CommandRegistration {
         this.zMenuConvert = Objects.requireNonNull(zMenuConvert, "zMenuConvert");
         this.oguiConvert = Objects.requireNonNull(oguiConvert, "oguiConvert");
         this.guiPlusConvert = Objects.requireNonNull(guiPlusConvert, "guiPlusConvert");
+        this.persistence = Objects.requireNonNull(persistence, "persistence");
+        this.openCommandFor = Objects.requireNonNull(openCommandFor, "openCommandFor");
+        this.menusDir = Objects.requireNonNull(menusDir, "menusDir");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -125,6 +140,9 @@ public final class MenuCommand implements CommandRegistration {
                 .then(Commands.literal("meta")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .then(menuArgument().executes(this::meta)))
+                .then(Commands.literal("save")
+                        .requires(src -> src.getSender().hasPermission(ADMIN))
+                        .then(menuArgument().executes(this::save)))
                 .then(Commands.literal("convert")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .then(Commands.literal("deluxemenus")
@@ -144,7 +162,7 @@ public final class MenuCommand implements CommandRegistration {
 
     @Override
     public String description() {
-        return "Open, list, reload, execute, dump, and convert operator custom menus.";
+        return "Open, list, reload, execute, dump, save, and convert operator custom menus.";
     }
 
     /** The {@code <name>} argument, completed from the currently registered menu names. */
@@ -392,6 +410,47 @@ public final class MenuCommand implements CommandRegistration {
         }
         feedback.send(sender, CustomMenusMessageKey.MENU_META, metaPlaceholders(name, found.get()));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Re-serialize a loaded menu back to its {@code menus/<menu>.conf} file and reload it — {@code /menu save <menu>},
+     * the end-to-end proof that the editor's write path round-trips. An unregistered name replies not-found; otherwise
+     * the registered spec (and any {@code command {}} block it declared) is validated and written off the tick thread
+     * through the {@link Scheduler} port, and the outcome is bridged back to the global region to report it and, on a
+     * clean save, trigger the single-file reload. A spec whose refs no longer resolve is refused with the offending
+     * ids and nothing is written, so a save can never leave a menu the loader would only skip.
+     */
+    private int save(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "menu");
+        Optional<MenuSpec> found = menus.registeredSpec(name);
+        if (found.isEmpty()) {
+            feedback.send(sender, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", name));
+            return 0;
+        }
+        MenuSpec spec = found.get();
+        OpenCommandSpec command = openCommandFor.apply(name).orElse(null);
+        scheduler.async(() -> {
+            MenuSpecPersistence.SaveResult result = persistence.save(menusDir, name, spec, command);
+            scheduler.onGlobal(() -> reportSave(sender, name, result));
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Report a save outcome to {@code sender}; on a clean write, reload the single file so the engine picks it up. */
+    private void reportSave(CommandSender sender, String name, MenuSpecPersistence.SaveResult result) {
+        switch (result.status()) {
+            case SAVED -> {
+                var unused = reloadOne.apply(name);
+                feedback.send(sender, CustomMenusMessageKey.MENU_SAVED, Map.of("name", name));
+            }
+            case INVALID_REFS ->
+                feedback.send(
+                        sender,
+                        CustomMenusMessageKey.MENU_SAVE_INVALID,
+                        Map.of("name", name, "missing", String.join(", ", result.missingRefs())));
+            case IO_ERROR -> feedback.send(sender, CustomMenusMessageKey.MENU_SAVE_FAILED, Map.of("name", name));
+        }
     }
 
     /** The per-item dump line's placeholders: the item id, its slot list, its raw material token, and its action count. */

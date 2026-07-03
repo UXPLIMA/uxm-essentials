@@ -62,7 +62,7 @@ class CustomMenusWiringTest {
         Files.writeString(menus.resolve("hub.conf"), "rows = 1\nitems { x { slot = 0, material = STONE } }\n");
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.commands().getFirst().build().getLiteral()).isEqualTo("menu");
@@ -80,7 +80,7 @@ class CustomMenusWiringTest {
                 """);
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
 
         assertThat(wired.commands().stream().map(c -> c.build().getLiteral())).contains("menu", "shop");
         assertThat(wired.commands().stream()
@@ -94,7 +94,7 @@ class CustomMenusWiringTest {
     @Test
     void anEmptyMenusFolderLoadsNothingButStillRegistersTheCommandAndListeners(@TempDir Path dataFolder) {
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.menuNames().get()).isEmpty();
@@ -112,7 +112,7 @@ class CustomMenusWiringTest {
                 """);
 
         CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), messages());
+                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
 
         // openers.conf is reserved for opener config: it must not appear as a loaded menu name, and it arms the
         // two opener listeners rather than being skipped as a malformed menu spec.
@@ -142,6 +142,10 @@ class CustomMenusWiringTest {
 
     private static Messages messages() {
         return new KeyMessages();
+    }
+
+    private static Scheduler scheduler() {
+        return new SyncScheduler();
     }
 
     private static Logger log() {

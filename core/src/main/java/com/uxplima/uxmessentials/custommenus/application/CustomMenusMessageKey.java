@@ -57,7 +57,16 @@ public enum CustomMenusMessageKey implements MessageKey {
     MENU_CONVERTED("menu.converted"),
 
     /** Reply for {@code /menu convert <deluxemenus|zmenu> <path>} when the given {@code {path}} held no menu YAML. */
-    MENU_CONVERT_FAILED("menu.convert-failed");
+    MENU_CONVERT_FAILED("menu.convert-failed"),
+
+    /** Confirmation for {@code /menu save <menu>} that {@code {name}} was written back to its file and reloaded. */
+    MENU_SAVED("menu.saved"),
+
+    /** Reply for {@code /menu save <menu>} refused because the spec named the unregistered ids {@code {missing}}. */
+    MENU_SAVE_INVALID("menu.save-invalid"),
+
+    /** Reply for {@code /menu save <menu>} when {@code {name}}'s file could not be written. */
+    MENU_SAVE_FAILED("menu.save-failed");
 
     private final String key;
 
