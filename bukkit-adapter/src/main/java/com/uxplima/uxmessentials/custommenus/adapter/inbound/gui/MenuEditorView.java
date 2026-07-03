@@ -65,8 +65,8 @@ public final class MenuEditorView {
     /** The create button's slot on the six-row picker. */
     private static final int CREATE_SLOT = 49;
 
-    /** The overview's four action-button slots, then its back and delete slots — a single three-row chest. */
-    private static final List<Integer> OVERVIEW_PROPERTY_SLOTS = List.of(10, 12, 14, 16);
+    /** The overview's five action-button slots, then its back and delete slots — a single three-row chest. */
+    private static final List<Integer> OVERVIEW_PROPERTY_SLOTS = List.of(10, 12, 14, 16, 18);
 
     private static final int OVERVIEW_BACK_SLOT = 22;
     private static final int OVERVIEW_DELETE_SLOT = 26;
@@ -78,6 +78,7 @@ public final class MenuEditorView {
     private final Function<String, Optional<MenuSpec>> specOf;
     private final TextInput textInput;
     private final BiConsumer<Player, String> openGrid;
+    private final BiConsumer<Player, String> openProperties;
     private final EntityListView<String> list;
     private final EntityEditorView<String> overview;
 
@@ -91,7 +92,8 @@ public final class MenuEditorView {
             Function<String, Optional<MenuSpec>> specOf,
             GuiLayouts guiLayouts,
             TextInput textInput,
-            BiConsumer<Player, String> openGrid) {
+            BiConsumer<Player, String> openGrid,
+            BiConsumer<Player, String> openProperties) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -101,6 +103,7 @@ public final class MenuEditorView {
         this.specOf = Objects.requireNonNull(specOf, "specOf");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.openGrid = Objects.requireNonNull(openGrid, "openGrid");
+        this.openProperties = Objects.requireNonNull(openProperties, "openProperties");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
 
         EntityEditorLayout overviewLayout = guiLayouts.loadEntityEditor(
@@ -193,7 +196,7 @@ public final class MenuEditorView {
                 () -> list.open(player, viewer));
     }
 
-    /** Create the named menu off-thread, then land in its overview (or back in the list on a rejected name). */
+    /** Create the named menu off-thread, then land in its property editor (or back in the list on a rejected name). */
     void applyCreate(Player player, PlayerRef viewer, String text) {
         if (text.isBlank()) {
             list.open(player, viewer);
@@ -204,8 +207,10 @@ public final class MenuEditorView {
             EditOutcome outcome = service.createBlank(name);
             scheduler.onEntity(viewer, () -> {
                 feedback(player, viewer, outcome, name, name);
+                // A create-from-scratch flows straight into the property editor so the operator sets its title, rows,
+                // and open command right away; a rejected name lands back in the picker list.
                 if (outcome == EditOutcome.CREATED) {
-                    overview.open(player, viewer, name);
+                    openProperties.accept(player, name);
                 } else {
                     list.open(player, viewer);
                 }
@@ -230,7 +235,7 @@ public final class MenuEditorView {
     }
 
     private List<EditableProperty> overviewProperties(String id) {
-        return List.of(saveButton(id), duplicateButton(id), renameButton(id), gridButton(id));
+        return List.of(saveButton(id), duplicateButton(id), renameButton(id), gridButton(id), propertiesButton(id));
     }
 
     private EditableProperty saveButton(String id) {
@@ -264,6 +269,15 @@ public final class MenuEditorView {
                 Material.CRAFTING_TABLE,
                 hint(CustomMenusMessageKey.MENU_EDITOR_GRID_HINT),
                 (player, reopen) -> openGrid.accept(player, id));
+    }
+
+    /** The overview button that opens the menu-level property editor for this menu — the P5 editor's entry point. */
+    private EditableProperty propertiesButton(String id) {
+        return new ActionProperty(
+                CustomMenusMessageKey.MENU_EDITOR_PROPERTIES,
+                Material.COMPARATOR,
+                hint(CustomMenusMessageKey.MENU_EDITOR_PROPERTIES_HINT),
+                (player, reopen) -> openProperties.accept(player, id));
     }
 
     private void saveMenu(Player player, String id, Runnable reopen) {

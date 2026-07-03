@@ -41,6 +41,9 @@ import org.jspecify.annotations.Nullable;
  */
 public final class MenuEditSession {
 
+    /** The viewer's own inventory slots a bottom-inventory menu additionally paints into — mirrors {@code MenuSpec}. */
+    private static final int BOTTOM_SLOTS = 36;
+
     private String title;
     private int rows;
     private RefreshSpec refresh;
@@ -318,8 +321,15 @@ public final class MenuEditSession {
         return this;
     }
 
+    /**
+     * Resize the menu to {@code rows}. Shrinking can leave an item in a slot the smaller menu no longer has; rather
+     * than let {@link #toSpec()} reject the whole menu, any item that would fall out of range is dropped here, so the
+     * model stays valid after every resize. The editor surfaces the shrink through the redrawn (now smaller) item
+     * count. The dropped items are gone from the working copy, not the file, until the operator saves.
+     */
     public MenuEditSession setRows(int rows) {
         this.rows = rows;
+        dropOrphanedItems();
         return this;
     }
 
@@ -331,6 +341,19 @@ public final class MenuEditSession {
 
     public MenuEditSession setRefresh(RefreshSpec refresh) {
         this.refresh = Objects.requireNonNull(refresh, "refresh");
+        return this;
+    }
+
+    /**
+     * Set the refresh policy from an enabled flag and an interval — the two properties the menu editor surfaces as a
+     * toggle and a stepper. Enabling with a non-positive interval is snapped up to one tick, since {@link RefreshSpec}
+     * forbids an enabled zero-interval loop, so the toggle can flip refresh on without the operator first setting an
+     * interval.
+     */
+    public MenuEditSession setRefresh(boolean enabled, int intervalTicks) {
+        this.refresh = enabled
+                ? new RefreshSpec(true, Math.max(1, intervalTicks))
+                : new RefreshSpec(false, Math.max(0, intervalTicks));
         return this;
     }
 
@@ -346,6 +369,8 @@ public final class MenuEditSession {
 
     public MenuEditSession setBottomInventory(boolean bottomInventory) {
         this.bottomInventory = bottomInventory;
+        // Turning the bottom canvas off shrinks the addressable range, so drop any item that was placed in it.
+        dropOrphanedItems();
         return this;
     }
 
@@ -394,9 +419,47 @@ public final class MenuEditSession {
         return Optional.ofNullable(inventoryType);
     }
 
+    public long clickCooldownMs() {
+        return clickCooldownMs;
+    }
+
+    public boolean bottomInventory() {
+        return bottomInventory;
+    }
+
+    public boolean chestOnly() {
+        return chestOnly;
+    }
+
+    /** The menu's refresh policy — the toggle-and-interval pair the menu editor's two refresh rows read. */
+    public RefreshSpec refresh() {
+        return refresh;
+    }
+
+    /** The condition refs gating who may open the menu, in order — the open-requirement ref-list editor's read. */
+    public List<Ref> openRequirement() {
+        return openRequirement;
+    }
+
+    /** The action refs run when the menu opens, in order — the open-actions ref-list editor's read. */
+    public List<Ref> openActions() {
+        return openActions;
+    }
+
+    /** The action refs run when the menu closes, in order — the close-actions ref-list editor's read. */
+    public List<Ref> closeActions() {
+        return closeActions;
+    }
+
     /** The open-command block riding this session, or empty when the menu declares none. */
     public Optional<OpenCommandSpec> command() {
         return Optional.ofNullable(command);
+    }
+
+    /** Drop any item whose slots no longer fit the menu, so a shrink never leaves {@link #toSpec()} unable to validate. */
+    private void dropOrphanedItems() {
+        int capacity = rows * 9 + (bottomInventory ? BOTTOM_SLOTS : 0);
+        items.values().removeIf(item -> item.slots().slots().stream().anyMatch(slot -> slot >= capacity));
     }
 
     /**

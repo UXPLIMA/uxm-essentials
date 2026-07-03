@@ -357,7 +357,160 @@ public enum CustomMenusMessageKey implements MessageKey {
     MENU_EDITOR_NAME_RESERVED("menu.editor.reserved"),
 
     /** Reply when {@code {name}} already belongs to a menu. */
-    MENU_EDITOR_NAME_TAKEN("menu.editor.name-taken");
+    MENU_EDITOR_NAME_TAKEN("menu.editor.name-taken"),
+
+    /** Name of the overview panel's button that opens the menu-property editor. */
+    MENU_EDITOR_PROPERTIES("menu.editor.properties"),
+
+    /** Hint lore of the overview panel's menu-property button. */
+    MENU_EDITOR_PROPERTIES_HINT("menu.editor.properties-hint"),
+
+    /** Title of the menu-property editor ({@code {name}}). */
+    MENU_PROPERTIES_TITLE("menu.properties.title"),
+
+    /** The menu-property editor's value-lore wrapper around each property's current value ({@code {value}}). */
+    MENU_PROPERTIES_VALUE_LORE("menu.properties.value-lore"),
+
+    /** Name of the menu-property editor's back button. */
+    MENU_PROPERTIES_BACK("menu.properties.back"),
+
+    /** The on state of a toggle in the menu-property editor. */
+    MENU_PROPERTIES_VALUE_ON("menu.properties.value-on"),
+
+    /** The off state of a toggle in the menu-property editor. */
+    MENU_PROPERTIES_VALUE_OFF("menu.properties.value-off"),
+
+    /** Label of the menu-property editor's title field. */
+    MENU_PROPERTIES_TITLE_FIELD("menu.properties.title-field"),
+
+    /** Anvil prompt shown when the title field asks for a new menu title. */
+    MENU_PROPERTIES_TITLE_PROMPT("menu.properties.title-prompt"),
+
+    /** Label of the menu-property editor's row-count field. */
+    MENU_PROPERTIES_ROWS("menu.properties.rows"),
+
+    /** Label of the menu-property editor's inventory-type selector. */
+    MENU_PROPERTIES_INVENTORY_TYPE("menu.properties.inventory-type"),
+
+    /** Title of the inventory-type selector sub-menu. */
+    MENU_PROPERTIES_SELECT_INVENTORY_TYPE("menu.properties.select-inventory-type"),
+
+    /** Label of the menu-property editor's click-cooldown field (milliseconds). */
+    MENU_PROPERTIES_CLICK_COOLDOWN("menu.properties.click-cooldown"),
+
+    /** Label of the menu-property editor's chest-only toggle. */
+    MENU_PROPERTIES_CHEST_ONLY("menu.properties.chest-only"),
+
+    /** Label of the menu-property editor's bottom-inventory toggle. */
+    MENU_PROPERTIES_BOTTOM_INVENTORY("menu.properties.bottom-inventory"),
+
+    /** Label of the menu-property editor's open-requirement row (opens the condition ref-list). */
+    MENU_PROPERTIES_OPEN_REQUIREMENT("menu.properties.open-requirement"),
+
+    /** Title of the open-requirement condition ref-list. */
+    MENU_PROPERTIES_OPEN_REQUIREMENT_TITLE("menu.properties.open-requirement-title"),
+
+    /** Label of the menu-property editor's open-actions row (opens the action ref-list). */
+    MENU_PROPERTIES_OPEN_ACTIONS("menu.properties.open-actions"),
+
+    /** Title of the open-actions ref-list. */
+    MENU_PROPERTIES_OPEN_ACTIONS_TITLE("menu.properties.open-actions-title"),
+
+    /** Label of the menu-property editor's close-actions row (opens the action ref-list). */
+    MENU_PROPERTIES_CLOSE_ACTIONS("menu.properties.close-actions"),
+
+    /** Title of the close-actions ref-list. */
+    MENU_PROPERTIES_CLOSE_ACTIONS_TITLE("menu.properties.close-actions-title"),
+
+    /** Label of the menu-property editor's refresh-enabled toggle. */
+    MENU_PROPERTIES_REFRESH("menu.properties.refresh"),
+
+    /** Label of the menu-property editor's refresh-interval field (ticks). */
+    MENU_PROPERTIES_REFRESH_INTERVAL("menu.properties.refresh-interval"),
+
+    /** Label of the menu-property editor's open-command row (opens the command-block sub-editor). */
+    MENU_PROPERTIES_OPEN_COMMAND("menu.properties.open-command"),
+
+    /** Label of the menu-property editor's slot-grid button. */
+    MENU_PROPERTIES_GRID("menu.properties.grid"),
+
+    /** Hint lore of the menu-property editor's slot-grid button. */
+    MENU_PROPERTIES_GRID_HINT("menu.properties.grid-hint"),
+
+    /** Label of the menu-property editor's save button. */
+    MENU_PROPERTIES_SAVE("menu.properties.save"),
+
+    /** Hint lore of the menu-property editor's save button. */
+    MENU_PROPERTIES_SAVE_HINT("menu.properties.save-hint"),
+
+    /** Name of the menu-property editor's delete button. */
+    MENU_PROPERTIES_DELETE("menu.properties.delete"),
+
+    /** Title of the confirm window the menu-property editor's delete button opens ({@code {name}}). */
+    MENU_PROPERTIES_DELETE_CONFIRM("menu.properties.delete-confirm"),
+
+    /** Title of the open-command sub-editor ({@code {name}}). */
+    MENU_COMMAND_TITLE("menu.command.title"),
+
+    /** Name of the open-command sub-editor's back button. */
+    MENU_COMMAND_BACK("menu.command.back"),
+
+    /** Label of the command sub-editor's enabled toggle (adds a command block, or clears it). */
+    MENU_COMMAND_ENABLED("menu.command.enabled"),
+
+    /** Label of the command sub-editor's command-name field. */
+    MENU_COMMAND_NAME("menu.command.name"),
+
+    /** Anvil prompt shown when the command-name field asks for a command word. */
+    MENU_COMMAND_NAME_PROMPT("menu.command.name-prompt"),
+
+    /** Label of the command sub-editor's aliases list field. */
+    MENU_COMMAND_ALIASES("menu.command.aliases"),
+
+    /** Title of the command aliases sub-menu. */
+    MENU_COMMAND_ALIASES_TITLE("menu.command.aliases.title"),
+
+    /** Per-alias button name in the aliases sub-menu ({@code {entry}}). */
+    MENU_COMMAND_ALIASES_ENTRY_NAME("menu.command.aliases.entry-name"),
+
+    /** Per-alias action-hint lore in the aliases sub-menu. */
+    MENU_COMMAND_ALIASES_ENTRY_HINTS("menu.command.aliases.entry-hints"),
+
+    /** Name of the aliases sub-menu's add button. */
+    MENU_COMMAND_ALIASES_ADD("menu.command.aliases.add"),
+
+    /** Anvil prompt shown when adding an alias. */
+    MENU_COMMAND_ALIASES_ADD_PROMPT("menu.command.aliases.add-prompt"),
+
+    /** Anvil prompt shown when editing an alias ({@code {entry}}). */
+    MENU_COMMAND_ALIASES_EDIT_PROMPT("menu.command.aliases.edit-prompt"),
+
+    /** Confirm title shown before removing an alias. */
+    MENU_COMMAND_ALIASES_REMOVE_CONFIRM("menu.command.aliases.remove-confirm"),
+
+    /** Name of the aliases sub-menu's back button. */
+    MENU_COMMAND_ALIASES_BACK("menu.command.aliases.back"),
+
+    /** Label of the command sub-editor's permission field. */
+    MENU_COMMAND_PERMISSION("menu.command.permission"),
+
+    /** Anvil prompt shown when the permission field asks for a node. */
+    MENU_COMMAND_PERMISSION_PROMPT("menu.command.permission-prompt"),
+
+    /** Label of the command sub-editor's deny-message field. */
+    MENU_COMMAND_DENY_MESSAGE("menu.command.deny-message"),
+
+    /** Anvil prompt shown when the deny-message field asks for a line. */
+    MENU_COMMAND_DENY_MESSAGE_PROMPT("menu.command.deny-message-prompt"),
+
+    /** Label of the command sub-editor's console-allowed toggle. */
+    MENU_COMMAND_CONSOLE("menu.command.console"),
+
+    /** Label of the command sub-editor's usage field. */
+    MENU_COMMAND_USAGE("menu.command.usage"),
+
+    /** Anvil prompt shown when the usage field asks for a usage line. */
+    MENU_COMMAND_USAGE_PROMPT("menu.command.usage-prompt");
 
     private final String key;
 

@@ -62,6 +62,36 @@ public record OpenCommandSpec(
         this(name, aliases, permission, denyMessage, consoleAllowed, List.of(), Optional.empty());
     }
 
+    /** A copy under a new primary command literal — the command editor's name field. Re-normalises at construction. */
+    public OpenCommandSpec withName(String name) {
+        return new OpenCommandSpec(name, aliases, permission, denyMessage, consoleAllowed, arguments, usage);
+    }
+
+    /** A copy answering to a new alias set — the command editor's aliases list. Blanks / duplicates drop as ever. */
+    public OpenCommandSpec withAliases(List<String> aliases) {
+        return new OpenCommandSpec(name, aliases, permission, denyMessage, consoleAllowed, arguments, usage);
+    }
+
+    /** A copy gated by a new permission node ({@link Optional#empty()} clears the gate) — the permission field. */
+    public OpenCommandSpec withPermission(Optional<String> permission) {
+        return new OpenCommandSpec(name, aliases, permission, denyMessage, consoleAllowed, arguments, usage);
+    }
+
+    /** A copy showing a new deny line when the gate fails ({@link Optional#empty()} clears it) — the deny field. */
+    public OpenCommandSpec withDenyMessage(Optional<String> denyMessage) {
+        return new OpenCommandSpec(name, aliases, permission, denyMessage, consoleAllowed, arguments, usage);
+    }
+
+    /** A copy toggling whether a non-player sender may invoke the command — the console toggle. */
+    public OpenCommandSpec withConsoleAllowed(boolean consoleAllowed) {
+        return new OpenCommandSpec(name, aliases, permission, denyMessage, consoleAllowed, arguments, usage);
+    }
+
+    /** A copy carrying a new usage line ({@link Optional#empty()} clears it) — the usage field. */
+    public OpenCommandSpec withUsage(Optional<String> usage) {
+        return new OpenCommandSpec(name, aliases, permission, denyMessage, consoleAllowed, arguments, usage);
+    }
+
     /** Normalise a raw name to a single lowercase command word, rejecting a blank or whitespace-bearing value. */
     private static String requireCommandWord(String raw) {
         String normalised = Objects.requireNonNull(raw, "name").strip().toLowerCase(Locale.ROOT);

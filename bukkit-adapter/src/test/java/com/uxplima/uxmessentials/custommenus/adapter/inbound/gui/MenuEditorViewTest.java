@@ -129,6 +129,7 @@ class MenuEditorViewTest {
                 menus::registeredSpec,
                 new GuiLayouts(guiDir, NOOP),
                 textInput,
+                (player, id) -> {},
                 (player, id) -> {});
     }
 

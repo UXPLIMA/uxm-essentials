@@ -26,9 +26,11 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuOpenCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuClickActionsView;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuCommandEditorView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuEditorView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuGridView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuItemEditorView;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuPropertiesView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRefListEditor;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRequirementsView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
@@ -181,6 +183,7 @@ public final class CustomMenusWiring {
         // reads the grid through a holder set once the grid exists.
         AtomicReference<MenuEditorView> editorViewRef = new AtomicReference<>();
         AtomicReference<MenuGridView> gridViewRef = new AtomicReference<>();
+        AtomicReference<MenuPropertiesView> propertiesViewRef = new AtomicReference<>();
         // The click-action and view-requirement builders (the item editor's two new rows). The requirement editor and
         // the item editor reference each other — the item editor opens the requirement editor, the requirement editor's
         // back reopens the item editor — so the requirement editor is built first with a back hook that reads the item
@@ -213,6 +216,46 @@ public final class CustomMenusWiring {
                 clickActionsView,
                 requirementsView);
         itemEditorViewRef.set(itemEditorView);
+        // The menu-level property editor (the overview's "Edit properties" row and the create-from-scratch landing)
+        // and its open-command sub-editor. The command editor and the property editor reference each other — the
+        // property editor opens the command editor, the command editor's back reopens the property editor — so the
+        // command editor is built first with a back hook that reads the property editor through a holder set once it
+        // exists. A property-editor Save writes the session's own command block, so rememberCommand mirrors it into the
+        // live open-command reference: a later grid save (which re-attaches from that reference) then keeps the edit
+        // rather than reverting it.
+        MenuCommandEditorView commandEditorView = new MenuCommandEditorView(
+                menus,
+                guiText,
+                scheduler,
+                messages,
+                textInput,
+                guiLayouts,
+                (player, viewer) -> Objects.requireNonNull(propertiesViewRef.get(), "propertiesView")
+                        .reopen(player, viewer));
+        java.util.function.BiConsumer<String, Optional<OpenCommandSpec>> rememberCommand =
+                (name, command) -> openCommands.updateAndGet(current -> withCommand(current, name, command));
+        MenuPropertiesView propertiesView = new MenuPropertiesView(
+                menus,
+                guiText,
+                scheduler,
+                messages,
+                editorService,
+                menus::registeredSpec,
+                openCommandFor,
+                rememberCommand,
+                guiLayouts,
+                bindings::schema,
+                refListEditor,
+                commandEditorView,
+                textInput,
+                (player, id) -> Objects.requireNonNull(gridViewRef.get(), "gridView")
+                        .open(player, BukkitRefs.toRef(player), id),
+                (player, id) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
+                        .overview()
+                        .open(player, BukkitRefs.toRef(player), id),
+                (player, viewer) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
+                        .open(player, viewer));
+        propertiesViewRef.set(propertiesView);
         MenuGridView gridView = new MenuGridView(
                 menus,
                 guiText,
@@ -234,7 +277,8 @@ public final class CustomMenusWiring {
                 menus::registeredSpec,
                 guiLayouts,
                 textInput,
-                (player, id) -> gridView.open(player, BukkitRefs.toRef(player), id));
+                (player, id) -> gridView.open(player, BukkitRefs.toRef(player), id),
+                (player, id) -> propertiesView.open(player, BukkitRefs.toRef(player), id));
         editorViewRef.set(editorView);
         guiRegistry.register(new ManagementGuiEntry(
                 "custommenus",
@@ -295,6 +339,18 @@ public final class CustomMenusWiring {
         List<String> next = new ArrayList<>(current);
         next.remove(name);
         return List.copyOf(next);
+    }
+
+    /**
+     * {@code current} with {@code name} bound to {@code command} (or dropped when it is empty), as a fresh immutable
+     * map — how a property-editor Save that added, changed, or cleared a menu's {@code command {}} block keeps the live
+     * open-command reference in step, so a subsequent grid save re-attaches the edited block rather than the stale one.
+     */
+    private static Map<String, OpenCommandSpec> withCommand(
+            Map<String, OpenCommandSpec> current, String name, Optional<OpenCommandSpec> command) {
+        Map<String, OpenCommandSpec> next = new java.util.LinkedHashMap<>(current == null ? Map.of() : current);
+        command.ifPresentOrElse(spec -> next.put(name, spec), () -> next.remove(name));
+        return Map.copyOf(next);
     }
 
     /** {@code current} with the {@code name} entry dropped, as a fresh immutable map; unchanged when it was absent. */

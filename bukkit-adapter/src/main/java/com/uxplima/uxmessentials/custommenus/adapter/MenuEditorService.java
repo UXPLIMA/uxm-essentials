@@ -183,6 +183,19 @@ public final class MenuEditorService {
         return persist(name, session.toSpec(), command, EditOutcome.SAVED);
     }
 
+    /**
+     * Save the edited {@code session} back to menu {@code name}'s file with the caller-supplied {@code command} block —
+     * the menu-property editor's "Save". Unlike {@link #saveSession(String, MenuEditSession)}, which re-attaches the
+     * live open command and so is safe for the grid (whose session never carries one), this writes the exact command
+     * the property editor edited, so adding a {@code command {}} block to a menu that had none, changing it, or clearing
+     * it all land on disk. Reports {@link EditOutcome#INVALID_REFS} / {@link EditOutcome#IO_ERROR} like every write.
+     */
+    public EditOutcome saveSession(String name, MenuEditSession session, @Nullable OpenCommandSpec command) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(session, "session");
+        return persist(name, session.toSpec(), command, EditOutcome.SAVED);
+    }
+
     /** Validate a spec, write it, and — on a clean write — reload it; maps the persistence status to an outcome. */
     private EditOutcome persist(String name, MenuSpec spec, @Nullable OpenCommandSpec command, EditOutcome success) {
         MenuSpecPersistence.SaveResult result = persistence.save(menusDir, name, spec, command);

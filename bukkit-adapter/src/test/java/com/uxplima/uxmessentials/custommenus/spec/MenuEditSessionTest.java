@@ -16,6 +16,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import org.junit.jupiter.api.Test;
 
@@ -184,6 +186,60 @@ class MenuEditSessionTest {
 
         assertThat(session.items()).containsOnlyKeys("a");
         assertThat(session.item("a").orElseThrow().material()).isEqualTo("STONE");
+    }
+
+    @Test
+    void everyMenuLevelSetterRoundTripsThroughTheWriter() {
+        MenuEditSession session = MenuEditSession.from(loader.parse("rows = 1"));
+
+        session.setTitle("<red>Shop");
+        session.setRows(3);
+        session.setInventoryType("hopper");
+        session.setClickCooldownMs(200L);
+        session.setChestOnly(true);
+        session.setBottomInventory(false);
+        session.setOpenRequirement(List.of(Ref.parse("perm:shop.use")));
+        session.setOpenActions(List.of(Ref.parse("sound:PLING")));
+        session.setCloseActions(List.of(Ref.parse("message:bye")));
+        session.setRefresh(true, 40);
+
+        MenuSpec reloaded = loader.parse(writer.write(session.toSpec()));
+        assertThat(reloaded.title()).isEqualTo("<red>Shop");
+        assertThat(reloaded.rows()).isEqualTo(3);
+        assertThat(reloaded.inventoryType()).contains("hopper");
+        assertThat(reloaded.clickCooldownMs()).isEqualTo(200L);
+        assertThat(reloaded.chestOnly()).isTrue();
+        assertThat(reloaded.openRequirement()).extracting(Ref::id).containsExactly("perm");
+        assertThat(reloaded.openActions()).extracting(Ref::id).containsExactly("sound");
+        assertThat(reloaded.closeActions()).extracting(Ref::id).containsExactly("message");
+        assertThat(reloaded.refresh()).isEqualTo(new RefreshSpec(true, 40));
+    }
+
+    @Test
+    void decreasingRowsDropsItemsThatFallOutOfRangeWithoutThrowing() {
+        MenuEditSession session = MenuEditSession.from(loader.parse("""
+                rows = 6
+                items {
+                  keep { slot = 0, material = STONE, click { left = ["close"] } }
+                  drop { slot = 45, material = DIRT, click { left = ["close"] } }
+                }
+                """));
+
+        session.setRows(1); // capacity shrinks to 9, so slot 45 no longer fits
+
+        MenuSpec spec = session.toSpec(); // must not throw
+        assertThat(spec.rows()).isEqualTo(1);
+        assertThat(spec.items()).containsOnlyKeys("keep");
+    }
+
+    @Test
+    void theRefreshTogglePreservesAValidIntervalWhenEnabled() {
+        MenuEditSession session = MenuEditSession.from(loader.parse("rows = 1"));
+
+        session.setRefresh(true, 0); // enabling with no interval must not produce an invalid RefreshSpec
+
+        assertThat(session.refresh().enabled()).isTrue();
+        assertThat(session.refresh().intervalTicks()).isGreaterThanOrEqualTo(1);
     }
 
     @Test
