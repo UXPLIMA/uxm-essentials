@@ -79,6 +79,7 @@ public final class MenuGridView {
     private final MenuEditorService service;
     private final Function<String, Optional<MenuSpec>> specOf;
     private final BiConsumer<Player, String> onBack;
+    private final MenuItemEditorView itemEditor;
 
     /** One editing session per viewer, holding the clone being edited and the picked-up slot (null when none). */
     private final Map<UUID, GridEditState> states = new ConcurrentHashMap<>();
@@ -89,13 +90,15 @@ public final class MenuGridView {
             Scheduler scheduler,
             MenuEditorService service,
             Function<String, Optional<MenuSpec>> specOf,
-            BiConsumer<Player, String> onBack) {
+            BiConsumer<Player, String> onBack,
+            MenuItemEditorView itemEditor) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.service = Objects.requireNonNull(service, "service");
         this.specOf = Objects.requireNonNull(specOf, "specOf");
         this.onBack = Objects.requireNonNull(onBack, "onBack");
+        this.itemEditor = Objects.requireNonNull(itemEditor, "itemEditor");
     }
 
     /**
@@ -119,6 +122,18 @@ public final class MenuGridView {
     /** The session a viewer is editing, exposed so a test can read the working copy without a live save. */
     Optional<MenuEditSession> editSession(UUID viewer) {
         return Optional.ofNullable(states.get(viewer)).map(state -> state.session);
+    }
+
+    /**
+     * Reopen the grid for {@code viewer} over the session they were editing — the item editor's Back target. A no-op
+     * when the viewer holds no open grid session (they closed it), so a late Back never opens a blank canvas.
+     */
+    public void reopenGrid(PlayerRef viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        GridEditState state = states.get(viewer.uuid());
+        if (state != null) {
+            showGrid(viewer, state);
+        }
     }
 
     /** Build the grid spec from the current session and open it through the engine; reused on every re-open. */
@@ -202,7 +217,7 @@ public final class MenuGridView {
             return;
         }
         if (filled) {
-            openSlotEditor(viewer, player, menuSlot);
+            openSlotEditor(viewer, state, player, menuSlot);
         } else {
             addDefault(viewer, state, view, player, menuSlot);
         }
@@ -242,13 +257,13 @@ public final class MenuGridView {
         }
     }
 
-    /** Add a default item at {@code menuSlot}, then open its item editor (the P3 seam) so it can be dressed up. */
+    /** Add a default item at {@code menuSlot}, then open its item editor so it can be dressed up straight away. */
     private void addDefault(PlayerRef viewer, GridEditState state, GridView view, Player player, int menuSlot) {
         String id = freshId(state.session);
         state.session.addItem(id, defaultItem(menuSlot));
         player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_ADDED, slot(menuSlot)));
         view.reRender();
-        openSlotEditor(viewer, player, menuSlot);
+        openSlotEditor(viewer, state, player, menuSlot);
     }
 
     /**
@@ -275,12 +290,15 @@ public final class MenuGridView {
     }
 
     /**
-     * The item-editor routing seam. The P3 item property editor opens here; for now it notes that editing the item's
-     * material / name / lore / actions arrives in that phase, so a filled cell (and a freshly added one) has a real,
-     * single place to route to that the next phase fills in.
+     * Open the item property editor for whatever occupies {@code menuSlot} — the routing seam a filled cell (and a
+     * freshly added one) lands on. The editor mutates this viewer's working copy in place and its Back reopens the
+     * grid, so an edit shows on the canvas the moment the operator returns. A cell that holds nothing is a no-op.
      */
-    private void openSlotEditor(PlayerRef viewer, Player player, int menuSlot) {
-        player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_SLOT_SOON, slot(menuSlot)));
+    private void openSlotEditor(PlayerRef viewer, GridEditState state, Player player, int menuSlot) {
+        String id = idAt(state.session, menuSlot);
+        if (id != null) {
+            itemEditor.open(player, viewer, state.session, id);
+        }
     }
 
     /** Save the edited session over the P0 write path off the tick thread, then report the outcome to the viewer. */
@@ -339,22 +357,7 @@ public final class MenuGridView {
 
     /** A copy of {@code item} with its enchant glow on — how the picked-up cell is shown as selected on the canvas. */
     private static MenuItemSpec withGlow(MenuItemSpec item) {
-        ItemDecor decor = item.decor();
-        ItemDecor glowing = new ItemDecor(decor.amount(), decor.modelData(), true, decor.flagTokens(), decor.meta());
-        return new MenuItemSpec(
-                item.slots(),
-                item.priority(),
-                item.material(),
-                item.name(),
-                item.lore(),
-                glowing,
-                item.loreMode(),
-                item.view(),
-                item.click(),
-                item.update(),
-                item.list(),
-                item.type(),
-                item.itemDrag());
+        return item.withDecor(item.decor().withGlow(true));
     }
 
     /** A control / placeholder icon of {@code material} named from the viewer's catalog, carrying no inline literal. */

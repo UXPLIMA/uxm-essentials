@@ -141,4 +141,54 @@ public record MenuItemSpec(
                 type,
                 Optional.empty());
     }
+
+    // --- immutable field-copy helpers (the in-game item editor rebuilds one field at a time) ---
+
+    /** A copy occupying {@code slots}, every other field unchanged — the canonical way to relocate an item. */
+    public MenuItemSpec withSlots(SlotSet slots) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy with a new contention {@code priority}, every other field unchanged. */
+    public MenuItemSpec withPriority(int priority) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy with a new raw {@code material} token ({@code STONE}, {@code head:…}, {@code b64:…}), every other field kept. */
+    public MenuItemSpec withMaterial(String material) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy with a new display {@code name} (a MiniMessage/legacy line, or blank to reset), every other field kept. */
+    public MenuItemSpec withName(String name) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy carrying a new {@code lore} line list, every other field unchanged. */
+    public MenuItemSpec withLore(List<String> lore) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy carrying a new {@code decor} block (amount / model-data / glow / flags / rich meta), every other field kept. */
+    public MenuItemSpec withDecor(ItemDecor decor) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy with a new {@code loreMode} (replace / append / prepend), every other field unchanged. */
+    public MenuItemSpec withLoreMode(LoreMode loreMode) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy with a new pagination {@code type} (none / next / previous / jump), every other field unchanged. */
+    public MenuItemSpec withType(ItemType type) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
 }

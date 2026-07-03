@@ -26,4 +26,24 @@ public record ItemDecor(int amount, Optional<Integer> modelData, boolean glow, L
     public ItemDecor(int amount, Optional<Integer> modelData, boolean glow, List<String> flagTokens) {
         this(amount, modelData, glow, flagTokens, RichMeta.NONE);
     }
+
+    /** A copy with a new stack {@code amount}, every other field unchanged — the item editor's amount stepper. */
+    public ItemDecor withAmount(int amount) {
+        return new ItemDecor(amount, modelData, glow, flagTokens, meta);
+    }
+
+    /** A copy with a new custom-model-data override (or {@link Optional#empty()} to clear it), every other field kept. */
+    public ItemDecor withModelData(Optional<Integer> modelData) {
+        return new ItemDecor(amount, modelData, glow, flagTokens, meta);
+    }
+
+    /** A copy with the enchant glow turned on or off, every other field unchanged. */
+    public ItemDecor withGlow(boolean glow) {
+        return new ItemDecor(amount, modelData, glow, flagTokens, meta);
+    }
+
+    /** A copy carrying a new item-flag token list, every other field unchanged — the item editor's flag toggles. */
+    public ItemDecor withFlagTokens(List<String> flagTokens) {
+        return new ItemDecor(amount, modelData, glow, flagTokens, meta);
+    }
 }

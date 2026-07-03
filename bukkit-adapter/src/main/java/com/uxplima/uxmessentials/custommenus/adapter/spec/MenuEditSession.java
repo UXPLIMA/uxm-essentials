@@ -5,9 +5,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
@@ -99,11 +102,21 @@ public final class MenuEditSession {
      * item carries that id — the grid editor never moves a slot that holds nothing.
      */
     public MenuEditSession moveItem(String id, SlotSet slots) {
-        Objects.requireNonNull(id, "id");
         Objects.requireNonNull(slots, "slots");
+        return updateItem(id, item -> item.withSlots(slots));
+    }
+
+    /**
+     * Replace the item stored under {@code id} with {@code mutation}'s result, keeping the map key — the primitive the
+     * item property editor's every field setter runs through, since {@link MenuItemSpec} is immutable. A no-op when no
+     * item carries that id, so a stale editor click never re-inserts a removed item.
+     */
+    public MenuEditSession updateItem(String id, UnaryOperator<MenuItemSpec> mutation) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(mutation, "mutation");
         MenuItemSpec current = items.get(id);
         if (current != null) {
-            items.put(id, withSlots(current, slots));
+            items.put(id, Objects.requireNonNull(mutation.apply(current), "mutation result"));
         }
         return this;
     }
@@ -112,6 +125,71 @@ public final class MenuEditSession {
     public Optional<MenuItemSpec> item(String id) {
         Objects.requireNonNull(id, "id");
         return Optional.ofNullable(items.get(id));
+    }
+
+    // --- per-item field setters (the item property editor mutates one field per click) --------------------------
+
+    /** Set the raw material token of the item under {@code id} — a plain name, {@code head:…}, or a {@code b64:…} stack. */
+    public MenuEditSession setMaterial(String id, String material) {
+        Objects.requireNonNull(material, "material");
+        return updateItem(id, item -> item.withMaterial(material));
+    }
+
+    /** Set the display name of the item under {@code id}; a blank name resets it to the base icon's own name. */
+    public MenuEditSession setName(String id, String name) {
+        Objects.requireNonNull(name, "name");
+        return updateItem(id, item -> item.withName(name));
+    }
+
+    /** Replace the lore lines of the item under {@code id} (add / edit / remove / reorder all funnel through here). */
+    public MenuEditSession setLore(String id, List<String> lore) {
+        Objects.requireNonNull(lore, "lore");
+        return updateItem(id, item -> item.withLore(lore));
+    }
+
+    /** Set the slots the item under {@code id} occupies — the item editor's slot-assignment field. */
+    public MenuEditSession setSlots(String id, SlotSet slots) {
+        Objects.requireNonNull(slots, "slots");
+        return updateItem(id, item -> item.withSlots(slots));
+    }
+
+    /** Set the contention priority of the item under {@code id}. */
+    public MenuEditSession setPriority(String id, int priority) {
+        return updateItem(id, item -> item.withPriority(priority));
+    }
+
+    /** Set the pagination role of the item under {@code id}. */
+    public MenuEditSession setType(String id, ItemType type) {
+        Objects.requireNonNull(type, "type");
+        return updateItem(id, item -> item.withType(type));
+    }
+
+    /** Set how the item under {@code id} combines its spec lore with the base icon's lore. */
+    public MenuEditSession setLoreMode(String id, LoreMode loreMode) {
+        Objects.requireNonNull(loreMode, "loreMode");
+        return updateItem(id, item -> item.withLoreMode(loreMode));
+    }
+
+    /** Set the rendered stack amount of the item under {@code id}. */
+    public MenuEditSession setAmount(String id, int amount) {
+        return updateItem(id, item -> item.withDecor(item.decor().withAmount(amount)));
+    }
+
+    /** Set (or clear, with {@link Optional#empty()}) the custom-model-data override of the item under {@code id}. */
+    public MenuEditSession setModelData(String id, Optional<Integer> modelData) {
+        Objects.requireNonNull(modelData, "modelData");
+        return updateItem(id, item -> item.withDecor(item.decor().withModelData(modelData)));
+    }
+
+    /** Turn the enchant glow of the item under {@code id} on or off. */
+    public MenuEditSession setGlow(String id, boolean glow) {
+        return updateItem(id, item -> item.withDecor(item.decor().withGlow(glow)));
+    }
+
+    /** Replace the item-flag tokens of the item under {@code id} — the item editor's per-flag toggles. */
+    public MenuEditSession setFlags(String id, List<String> flags) {
+        Objects.requireNonNull(flags, "flags");
+        return updateItem(id, item -> item.withDecor(item.decor().withFlagTokens(flags)));
     }
 
     /** The current item map, as an unmodifiable view in insertion order. */
@@ -227,23 +305,5 @@ public final class MenuEditSession {
                 bottomInventory,
                 chestOnly,
                 Optional.ofNullable(bedrock));
-    }
-
-    /** A copy of {@code item} occupying {@code slots}, every other field unchanged (the record carries no slot setter). */
-    private static MenuItemSpec withSlots(MenuItemSpec item, SlotSet slots) {
-        return new MenuItemSpec(
-                slots,
-                item.priority(),
-                item.material(),
-                item.name(),
-                item.lore(),
-                item.decor(),
-                item.loreMode(),
-                item.view(),
-                item.click(),
-                item.update(),
-                item.list(),
-                item.type(),
-                item.itemDrag());
     }
 }

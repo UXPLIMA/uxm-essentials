@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuOpenCom
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuEditorView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuGridView;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuItemEditorView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerJoinListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuSwapListener;
@@ -171,7 +172,21 @@ public final class CustomMenusWiring {
         // The slot-grid canvas (the overview's "Slot editor" button) and the overview reference each other — the
         // overview opens the grid, the grid's Back returns to the overview — so the grid is built first with a Back
         // hook that reads the overview through a holder set once the overview exists, breaking the construction cycle.
+        // The item property editor and the grid reference each other the same way: the grid opens the item editor for a
+        // clicked cell, the item editor's Back reopens the grid, so the item editor is built first with a Back hook
+        // that
+        // reads the grid through a holder set once the grid exists.
         AtomicReference<MenuEditorView> editorViewRef = new AtomicReference<>();
+        AtomicReference<MenuGridView> gridViewRef = new AtomicReference<>();
+        MenuItemEditorView itemEditorView = new MenuItemEditorView(
+                menus,
+                guiText,
+                scheduler,
+                messages,
+                textInput,
+                guiLayouts,
+                (player, viewer) ->
+                        Objects.requireNonNull(gridViewRef.get(), "gridView").reopenGrid(viewer));
         MenuGridView gridView = new MenuGridView(
                 menus,
                 guiText,
@@ -180,7 +195,9 @@ public final class CustomMenusWiring {
                 menus::registeredSpec,
                 (player, id) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
                         .overview()
-                        .open(player, BukkitRefs.toRef(player), id));
+                        .open(player, BukkitRefs.toRef(player), id),
+                itemEditorView);
+        gridViewRef.set(gridView);
         MenuEditorView editorView = new MenuEditorView(
                 menus,
                 guiText,

@@ -152,8 +152,125 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Title of the confirm window the grid's shift-click-to-clear opens ({@code {slot}}). */
     MENU_GRID_CLEAR_CONFIRM("menu.editor.grid.clear-confirm"),
 
-    /** Note shown when a filled cell is opened, until the item property editor lands in the next phase ({@code {slot}}). */
-    MENU_GRID_SLOT_SOON("menu.editor.grid.slot-soon"),
+    /** Title of the per-item property editor opened from a grid cell ({@code {id}{slot}}). */
+    MENU_ITEM_EDITOR_TITLE("menu.item-editor.title"),
+
+    /** The item editor's value-lore wrapper around each property's current value ({@code {value}}). */
+    MENU_ITEM_EDITOR_VALUE_LORE("menu.item-editor.value-lore"),
+
+    /** Name of the item editor's back-to-grid button. */
+    MENU_ITEM_EDITOR_BACK("menu.item-editor.back"),
+
+    /** Label of the item editor's material field. */
+    MENU_ITEM_EDITOR_MATERIAL("menu.item-editor.material"),
+
+    /** Anvil prompt shown when the material field asks for a material token. */
+    MENU_ITEM_EDITOR_MATERIAL_PROMPT("menu.item-editor.material-prompt"),
+
+    /** Label of the item editor's capture-from-hand button. */
+    MENU_ITEM_EDITOR_CAPTURE("menu.item-editor.capture"),
+
+    /** Hint lore of the capture-from-hand button. */
+    MENU_ITEM_EDITOR_CAPTURE_HINT("menu.item-editor.capture-hint"),
+
+    /** Feedback that the held item was captured into the material field. */
+    MENU_ITEM_EDITOR_CAPTURED("menu.item-editor.captured"),
+
+    /** Feedback that the capture button was clicked with an empty hand. */
+    MENU_ITEM_EDITOR_CAPTURE_EMPTY("menu.item-editor.capture-empty"),
+
+    /** Label of the item editor's name field. */
+    MENU_ITEM_EDITOR_NAME("menu.item-editor.name"),
+
+    /** Anvil prompt shown when the name field asks for a display name. */
+    MENU_ITEM_EDITOR_NAME_PROMPT("menu.item-editor.name-prompt"),
+
+    /** Label of the item editor's lore-lines list field. */
+    MENU_ITEM_EDITOR_LORE("menu.item-editor.lore"),
+
+    /** Title of the lore-lines sub-menu. */
+    MENU_ITEM_EDITOR_LORE_TITLE("menu.item-editor.lore.title"),
+
+    /** Per-line button name in the lore sub-menu ({@code {entry}}). */
+    MENU_ITEM_EDITOR_LORE_ENTRY_NAME("menu.item-editor.lore.entry-name"),
+
+    /** Per-line action-hint lore in the lore sub-menu. */
+    MENU_ITEM_EDITOR_LORE_ENTRY_HINTS("menu.item-editor.lore.entry-hints"),
+
+    /** Name of the lore sub-menu's add button. */
+    MENU_ITEM_EDITOR_LORE_ADD("menu.item-editor.lore.add"),
+
+    /** Anvil prompt shown when adding a lore line. */
+    MENU_ITEM_EDITOR_LORE_ADD_PROMPT("menu.item-editor.lore.add-prompt"),
+
+    /** Anvil prompt shown when editing a lore line ({@code {entry}}). */
+    MENU_ITEM_EDITOR_LORE_EDIT_PROMPT("menu.item-editor.lore.edit-prompt"),
+
+    /** Confirm title shown before removing a lore line. */
+    MENU_ITEM_EDITOR_LORE_REMOVE_CONFIRM("menu.item-editor.lore.remove-confirm"),
+
+    /** Name of the lore sub-menu's back button. */
+    MENU_ITEM_EDITOR_LORE_BACK("menu.item-editor.lore.back"),
+
+    /** Label of the item editor's slot-assignment field. */
+    MENU_ITEM_EDITOR_SLOTS("menu.item-editor.slots"),
+
+    /** Anvil prompt shown when the slot field asks for slot tokens (e.g. {@code 0-2,8}). */
+    MENU_ITEM_EDITOR_SLOTS_PROMPT("menu.item-editor.slots-prompt"),
+
+    /** Label of the item editor's stack-amount field. */
+    MENU_ITEM_EDITOR_AMOUNT("menu.item-editor.amount"),
+
+    /** Label of the item editor's priority field. */
+    MENU_ITEM_EDITOR_PRIORITY("menu.item-editor.priority"),
+
+    /** Label of the item editor's custom-model-data field. */
+    MENU_ITEM_EDITOR_MODEL_DATA("menu.item-editor.model-data"),
+
+    /** Label of the item editor's glow toggle. */
+    MENU_ITEM_EDITOR_GLOW("menu.item-editor.glow"),
+
+    /** Label of the item editor's lore-mode selector. */
+    MENU_ITEM_EDITOR_LORE_MODE("menu.item-editor.lore-mode"),
+
+    /** Title of the lore-mode selector sub-menu. */
+    MENU_ITEM_EDITOR_SELECT_LORE_MODE("menu.item-editor.select-lore-mode"),
+
+    /** Label of the item editor's pagination-type selector. */
+    MENU_ITEM_EDITOR_TYPE("menu.item-editor.type"),
+
+    /** Title of the pagination-type selector sub-menu. */
+    MENU_ITEM_EDITOR_SELECT_TYPE("menu.item-editor.select-type"),
+
+    /** The on state of a toggle in the item editor. */
+    MENU_ITEM_EDITOR_VALUE_ON("menu.item-editor.value-on"),
+
+    /** The off state of a toggle in the item editor. */
+    MENU_ITEM_EDITOR_VALUE_OFF("menu.item-editor.value-off"),
+
+    /** Label of the hide-enchantments flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_ENCHANTS("menu.item-editor.flag.hide-enchants"),
+
+    /** Label of the hide-attributes flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_ATTRIBUTES("menu.item-editor.flag.hide-attributes"),
+
+    /** Label of the hide-unbreakable flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_UNBREAKABLE("menu.item-editor.flag.hide-unbreakable"),
+
+    /** Label of the hide-extra-tooltip flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_ADDITIONAL_TOOLTIP("menu.item-editor.flag.hide-additional-tooltip"),
+
+    /** Label of the hide-dye flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_DYE("menu.item-editor.flag.hide-dye"),
+
+    /** Label of the hide-armor-trim flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_ARMOR_TRIM("menu.item-editor.flag.hide-armor-trim"),
+
+    /** Label of the hide-can-destroy flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_DESTROYS("menu.item-editor.flag.hide-destroys"),
+
+    /** Label of the hide-can-place-on flag toggle. */
+    MENU_ITEM_EDITOR_FLAG_HIDE_PLACED_ON("menu.item-editor.flag.hide-placed-on"),
 
     /** Name of the overview panel's delete button. */
     MENU_EDITOR_DELETE("menu.editor.delete"),

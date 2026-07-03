@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.custommenus.spec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -9,6 +11,9 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpe
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
@@ -113,6 +118,72 @@ class MenuEditSessionTest {
         session.setInventoryType(null);
 
         assertThat(session.toSpec().inventoryType()).isEmpty();
+    }
+
+    @Test
+    void itemFieldSettersRoundTripThroughTheWriter() {
+        MenuSpec initial = loader.parse("""
+                rows = 3
+                items { a { slot = 0, material = STONE, name = "", click { left = ["close"] } } }
+                """);
+        MenuEditSession session = MenuEditSession.from(initial);
+
+        session.setMaterial("a", "DIAMOND");
+        session.setName("a", "<gold>Shiny");
+        session.setAmount("a", 16);
+        session.setPriority("a", 5);
+        session.setGlow("a", true);
+        session.setModelData("a", Optional.of(7));
+        session.setFlags("a", List.of("HIDE_ATTRIBUTES"));
+        session.setLore("a", List.of("<gray>one", "<gray>two"));
+        session.setLoreMode("a", LoreMode.APPEND);
+        session.setType("a", ItemType.NEXT);
+        session.setSlots("a", new SlotSet(List.of(4)));
+
+        MenuSpec reloaded = loader.parse(writer.write(session.toSpec()));
+        MenuItemSpec item = reloaded.items().get("a");
+        assertThat(item.material()).isEqualTo("DIAMOND");
+        assertThat(item.name()).isEqualTo("<gold>Shiny");
+        assertThat(item.decor().amount()).isEqualTo(16);
+        assertThat(item.priority()).isEqualTo(5);
+        assertThat(item.decor().glow()).isTrue();
+        assertThat(item.decor().modelData()).contains(7);
+        assertThat(item.decor().flagTokens()).containsExactly("HIDE_ATTRIBUTES");
+        assertThat(item.lore()).containsExactly("<gray>one", "<gray>two");
+        assertThat(item.loreMode()).isEqualTo(LoreMode.APPEND);
+        assertThat(item.type()).isEqualTo(ItemType.NEXT);
+        assertThat(item.slots().slots()).containsExactly(4);
+    }
+
+    @Test
+    void loreLinesAddReorderRemoveRoundTrip() {
+        MenuSpec initial = loader.parse("""
+                rows = 1
+                items { a { slot = 0, material = STONE, lore = ["one", "two"], click { left = ["close"] } } }
+                """);
+        MenuEditSession session = MenuEditSession.from(initial);
+
+        // The ListProperty rewrites the whole list on each add / reorder / remove, so the session-level setter takes
+        // the fully rebuilt list: add "three", reorder the first two, then drop "one".
+        List<String> lore = new ArrayList<>(session.item("a").orElseThrow().lore());
+        lore.add("three");
+        Collections.swap(lore, 0, 1);
+        lore.remove("one");
+        session.setLore("a", lore);
+
+        MenuSpec reloaded = loader.parse(writer.write(session.toSpec()));
+        assertThat(reloaded.items().get("a").lore()).containsExactly("two", "three");
+    }
+
+    @Test
+    void updateItemIsANoOpForAnUnknownId() {
+        MenuEditSession session =
+                MenuEditSession.from(loader.parse("rows = 1\nitems { a { slot = 0, material = STONE } }"));
+
+        session.setMaterial("ghost", "DIRT");
+
+        assertThat(session.items()).containsOnlyKeys("a");
+        assertThat(session.item("a").orElseThrow().material()).isEqualTo("STONE");
     }
 
     @Test
