@@ -518,7 +518,7 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Reply when a viewer opens a menu another operator already has open in the editor ({@code {player}}). */
     MENU_EDITOR_LOCKED("menu.editor.locked"),
 
-    /** Confirmation that the held item was captured into {@code {slot}} — {@code /menu captureitem} and grid drag. */
+    /** Confirmation that the held item was captured into {@code {slot}} — the {@code /menu captureitem} command. */
     MENU_CAPTURE_CAPTURED("menu.capture.captured"),
 
     /** Reply for {@code /menu captureitem} when the sender is not holding an item. */

@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +19,7 @@ import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
@@ -242,20 +244,19 @@ class MenuGridViewTest {
         assertThat(page1.getItem(5).getType()).isEqualTo(Material.STONE); // menu slot 50 lands at canvas slot 5
     }
 
-    // --- P6: item capture (grid drag-from-hand + /menu captureitem) ---
+    // --- item capture via /menu captureitem ---
 
     @Test
-    void draggingAHeldItemIntoAnEmptySlotCapturesItWithoutOpeningTheItemEditor() {
+    void leftClickingAnEmptyCellNoLongerCapturesTheMainHandItem() {
         player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
         view.open(player, viewer, "alpha");
 
-        fireClick(1, ClickType.LEFT); // an empty cell, holding an item
+        fireClick(1, ClickType.LEFT); // an empty cell, an item in hand but an empty cursor
 
-        assertThat(itemAt(editSession(), 1)).isPresent();
+        // The empty-cursor left-click now always adds a plain default item and opens its editor; a selected hotbar
+        // item is no longer captured this way — cursor placement and /menu captureitem are the capture paths.
         String id = itemAt(editSession(), 1).orElseThrow();
-        assertThat(editSession().item(id).orElseThrow().material()).startsWith("b64:");
-        // The quick path re-renders the grid in place; it does not open the 54-slot item editor an empty hand would.
-        assertThat(player.getOpenInventory().getTopInventory().getSize()).isEqualTo(18);
+        assertThat(editSession().item(id).orElseThrow().material()).isEqualTo("STONE");
     }
 
     @Test
@@ -352,6 +353,89 @@ class MenuGridViewTest {
         assertThat(editLocks.holds("alpha", bob.getUniqueId())).isTrue();
     }
 
+    // --- drag-from-inventory placement (the capture grid) ---
+
+    @Test
+    void placingACursorItemOnAFilledCellReskinsItInPlaceWithoutDuplicating() {
+        view.open(player, viewer, "alpha"); // slot 0 holds the seeded item "x"
+
+        InventoryClickEvent event = firePlace(0, new ItemStack(Material.DIAMOND_SWORD), InventoryAction.PLACE_ALL);
+
+        assertThat(editSession().item("x").orElseThrow().material()).startsWith("b64:"); // re-skinned
+        assertThat(editSession().items()).hasSize(1); // a copy into the model, never a new (duplicate) item
+        assertThat(event.isCancelled()).isTrue(); // the real cursor item never moves
+    }
+
+    @Test
+    void placingACursorItemOnAnEmptyCellAddsACapturedItem() {
+        view.open(player, viewer, "alpha");
+
+        InventoryClickEvent event = firePlace(3, new ItemStack(Material.DIAMOND_SWORD), InventoryAction.PLACE_ALL);
+
+        String id = itemAt(editSession(), 3).orElseThrow();
+        assertThat(editSession().item(id).orElseThrow().material()).startsWith("b64:");
+        assertThat(player.getOpenInventory().getTopInventory().getSize()).isEqualTo(18); // stamped in place, no editor
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    void shiftClickingInventoryItemsAppendsThemToConsecutiveEmptySlots() {
+        view.open(player, viewer, "alpha"); // slot 0 filled, slots 1..8 empty
+        player.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
+        player.getInventory().setItem(1, new ItemStack(Material.GOLDEN_APPLE));
+
+        InventoryClickEvent first = fireBottomClick(0, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        InventoryClickEvent second = fireBottomClick(1, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+
+        assertThat(itemAt(editSession(), 1)).isPresent(); // appended to the first empty menu slot
+        assertThat(itemAt(editSession(), 2)).isPresent(); // then the next
+        assertThat(first.isCancelled()).isTrue();
+        assertThat(second.isCancelled()).isTrue();
+    }
+
+    @Test
+    void anOrdinaryPickupInTheBottomInventoryIsNotCancelled() {
+        view.open(player, viewer, "alpha");
+        player.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
+
+        InventoryClickEvent event = fireBottomClick(0, InventoryAction.PICKUP_ALL);
+
+        assertThat(event.isCancelled()).isFalse(); // the operator keeps free control of their own items
+    }
+
+    @Test
+    void aDoubleClickInTheBottomInventoryIsCancelled() {
+        view.open(player, viewer, "alpha");
+        player.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
+
+        InventoryClickEvent event = fireBottomClick(0, InventoryAction.COLLECT_TO_CURSOR);
+
+        assertThat(event.isCancelled()).isTrue(); // gathering top display icons onto the cursor is swallowed
+    }
+
+    @Test
+    void draggingAcrossTwoContentCellsCapturesBothWithoutDuplicating() {
+        view.open(player, viewer, "alpha");
+
+        InventoryDragEvent event = fireDrag(new ItemStack(Material.DIAMOND_SWORD), 1, 2);
+
+        assertThat(event.isCancelled()).isTrue();
+        String one = itemAt(editSession(), 1).orElseThrow();
+        String two = itemAt(editSession(), 2).orElseThrow();
+        assertThat(editSession().item(one).orElseThrow().material()).startsWith("b64:");
+        assertThat(editSession().item(two).orElseThrow().material()).startsWith("b64:");
+    }
+
+    @Test
+    void aDragEntirelyInTheBottomInventoryIsNotCancelled() {
+        view.open(player, viewer, "alpha");
+        int topSize = player.getOpenInventory().getTopInventory().getSize();
+
+        InventoryDragEvent event = fireDrag(new ItemStack(Material.DIAMOND_SWORD), topSize, topSize + 1);
+
+        assertThat(event.isCancelled()).isFalse();
+    }
+
     // --- helpers ---
 
     private MenuEditSession editSession() {
@@ -392,6 +476,39 @@ class MenuGridViewTest {
         InventoryClickEvent event = new InventoryClickEvent(
                 openView, InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
+    }
+
+    /** Fire a place/swap on a top {@code rawSlot} with {@code cursor} held, mirroring a cursor drop onto a cell. */
+    private InventoryClickEvent firePlace(int rawSlot, ItemStack cursor, InventoryAction action) {
+        InventoryView openView = player.getOpenInventory();
+        openView.setCursor(cursor);
+        InventoryClickEvent event =
+                new InventoryClickEvent(openView, InventoryType.SlotType.CONTAINER, rawSlot, ClickType.LEFT, action);
+        server.getPluginManager().callEvent(event);
+        return event;
+    }
+
+    /** Fire a click on the {@code bottomSlot}-th slot of the viewer's own inventory (raw slot past the top window). */
+    private InventoryClickEvent fireBottomClick(int bottomSlot, InventoryAction action) {
+        InventoryView openView = player.getOpenInventory();
+        int rawSlot = openView.getTopInventory().getSize() + bottomSlot;
+        ClickType type = action == InventoryAction.MOVE_TO_OTHER_INVENTORY ? ClickType.SHIFT_LEFT : ClickType.LEFT;
+        InventoryClickEvent event =
+                new InventoryClickEvent(openView, InventoryType.SlotType.CONTAINER, rawSlot, type, action);
+        server.getPluginManager().callEvent(event);
+        return event;
+    }
+
+    /** Fire a drag of {@code cursor} across the given raw slots and return the (possibly cancelled) event. */
+    private InventoryDragEvent fireDrag(ItemStack cursor, int... rawSlots) {
+        InventoryView openView = player.getOpenInventory();
+        Map<Integer, ItemStack> added = new LinkedHashMap<>();
+        for (int rawSlot : rawSlots) {
+            added.put(rawSlot, cursor.clone());
+        }
+        InventoryDragEvent event = new InventoryDragEvent(openView, null, cursor, false, added);
+        server.getPluginManager().callEvent(event);
+        return event;
     }
 
     private static final class KeyMessages implements Messages {

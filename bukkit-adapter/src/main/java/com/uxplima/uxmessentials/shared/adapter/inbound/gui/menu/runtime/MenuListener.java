@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -21,8 +22,10 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -32,6 +35,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridCaptureHandler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridHandlers;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridView;
@@ -222,6 +226,13 @@ public final class MenuListener implements Listener {
         if (!(event.getInventory().getHolder() instanceof MenuHolder holder)) {
             return;
         }
+        // A capture-enabled grid decides cancellation per action, so the operator can pull items off their own
+        // inventory onto the canvas; every other menu — and a plain grid — blanket-cancels, so no item ever moves.
+        GridViewState captureGrid = holder.gridView().orElse(null);
+        if (captureGrid != null && captureEnabled(captureGrid) && event.getWhoClicked() instanceof Player) {
+            handleCaptureGridClick(holder, captureGrid, event);
+            return;
+        }
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player)) {
             return;
@@ -259,6 +270,27 @@ public final class MenuListener implements Listener {
                 routeSpecClick(holder, rs, event);
             }
         });
+    }
+
+    /**
+     * Route a drag gesture over a menu window. A drag that touches any slot of a capture-enabled grid's top canvas is
+     * cancelled and each dragged content cell captures a copy of the held item, so the operator can paint a row by
+     * dragging across it; a drag that stays entirely in their own inventory is left alone. Every other menu — and a
+     * plain grid — cancels a drag outright: a drag is not part of a menu's interaction model, and cancelling closes the
+     * one gap the blanket click-cancel does not (an item cannot reach a menu's cursor anyway, so this changes nothing a
+     * player could observe, it only fails safe).
+     */
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (!(event.getInventory().getHolder() instanceof MenuHolder holder)) {
+            return;
+        }
+        GridViewState grid = holder.gridView().orElse(null);
+        if (grid == null || !captureEnabled(grid) || !(event.getWhoClicked() instanceof Player)) {
+            event.setCancelled(true);
+            return;
+        }
+        handleCaptureGridDrag(holder, grid, event);
     }
 
     /**
@@ -639,6 +671,120 @@ public final class MenuListener implements Listener {
                     holder.ctx().viewer(),
                     () -> repaginateGrid(holder, grid, holder.ctx().page()));
         }
+    }
+
+    /** Whether {@code grid} carries a capture handler, i.e. accepts items dragged in from the viewer's inventory. */
+    private static boolean captureEnabled(GridViewState grid) {
+        return ((GridHandlers) grid.handlers()).onCapture() != null;
+    }
+
+    /**
+     * Core invariant of the capture grid: the top canvas never accepts or yields a real item — every transfer touching
+     * it is cancelled here — so "placing" only copies the held item's definition into the caller's edit model and
+     * re-renders. The player's real items never move, so no dupe is possible. A click on the top canvas is always
+     * cancelled and then either captures (a held item placed onto a content cell) or runs the ordinary editor gesture
+     * ({@link #handleGridClick}); a click in the player's own bottom inventory stays free, except a shift-click appends
+     * the item to the canvas and a double-click is swallowed so it cannot gather the top's display icons.
+     */
+    private void handleCaptureGridClick(MenuHolder holder, GridViewState grid, InventoryClickEvent event) {
+        int topSize = event.getView().getTopInventory().getSize();
+        int raw = event.getRawSlot();
+        if (raw < 0) {
+            // A click outside the whole window (dropping their own item) — never the canvas's concern.
+            return;
+        }
+        if (raw < topSize) {
+            handleCaptureTopClick(holder, grid, event, raw);
+        } else {
+            handleCaptureBottomClick(holder, grid, event);
+        }
+    }
+
+    /**
+     * A click on the top canvas: always cancelled. A held item placed or swapped onto a content cell captures a copy of
+     * it into that menu slot; anything else (an empty cursor, a pick-up, a nav / control / editor gesture) runs the
+     * ordinary {@link #handleGridClick} path, so the existing place / move / clear / open-editor behaviour is unchanged.
+     */
+    private void handleCaptureTopClick(MenuHolder holder, GridViewState grid, InventoryClickEvent event, int raw) {
+        event.setCancelled(true);
+        GridViewState.ContentSlot cell = grid.contentAt(raw).orElse(null);
+        ItemStack cursor = event.getCursor();
+        if (cell != null && isPlaceOrSwap(event.getAction()) && isRealItem(cursor)) {
+            capture(holder, grid, cell.menuSlot(), cursor.clone());
+            return;
+        }
+        handleGridClick(holder, grid, raw, kindOf(event.getClick()));
+    }
+
+    /**
+     * A click in the viewer's own bottom inventory. A shift-click ({@code MOVE_TO_OTHER_INVENTORY}) is cancelled and the
+     * clicked item is appended to the first empty menu slot — the quick "send this to the canvas" gesture — and a
+     * double-click ({@code COLLECT_TO_CURSOR}) is cancelled so it cannot rake the top's display icons onto the cursor.
+     * Every other bottom click is left alone, so the operator freely picks up and rearranges their own items.
+     */
+    private void handleCaptureBottomClick(MenuHolder holder, GridViewState grid, InventoryClickEvent event) {
+        InventoryAction action = event.getAction();
+        if (action == InventoryAction.MOVE_TO_OTHER_INVENTORY) {
+            event.setCancelled(true);
+            appendToFirstEmpty(holder, grid, event.getCurrentItem());
+        } else if (action == InventoryAction.COLLECT_TO_CURSOR) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Capture {@code clicked} into the canvas's first empty menu slot, if it holds a real item and a slot is free. */
+    private void appendToFirstEmpty(MenuHolder holder, GridViewState grid, @Nullable ItemStack clicked) {
+        if (clicked == null || !isRealItem(clicked)) {
+            return;
+        }
+        OptionalInt free = ((GridSpec) grid.spec()).firstEmptySlot();
+        if (free.isPresent()) {
+            capture(holder, grid, free.getAsInt(), clicked.clone());
+        }
+    }
+
+    /**
+     * A drag over a capture grid. When it touches any top-canvas slot the whole drag is cancelled (no real item is ever
+     * split into the canvas) and every dragged content cell captures a copy of the held item; a drag that stays entirely
+     * in the viewer's own inventory is left alone so they can spread their own stack there.
+     */
+    private void handleCaptureGridDrag(MenuHolder holder, GridViewState grid, InventoryDragEvent event) {
+        int topSize = event.getView().getTopInventory().getSize();
+        List<Integer> topSlots =
+                event.getRawSlots().stream().filter(raw -> raw < topSize).toList();
+        if (topSlots.isEmpty()) {
+            return;
+        }
+        event.setCancelled(true);
+        ItemStack dragged = event.getOldCursor();
+        if (!isRealItem(dragged)) {
+            return;
+        }
+        for (int raw : topSlots) {
+            grid.contentAt(raw).ifPresent(cell -> capture(holder, grid, cell.menuSlot(), dragged.clone()));
+        }
+    }
+
+    /** Hand one capture to the grid's capture handler on the viewer's entity thread; the handler stamps and re-renders. */
+    private void capture(MenuHolder holder, GridViewState grid, int menuSlot, ItemStack copy) {
+        GridCaptureHandler onCapture = ((GridHandlers) grid.handlers()).onCapture();
+        if (onCapture == null) {
+            return;
+        }
+        runOnGrid(holder, live -> onCapture.capture(new HolderGridView(holder, grid), live, menuSlot, copy));
+    }
+
+    /** Whether {@code action} drops the cursor onto a slot — the gestures that mean "put this item here". */
+    private static boolean isPlaceOrSwap(InventoryAction action) {
+        return action == InventoryAction.PLACE_ONE
+                || action == InventoryAction.PLACE_SOME
+                || action == InventoryAction.PLACE_ALL
+                || action == InventoryAction.SWAP_WITH_CURSOR;
+    }
+
+    /** Whether {@code item} is a real (non-null, non-air) stack worth capturing. */
+    private static boolean isRealItem(@Nullable ItemStack item) {
+        return item != null && item.getType() != Material.AIR;
     }
 
     private void handleClick(MenuHolder holder, RenderedSlot rs, ClickType click) {

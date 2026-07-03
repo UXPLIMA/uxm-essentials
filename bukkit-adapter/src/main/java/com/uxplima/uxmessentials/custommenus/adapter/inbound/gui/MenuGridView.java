@@ -53,9 +53,15 @@ import org.jspecify.annotations.Nullable;
  * <p>An open clones the registered {@link MenuSpec} into a {@link MenuEditSession} held per viewer, so every edit
  * mutates a private working copy and the live menu changes only on Save (which validates through the P0 writer and
  * hot-reloads the single file, off the tick thread). The interactions mirror the OGUI editor: left-click a filled cell
- * opens its item editor (a P3 seam, a note for now), left-click an empty cell adds a default item and opens that same
- * seam, right-click picks a cell up and the next click drops it (moving, or swapping with the target), and shift-click
- * clears a cell behind a confirm. Selection is shown by glowing the picked-up cell.
+ * opens its item editor, left-click an empty cell adds a default item and opens that same editor, right-click picks a
+ * cell up and the next click drops it (moving, or swapping with the target), and shift-click clears a cell behind a
+ * confirm. Selection is shown by glowing the picked-up cell.
+ *
+ * <p>The operator can also arrange the canvas by dragging or placing their own items straight onto it: the engine's
+ * capture grid cancels every real transfer touching the top canvas and instead copies the held item's definition into
+ * the slot ({@link #onCapture}), so a hotbar item stamps a cell without ever leaving the operator's inventory — no item
+ * moves, so no dupe. A shift-click out of their inventory appends an item to the next free slot; their own inventory
+ * otherwise stays freely interactive so they can pick an item onto the cursor to stamp with.
  */
 @NullMarked
 public final class MenuGridView {
@@ -212,7 +218,8 @@ public final class MenuGridView {
                 icon(viewer, NAV_ICON, GuiMessageKey.PAGE_NEXT),
                 controls(viewer, state));
         GridHandlers handlers = new GridHandlers(
-                (view, player, menuSlot, filled, kind) -> onSlot(viewer, state, view, player, menuSlot, filled, kind));
+                (view, player, menuSlot, filled, kind) -> onSlot(viewer, state, view, player, menuSlot, filled, kind),
+                (view, player, menuSlot, item) -> onCapture(state, view, menuSlot, item));
         menus.openGrid(viewer, spec, handlers);
     }
 
@@ -265,11 +272,12 @@ public final class MenuGridView {
     }
 
     /**
-     * Route a content-cell click. A pending pick-up takes priority — the next click drops it onto the clicked cell
-     * (moving, or swapping with whatever is there). Otherwise a shift-click clears a filled cell (behind a confirm), a
-     * right-click picks a filled cell up, a left-click on a filled cell opens its item editor (a P3 seam), and a
-     * left-click on an empty cell either captures the operator's held item into it (the quick drag-from-hand path) or,
-     * with an empty hand, adds a default item and opens that seam for it.
+     * Route a content-cell click made with an empty cursor — the editor gestures. A pending pick-up takes priority —
+     * the next click drops it onto the clicked cell (moving, or swapping with whatever is there). Otherwise a
+     * shift-click clears a filled cell (behind a confirm), a right-click picks a filled cell up, a left-click on a
+     * filled cell opens its item editor, and a left-click on an empty cell adds a default item and opens that editor.
+     * Dropping one of the operator's own items onto a cell is a separate gesture the engine routes to
+     * {@link #onCapture}; a selected hotbar item is no longer captured by an empty-cursor click.
      */
     private void onSlot(
             PlayerRef viewer,
@@ -298,30 +306,23 @@ public final class MenuGridView {
         if (filled) {
             openSlotEditor(viewer, state, player, menuSlot);
         } else {
-            addAtEmpty(viewer, state, view, player, menuSlot);
+            addDefault(viewer, state, view, player, menuSlot);
         }
     }
 
     /**
-     * Fill an empty cell. Holding an item is the quick capture path: the held item (all its NBT) drops straight into
-     * the cell as a {@code b64:} token and the grid re-renders — no item editor, a one-click way to lay a hotbar item
-     * into a slot. An empty hand instead adds a plain default item and opens its editor, the P3 detailed path.
+     * Copy a dragged / placed item's full definition into {@code menuSlot} of the working copy — the capture seam the
+     * engine calls when the operator drops one of their own items onto the canvas (a cursor place, a drag across cells,
+     * or a shift-click out of their inventory). The item is encoded to a {@code b64:} token (all its NBT) and either
+     * re-skins whatever already occupies the slot or is added as a fresh item there, then the canvas re-renders. It
+     * sends no chat line: the repaint is the feedback, so stamping a whole row stays quiet. The operator's real item is
+     * never moved — only its definition is copied — so no duplicate can be produced.
      */
-    private void addAtEmpty(PlayerRef viewer, GridEditState state, GridView view, Player player, int menuSlot) {
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        if (hand.getType().isAir()) {
-            addDefault(viewer, state, view, player, menuSlot);
-        } else {
-            captureIntoEmpty(viewer, state, view, player, menuSlot, hand);
+    private void onCapture(GridEditState state, GridView view, int menuSlot, ItemStack item) {
+        if (item.getType().isAir()) {
+            return;
         }
-    }
-
-    /** Drop the held item into a fresh cell as a serialized token, tell the viewer, and re-render — no item editor. */
-    private void captureIntoEmpty(
-            PlayerRef viewer, GridEditState state, GridView view, Player player, int menuSlot, ItemStack hand) {
-        String id = freshId(state.session);
-        state.session.addItem(id, capturedItem(menuSlot, SerializedItems.encode(hand)));
-        player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_CAPTURE_CAPTURED, slot(menuSlot)));
+        applyCapture(state, menuSlot, SerializedItems.encode(item));
         view.reRender();
     }
 

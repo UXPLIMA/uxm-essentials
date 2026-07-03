@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.menu;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -14,6 +15,7 @@ import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
@@ -150,6 +152,32 @@ class MenusGridTest {
     }
 
     @Test
+    void aDragOverANonCaptureGridIsCancelled() {
+        // A grid opened with only a content handler (no capture handler) is not capture-enabled, so a drag over it is
+        // cancelled outright — the same safety every non-grid menu window gets — and no item is smuggled onto the
+        // cursor.
+        GridHandlers noCapture = new GridHandlers((view, player, menuSlot, filled, kind) -> {});
+        menus.openGrid(viewer, spec(1, () -> Map.of(0, item("DIAMOND")), p -> {}), noCapture);
+
+        InventoryDragEvent event = fireDrag(new ItemStack(Material.DIAMOND), 1, 2);
+
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    void firstEmptySlotFindsTheFirstFreeMenuSlotOrEmptyWhenFull() {
+        GridSpec twoFilled = spec(1, () -> Map.of(0, item("DIAMOND"), 1, item("DIAMOND")), p -> {});
+        assertThat(twoFilled.firstEmptySlot()).hasValue(2); // 0 and 1 are taken, 2 is the first free chest slot
+
+        Map<Integer, MenuItemSpec> full = new LinkedHashMap<>();
+        for (int slot = 0; slot < 9; slot++) {
+            full.put(slot, item("DIAMOND"));
+        }
+        GridSpec fullRow = spec(1, () -> full, p -> {});
+        assertThat(fullRow.firstEmptySlot()).isEmpty(); // a full one-row canvas has nowhere to append
+    }
+
+    @Test
     void aPreviewRendersASpecAsAPlayerSeesItWithoutRegisteringIt() {
         MenuSpec spec = previewSpec();
         menus.openPreview(viewer, spec, () -> {});
@@ -222,6 +250,17 @@ class MenusGridTest {
         InventoryClickEvent event =
                 new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
+    }
+
+    private InventoryDragEvent fireDrag(ItemStack cursor, int... rawSlots) {
+        InventoryView view = player.getOpenInventory();
+        Map<Integer, ItemStack> added = new LinkedHashMap<>();
+        for (int rawSlot : rawSlots) {
+            added.put(rawSlot, cursor.clone());
+        }
+        InventoryDragEvent event = new InventoryDragEvent(view, null, cursor, false, added);
+        server.getPluginManager().callEvent(event);
+        return event;
     }
 
     private static final class KeyMessages implements Messages {

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -50,6 +51,24 @@ public record GridSpec(
         Objects.requireNonNull(prevIcon, "prevIcon");
         Objects.requireNonNull(nextIcon, "nextIcon");
         controls = List.copyOf(Objects.requireNonNull(controls, "controls"));
+    }
+
+    /**
+     * The first menu slot in {@code [0, menuRows*9)} that no content item occupies on this draw, or empty when the
+     * canvas is full — where the engine appends an item shift-clicked out of the operator's inventory. The content
+     * supplier is re-read here, so appending one item then re-rendering makes the next append land on the following
+     * free slot. It scans only the chest slots, never the bottom-inventory range, so a shift-click always fills the
+     * grid itself.
+     */
+    public OptionalInt firstEmptySlot() {
+        Map<Integer, MenuItemSpec> filled = content.get();
+        int capacity = menuRows * 9;
+        for (int slot = 0; slot < capacity; slot++) {
+            if (!filled.containsKey(slot)) {
+                return OptionalInt.of(slot);
+            }
+        }
+        return OptionalInt.empty();
     }
 
     /**
