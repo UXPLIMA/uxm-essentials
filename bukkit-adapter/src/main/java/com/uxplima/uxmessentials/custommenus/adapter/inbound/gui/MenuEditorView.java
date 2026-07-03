@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -76,6 +77,7 @@ public final class MenuEditorView {
     private final MenuEditorService service;
     private final Function<String, Optional<MenuSpec>> specOf;
     private final TextInput textInput;
+    private final BiConsumer<Player, String> openGrid;
     private final EntityListView<String> list;
     private final EntityEditorView<String> overview;
 
@@ -88,7 +90,8 @@ public final class MenuEditorView {
             Supplier<List<String>> menuNames,
             Function<String, Optional<MenuSpec>> specOf,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            BiConsumer<Player, String> openGrid) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -97,6 +100,7 @@ public final class MenuEditorView {
         Objects.requireNonNull(menuNames, "menuNames");
         this.specOf = Objects.requireNonNull(specOf, "specOf");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.openGrid = Objects.requireNonNull(openGrid, "openGrid");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
 
         EntityEditorLayout overviewLayout = guiLayouts.loadEntityEditor(
@@ -226,7 +230,7 @@ public final class MenuEditorView {
     }
 
     private List<EditableProperty> overviewProperties(String id) {
-        return List.of(saveButton(id), duplicateButton(id), renameButton(id), gridSoonButton());
+        return List.of(saveButton(id), duplicateButton(id), renameButton(id), gridButton(id));
     }
 
     private EditableProperty saveButton(String id) {
@@ -253,13 +257,13 @@ public final class MenuEditorView {
                 (player, reopen) -> promptRename(player, id, reopen));
     }
 
-    /** The placeholder button for the slot-grid editor the P2 phase ships; clicking it simply re-renders for now. */
-    private EditableProperty gridSoonButton() {
+    /** The overview button that opens the slot-grid canvas for this menu — the P2 editor's entry point. */
+    private EditableProperty gridButton(String id) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_EDITOR_GRID_SOON,
+                CustomMenusMessageKey.MENU_EDITOR_GRID,
                 Material.CRAFTING_TABLE,
-                hint(CustomMenusMessageKey.MENU_EDITOR_GRID_SOON_HINT),
-                (player, reopen) -> reopen.run());
+                hint(CustomMenusMessageKey.MENU_EDITOR_GRID_HINT),
+                (player, reopen) -> openGrid.accept(player, id));
     }
 
     private void saveMenu(Player player, String id, Runnable reopen) {

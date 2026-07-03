@@ -88,6 +88,13 @@ public final class MenuHolder implements InventoryHolder {
      */
     @Nullable private ListViewState listView;
 
+    /**
+     * Set only on the grid path: the slot-grid canvas's per-open cell/control/nav routing. Any other menu kind leaves
+     * this null; a grid sets it and the one listener routes its clicks through it, so all six menu kinds ride the same
+     * holder and the same teardown without a separate listener.
+     */
+    @Nullable private GridViewState gridView;
+
     public MenuHolder(String specId, MenuSpec spec, MenuContext ctx) {
         this.specId = Objects.requireNonNull(specId, "specId");
         this.spec = Objects.requireNonNull(spec, "spec");
@@ -187,6 +194,16 @@ public final class MenuHolder implements InventoryHolder {
     /** The list-view state if this holder backs an entity list, or empty for any other menu kind. */
     public Optional<ListViewState> listView() {
         return Optional.ofNullable(listView);
+    }
+
+    /** Attaches the grid state for a slot-grid open; any other menu kind never calls this and leaves it null. */
+    public void attachGridView(GridViewState gridView) {
+        this.gridView = Objects.requireNonNull(gridView, "gridView");
+    }
+
+    /** The grid state if this holder backs a slot-grid canvas, or empty for any other menu kind. */
+    public Optional<GridViewState> gridView() {
+        return Optional.ofNullable(gridView);
     }
 
     /** The clock reading of the last click that passed this menu's anti-spam window, or {@code 0} before the first. */

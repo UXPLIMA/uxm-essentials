@@ -55,6 +55,16 @@ public final class MenuRenderer {
     }
 
     /**
+     * The item renderer this menu renderer draws each icon through — the same collaborator the grid canvas needs to
+     * render a slot preview. Exposed so the engine can build a {@link GridRenderer} from an already-wired
+     * {@code MenuRenderer} without threading a second {@code ItemRenderer} through every engine constructor; it is
+     * engine-internal (both live under {@code ..gui.menu..}), so no consumer outside the engine reaches it.
+     */
+    public ItemRenderer itemRenderer() {
+        return itemRenderer;
+    }
+
+    /**
      * Resolve {@code spec}'s title for {@code ctx} through the same placeholder/catalog path an item name takes, so a
      * subject-driven title fills its {@code {token}} arguments from the open context. Delegates to the item renderer,
      * which already owns the placeholder registry and the catalog lookup, so no extra collaborator is threaded here.

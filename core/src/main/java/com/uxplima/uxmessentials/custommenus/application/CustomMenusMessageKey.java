@@ -119,11 +119,41 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Prompt shown when the rename button asks for the new name ({@code {name}}). */
     MENU_EDITOR_RENAME_PROMPT("menu.editor.rename-prompt"),
 
-    /** Name of the overview panel's placeholder button for the slot grid that lands in a later phase. */
-    MENU_EDITOR_GRID_SOON("menu.editor.grid-soon"),
+    /** Name of the overview panel's button that opens the slot-grid canvas. */
+    MENU_EDITOR_GRID("menu.editor.grid"),
 
-    /** Hint lore of the overview panel's grid placeholder button. */
-    MENU_EDITOR_GRID_SOON_HINT("menu.editor.grid-soon-hint"),
+    /** Hint lore of the overview panel's slot-grid button. */
+    MENU_EDITOR_GRID_HINT("menu.editor.grid-hint"),
+
+    /** Title of the slot-grid canvas ({@code {name}{rows}}). */
+    MENU_GRID_TITLE("menu.editor.grid.title"),
+
+    /** Name of an empty cell's placeholder on the grid canvas — click to add an item. */
+    MENU_GRID_EMPTY("menu.editor.grid.empty"),
+
+    /** Name of the grid canvas's back-to-overview control button. */
+    MENU_GRID_BACK("menu.editor.grid.back"),
+
+    /** Name of the grid canvas's save control button. */
+    MENU_GRID_SAVE("menu.editor.grid.save"),
+
+    /** Feedback that a default item was added at {@code {slot}} on the grid. */
+    MENU_GRID_ADDED("menu.editor.grid.added"),
+
+    /** Feedback that the item at {@code {slot}} was picked up, awaiting a target slot. */
+    MENU_GRID_SELECTED("menu.editor.grid.selected"),
+
+    /** Feedback that the picked-up item moved from {@code {from}} to {@code {to}}. */
+    MENU_GRID_MOVED("menu.editor.grid.moved"),
+
+    /** Feedback that the item at {@code {slot}} was cleared from the grid. */
+    MENU_GRID_CLEARED("menu.editor.grid.cleared"),
+
+    /** Title of the confirm window the grid's shift-click-to-clear opens ({@code {slot}}). */
+    MENU_GRID_CLEAR_CONFIRM("menu.editor.grid.clear-confirm"),
+
+    /** Note shown when a filled cell is opened, until the item property editor lands in the next phase ({@code {slot}}). */
+    MENU_GRID_SLOT_SOON("menu.editor.grid.slot-soon"),
 
     /** Name of the overview panel's delete button. */
     MENU_EDITOR_DELETE("menu.editor.delete"),

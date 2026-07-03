@@ -168,6 +168,21 @@ public final class MenuEditorService {
         return persist(name, session.toSpec(), session.command().orElse(null), EditOutcome.SAVED);
     }
 
+    /**
+     * Save the edited {@code session} back to menu {@code name}'s file and reload it — the slot-grid editor's "Save".
+     * Unlike {@link #save(String)}, which re-serialises the registered spec unchanged, this writes the caller's mutated
+     * {@link MenuEditSession}, so a place / move / clear made in the grid lands on disk. The menu's {@code command {}}
+     * block is re-attached from the live open-commands, so a grid save never drops a menu's opener even though the grid
+     * session carries only the visual model. Reports {@link EditOutcome#INVALID_REFS} / {@link EditOutcome#IO_ERROR}
+     * the same way every other write does.
+     */
+    public EditOutcome saveSession(String name, MenuEditSession session) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(session, "session");
+        OpenCommandSpec command = openCommandFor.apply(name).orElse(null);
+        return persist(name, session.toSpec(), command, EditOutcome.SAVED);
+    }
+
     /** Validate a spec, write it, and — on a clean write — reload it; maps the persistence status to an outcome. */
     private EditOutcome persist(String name, MenuSpec spec, @Nullable OpenCommandSpec command, EditOutcome success) {
         MenuSpecPersistence.SaveResult result = persistence.save(menusDir, name, spec, command);

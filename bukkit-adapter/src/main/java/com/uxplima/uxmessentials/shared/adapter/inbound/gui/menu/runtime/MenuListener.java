@@ -32,11 +32,15 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridHandlers;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuClickEvent;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.GridRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuItemMark;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
@@ -242,6 +246,11 @@ public final class MenuListener implements Listener {
         ListViewState list = holder.listView().orElse(null);
         if (list != null) {
             handleListClick(holder, list, slot);
+            return;
+        }
+        GridViewState grid = holder.gridView().orElse(null);
+        if (grid != null) {
+            handleGridClick(holder, grid, slot, kindOf(event.getClick()));
             return;
         }
         Player clicker = (Player) event.getWhoClicked();
@@ -541,6 +550,95 @@ public final class MenuListener implements Listener {
                 holder.ctx().viewer(),
                 page);
         holder.setCtx(holder.ctx().withPage(clamped));
+    }
+
+    /**
+     * Route a click in a slot-grid canvas: a previous/next nav button re-paginates the same holder in place, a
+     * control-bar button runs its recorded handler, and a content cell invokes the caller's {@link GridHandlers}
+     * content handler with the menu slot it maps to and whether it held an item. Each branch hops to the viewer's
+     * entity thread and re-resolves the live player there — the same hop the editor, list and spec paths take — so a
+     * viewer who logged off in the gap is simply skipped and Bukkit is only ever touched on the owning thread. The
+     * content handler is handed a {@link GridView} bound to this holder, so a place / move / clear that mutates the
+     * caller's edit model can repaint the same window in place.
+     */
+    private void handleGridClick(MenuHolder holder, GridViewState grid, int slot, ClickKind kind) {
+        if (grid.isPrev(slot) || grid.isNext(slot)) {
+            int page = grid.isPrev(slot)
+                    ? Math.max(0, holder.ctx().page() - 1)
+                    : holder.ctx().page() + 1;
+            scheduler.onEntity(holder.ctx().viewer(), () -> repaginateGrid(holder, grid, page));
+            return;
+        }
+        Consumer<Player> control = grid.controlAt(slot).orElse(null);
+        if (control != null) {
+            runOnGrid(holder, control);
+            return;
+        }
+        grid.contentAt(slot)
+                .ifPresent(cell -> runOnGrid(
+                        holder,
+                        live -> ((GridHandlers) grid.handlers())
+                                .onSlot()
+                                .onClick(
+                                        new HolderGridView(holder, grid), live, cell.menuSlot(), cell.filled(), kind)));
+    }
+
+    /** Hop to the viewer's entity thread, re-resolve the live player, and run one grid handler there. */
+    private void runOnGrid(MenuHolder holder, Consumer<Player> handler) {
+        scheduler.onEntity(holder.ctx().viewer(), () -> {
+            Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
+            if (live != null) {
+                handler.accept(live);
+            }
+        });
+    }
+
+    /** Re-paint an open grid at {@code page} (a page flip, or an in-place re-render), if still this holder's window. */
+    private void repaginateGrid(MenuHolder holder, GridViewState grid, int page) {
+        Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
+        if (live == null) {
+            return;
+        }
+        if (!(live.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder h) || h != holder) {
+            return;
+        }
+        grid.clearSlots();
+        // Built at the use site, not the constructor, so a spec-only engine wired with a stub/mocked MenuRenderer never
+        // dereferences its item renderer unless a grid is actually re-painted (which only the grid path ever triggers).
+        int clamped = new GridRenderer(renderer.itemRenderer())
+                .populate(
+                        holder.getInventory(),
+                        (GridSpec) grid.spec(),
+                        grid,
+                        live,
+                        holder.ctx().viewer(),
+                        page);
+        holder.setCtx(holder.ctx().withPage(clamped));
+    }
+
+    /**
+     * The {@link GridView} the engine binds to one open grid for the duration of a content-slot click: its
+     * {@link #reRender} drives that holder's repaint through the same viewer's-entity-thread hop the page-flip path
+     * uses, re-reading the grid's content supplier at the current page, so a place / move / clear that mutated the
+     * caller's edit model shows without reopening the window. It captures only the holder and state; the live player is
+     * re-resolved inside the repaint, so a viewer who logged off in the gap is simply skipped there.
+     */
+    private final class HolderGridView implements GridView {
+
+        private final MenuHolder holder;
+        private final GridViewState grid;
+
+        HolderGridView(MenuHolder holder, GridViewState grid) {
+            this.holder = holder;
+            this.grid = grid;
+        }
+
+        @Override
+        public void reRender() {
+            scheduler.onEntity(
+                    holder.ctx().viewer(),
+                    () -> repaginateGrid(holder, grid, holder.ctx().page()));
+        }
     }
 
     private void handleClick(MenuHolder holder, RenderedSlot rs, ClickType click) {

@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSou
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.GridRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.SelectorRenderer;
@@ -41,6 +42,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ActionA
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ConfirmState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.GridViewState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ListViewState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
@@ -670,6 +672,48 @@ public final class Menus {
     /** The minimal {@link MenuSpec} a selector holder carries: the row count, refresh off, no items — clicks ride state. */
     private static MenuSpec selectorMenuSpec(int rows) {
         return new MenuSpec("", rows, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
+    }
+
+    /**
+     * Open a slot-grid canvas for {@code viewer} — the engine's visual editor window, opened by the custom-menus grid
+     * editor. It builds the same {@link MenuHolder} every other menu uses — recognised and torn down by the one
+     * listener and one {@code closeMenu} — but tags it with a {@link GridViewState} so the listener routes its clicks
+     * through the canvas's content/nav/control slots rather than a spec's. The window is shown on the viewer's entity
+     * thread, where touching the live inventory is legal; the {@code spec}'s content supplier is read imperatively on
+     * that thread over the caller's already-loaded edit model, so there is no off-thread resolve step. Unlike a list a
+     * grid re-reads its content on every draw (a place / move / clear then a {@link GridView#reRender}), so it arms no
+     * refresh timer and stays leak-balanced.
+     */
+    public void openGrid(PlayerRef viewer, GridSpec spec, GridHandlers handlers) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(handlers, "handlers");
+        scheduler.onEntity(viewer, () -> openGridResolved(viewer, spec, handlers));
+    }
+
+    /** On the viewer's entity thread: build the grid holder + window, render page zero, show it. No refresh. */
+    private void openGridResolved(PlayerRef viewer, GridSpec spec, GridHandlers handlers) {
+        Player live = Bukkit.getPlayer(viewer.uuid());
+        if (live == null || !live.isOnline()) {
+            return;
+        }
+        int windowRows = GridRenderer.windowRows(spec.menuRows());
+        MenuContext ctx = MenuContext.of(viewer, null, 0);
+        MenuHolder holder = new MenuHolder("grid:" + spec.menuRows(), gridMenuSpec(windowRows), ctx);
+        GridViewState state = new GridViewState(spec, handlers);
+        holder.attachGridView(state);
+        Inventory inv = Bukkit.createInventory(holder, windowRows * 9, spec.title());
+        holder.attach(inv);
+        // The grid renderer is built at the use site rather than in the constructor, so an engine wired with a stub or
+        // mocked MenuRenderer (many spec-only test fixtures) never dereferences its item renderer unless a grid opens.
+        int clamped = new GridRenderer(renderer.itemRenderer()).populate(inv, spec, state, live, viewer, 0);
+        holder.setCtx(ctx.withPage(clamped));
+        live.openInventory(inv);
+    }
+
+    /** The minimal {@link MenuSpec} a grid holder carries: the window's row count, refresh off — clicks ride state. */
+    private static MenuSpec gridMenuSpec(int windowRows) {
+        return new MenuSpec("", windowRows, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     private EditorRenderer requireEditorRenderer() {

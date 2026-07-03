@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuOpenCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuEditorView;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuGridView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerJoinListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuSwapListener;
@@ -167,6 +168,19 @@ public final class CustomMenusWiring {
         };
         MenuEditorService editorService = new MenuEditorService(
                 menusDir, persistence, menus::registeredSpec, openCommandFor, reloadOne, forget, log);
+        // The slot-grid canvas (the overview's "Slot editor" button) and the overview reference each other — the
+        // overview opens the grid, the grid's Back returns to the overview — so the grid is built first with a Back
+        // hook that reads the overview through a holder set once the overview exists, breaking the construction cycle.
+        AtomicReference<MenuEditorView> editorViewRef = new AtomicReference<>();
+        MenuGridView gridView = new MenuGridView(
+                menus,
+                guiText,
+                scheduler,
+                editorService,
+                menus::registeredSpec,
+                (player, id) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
+                        .overview()
+                        .open(player, BukkitRefs.toRef(player), id));
         MenuEditorView editorView = new MenuEditorView(
                 menus,
                 guiText,
@@ -176,7 +190,9 @@ public final class CustomMenusWiring {
                 nameSupplier,
                 menus::registeredSpec,
                 guiLayouts,
-                textInput);
+                textInput,
+                (player, id) -> gridView.open(player, BukkitRefs.toRef(player), id));
+        editorViewRef.set(editorView);
         guiRegistry.register(new ManagementGuiEntry(
                 "custommenus",
                 CustomMenusMessageKey.MENU_EDITOR_TITLE,
