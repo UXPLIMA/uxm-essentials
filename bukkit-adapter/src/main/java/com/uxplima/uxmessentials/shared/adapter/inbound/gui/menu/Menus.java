@@ -235,6 +235,16 @@ public final class Menus {
     }
 
     /**
+     * Drop the spec registered under {@code id} so the menu can no longer be opened — the unregister half of the menu
+     * editor's delete, run once the file is gone. A no-op when no spec carries that id. The loader's single-file reload
+     * cannot do this itself (a deleted file is a not-found reload, not an unregister), so the editor calls it directly.
+     */
+    public void unregisterSpec(String id) {
+        Objects.requireNonNull(id, "id");
+        specs.remove(id);
+    }
+
+    /**
      * The spec registered under {@code id}, or empty when none is — a read-only lookup the {@code /menu dump} and
      * {@code /menu meta} operator diagnostics use to describe a loaded menu without opening it.
      */

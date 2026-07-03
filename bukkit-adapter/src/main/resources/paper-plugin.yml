@@ -1137,6 +1137,9 @@ permissions:
   uxmessentials.menu.admin:
     description: '/menu reload to re-read the menus/ folder from disk.'
     default: op
+  uxmessentials.menu.editor:
+    description: '/menu editor (and the /uxmess gui hub entry) to create, duplicate, rename and delete custom menus in-game.'
+    default: op
   # poses context (docs/permissions.md "Poses"). Built-in GSit-parity sitting and posing (/sit, player-sit, /lay,
   # /bellyflop, /spin, /crawl). Each pose verb is a self-service use node (default true). The module node is the
   # reload/inspect tier for the module as a whole. The cooldown tier uxmessentials.poses.cooldown.<seconds> is an

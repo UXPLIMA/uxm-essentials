@@ -92,6 +92,7 @@ class MenuCommandTest {
     private final AtomicInteger reloads = new AtomicInteger();
     private final AtomicReference<String> executedFor = new AtomicReference<>();
     private final AtomicReference<String> executedArg = new AtomicReference<>();
+    private final AtomicReference<String> editorOpenedFor = new AtomicReference<>();
 
     @TempDir
     Path menusDir;
@@ -417,6 +418,29 @@ class MenuCommandTest {
     }
 
     @Test
+    void editorOpensThePickerForThePlayer() {
+        execute("menu editor", player);
+
+        assertThat(editorOpenedFor.get()).isEqualTo("Operator");
+    }
+
+    @Test
+    void editorFromConsoleRepliesPlayersOnly() {
+        execute("menu editor", server.getConsoleSender());
+
+        assertThat(messages.keys).contains("command.players-only");
+        assertThat(editorOpenedFor.get()).isNull();
+    }
+
+    @Test
+    void editorIsGatedByTheEditorPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no editor node, so the editor branch stays hidden
+        executeExpectingDenial("menu editor", plain);
+
+        assertThat(editorOpenedFor.get()).isNull();
+    }
+
+    @Test
     void convertDeluxeMenusWritesAConfAndReportsTheCounts() throws Exception {
         Files.writeString(
                 menusDir.resolve("shop.yml"),
@@ -700,6 +724,7 @@ class MenuCommandTest {
                 guiPlusConvert,
                 persistence,
                 name -> java.util.Optional.ofNullable(openCommands.get(name)),
+                player -> editorOpenedFor.set(player.getName()),
                 menusDir,
                 new SyncScheduler(),
                 messages);

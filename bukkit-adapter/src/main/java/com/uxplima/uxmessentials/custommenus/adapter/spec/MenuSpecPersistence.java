@@ -66,6 +66,32 @@ public final class MenuSpecPersistence {
     }
 
     /**
+     * Delete {@code menusDir/<name>.conf} from disk — the file half of the editor's delete. Returns the outcome rather
+     * than throwing: {@link DeleteStatus#DELETED} when the file existed and was removed, {@link DeleteStatus#NOT_FOUND}
+     * when there was no such file (an already-deleted or never-written menu), {@link DeleteStatus#IO_ERROR} when the
+     * removal failed. The caller unregisters the spec from the engine once the file is gone; this only touches disk, so
+     * it runs off the tick thread like {@link #save}.
+     */
+    public DeleteStatus delete(Path menusDir, String name) {
+        Objects.requireNonNull(menusDir, "menusDir");
+        Objects.requireNonNull(name, "name");
+        try {
+            boolean removed = Files.deleteIfExists(menusDir.resolve(name + CONF_EXTENSION));
+            return removed ? DeleteStatus.DELETED : DeleteStatus.NOT_FOUND;
+        } catch (IOException failure) {
+            log.warn("could not delete menu {} : {}", name, String.valueOf(failure.getMessage()));
+            return DeleteStatus.IO_ERROR;
+        }
+    }
+
+    /** Why a delete ended the way it did. */
+    public enum DeleteStatus {
+        DELETED,
+        NOT_FOUND,
+        IO_ERROR
+    }
+
+    /**
      * The outcome of a save: whether the spec was written, and — for a rejected one — the ref ids that failed
      * validation, so the caller can name them to the operator.
      */

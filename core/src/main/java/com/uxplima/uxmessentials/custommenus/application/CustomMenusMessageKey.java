@@ -66,7 +66,91 @@ public enum CustomMenusMessageKey implements MessageKey {
     MENU_SAVE_INVALID("menu.save-invalid"),
 
     /** Reply for {@code /menu save <menu>} when {@code {name}}'s file could not be written. */
-    MENU_SAVE_FAILED("menu.save-failed");
+    MENU_SAVE_FAILED("menu.save-failed"),
+
+    /** Title of the {@code /menu editor} menu picker. */
+    MENU_EDITOR_TITLE("menu.editor.title"),
+
+    /** Title of the {@code /menu editor} picker when no custom menus exist yet. */
+    MENU_EDITOR_EMPTY_TITLE("menu.editor.empty-title"),
+
+    /** Name of the picker's create-a-new-menu button. */
+    MENU_EDITOR_CREATE("menu.editor.create"),
+
+    /** Prompt shown when the create button asks for the new menu's name. */
+    MENU_EDITOR_CREATE_PROMPT("menu.editor.create-prompt"),
+
+    /** Display name of one menu row in the picker ({@code {name}}). */
+    MENU_EDITOR_ENTRY_NAME("menu.editor.entry.name"),
+
+    /** Lore of one menu row in the picker: its title, row count and item count ({@code {title}{rows}{items}}). */
+    MENU_EDITOR_ENTRY_LORE("menu.editor.entry.lore"),
+
+    /** Title of the per-menu overview panel ({@code {name}{rows}{items}}). */
+    MENU_EDITOR_OVERVIEW_TITLE("menu.editor.overview.title"),
+
+    /** The overview panel's value-lore wrapper for each button's hint ({@code {value}}). */
+    MENU_EDITOR_OVERVIEW_VALUE_LORE("menu.editor.overview.value-lore"),
+
+    /** Name of the overview panel's back button. */
+    MENU_EDITOR_OVERVIEW_BACK("menu.editor.overview.back"),
+
+    /** Name of the overview panel's save button. */
+    MENU_EDITOR_SAVE("menu.editor.save"),
+
+    /** Hint lore of the overview panel's save button. */
+    MENU_EDITOR_SAVE_HINT("menu.editor.save-hint"),
+
+    /** Name of the overview panel's duplicate button. */
+    MENU_EDITOR_DUPLICATE("menu.editor.duplicate"),
+
+    /** Hint lore of the overview panel's duplicate button. */
+    MENU_EDITOR_DUPLICATE_HINT("menu.editor.duplicate-hint"),
+
+    /** Prompt shown when the duplicate button asks for the copy's name ({@code {name}}). */
+    MENU_EDITOR_DUPLICATE_PROMPT("menu.editor.duplicate-prompt"),
+
+    /** Name of the overview panel's rename button. */
+    MENU_EDITOR_RENAME("menu.editor.rename"),
+
+    /** Hint lore of the overview panel's rename button. */
+    MENU_EDITOR_RENAME_HINT("menu.editor.rename-hint"),
+
+    /** Prompt shown when the rename button asks for the new name ({@code {name}}). */
+    MENU_EDITOR_RENAME_PROMPT("menu.editor.rename-prompt"),
+
+    /** Name of the overview panel's placeholder button for the slot grid that lands in a later phase. */
+    MENU_EDITOR_GRID_SOON("menu.editor.grid-soon"),
+
+    /** Hint lore of the overview panel's grid placeholder button. */
+    MENU_EDITOR_GRID_SOON_HINT("menu.editor.grid-soon-hint"),
+
+    /** Name of the overview panel's delete button. */
+    MENU_EDITOR_DELETE("menu.editor.delete"),
+
+    /** Title of the confirm window the overview's delete button opens ({@code {name}}). */
+    MENU_EDITOR_DELETE_CONFIRM("menu.editor.delete-confirm"),
+
+    /** Confirmation that a blank menu named {@code {name}} was created. */
+    MENU_EDITOR_CREATED("menu.editor.created"),
+
+    /** Confirmation that {@code {from}} was duplicated to {@code {to}}. */
+    MENU_EDITOR_DUPLICATED("menu.editor.duplicated"),
+
+    /** Confirmation that {@code {from}} was renamed to {@code {to}}. */
+    MENU_EDITOR_RENAMED("menu.editor.renamed"),
+
+    /** Confirmation that the menu {@code {name}} was deleted. */
+    MENU_EDITOR_DELETED("menu.editor.deleted"),
+
+    /** Reply when {@code {name}} is not a safe menu file name. */
+    MENU_EDITOR_NAME_INVALID("menu.editor.name-invalid"),
+
+    /** Reply when {@code {name}} is a reserved (non-menu) config name. */
+    MENU_EDITOR_NAME_RESERVED("menu.editor.reserved"),
+
+    /** Reply when {@code {name}} already belongs to a menu. */
+    MENU_EDITOR_NAME_TAKEN("menu.editor.name-taken");
 
     private final String key;
 

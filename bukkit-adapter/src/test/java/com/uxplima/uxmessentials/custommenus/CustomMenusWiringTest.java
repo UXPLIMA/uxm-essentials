@@ -10,7 +10,11 @@ import java.util.Map;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
@@ -48,10 +52,12 @@ class CustomMenusWiringTest {
     void setUp() {
         MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
+        com.uxplima.uxmlib.gui.Guis.install(plugin);
     }
 
     @AfterEach
     void tearDown() {
+        com.uxplima.uxmlib.gui.Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -61,8 +67,18 @@ class CustomMenusWiringTest {
         Files.copy(shippedExample(), menus.resolve("example.conf"));
         Files.writeString(menus.resolve("hub.conf"), "rows = 1\nitems { x { slot = 0, material = STONE } }\n");
 
-        CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
+        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
+                plugin,
+                menus(),
+                bindings(),
+                dataFolder,
+                log(),
+                scheduler(),
+                messages(),
+                guiText(),
+                new GuiLayouts(dataFolder, log()),
+                textInput(),
+                new ManagementGuiRegistry());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.commands().getFirst().build().getLiteral()).isEqualTo("menu");
@@ -79,8 +95,18 @@ class CustomMenusWiringTest {
                 command { name = "shop", aliases = ["store"] }
                 """);
 
-        CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
+        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
+                plugin,
+                menus(),
+                bindings(),
+                dataFolder,
+                log(),
+                scheduler(),
+                messages(),
+                guiText(),
+                new GuiLayouts(dataFolder, log()),
+                textInput(),
+                new ManagementGuiRegistry());
 
         assertThat(wired.commands().stream().map(c -> c.build().getLiteral())).contains("menu", "shop");
         assertThat(wired.commands().stream()
@@ -93,8 +119,18 @@ class CustomMenusWiringTest {
 
     @Test
     void anEmptyMenusFolderLoadsNothingButStillRegistersTheCommandAndListeners(@TempDir Path dataFolder) {
-        CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
+        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
+                plugin,
+                menus(),
+                bindings(),
+                dataFolder,
+                log(),
+                scheduler(),
+                messages(),
+                guiText(),
+                new GuiLayouts(dataFolder, log()),
+                textInput(),
+                new ManagementGuiRegistry());
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.menuNames().get()).isEmpty();
@@ -111,8 +147,18 @@ class CustomMenusWiringTest {
                 ]
                 """);
 
-        CustomMenusWiring.Wired wired =
-                CustomMenusWiring.wire(plugin, menus(), bindings(), dataFolder, log(), scheduler(), messages());
+        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
+                plugin,
+                menus(),
+                bindings(),
+                dataFolder,
+                log(),
+                scheduler(),
+                messages(),
+                guiText(),
+                new GuiLayouts(dataFolder, log()),
+                textInput(),
+                new ManagementGuiRegistry());
 
         // openers.conf is reserved for opener config: it must not appear as a loaded menu name, and it arms the
         // two opener listeners rather than being skipped as a malformed menu spec.
@@ -134,6 +180,15 @@ class CustomMenusWiringTest {
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
         return new Menus(renderer, new SyncScheduler(), new ListSourceRegistry());
+    }
+
+    private static GuiText guiText() {
+        return new GuiText(new KeyMessages());
+    }
+
+    /** A wired text-input seam (anvil default; no live prompt is fired in these wiring smokes). */
+    private TextInput textInput() {
+        return TextInputTestKit.create(plugin, guiText(), scheduler(), Path.of("nonexistent"), log());
     }
 
     private static Path shippedExample() {

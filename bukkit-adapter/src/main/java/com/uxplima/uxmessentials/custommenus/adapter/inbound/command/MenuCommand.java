@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -68,6 +69,7 @@ public final class MenuCommand implements CommandRegistration {
 
     private static final String USE = "uxmessentials.menu.use";
     private static final String ADMIN = "uxmessentials.menu.admin";
+    private static final String EDITOR = "uxmessentials.menu.editor";
     private static final String OPEN_OTHERS = "uxmessentials.menu.open.others";
 
     private final Menus menus;
@@ -80,6 +82,7 @@ public final class MenuCommand implements CommandRegistration {
     private final GuiPlusConvertService guiPlusConvert;
     private final MenuSpecPersistence persistence;
     private final Function<String, Optional<OpenCommandSpec>> openCommandFor;
+    private final Consumer<Player> openEditor;
     private final Path menusDir;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
@@ -95,6 +98,7 @@ public final class MenuCommand implements CommandRegistration {
             GuiPlusConvertService guiPlusConvert,
             MenuSpecPersistence persistence,
             Function<String, Optional<OpenCommandSpec>> openCommandFor,
+            Consumer<Player> openEditor,
             Path menusDir,
             Scheduler scheduler,
             Messages messages) {
@@ -108,6 +112,7 @@ public final class MenuCommand implements CommandRegistration {
         this.guiPlusConvert = Objects.requireNonNull(guiPlusConvert, "guiPlusConvert");
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.openCommandFor = Objects.requireNonNull(openCommandFor, "openCommandFor");
+        this.openEditor = Objects.requireNonNull(openEditor, "openEditor");
         this.menusDir = Objects.requireNonNull(menusDir, "menusDir");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
@@ -143,6 +148,9 @@ public final class MenuCommand implements CommandRegistration {
                 .then(Commands.literal("save")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .then(menuArgument().executes(this::save)))
+                .then(Commands.literal("editor")
+                        .requires(src -> src.getSender().hasPermission(EDITOR))
+                        .executes(this::editor))
                 .then(Commands.literal("convert")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .then(Commands.literal("deluxemenus")
@@ -162,7 +170,7 @@ public final class MenuCommand implements CommandRegistration {
 
     @Override
     public String description() {
-        return "Open, list, reload, execute, dump, save, and convert operator custom menus.";
+        return "Open, list, reload, execute, dump, save, edit, and convert operator custom menus.";
     }
 
     /** The {@code <name>} argument, completed from the currently registered menu names. */
@@ -451,6 +459,21 @@ public final class MenuCommand implements CommandRegistration {
                         Map.of("name", name, "missing", String.join(", ", result.missingRefs())));
             case IO_ERROR -> feedback.send(sender, CustomMenusMessageKey.MENU_SAVE_FAILED, Map.of("name", name));
         }
+    }
+
+    /**
+     * Open the in-game menu editor for the sender — {@code /menu editor}, gated by {@code uxmessentials.menu.editor}.
+     * The editor is a GUI, so only a player can open it; a console (or other non-player) meets the shared players-only
+     * line. The picker itself opens on the player's own entity thread through the engine, so the open stays Folia-safe.
+     */
+    private int editor(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player player)) {
+            feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
+            return 0;
+        }
+        openEditor.accept(player);
+        return Command.SINGLE_SUCCESS;
     }
 
     /** The per-item dump line's placeholders: the item id, its slot list, its raw material token, and its action count. */

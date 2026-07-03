@@ -867,7 +867,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
-            wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
+            wireCustomMenus(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("poses"))) {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         }
@@ -905,13 +905,17 @@ public final class PluginModule {
             JavaPlugin plugin,
             ModuleContext ctx,
             CloseableResources resources,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry,
+            TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
         // custommenus consumes the always-on menu engine (the façade + bindings built in PluginModule): it loads the
         // operator's menus/*.conf into the engine on enable and registers the /menu command. There is no per-context
         // repository or listener — the single menu click listener is installed once in bootstrap — so the wiring is a
         // loader run plus the command. The console-dispatch flag is read once in PluginModule and threaded into the
-        // engine's action vocabulary there, not here.
+        // engine's action vocabulary there, not here. The /menu editor picker (and the /uxmess gui hub entry) opens
+        // through the shared GUI framework, so the layouts, the text-input seam and the hub registry are threaded in.
         CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
                 plugin,
                 menus,
@@ -919,7 +923,11 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 ctx.kernel().log(),
                 ctx.kernel().scheduler(),
-                ctx.kernel().messages());
+                ctx.kernel().messages(),
+                new GuiText(ctx.kernel().messages()),
+                guiLayouts,
+                textInput,
+                guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }
