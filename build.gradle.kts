@@ -5,7 +5,7 @@
 
 allprojects {
     group = "com.uxplima"
-    version = project.findProperty("projectVersion")?.toString() ?: "0.3.0"
+    version = project.findProperty("projectVersion")?.toString() ?: "0.4.0"
 
     repositories {
         mavenLocal() // uxmLib is consumed from ~/.m2 during the dogfood (publishToMavenLocal)
