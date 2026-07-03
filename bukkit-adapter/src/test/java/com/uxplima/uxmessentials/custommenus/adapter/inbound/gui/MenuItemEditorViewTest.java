@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
+import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -40,9 +41,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
@@ -77,6 +81,11 @@ class MenuItemEditorViewTest {
     private static final int AMOUNT_SLOT = 15; // PROPERTY_SLOTS[5]
     private static final int GLOW_SLOT = 20; // PROPERTY_SLOTS[8]
     private static final int LORE_MODE_SLOT = 21; // PROPERTY_SLOTS[9]
+    private static final int CLICK_ACTIONS_SLOT = 23; // PROPERTY_SLOTS[11]
+    private static final int REQUIREMENTS_SLOT = 24; // PROPERTY_SLOTS[12]
+    private static final int GESTURE_LEFT_SLOT = 10; // MenuClickActionsView.GESTURE_SLOTS[0] (ClickKind.LEFT)
+    private static final int REF_ADD_SLOT = 48; // MenuRefListEditor.ADD_SLOT
+    private static final int REQ_CONDITIONS_SLOT = 11; // MenuRequirementsView.PROPERTY_SLOTS[0]
     private static final int EDITOR_BACK_SLOT = 49;
 
     private ServerMock server;
@@ -88,6 +97,7 @@ class MenuItemEditorViewTest {
     private final List<String> names = new ArrayList<>();
     private MenuGridView grid;
     private MenuItemEditorView itemEditor;
+    private MenuRefListEditor refListEditor;
 
     @TempDir
     Path menusDir;
@@ -103,6 +113,9 @@ class MenuItemEditorViewTest {
 
         MenuBindings bindings = new MenuBindings();
         bindings.action("close", ctx -> {});
+        bindings.action("message", ctx -> {});
+        bindings.action("sound", ctx -> {});
+        bindings.condition("perm", (ctx, args) -> true);
         EditorRenderer editorRenderer = new EditorRenderer(guiText);
         MenuRenderer renderer =
                 new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
@@ -133,6 +146,17 @@ class MenuItemEditorViewTest {
                 NOOP);
         TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         AtomicReference<MenuGridView> gridRef = new AtomicReference<>();
+        AtomicReference<MenuItemEditorView> itemEditorRef = new AtomicReference<>();
+        refListEditor = new MenuRefListEditor(guiText, scheduler, textInput, "menu.action-editor.arg");
+        MenuClickActionsView clickActions = new MenuClickActionsView(guiText, refListEditor, bindings::schema);
+        MenuRequirementsView requirements = new MenuRequirementsView(
+                menus,
+                guiText,
+                scheduler,
+                new GuiLayouts(menusDir, NOOP),
+                refListEditor,
+                bindings::schema,
+                (p, v) -> Objects.requireNonNull(itemEditorRef.get()).reopen(p, v));
         itemEditor = new MenuItemEditorView(
                 menus,
                 guiText,
@@ -140,7 +164,10 @@ class MenuItemEditorViewTest {
                 new KeyMessages(),
                 textInput,
                 new GuiLayouts(menusDir, NOOP),
-                (p, v) -> Objects.requireNonNull(gridRef.get()).reopenGrid(v));
+                (p, v) -> Objects.requireNonNull(gridRef.get()).reopenGrid(v),
+                clickActions,
+                requirements);
+        itemEditorRef.set(itemEditor);
         grid = new MenuGridView(menus, guiText, scheduler, service, menus::registeredSpec, (p, id) -> {}, itemEditor);
         gridRef.set(grid);
     }
@@ -231,6 +258,135 @@ class MenuItemEditorViewTest {
         MenuItemSpec saved = Objects.requireNonNull(
                 menus.registeredSpec("alpha").orElseThrow().items().get("x"));
         assertThat(saved.decor().glow()).isTrue();
+    }
+
+    // --- P4: click actions + requirements ---
+
+    @Test
+    void theClickActionsAndRequirementsRowsAreOpenerProperties() {
+        grid.open(player, viewer, "alpha");
+        MenuEditSession session = session();
+
+        assertThat(itemEditor.propertyAt(CLICK_ACTIONS_SLOT, session, "x"))
+                .get()
+                .isInstanceOf(MenuOpenerProperty.class);
+        assertThat(itemEditor.propertyAt(REQUIREMENTS_SLOT, session, "x")).get().isInstanceOf(MenuOpenerProperty.class);
+    }
+
+    @Test
+    void clickingTheClickActionsRowOpensTheGestureList() {
+        grid.open(player, viewer, "alpha");
+        fireClick(0, ClickType.LEFT); // open the item editor
+
+        fireClick(CLICK_ACTIONS_SLOT, ClickType.LEFT);
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(inv.getSize()).isEqualTo(27); // the three-row gesture list
+        assertThat(inv.getItem(GESTURE_LEFT_SLOT).getType()).isEqualTo(Material.LEVER); // the LEFT gesture button
+    }
+
+    @Test
+    void selectingAGestureOpensItsActionRefList() {
+        grid.open(player, viewer, "alpha");
+        fireClick(0, ClickType.LEFT);
+        fireClick(CLICK_ACTIONS_SLOT, ClickType.LEFT); // gesture list
+
+        fireClick(GESTURE_LEFT_SLOT, ClickType.LEFT); // open LEFT's action list
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getSize()).isEqualTo(54); // the six-row ref list
+        assertThat(inv.getItem(0).getType()).isEqualTo(Material.PAPER); // the existing "close" action entry
+        assertThat(inv.getItem(REF_ADD_SLOT).getType()).isEqualTo(Material.LIME_DYE); // add button
+    }
+
+    @Test
+    void theAddButtonOpensTheActionIdPicker() {
+        grid.open(player, viewer, "alpha");
+        fireClick(0, ClickType.LEFT);
+        fireClick(CLICK_ACTIONS_SLOT, ClickType.LEFT);
+        fireClick(GESTURE_LEFT_SLOT, ClickType.LEFT); // action list
+
+        fireClick(REF_ADD_SLOT, ClickType.LEFT); // open the id picker
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getSize()).isEqualTo(54);
+        // The picker offers one paper button per registered action id (close / message / sound in this fixture).
+        assertThat(inv.getItem(0).getType()).isEqualTo(Material.PAPER);
+    }
+
+    @Test
+    void addingARefThroughThePickerAndArgAppendsItToTheGesture() {
+        grid.open(player, viewer, "alpha");
+        MenuEditSession session = session();
+        MenuRefListEditor.RefList list = new MenuRefListEditor.RefList(
+                CustomMenusMessageKey.MENU_ACTION_EDITOR_ACTIONS_TITLE,
+                Map.of("gesture", "LEFT"),
+                List.of("close", "message", "sound"),
+                () -> session.clickActions("x", ClickKind.LEFT),
+                refs -> session.setClickActions("x", ClickKind.LEFT, refs),
+                () -> {});
+
+        refListEditor.applyRef(context(), list, "sound", "PLING", -1); // picked "sound", typed the arg
+
+        List<Ref> left = session.clickActions("x", ClickKind.LEFT);
+        assertThat(left).hasSize(2);
+        assertThat(left.get(1).id()).isEqualTo("sound");
+        assertThat(left.get(1).value()).isEqualTo("PLING");
+    }
+
+    @Test
+    void clickingTheRequirementsRowOpensTheRequirementEditor() {
+        grid.open(player, viewer, "alpha");
+        fireClick(0, ClickType.LEFT);
+
+        fireClick(REQUIREMENTS_SLOT, ClickType.LEFT);
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(inv.getSize()).isEqualTo(27); // the three-row requirement editor
+        assertThat(inv.getItem(REQ_CONDITIONS_SLOT).getType()).isEqualTo(Material.COMPASS); // conditions row
+    }
+
+    @Test
+    void addingAViewRequirementThroughThePickerAppendsIt() {
+        grid.open(player, viewer, "alpha");
+        MenuEditSession session = session();
+        MenuRefListEditor.RefList list = new MenuRefListEditor.RefList(
+                CustomMenusMessageKey.MENU_ACTION_EDITOR_CONDITIONS_TITLE,
+                Map.of(),
+                List.of("perm"),
+                () -> session.viewConditions("x"),
+                refs -> session.setViewConditions("x", refs),
+                () -> {});
+
+        refListEditor.applyRef(context(), list, "perm", "shop.use", -1);
+
+        List<Ref> conditions = session.viewConditions("x");
+        assertThat(conditions).hasSize(1);
+        assertThat(conditions.get(0).id()).isEqualTo("perm");
+    }
+
+    @Test
+    void afterSaveTheReloadedMenuHasTheClickActionAndViewRequirement() {
+        grid.open(player, viewer, "alpha");
+        MenuEditSession session = session();
+        session.addAction("x", ClickKind.LEFT, Ref.parse("sound:PLING"));
+        session.addRequirement("x", Ref.parse("perm:shop.use"));
+        session.setViewMinimum("x", 1);
+
+        fireClick(GRID_SAVE_SLOT, ClickType.LEFT); // save the grid
+
+        MenuItemSpec saved = Objects.requireNonNull(
+                menus.registeredSpec("alpha").orElseThrow().items().get("x"));
+        assertThat(saved.click().actions().get(ClickKind.LEFT)).hasSize(2);
+        assertThat(saved.view().requirements()).hasSize(1);
+        assertThat(saved.view().minimum()).isEqualTo(1);
+    }
+
+    /** A hand-built editor click context for driving a ref-list apply seam directly (no live anvil). */
+    private ClickContext context() {
+        return new ClickContext(player, viewer, false, false, () -> {}, menus.selectorOpener(), menus.confirmOpener());
     }
 
     // --- helpers ---

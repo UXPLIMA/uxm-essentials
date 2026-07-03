@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -120,7 +122,16 @@ public final class MenuItemEditorView {
     private final Messages messages;
     private final TextInput textInput;
     private final ListPropertyLayout loreLayout;
+    private final MenuClickActionsView clickActions;
+    private final MenuRequirementsView requirements;
     private final EntityEditorView<ItemTarget> view;
+
+    /**
+     * The item each viewer is currently editing, so the click-action and requirement sub-editors — which open their own
+     * engine windows and cannot carry the subject back through the framework's {@code onBack} — can reopen this editor
+     * for the right item via {@link #reopen}. Mirrors the grid's per-viewer session map.
+     */
+    private final Map<UUID, ItemTarget> openTargets = new ConcurrentHashMap<>();
 
     public MenuItemEditorView(
             Menus menus,
@@ -129,12 +140,16 @@ public final class MenuItemEditorView {
             Messages messages,
             TextInput textInput,
             GuiLayouts guiLayouts,
-            BiConsumer<Player, PlayerRef> onBackToGrid) {
+            BiConsumer<Player, PlayerRef> onBackToGrid,
+            MenuClickActionsView clickActions,
+            MenuRequirementsView requirements) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.clickActions = Objects.requireNonNull(clickActions, "clickActions");
+        this.requirements = Objects.requireNonNull(requirements, "requirements");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(onBackToGrid, "onBackToGrid");
         this.loreLayout = defaultLoreLayout();
@@ -158,7 +173,23 @@ public final class MenuItemEditorView {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(session, "session");
         Objects.requireNonNull(itemId, "itemId");
-        view.open(player, viewer, new ItemTarget(session, itemId));
+        ItemTarget target = new ItemTarget(session, itemId);
+        openTargets.put(viewer.uuid(), target);
+        view.open(player, viewer, target);
+    }
+
+    /**
+     * Reopen the item editor for whatever item {@code viewer} was last editing — the target the click-action and
+     * requirement sub-editors return to, since they open their own windows and lose the framework's subject on back. A
+     * no-op when the viewer has no tracked item (they never opened one, or it closed).
+     */
+    public void reopen(Player player, PlayerRef viewer) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        ItemTarget target = openTargets.get(viewer.uuid());
+        if (target != null) {
+            view.open(player, viewer, target);
+        }
     }
 
     /** The property drawn at {@code slot} for the item, exposed so a test can resolve it without firing a click. */
@@ -187,6 +218,8 @@ public final class MenuItemEditorView {
         props.add(glowProperty(target));
         props.add(loreModeProperty(target));
         props.add(typeProperty(target));
+        props.add(clickActions.row(target.session(), target.itemId()));
+        props.add(requirements.row(target.session(), target.itemId()));
         for (String token : FLAG_TOKENS) {
             props.add(flagProperty(target, token));
         }

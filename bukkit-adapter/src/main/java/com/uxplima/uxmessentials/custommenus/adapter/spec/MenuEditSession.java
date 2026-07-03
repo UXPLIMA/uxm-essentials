@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.custommenus.adapter.spec;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,12 +10,15 @@ import java.util.function.UnaryOperator;
 
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import org.jspecify.annotations.Nullable;
 
@@ -190,6 +194,116 @@ public final class MenuEditSession {
     public MenuEditSession setFlags(String id, List<String> flags) {
         Objects.requireNonNull(flags, "flags");
         return updateItem(id, item -> item.withDecor(item.decor().withFlagTokens(flags)));
+    }
+
+    // --- per-gesture click actions (the click-actions editor mutates one gesture per edit) -----------------------
+
+    /** The action refs bound to {@code kind} on the item under {@code id} — the gesture's own list, not the {@code ANY} merge. */
+    public List<Ref> clickActions(String id, ClickKind kind) {
+        Objects.requireNonNull(kind, "kind");
+        return item(id).map(item -> item.click().actions().getOrDefault(kind, List.of()))
+                .orElseGet(List::of);
+    }
+
+    /** Replace the whole action list bound to {@code kind} — the workhorse the click-actions ref-list editor writes through. */
+    public MenuEditSession setClickActions(String id, ClickKind kind, List<Ref> refs) {
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(refs, "refs");
+        return updateItem(id, item -> item.withClick(item.click().withGestureActions(kind, refs)));
+    }
+
+    /** Append {@code ref} to {@code kind}'s action list on the item under {@code id}. */
+    public MenuEditSession addAction(String id, ClickKind kind, Ref ref) {
+        Objects.requireNonNull(ref, "ref");
+        List<Ref> next = new ArrayList<>(clickActions(id, kind));
+        next.add(ref);
+        return setClickActions(id, kind, next);
+    }
+
+    /** Remove the action at {@code index} from {@code kind}'s list on the item under {@code id}; out-of-range is a no-op. */
+    public MenuEditSession removeAction(String id, ClickKind kind, int index) {
+        List<Ref> next = new ArrayList<>(clickActions(id, kind));
+        if (index >= 0 && index < next.size()) {
+            next.remove(index);
+        }
+        return setClickActions(id, kind, next);
+    }
+
+    /** Move the action at {@code index} by {@code direction} (−1 up, +1 down) within {@code kind}'s list; a bad move is a no-op. */
+    public MenuEditSession moveAction(String id, ClickKind kind, int index, int direction) {
+        List<Ref> next = new ArrayList<>(clickActions(id, kind));
+        int target = index + direction;
+        if (index >= 0 && index < next.size() && target >= 0 && target < next.size()) {
+            next.add(target, next.remove(index));
+        }
+        return setClickActions(id, kind, next);
+    }
+
+    /** Set {@code kind}'s requirement block on the item under {@code id} — the per-gesture click gate. */
+    public MenuEditSession setClickRequirement(String id, ClickKind kind, RequirementSpec requirement) {
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(requirement, "requirement");
+        return updateItem(id, item -> item.withClick(item.click().withGestureRequirement(kind, requirement)));
+    }
+
+    // --- view requirements (the requirements editor gates an item's visibility) ---------------------------------
+
+    /** The condition refs of the item under {@code id}'s {@code view} gate, in order — the ref-list editor's read. */
+    public List<Ref> viewConditions(String id) {
+        return item(id).map(item -> item.view().requirements().stream()
+                        .map(Requirement::condition)
+                        .toList())
+                .orElseGet(List::of);
+    }
+
+    /**
+     * Replace the item under {@code id}'s view requirements from a flat condition-ref list — the ref-list editor's
+     * write. Each ref becomes a plain mandatory, non-inverted {@link Requirement}; a hand-written {@code !condition} or
+     * optional flag is normalised away by a GUI edit, so an author who needs inversion keeps it in the file.
+     */
+    public MenuEditSession setViewConditions(String id, List<Ref> conditions) {
+        Objects.requireNonNull(conditions, "conditions");
+        List<Requirement> requirements =
+                conditions.stream().map(ref -> new Requirement(ref, false)).toList();
+        return updateItem(id, item -> item.withView(item.view().withRequirements(requirements)));
+    }
+
+    /** Append a mandatory, non-inverted condition {@code requirement} to the item under {@code id}'s view gate. */
+    public MenuEditSession addRequirement(String id, Ref requirement) {
+        Objects.requireNonNull(requirement, "requirement");
+        List<Ref> next = new ArrayList<>(viewConditions(id));
+        next.add(requirement);
+        return setViewConditions(id, next);
+    }
+
+    /** Remove the view requirement at {@code index} from the item under {@code id}; out-of-range is a no-op. */
+    public MenuEditSession removeRequirement(String id, int index) {
+        List<Ref> next = new ArrayList<>(viewConditions(id));
+        if (index >= 0 && index < next.size()) {
+            next.remove(index);
+        }
+        return setViewConditions(id, next);
+    }
+
+    /** Move the view requirement at {@code index} by {@code direction} (−1 up, +1 down); a bad move is a no-op. */
+    public MenuEditSession moveRequirement(String id, int index, int direction) {
+        List<Ref> next = new ArrayList<>(viewConditions(id));
+        int target = index + direction;
+        if (index >= 0 && index < next.size() && target >= 0 && target < next.size()) {
+            next.add(target, next.remove(index));
+        }
+        return setViewConditions(id, next);
+    }
+
+    /** Set the item under {@code id}'s view {@code minimum} — the AND / OR / N-of-M combinator over its requirements. */
+    public MenuEditSession setViewMinimum(String id, int minimum) {
+        return updateItem(id, item -> item.withView(item.view().withMinimum(minimum)));
+    }
+
+    /** Set the item under {@code id}'s view {@code deny} action list — what runs when the visibility gate fails. */
+    public MenuEditSession setViewDeny(String id, List<Ref> deny) {
+        Objects.requireNonNull(deny, "deny");
+        return updateItem(id, item -> item.withView(item.view().withDeny(deny)));
     }
 
     /** The current item map, as an unmodifiable view in insertion order. */

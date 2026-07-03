@@ -272,6 +272,66 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Label of the hide-can-place-on flag toggle. */
     MENU_ITEM_EDITOR_FLAG_HIDE_PLACED_ON("menu.item-editor.flag.hide-placed-on"),
 
+    /** Label of the item editor's click-actions row (opens the per-gesture action editor). */
+    MENU_ACTION_EDITOR_CLICK_ACTIONS("menu.action-editor.click-actions"),
+
+    /** Label of the item editor's requirements row (opens the view-requirement editor). */
+    MENU_ACTION_EDITOR_REQUIREMENTS("menu.action-editor.requirements"),
+
+    /** Title of the gesture-list picker the click-actions row opens. */
+    MENU_ACTION_EDITOR_GESTURE_TITLE("menu.action-editor.gesture-title"),
+
+    /** Name of one gesture button in the gesture-list picker ({@code {gesture}{count}}). */
+    MENU_ACTION_EDITOR_GESTURE("menu.action-editor.gesture"),
+
+    /** Name of a back button in the action/requirement pickers. */
+    MENU_ACTION_EDITOR_BACK("menu.action-editor.back"),
+
+    /** Title of a gesture's action ref-list ({@code {gesture}}). */
+    MENU_ACTION_EDITOR_ACTIONS_TITLE("menu.action-editor.actions-title"),
+
+    /** Name of one ref button in an action/condition/deny list ({@code {ref}}, shown as {@code id:value}). */
+    MENU_ACTION_EDITOR_REF_NAME("menu.action-editor.ref-name"),
+
+    /** Per-ref action-hint lore in a ref-list (move / edit / remove gestures). */
+    MENU_ACTION_EDITOR_REF_HINTS("menu.action-editor.ref-hints"),
+
+    /** Name of a ref-list's add button. */
+    MENU_ACTION_EDITOR_ADD("menu.action-editor.add"),
+
+    /** Confirm title shown before removing a ref from a list. */
+    MENU_ACTION_EDITOR_REMOVE_CONFIRM("menu.action-editor.remove-confirm"),
+
+    /** Title of the id picker (choose a registered action / condition id). */
+    MENU_ACTION_EDITOR_PICK_TITLE("menu.action-editor.pick-title"),
+
+    /** Name of one id button in the id picker ({@code {id}}). */
+    MENU_ACTION_EDITOR_ID_NAME("menu.action-editor.id-name"),
+
+    /** Anvil prompt shown when a ref asks for its value/argument ({@code {id}}). */
+    MENU_ACTION_EDITOR_ARG_PROMPT("menu.action-editor.arg-prompt"),
+
+    /** Title of the per-item view-requirement editor ({@code {id}}). */
+    MENU_ACTION_EDITOR_REQ_TITLE("menu.action-editor.req-title"),
+
+    /** Name of the requirement editor's back-to-item button. */
+    MENU_ACTION_EDITOR_REQ_BACK("menu.action-editor.req-back"),
+
+    /** Label of the requirement editor's conditions row (opens the condition ref-list). */
+    MENU_ACTION_EDITOR_CONDITIONS("menu.action-editor.conditions"),
+
+    /** Title of the view condition ref-list. */
+    MENU_ACTION_EDITOR_CONDITIONS_TITLE("menu.action-editor.conditions-title"),
+
+    /** Label of the requirement editor's minimum stepper. */
+    MENU_ACTION_EDITOR_MINIMUM("menu.action-editor.minimum"),
+
+    /** Label of the requirement editor's deny-actions row (opens the deny ref-list). */
+    MENU_ACTION_EDITOR_DENY("menu.action-editor.deny"),
+
+    /** Title of the view deny-action ref-list. */
+    MENU_ACTION_EDITOR_DENY_TITLE("menu.action-editor.deny-title"),
+
     /** Name of the overview panel's delete button. */
     MENU_EDITOR_DELETE("menu.editor.delete"),
 

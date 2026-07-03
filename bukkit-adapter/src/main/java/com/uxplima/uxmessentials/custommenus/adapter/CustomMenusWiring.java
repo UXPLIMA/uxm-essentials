@@ -25,9 +25,12 @@ import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuOpenCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuClickActionsView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuEditorView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuGridView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuItemEditorView;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRefListEditor;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRequirementsView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerJoinListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuSwapListener;
@@ -178,6 +181,26 @@ public final class CustomMenusWiring {
         // reads the grid through a holder set once the grid exists.
         AtomicReference<MenuEditorView> editorViewRef = new AtomicReference<>();
         AtomicReference<MenuGridView> gridViewRef = new AtomicReference<>();
+        // The click-action and view-requirement builders (the item editor's two new rows). The requirement editor and
+        // the item editor reference each other — the item editor opens the requirement editor, the requirement editor's
+        // back reopens the item editor — so the requirement editor is built first with a back hook that reads the item
+        // editor through a holder set once it exists, breaking the construction cycle (mirroring the grid↔overview
+        // one).
+        // Both builders read the id catalog from the live bindings' schema export, so a late-registered feature is
+        // offered. The arg-entry input key is stable so an operator can flip it between anvil and chat like any other.
+        AtomicReference<MenuItemEditorView> itemEditorViewRef = new AtomicReference<>();
+        MenuRefListEditor refListEditor =
+                new MenuRefListEditor(guiText, scheduler, textInput, "menu.action-editor.arg");
+        MenuClickActionsView clickActionsView = new MenuClickActionsView(guiText, refListEditor, bindings::schema);
+        MenuRequirementsView requirementsView = new MenuRequirementsView(
+                menus,
+                guiText,
+                scheduler,
+                guiLayouts,
+                refListEditor,
+                bindings::schema,
+                (player, viewer) -> Objects.requireNonNull(itemEditorViewRef.get(), "itemEditorView")
+                        .reopen(player, viewer));
         MenuItemEditorView itemEditorView = new MenuItemEditorView(
                 menus,
                 guiText,
@@ -186,7 +209,10 @@ public final class CustomMenusWiring {
                 textInput,
                 guiLayouts,
                 (player, viewer) ->
-                        Objects.requireNonNull(gridViewRef.get(), "gridView").reopenGrid(viewer));
+                        Objects.requireNonNull(gridViewRef.get(), "gridView").reopenGrid(viewer),
+                clickActionsView,
+                requirementsView);
+        itemEditorViewRef.set(itemEditorView);
         MenuGridView gridView = new MenuGridView(
                 menus,
                 guiText,

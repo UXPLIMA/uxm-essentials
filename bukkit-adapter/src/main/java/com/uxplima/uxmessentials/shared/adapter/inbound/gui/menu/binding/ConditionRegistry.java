@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -38,5 +39,10 @@ public final class ConditionRegistry {
     public boolean has(String id) {
         Objects.requireNonNull(id, "id");
         return handlers.containsKey(id);
+    }
+
+    /** Every registered condition id, sorted — the catalog the in-game requirement picker offers a spec author. */
+    public List<String> ids() {
+        return handlers.keySet().stream().sorted().toList();
     }
 }

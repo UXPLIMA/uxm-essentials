@@ -74,6 +74,21 @@ public record RequirementSpec(List<Requirement> requirements, int minimum, List<
                 refs.stream().map(ref -> new Requirement(ref, false)).toList(), 0, List.of());
     }
 
+    /** A copy carrying a new {@code requirements} list — the requirement editor's add / edit / remove / reorder funnel. */
+    public RequirementSpec withRequirements(List<Requirement> requirements) {
+        return new RequirementSpec(requirements, minimum, deny, stopAtSuccess);
+    }
+
+    /** A copy with a new {@code minimum} (the AND / OR / N-of-M combinator), every other field unchanged. */
+    public RequirementSpec withMinimum(int minimum) {
+        return new RequirementSpec(requirements, minimum, deny, stopAtSuccess);
+    }
+
+    /** A copy carrying a new {@code deny} action list — what the runtime fires instead when the block fails. */
+    public RequirementSpec withDeny(List<Ref> deny) {
+        return new RequirementSpec(requirements, minimum, deny, stopAtSuccess);
+    }
+
     /**
      * Whether this block passes, given {@code holds} — the caller's decision on which individual requirements hold
      * right now (the caller owns the condition registry, so it evaluates each requirement's condition and hands the

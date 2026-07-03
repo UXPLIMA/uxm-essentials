@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,5 +33,10 @@ public final class ActionRegistry {
     public boolean has(String id) {
         Objects.requireNonNull(id, "id");
         return handlers.containsKey(id);
+    }
+
+    /** Every registered action id, sorted — the catalog the in-game action picker offers a spec author. */
+    public List<String> ids() {
+        return handlers.keySet().stream().sorted().toList();
     }
 }

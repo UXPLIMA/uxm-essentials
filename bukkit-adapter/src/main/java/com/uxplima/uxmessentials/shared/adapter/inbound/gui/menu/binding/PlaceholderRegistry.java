@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -77,6 +78,15 @@ public final class PlaceholderRegistry {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Every exactly-registered placeholder id, sorted — the catalog a token picker offers. The prefix/family
+     * fallbacks ({@code papi_*}, {@code data_*}) claim ids by predicate, not by name, so they cannot be enumerated
+     * here; a picker offers the exact tokens and leaves the open-ended families to a typed token.
+     */
+    public List<String> ids() {
+        return handlers.keySet().stream().sorted().toList();
     }
 
     public boolean has(String id) {

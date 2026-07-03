@@ -110,6 +110,44 @@ public record ClickSpec(
         return Optional.ofNullable(orElse.get(kind));
     }
 
+    /**
+     * A copy with {@code kind}'s own action list replaced by {@code refs} — the primitive the per-gesture action editor
+     * rebuilds one gesture through. An empty list drops the gesture's entry entirely (so the writer emits nothing for
+     * it), keeping the map to the gestures that actually bind an action; every other gesture, the conditions, the
+     * requirement blocks and the else-chains are carried through unchanged.
+     */
+    public ClickSpec withGestureActions(ClickKind kind, List<Ref> refs) {
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(refs, "refs");
+        Map<ClickKind, List<Ref>> next = new EnumMap<>(ClickKind.class);
+        next.putAll(actions);
+        if (refs.isEmpty()) {
+            next.remove(kind);
+        } else {
+            next.put(kind, List.copyOf(refs));
+        }
+        return new ClickSpec(next, conditions, requirements, orElse);
+    }
+
+    /**
+     * A copy with {@code kind}'s requirement block replaced by {@code requirement} — the primitive the per-gesture
+     * requirement editor rebuilds one gesture's gate through. A block that gates nothing and denies nothing drops the
+     * gesture's entry entirely, so the writer emits no empty {@code requirements {}} for it; every other gesture, the
+     * actions, the conditions and the else-chains are carried through unchanged.
+     */
+    public ClickSpec withGestureRequirement(ClickKind kind, RequirementSpec requirement) {
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(requirement, "requirement");
+        Map<ClickKind, RequirementSpec> next = new EnumMap<>(ClickKind.class);
+        next.putAll(requirements);
+        if (requirement.requirements().isEmpty() && requirement.deny().isEmpty()) {
+            next.remove(kind);
+        } else {
+            next.put(kind, requirement);
+        }
+        return new ClickSpec(actions, conditions, next, orElse);
+    }
+
     private static Map<ClickKind, List<Ref>> copyRefs(Map<ClickKind, List<Ref>> source) {
         Map<ClickKind, List<Ref>> copy = new EnumMap<>(ClickKind.class);
         source.forEach((kind, refs) ->

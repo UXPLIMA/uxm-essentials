@@ -96,6 +96,15 @@ public final class MenuBindings {
     }
 
     /**
+     * The id catalog the in-game editor's pickers render from — the sorted action / condition / placeholder /
+     * list-source ids these four registries currently hold. A picker reads this one export, so it offers exactly the
+     * bindings that are wired. Built on demand from the live registries, so a feature that registered late is included.
+     */
+    public MenuSchema schema() {
+        return new MenuSchema(actions.ids(), conditions.ids(), placeholders.ids(), lists.ids());
+    }
+
+    /**
      * Every ref id a spec names that no registry knows, de-duplicated. An empty list means the specs are fully
      * wired; anything returned is a missing binding the operator must fix before the menu can open cleanly.
      */

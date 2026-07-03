@@ -124,6 +124,18 @@ class MenuGridViewTest {
         // the grid, so it is built with a Back hook that reads the grid through a holder set once the grid exists.
         TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         AtomicReference<MenuGridView> gridRef = new AtomicReference<>();
+        AtomicReference<MenuItemEditorView> itemEditorRef = new AtomicReference<>();
+        MenuRefListEditor refListEditor =
+                new MenuRefListEditor(guiText, scheduler, textInput, "menu.action-editor.arg");
+        MenuClickActionsView clickActions = new MenuClickActionsView(guiText, refListEditor, bindings::schema);
+        MenuRequirementsView requirements = new MenuRequirementsView(
+                menus,
+                guiText,
+                scheduler,
+                new GuiLayouts(menusDir, NOOP),
+                refListEditor,
+                bindings::schema,
+                (p, v) -> Objects.requireNonNull(itemEditorRef.get()).reopen(p, v));
         MenuItemEditorView itemEditor = new MenuItemEditorView(
                 menus,
                 guiText,
@@ -131,7 +143,10 @@ class MenuGridViewTest {
                 new KeyMessages(),
                 textInput,
                 new GuiLayouts(menusDir, NOOP),
-                (p, v) -> Objects.requireNonNull(gridRef.get()).reopenGrid(v));
+                (p, v) -> Objects.requireNonNull(gridRef.get()).reopenGrid(v),
+                clickActions,
+                requirements);
+        itemEditorRef.set(itemEditor);
         view = new MenuGridView(menus, guiText, scheduler, service, menus::registeredSpec, (p, id) -> {}, itemEditor);
         gridRef.set(view);
     }

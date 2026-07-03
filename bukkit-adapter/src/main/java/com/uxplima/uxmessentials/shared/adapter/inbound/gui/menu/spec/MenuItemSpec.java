@@ -191,4 +191,16 @@ public record MenuItemSpec(
         return new MenuItemSpec(
                 slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
     }
+
+    /** A copy carrying a new {@code view} visibility gate (the requirement/action editor rebuilds it), every other field kept. */
+    public MenuItemSpec withView(RequirementSpec view) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
+
+    /** A copy carrying a new {@code click} handling block (the per-gesture action editor rebuilds it), every other field kept. */
+    public MenuItemSpec withClick(ClickSpec click) {
+        return new MenuItemSpec(
+                slots, priority, material, name, lore, decor, loreMode, view, click, update, list, type, itemDrag);
+    }
 }
