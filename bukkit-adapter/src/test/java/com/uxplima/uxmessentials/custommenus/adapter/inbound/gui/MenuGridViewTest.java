@@ -19,12 +19,16 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuEditLockListener;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
@@ -65,6 +69,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 class MenuGridViewTest {
 
     private static final int BACK_SLOT = 12; // control row (9) + BACK_COLUMN 3
+    private static final int PREVIEW_SLOT = 13; // control row (9) + PREVIEW_COLUMN 4
     private static final int SAVE_SLOT = 14; // control row (9) + SAVE_COLUMN 5
     private static final int CONFIRM_YES_SLOT = 11; // ConfirmRenderer.YES_SLOT
 
@@ -75,6 +80,7 @@ class MenuGridViewTest {
     private Menus menus;
     private CustomMenuLoader loader;
     private final List<String> names = new ArrayList<>();
+    private MenuEditLocks editLocks;
     private MenuGridView view;
 
     @TempDir
@@ -147,8 +153,11 @@ class MenuGridViewTest {
                 clickActions,
                 requirements);
         itemEditorRef.set(itemEditor);
-        view = new MenuGridView(menus, guiText, scheduler, service, menus::registeredSpec, (p, id) -> {}, itemEditor);
+        editLocks = new MenuEditLocks();
+        view = new MenuGridView(
+                menus, guiText, scheduler, service, editLocks, menus::registeredSpec, (p, id) -> {}, itemEditor);
         gridRef.set(view);
+        server.getPluginManager().registerEvents(new MenuEditLockListener(editLocks), plugin);
     }
 
     @AfterEach
@@ -231,6 +240,116 @@ class MenuGridViewTest {
 
         Inventory page1 = player.getOpenInventory().getTopInventory();
         assertThat(page1.getItem(5).getType()).isEqualTo(Material.STONE); // menu slot 50 lands at canvas slot 5
+    }
+
+    // --- P6: item capture (grid drag-from-hand + /menu captureitem) ---
+
+    @Test
+    void draggingAHeldItemIntoAnEmptySlotCapturesItWithoutOpeningTheItemEditor() {
+        player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
+        view.open(player, viewer, "alpha");
+
+        fireClick(1, ClickType.LEFT); // an empty cell, holding an item
+
+        assertThat(itemAt(editSession(), 1)).isPresent();
+        String id = itemAt(editSession(), 1).orElseThrow();
+        assertThat(editSession().item(id).orElseThrow().material()).startsWith("b64:");
+        // The quick path re-renders the grid in place; it does not open the 54-slot item editor an empty hand would.
+        assertThat(player.getOpenInventory().getTopInventory().getSize()).isEqualTo(18);
+    }
+
+    @Test
+    void captureHeldItemUpdatesTheMaterialOfAFilledSlot() {
+        view.open(player, viewer, "alpha");
+        player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
+
+        view.captureHeldItem(player, viewer, 0); // slot 0 holds the seeded item "x"
+
+        assertThat(editSession().item("x").orElseThrow().material()).startsWith("b64:");
+        assertThat(player.getOpenInventory().getTopInventory().getSize()).isEqualTo(18); // grid re-opened
+    }
+
+    @Test
+    void captureHeldItemIntoAnEmptySlotCreatesAnItem() {
+        view.open(player, viewer, "alpha");
+        player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
+
+        view.captureHeldItem(player, viewer, 3); // an empty slot
+
+        assertThat(itemAt(editSession(), 3)).isPresent();
+        assertThat(editSession().items()).hasSize(2); // the seeded item plus the captured one
+    }
+
+    @Test
+    void captureHeldItemWithAnEmptyHandChangesNothing() {
+        view.open(player, viewer, "alpha");
+        player.getInventory().setItemInMainHand(null);
+
+        view.captureHeldItem(player, viewer, 0);
+
+        assertThat(editSession().item("x").orElseThrow().material()).isEqualTo("STONE"); // untouched
+    }
+
+    @Test
+    void captureHeldItemWithNoActiveSessionIsSafe() {
+        player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
+        // No grid opened, so the viewer has no edit session.
+        view.captureHeldItem(player, viewer, 0);
+
+        assertThat(view.editSession(viewer.uuid())).isEmpty();
+    }
+
+    // --- P6: live preview ---
+
+    @Test
+    void previewOpensTheWorkingCopyThroughTheEngine() {
+        view.open(player, viewer, "alpha");
+
+        fireClick(PREVIEW_SLOT, ClickType.LEFT);
+
+        Inventory preview = player.getOpenInventory().getTopInventory();
+        assertThat(preview.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(((MenuHolder) preview.getHolder()).specId()).startsWith("preview:");
+        assertThat(preview.getSize()).isEqualTo(9); // the real 1-row menu, as a player sees it
+        assertThat(preview.getItem(0).getType()).isEqualTo(Material.STONE);
+    }
+
+    // The "close the preview → back to the grid" reopen defers to the viewer's next tick (opening a window inside an
+    // InventoryCloseEvent is a Paper gotcha, so the reopen funnels through the scheduler). Under the synchronous test
+    // scheduler that deferral collapses into the close and is clobbered by MockBukkit resetting the view, so the reopen
+    // is covered where it is observable: MenusGridTest asserts the engine fires the close hook the grid wires to
+    // reopenGrid, and previewOpensTheWorkingCopyThroughTheEngine asserts the preview opens.
+
+    // --- P6: edit lock ---
+
+    @Test
+    void aSecondViewerCannotOpenAMenuAnotherIsEditing() {
+        view.open(player, viewer, "alpha"); // Alice acquires the lock
+
+        PlayerMock bob = server.addPlayer("Bob");
+        PlayerRef bobRef = new PlayerRef(bob.getUniqueId(), bob.getName());
+        view.open(bob, bobRef, "alpha");
+
+        assertThat(view.editSession(bob.getUniqueId())).isEmpty(); // Bob was refused, no session opened
+        assertThat(editLocks.holds("alpha", viewer.uuid())).isTrue();
+    }
+
+    @Test
+    void theLockReleasesOnQuitSoAnotherViewerCanOpen() {
+        view.open(player, viewer, "alpha"); // Alice acquires
+
+        server.getPluginManager()
+                .callEvent(new PlayerQuitEvent(
+                        player,
+                        net.kyori.adventure.text.Component.text("bye"),
+                        PlayerQuitEvent.QuitReason.DISCONNECTED));
+
+        PlayerMock bob = server.addPlayer("Bob");
+        PlayerRef bobRef = new PlayerRef(bob.getUniqueId(), bob.getName());
+        view.open(bob, bobRef, "alpha");
+
+        assertThat(view.editSession(bob.getUniqueId())).isPresent(); // the lock freed, Bob may edit now
+        assertThat(editLocks.holds("alpha", bob.getUniqueId())).isTrue();
     }
 
     // --- helpers ---

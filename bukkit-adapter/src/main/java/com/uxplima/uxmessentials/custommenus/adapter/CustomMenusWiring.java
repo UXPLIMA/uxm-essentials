@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuItemEditorV
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuPropertiesView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRefListEditor;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRequirementsView;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuEditLockListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerJoinListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuSwapListener;
@@ -174,6 +175,10 @@ public final class CustomMenusWiring {
         };
         MenuEditorService editorService = new MenuEditorService(
                 menusDir, persistence, menus::registeredSpec, openCommandFor, reloadOne, forget, log);
+        // One-editor-per-menu lock: the grid and property editors take it on open (refusing a second viewer with a
+        // "being edited by …" line), the picker release it on returning to the browser, and the quit listener release
+        // it on disconnect — so a menu is never rewritten while another operator has it open.
+        MenuEditLocks editLocks = new MenuEditLocks();
         // The slot-grid canvas (the overview's "Slot editor" button) and the overview reference each other — the
         // overview opens the grid, the grid's Back returns to the overview — so the grid is built first with a Back
         // hook that reads the overview through a holder set once the overview exists, breaking the construction cycle.
@@ -240,6 +245,7 @@ public final class CustomMenusWiring {
                 scheduler,
                 messages,
                 editorService,
+                editLocks,
                 menus::registeredSpec,
                 openCommandFor,
                 rememberCommand,
@@ -261,6 +267,7 @@ public final class CustomMenusWiring {
                 guiText,
                 scheduler,
                 editorService,
+                editLocks,
                 menus::registeredSpec,
                 (player, id) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
                         .overview()
@@ -273,6 +280,7 @@ public final class CustomMenusWiring {
                 scheduler,
                 messages,
                 editorService,
+                editLocks,
                 nameSupplier,
                 menus::registeredSpec,
                 guiLayouts,
@@ -298,6 +306,7 @@ public final class CustomMenusWiring {
                 persistence,
                 openCommandFor,
                 player -> editorView.open(player, BukkitRefs.toRef(player)),
+                (player, slot) -> gridView.captureHeldItem(player, BukkitRefs.toRef(player), slot),
                 menusDir,
                 scheduler,
                 messages);
@@ -317,7 +326,8 @@ public final class CustomMenusWiring {
         List<Listener> listeners = List.of(
                 new MenuOpenerInteractListener(menus, nameSupplier, openerItems),
                 new MenuOpenerJoinListener(openerSupplier, openerItems),
-                new MenuSwapListener(menus, swapMenuSupplier, nameSupplier));
+                new MenuSwapListener(menus, swapMenuSupplier, nameSupplier),
+                new MenuEditLockListener(editLocks));
         return new Wired(commands, nameSupplier, listeners);
     }
 

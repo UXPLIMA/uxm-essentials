@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutcome;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
@@ -87,6 +88,7 @@ public final class MenuPropertiesView {
     private final Scheduler scheduler;
     private final Messages messages;
     private final MenuEditorService service;
+    private final MenuEditLocks locks;
     private final Function<String, Optional<MenuSpec>> specOf;
     private final Function<String, Optional<OpenCommandSpec>> openCommandFor;
     private final BiConsumer<String, Optional<OpenCommandSpec>> rememberCommand;
@@ -108,6 +110,7 @@ public final class MenuPropertiesView {
             Scheduler scheduler,
             Messages messages,
             MenuEditorService service,
+            MenuEditLocks locks,
             Function<String, Optional<MenuSpec>> specOf,
             Function<String, Optional<OpenCommandSpec>> openCommandFor,
             BiConsumer<String, Optional<OpenCommandSpec>> rememberCommand,
@@ -124,6 +127,7 @@ public final class MenuPropertiesView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.service = Objects.requireNonNull(service, "service");
+        this.locks = Objects.requireNonNull(locks, "locks");
         this.specOf = Objects.requireNonNull(specOf, "specOf");
         this.openCommandFor = Objects.requireNonNull(openCommandFor, "openCommandFor");
         this.rememberCommand = Objects.requireNonNull(rememberCommand, "rememberCommand");
@@ -154,9 +158,10 @@ public final class MenuPropertiesView {
     }
 
     /**
-     * Open the menu-property editor for {@code menuId}: clone the registered spec (and its open command) into a fresh
-     * per-viewer working copy, then show the editor. A menu no longer registered tells the viewer and returns to the
-     * picker list.
+     * Open the menu-property editor for {@code menuId}: take the menu's edit lock, clone the registered spec (and its
+     * open command) into a fresh per-viewer working copy, then show the editor. A menu no longer registered tells the
+     * viewer and returns to the picker list; a menu another operator already has open is refused with a "being edited
+     * by …" line, so two sessions can never save over each other.
      */
     public void open(Player player, PlayerRef viewer, String menuId) {
         Objects.requireNonNull(player, "player");
@@ -166,6 +171,12 @@ public final class MenuPropertiesView {
         if (spec == null) {
             player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", menuId)));
             openList.accept(player, viewer);
+            return;
+        }
+        Optional<String> lockedBy = locks.tryAcquire(menuId, viewer.uuid(), viewer.name());
+        if (lockedBy.isPresent()) {
+            player.sendMessage(
+                    guiText.text(viewer, CustomMenusMessageKey.MENU_EDITOR_LOCKED, Map.of("player", lockedBy.get())));
             return;
         }
         MenuTarget target = new MenuTarget(

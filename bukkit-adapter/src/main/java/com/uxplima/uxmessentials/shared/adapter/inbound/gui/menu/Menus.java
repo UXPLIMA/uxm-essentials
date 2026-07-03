@@ -716,6 +716,48 @@ public final class Menus {
         return new MenuSpec("", windowRows, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
+    /**
+     * Open {@code spec} for {@code viewer} as a live preview — render an in-memory working copy exactly as a player
+     * would see it, through the real {@link MenuRenderer}, without registering the spec. The menu editor uses this so
+     * an operator can look over their unsaved edits before committing them to disk: the working copy is frozen into an
+     * immutable {@link MenuSpec} and handed here. It builds the same {@link MenuHolder} every other menu uses — so the
+     * one listener routes its clicks and the one {@code closeMenu} tears it down — and attaches {@code onClose}, the
+     * seam the close path runs once to step the operator back to the grid editor when the preview closes.
+     *
+     * <p>A preview is deliberately not a full open: it does not gate on the spec's open-requirement, run its
+     * open-actions, record it in the viewer's {@code /menu last} history, paint the bottom inventory, or arm a refresh
+     * timer — those are the side effects of really opening a menu, and a preview is a look, not an open. Its clicks
+     * still run the spec's own click actions (that is what "as a player sees it" means), so a preview of a shop can be
+     * clicked through live. Its list sources are resolved off the tick thread like any open, then the window is shown
+     * on the viewer's entity thread.
+     */
+    public void openPreview(PlayerRef viewer, MenuSpec spec, Runnable onClose) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(onClose, "onClose");
+        MenuContext ctx = MenuContext.of(viewer, null, 0).withLocalPlaceholders(spec.placeholders());
+        scheduler.async(() -> {
+            Map<String, List<?>> resolved = resolveLists(spec, ctx);
+            scheduler.onEntity(viewer, () -> openPreviewResolved(viewer, spec, ctx, resolved, onClose));
+        });
+    }
+
+    /** On the viewer's entity thread: build the preview holder + window, render it, attach the back hook, show it. */
+    private void openPreviewResolved(
+            PlayerRef viewer, MenuSpec spec, MenuContext ctx, Map<String, List<?>> resolved, Runnable onClose) {
+        Player live = Bukkit.getPlayer(viewer.uuid());
+        if (live == null || !live.isOnline()) {
+            return;
+        }
+        MenuHolder holder = new MenuHolder("preview:" + spec.rows(), spec, ctx);
+        holder.setResolvedLists(resolved);
+        holder.attachCloseHook(onClose);
+        Inventory inv = createWindow(holder, spec, renderer.title(spec, ctx));
+        holder.attach(inv);
+        renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
+        live.openInventory(inv);
+    }
+
     private EditorRenderer requireEditorRenderer() {
         if (editorRenderer == null) {
             throw new IllegalStateException("this Menus engine was wired without editor support");

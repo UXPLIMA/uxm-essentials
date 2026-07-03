@@ -22,6 +22,7 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
@@ -125,6 +126,7 @@ class MenuEditorViewTest {
                 scheduler,
                 new KeyMessages(),
                 service,
+                new MenuEditLocks(),
                 () -> List.copyOf(names),
                 menus::registeredSpec,
                 new GuiLayouts(guiDir, NOOP),

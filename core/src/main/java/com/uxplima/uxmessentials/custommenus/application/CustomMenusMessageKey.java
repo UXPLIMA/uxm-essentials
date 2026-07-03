@@ -510,7 +510,25 @@ public enum CustomMenusMessageKey implements MessageKey {
     MENU_COMMAND_USAGE("menu.command.usage"),
 
     /** Anvil prompt shown when the usage field asks for a usage line. */
-    MENU_COMMAND_USAGE_PROMPT("menu.command.usage-prompt");
+    MENU_COMMAND_USAGE_PROMPT("menu.command.usage-prompt"),
+
+    /** Name of the grid canvas's live-preview control button. */
+    MENU_GRID_PREVIEW("menu.editor.grid.preview"),
+
+    /** Reply when a viewer opens a menu another operator already has open in the editor ({@code {player}}). */
+    MENU_EDITOR_LOCKED("menu.editor.locked"),
+
+    /** Confirmation that the held item was captured into {@code {slot}} — {@code /menu captureitem} and grid drag. */
+    MENU_CAPTURE_CAPTURED("menu.capture.captured"),
+
+    /** Reply for {@code /menu captureitem} when the sender is not holding an item. */
+    MENU_CAPTURE_EMPTY_HAND("menu.capture.empty-hand"),
+
+    /** Reply for {@code /menu captureitem} when the sender has no menu open in the slot-grid editor. */
+    MENU_CAPTURE_NO_SESSION("menu.capture.no-session"),
+
+    /** Reply for {@code /menu captureitem} when {@code {slot}} is past the menu's {@code {max}} slots. */
+    MENU_CAPTURE_BAD_SLOT("menu.capture.bad-slot");
 
     private final String key;
 

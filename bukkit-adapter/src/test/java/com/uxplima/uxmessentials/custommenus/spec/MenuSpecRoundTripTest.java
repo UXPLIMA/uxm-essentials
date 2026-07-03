@@ -6,10 +6,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -73,6 +78,35 @@ class MenuSpecRoundTripTest {
     @Test
     void bedrockFormRoundTrips() {
         assertRoundTrips(BEDROCK_FORM);
+    }
+
+    /**
+     * The editor's write path, end to end: a spec built up through {@link MenuEditSession} mutations — the very model
+     * the in-game editor drives — must survive write → re-load unchanged. This locks the edit-model → HOCON path against
+     * regression the way the golden cases above lock the loader → writer path, covering a captured {@code b64:} material
+     * token, a renamed item with lore and glow, an appended right-click action, and a resize.
+     */
+    @Test
+    void anEditorProducedSpecRoundTrips() {
+        MenuSpec base = loader.parse("""
+                rows = 3
+                items { x { slot = 0, material = STONE, click { left = ["close"] } } }
+                """);
+        MenuEditSession session = MenuEditSession.from(base);
+        session.setTitle("<gold>Edited menu");
+        session.setName("x", "<aqua>Renamed");
+        session.setLore("x", List.of("<gray>Line one", "<gray>Line two"));
+        session.setGlow("x", true);
+        // A capture stores the held item as a b64 token — the material the /menu captureitem and drag paths write.
+        session.setMaterial("x", "b64:cmVhbGx5LWFuLW9wYXF1ZS1zdGFjaw==");
+        session.addAction("x", ClickKind.RIGHT, Ref.parse("sound:UI_BUTTON_CLICK_1"));
+        session.addItem("y", base.items().get("x").withSlots(new SlotSet(List.of(5))));
+        session.setRows(4);
+
+        MenuSpec edited = session.toSpec();
+        MenuSpec reloaded = loader.parse(writer.write(edited));
+
+        assertThat(reloaded).isEqualTo(edited);
     }
 
     /** Parse, write, re-parse, and assert the two models are equal — the round-trip every case shares. */

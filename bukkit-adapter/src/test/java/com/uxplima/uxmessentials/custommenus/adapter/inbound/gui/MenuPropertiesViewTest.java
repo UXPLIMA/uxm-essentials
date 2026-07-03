@@ -23,6 +23,7 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
@@ -150,6 +151,7 @@ class MenuPropertiesViewTest {
                 scheduler,
                 new KeyMessages(),
                 service,
+                new MenuEditLocks(),
                 menus::registeredSpec,
                 name -> Optional.empty(),
                 (name, command) -> {},

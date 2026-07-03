@@ -83,7 +83,7 @@ class CustomMenusWiringTest {
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.commands().getFirst().build().getLiteral()).isEqualTo("menu");
         assertThat(wired.menuNames().get()).contains("example", "hub");
-        assertThat(wired.listeners()).hasSize(3);
+        assertThat(wired.listeners()).hasSize(4); // opener interact + join + swap + edit-lock
     }
 
     @Test
@@ -134,7 +134,7 @@ class CustomMenusWiringTest {
 
         assertThat(wired.commands()).hasSize(1);
         assertThat(wired.menuNames().get()).isEmpty();
-        assertThat(wired.listeners()).hasSize(3);
+        assertThat(wired.listeners()).hasSize(4); // opener interact + join + swap + edit-lock
     }
 
     @Test
@@ -163,7 +163,7 @@ class CustomMenusWiringTest {
         // openers.conf is reserved for opener config: it must not appear as a loaded menu name, and it arms the
         // two opener listeners rather than being skipped as a malformed menu spec.
         assertThat(wired.menuNames().get()).containsExactly("hub");
-        assertThat(wired.listeners()).hasSize(3);
+        assertThat(wired.listeners()).hasSize(4); // opener interact + join + swap + edit-lock
     }
 
     /** The generic vocabulary registry exactly as PluginModule installs it at startup (console dispatch off). */

@@ -967,6 +967,10 @@ public final class MenuListener implements Listener {
         if (event.getInventory().getHolder() instanceof MenuHolder holder) {
             closeMenu(holder);
             restoreBottom(holder, event.getPlayer());
+            // A preview window carries a close hook that steps the operator back to the grid editor; the reopen it runs
+            // funnels through the scheduler, so it is deferred off this close event rather than opening a window inside
+            // it. Every non-preview menu carries no hook, so this is a no-op for them.
+            holder.fireCloseHook();
         }
     }
 

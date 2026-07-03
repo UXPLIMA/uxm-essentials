@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.ObjIntConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -21,6 +22,7 @@ import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSele
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -83,6 +85,7 @@ public final class MenuCommand implements CommandRegistration {
     private final MenuSpecPersistence persistence;
     private final Function<String, Optional<OpenCommandSpec>> openCommandFor;
     private final Consumer<Player> openEditor;
+    private final ObjIntConsumer<Player> captureItem;
     private final Path menusDir;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
@@ -99,6 +102,7 @@ public final class MenuCommand implements CommandRegistration {
             MenuSpecPersistence persistence,
             Function<String, Optional<OpenCommandSpec>> openCommandFor,
             Consumer<Player> openEditor,
+            ObjIntConsumer<Player> captureItem,
             Path menusDir,
             Scheduler scheduler,
             Messages messages) {
@@ -113,6 +117,7 @@ public final class MenuCommand implements CommandRegistration {
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.openCommandFor = Objects.requireNonNull(openCommandFor, "openCommandFor");
         this.openEditor = Objects.requireNonNull(openEditor, "openEditor");
+        this.captureItem = Objects.requireNonNull(captureItem, "captureItem");
         this.menusDir = Objects.requireNonNull(menusDir, "menusDir");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
@@ -151,6 +156,10 @@ public final class MenuCommand implements CommandRegistration {
                 .then(Commands.literal("editor")
                         .requires(src -> src.getSender().hasPermission(EDITOR))
                         .executes(this::editor))
+                .then(Commands.literal("captureitem")
+                        .requires(src -> src.getSender().hasPermission(EDITOR))
+                        .then(Commands.argument("slot", IntegerArgumentType.integer(0))
+                                .executes(this::captureItem)))
                 .then(Commands.literal("convert")
                         .requires(src -> src.getSender().hasPermission(ADMIN))
                         .then(Commands.literal("deluxemenus")
@@ -170,7 +179,7 @@ public final class MenuCommand implements CommandRegistration {
 
     @Override
     public String description() {
-        return "Open, list, reload, execute, dump, save, edit, and convert operator custom menus.";
+        return "Open, list, reload, execute, dump, save, edit, capture into, and convert operator custom menus.";
     }
 
     /** The {@code <name>} argument, completed from the currently registered menu names. */
@@ -473,6 +482,24 @@ public final class MenuCommand implements CommandRegistration {
             return 0;
         }
         openEditor.accept(player);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Capture the sender's main-hand item into {@code <slot>} of the menu they are editing — {@code /menu captureitem
+     * <slot>}, gated by {@code uxmessentials.menu.editor}. A held item is captured with all its NBT (mirroring
+     * {@code /hologram action … give hand}) and written into the slot of the viewer's active grid session. Only a
+     * player has a hand and an edit session, so the console meets the shared players-only line; the capture hook itself
+     * answers an empty hand, a slot past the menu, or no active session with the matching editor line and changes
+     * nothing. The hook re-opens the grid on the viewer's own entity thread, so the redraw stays Folia-safe.
+     */
+    private int captureItem(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player player)) {
+            feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
+            return 0;
+        }
+        captureItem.accept(player, IntegerArgumentType.getInteger(ctx, "slot"));
         return Command.SINGLE_SUCCESS;
     }
 

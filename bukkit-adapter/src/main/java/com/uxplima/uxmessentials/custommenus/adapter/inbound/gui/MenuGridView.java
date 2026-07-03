@@ -16,6 +16,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutcome;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
@@ -33,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSp
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -61,14 +63,21 @@ public final class MenuGridView {
     /** The material a freshly placed item starts as — a neutral stone the operator then re-skins in the item editor. */
     private static final String DEFAULT_MATERIAL = "STONE";
 
+    /** The 36 viewer-inventory slots a bottom-inventory menu addresses on top of its {@code rows * 9} chest slots. */
+    private static final int BOTTOM_SLOTS = 36;
+
     private static final Material EMPTY_ICON = Material.LIGHT_GRAY_STAINED_GLASS_PANE;
     private static final Material BLOCKER_ICON = Material.GRAY_STAINED_GLASS_PANE;
     private static final Material BACK_ICON = Material.BARRIER;
     private static final Material SAVE_ICON = Material.EMERALD;
+    private static final Material PREVIEW_ICON = Material.SPYGLASS;
     private static final Material NAV_ICON = Material.ARROW;
 
     /** The control-row column the back button sits in (columns 0 and 8 are the engine's prev/next). */
     private static final int BACK_COLUMN = 3;
+
+    /** The control-row column the live-preview button sits in, between back and save. */
+    private static final int PREVIEW_COLUMN = 4;
 
     /** The control-row column the save button sits in. */
     private static final int SAVE_COLUMN = 5;
@@ -77,6 +86,7 @@ public final class MenuGridView {
     private final GuiText guiText;
     private final Scheduler scheduler;
     private final MenuEditorService service;
+    private final MenuEditLocks locks;
     private final Function<String, Optional<MenuSpec>> specOf;
     private final BiConsumer<Player, String> onBack;
     private final MenuItemEditorView itemEditor;
@@ -89,6 +99,7 @@ public final class MenuGridView {
             GuiText guiText,
             Scheduler scheduler,
             MenuEditorService service,
+            MenuEditLocks locks,
             Function<String, Optional<MenuSpec>> specOf,
             BiConsumer<Player, String> onBack,
             MenuItemEditorView itemEditor) {
@@ -96,14 +107,17 @@ public final class MenuGridView {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.service = Objects.requireNonNull(service, "service");
+        this.locks = Objects.requireNonNull(locks, "locks");
         this.specOf = Objects.requireNonNull(specOf, "specOf");
         this.onBack = Objects.requireNonNull(onBack, "onBack");
         this.itemEditor = Objects.requireNonNull(itemEditor, "itemEditor");
     }
 
     /**
-     * Open the slot grid for {@code menuId}: clone the registered spec into a fresh edit session for this viewer, then
-     * show the canvas. A menu that is no longer registered simply tells the viewer so and opens nothing.
+     * Open the slot grid for {@code menuId}: take the menu's edit lock, clone the registered spec into a fresh edit
+     * session for this viewer, then show the canvas. A menu that is no longer registered simply tells the viewer so and
+     * opens nothing; a menu another operator already has open in the editor is refused with a "being edited by …" line,
+     * so two sessions can never edit — and then save over — the same menu.
      */
     public void open(Player player, PlayerRef viewer, String menuId) {
         Objects.requireNonNull(player, "player");
@@ -112,6 +126,12 @@ public final class MenuGridView {
         MenuSpec spec = specOf.apply(menuId).orElse(null);
         if (spec == null) {
             player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", menuId)));
+            return;
+        }
+        Optional<String> lockedBy = locks.tryAcquire(menuId, viewer.uuid(), viewer.name());
+        if (lockedBy.isPresent()) {
+            player.sendMessage(
+                    guiText.text(viewer, CustomMenusMessageKey.MENU_EDITOR_LOCKED, Map.of("player", lockedBy.get())));
             return;
         }
         GridEditState state = new GridEditState(menuId, MenuEditSession.from(spec));
@@ -136,6 +156,50 @@ public final class MenuGridView {
         }
     }
 
+    /**
+     * Capture the player's main-hand item into {@code slot} of the menu they are currently editing — the body of
+     * {@code /menu captureitem <slot>}. It resolves the viewer's live grid session (the working copy they opened, which
+     * survives closing the grid window to type the command), copies the held item with all its NBT into a {@code b64:}
+     * token, and either updates the material of whatever item already occupies the slot or adds a fresh one there. It
+     * then re-opens the grid so the change is visible. An empty hand, no active session, or a slot past the menu each
+     * reply with the matching line and change nothing.
+     */
+    public void captureHeldItem(Player player, PlayerRef viewer, int slot) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        GridEditState state = states.get(viewer.uuid());
+        if (state == null) {
+            player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_CAPTURE_NO_SESSION));
+            return;
+        }
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand.getType().isAir()) {
+            player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_CAPTURE_EMPTY_HAND));
+            return;
+        }
+        int capacity = state.session.rows() * 9 + (state.session.bottomInventory() ? BOTTOM_SLOTS : 0);
+        if (slot < 0 || slot >= capacity) {
+            player.sendMessage(guiText.text(
+                    viewer,
+                    CustomMenusMessageKey.MENU_CAPTURE_BAD_SLOT,
+                    Map.of("slot", Integer.toString(slot), "max", Integer.toString(capacity))));
+            return;
+        }
+        applyCapture(state, slot, SerializedItems.encode(hand));
+        player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_CAPTURE_CAPTURED, slot(slot)));
+        showGrid(viewer, state);
+    }
+
+    /** Set the material of the item already at {@code slot}, or add a fresh captured item there when the slot is empty. */
+    private void applyCapture(GridEditState state, int slot, String token) {
+        String id = idAt(state.session, slot);
+        if (id != null) {
+            state.session.setMaterial(id, token);
+        } else {
+            state.session.addItem(freshId(state.session), capturedItem(slot, token));
+        }
+    }
+
     /** Build the grid spec from the current session and open it through the engine; reused on every re-open. */
     private void showGrid(PlayerRef viewer, GridEditState state) {
         GridSpec spec = new GridSpec(
@@ -156,7 +220,7 @@ public final class MenuGridView {
         return Map.of("name", state.menuId, "rows", Integer.toString(state.session.rows()));
     }
 
-    /** The control-row buttons: back to the overview, and save the edited session over the P0 write path. */
+    /** The control-row buttons: back to the overview, a live preview of the working copy, and save over the P0 path. */
     private List<GridSpec.Control> controls(PlayerRef viewer, GridEditState state) {
         return List.of(
                 new GridSpec.Control(
@@ -164,9 +228,23 @@ public final class MenuGridView {
                         icon(viewer, BACK_ICON, CustomMenusMessageKey.MENU_GRID_BACK),
                         player -> onBack.accept(player, state.menuId)),
                 new GridSpec.Control(
+                        PREVIEW_COLUMN,
+                        icon(viewer, PREVIEW_ICON, CustomMenusMessageKey.MENU_GRID_PREVIEW),
+                        player -> preview(viewer, state)),
+                new GridSpec.Control(
                         SAVE_COLUMN,
                         icon(viewer, SAVE_ICON, CustomMenusMessageKey.MENU_GRID_SAVE),
                         player -> saveGrid(player, viewer, state)));
+    }
+
+    /**
+     * Open the working copy as a live preview through the engine — the real renderer paints {@code session.toSpec()}
+     * exactly as a player would see it, without touching disk — so the operator can look over their unsaved edits.
+     * Closing the preview steps back to this grid (the engine's close hook), and the working copy is unchanged, so no
+     * edit is lost by looking.
+     */
+    private void preview(PlayerRef viewer, GridEditState state) {
+        menus.openPreview(viewer, state.session.toSpec(), () -> reopenGrid(viewer));
     }
 
     /**
@@ -190,7 +268,8 @@ public final class MenuGridView {
      * Route a content-cell click. A pending pick-up takes priority — the next click drops it onto the clicked cell
      * (moving, or swapping with whatever is there). Otherwise a shift-click clears a filled cell (behind a confirm), a
      * right-click picks a filled cell up, a left-click on a filled cell opens its item editor (a P3 seam), and a
-     * left-click on an empty cell adds a default item and opens that seam for it.
+     * left-click on an empty cell either captures the operator's held item into it (the quick drag-from-hand path) or,
+     * with an empty hand, adds a default item and opens that seam for it.
      */
     private void onSlot(
             PlayerRef viewer,
@@ -219,8 +298,31 @@ public final class MenuGridView {
         if (filled) {
             openSlotEditor(viewer, state, player, menuSlot);
         } else {
-            addDefault(viewer, state, view, player, menuSlot);
+            addAtEmpty(viewer, state, view, player, menuSlot);
         }
+    }
+
+    /**
+     * Fill an empty cell. Holding an item is the quick capture path: the held item (all its NBT) drops straight into
+     * the cell as a {@code b64:} token and the grid re-renders — no item editor, a one-click way to lay a hotbar item
+     * into a slot. An empty hand instead adds a plain default item and opens its editor, the P3 detailed path.
+     */
+    private void addAtEmpty(PlayerRef viewer, GridEditState state, GridView view, Player player, int menuSlot) {
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand.getType().isAir()) {
+            addDefault(viewer, state, view, player, menuSlot);
+        } else {
+            captureIntoEmpty(viewer, state, view, player, menuSlot, hand);
+        }
+    }
+
+    /** Drop the held item into a fresh cell as a serialized token, tell the viewer, and re-render — no item editor. */
+    private void captureIntoEmpty(
+            PlayerRef viewer, GridEditState state, GridView view, Player player, int menuSlot, ItemStack hand) {
+        String id = freshId(state.session);
+        state.session.addItem(id, capturedItem(menuSlot, SerializedItems.encode(hand)));
+        player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_CAPTURE_CAPTURED, slot(menuSlot)));
+        view.reRender();
     }
 
     /** Pick up the item at {@code menuSlot}, glowing it and waiting for the next click to place it. */
@@ -353,6 +455,11 @@ public final class MenuGridView {
                 false,
                 Optional.empty(),
                 ItemType.NONE);
+    }
+
+    /** A minimal item at {@code menuSlot} carrying {@code material} — a captured {@code b64:} token or any token. */
+    private static MenuItemSpec capturedItem(int menuSlot, String material) {
+        return defaultItem(menuSlot).withMaterial(material);
     }
 
     /** A copy of {@code item} with its enchant glow on — how the picked-up cell is shown as selected on the canvas. */

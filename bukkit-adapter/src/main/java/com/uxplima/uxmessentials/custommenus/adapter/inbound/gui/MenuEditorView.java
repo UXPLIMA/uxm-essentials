@@ -14,6 +14,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutcome;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
@@ -75,6 +76,7 @@ public final class MenuEditorView {
     private final Scheduler scheduler;
     private final Messages messages;
     private final MenuEditorService service;
+    private final MenuEditLocks locks;
     private final Function<String, Optional<MenuSpec>> specOf;
     private final TextInput textInput;
     private final BiConsumer<Player, String> openGrid;
@@ -88,6 +90,7 @@ public final class MenuEditorView {
             Scheduler scheduler,
             Messages messages,
             MenuEditorService service,
+            MenuEditLocks locks,
             Supplier<List<String>> menuNames,
             Function<String, Optional<MenuSpec>> specOf,
             GuiLayouts guiLayouts,
@@ -99,6 +102,7 @@ public final class MenuEditorView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.service = Objects.requireNonNull(service, "service");
+        this.locks = Objects.requireNonNull(locks, "locks");
         Objects.requireNonNull(menuNames, "menuNames");
         this.specOf = Objects.requireNonNull(specOf, "specOf");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
@@ -147,13 +151,19 @@ public final class MenuEditorView {
                 .build();
     }
 
-    /** Open the menu picker for {@code player}; the framework schedules it on the viewer's entity thread. */
+    /**
+     * Open the menu picker for {@code player}; the framework schedules it on the viewer's entity thread. Arriving at
+     * the browser means the viewer is no longer editing a specific menu, so their edit lock (if any) is released here —
+     * this is the "done with this menu" signal, alongside the quit hook.
+     */
     public void open(Player player, PlayerRef viewer) {
+        locks.release(viewer.uuid());
         list.open(player, viewer);
     }
 
-    /** Reopen the picker — the overview's back target, read at click time so the list field is already assigned. */
+    /** Reopen the picker — the overview's back target, releasing the viewer's edit lock as the browser is the root. */
     private void openList(Player player, PlayerRef viewer) {
+        locks.release(viewer.uuid());
         list.open(player, viewer);
     }
 

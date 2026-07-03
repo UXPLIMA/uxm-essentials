@@ -39,6 +39,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -147,7 +149,37 @@ class MenusGridTest {
         assertThat(lastSlot.get()).containsExactly(50, 1); // the un-paged menu slot reaches the handler
     }
 
+    @Test
+    void aPreviewRendersASpecAsAPlayerSeesItWithoutRegisteringIt() {
+        MenuSpec spec = previewSpec();
+        menus.openPreview(viewer, spec, () -> {});
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(((MenuHolder) inv.getHolder()).specId()).startsWith("preview:");
+        assertThat(inv.getSize()).isEqualTo(9); // the real 1-row menu
+        assertThat(inv.getItem(0).getType()).isEqualTo(Material.DIAMOND);
+        // A preview is not registered, so no spec is queryable under its synthetic id.
+        assertThat(menus.registeredSpec(((MenuHolder) inv.getHolder()).specId()))
+                .isEmpty();
+    }
+
+    @Test
+    void closingAPreviewFiresItsCloseHookExactlyOnce() {
+        AtomicReference<Integer> closes = new AtomicReference<>(0);
+        menus.openPreview(viewer, previewSpec(), () -> closes.updateAndGet(n -> n + 1));
+
+        player.closeInventory(); // the grid editor wires this hook to reopenGrid — the "back to editor" path
+
+        assertThat(closes.get()).isEqualTo(1);
+    }
+
     // --- helpers ---
+
+    private static MenuSpec previewSpec() {
+        return new MenuSpec(
+                "", 1, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of("x", item("DIAMOND")));
+    }
 
     private GridSpec spec(
             int rows,

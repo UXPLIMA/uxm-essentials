@@ -93,6 +93,7 @@ class MenuCommandTest {
     private final AtomicReference<String> executedFor = new AtomicReference<>();
     private final AtomicReference<String> executedArg = new AtomicReference<>();
     private final AtomicReference<String> editorOpenedFor = new AtomicReference<>();
+    private final AtomicReference<String> capturedSlotFor = new AtomicReference<>();
 
     @TempDir
     Path menusDir;
@@ -441,6 +442,29 @@ class MenuCommandTest {
     }
 
     @Test
+    void captureItemRoutesTheSlotToTheCaptureHook() {
+        execute("menu captureitem 5", player);
+
+        assertThat(capturedSlotFor.get()).isEqualTo("Operator:5");
+    }
+
+    @Test
+    void captureItemFromConsoleRepliesPlayersOnly() {
+        execute("menu captureitem 5", server.getConsoleSender());
+
+        assertThat(messages.keys).contains("command.players-only");
+        assertThat(capturedSlotFor.get()).isNull();
+    }
+
+    @Test
+    void captureItemIsGatedByTheEditorPermission() {
+        PlayerMock plain = server.addPlayer("NoPerms"); // holds no editor node, so the branch stays hidden
+        executeExpectingDenial("menu captureitem 5", plain);
+
+        assertThat(capturedSlotFor.get()).isNull();
+    }
+
+    @Test
     void convertDeluxeMenusWritesAConfAndReportsTheCounts() throws Exception {
         Files.writeString(
                 menusDir.resolve("shop.yml"),
@@ -725,6 +749,7 @@ class MenuCommandTest {
                 persistence,
                 name -> java.util.Optional.ofNullable(openCommands.get(name)),
                 player -> editorOpenedFor.set(player.getName()),
+                (player, slot) -> capturedSlotFor.set(player.getName() + ":" + slot),
                 menusDir,
                 new SyncScheduler(),
                 messages);

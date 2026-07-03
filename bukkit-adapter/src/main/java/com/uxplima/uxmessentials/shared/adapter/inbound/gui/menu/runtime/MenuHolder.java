@@ -40,6 +40,13 @@ public final class MenuHolder implements InventoryHolder {
 
     @Nullable private Cancellable refreshHandle;
 
+    /**
+     * Set only on a preview open: the callback the engine runs once when this window closes, so the menu editor's
+     * live preview returns the operator to the grid editor. An ordinary menu leaves it null and the close is a plain
+     * teardown; a preview sets it and the close path fires it exactly once.
+     */
+    @Nullable private Runnable closeHook;
+
     @Nullable private Inventory inventory;
 
     /**
@@ -228,6 +235,25 @@ public final class MenuHolder implements InventoryHolder {
     /** The saved real bottom inventory of a bottom-inventory menu, or null for an ordinary menu / after a restore. */
     public @Nullable ItemStack @Nullable [] bottomSnapshot() {
         return bottomSnapshot == null ? null : bottomSnapshot.clone();
+    }
+
+    /** Attaches the close callback for a preview open; every other menu kind never calls this and leaves it null. */
+    public void attachCloseHook(Runnable hook) {
+        this.closeHook = Objects.requireNonNull(hook, "hook");
+    }
+
+    /**
+     * Run this window's close callback, if it has one, exactly once — the seam the menu editor's live preview uses to
+     * step back to the grid editor when the preview closes. The hook is cleared before it runs, so a double close (a
+     * close immediately followed by a quit close) can never re-run it. A menu with no hook (every non-preview menu) is
+     * a harmless no-op.
+     */
+    public void fireCloseHook() {
+        Runnable hook = closeHook;
+        if (hook != null) {
+            closeHook = null;
+            hook.run();
+        }
     }
 
     public void setRefreshHandle(Cancellable handle) {

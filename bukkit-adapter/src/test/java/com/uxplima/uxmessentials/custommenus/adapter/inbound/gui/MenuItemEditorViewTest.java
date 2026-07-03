@@ -25,6 +25,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
+import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
@@ -168,7 +169,15 @@ class MenuItemEditorViewTest {
                 clickActions,
                 requirements);
         itemEditorRef.set(itemEditor);
-        grid = new MenuGridView(menus, guiText, scheduler, service, menus::registeredSpec, (p, id) -> {}, itemEditor);
+        grid = new MenuGridView(
+                menus,
+                guiText,
+                scheduler,
+                service,
+                new MenuEditLocks(),
+                menus::registeredSpec,
+                (p, id) -> {},
+                itemEditor);
         gridRef.set(grid);
     }
 
