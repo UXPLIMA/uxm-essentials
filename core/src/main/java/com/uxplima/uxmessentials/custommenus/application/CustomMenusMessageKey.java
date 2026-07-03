@@ -128,8 +128,11 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Title of the slot-grid canvas ({@code {name}{rows}}). */
     MENU_GRID_TITLE("menu.editor.grid.title"),
 
-    /** Name of an empty cell's placeholder on the grid canvas — click to add an item. */
+    /** Name of an empty cell's placeholder on the grid canvas. */
     MENU_GRID_EMPTY("menu.editor.grid.empty"),
+
+    /** Lore of an empty cell's placeholder — the "click to add an item" hint, kept off the display name. */
+    MENU_GRID_EMPTY_LORE("menu.editor.grid.empty-lore"),
 
     /** Name of the grid canvas's back-to-overview control button. */
     MENU_GRID_BACK("menu.editor.grid.back"),

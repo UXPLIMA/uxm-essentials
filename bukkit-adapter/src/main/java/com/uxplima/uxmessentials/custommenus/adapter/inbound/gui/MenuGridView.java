@@ -212,7 +212,7 @@ public final class MenuGridView {
                 guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_TITLE, titlePlaceholders(state)),
                 state.session.rows(),
                 () -> contentOf(state),
-                icon(viewer, EMPTY_ICON, CustomMenusMessageKey.MENU_GRID_EMPTY),
+                emptyIcon(viewer),
                 ItemBuilder.of(BLOCKER_ICON).name(Component.empty()).build(),
                 icon(viewer, NAV_ICON, GuiMessageKey.PAGE_PREVIOUS),
                 icon(viewer, NAV_ICON, GuiMessageKey.PAGE_NEXT),
@@ -471,6 +471,17 @@ public final class MenuGridView {
     /** A control / placeholder icon of {@code material} named from the viewer's catalog, carrying no inline literal. */
     private ItemStack icon(PlayerRef viewer, Material material, MessageKey name) {
         return ItemBuilder.of(material).name(guiText.text(viewer, name)).build();
+    }
+
+    /**
+     * The empty-cell placeholder: a one-word name plus the "click to add" hint on a separate lore line. The hint lives
+     * in lore, not the name — a display name can't hold a line break, so folding it in rendered as a stray glyph box.
+     */
+    private ItemStack emptyIcon(PlayerRef viewer) {
+        return ItemBuilder.of(EMPTY_ICON)
+                .name(guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_EMPTY))
+                .lore(guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_EMPTY_LORE))
+                .build();
     }
 
     private static Map<String, String> slot(int menuSlot) {
