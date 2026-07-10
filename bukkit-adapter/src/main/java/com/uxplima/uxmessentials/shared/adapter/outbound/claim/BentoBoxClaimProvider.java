@@ -86,7 +86,7 @@ public final class BentoBoxClaimProvider implements ClaimProvider {
                 return Optional.empty();
             }
             return Optional.of(new BentoBoxClaimLookup(new ReflectiveIslandView(island)));
-        } catch (ReflectiveOperationException | RuntimeException failure) {
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
             degrade(failure);
             return Optional.empty();
         }
@@ -105,7 +105,12 @@ public final class BentoBoxClaimProvider implements ClaimProvider {
         return result instanceof Optional<?> island ? island.orElse(null) : null;
     }
 
-    private void degrade(Exception failure) {
+    /**
+     * Log the first lookup failure and go quiet. Catches a {@link LinkageError} as well as a reflective or runtime
+     * failure: a present-but-version-mismatched claim plugin can throw {@code NoClassDefFoundError} mid-reflection, and
+     * a claim gate must degrade to "unclaimed" rather than crash the caller.
+     */
+    private void degrade(Throwable failure) {
         if (warned.compareAndSet(false, true)) {
             log.warn("event=claim_lookup_failed provider=bentobox reason={}", failure.toString());
         }
@@ -141,7 +146,7 @@ public final class BentoBoxClaimProvider implements ClaimProvider {
             try {
                 Object owner = island.getClass().getMethod("getOwner").invoke(island);
                 return owner instanceof UUID id ? Optional.of(id) : Optional.empty();
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return Optional.empty();
             }
@@ -152,7 +157,7 @@ public final class BentoBoxClaimProvider implements ClaimProvider {
             try {
                 Object members = island.getClass().getMethod("getMemberSet").invoke(island);
                 return members instanceof Set<?> set && set.contains(player);
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return false;
             }
@@ -164,7 +169,7 @@ public final class BentoBoxClaimProvider implements ClaimProvider {
                 Object banned =
                         island.getClass().getMethod("isBanned", UUID.class).invoke(island, player);
                 return Boolean.TRUE.equals(banned);
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return false;
             }

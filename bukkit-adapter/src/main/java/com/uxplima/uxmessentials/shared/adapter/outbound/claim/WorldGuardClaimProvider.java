@@ -89,7 +89,7 @@ public final class WorldGuardClaimProvider implements ClaimProvider {
             Location location = new Location(bukkitWorld, blockX, CLAIM_LOOKUP_Y, blockZ);
             List<RegionView> named = namedRegions(coveringRegionViews(location));
             return named.isEmpty() ? Optional.empty() : Optional.of(new WorldGuardClaimLookup(named));
-        } catch (ReflectiveOperationException | RuntimeException failure) {
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
             degrade(failure);
             return Optional.empty();
         }
@@ -157,7 +157,12 @@ public final class WorldGuardClaimProvider implements ClaimProvider {
         throw new NoSuchMethodException("getApplicableRegions");
     }
 
-    private void degrade(Exception failure) {
+    /**
+     * Log the first lookup failure and go quiet. Catches a {@link LinkageError} as well as a reflective or runtime
+     * failure: a present-but-version-mismatched claim plugin can throw {@code NoClassDefFoundError} mid-reflection, and
+     * a claim gate must degrade to "unclaimed" rather than crash the caller.
+     */
+    private void degrade(Throwable failure) {
         if (warned.compareAndSet(false, true)) {
             log.warn("event=claim_lookup_failed provider=worldguard reason={}", failure.toString());
         }
@@ -211,7 +216,7 @@ public final class WorldGuardClaimProvider implements ClaimProvider {
                 Object contains =
                         domain.getClass().getMethod("contains", UUID.class).invoke(domain, player);
                 return Boolean.TRUE.equals(contains);
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return false;
             }

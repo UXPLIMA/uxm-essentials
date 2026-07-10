@@ -85,7 +85,7 @@ public final class TownyClaimProvider implements ClaimProvider {
                 return Optional.empty();
             }
             return Optional.of(new TownyClaimLookup(new ReflectivePlotView(api, townBlock)));
-        } catch (ReflectiveOperationException | RuntimeException failure) {
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
             degrade(failure);
             return Optional.empty();
         }
@@ -101,7 +101,12 @@ public final class TownyClaimProvider implements ClaimProvider {
         return api.getClass().getMethod("getTownBlock", Location.class).invoke(api, location);
     }
 
-    private void degrade(Exception failure) {
+    /**
+     * Log the first lookup failure and go quiet. Catches a {@link LinkageError} as well as a reflective or runtime
+     * failure: a present-but-version-mismatched claim plugin can throw {@code NoClassDefFoundError} mid-reflection, and
+     * a claim gate must degrade to "unclaimed" rather than crash the caller.
+     */
+    private void degrade(Throwable failure) {
         if (warned.compareAndSet(false, true)) {
             log.warn("event=claim_lookup_failed provider=towny reason={}", failure.toString());
         }
@@ -143,7 +148,7 @@ public final class TownyClaimProvider implements ClaimProvider {
                 Object resident =
                         townBlock.getClass().getMethod("getResidentOrNull").invoke(townBlock);
                 return residentUuid(resident);
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return Optional.empty();
             }
@@ -157,7 +162,7 @@ public final class TownyClaimProvider implements ClaimProvider {
                     return Optional.empty();
                 }
                 return residentUuid(town.getClass().getMethod("getMayor").invoke(town));
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return Optional.empty();
             }
@@ -173,7 +178,7 @@ public final class TownyClaimProvider implements ClaimProvider {
                 Object answer =
                         town.getClass().getMethod("hasResident", UUID.class).invoke(town, player);
                 return Boolean.TRUE.equals(answer);
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return false;
             }
@@ -192,7 +197,7 @@ public final class TownyClaimProvider implements ClaimProvider {
                 Object answer =
                         town.getClass().getMethod("hasOutlaw", residentClass).invoke(town, resident);
                 return Boolean.TRUE.equals(answer);
-            } catch (ReflectiveOperationException | RuntimeException failure) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
                 degrade(failure);
                 return false;
             }
