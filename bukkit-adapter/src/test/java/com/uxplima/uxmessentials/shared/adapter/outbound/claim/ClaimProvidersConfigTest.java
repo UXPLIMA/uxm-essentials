@@ -43,6 +43,29 @@ class ClaimProvidersConfigTest {
     }
 
     @Test
+    void anUnknownCombineTokenWarnsAndFallsBackToAnyLand() {
+        // A mistyped combine must not silently loosen the gate from all-land to any-land without a word.
+        RecordingLogger log = new RecordingLogger();
+
+        ClaimProvidersConfig config = ClaimProvidersConfig.from(new Providers(Map.of(), "all_land"), log);
+
+        assertThat(config.combine()).isEqualTo(ClaimProvidersConfig.CombineMode.ANY_LAND);
+        assertThat(log.warnings).hasSize(1);
+        assertThat(log.warnings.get(0).args()).contains("all_land");
+        assertThat(log.warnings.get(0).message()).contains("claim_combine_unknown");
+    }
+
+    @Test
+    void aKnownCombineTokenDoesNotWarn() {
+        RecordingLogger log = new RecordingLogger();
+
+        ClaimProvidersConfig config = ClaimProvidersConfig.from(new Providers(Map.of(), "all-land"), log);
+
+        assertThat(config.combine()).isEqualTo(ClaimProvidersConfig.CombineMode.ALL_LAND);
+        assertThat(log.warnings).isEmpty();
+    }
+
+    @Test
     void aKnownKeyDoesNotWarnAndStillTakesEffect() {
         RecordingLogger log = new RecordingLogger();
 
@@ -68,9 +91,13 @@ class ClaimProvidersConfigTest {
     }
 
     /** A {@link ConfigStore} exposing exactly the given {@code claims.providers} keys and their boolean values. */
-    private record Providers(Map<String, Boolean> providers) implements ConfigStore {
+    private record Providers(Map<String, Boolean> providers, String combine) implements ConfigStore {
 
         private static final String PREFIX = "claims.providers.";
+
+        Providers(Map<String, Boolean> providers) {
+            this(providers, "any-land");
+        }
 
         @Override
         public boolean getBoolean(String path, boolean fallback) {
@@ -83,7 +110,7 @@ class ClaimProvidersConfigTest {
 
         @Override
         public String getString(String path, String fallback) {
-            return fallback;
+            return "claims.combine".equals(path) ? combine : fallback;
         }
 
         @Override

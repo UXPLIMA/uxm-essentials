@@ -68,8 +68,27 @@ public record ClaimProvidersConfig(Set<String> disabledProviders, CombineMode co
                 disabled.add(normalized);
             }
         }
-        CombineMode combine = CombineMode.fromConfig(config.getString(COMBINE_PATH, CombineMode.ANY_LAND.configName()));
-        return new ClaimProvidersConfig(disabled, combine);
+        String combineToken = config.getString(COMBINE_PATH, CombineMode.ANY_LAND.configName());
+        warnOnUnknownCombine(combineToken, log);
+        return new ClaimProvidersConfig(disabled, CombineMode.fromConfig(combineToken));
+    }
+
+    /**
+     * Warn when {@code claims.combine} is set to something neither {@code any-land} nor {@code all-land}. Left
+     * unwarned, a typo like {@code all_land} silently resolves to the more permissive {@code any-land}, quietly
+     * loosening a security-relevant knob — the same trap the unknown-provider-key warning guards against.
+     */
+    private static void warnOnUnknownCombine(String token, Logger log) {
+        String normalized = token.trim().toLowerCase(Locale.ROOT);
+        for (CombineMode mode : CombineMode.values()) {
+            if (mode.configName().equals(normalized)) {
+                return;
+            }
+        }
+        log.warn(
+                "event=claim_combine_unknown value={} known=[any-land, all-land]: unrecognised claims.combine, "
+                        + "falling back to any-land; check the spelling",
+                token);
     }
 
     /** Whether the provider registered under {@code key} may be consulted; one absent from config is on by default. */
