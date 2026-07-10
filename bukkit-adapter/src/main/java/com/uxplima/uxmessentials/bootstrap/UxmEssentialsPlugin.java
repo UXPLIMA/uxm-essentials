@@ -10,6 +10,7 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlagRegistrar;
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardSetPwarpFlagRegistrar;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -28,16 +29,17 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
     private @Nullable CloseableResources resources;
 
     /**
-     * Registers the poses context's WorldGuard custom flags before any plugin is enabled. WorldGuard locks its flag
-     * registry the moment it enables, so registration has to happen in the load phase — and a Paper
+     * Registers our WorldGuard custom flags before any plugin is enabled. WorldGuard locks its flag registry the moment
+     * it enables, so registration has to happen in the load phase — and a Paper
      * {@link io.papermc.paper.plugin.bootstrap.PluginBootstrap} runs even earlier, before WorldGuard has created that
-     * registry, so {@code onLoad} is the correct hook. The call is a silent no-op when WorldGuard is absent (it never
-     * loads a WorldGuard class on a server without it), so it is safe to run unconditionally here, before the module
-     * registry that decides whether poses is enabled even exists.
+     * registry, so {@code onLoad} is the correct hook. Each call is a silent no-op when WorldGuard is absent (it never
+     * loads a WorldGuard class on a server without it), so both are safe to run unconditionally here, before the module
+     * registry that decides whether a feature is enabled even exists.
      */
     @Override
     public void onLoad() {
         WorldGuardPoseFlagRegistrar.register(getServer(), getLogger());
+        WorldGuardSetPwarpFlagRegistrar.register(getServer(), getLogger());
     }
 
     @Override
