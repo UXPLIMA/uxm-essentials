@@ -164,5 +164,15 @@ public final class HomesteadClaimProvider implements ClaimProvider {
                 return false;
             }
         }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            return player.equals(ownerId);
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            return Optional.ofNullable(ownerId);
+        }
     }
 }

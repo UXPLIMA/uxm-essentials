@@ -113,6 +113,11 @@ dependencies {
     testImplementation(libs.archunit.junit)
     testImplementation(libs.paper.api)
     testImplementation(libs.vault.api) // the migration live-feed tests stub a Vault Economy provider
+    // Lands and GriefPrevention on the test classpath so the ownership tests can stub a real Area/Claim and
+    // prove owner is distinct from trusted. Transitive-free: the SDK types only reference org.bukkit.*, which
+    // paper-api already provides — pulling each plugin's own spigot-api would collide with it.
+    testImplementation(libs.hook.lands) { isTransitive = false }
+    testImplementation(libs.hook.griefprevention) { isTransitive = false }
     testImplementation(libs.bundles.adventure)
     testImplementation(libs.bundles.configs)
     testImplementation(libs.bundles.db)

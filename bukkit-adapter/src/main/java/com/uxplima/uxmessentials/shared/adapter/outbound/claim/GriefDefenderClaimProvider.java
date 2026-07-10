@@ -168,5 +168,26 @@ public final class GriefDefenderClaimProvider implements ClaimProvider {
             // GriefDefender has no per-claim ban concept — access is expressed through trust and flags only.
             return false;
         }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            try {
+                return player.equals(requireHandle(getOwnerUniqueId).invoke(claim));
+            } catch (Throwable t) {
+                logUnavailableOnce(t);
+                return false;
+            }
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            try {
+                return Optional.ofNullable(
+                        (UUID) requireHandle(getOwnerUniqueId).invoke(claim));
+            } catch (Throwable t) {
+                logUnavailableOnce(t);
+                return Optional.empty();
+            }
+        }
     }
 }

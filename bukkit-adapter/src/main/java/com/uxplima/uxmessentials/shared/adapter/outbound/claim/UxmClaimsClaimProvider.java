@@ -22,7 +22,9 @@ import org.jspecify.annotations.Nullable;
  * <p>The API chain runs through the {@code UxmClaimsHook}: {@code UxmClaimBukkitAPI.getInstance()} →
  * {@code claimFacade()} → {@code findByLocation(new com.uxplima.claim.domain.model.vo.Location(world, x, y, z))}
  * → a {@code Claim} exposing {@code isOwner(UUID)}, {@code findMemberByUid(UUID)} (an {@link Optional}) and
- * {@code hasBanByUid(UUID)}. Trust is owner-or-member; ban is {@code hasBanByUid}.
+ * {@code hasBanByUid(UUID)}. Trust is owner-or-member; ownership is the {@code isOwner(UUID)} predicate; ban is
+ * {@code hasBanByUid}. The {@code Claim} exposes no single owner-UUID accessor, so {@link ClaimLookup#owner()}
+ * keeps its empty default while {@link ClaimLookup#isOwner(java.util.UUID)} still answers ownership.
  *
  * <p>{@link #active()} is {@code true} only when the API class resolves and {@code getInstance()} is non-null.
  * Reflective handles are resolved on first success and cached. Any reflective failure logs once and degrades
@@ -156,6 +158,16 @@ public final class UxmClaimsClaimProvider implements ClaimProvider {
         public boolean isBanned(UUID player) {
             try {
                 return Boolean.TRUE.equals(requireHandle(hasBanByUid).invoke(claim, player));
+            } catch (Throwable t) {
+                logUnavailableOnce(t);
+                return false;
+            }
+        }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            try {
+                return Boolean.TRUE.equals(requireHandle(isOwner).invoke(claim, player));
             } catch (Throwable t) {
                 logUnavailableOnce(t);
                 return false;

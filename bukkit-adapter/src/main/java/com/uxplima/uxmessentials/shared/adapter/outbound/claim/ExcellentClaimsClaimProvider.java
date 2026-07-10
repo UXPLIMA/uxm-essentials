@@ -163,5 +163,25 @@ public final class ExcellentClaimsClaimProvider implements ClaimProvider {
             // ExcellentClaims has no per-claim ban concept — access is owner/member/rank-permission only.
             return false;
         }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            try {
+                return player.equals(requireHandle(getOwnerId).invoke(claim));
+            } catch (Throwable t) {
+                logUnavailableOnce(t);
+                return false;
+            }
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            try {
+                return Optional.ofNullable((UUID) requireHandle(getOwnerId).invoke(claim));
+            } catch (Throwable t) {
+                logUnavailableOnce(t);
+                return Optional.empty();
+            }
+        }
     }
 }

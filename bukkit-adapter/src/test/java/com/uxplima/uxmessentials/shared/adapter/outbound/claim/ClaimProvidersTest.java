@@ -18,9 +18,10 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 
 /**
- * The claim-provider discoverer's plugin-present guard. With no claim plugin installed (the MockBukkit default,
- * and the case on the test classpath where the Lands/GriefPrevention SDKs are absent and uxmClaims is not
- * loaded) {@link ClaimProviders#detect} must bind an inactive provider whose {@code claimAt} is empty — and,
+ * The claim-provider discoverer's plugin-present guard. With no claim plugin registered (the MockBukkit
+ * default, with most claim SDKs also absent from the test classpath and uxmClaims not loaded — the Lands and
+ * GriefPrevention API types resolve only because the ownership tests stub them) {@link ClaimProviders#detect}
+ * must bind an inactive provider whose {@code claimAt} is empty — and,
  * crucially, probing each candidate must not throw {@link NoClassDefFoundError}, proving each typed provider
  * keeps its SDK references behind its own present-guard so merely constructing and asking {@code active()}
  * never force-loads a claim-plugin class.
@@ -50,9 +51,10 @@ class ClaimProvidersTest {
     @Test
     void detect_doesNotThrow_whenNoClaimPluginInstalled() {
         // The probe constructs every candidate (uxmClaims, Lands, GriefPrevention, GriefDefender,
-        // ExcellentClaims, SimpleClaimSystem, RClaim, XClaim, Homestead) and calls active() on each. None of
-        // those SDKs is on the test classpath, so this would throw NoClassDefFoundError if a provider touched
-        // its SDK before the present-guard. It must not.
+        // ExcellentClaims, SimpleClaimSystem, RClaim, XClaim, Homestead) and calls active() on each. Most of
+        // those SDKs are absent from the test classpath (Lands and GriefPrevention resolve only as ownership-
+        // test stubs), so a provider that touched an absent SDK before its present-guard would throw
+        // NoClassDefFoundError here. It must not.
         assertThatCode(() -> ClaimProviders.detect(plugin, server, noOpLog())).doesNotThrowAnyException();
     }
 

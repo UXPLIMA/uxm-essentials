@@ -113,5 +113,15 @@ public final class SimpleClaimSystemClaimProvider implements ClaimProvider {
         public boolean isBanned(UUID player) {
             return claim.isBanned(player);
         }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            return player.equals(claim.getUUID());
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            return Optional.ofNullable(claim.getUUID());
+        }
     }
 }

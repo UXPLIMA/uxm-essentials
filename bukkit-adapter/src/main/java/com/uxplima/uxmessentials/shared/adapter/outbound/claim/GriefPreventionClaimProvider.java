@@ -86,7 +86,7 @@ public final class GriefPreventionClaimProvider implements ClaimProvider {
     }
 
     /** Adapts a GriefPrevention {@link Claim} to the port's read-only claim view. */
-    private record GriefPreventionClaimLookup(Claim claim) implements ClaimLookup {
+    record GriefPreventionClaimLookup(Claim claim) implements ClaimLookup {
 
         @Override
         public boolean isTrusted(UUID player) {
@@ -101,6 +101,18 @@ public final class GriefPreventionClaimProvider implements ClaimProvider {
         public boolean isBanned(UUID player) {
             // GriefPrevention has no per-claim ban concept.
             return false;
+        }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            // An admin claim has a null owner, so no player owns it; player.equals(null) yields false.
+            return player.equals(claim.getOwnerID());
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            // Empty for an admin claim, which is collectively held and has no single owner UUID.
+            return Optional.ofNullable(claim.getOwnerID());
         }
     }
 }

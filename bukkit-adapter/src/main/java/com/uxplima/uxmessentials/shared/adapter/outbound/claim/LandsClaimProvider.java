@@ -100,7 +100,7 @@ public final class LandsClaimProvider implements ClaimProvider {
     }
 
     /** Adapts a Lands {@link Area} to the port's read-only claim view. */
-    private record LandsClaimLookup(Area area) implements ClaimLookup {
+    record LandsClaimLookup(Area area) implements ClaimLookup {
 
         @Override
         public boolean isTrusted(UUID player) {
@@ -110,6 +110,16 @@ public final class LandsClaimProvider implements ClaimProvider {
         @Override
         public boolean isBanned(UUID player) {
             return area.isBanned(player);
+        }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            return player.equals(area.getOwnerUID());
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            return Optional.ofNullable(area.getOwnerUID());
         }
     }
 }

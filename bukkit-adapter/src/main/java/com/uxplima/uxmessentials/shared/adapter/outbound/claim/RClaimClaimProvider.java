@@ -98,5 +98,15 @@ public final class RClaimClaimProvider implements ClaimProvider {
             // RClaim has no per-claim ban concept — access is modelled as membership/permission only.
             return false;
         }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            return claim.isOwner(player);
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            return Optional.ofNullable(claim.getOwner());
+        }
     }
 }

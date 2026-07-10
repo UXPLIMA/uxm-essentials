@@ -168,5 +168,32 @@ public final class XClaimClaimProvider implements ClaimProvider {
             // XClaim has no per-claim ban concept — access is a permission/trust deny-model only.
             return false;
         }
+
+        @Override
+        public boolean isOwner(UUID player) {
+            try {
+                Object owner = requireHandle(getOwner).invoke(claim);
+                return owner != null
+                        && player.equals(requireHandle(getOwnerUniqueId).invoke(owner));
+            } catch (Throwable t) {
+                logUnavailableOnce(t);
+                return false;
+            }
+        }
+
+        @Override
+        public Optional<UUID> owner() {
+            try {
+                Object owner = requireHandle(getOwner).invoke(claim);
+                if (owner == null) {
+                    return Optional.empty();
+                }
+                return Optional.ofNullable(
+                        (UUID) requireHandle(getOwnerUniqueId).invoke(owner));
+            } catch (Throwable t) {
+                logUnavailableOnce(t);
+                return Optional.empty();
+            }
+        }
     }
 }
