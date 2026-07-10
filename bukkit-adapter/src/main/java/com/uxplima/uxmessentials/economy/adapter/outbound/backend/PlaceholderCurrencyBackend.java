@@ -1,8 +1,11 @@
 package com.uxplima.uxmessentials.economy.adapter.outbound.backend;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.Server;
@@ -13,6 +16,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.Precision;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BoundedAwait;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -34,12 +38,18 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * {@code allow-nonatomic-recurring}. The sufficiency check still runs before every take, so a short balance is
  * rejected rather than handed a free purchase.
  *
- * <p>{@code Bukkit.dispatchCommand} is a main-thread API, so both commands hop onto the global region thread through
- * the injected {@link Scheduler}. The balance is resolved through {@link PlaceholderApiSupport}, so no
- * {@code me.clip.placeholderapi} type is named here and a server without PlaceholderAPI loads none of its classes; the
- * placeholder must resolve to a bare number, since {@link #balance} parses it with {@link BigDecimal}.
+ * <p>{@code Bukkit.dispatchCommand} and {@code PlaceholderAPI.setPlaceholders} are both tick-thread APIs, so the give
+ * and take commands and the balance read all reach the global region thread through the injected {@link Scheduler}. A
+ * balance read already on a tick thread resolves inline; otherwise it hops onto the global thread, completes a future,
+ * and waits with a short bound so a read can never wedge the command that made it — a stall degrades to zero. The
+ * resolve runs through {@link PlaceholderApiSupport}, so no {@code me.clip.placeholderapi} type is named here and a
+ * server without PlaceholderAPI loads none of its classes; the placeholder must resolve to a bare number, since
+ * {@link #balance} parses it with {@link BigDecimal}.
  */
 public final class PlaceholderCurrencyBackend implements CurrencyBackend {
+
+    /** A balance read must never wedge the command that made it; a stalled resolve degrades to zero after this. */
+    private static final Duration BALANCE_TIMEOUT = Duration.ofSeconds(2);
 
     private final String id;
     private final String balancePlaceholder;
@@ -50,9 +60,19 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
     private final Server server;
     private final Logger log;
     private final Scheduler scheduler;
+    private final BalanceReader reader;
     private final AtomicBoolean warned = new AtomicBoolean();
 
-    private PlaceholderCurrencyBackend(
+    /**
+     * Resolves a currency's balance placeholder for one player. Production supplies the {@link PlaceholderApiSupport}
+     * seam; a test supplies a fake so the positive path is covered without a live PlaceholderAPI.
+     */
+    @FunctionalInterface
+    interface BalanceReader {
+        String resolve(UUID player, String placeholder);
+    }
+
+    PlaceholderCurrencyBackend(
             String name,
             String balancePlaceholder,
             String giveCommand,
@@ -61,7 +81,8 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
             Precision precision,
             Server server,
             Logger log,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            BalanceReader reader) {
         this.id = "placeholder:" + Objects.requireNonNull(name, "name");
         this.balancePlaceholder = Objects.requireNonNull(balancePlaceholder, "balancePlaceholder");
         this.giveCommand = Objects.requireNonNull(giveCommand, "giveCommand");
@@ -71,13 +92,15 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
         this.server = Objects.requireNonNull(server, "server");
         this.log = Objects.requireNonNull(log, "log");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.reader = Objects.requireNonNull(reader, "reader");
     }
 
     /**
      * Build the backend from {@code backends.placeholder.<name>}. Both command templates are validated at load, so an
      * operator who copies a template carrying neither {@code %amount%} nor {@code %price%} gets a startup error naming
-     * the currency and the setting rather than a silent no-op at the first charge. {@code integral} selects whether the
-     * amount reaches the command as a whole number or at the currency's scale; {@code works-offline} defaults false.
+     * the currency and the setting rather than a silent no-op at the first charge. {@code integral} defaults false, so
+     * a money-like economy keeps its decimals unless the operator opts into whole units; {@code works-offline} defaults
+     * false.
      */
     public static CurrencyBackend fromConfig(
             String name, ConfigStore config, Server server, Logger log, Scheduler scheduler) {
@@ -92,10 +115,19 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
         String takeCommand = config.getString(root + ".take-command", "");
         validateCommand(name, "give-command", giveCommand);
         validateCommand(name, "take-command", takeCommand);
-        Precision precision = config.getBoolean(root + ".integral", true) ? Precision.INTEGRAL : Precision.DECIMAL;
+        Precision precision = config.getBoolean(root + ".integral", false) ? Precision.INTEGRAL : Precision.DECIMAL;
         boolean worksOffline = config.getBoolean(root + ".works-offline", false);
         return new PlaceholderCurrencyBackend(
-                name, balancePlaceholder, giveCommand, takeCommand, worksOffline, precision, server, log, scheduler);
+                name,
+                balancePlaceholder,
+                giveCommand,
+                takeCommand,
+                worksOffline,
+                precision,
+                server,
+                log,
+                scheduler,
+                (uuid, placeholder) -> PlaceholderApiSupport.messageBridge(uuid).apply(placeholder));
     }
 
     /** Substitute the player name and the amount; both {@code %amount%} and {@code %price%} are honoured. */
@@ -142,15 +174,43 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
     public Money balance(PlayerRef owner, Currency currency) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(currency, "currency");
-        String text = PlaceholderApiSupport.messageBridge(owner.uuid()).apply(balancePlaceholder);
+        if (server.isPrimaryThread()) {
+            return readBalance(owner, currency);
+        }
+        CompletableFuture<Money> resolved = new CompletableFuture<>();
+        scheduler.onGlobal(() -> resolved.complete(readBalance(owner, currency)));
+        try {
+            return BoundedAwait.get(resolved, BALANCE_TIMEOUT, "placeholder balance " + id);
+        } catch (IllegalStateException stalled) {
+            return degrade(currency, "balance_timeout");
+        }
+    }
+
+    /**
+     * Resolve and parse the balance on the tick thread {@code PlaceholderAPI.setPlaceholders} requires. A resolve that
+     * throws, or a value that will not parse as a number, degrades to zero with one log line rather than escaping into
+     * the command that read it.
+     */
+    private Money readBalance(PlayerRef owner, Currency currency) {
+        String text;
+        try {
+            text = reader.resolve(owner.uuid(), balancePlaceholder);
+        } catch (RuntimeException failure) {
+            return degrade(currency, "resolve_failed");
+        }
         try {
             return Money.of(currency, new BigDecimal(text.trim()));
-        } catch (NumberFormatException failure) {
-            if (warned.compareAndSet(false, true)) {
-                log.warn("event=currency_backend_failed id={} reason=unparseable_balance", id);
-            }
-            return Money.zero(currency);
+        } catch (NumberFormatException unparseable) {
+            return degrade(currency, "unparseable_balance");
         }
+    }
+
+    /** Warn once for this backend so a persistently broken placeholder cannot spam the log, then read as zero. */
+    private Money degrade(Currency currency, String reason) {
+        if (warned.compareAndSet(false, true)) {
+            log.warn("event=currency_backend_failed id={} reason=" + reason, id);
+        }
+        return Money.zero(currency);
     }
 
     @Override
