@@ -289,6 +289,36 @@ class PagedListFlipTest {
         assertThat(plainName(0)).isEqualTo("p1_0");
     }
 
+    @Test
+    void aQueryThatReturnsNullIsTreatedAsAFailureRatherThanWedgingTheArrows() {
+        // A source that answers null instead of throwing used to escape the guard and strand the in-flight flag.
+        AtomicBoolean nullOnFlip = new AtomicBoolean(true);
+        FakePagedSource source = new FakePagedSource(request -> {
+            if (nullOnFlip.get() && request.page() > 0) {
+                return null;
+            }
+            return PagedResult.of(pageRows(request.page()), TOTAL);
+        });
+        openPaged(source);
+        source.reset();
+
+        List<LogRecord> logged = captureListenerLog(() -> {
+            clickNext();
+            scheduler.drainAsync();
+        });
+
+        assertThat(page()).as("the page already on screen is kept").isZero();
+        assertThat(logged.stream().map(LogRecord::getMessage))
+                .anyMatch(message -> message.contains("event=paged_flip_failed") && message.contains("id=pw:browse"));
+
+        nullOnFlip.set(false);
+        source.reset();
+        clickNext();
+        scheduler.drainAsync();
+
+        assertThat(page()).as("the arrows still work after a null answer").isEqualTo(1);
+    }
+
     // --- fixtures -------------------------------------------------------------------------------------------------
 
     private FakePagedSource pagedRows() {

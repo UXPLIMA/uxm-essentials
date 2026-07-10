@@ -1219,16 +1219,23 @@ public final class MenuListener implements Listener {
             int size,
             int target,
             List<String> sorts) {
-        PagedResult<?> result;
+        List<Object> rows;
+        long total;
+        // Everything that can fail belongs inside the guard, not just the source call: a source handing back null, or a
+        // page assembly that throws, would otherwise escape on this thread and strand the in-flight flag, leaving the
+        // viewer's arrows dead for the rest of the session.
         try {
-            result = source.apply(queryCtx, request);
+            PagedResult<?> result = source.apply(queryCtx, request);
+            if (result == null) {
+                throw new IllegalStateException("paged list source '" + sourceId + "' returned null");
+            }
+            rows = PagedListRows.combine(sourceId, size, result, LOG);
+            total = result.totalCount();
         } catch (RuntimeException failure) {
             LOG.log(Level.WARNING, "event=paged_flip_failed id=" + sourceId + " page=" + target, failure);
             scheduler.onEntity(viewer, () -> holder.pagedFlipInFlight(false));
             return;
         }
-        List<Object> rows = PagedListRows.combine(sourceId, size, result, LOG);
-        long total = result.totalCount();
         scheduler.onEntity(viewer, () -> completePagedFlip(holder, sourceId, sorts, target, size, total, rows));
     }
 
