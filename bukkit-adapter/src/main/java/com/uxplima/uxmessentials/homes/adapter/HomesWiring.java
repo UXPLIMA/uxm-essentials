@@ -60,6 +60,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
@@ -106,7 +107,8 @@ public final class HomesWiring {
             CloseableResources resources,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            ClaimProvidersConfig claimProviders) {
         return wire(
                 plugin,
                 ctx,
@@ -118,7 +120,8 @@ public final class HomesWiring {
                 resources,
                 textInput,
                 menus,
-                menuBindings);
+                menuBindings,
+                claimProviders);
     }
 
     /**
@@ -138,7 +141,8 @@ public final class HomesWiring {
             CloseableResources resources,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            ClaimProvidersConfig claimProviders) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -150,6 +154,7 @@ public final class HomesWiring {
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(claimProviders, "claimProviders");
         KernelPorts kernel = ctx.kernel();
         CachedHomeRepository cached = HomeRepositories.cachedConcrete(persistence);
         bus.registry().register(HomeSync.listener(cached));
@@ -170,7 +175,8 @@ public final class HomesWiring {
                 guiLayouts,
                 textInput,
                 menus,
-                menuBindings);
+                menuBindings,
+                claimProviders);
         HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
         return new Wired(
                 HomeCommands.all(services, kernel.messages(), kernel.scheduler()),
@@ -192,14 +198,15 @@ public final class HomesWiring {
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            ClaimProvidersConfig claimProviders) {
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         int unlimitedMax = unlimitedMax(ctx);
         DateTimeFormatter dateFormat = dateFormat(ctx);
 
         SafeLocationGuard safeGuard = buildSafeGuard(plugin, ctx);
-        ClaimService claimService = buildClaimService(plugin, ctx, kernel);
+        ClaimService claimService = buildClaimService(plugin, ctx, kernel, claimProviders);
         List<SethomeGuard> guards = buildGuards(ctx);
         HomeCharge charge = buildCharge(ctx, kernel, homeEconomy);
         CreateHomeAtSlot createHome = new CreateHomeAtSlot(
@@ -372,7 +379,8 @@ public final class HomesWiring {
         return DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault());
     }
 
-    private static ClaimService buildClaimService(Plugin plugin, ModuleContext ctx, KernelPorts kernel) {
+    private static ClaimService buildClaimService(
+            Plugin plugin, ModuleContext ctx, KernelPorts kernel, ClaimProvidersConfig claimProviders) {
         boolean enabled = ctx.config().getBoolean("claims.enabled", true);
         if (!enabled) {
             return new AlwaysAllowClaimService();
@@ -383,7 +391,8 @@ public final class HomesWiring {
         boolean checkTeleportAccess = ctx.config().getBoolean("claims.check-teleport-access", true);
         ClaimPolicySettings settings =
                 new ClaimPolicySettings(requireClaim, blockForeignClaims, foreignChunkDistance, checkTeleportAccess);
-        return new ClaimServiceImpl(ClaimProviders.detect(plugin, plugin.getServer(), kernel.log()), settings);
+        return new ClaimServiceImpl(
+                ClaimProviders.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()), settings);
     }
 
     private static SafeLocationGuard buildSafeGuard(Plugin plugin, ModuleContext ctx) {

@@ -127,6 +127,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
@@ -729,6 +730,10 @@ public final class PluginModule {
         // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
         // here with the data folder so every GUI-using context loads its layout the same way.
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
+        // Which claim plugins to consult and how to fold their answers is a server-wide choice read once from the
+        // root config.conf, then handed to every context whose region gate consults claimed land (homes, teleport,
+        // poses) so all three see the same provider set.
+        ClaimProvidersConfig claimProviders = ClaimProvidersConfig.from(config);
         loadModulesIsolated(registry.enabledModules(config), resources, log, module -> {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);
@@ -750,7 +755,8 @@ public final class PluginModule {
                     textInput,
                     menus,
                     menuBindings,
-                    menuCurrencyBackends);
+                    menuCurrencyBackends,
+                    claimProviders);
         });
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -778,12 +784,23 @@ public final class PluginModule {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings,
-            AtomicReference<EconomyBackends> menuCurrencyBackends) {
+            AtomicReference<EconomyBackends> menuCurrencyBackends,
+            ClaimProvidersConfig claimProviders) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
-            wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus, menuBindings);
+            wireTeleport(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    guiLayouts,
+                    guiRegistry,
+                    menus,
+                    menuBindings,
+                    claimProviders);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
             wireWorlds(
                     plugin,
@@ -808,7 +825,8 @@ public final class PluginModule {
                     guiRegistry,
                     textInput,
                     menus,
-                    menuBindings);
+                    menuBindings,
+                    claimProviders);
         } else if (module.id().equals(ModuleId.of("economy"))) {
             wireEconomy(
                     plugin,
@@ -927,7 +945,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
             wireCustomMenus(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("poses"))) {
-            wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
+            wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
         }
     }
 
@@ -938,7 +956,8 @@ public final class PluginModule {
             ContextLinks links,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            Menus menus) {
+            Menus menus,
+            ClaimProvidersConfig claimProviders) {
         // Sit on blocks (/sit) and, when features.player-sit is on, sit on players (right-click, /poses toggle to
         // opt out). The seat is a real, tagged, non-persistent marker armour stand for block-sits; a player-sit has
         // no seat entity — the rider mounts straight onto the carrier and addPassenger chains for stacking.
@@ -951,7 +970,7 @@ public final class PluginModule {
         // (UxmEssentialsPlugin.onLoad), before WorldGuard locks its registry. A bare /poses opens a personal
         // settings/status panel (also on the /uxmess gui hub), and every pose start passes an optional shared
         // uxmessentials.poses.cooldown.<seconds> gate before it begins.
-        PosesWiring.Wired wired = PosesWiring.wire(plugin, ctx, guiLayouts, guiRegistry, menus);
+        PosesWiring.Wired wired = PosesWiring.wire(plugin, ctx, guiLayouts, guiRegistry, menus, claimProviders);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.seats().sweepOrphans();
@@ -999,7 +1018,8 @@ public final class PluginModule {
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            ClaimProvidersConfig claimProviders) {
         // The /rtp cost bridges to the resolved economy provider lazily: teleport is wired before economy, so the
         // provider/currency are read through suppliers at charge time (free until economy is up, free for good when
         // economy is disabled), mirroring the worlds entry fee. The affordability is checked before the search and the
@@ -1009,8 +1029,8 @@ public final class PluginModule {
                 () -> links.economyCurrency,
                 ctx.kernel().scheduler(),
                 ctx.kernel().log());
-        TeleportWiring.Wired wired =
-                TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry, menus, menuBindings, fee);
+        TeleportWiring.Wired wired = TeleportWiring.wire(
+                plugin, ctx, persistence, guiLayouts, guiRegistry, menus, menuBindings, fee, claimProviders);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -1103,7 +1123,8 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            ClaimProvidersConfig claimProviders) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
         HomesWiring.Wired wired = HomesWiring.wire(
@@ -1117,7 +1138,8 @@ public final class PluginModule {
                 resources,
                 textInput,
                 menus,
-                menuBindings);
+                menuBindings,
+                claimProviders);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Rebind the teleport context's home-respawn seam (built while it still resolved to empty) to the

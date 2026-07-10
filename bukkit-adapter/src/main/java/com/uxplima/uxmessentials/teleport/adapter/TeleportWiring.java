@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
@@ -130,7 +131,8 @@ public final class TeleportWiring {
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings,
-            TeleportFee fee) {
+            TeleportFee fee,
+            ClaimProvidersConfig claimProviders) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -139,6 +141,7 @@ public final class TeleportWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(fee, "fee");
+        Objects.requireNonNull(claimProviders, "claimProviders");
         ConfigStore config = ctx.config();
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -153,7 +156,7 @@ public final class TeleportWiring {
         // so a HOME step in a configured respawn chain falls through whenever homes is disabled.
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
         SpawnDirectory spawns = spawns(plugin, persistence);
-        RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running);
+        RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running, claimProviders);
         // The post-arrival grace shields an /rtp landing (Resistance + Slow-Falling + a no-fall-damage window);
         // it is both the engine's ArrivalGrace port and the fall-damage listener, so it is registered below.
         ArrivalGraceGuard graceGuard =
@@ -290,7 +293,8 @@ public final class TeleportWiring {
             ConfigStore config,
             TeleportSettings settings,
             Persistence persistence,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            ClaimProvidersConfig claimProviders) {
         // The safe-search probe loads each candidate's chunk asynchronously through BukkitChunkAccess, so no RTP
         // probe generates a far chunk on a tick thread and every probed-but-unserved chunk is released again. The
         // budgeted search wraps the finder so a single search terminates within its budget and tick-slices its
@@ -300,7 +304,7 @@ public final class TeleportWiring {
         // extra hop), setting each candidate's insideClaim flag so the pure policy keeps the shared pool out of
         // claimed land and regions. Both checks are folded behind the respect-claims / respect-worldguard toggles.
         ProtectedLand protectedLand = new ClaimAwareProtectedLand(
-                buildClaimService(plugin, kernel, settings.respectClaims()),
+                buildClaimService(plugin, kernel, settings.respectClaims(), claimProviders),
                 new WorldGuardRegions(plugin.getServer(), kernel.log()),
                 settings.respectClaims(),
                 settings.respectWorldguard());
@@ -376,12 +380,14 @@ public final class TeleportWiring {
      * {@link ClaimService#isProtected} — is any claim here — so the placement knobs are left at their inert
      * defaults; only presence-of-claim matters.
      */
-    private static ClaimService buildClaimService(Plugin plugin, KernelPorts kernel, boolean respectClaims) {
+    private static ClaimService buildClaimService(
+            Plugin plugin, KernelPorts kernel, boolean respectClaims, ClaimProvidersConfig claimProviders) {
         if (!respectClaims) {
             return new AlwaysAllowClaimService();
         }
         return new ClaimServiceImpl(
-                ClaimProviders.detect(plugin, plugin.getServer(), kernel.log()), ClaimPolicySettings.defaults());
+                ClaimProviders.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()),
+                ClaimPolicySettings.defaults());
     }
 
     /**

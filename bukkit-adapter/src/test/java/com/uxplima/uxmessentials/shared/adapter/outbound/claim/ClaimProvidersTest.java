@@ -20,8 +20,8 @@ import org.mockbukkit.mockbukkit.ServerMock;
 /**
  * The claim-provider discoverer's plugin-present guard. With no claim plugin registered (the MockBukkit
  * default, with most claim SDKs also absent from the test classpath and uxmClaims not loaded — the Lands and
- * GriefPrevention API types resolve only because the ownership tests stub them) {@link ClaimProviders#detect}
- * must bind an inactive provider whose {@code claimAt} is empty — and,
+ * GriefPrevention API types resolve only because the ownership tests stub them) {@link
+ * ClaimProviders#detectAll} must bind an inactive provider whose {@code claimAt} is empty — and,
  * crucially, probing each candidate must not throw {@link NoClassDefFoundError}, proving each typed provider
  * keeps its SDK references behind its own present-guard so merely constructing and asking {@code active()}
  * never force-loads a claim-plugin class.
@@ -43,24 +43,25 @@ class ClaimProvidersTest {
     }
 
     @Test
-    void detect_bindsInactiveProvider_whenNoClaimPluginInstalled() {
-        ClaimProvider provider = ClaimProviders.detect(plugin, server, noOpLog());
+    void detectAll_bindsInactiveProvider_whenNoClaimPluginInstalled() {
+        ClaimProvider provider = ClaimProviders.detectAll(ClaimProvidersConfig.defaults(), plugin, server, noOpLog());
         assertThat(provider.active()).isFalse();
     }
 
     @Test
-    void detect_doesNotThrow_whenNoClaimPluginInstalled() {
+    void detectAll_doesNotThrow_whenNoClaimPluginInstalled() {
         // The probe constructs every candidate (uxmClaims, Lands, GriefPrevention, GriefDefender,
         // ExcellentClaims, SimpleClaimSystem, RClaim, XClaim, Homestead) and calls active() on each. Most of
         // those SDKs are absent from the test classpath (Lands and GriefPrevention resolve only as ownership-
         // test stubs), so a provider that touched an absent SDK before its present-guard would throw
         // NoClassDefFoundError here. It must not.
-        assertThatCode(() -> ClaimProviders.detect(plugin, server, noOpLog())).doesNotThrowAnyException();
+        assertThatCode(() -> ClaimProviders.detectAll(ClaimProvidersConfig.defaults(), plugin, server, noOpLog()))
+                .doesNotThrowAnyException();
     }
 
     @Test
-    void detect_claimAtReturnsEmpty_whenNoClaimPluginInstalled() {
-        ClaimProvider provider = ClaimProviders.detect(plugin, server, noOpLog());
+    void detectAll_claimAtReturnsEmpty_whenNoClaimPluginInstalled() {
+        ClaimProvider provider = ClaimProviders.detectAll(ClaimProvidersConfig.defaults(), plugin, server, noOpLog());
         WorldRef world = new WorldRef(UUID.randomUUID(), "world");
         assertThat(provider.claimAt(world, 10, 20)).isEmpty();
     }

@@ -50,6 +50,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
@@ -96,12 +97,18 @@ public final class PosesWiring {
 
     /** Build the poses adapters and use cases from {@code plugin} and {@code ctx}, ready to register. */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, ManagementGuiRegistry guiRegistry, Menus menus) {
+            Plugin plugin,
+            ModuleContext ctx,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            ClaimProvidersConfig claimProviders) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(claimProviders, "claimProviders");
         KernelPorts kernel = ctx.kernel();
         PosesConfig config = PosesConfig.from(ctx.config());
         PoseSessions sessions = new PoseSessions();
@@ -110,7 +117,7 @@ public final class PosesWiring {
         PoseCooldown poseCooldown = PoseCooldown.backedBy(kernel.cooldowns());
         PoseCooldownNotice cooldownNotice = new PoseCooldownNotice(poseCooldown, kernel.messages());
         BukkitSeatPort seats = new BukkitSeatPort(plugin, kernel.scheduler(), kernel.log());
-        ClaimService claims = buildClaimService(plugin, kernel, config.respectClaims());
+        ClaimService claims = buildClaimService(plugin, kernel, config.respectClaims(), claimProviders);
         PoseRegionFlags regionFlags = new WorldGuardPoseFlags(plugin.getServer(), kernel.log());
         PoseRegionGate regionGate =
                 new ClaimAwareRegionGate(claims, regionFlags, config.respectClaims(), config.respectWorldguard());
@@ -266,12 +273,14 @@ public final class PosesWiring {
      * spot, so the placement knobs (require-a-claim, foreign-block, proximity) are left at their inert defaults and
      * only teleport-access checking is enabled.
      */
-    private static ClaimService buildClaimService(Plugin plugin, KernelPorts kernel, boolean respectClaims) {
+    private static ClaimService buildClaimService(
+            Plugin plugin, KernelPorts kernel, boolean respectClaims, ClaimProvidersConfig claimProviders) {
         if (!respectClaims) {
             return new AlwaysAllowClaimService();
         }
         ClaimPolicySettings settings = new ClaimPolicySettings(false, true, 0, true);
-        return new ClaimServiceImpl(ClaimProviders.detect(plugin, plugin.getServer(), kernel.log()), settings);
+        return new ClaimServiceImpl(
+                ClaimProviders.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()), settings);
     }
 
     /**
