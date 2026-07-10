@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageReques
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
@@ -168,22 +169,45 @@ public final class MenuBindings {
                 missing.add(id);
             }
         }
-        for (MenuItemSpec item : spec.items().values()) {
-            collectItemMissing(item, placeholderKnown, missing);
+        for (Map.Entry<String, MenuItemSpec> entry : spec.items().entrySet()) {
+            collectItemMissing(spec, entry.getKey(), entry.getValue(), placeholderKnown, missing);
         }
     }
 
-    private void collectItemMissing(MenuItemSpec item, Predicate<String> placeholderKnown, Set<String> missing) {
+    private void collectItemMissing(
+            MenuSpec spec, String itemId, MenuItemSpec item, Predicate<String> placeholderKnown, Set<String> missing) {
         collectViewMissing(item.view(), conditions::has, missing);
         item.click().conditions().values().forEach(refs -> addMissing(refs, conditions::has, missing));
         item.click().actions().values().forEach(refs -> addMissing(refs, actions::has, missing));
         collectTextPlaceholders(item, placeholderKnown, missing);
         item.list().ifPresent(list -> {
-            if (!lists.has(list.source().id())) {
-                missing.add(list.source().id());
-            }
-            collectItemMissing(list.template(), placeholderKnown, missing);
+            collectListSourceMissing(spec, itemId, list, missing);
+            collectItemMissing(spec, itemId + " (list template)", list.template(), placeholderKnown, missing);
         });
+    }
+
+    /**
+     * Validate a list-backed item's source. It must be registered as either an in-memory list or a paged one, or its
+     * id is reported unresolved — exactly as an unknown source has always been reported — so the loader skips just
+     * that one menu rather than the server failing to boot, the same tolerance an unresolved action or placeholder
+     * gets. Beyond that, {@code page-size} and {@code sorts} are paged-only knobs: a plain in-memory source hands its
+     * whole corpus over for the engine to slice and can act on neither, so silently dropping them would let an
+     * operator believe their browse menu pages or sorts when it does not. Both cases are reported naming the menu,
+     * item and source so the offending line is easy to find.
+     */
+    private void collectListSourceMissing(MenuSpec spec, String itemId, ListSpec list, Set<String> missing) {
+        String sourceId = list.source().id();
+        boolean plain = lists.has(sourceId);
+        boolean paged = pagedLists.has(sourceId);
+        String where = "menu '" + spec.title() + "' item '" + itemId + "' list source '" + sourceId + "'";
+        if (!plain && !paged) {
+            missing.add(where + " is registered as neither a list nor a paged list source");
+            return;
+        }
+        if (plain && (list.pageSize() != 0 || !list.sorts().isEmpty())) {
+            missing.add(where + " is a plain list source, so its page-size and sorts do nothing; "
+                    + "register it as a paged source or drop those keys");
+        }
     }
 
     private void collectTextPlaceholders(MenuItemSpec item, Predicate<String> placeholderKnown, Set<String> missing) {

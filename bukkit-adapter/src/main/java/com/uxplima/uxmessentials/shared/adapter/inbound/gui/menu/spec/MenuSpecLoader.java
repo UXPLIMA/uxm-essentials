@@ -961,12 +961,22 @@ public final class MenuSpecLoader {
         return node.virtual() || node.isNull() ? Optional.empty() : Optional.of(node.getBoolean());
     }
 
+    /**
+     * Parse an item's optional {@code list { }} block. Beyond the {@code source} reference and the {@code template}
+     * stamped once per entry it reads two optional paged-source knobs: {@code page-size} (absent → {@code 0} → derive
+     * the page from the item's slot count, the historic behaviour) and {@code sorts} (absent → empty → the source's
+     * default order). A negative {@code page-size} is rejected by the {@link ListSpec} constructor, surfacing as a
+     * {@link MenuSpecException} that names the item. An absent block yields {@link Optional#empty()}, so an item
+     * without one parses exactly as before.
+     */
     private Optional<ListSpec> parseList(ConfigurationNode node, int slotCeiling, Map<String, Pattern> patterns) {
         if (node.virtual() || node.isNull()) {
             return Optional.empty();
         }
         Ref source = Ref.parse(Objects.requireNonNull(node.node("source").getString(), "list.source"));
-        return Optional.of(new ListSpec(source, parseItem(node.node("template"), slotCeiling, patterns)));
+        MenuItemSpec template = parseItem(node.node("template"), slotCeiling, patterns);
+        int pageSize = node.node("page-size").getInt(0);
+        return Optional.of(new ListSpec(source, template, pageSize, strings(node.node("sorts"))));
     }
 
     /**
