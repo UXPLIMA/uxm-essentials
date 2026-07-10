@@ -15,10 +15,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The façade's spec grammar and caching mechanics, over an in-memory backend set: the backend head is
- * normalised, one provider instance is cached per normalised spec, a blank spec resolves the configured
- * default, and an unknown spec is a safe no-op. The backend-resolution behaviour — a configured currency over
- * its own backend, a bare backend id as a synthetic currency, an unknown spec as unavailable — lives in
- * {@link CurrenciesBackedTest}.
+ * normalised while a sub-currency name keeps its case, one provider instance is cached per normalised spec, a
+ * blank spec resolves the configured default, and an unknown spec is a safe no-op. The backend-resolution
+ * behaviour — a configured currency over its own backend, a bare backend id as a synthetic currency, an
+ * unknown spec as unavailable — lives in {@link CurrenciesBackedTest}.
  */
 class CurrenciesTest {
 
@@ -35,11 +35,14 @@ class CurrenciesTest {
     }
 
     @Test
-    void resolve_normalisesTheBackendHead() {
+    void resolve_normalisesTheBackendHeadAndKeepsTheCurrencyName() {
         Currencies currencies = currenciesWithDefault("vault");
 
         assertThat(currencies.resolve("VAULT").id()).isEqualTo("vault");
         assertThat(currencies.resolve("  Vault  ").id()).isEqualTo("vault");
+        // The head lower-cases, but a sub-currency name is kept verbatim: a plugin's currency lookup can be
+        // case-sensitive, so coinsengine:Gold and coinsengine:gold must not collapse to the same currency.
+        assertThat(currencies.resolve("CoinsEngine:Gold").id()).isEqualTo("coinsengine:Gold");
     }
 
     @Test
