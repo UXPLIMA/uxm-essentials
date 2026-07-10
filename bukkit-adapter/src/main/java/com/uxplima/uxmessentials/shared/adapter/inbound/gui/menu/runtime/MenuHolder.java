@@ -74,6 +74,16 @@ public final class MenuHolder implements InventoryHolder {
     private long lastClickMs;
 
     /**
+     * Whether a paged list's page flip has fired its off-thread re-query and is still waiting for that page to land.
+     * A flip sets it before hopping to the query and clears it on the viewer's entity thread on every exit — the
+     * render completing, the query failing, or the window having closed in the gap — so a viewer mashing the arrow
+     * issues one query at a time rather than stacking a queue of them, and can never see an earlier page painted over
+     * a later one that returned first. Plain like the holder's other fields: one viewer owns it, read and written only
+     * on their own entity thread inside the click handler, so the check-and-set is single-threaded and needs no lock.
+     */
+    private boolean pagedFlipInFlight;
+
+    /**
      * Set only on the editor path: the editor's per-open property/subject state and its slot routing. A spec menu
      * leaves this null and routes clicks through {@link #clickMap}; an editor sets it and routes through it instead,
      * so the one listener tells the two apart by its presence.
@@ -239,6 +249,16 @@ public final class MenuHolder implements InventoryHolder {
     /** Records the clock reading of a click the anti-spam window just let through. */
     public void lastClickMs(long now) {
         this.lastClickMs = now;
+    }
+
+    /** Whether a paged list's page-flip re-query is already in flight for this window. */
+    public boolean pagedFlipInFlight() {
+        return pagedFlipInFlight;
+    }
+
+    /** Marks a paged page-flip re-query as started ({@code true}) or settles it on any exit path ({@code false}). */
+    public void pagedFlipInFlight(boolean inFlight) {
+        this.pagedFlipInFlight = inFlight;
     }
 
     /**

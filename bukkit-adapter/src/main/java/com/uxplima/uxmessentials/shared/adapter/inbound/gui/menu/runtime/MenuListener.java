@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -10,8 +11,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -43,6 +47,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuClickEvent;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.GridRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
@@ -56,6 +63,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDragSp
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemRuleSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
@@ -85,11 +93,23 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class MenuListener implements Listener {
 
+    /** Operator diagnostics for a paged list flip: an overflowing source, or a query that threw — logged, page kept. */
+    private static final Logger LOG = Logger.getLogger(MenuListener.class.getName());
+
     private final MenuRenderer renderer;
     private final ActionRegistry actions;
     private final ConditionRegistry conditions;
     private final Scheduler scheduler;
     private final Plugin plugin;
+
+    /**
+     * The streaming list sources a page flip re-queries. A paged list holds no cached corpus to re-slice — only the
+     * page on screen — so flipping it must ask the source for the next page, which this registry resolves by id.
+     * Empty on every engine wired without one (a plain/spec-only test fixture and any production menu set with no
+     * paged source): no menu on such an engine carries a paged view, so the flip path never reaches this registry and
+     * a flip stays the synchronous cache re-slice it always was.
+     */
+    private final PagedListSourceRegistry pagedLists;
 
     /**
      * The editor renderer, present only on an engine wired for typed property editors. It is what a property's
@@ -181,9 +201,10 @@ public final class MenuListener implements Listener {
     }
 
     /**
-     * The canonical constructor, carrying the anti-spam cooldown floor and its clock. The eight shorter forms above
-     * delegate here with no floor and the real system clock, so every existing construction and test is unchanged;
-     * only an engine wanting a server-wide floor, or a test wanting a deterministic clock, reaches for this shape.
+     * The anti-spam-aware form carrying the cooldown floor and its clock, kept so every existing construction and test
+     * (all of which predate paged sources) compiles unchanged. Delegates to the canonical constructor with an empty
+     * {@link PagedListSourceRegistry}, so a listener built here can never flip a paged list — no menu it routes carries
+     * a paged view — and a flip stays the synchronous cache re-slice it always was.
      */
     public MenuListener(
             MenuRenderer renderer,
@@ -196,6 +217,38 @@ public final class MenuListener implements Listener {
             @Nullable ConfirmOpener confirmOpener,
             long defaultClickCooldownMs,
             LongSupplier clock) {
+        this(
+                renderer,
+                actions,
+                conditions,
+                scheduler,
+                plugin,
+                editorRenderer,
+                selectorOpener,
+                confirmOpener,
+                defaultClickCooldownMs,
+                clock,
+                new PagedListSourceRegistry());
+    }
+
+    /**
+     * The canonical constructor, carrying the anti-spam cooldown floor, its clock, and the paged list sources a page
+     * flip re-queries. Every shorter form above delegates here with no floor, the real system clock, and (bar this one)
+     * an empty paged registry, so every existing construction and test is unchanged; only production wiring, which holds
+     * the feature-populated paged registry, passes it, and only a test wanting a deterministic clock reaches this shape.
+     */
+    public MenuListener(
+            MenuRenderer renderer,
+            ActionRegistry actions,
+            ConditionRegistry conditions,
+            Scheduler scheduler,
+            Plugin plugin,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable SelectorOpener selectorOpener,
+            @Nullable ConfirmOpener confirmOpener,
+            long defaultClickCooldownMs,
+            LongSupplier clock,
+            PagedListSourceRegistry pagedLists) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
@@ -209,6 +262,7 @@ public final class MenuListener implements Listener {
         }
         this.defaultClickCooldownMs = defaultClickCooldownMs;
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.pagedLists = Objects.requireNonNull(pagedLists, "pagedLists");
     }
 
     /** Registers this listener with the server. Called once when the menu engine starts. */
@@ -1083,8 +1137,143 @@ public final class MenuListener implements Listener {
     }
 
     private void repaginate(MenuHolder holder, int newPage) {
+        if (flipPagedList(holder, newPage)) {
+            return;
+        }
         holder.setCtx(holder.ctx().withPage(newPage));
         repaint(holder);
+    }
+
+    /**
+     * Flip a paged list one page over by re-querying its source, rather than re-slicing a cache it does not hold.
+     * Runs on the viewer's entity thread. Returns {@code false} when the menu's list is a plain in-memory source (or
+     * it has no list at all), so the caller takes the historic synchronous re-slice, byte for byte — the paged
+     * registry is never consulted for such a menu, because a plain list is never given a {@link PagedListView}. For a
+     * paged source it clamps to the reachable target page, builds the immutable {@link PageRequest} here, and hops to
+     * {@link Scheduler#async} to fetch that page; the page on screen stays put until the new one lands. A second flip
+     * while a query is in flight is dropped, not queued, so a mashed arrow issues one query at a time and a later page
+     * can never be overwritten by an earlier one. A flip that cannot move — already at the first or last page — leaves
+     * the current page up and issues no query, matching what {@link com.uxplima.uxmessentials.shared.adapter.inbound
+     * .gui.menu.eval.Pagination} does for a plain list: it clamps, it never wraps.
+     */
+    private boolean flipPagedList(MenuHolder holder, int requestedPage) {
+        MenuItemSpec listItem = firstListItem(holder.spec());
+        if (listItem == null) {
+            return false;
+        }
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec listSpec =
+                listItem.list().orElseThrow();
+        String sourceId = listSpec.source().id();
+        PagedListView view = holder.ctx().pagedViews().get(sourceId);
+        if (view == null) {
+            return false;
+        }
+        BiFunction<MenuContext, PageRequest, PagedResult<?>> source =
+                pagedLists.get(sourceId).orElse(null);
+        if (source == null || holder.pagedFlipInFlight()) {
+            return true;
+        }
+        ListQueryState state = holder.queryState(sourceId, listSpec.sorts());
+        int size = view.size();
+        int target = Math.max(0, Math.min(requestedPage, state.pageCount(size) - 1));
+        if (target != state.page()) {
+            startPagedQuery(holder, source, state, sourceId, size, target, listSpec.sorts());
+        }
+        return true;
+    }
+
+    /**
+     * Set the in-flight flag and hop off the entity thread to fetch {@code target}. Every value the async body reads is
+     * built here, on the entity thread, and handed across immutable — the {@link PageRequest} from the list's live
+     * query state, the query context, and the viewer — so the async lambda touches no holder field and the holder's
+     * single-threaded contract holds.
+     */
+    private void startPagedQuery(
+            MenuHolder holder,
+            BiFunction<MenuContext, PageRequest, PagedResult<?>> source,
+            ListQueryState state,
+            String sourceId,
+            int size,
+            int target,
+            List<String> sorts) {
+        holder.pagedFlipInFlight(true);
+        PageRequest request = state.request(size).atPage(target);
+        MenuContext queryCtx = holder.ctx();
+        PlayerRef viewer = holder.ctx().viewer();
+        scheduler.async(() -> runPagedQuery(holder, source, queryCtx, request, viewer, sourceId, size, target, sorts));
+    }
+
+    /**
+     * Off the viewer's entity thread: fetch the requested page, then hop back to render it. Reads and writes no holder
+     * field here — every argument is an immutable value captured on the entity thread — so the holder's single-threaded
+     * contract holds. A query that throws is logged with context and hops back only to clear the in-flight flag, so the
+     * page already on screen stays put and the arrows are freed for the next click rather than wedged.
+     */
+    private void runPagedQuery(
+            MenuHolder holder,
+            BiFunction<MenuContext, PageRequest, PagedResult<?>> source,
+            MenuContext queryCtx,
+            PageRequest request,
+            PlayerRef viewer,
+            String sourceId,
+            int size,
+            int target,
+            List<String> sorts) {
+        PagedResult<?> result;
+        try {
+            result = source.apply(queryCtx, request);
+        } catch (RuntimeException failure) {
+            LOG.log(Level.WARNING, "event=paged_flip_failed id=" + sourceId + " page=" + target, failure);
+            scheduler.onEntity(viewer, () -> holder.pagedFlipInFlight(false));
+            return;
+        }
+        List<Object> rows = PagedListRows.combine(sourceId, size, result, LOG);
+        long total = result.totalCount();
+        scheduler.onEntity(viewer, () -> completePagedFlip(holder, sourceId, sorts, target, size, total, rows));
+    }
+
+    /**
+     * On the viewer's entity thread: settle the flip. The in-flight flag is cleared first, so a viewer who closed the
+     * window while the query ran frees the arrows for their next session rather than wedging them, and a closed window
+     * is then a clean early return — the render never runs against a dead holder and never throws. When the window is
+     * still this holder's, the fetched page is committed: the list's query state records the new page and corpus total,
+     * only this list's rows and paged view are swapped in (a plain list sharing the menu keeps its cached corpus), and
+     * the window is repainted in place.
+     */
+    private void completePagedFlip(
+            MenuHolder holder, String sourceId, List<String> sorts, int page, int size, long total, List<Object> rows) {
+        holder.pagedFlipInFlight(false);
+        Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
+        if (live == null) {
+            return;
+        }
+        // The window may have closed while the query was in flight; a closed view has no top inventory to read a
+        // holder from, so the null-guard is what makes the mid-query close a clean no-render return rather than a
+        // throw.
+        var top = live.getOpenInventory().getTopInventory();
+        if (top == null || !(top.getHolder() instanceof MenuHolder h) || h != holder) {
+            return;
+        }
+        ListQueryState state = holder.queryState(sourceId, sorts);
+        state.page(page);
+        state.recordTotal(total);
+        Map<String, List<?>> lists = new HashMap<>(holder.resolvedLists());
+        lists.put(sourceId, rows);
+        holder.setResolvedLists(lists);
+        Map<String, PagedListView> views = new HashMap<>(holder.ctx().pagedViews());
+        views.put(sourceId, new PagedListView(page, total, size));
+        holder.setCtx(holder.ctx().withPage(page).withPagedViews(views));
+        repaint(holder);
+    }
+
+    /** The first list-backed item of {@code spec} in declaration order — the list the nav buttons page — or null. */
+    @Nullable private static MenuItemSpec firstListItem(MenuSpec spec) {
+        for (MenuItemSpec item : spec.items().values()) {
+            if (item.list().isPresent()) {
+                return item;
+            }
+        }
+        return null;
     }
 
     /**

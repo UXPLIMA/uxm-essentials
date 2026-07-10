@@ -55,6 +55,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAct
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.PagedListRows;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.PagedListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.SelectorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
@@ -890,9 +891,7 @@ public final class Menus {
         int size = pageSize(item, listSpec);
         String sort = listSpec.sorts().isEmpty() ? "" : listSpec.sorts().get(0);
         PagedResult<?> result = source.apply(ctx, new PageRequest(0, size, sort, Map.of()));
-        List<Object> combined = new ArrayList<>(result.pinned());
-        combined.addAll(boundedRows(sourceId, size, result.pinned().size(), result.rows()));
-        rows.put(sourceId, combined);
+        rows.put(sourceId, PagedListRows.combine(sourceId, size, result, LOG));
         paged.put(sourceId, new PagedListMeta(result.totalCount(), size, listSpec.sorts()));
     }
 
@@ -902,22 +901,6 @@ public final class Menus {
         return listSpec.pageSize() != 0
                 ? listSpec.pageSize()
                 : item.slots().slots().size();
-    }
-
-    /**
-     * The page's flow rows, trimmed to the capacity left once pinned entries have claimed their content slots
-     * ({@code size - pinned}, never below zero, since pinned entries occupy content slots too). A source over-returning
-     * is its own bug, not something to hide: rendering only what fits while logging keeps the page honest, where
-     * silently keeping them all would read to the operator as "the viewer saw everything".
-     */
-    private List<?> boundedRows(String sourceId, int size, int pinned, List<?> rows) {
-        int capacity = Math.max(0, size - pinned);
-        if (rows.size() <= capacity) {
-            return rows;
-        }
-        LOG.warning("event=paged_source_overflowed id=" + sourceId + " size=" + size + " rows=" + rows.size()
-                + " pinned=" + pinned);
-        return List.copyOf(rows.subList(0, capacity));
     }
 
     /**

@@ -349,7 +349,8 @@ public final class PluginModule {
                 menus.selectorOpener(),
                 menus.confirmOpener(),
                 menuClickCooldownMs,
-                System::currentTimeMillis);
+                System::currentTimeMillis,
+                menuBindings.pagedLists());
         menuListener.install();
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —

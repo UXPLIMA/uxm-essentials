@@ -309,7 +309,8 @@ class ArchitectureTest {
                 runtime + "MenuListener",
                 runtime + "MenuRefresh",
                 runtime + "Cancellable",
-                runtime + "PagedListView");
+                runtime + "PagedListView",
+                runtime + "PagedListRows");
         return JavaClass.Predicates.resideInAPackage("..gui.menu.render..")
                 .or(DescribedPredicate.describe(
                         "are menu runtime internals", javaClass -> runtimeInternals.contains(javaClass.getFullName())))
