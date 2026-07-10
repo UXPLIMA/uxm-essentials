@@ -23,6 +23,16 @@ class CurrencyBackendRegistryTest {
     }
 
     @Test
+    void idsIterateInRegistrationOrderNotAlphabetical() {
+        CurrencyBackendRegistry registry = CurrencyBackendRegistry.of(List.of(
+                new FakeCurrencyBackend("vault"),
+                new FakeCurrencyBackend("native"),
+                new FakeCurrencyBackend("playerpoints"),
+                new FakeCurrencyBackend("coins")));
+        assertThat(registry.ids()).containsExactly("vault", "native", "playerpoints", "coins");
+    }
+
+    @Test
     void duplicateIdsFailLoudlyAtConstruction() {
         assertThatThrownBy(() -> CurrencyBackendRegistry.of(
                         List.of(new FakeCurrencyBackend("vault"), new FakeCurrencyBackend("vault"))))

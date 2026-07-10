@@ -2,10 +2,10 @@ package com.uxplima.uxmessentials.economy.application;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackend;
@@ -27,7 +27,10 @@ public final class FakeCurrencyBackend implements CurrencyBackend {
     private final String id;
     private final boolean atomic;
     private final boolean offline;
-    private final Map<PlayerRef, BigDecimal> balances = new HashMap<>();
+    // A ConcurrentHashMap, not a plain HashMap: the non-atomic debit path below reads and writes with no lock so
+    // its lost update stays reachable for the serialising decorator's race test, and a plain map would let those
+    // concurrent writes corrupt the map structure on resize rather than merely lose an update.
+    private final Map<PlayerRef, BigDecimal> balances = new ConcurrentHashMap<>();
 
     public FakeCurrencyBackend(String id) {
         this(id, true, true);
@@ -92,6 +95,9 @@ public final class FakeCurrencyBackend implements CurrencyBackend {
                 return applyDebit(owner, amount);
             }
         }
+        // Deliberately unlocked: reading, checking, yielding, then writing without holding a lock lets two
+        // concurrent debits both read the same balance and one overwrite the other's result. That lost update is
+        // the exact race the serialising decorator prevents, so its test drives it through this path.
         BigDecimal current = balances.getOrDefault(owner, BigDecimal.ZERO);
         if (current.compareTo(amount.amount()) < 0) {
             return Result.err(TransferError.INSUFFICIENT_FUNDS);

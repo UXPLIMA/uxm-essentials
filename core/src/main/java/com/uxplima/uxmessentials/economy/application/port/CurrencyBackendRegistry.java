@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.economy.application.port;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -18,7 +19,9 @@ public final class CurrencyBackendRegistry {
     private final Map<String, CurrencyBackend> byId;
 
     private CurrencyBackendRegistry(Map<String, CurrencyBackend> byId) {
-        this.byId = Map.copyOf(byId);
+        // A LinkedHashMap copy, not Map.copyOf: the latter randomises iteration order per JVM run, which would
+        // break the registration-order guarantee ids() makes and the operator reads in the startup error.
+        this.byId = Collections.unmodifiableMap(new LinkedHashMap<>(byId));
     }
 
     /** Build the registry; two backends claiming one id is a programming error, not a precedence question. */
