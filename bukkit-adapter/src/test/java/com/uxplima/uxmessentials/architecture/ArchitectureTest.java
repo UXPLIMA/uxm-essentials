@@ -140,11 +140,12 @@ class ArchitectureTest {
 
     // Every spec-driven menu renders through the engine (Menus / MenuBindings / holder / listener); none of them
     // touch uxmLib's GUI library directly. The only production classes that legitimately depend on
-    // com.uxplima.uxmlib.gui are five non-menu leaves, and they stay that way:
+    // com.uxplima.uxmlib.gui are the non-menu text-input and storage leaves, and they stay that way:
     //   - vaults VaultView and itemworld DisposalCommand are real item-STORAGE inventories (uxmLib StorageGui):
     //     players put and take items, contents persist — these are not menus.
-    //   - the shared AnvilTextBackend and its TextInputInstaller are the anvil TEXT-INPUT seam (uxmLib
-    //     com.uxplima.uxmlib.gui.anvil) — the single runtime-neutral leaf the whole engine reuses for typed input.
+    //   - the shared AnvilTextBackend, SignTextBackend, DialogTextBackend and their TextInputInstaller are the
+    //     TEXT-INPUT seam (uxmLib com.uxplima.uxmlib.gui anvil/input/dialog) — the runtime-neutral leaves the whole
+    //     engine reuses for typed input.
     //   - bootstrap PluginModule is the Guis.install(...) site: the uxmLib GUI runtime must stay installed for the
     //     storage and anvil leaves above.
     // Any other production class reaching for com.uxplima.uxmlib.gui would be a spec menu that slipped off the
@@ -160,7 +161,8 @@ class ArchitectureTest {
             .resideInAPackage("com.uxplima.uxmlib.gui..")
             .because("spec-driven menus must render through the engine; only the item-storage inventories "
                     + "(VaultView, DisposalCommand), the text-input seam (AnvilTextBackend, SignTextBackend, "
-                    + "TextInputInstaller) and the Guis.install site (PluginModule) may touch uxmLib's GUI library");
+                    + "DialogTextBackend, TextInputInstaller) and the Guis.install site (PluginModule) may touch "
+                    + "uxmLib's GUI library");
 
     // The completeness twin of the uxmLib fence above. That rule proves no spec menu reaches for uxmLib's GUI
     // library; this one proves no spec menu drops a level lower and hand-rolls a raw Bukkit inventory instead —
@@ -268,12 +270,13 @@ class ArchitectureTest {
     }
 
     /**
-     * The five non-menu leaves allowed to depend on uxmLib's GUI library, named by fully qualified name so this
-     * predicate itself adds no dependency on them. Two are item-storage inventories ({@code VaultView},
-     * {@code DisposalCommand}, built on uxmLib's {@code StorageGui}), two are the anvil text-input seam
-     * ({@code AnvilTextBackend}, {@code TextInputInstaller}, built on {@code com.uxplima.uxmlib.gui.anvil}), and one
-     * is the {@code Guis.install} site ({@code PluginModule}). Every spec-driven menu renders through the engine
-     * instead, so this allow-list must stay exactly these five.
+     * The non-menu leaves allowed to depend on uxmLib's GUI library, named by fully qualified name so this predicate
+     * itself adds no dependency on them. Two are item-storage inventories ({@code VaultView}, {@code DisposalCommand},
+     * built on uxmLib's {@code StorageGui}); the text-input seam contributes the anvil, sign and dialog backends
+     * ({@code AnvilTextBackend}, {@code SignTextBackend}, {@code DialogTextBackend}) and their {@code TextInputInstaller},
+     * built on {@code com.uxplima.uxmlib.gui} anvil/input/dialog; and one is the {@code Guis.install} site
+     * ({@code PluginModule}). Every spec-driven menu renders through the engine instead, so this allow-list must stay
+     * exactly these leaves.
      *
      * <p>A leaf's nested members ({@code VaultView.OpenWindow}, {@code TextInputInstaller.Installed},
      * {@code PluginModule.ContextLinks}) carry the dependency too — a held {@code StorageGui} or {@code AnvilInput}
@@ -286,6 +289,7 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.itemworld.adapter.inbound.command.DisposalCommand",
                 "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.AnvilTextBackend",
                 "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.SignTextBackend",
+                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.DialogTextBackend",
                 "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller",
                 "com.uxplima.uxmessentials.bootstrap.di.PluginModule");
         return DescribedPredicate.describe("are not the allowed uxmLib-GUI leaves", javaClass -> {

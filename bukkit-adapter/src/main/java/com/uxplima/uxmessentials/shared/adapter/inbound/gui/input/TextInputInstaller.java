@@ -11,14 +11,17 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.Bedrock
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
+import com.uxplima.uxmlib.gui.dialog.DialogInputScreen;
 import com.uxplima.uxmlib.gui.input.PlayerInput;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the text-input seam once at bootstrap: loads {@link InputSettings} from {@code text-input.conf}, wraps the
  * already-installed shared {@link AnvilInput} as the anvil backend, installs the single shared chat backend, installs a
- * uxmLib {@link PlayerInput} the sign backend drives, and hands back the {@link TextInput} every GUI-using context
- * shares. The chat listener and the {@code PlayerInput} sign listener are registered here and torn down through
+ * uxmLib {@link PlayerInput} the sign backend drives, wires the native dialog backend where the server supports it, and
+ * hands back the {@link TextInput} every GUI-using context shares. The chat listener and the {@code PlayerInput} sign
+ * listener are registered here and torn down through
  * {@link Installed#uninstall()}, so on disable/reload exactly the listeners this installs come and go — mirroring how
  * the anvil input and the menu listener are installed once in {@code PluginModule}.
  */
@@ -74,8 +77,20 @@ public final class TextInputInstaller {
         PlayerInput playerInput = new PlayerInput(plugin);
         playerInput.install();
         SignTextBackend signBackend = new SignTextBackend(playerInput);
+        // Wire the dialog backend only where the native Dialog API exists (Minecraft 1.21.6+). On an older server it
+        // stays null, so a dialog-mode input point falls back with a logged warning rather than an immediate cancel.
+        @Nullable DialogTextBackend dialogBackend = DialogInputScreen.isSupported() ? DialogTextBackend.paperNative() : null;
         TextInput textInput = new TextInput(
-                settings, guiText, scheduler, anvilBackend, chatBackend, bedrock, bedrockScreen, signBackend);
+                settings,
+                guiText,
+                scheduler,
+                anvilBackend,
+                chatBackend,
+                bedrock,
+                bedrockScreen,
+                signBackend,
+                dialogBackend,
+                log);
         return new Installed(textInput, settings, () -> {
             chatBackend.uninstall();
             playerInput.uninstall();

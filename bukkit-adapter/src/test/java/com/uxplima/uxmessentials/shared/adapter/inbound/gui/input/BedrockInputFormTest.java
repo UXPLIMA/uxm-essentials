@@ -164,11 +164,12 @@ class BedrockInputFormTest {
     }
 
     private TextInput build() {
-        InputSettings settings = new InputSettings(dir.resolve("text-input.conf"), new SilentLogger());
+        Logger log = new SilentLogger();
+        InputSettings settings = new InputSettings(dir.resolve("text-input.conf"), log);
         GuiText guiText = new GuiText(new KeyMessages());
         AnvilTextBackend anvilBackend = new AnvilTextBackend(new AnvilInput(plugin));
         ChatTextBackend chatBackend = new ChatTextBackend(plugin);
-        return new TextInput(settings, guiText, new SyncScheduler(), anvilBackend, chatBackend, detector, screen);
+        return new TextInput(settings, guiText, new SyncScheduler(), anvilBackend, chatBackend, detector, screen, log);
     }
 
     /** Records the last input form it was asked to send and lets the test fire the submit or the close callback. */

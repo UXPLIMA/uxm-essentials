@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.input;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
@@ -14,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.Bedrock
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -52,16 +54,27 @@ public final class TextInput {
     private final ChatTextBackend chatBackend;
     private final BedrockDetector bedrock;
     private final BedrockScreen bedrockScreen;
+    private final Logger log;
 
     /**
-     * The native-screen backend a {@code sign}/{@code dialog} input point uses, or {@code null} on an engine wired
-     * without one (every test fixture), in which case those two modes fall back to the anvil backend. A dedicated
-     * dialog text backend does not exist yet, so {@code dialog} currently reuses this same native-screen backend.
+     * The transient-sign backend a {@code sign} input point uses, or {@code null} on an engine wired without one
+     * (every test fixture), in which case {@code sign} falls back to the anvil backend.
      */
     @Nullable private final TextInputBackend signBackend;
 
     /**
-     * As the seven-argument constructor, but with no Bedrock redirect: every viewer gets the anvil or chat prompt.
+     * The native-dialog backend a {@code dialog} input point uses, or {@code null} when no dialog backend is wired —
+     * the server predates the 1.21.6 Dialog API, or the seam predates the dialog backend. When {@code null}, a
+     * {@code dialog} input point falls back to the sign backend (or the anvil if no sign backend either), and the seam
+     * logs the substitution once through {@link #dialogFallback()} so the operator is not silently handed a sign.
+     */
+    @Nullable private final TextInputBackend dialogBackend;
+
+    /** Guards the one-time {@code input_mode_unavailable} log so a repeated dialog fallback does not spam the console. */
+    private final AtomicBoolean dialogFallbackWarned = new AtomicBoolean();
+
+    /**
+     * As the eight-argument constructor, but with no Bedrock redirect: every viewer gets the anvil or chat prompt.
      * Kept so the tests and any wiring that predates the Bedrock seam stay a delegating call.
      */
     public TextInput(
@@ -69,14 +82,15 @@ public final class TextInput {
             GuiText guiText,
             Scheduler scheduler,
             AnvilTextBackend anvilBackend,
-            ChatTextBackend chatBackend) {
-        this(settings, guiText, scheduler, anvilBackend, chatBackend, BedrockDetector.NONE, BedrockScreen.NONE);
+            ChatTextBackend chatBackend,
+            Logger log) {
+        this(settings, guiText, scheduler, anvilBackend, chatBackend, BedrockDetector.NONE, BedrockScreen.NONE, log);
     }
 
     /**
-     * As the eight-argument constructor, but with no native-screen backend: a {@code sign}/{@code dialog} input point
-     * falls back to the anvil backend. Kept so the tests and any wiring that predates the native-screen backends stay
-     * a delegating call.
+     * As the ten-argument constructor, but with neither a sign nor a dialog backend: a {@code sign} or {@code dialog}
+     * input point falls back to the anvil backend. Kept so the tests and any wiring that predates the native-screen
+     * backends stay a delegating call.
      */
     public TextInput(
             InputSettings settings,
@@ -85,8 +99,9 @@ public final class TextInput {
             AnvilTextBackend anvilBackend,
             ChatTextBackend chatBackend,
             BedrockDetector bedrock,
-            BedrockScreen bedrockScreen) {
-        this(settings, guiText, scheduler, anvilBackend, chatBackend, bedrock, bedrockScreen, null);
+            BedrockScreen bedrockScreen,
+            Logger log) {
+        this(settings, guiText, scheduler, anvilBackend, chatBackend, bedrock, bedrockScreen, null, null, log);
     }
 
     public TextInput(
@@ -97,7 +112,9 @@ public final class TextInput {
             ChatTextBackend chatBackend,
             BedrockDetector bedrock,
             BedrockScreen bedrockScreen,
-            @Nullable TextInputBackend signBackend) {
+            @Nullable TextInputBackend signBackend,
+            @Nullable TextInputBackend dialogBackend,
+            Logger log) {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -105,7 +122,9 @@ public final class TextInput {
         this.chatBackend = Objects.requireNonNull(chatBackend, "chatBackend");
         this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
         this.bedrockScreen = Objects.requireNonNull(bedrockScreen, "bedrockScreen");
+        this.log = Objects.requireNonNull(log, "log");
         this.signBackend = signBackend;
+        this.dialogBackend = dialogBackend;
     }
 
     /**
@@ -188,16 +207,32 @@ public final class TextInput {
     }
 
     /**
-     * The backend for {@code mode}: chat for {@code CHAT}, the native-screen backend for {@code SIGN}/{@code DIALOG}
-     * (falling back to the anvil when none is wired), and the anvil for {@code ANVIL}. {@code DIALOG} shares the
-     * native-screen backend until a dedicated dialog text backend exists.
+     * The backend for {@code mode}: chat for {@code CHAT}, the transient sign for {@code SIGN}, the native dialog for
+     * {@code DIALOG}, and the anvil for {@code ANVIL}. A {@code SIGN}/{@code DIALOG} point whose backend is not wired
+     * falls back to the anvil; a {@code DIALOG} fallback is logged once by {@link #dialogFallback()} rather than
+     * silently masquerading as a sign or an anvil.
      */
     private TextInputBackend backendFor(InputMode mode) {
         return switch (mode) {
             case CHAT -> chatBackend;
-            case SIGN, DIALOG -> signBackend != null ? signBackend : anvilBackend;
+            case DIALOG -> dialogBackend != null ? dialogBackend : dialogFallback();
+            case SIGN -> signBackend != null ? signBackend : anvilBackend;
             case ANVIL -> anvilBackend;
         };
+    }
+
+    /**
+     * The backend a {@code dialog} input point falls back to when no dialog backend is wired — the server predates the
+     * 1.21.6 Dialog API, or the seam was built without one. The substitution is logged once (not per prompt, guarded by
+     * {@link #dialogFallbackWarned}) so an operator who configured {@code dialog} and saw a sign or an anvil can find
+     * out why, instead of a silent masquerade.
+     */
+    private TextInputBackend dialogFallback() {
+        TextInputBackend sign = signBackend;
+        if (dialogFallbackWarned.compareAndSet(false, true)) {
+            log.warn("event=input_mode_unavailable mode=dialog fallback={}", sign != null ? "sign" : "anvil");
+        }
+        return sign != null ? sign : anvilBackend;
     }
 
     /**
