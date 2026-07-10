@@ -10,7 +10,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ListViewState;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -18,7 +18,7 @@ import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Lays a {@link ListSpec} into an open inventory for one viewer, the list counterpart of {@link EditorRenderer}. It
+ * Lays an {@link EntityListSpec} into an open inventory for one viewer, the list counterpart of {@link EditorRenderer}. It
  * paints the spec's filler everywhere, then one entity icon per content slot for the requested page (sliced through
  * the shared {@link Pagination} so a page flip never re-queries), then the previous/next nav buttons, then the
  * optional create and action buttons — recording each clickable slot onto the holder's {@link ListViewState} so the
@@ -41,7 +41,8 @@ public final class ListViewRenderer {
      * onto {@code state}. The caller clears the list's slot routing first, so this never needs to; it just records
      * the slots it paints and returns the clamped page index so the holder can stamp it back.
      */
-    public int populate(Inventory inv, ListSpec spec, ListViewState state, Player live, PlayerRef viewer, int page) {
+    public int populate(
+            Inventory inv, EntityListSpec spec, ListViewState state, Player live, PlayerRef viewer, int page) {
         Objects.requireNonNull(inv, "inv");
         Objects.requireNonNull(spec, "spec");
         Objects.requireNonNull(state, "state");
@@ -57,7 +58,7 @@ public final class ListViewRenderer {
     }
 
     /** Slice the snapshot for {@code page}, draw each entity's icon at its content slot, record each as an entity. */
-    private int paintEntities(Inventory inv, ListSpec spec, ListViewState state, PlayerRef viewer, int page) {
+    private int paintEntities(Inventory inv, EntityListSpec spec, ListViewState state, PlayerRef viewer, int page) {
         Pagination.Page<Object> sliced = Pagination.paginate(spec.entities(), spec.contentSlots(), page);
         for (Map.Entry<Integer, Object> placed : sliced.placements()) {
             int slot = placed.getKey();
@@ -69,18 +70,18 @@ public final class ListViewRenderer {
     }
 
     /** Draw the previous/next nav buttons at their slots and record both so a click re-paginates the holder. */
-    private void paintNav(Inventory inv, ListSpec spec, ListViewState state) {
+    private void paintNav(Inventory inv, EntityListSpec spec, ListViewState state) {
         inv.setItem(spec.prevSlot(), navButton(spec, spec.prevName()));
         inv.setItem(spec.nextSlot(), navButton(spec, spec.nextName()));
         state.recordNav(spec.prevSlot(), spec.nextSlot());
     }
 
-    private ItemStack navButton(ListSpec spec, Component name) {
+    private ItemStack navButton(EntityListSpec spec, Component name) {
         return ItemBuilder.of(spec.navIcon()).name(name).build();
     }
 
     /** Paint the optional create button when the spec carries one, recording its click as a plain button. */
-    private void paintCreate(Inventory inv, ListSpec spec, ListViewState state, Player live) {
+    private void paintCreate(Inventory inv, EntityListSpec spec, ListViewState state, Player live) {
         if (spec.createSlot().isEmpty()
                 || spec.createName().isEmpty()
                 || spec.onCreate().isEmpty()) {
@@ -96,7 +97,7 @@ public final class ListViewRenderer {
     }
 
     /** Paint the optional action button when the spec carries one, recording its click as a plain button. */
-    private void paintAction(Inventory inv, ListSpec spec, ListViewState state, Player live) {
+    private void paintAction(Inventory inv, EntityListSpec spec, ListViewState state, Player live) {
         if (spec.actionSlot().isEmpty()
                 || spec.actionName().isEmpty()
                 || spec.onAction().isEmpty()) {
@@ -112,8 +113,8 @@ public final class ListViewRenderer {
     }
 
     /** Paint each of the spec's fixed extra buttons as-is, recording each click as a plain button on the state. */
-    private void paintExtras(Inventory inv, ListSpec spec, ListViewState state, Player live) {
-        for (ListSpec.ExtraButton button : spec.extraButtons()) {
+    private void paintExtras(Inventory inv, EntityListSpec spec, ListViewState state, Player live) {
+        for (EntityListSpec.ExtraButton button : spec.extraButtons()) {
             inv.setItem(button.slot(), button.icon());
             state.recordButton(button.slot(), () -> button.onClick().accept(live));
         }

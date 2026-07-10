@@ -17,7 +17,7 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -34,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The view holds no module logic beyond the icon: it is given the full currency list, the active one, and the
  * callback. It draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over a
- * {@link ListSpec}, so the window is a holder-backed engine list routed and torn down by the one menu listener and
+ * {@link EntityListSpec}, so the window is a holder-backed engine list routed and torn down by the one menu listener and
  * one {@code closeMenu}, with paging re-paginating the same holder. The currency list is already in hand (the
  * caller passes it), so the engine reads only that snapshot and shows the window on the viewer's entity thread.
  */
@@ -73,13 +73,14 @@ public final class CurrencyPickerView {
     }
 
     /**
-     * Build the engine {@link ListSpec} for one viewer: the currencies as the listed entities, the per-currency
+     * Build the engine {@link EntityListSpec} for one viewer: the currencies as the listed entities, the per-currency
      * icon renderer (which glints the active one), and an {@code onSelect} that runs the caller's {@code onPick}.
      * The geometry — six rows, content slots 0..44, prev/next at 45/53, gray-glass filler — matches the old view
      * slot-for-slot, so the engine draws the same picker the {@code PaginatedGui} did.
      */
-    private ListSpec spec(PlayerRef viewerRef, List<Currency> currencies, Currency active, Consumer<Currency> onPick) {
-        return ListSpec.builder()
+    private EntityListSpec spec(
+            PlayerRef viewerRef, List<Currency> currencies, Currency active, Consumer<Currency> onPick) {
+        return EntityListSpec.builder()
                 .title(guiText.text(viewerRef, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_PICKER_TITLE))
                 .rows(ROWS)
                 .contentSlots(CONTENT_SLOTS)

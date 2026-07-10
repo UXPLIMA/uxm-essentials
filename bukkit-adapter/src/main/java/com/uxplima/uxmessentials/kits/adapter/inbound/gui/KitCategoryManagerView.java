@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  * old bespoke window did.
  *
  * <p>The window draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over a
- * {@link ListSpec}, so it is a holder-backed engine list routed and torn down by the one menu listener and one
+ * {@link EntityListSpec}, so it is a holder-backed engine list routed and torn down by the one menu listener and one
  * {@code closeMenu}, with paging re-paginating the same holder. The category list is a plain repository read that
  * touches no Bukkit API, so the engine reads only that snapshot and shows the window on the viewer's entity thread.
  * Mirrors the two category selectors the kit-settings and category-settings editors open.
@@ -102,12 +102,12 @@ public final class KitCategoryManagerView {
     }
 
     /**
-     * Build the engine {@link ListSpec}: the categories as the listed entities, the per-category icon reproducing the
+     * Build the engine {@link EntityListSpec}: the categories as the listed entities, the per-category icon reproducing the
      * old {@code icon(cat, viewer)}, an {@code onSelect} that opens the clicked category's settings, plus the create
      * and back buttons the old grid drew at slots 49 and 53.
      */
-    private ListSpec spec(PlayerRef viewer, List<KitCategory> categories) {
-        return ListSpec.builder()
+    private EntityListSpec spec(PlayerRef viewer, List<KitCategory> categories) {
+        return EntityListSpec.builder()
                 .title(guiText.text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_MANAGER_TITLE))
                 .rows(ROWS)
                 .contentSlots(CONTENT_SLOTS)
@@ -123,19 +123,19 @@ public final class KitCategoryManagerView {
                 .build();
     }
 
-    private ListSpec.ExtraButton createButton(PlayerRef viewer) {
+    private EntityListSpec.ExtraButton createButton(PlayerRef viewer) {
         ItemStack icon = ItemBuilder.of(Material.EMERALD_BLOCK)
                 .name(guiText.text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_CREATE_BUTTON_NAME))
                 .lore(List.of(guiText.text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_CREATE_BUTTON_LORE)))
                 .build();
-        return new ListSpec.ExtraButton(CREATE_SLOT, icon, p -> promptCreate(p, viewer));
+        return new EntityListSpec.ExtraButton(CREATE_SLOT, icon, p -> promptCreate(p, viewer));
     }
 
-    private ListSpec.ExtraButton backButton(PlayerRef viewer) {
+    private EntityListSpec.ExtraButton backButton(PlayerRef viewer) {
         ItemStack icon = ItemBuilder.of(Material.ARROW)
                 .name(guiText.text(viewer, KitsMessageKey.KIT_EDITOR_SETTINGS_BACK_BUTTON))
                 .build();
-        return new ListSpec.ExtraButton(BACK_SLOT, icon, p -> back(p, viewer));
+        return new EntityListSpec.ExtraButton(BACK_SLOT, icon, p -> back(p, viewer));
     }
 
     /** Prompt for a category id, save the new empty category, and open its settings — the old create button's effect. */

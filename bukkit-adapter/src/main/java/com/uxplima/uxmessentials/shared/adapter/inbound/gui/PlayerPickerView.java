@@ -15,7 +15,7 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
@@ -46,11 +46,11 @@ import org.jspecify.annotations.NullMarked;
  * so the sanction callers that only pick a target are unaffected; a supplied button renders in a free bottom-row slot
  * and fires its own callback with the live viewer.
  *
- * <p>It draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over a {@link ListSpec}: a
+ * <p>It draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over an {@link EntityListSpec}: a
  * holder-backed engine list routed and torn down by the one menu listener and one {@code closeMenu}, with paging
  * re-paginating the same holder so a 500-player roster pages cleanly. The heads are the listed entities (their
  * {@code onSelect} the pick callback), and the offline-name button plus any footer buttons are the spec's fixed
- * {@link ListSpec.ExtraButton extra buttons}.
+ * {@link EntityListSpec.ExtraButton extra buttons}.
  *
  * <p>Folia: the online roster is enumerated on the global region thread (iterating
  * {@code Server.getOnlinePlayers()} off it is illegal) and snapshotted to plain {@link PlayerRef}s; the engine then
@@ -116,13 +116,13 @@ public final class PlayerPickerView {
     }
 
     /**
-     * Build the engine {@link ListSpec} for one open: the roster as the listed entities, the per-head icon renderer,
+     * Build the engine {@link EntityListSpec} for one open: the roster as the listed entities, the per-head icon renderer,
      * an {@code onSelect} that runs the caller's {@code onPick}, and the offline-name button plus any footer buttons
      * as the spec's fixed extra buttons. The geometry — six rows, content slots 0..44, prev/next at 45/53, the offline
      * button at 49, footer buttons at 47/51, gray-glass filler — matches the old view slot-for-slot.
      */
-    private ListSpec spec(PlayerRef viewerRef, Request request, List<PlayerRef> roster) {
-        return ListSpec.builder()
+    private EntityListSpec spec(PlayerRef viewerRef, Request request, List<PlayerRef> roster) {
+        return EntityListSpec.builder()
                 .title(guiText.text(viewerRef, request.title()))
                 .rows(PICKER_ROWS)
                 .contentSlots(CONTENT_SLOTS)
@@ -139,14 +139,15 @@ public final class PlayerPickerView {
     }
 
     /** The offline-name anvil button plus the caller's optional footer buttons, each firing with the live viewer. */
-    private List<ListSpec.ExtraButton> extraButtons(PlayerRef viewerRef, Request request) {
-        List<ListSpec.ExtraButton> buttons = new ArrayList<>();
-        buttons.add(new ListSpec.ExtraButton(
+    private List<EntityListSpec.ExtraButton> extraButtons(PlayerRef viewerRef, Request request) {
+        List<EntityListSpec.ExtraButton> buttons = new ArrayList<>();
+        buttons.add(new EntityListSpec.ExtraButton(
                 OFFLINE_BUTTON_SLOT, offlineButton(viewerRef), p -> promptOffline(p, viewerRef, request)));
         List<FooterButton> footers = request.footerButtons();
         for (int i = 0; i < footers.size() && i < FOOTER_SLOTS.length; i++) {
             FooterButton footer = footers.get(i);
-            buttons.add(new ListSpec.ExtraButton(FOOTER_SLOTS[i], footerIcon(viewerRef, footer), footer.onClick()));
+            buttons.add(
+                    new EntityListSpec.ExtraButton(FOOTER_SLOTS[i], footerIcon(viewerRef, footer), footer.onClick()));
         }
         return buttons;
     }

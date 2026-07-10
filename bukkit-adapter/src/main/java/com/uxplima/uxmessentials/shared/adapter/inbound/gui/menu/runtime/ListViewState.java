@@ -12,7 +12,7 @@ import org.jspecify.annotations.NullMarked;
  * The per-open state of a paginated entity list, parked on its {@link MenuHolder} on the list path only. Where a
  * spec menu re-derives its slots from a {@code MenuSpec}, an editor from an {@code EditorSpec}, a selector from its
  * {@link SelectorState} and a confirm from its {@link ConfirmState}, an entity list re-derives its slots from the
- * {@code ListSpec} and the already-snapshotted entities, so the holder carries the spec here and the list renderer
+ * {@code EntityListSpec} and the already-snapshotted entities, so the holder carries the spec here and the list renderer
  * re-reads the entity snapshot fresh on every draw (matching the bespoke {@code EntityListView}'s
  * {@code entities.get()} per page).
  *
@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * apart from the other menu kinds without giving any of them a slot it has no item for.
  *
  * <p>The {@code spec} is held as {@link Object} so this runtime class needs no compile dependency on the public
- * {@code ListSpec} façade type (the list renderer, which already depends on that type, casts it back) and the
+ * {@code EntityListSpec} façade type (the list renderer, which already depends on that type, casts it back) and the
  * {@code runtime}→{@code menu} package edge stays acyclic.
  */
 @NullMarked
@@ -44,7 +44,7 @@ public final class ListViewState {
         this.spec = Objects.requireNonNull(spec, "spec");
     }
 
-    /** The {@code ListSpec} this list was opened from, opaque here and cast back by the list renderer. */
+    /** The {@code EntityListSpec} this list was opened from, opaque here and cast back by the list renderer. */
     public Object spec() {
         return spec;
     }

@@ -16,13 +16,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSp
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The recipe the engine draws a slot-grid canvas from — the grid analog of a {@link ListSpec} or {@link EditorSpec},
+ * The recipe the engine draws a slot-grid canvas from — the grid analog of an {@link EntityListSpec} or {@link EditorSpec},
  * opened through {@link Menus#openGrid}. It describes a canvas that mirrors an edited menu's slots: the engine sizes a
  * window one row taller than the menu (capped at six), paints the content rows with the caller's items and reserves the
  * last row for controls, paginating a six-row menu across two pages so the control row never collides with content.
  *
  * <p>Only the layout lives here; the editing behaviour is the {@link GridHandlers} handed alongside. The content is a
- * {@link Supplier} of {@code menuSlot -> MenuItemSpec}, re-read on every draw (the same discipline {@link ListSpec}
+ * {@link Supplier} of {@code menuSlot -> MenuItemSpec}, re-read on every draw (the same discipline {@link EntityListSpec}
  * uses for its entities), so a caller mutating its edit model and calling {@link GridView#reRender} shows the change
  * without rebuilding the spec — and the engine renders each preview through its own {@code ItemRenderer}, so the
  * consumer never touches a renderer. The empty / blocker / nav / control icons are {@link ItemStack}s the caller

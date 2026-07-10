@@ -13,7 +13,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  * a click on the create button invokes the optional {@code onCreate}.
  *
  * <p>The view is a thin shim over the menu engine's paginated-list runtime: it turns the {@code (layout, title,
- * entities, icon renderer, select, optional create/action)} a module hands it into a {@link ListSpec} and opens it
+ * entities, icon renderer, select, optional create/action)} a module hands it into an {@link EntityListSpec} and opens it
  * through {@link Menus#openList}, so the window is a holder-backed engine list routed and torn down by the one menu
  * listener and one {@code closeMenu}. The geometry, materials and catalog keys are unchanged, so the rendered list
  * is identical slot-for-slot to the bespoke {@code PaginatedGui} it replaces, and page flips re-paginate the same
@@ -101,7 +101,7 @@ public final class EntityListView<T> {
     }
 
     /**
-     * Build the engine {@link ListSpec} for one viewer. The title and button names resolve against {@code viewer},
+     * Build the engine {@link EntityListSpec} for one viewer. The title and button names resolve against {@code viewer},
      * so the spec is built per open (matching the bespoke view, which rebuilt its {@code PaginatedGui} per open); the
      * typed icon renderer and select handler close over {@code T} and cast the engine's type-erased {@link Object}
      * entity back, which is always one of the very entities this view's supplier produced.
@@ -110,10 +110,10 @@ public final class EntityListView<T> {
      * instead — the engine then draws just the filler and nav, an empty-state panel rather than a head grid, so a
      * list with nothing to show no longer needs a bespoke empty-state window.
      */
-    private ListSpec spec(PlayerRef viewer) {
+    private EntityListSpec spec(PlayerRef viewer) {
         List<T> snapshot = entities.get();
         MessageKey resolvedTitle = snapshot.isEmpty() && emptyTitle != null ? emptyTitle : title;
-        ListSpec.Builder spec = ListSpec.builder()
+        EntityListSpec.Builder spec = EntityListSpec.builder()
                 .title(guiText.text(viewer, resolvedTitle))
                 .rows(layout.rows())
                 .contentSlots(contentSlots())

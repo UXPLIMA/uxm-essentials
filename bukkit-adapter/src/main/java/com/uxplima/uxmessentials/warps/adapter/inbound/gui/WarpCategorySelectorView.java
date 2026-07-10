@@ -13,7 +13,7 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -36,7 +36,7 @@ import org.jspecify.annotations.NullMarked;
  * then returns the viewer to its {@link WarpEditorView}, the caller that opened the selector.
  *
  * <p>The window draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over a
- * {@link ListSpec}, so it is a holder-backed engine list routed and torn down by the one menu listener and one
+ * {@link EntityListSpec}, so it is a holder-backed engine list routed and torn down by the one menu listener and one
  * {@code closeMenu}, with paging re-paginating the same holder. The category list is a plain repository read that
  * touches no Bukkit API, so the engine reads only that snapshot and shows the window on the viewer's entity thread;
  * the still-bespoke warp editor opens this transitionally and the assign reopens it, exactly as before.
@@ -86,12 +86,12 @@ public final class WarpCategorySelectorView {
     }
 
     /**
-     * Build the engine {@link ListSpec}: the categories as the listed entities, the per-category icon reproducing
+     * Build the engine {@link EntityListSpec}: the categories as the listed entities, the per-category icon reproducing
      * the old {@code icon(cat, viewer)}, an {@code onSelect} that saves the warp with the clicked category and reopens
      * its editor, plus the "no category" clear and back buttons the old grid drew at slots 49 and 53.
      */
-    private ListSpec spec(Player player, PlayerRef viewer, String warpName, List<WarpCategory> categories) {
-        return ListSpec.builder()
+    private EntityListSpec spec(Player player, PlayerRef viewer, String warpName, List<WarpCategory> categories) {
+        return EntityListSpec.builder()
                 .title(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_SELECTOR_TITLE))
                 .rows(ROWS)
                 .contentSlots(CONTENT_SLOTS)
@@ -112,19 +112,19 @@ public final class WarpCategorySelectorView {
         editorView.open(player, viewer, warpName, null);
     }
 
-    private ListSpec.ExtraButton noneButton(Player player, PlayerRef viewer, String warpName) {
+    private EntityListSpec.ExtraButton noneButton(Player player, PlayerRef viewer, String warpName) {
         ItemStack icon = ItemBuilder.of(Material.BARRIER)
                 .name(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_SELECTOR_NONE_NAME))
                 .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_SELECTOR_NONE_LORE)))
                 .build();
-        return new ListSpec.ExtraButton(NONE_SLOT, icon, p -> assign(player, viewer, warpName, Optional.empty()));
+        return new EntityListSpec.ExtraButton(NONE_SLOT, icon, p -> assign(player, viewer, warpName, Optional.empty()));
     }
 
-    private ListSpec.ExtraButton backButton(Player player, PlayerRef viewer, String warpName) {
+    private EntityListSpec.ExtraButton backButton(Player player, PlayerRef viewer, String warpName) {
         ItemStack icon = ItemBuilder.of(Material.ARROW)
                 .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK))
                 .build();
-        return new ListSpec.ExtraButton(BACK_SLOT, icon, p -> editorView.open(player, viewer, warpName, null));
+        return new EntityListSpec.ExtraButton(BACK_SLOT, icon, p -> editorView.open(player, viewer, warpName, null));
     }
 
     private ItemStack icon(WarpCategory category, PlayerRef viewer) {

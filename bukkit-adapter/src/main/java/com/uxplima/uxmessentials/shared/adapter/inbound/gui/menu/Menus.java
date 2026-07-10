@@ -61,6 +61,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.Selecto
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
@@ -561,14 +562,14 @@ public final class Menus {
      * imperative icon renderer reads only the snapshot. A page flip re-paginates the same holder (the listener's list
      * branch), so a list arms no refresh timer and stays leak-balanced.
      */
-    public void openList(PlayerRef viewer, ListSpec spec) {
+    public void openList(PlayerRef viewer, EntityListSpec spec) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(spec, "spec");
         scheduler.onEntity(viewer, () -> openListResolved(viewer, spec));
     }
 
     /** On the viewer's entity thread: build the list holder + window, render page zero, show it. No refresh. */
-    private void openListResolved(PlayerRef viewer, ListSpec spec) {
+    private void openListResolved(PlayerRef viewer, EntityListSpec spec) {
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live == null || !live.isOnline()) {
             return;
@@ -585,7 +586,7 @@ public final class Menus {
     }
 
     /** The minimal {@link MenuSpec} a list holder carries: the row count, refresh off, no items — clicks ride state. */
-    private static MenuSpec listMenuSpec(ListSpec spec) {
+    private static MenuSpec listMenuSpec(EntityListSpec spec) {
         return new MenuSpec("", spec.rows(), new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
@@ -861,7 +862,7 @@ public final class Menus {
     /** Resolve one list-backed item's source: the in-memory registry first, then the paged one, else an empty list. */
     private void resolveListSource(
             MenuItemSpec item,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec listSpec,
+            ListSpec listSpec,
             MenuContext ctx,
             Map<String, List<?>> rows,
             Map<String, PagedListMeta> paged) {
@@ -882,7 +883,7 @@ public final class Menus {
     /** Ask a paged source for the default page, store its rows (pinned first) under the id, and note its reported total. */
     private void resolvePagedSource(
             MenuItemSpec item,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec listSpec,
+            ListSpec listSpec,
             String sourceId,
             BiFunction<MenuContext, PageRequest, PagedResult<?>> source,
             MenuContext ctx,
@@ -896,8 +897,7 @@ public final class Menus {
     }
 
     /** The page size the default request uses: the spec's explicit page-size, or the item's slot count when it is zero. */
-    private static int pageSize(
-            MenuItemSpec item, com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec listSpec) {
+    private static int pageSize(MenuItemSpec item, ListSpec listSpec) {
         return listSpec.pageSize() != 0
                 ? listSpec.pageSize()
                 : item.slots().slots().size();

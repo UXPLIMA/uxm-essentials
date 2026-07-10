@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  * user-facing literal of its own.
  */
 @NullMarked
-public final class ListSpec {
+public final class EntityListSpec {
 
     private final Component title;
     private final int rows;
@@ -61,7 +61,7 @@ public final class ListSpec {
     private final @Nullable Consumer<Player> onAction;
     private final List<ExtraButton> extraButtons;
 
-    private ListSpec(Builder builder) {
+    private EntityListSpec(Builder builder) {
         this.title = Objects.requireNonNull(builder.title, "title");
         this.rows = builder.rows;
         this.contentSlots = List.copyOf(Objects.requireNonNull(builder.contentSlots, "contentSlots"));
@@ -88,7 +88,7 @@ public final class ListSpec {
         }
     }
 
-    /** Start building a list spec; required fields are validated at {@link Builder#build}. */
+    /** Start building an entity-list spec; required fields are validated at {@link Builder#build}. */
     public static Builder builder() {
         return new Builder();
     }
@@ -287,8 +287,8 @@ public final class ListSpec {
         }
 
         /** Build the spec; the constructor validates that every required field was set. */
-        public ListSpec build() {
-            return new ListSpec(this);
+        public EntityListSpec build() {
+            return new EntityListSpec(this);
         }
     }
 

@@ -39,11 +39,11 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridCaptureHandler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridHandlers;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuClickEvent;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
@@ -602,7 +602,7 @@ public final class MenuListener implements Listener {
         }
         Object entity = list.entityAt(slot).orElse(null);
         if (entity != null) {
-            runOnList(holder, live -> ((ListSpec) list.spec()).onSelect().accept(live, entity));
+            runOnList(holder, live -> ((EntityListSpec) list.spec()).onSelect().accept(live, entity));
             return;
         }
         list.buttonAt(slot).ifPresent(action -> runOnList(holder, ignored -> action.run()));
@@ -630,7 +630,7 @@ public final class MenuListener implements Listener {
         list.clearSlots();
         int clamped = listViewRenderer.populate(
                 holder.getInventory(),
-                (ListSpec) list.spec(),
+                (EntityListSpec) list.spec(),
                 list,
                 live,
                 holder.ctx().viewer(),

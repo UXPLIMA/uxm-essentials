@@ -19,7 +19,7 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -34,7 +34,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * Coverage of the engine list's {@code extraButtons} completion: a {@link ListSpec} may carry fixed pre-built buttons
+ * Coverage of the engine list's {@code extraButtons} completion: an {@link EntityListSpec} may carry fixed pre-built buttons
  * beyond its single create/action pair, so a caller that needs three or more non-entity buttons (the shared player
  * picker's offline-name button plus its two optional footer buttons) is not capped at two. The test opens a list with
  * two extra buttons through {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus#openList}, asserts
@@ -93,8 +93,8 @@ class MenuListExtraButtonsTest {
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
-    private ListSpec spec() {
-        return ListSpec.builder()
+    private EntityListSpec spec() {
+        return EntityListSpec.builder()
                 .title(Component.text("list"))
                 .rows(6)
                 .contentSlots(List.of(0, 1, 2))
@@ -105,8 +105,10 @@ class MenuListExtraButtonsTest {
                 .iconRenderer((v, entity) -> new ItemStack(Material.PLAYER_HEAD))
                 .onSelect((p, entity) -> {})
                 .extraButtons(List.of(
-                        new ListSpec.ExtraButton(FIRST_EXTRA_SLOT, named(Material.NAME_TAG), p -> clicks.add("first")),
-                        new ListSpec.ExtraButton(SECOND_EXTRA_SLOT, named(Material.BOOK), p -> clicks.add("second"))))
+                        new EntityListSpec.ExtraButton(
+                                FIRST_EXTRA_SLOT, named(Material.NAME_TAG), p -> clicks.add("first")),
+                        new EntityListSpec.ExtraButton(
+                                SECOND_EXTRA_SLOT, named(Material.BOOK), p -> clicks.add("second"))))
                 .build();
     }
 

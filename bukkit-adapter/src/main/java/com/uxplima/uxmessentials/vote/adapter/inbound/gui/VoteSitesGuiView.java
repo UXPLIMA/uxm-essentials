@@ -17,7 +17,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * component so their client can open the link; clicking a site with no URL (or one still on cooldown) is a no-op.
  *
  * <p>The view draws through the menu engine's paginated-list runtime ({@link Menus#openList}) over a
- * {@link ListSpec}, so the window is a holder-backed engine list routed and torn down by the one menu listener and
+ * {@link EntityListSpec}, so the window is a holder-backed engine list routed and torn down by the one menu listener and
  * one {@code closeMenu}, with paging re-paginating the same holder. The per-site cooldown read is a database hit, so
  * {@link #open} resolves each site's votable/remaining state off the tick thread first and hands the engine the
  * resolved {@link SiteEntry} snapshot; the imperative icon renderer then reads only that snapshot and shows the
@@ -150,16 +150,16 @@ public final class VoteSitesGuiView {
     }
 
     /**
-     * Build the engine {@link ListSpec} for one viewer over the resolved site entries: one icon per site (votable
+     * Build the engine {@link EntityListSpec} for one viewer over the resolved site entries: one icon per site (votable
      * green / cooldown amber, matching the config materials), and an {@code onSelect} that sends the clickable vote
      * link for a votable site with a URL — a no-op otherwise. The window is sized just large enough for the entries
      * (capped at the configured {@code rows} plus the reserved nav row); the content grid fills every row above the
      * bottom one, and the previous/next arrows sit at the bottom-row corners, the same shape the other engine lists
      * draw.
      */
-    private ListSpec spec(PlayerRef viewerRef, List<SiteEntry> entries) {
+    private EntityListSpec spec(PlayerRef viewerRef, List<SiteEntry> entries) {
         int rows = windowRows(entries.size());
-        return ListSpec.builder()
+        return EntityListSpec.builder()
                 .title(guiText.text(viewerRef, VoteMessageKey.VOTE_GUI_TITLE))
                 .rows(rows)
                 .contentSlots(contentSlots(rows))
