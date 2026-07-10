@@ -35,6 +35,31 @@ public final class ClaimProviders {
     private static final ClaimProvider INACTIVE = new InactiveClaimProvider();
 
     /**
+     * The one ordered registry of claim-provider candidates: each pairs a {@code claims.providers} config key
+     * with the factory that builds its (lazily-guarded) provider. It is the single source of truth for the
+     * provider set — {@link #detectAll} folds every entry into the composite and {@link #candidateKeys()}
+     * exposes their keys — so a provider added here is the one edit {@code ClaimProviderCoverageDriftTest}
+     * cross-checks against {@code config.conf} and {@code paper-plugin.yml}, failing the build if either the
+     * discoverable toggle line or the load-order dependency was forgotten.
+     */
+    private static final List<Registration> REGISTRY = List.of(
+            new Registration("uxmclaims", UxmClaimsClaimProvider::new),
+            new Registration("lands", LandsClaimProvider::new),
+            new Registration("griefprevention", GriefPreventionClaimProvider::new),
+            new Registration("griefdefender", GriefDefenderClaimProvider::new),
+            new Registration("excellentclaims", ExcellentClaimsClaimProvider::new),
+            new Registration("simpleclaimsystem", SimpleClaimSystemClaimProvider::new),
+            new Registration("rclaim", RClaimClaimProvider::new),
+            new Registration("xclaim", XClaimClaimProvider::new),
+            new Registration("homestead", HomesteadClaimProvider::new),
+            new Registration("worldguard", WorldGuardClaimProvider::new),
+            new Registration("towny", TownyClaimProvider::new),
+            new Registration("bentobox", BentoBoxClaimProvider::new),
+            new Registration("residence", ResidenceClaimProvider::new),
+            new Registration("plotsquared", PlotSquaredClaimProvider::new),
+            new Registration("superiorskyblock", SuperiorSkyblockClaimProvider::new));
+
+    /**
      * Binds a composite over every claim plugin that is both installed-and-active and enabled in
      * {@code config}, or the no-op provider when none qualifies. The returned provider's answers are folded
      * per {@link ClaimProvidersConfig#combine()}.
@@ -45,23 +70,22 @@ public final class ClaimProviders {
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(log, "log");
 
-        List<Candidate> candidates = List.of(
-                new Candidate("uxmclaims", new UxmClaimsClaimProvider(plugin, server, log)),
-                new Candidate("lands", new LandsClaimProvider(plugin, server, log)),
-                new Candidate("griefprevention", new GriefPreventionClaimProvider(plugin, server, log)),
-                new Candidate("griefdefender", new GriefDefenderClaimProvider(plugin, server, log)),
-                new Candidate("excellentclaims", new ExcellentClaimsClaimProvider(plugin, server, log)),
-                new Candidate("simpleclaimsystem", new SimpleClaimSystemClaimProvider(plugin, server, log)),
-                new Candidate("rclaim", new RClaimClaimProvider(plugin, server, log)),
-                new Candidate("xclaim", new XClaimClaimProvider(plugin, server, log)),
-                new Candidate("homestead", new HomesteadClaimProvider(plugin, server, log)),
-                new Candidate("worldguard", new WorldGuardClaimProvider(plugin, server, log)),
-                new Candidate("towny", new TownyClaimProvider(plugin, server, log)),
-                new Candidate("bentobox", new BentoBoxClaimProvider(plugin, server, log)),
-                new Candidate("residence", new ResidenceClaimProvider(plugin, server, log)),
-                new Candidate("plotsquared", new PlotSquaredClaimProvider(plugin, server, log)),
-                new Candidate("superiorskyblock", new SuperiorSkyblockClaimProvider(plugin, server, log)));
+        List<Candidate> candidates = REGISTRY.stream()
+                .map(registration ->
+                        new Candidate(registration.key(), registration.factory().create(plugin, server, log)))
+                .toList();
         return compose(config, candidates, log);
+    }
+
+    /**
+     * The {@code claims.providers} key of every registered candidate, in registry order. This is the single
+     * source of truth two surfaces read rather than keeping their own copy: {@link ClaimProvidersConfig#from}
+     * validates operator keys against it (so a typo'd key that toggles nothing is flagged), and
+     * {@code ClaimProviderCoverageDriftTest} walks it to keep the registry, {@code config.conf} and
+     * {@code paper-plugin.yml} in lockstep.
+     */
+    public static List<String> candidateKeys() {
+        return REGISTRY.stream().map(Registration::key).toList();
     }
 
     /**
@@ -92,6 +116,21 @@ public final class ClaimProviders {
         Candidate {
             Objects.requireNonNull(configKey, "configKey");
             Objects.requireNonNull(provider, "provider");
+        }
+    }
+
+    /** Builds a candidate's provider from the wiring context; every claim provider shares this constructor shape. */
+    @FunctionalInterface
+    private interface ProviderFactory {
+        ClaimProvider create(Plugin plugin, Server server, Logger log);
+    }
+
+    /** A registry entry: a {@code claims.providers} key paired with the factory that builds its provider. */
+    private record Registration(String key, ProviderFactory factory) {
+
+        Registration {
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(factory, "factory");
         }
     }
 

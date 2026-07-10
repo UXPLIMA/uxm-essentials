@@ -733,7 +733,7 @@ public final class PluginModule {
         // Which claim plugins to consult and how to fold their answers is a server-wide choice read once from the
         // root config.conf, then handed to every context whose region gate consults claimed land (homes, teleport,
         // poses) so all three see the same provider set.
-        ClaimProvidersConfig claimProviders = ClaimProvidersConfig.from(config);
+        ClaimProvidersConfig claimProviders = ClaimProvidersConfig.from(config, kernel.log());
         loadModulesIsolated(registry.enabledModules(config), resources, log, module -> {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);

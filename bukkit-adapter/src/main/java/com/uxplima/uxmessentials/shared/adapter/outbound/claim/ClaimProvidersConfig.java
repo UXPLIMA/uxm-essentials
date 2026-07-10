@@ -1,11 +1,13 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.claim;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -38,13 +40,32 @@ public record ClaimProvidersConfig(Set<String> disabledProviders, CombineMode co
         return new ClaimProvidersConfig(Set.of(), CombineMode.ANY_LAND);
     }
 
-    /** Read the {@code claims} block from {@code config}, defaulting each provider on and the combine to any-land. */
-    public static ClaimProvidersConfig from(ConfigStore config) {
+    /**
+     * Read the {@code claims} block from {@code config}, defaulting each provider on and the combine to any-land.
+     *
+     * <p>A key an operator writes under {@code claims.providers} that matches no registered provider (a typo like
+     * {@code lnads}) disables nothing — the safe direction — but is silent, so the intended disable never takes
+     * without any signal. Each unrecognised key is warned about here, naming it and the known set, so the operator
+     * learns their edit had no effect. The valid keys are {@link ClaimProviders#candidateKeys()} — the same registry
+     * {@link ClaimProviders#detectAll} folds — so this validation cannot drift from the provider set.
+     */
+    public static ClaimProvidersConfig from(ConfigStore config, Logger log) {
         Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(log, "log");
+        List<String> known = ClaimProviders.candidateKeys();
         Set<String> disabled = new HashSet<>();
         for (String key : config.getKeys(PROVIDERS_PATH)) {
+            String normalized = normalize(key);
+            if (!known.contains(normalized)) {
+                log.warn(
+                        "event=claim_provider_unknown_key key={} known={}: no claim provider is registered under this "
+                                + "claims.providers key, so it disables nothing; check the spelling",
+                        key,
+                        known);
+                continue;
+            }
             if (!config.getBoolean(PROVIDERS_PATH + "." + key, true)) {
-                disabled.add(normalize(key));
+                disabled.add(normalized);
             }
         }
         CombineMode combine = CombineMode.fromConfig(config.getString(COMBINE_PATH, CombineMode.ANY_LAND.configName()));
