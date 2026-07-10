@@ -35,6 +35,19 @@ class EconomyConfigBackendTest {
                 .isFalse();
     }
 
+    @Test
+    void aLedgerHoldingEveryCurrencyReportsNoForeignBacking() {
+        EconomyConfig config = new EconomyConfig(TestConfig.of("currencies.coins.symbol", "$"));
+        assertThat(EconomyWiring.foreignBackedCurrencies(config.currencies())).isEmpty();
+    }
+
+    @Test
+    void aCurrencyOnAForeignBackendIsNamedSoExchangeBankAndLoansCanBeRefused() {
+        EconomyConfig config = new EconomyConfig(
+                TestConfig.of("wallet.default-currency", "points", "currencies.points.backend", "playerpoints"));
+        assertThat(EconomyWiring.foreignBackedCurrencies(config.currencies())).containsExactly("points=playerpoints");
+    }
+
     /**
      * A config whose string values come from a fixed map, addressed by full dotted path; every other getter
      * returns the caller's fallback. Enough to exercise the currency-backend and the recurring-gate reads,

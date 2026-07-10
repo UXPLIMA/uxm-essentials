@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.ExchangeService;
 import com.uxplima.uxmessentials.economy.application.LookupWorth;
+import com.uxplima.uxmessentials.economy.application.NativeCurrencyBackend;
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayTaxation;
@@ -393,6 +394,43 @@ public final class EconomyWiring {
                 services.walletView());
     }
 
+    /**
+     * Whether this plugin's own wallet ledger is the authoritative store for every configured currency. Exchange,
+     * banks and loans read and write {@code wallet_balances} directly instead of going through
+     * {@link EconomyProvider}, so they are only correct while that holds. Two things break it: a foreign economy
+     * plugin consuming us outright, or a single currency naming a foreign {@code backend} — its real balance then
+     * lives in PlayerPoints or CoinsEngine, and a row in our table would invent money that does not exist.
+     *
+     * <p>One foreign currency therefore disables the three features for all currencies. A per-currency gate is the
+     * better answer, but it means reworking {@code ExchangeService}, {@code BankService} and {@code LoanService},
+     * and inventing money is the worse failure to risk in the meantime.
+     */
+    private static boolean walletLedgerIsAuthoritative(
+            EconomyProvider resolved, CurrencyRegistry currencies, KernelPorts kernel) {
+        if (!(resolved instanceof RoutingEconomyProvider)) {
+            return false;
+        }
+        List<String> foreign = foreignBackedCurrencies(currencies);
+        if (foreign.isEmpty()) {
+            return true;
+        }
+        kernel.log()
+                .warn(
+                        "event=wallet_ledger_not_authoritative foreign_currencies={} disabled=exchange,bank,loan",
+                        foreign);
+        return false;
+    }
+
+    /** The configured currencies whose balances live outside our ledger, as {@code <id>=<backend>} pairs. */
+    static List<String> foreignBackedCurrencies(CurrencyRegistry currencies) {
+        Objects.requireNonNull(currencies, "currencies");
+        return currencies.all().stream()
+                .filter(currency -> !NativeCurrencyBackend.ID.equals(currency.backendId()))
+                .map(currency -> currency.id().value() + "=" + currency.backendId())
+                .sorted()
+                .toList();
+    }
+
     private static EconomyServices useCases(
             Plugin plugin,
             Persistence persistence,
@@ -446,11 +484,7 @@ public final class EconomyWiring {
                 new PermissionTaxExemption(kernel.permissions(), settings.taxBypassNode()));
         Pay pay = new Pay(resolved, preferences, pending, notifier, taxation, clock);
 
-        // Exchange is a native-ledger feature like loans and banks: the atomic two-currency move runs through the
-        // wallet repository this context owns, so it is available only when this plugin runs its own provider — a
-        // foreign economy that consumed us holds balances we cannot move atomically here. The routing provider is
-        // that own-provider marker; a deferred-to Treasury or Vault economy is any other type.
-        boolean nativeLedger = resolved instanceof RoutingEconomyProvider;
+        boolean nativeLedger = walletLedgerIsAuthoritative(resolved, currencies, kernel);
         ExchangeService exchangeService = new ExchangeService(repository, settings.exchangeRegistry(), nativeLedger);
 
         // The read-only transaction-history list and the baltop leaderboard both render through the menu engine:
