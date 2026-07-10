@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,8 +62,27 @@ class CurrencyBackendsTest {
         assertThat(registry.find("native").orElseThrow().atomicDebit()).isTrue();
     }
 
+    @Test
+    void picksUpAConfiguredPlaceholderCurrency() {
+        CurrencyBackendRegistry registry = discover(PLACEHOLDER_CONFIG);
+
+        assertThat(registry.ids()).contains("placeholder:crowns");
+    }
+
+    @Test
+    void registersNoPlaceholderBackendWhenTheMapIsAbsent() {
+        CurrencyBackendRegistry registry = discover();
+
+        assertThat(registry.ids()).noneMatch(id -> id.startsWith("placeholder:"));
+    }
+
     private CurrencyBackendRegistry discover() {
-        return CurrencyBackends.discover(server, emptyHooks(), SILENT, mock(WalletRepository.class), EMPTY_CONFIG);
+        return discover(EMPTY_CONFIG);
+    }
+
+    private CurrencyBackendRegistry discover(ConfigStore config) {
+        return CurrencyBackends.discover(
+                server, emptyHooks(), SILENT, mock(Scheduler.class), mock(WalletRepository.class), config);
     }
 
     private Hooks emptyHooks() {
@@ -84,6 +104,34 @@ class CurrencyBackendsTest {
         @Override
         public int getInt(String path, int fallback) {
             return fallback;
+        }
+    };
+
+    /** A config with one {@code backends.placeholder} entry, {@code crowns}, and the command templates it needs. */
+    private static final ConfigStore PLACEHOLDER_CONFIG = new ConfigStore() {
+        @Override
+        public boolean getBoolean(String path, boolean fallback) {
+            return fallback;
+        }
+
+        @Override
+        public String getString(String path, String fallback) {
+            return switch (path) {
+                case "backends.placeholder.crowns.balance-placeholder" -> "%myeconomy_balance%";
+                case "backends.placeholder.crowns.give-command" -> "myeco give %player% %amount%";
+                case "backends.placeholder.crowns.take-command" -> "myeco take %player% %amount%";
+                default -> fallback;
+            };
+        }
+
+        @Override
+        public int getInt(String path, int fallback) {
+            return fallback;
+        }
+
+        @Override
+        public List<String> getKeys(String path) {
+            return "backends.placeholder".equals(path) ? List.of("crowns") : List.of();
         }
     };
 
