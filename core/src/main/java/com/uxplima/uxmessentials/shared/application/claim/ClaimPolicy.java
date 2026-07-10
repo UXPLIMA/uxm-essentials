@@ -35,12 +35,16 @@ public final class ClaimPolicy {
      *
      * <ul>
      *   <li>Provider inactive → {@code ALLOWED}.
-     *   <li>Block inside a claim the player trusts → {@code ALLOWED}.
+     *   <li>Block inside a claim the player is banned from → {@code DENIED_ACCESS}, ahead of every
+     *       trust or ownership test — a ban overrides membership.
+     *   <li>Block inside a claim whose membership the player satisfies → {@code ALLOWED}. Membership
+     *       is ownership alone when {@code ownerOnly} is set, otherwise owner-or-member.
      *   <li>Block inside a foreign claim and {@code blockForeignClaims} is on → {@code DENIED_FOREIGN}.
      *   <li>Block inside a foreign claim and {@code blockForeignClaims} is off → {@code ALLOWED}.
      *   <li>Block in unclaimed land and {@code requireClaim} is on → {@code DENIED_REQUIRED}.
      *   <li>Block in unclaimed land and {@code foreignChunkDistance} &gt; 0 → proximity check →
-     *       {@code DENIED_TOO_CLOSE} when a foreign claim is within that chunk radius.
+     *       {@code DENIED_TOO_CLOSE} when a claim the player is not a member of is within that chunk
+     *       radius (membership honours {@code ownerOnly} the same way).
      *   <li>Otherwise → {@code ALLOWED}.
      * </ul>
      */
@@ -53,14 +57,8 @@ public final class ClaimPolicy {
         }
 
         Optional<ClaimLookup> claimOpt = provider.claimAt(world, blockX, blockZ);
-
         if (claimOpt.isPresent()) {
-            ClaimLookup lookup = claimOpt.get();
-            if (lookup.isTrusted(player)) {
-                return ClaimDecision.ALLOWED;
-            }
-            // Foreign claim exists — either block or allow based on config.
-            return settings.blockForeignClaims() ? ClaimDecision.DENIED_FOREIGN : ClaimDecision.ALLOWED;
+            return withinClaimPlacement(claimOpt.get(), player);
         }
 
         // Block is in unclaimed land.
@@ -76,11 +74,23 @@ public final class ClaimPolicy {
         return ClaimDecision.ALLOWED;
     }
 
+    /** Placement outcome when the target block already sits inside a claim. */
+    private ClaimDecision withinClaimPlacement(ClaimLookup lookup, UUID player) {
+        if (lookup.isBanned(player)) {
+            return ClaimDecision.DENIED_ACCESS;
+        }
+        if (permitted(lookup, player)) {
+            return ClaimDecision.ALLOWED;
+        }
+        // Foreign claim exists — either block or allow based on config.
+        return settings.blockForeignClaims() ? ClaimDecision.DENIED_FOREIGN : ClaimDecision.ALLOWED;
+    }
+
     /**
      * Determines whether {@code player} may teleport to ({@code blockX}, {@code blockZ}) in
      * {@code world}. Returns {@code ALLOWED} immediately when {@code checkTeleportAccess} is off.
-     * When a claim covers the block and the player is not trusted there (or is banned),
-     * returns {@code DENIED_ACCESS}.
+     * When a claim covers the block, a player banned from it is {@code DENIED_ACCESS} ahead of the
+     * trust test, and a player who is not trusted there is {@code DENIED_ACCESS} as well.
      */
     public ClaimDecision canAccess(UUID player, WorldRef world, int blockX, int blockZ) {
         Objects.requireNonNull(player, "player");
@@ -101,6 +111,9 @@ public final class ClaimPolicy {
         }
 
         ClaimLookup lookup = claimOpt.get();
+        if (lookup.isBanned(player)) {
+            return ClaimDecision.DENIED_ACCESS;
+        }
         return lookup.isTrusted(player) ? ClaimDecision.ALLOWED : ClaimDecision.DENIED_ACCESS;
     }
 
@@ -119,7 +132,9 @@ public final class ClaimPolicy {
     /**
      * Scans the chunk grid in the range {@code [-distance, distance]} around the base chunk of
      * ({@code blockX}, {@code blockZ}), skipping the centre. If any chunk contains a claim the
-     * player is not trusted in, returns {@code DENIED_TOO_CLOSE}.
+     * player is not a member of, returns {@code DENIED_TOO_CLOSE}. Membership honours {@code
+     * ownerOnly} through {@link #permitted}, so an owner-only policy treats a neighbouring claim the
+     * player is only trusted in as foreign.
      */
     private ClaimDecision checkProximity(UUID player, WorldRef world, int blockX, int blockZ, int distance) {
         int baseChunkX = blockX >> 4;
@@ -134,12 +149,20 @@ public final class ClaimPolicy {
                 int sampleX = (baseChunkX + dx) << 4;
                 int sampleZ = (baseChunkZ + dz) << 4;
                 Optional<ClaimLookup> nearby = provider.claimAt(world, sampleX, sampleZ);
-                if (nearby.isPresent() && !nearby.get().isTrusted(player)) {
+                if (nearby.isPresent() && !permitted(nearby.get(), player)) {
                     return ClaimDecision.DENIED_TOO_CLOSE;
                 }
             }
         }
 
         return ClaimDecision.ALLOWED;
+    }
+
+    /**
+     * The in-claim membership test placement uses: ownership alone under {@code ownerOnly}, otherwise
+     * owner-or-member. Both placement sites route through here so the two can never drift.
+     */
+    private boolean permitted(ClaimLookup lookup, UUID player) {
+        return settings.ownerOnly() ? lookup.isOwner(player) : lookup.isTrusted(player);
     }
 }
