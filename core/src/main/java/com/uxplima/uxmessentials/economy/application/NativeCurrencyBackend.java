@@ -86,4 +86,24 @@ public final class NativeCurrencyBackend implements CurrencyBackend {
         }
         return repo.top(currency, limit);
     }
+
+    /**
+     * Materialise the owner's ledger row, crediting the currency's starting balance only on first creation;
+     * idempotent. The seam {@link RoutingEconomyProvider} uses to honour {@code ensureAccount} for a native
+     * currency without minting a transaction, which a plain {@code credit} of zero would.
+     */
+    void ensureOwner(PlayerRef owner) {
+        repo.ensureOwner(Objects.requireNonNull(owner, "owner"));
+    }
+
+    /**
+     * The repository's atomic two-sided move — the guarded debit of {@code from} and the credit of {@code to}
+     * commit together or not at all. This is the guarantee routing must not lose, so it is exposed only to
+     * {@link RoutingEconomyProvider}, which uses it in place of a debit-then-credit pair whenever a currency
+     * lives on the native ledger.
+     */
+    Result<Unit, TransferError> transferAtomically(PlayerRef from, PlayerRef to, Money amount) {
+        repo.ensureOwner(to);
+        return repo.transfer(from, to, amount);
+    }
 }

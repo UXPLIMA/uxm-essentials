@@ -26,6 +26,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * guard is the repository's guarded {@code UPDATE}, not a JVM lock ({@code docs/11-economy-integration.md}
  * §2.1, §3). This class is pure application code: it never imports a Vault or Treasury type (the ArchUnit
  * fence) and translates only between the port vocabulary and the repository.
+ *
+ * <p>The plugin no longer registers this directly: {@link RoutingEconomyProvider} is the provider callers
+ * see, delegating a native currency here through the {@code CurrencyBackend} seam.
  */
 public final class NativeEconomyProvider implements EconomyProvider {
 
