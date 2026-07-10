@@ -490,6 +490,7 @@ public final class PluginModule {
                 resources,
                 log,
                 bus.bus(),
+                hooks,
                 guiRegistry,
                 menus,
                 menuBindings);
@@ -648,6 +649,7 @@ public final class PluginModule {
             CloseableResources resources,
             Logger log,
             Bus bus,
+            Hooks hooks,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
@@ -702,6 +704,7 @@ public final class PluginModule {
                     resources,
                     links,
                     bus,
+                    hooks,
                     guiLayouts,
                     guiRegistry,
                     textInput,
@@ -728,6 +731,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
+            Hooks hooks,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
@@ -764,7 +768,18 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("economy"))) {
-            wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry, textInput, menus, menuBindings);
+            wireEconomy(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    hooks,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("warps"))) {
             wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("kits"))) {
@@ -1090,6 +1105,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
+            Hooks hooks,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
@@ -1099,6 +1115,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 bus,
+                hooks,
                 textInput,
                 menus,
                 menuBindings,

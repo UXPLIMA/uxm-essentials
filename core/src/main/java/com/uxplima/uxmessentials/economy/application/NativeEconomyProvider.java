@@ -19,8 +19,8 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * The native ledger's {@link EconomyProvider} — the default the plugin registers through the
- * {@code ServicesManager} when no foreign economy is present. It holds <strong>no money state of its own</strong>:
+ * The native ledger's {@link EconomyProvider} — the direct DB-backed implementation a native currency runs
+ * on. It holds <strong>no money state of its own</strong>:
  * every read is a {@link WalletRepository} read and every write is a guarded transaction the repository owns,
  * so invariant (d) — balances are DB-backed, never PDC — is honoured at the source and the double-spend
  * guard is the repository's guarded {@code UPDATE}, not a JVM lock ({@code docs/11-economy-integration.md}

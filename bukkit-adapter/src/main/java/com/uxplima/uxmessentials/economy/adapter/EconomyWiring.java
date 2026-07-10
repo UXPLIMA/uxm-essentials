@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderWarpEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SalaryTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SchedulerPendingPayRegistry;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SnapshotBaltopProvider;
+import com.uxplima.uxmessentials.economy.adapter.outbound.backend.CurrencyBackends;
 import com.uxplima.uxmessentials.economy.application.AmountFormat;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.Balance;
@@ -38,17 +39,18 @@ import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.ExchangeService;
 import com.uxplima.uxmessentials.economy.application.LookupWorth;
-import com.uxplima.uxmessentials.economy.application.NativeEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayTaxation;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
+import com.uxplima.uxmessentials.economy.application.RoutingEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
 import com.uxplima.uxmessentials.economy.application.SetWorth;
 import com.uxplima.uxmessentials.economy.application.WorthSource;
 import com.uxplima.uxmessentials.economy.application.WorthTable;
 import com.uxplima.uxmessentials.economy.application.port.BaltopExemption;
+import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
@@ -70,6 +72,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
@@ -113,6 +116,7 @@ public final class EconomyWiring {
             ModuleContext ctx,
             Persistence persistence,
             Bus bus,
+            Hooks hooks,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
                     textInput,
             Menus menus,
@@ -122,6 +126,7 @@ public final class EconomyWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(hooks, "hooks");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
@@ -161,7 +166,8 @@ public final class EconomyWiring {
                 kernel.playerLookup(),
                 kernel.log());
 
-        EconomyProvider resolved = resolveProvider(plugin, kernel, settings, currencies, decoratedRepository, clock);
+        ResolvedEconomy resolved =
+                resolveProvider(plugin, ctx, kernel, hooks, settings, currencies, decoratedRepository, clock);
         return assemble(
                 plugin,
                 ctx,
@@ -169,7 +175,8 @@ public final class EconomyWiring {
                 settings,
                 currencies,
                 ledger,
-                resolved,
+                resolved.provider(),
+                resolved.backends(),
                 decoratedRepository,
                 pendingRepo,
                 textInput,
@@ -178,27 +185,41 @@ public final class EconomyWiring {
                 dataFolder);
     }
 
-    private static EconomyProvider resolveProvider(
+    /**
+     * Build the closed backend set the currencies we own live on, register the routing provider over it, then
+     * run register-or-defer. The routing provider is what the plugin registers with the {@code ServicesManager};
+     * a Treasury or Vault economy already present still wins the whole economy, and the backends serve the
+     * currencies we own. The registry is carried back out so the menu-side {@code Currencies} seam reads the same
+     * backend set the provider routes through.
+     */
+    private static ResolvedEconomy resolveProvider(
             Plugin plugin,
+            ModuleContext ctx,
             KernelPorts kernel,
+            Hooks hooks,
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletRepository repository,
             Clock clock) {
-        EconomyProvider nativeProvider = new NativeEconomyProvider(repository, currencies, clock);
+        CurrencyBackendRegistry backends = CurrencyBackends.discover(
+                plugin.getServer(), hooks, kernel.log(), kernel.scheduler(), repository, ctx.config());
+        EconomyProvider nativeProvider = new RoutingEconomyProvider(backends, currencies, clock, kernel.log());
         Optional<EconomyProvider> foreign = ForeignEconomyProviders.discover(plugin, currencies, kernel.log());
         if (foreign.isPresent()) {
             kernel.log().info("event=economy_provider_deferred (consuming foreign economy)");
-            return foreign.get();
+            return new ResolvedEconomy(foreign.get(), backends);
         }
         if (!settings.registerProvider()) {
             kernel.log().info("native economy provider registration disabled by config; using it locally");
-            return nativeProvider;
+            return new ResolvedEconomy(nativeProvider, backends);
         }
         EconomyProviderRegistrar registrar = new EconomyProviderRegistrar(
                 plugin.getServer().getServicesManager(), plugin, kernel.log(), settings.registerPriority());
-        return registrar.registerOrDefer(nativeProvider);
+        return new ResolvedEconomy(registrar.registerOrDefer(nativeProvider), backends);
     }
+
+    /** The provider the plugin talks through and the backend set it routes over, resolved together at start. */
+    private record ResolvedEconomy(EconomyProvider provider, CurrencyBackendRegistry backends) {}
 
     private static Wired assemble(
             Plugin plugin,
@@ -208,6 +229,7 @@ public final class EconomyWiring {
             CurrencyRegistry currencies,
             WalletLedger ledger,
             EconomyProvider resolved,
+            CurrencyBackendRegistry backends,
             WalletRepository repository,
             PendingTransactionRepository pendingRepo,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
@@ -359,6 +381,7 @@ public final class EconomyWiring {
                 ledger,
                 snapshots,
                 resolved,
+                backends,
                 plugin,
                 settings.registerProvider(),
                 currencies.defaultCurrency(),
@@ -424,9 +447,10 @@ public final class EconomyWiring {
         Pay pay = new Pay(resolved, preferences, pending, notifier, taxation, clock);
 
         // Exchange is a native-ledger feature like loans and banks: the atomic two-currency move runs through the
-        // wallet repository this context owns, so it is available only when the resolved provider is the native
-        // ledger (a foreign economy holds balances we cannot move atomically here).
-        boolean nativeLedger = resolved instanceof NativeEconomyProvider;
+        // wallet repository this context owns, so it is available only when this plugin runs its own provider — a
+        // foreign economy that consumed us holds balances we cannot move atomically here. The routing provider is
+        // that own-provider marker; a deferred-to Treasury or Vault economy is any other type.
+        boolean nativeLedger = resolved instanceof RoutingEconomyProvider;
         ExchangeService exchangeService = new ExchangeService(repository, settings.exchangeRegistry(), nativeLedger);
 
         // The read-only transaction-history list and the baltop leaderboard both render through the menu engine:
@@ -595,6 +619,7 @@ public final class EconomyWiring {
      * @param ledger the native-ledger persistence handle whose loops are armed/drained
      * @param snapshots the per-currency baltop snapshots whose refresh loop is armed/stopped
      * @param provider the resolved provider this plugin uses (registered or deferred)
+     * @param backends the closed backend set the routing provider resolves each currency against
      * @param plugin the owning plugin, for the registration drop on stop
      * @param registered whether this plugin registered the native provider (so stop only unregisters then)
      * @param defaultCurrency the default currency the {@code balance}/{@code baltop_position} placeholders read
@@ -612,6 +637,7 @@ public final class EconomyWiring {
             WalletLedger ledger,
             BaltopSnapshots snapshots,
             EconomyProvider provider,
+            CurrencyBackendRegistry backends,
             Plugin plugin,
             boolean registered,
             Currency defaultCurrency,
@@ -633,6 +659,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(ledger, "ledger");
             Objects.requireNonNull(snapshots, "snapshots");
             Objects.requireNonNull(provider, "provider");
+            Objects.requireNonNull(backends, "backends");
             Objects.requireNonNull(plugin, "plugin");
             Objects.requireNonNull(defaultCurrency, "defaultCurrency");
             Objects.requireNonNull(amountFormat, "amountFormat");

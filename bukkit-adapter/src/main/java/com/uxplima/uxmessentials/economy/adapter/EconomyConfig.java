@@ -66,7 +66,8 @@ public final class EconomyConfig {
                     .transferAllowed(config.getBoolean("currencies." + key + ".transfer-allowed", true))
                     .exchangeAllowed(config.getBoolean("currencies." + key + ".exchange-allowed", true))
                     .leaderboardEnabled(config.getBoolean("currencies." + key + ".leaderboard-enabled", true))
-                    .permissionRequired(config.getBoolean("currencies." + key + ".permission-required", false));
+                    .permissionRequired(config.getBoolean("currencies." + key + ".permission-required", false))
+                    .backendId(config.getString("currencies." + key + ".backend", "native"));
             BigDecimal confirm = optionalConfirmThreshold(id);
             if (confirm != null) {
                 builder.confirmThreshold(confirm);
@@ -226,6 +227,15 @@ public final class EconomyConfig {
     /** Whether to register the native provider at all (the register-or-defer entry condition). */
     public boolean registerProvider() {
         return config.getBoolean("provider.register", true);
+    }
+
+    /**
+     * Whether the operator accepts a scheduled charge against a currency whose backend cannot guard its take.
+     * Off by default so a recurring charge on such a currency is refused at startup rather than risking a
+     * double charge on the pass after a debit that reported failure but had in fact succeeded.
+     */
+    public boolean allowNonAtomicRecurring() {
+        return config.getBoolean("allow-nonatomic-recurring", false);
     }
 
     /** The default accept-pay flag a player takes before they ever run {@code /paytoggle}. */
