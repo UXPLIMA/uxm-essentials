@@ -27,10 +27,10 @@ import org.jspecify.annotations.Nullable;
  * It is empty for a menu that declares no such block, and for every engine child window (a list/confirm/selector/
  * editor), whose minimal spec carries none.
  *
- * <p>Immutable. {@link #withEntry}, {@link #withPage}, {@link #withPageCount}, {@link #withLocalPlaceholders} and
- * {@link #withExecutor} return copies rather than mutating, because the same base context is reused across every slot
- * of a list page and must not leak one element's identity into the next; each copy carries the open's arguments,
- * local placeholders and executor through unchanged.
+ * <p>Immutable. {@link #withEntry}, {@link #withPage}, {@link #withPageCount}, {@link #withLocalPlaceholders},
+ * {@link #withExecutor} and {@link #withPagedViews} return copies rather than mutating, because the same base context
+ * is reused across every slot of a list page and must not leak one element's identity into the next; each copy carries
+ * the open's arguments, local placeholders, executor and paged-list snapshots through unchanged.
  */
 public final class MenuContext {
 
@@ -50,6 +50,15 @@ public final class MenuContext {
 
     private final PlayerRef executor;
 
+    /**
+     * The paged lists this render draws, keyed by list-source id — empty for every open that queried no paged source,
+     * which is the historic case. A source id present here tells the renderer the list's rows are already one page (so
+     * they are placed without re-slicing) and carries the page and corpus total the page indicator reads. Each value is
+     * an immutable snapshot taken from the list's {@link ListQueryState} on the viewer's entity thread, so the renderer
+     * never touches that mutable state itself.
+     */
+    private final Map<String, PagedListView> pagedViews;
+
     private MenuContext(
             PlayerRef viewer,
             @Nullable Object subject,
@@ -58,7 +67,8 @@ public final class MenuContext {
             @Nullable Object entry,
             Map<String, String> arguments,
             Map<String, String> localPlaceholders,
-            PlayerRef executor) {
+            PlayerRef executor,
+            Map<String, PagedListView> pagedViews) {
         this.viewer = Objects.requireNonNull(viewer, "viewer");
         this.subject = subject;
         this.page = page;
@@ -67,6 +77,7 @@ public final class MenuContext {
         this.arguments = Objects.requireNonNull(arguments, "arguments");
         this.localPlaceholders = Objects.requireNonNull(localPlaceholders, "localPlaceholders");
         this.executor = Objects.requireNonNull(executor, "executor");
+        this.pagedViews = Objects.requireNonNull(pagedViews, "pagedViews");
     }
 
     /** Opens a fresh context with no list element bound yet and a single-page count until the renderer knows better. */
@@ -81,7 +92,7 @@ public final class MenuContext {
      * placeholders start empty here; the engine attaches the open spec's block via {@link #withLocalPlaceholders}.
      */
     public static MenuContext of(PlayerRef viewer, @Nullable Object subject, int page, Map<String, String> arguments) {
-        return new MenuContext(viewer, subject, page, 1, null, Map.copyOf(arguments), Map.of(), viewer);
+        return new MenuContext(viewer, subject, page, 1, null, Map.copyOf(arguments), Map.of(), viewer, Map.of());
     }
 
     public PlayerRef viewer() {
@@ -124,6 +135,15 @@ public final class MenuContext {
         return localPlaceholders;
     }
 
+    /**
+     * The paged lists this render draws, keyed by list-source id, as immutable snapshots — empty for an open that
+     * queried no paged source. The renderer reads it to tell a paged list (already one page) from an in-memory one
+     * (the whole corpus, sliced here) and to source the paged list's {@code %page%}/{@code %max_page%}.
+     */
+    public Map<String, PagedListView> pagedViews() {
+        return pagedViews;
+    }
+
     public Optional<Object> subjectRaw() {
         return Optional.ofNullable(subject);
     }
@@ -158,17 +178,39 @@ public final class MenuContext {
     /** A copy bound to one list element, leaving viewer, subject, page, page count, arguments, locals and executor untouched. */
     public MenuContext withEntry(Object entry) {
         Objects.requireNonNull(entry, "entry");
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
+        return new MenuContext(
+                viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor, pagedViews);
     }
 
     /** A copy on a new page, used when the renderer or listener advances pagination; resets nothing else. */
     public MenuContext withPage(int page) {
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
+        return new MenuContext(
+                viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor, pagedViews);
     }
 
     /** A copy carrying the page count the renderer computed, so a static item's {@code %max_page%} can read it. */
     public MenuContext withPageCount(int pageCount) {
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
+        return new MenuContext(
+                viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor, pagedViews);
+    }
+
+    /**
+     * A copy carrying the paged-list snapshots this render draws, keyed by list-source id, attached by the engine on
+     * the viewer's entity thread once each paged source has answered and its total is recorded on the list's state.
+     * Every other field is untouched, and the map is copied defensively so the caller cannot mutate it afterwards.
+     */
+    public MenuContext withPagedViews(Map<String, PagedListView> pagedViews) {
+        Objects.requireNonNull(pagedViews, "pagedViews");
+        return new MenuContext(
+                viewer,
+                subject,
+                page,
+                pageCount,
+                entry,
+                arguments,
+                localPlaceholders,
+                executor,
+                Map.copyOf(pagedViews));
     }
 
     /**
@@ -179,7 +221,15 @@ public final class MenuContext {
     public MenuContext withLocalPlaceholders(Map<String, String> localPlaceholders) {
         Objects.requireNonNull(localPlaceholders, "localPlaceholders");
         return new MenuContext(
-                viewer, subject, page, pageCount, entry, arguments, Map.copyOf(localPlaceholders), executor);
+                viewer,
+                subject,
+                page,
+                pageCount,
+                entry,
+                arguments,
+                Map.copyOf(localPlaceholders),
+                executor,
+                pagedViews);
     }
 
     /**
@@ -190,6 +240,7 @@ public final class MenuContext {
      */
     public MenuContext withExecutor(PlayerRef executor) {
         Objects.requireNonNull(executor, "executor");
-        return new MenuContext(viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor);
+        return new MenuContext(
+                viewer, subject, page, pageCount, entry, arguments, localPlaceholders, executor, pagedViews);
     }
 }

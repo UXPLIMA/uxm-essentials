@@ -326,7 +326,8 @@ public final class PluginModule {
                 menuBindings.conditions(),
                 lastMenu,
                 bedrock,
-                bedrockScreen);
+                bedrockScreen,
+                menuBindings.pagedLists());
         resources.addListener(new LastMenuCleanupListener(lastMenu));
         // Defence-in-depth over the engine's cancel-all-clicks invariant: strip a marked menu display item that ever
         // escapes into a player's real inventory (close-sweep + join-sweep). A separate listener from the menu router,

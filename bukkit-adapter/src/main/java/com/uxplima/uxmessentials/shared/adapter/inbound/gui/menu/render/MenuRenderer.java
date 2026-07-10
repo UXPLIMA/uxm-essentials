@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PriorityLayering;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ActionArguments;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.PagedListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
@@ -184,7 +185,7 @@ public final class MenuRenderer {
         for (MenuItemSpec item : spec.items().values()) {
             (item.list().isPresent() ? listItems : staticItems).add(item);
         }
-        MenuContext staticCtx = ctx.withPageCount(pageCount(listItems, ctx, resolvedLists));
+        MenuContext staticCtx = pagedAwareStaticCtx(ctx, listItems, resolvedLists);
         populateStatic(inv, staticItems, staticCtx, clickSink);
         for (MenuItemSpec listItem : listItems) {
             populateList(inv, listItem, ctx, clickSink, resolvedLists);
@@ -218,7 +219,7 @@ public final class MenuRenderer {
         for (MenuItemSpec item : spec.items().values()) {
             (item.list().isPresent() ? listItems : staticItems).add(item);
         }
-        MenuContext staticCtx = ctx.withPageCount(pageCount(listItems, ctx, resolvedLists));
+        MenuContext staticCtx = pagedAwareStaticCtx(ctx, listItems, resolvedLists);
         Map<Integer, MenuItemSpec> placed = PriorityLayering.resolve(staticItems, it -> viewPasses(it, staticCtx));
         for (Map.Entry<Integer, MenuItemSpec> entry : placed.entrySet()) {
             int rawSlot = entry.getKey();
@@ -232,19 +233,31 @@ public final class MenuRenderer {
     }
 
     /**
-     * How many pages the menu's list spans, computed once before static items render so a static item's
-     * {@code %max_page%} resolves to the same count {@link #populateList} will page across. A spec with no list item
-     * stays a single page. Only the first list item is consulted — a spec pairs one scrollable list with its page
-     * controls, and the page count those controls report is that list's.
+     * The context a static item renders with, carrying the {@code %page%}/{@code %max_page%} its page indicator reads —
+     * computed once before static items draw so the indicator matches the count {@link #populateList} pages across. A
+     * spec with no list item stays a single page. Only the first list item is consulted — a spec pairs one scrollable
+     * list with its page controls, and the page count those controls report is that list's.
+     *
+     * <p>When that list is a paged source (its id is in {@link MenuContext#pagedViews()}), the page and count come from
+     * its snapshot — the corpus total the source reported, not the length of the one rendered page — so a "Page x/y"
+     * indicator is right even though the engine holds only the page it can see. An in-memory list keeps the historic
+     * behaviour: it paginates its whole corpus in place to learn the count.
      */
-    private int pageCount(List<MenuItemSpec> listItems, MenuContext ctx, Map<String, List<?>> resolvedLists) {
+    private MenuContext pagedAwareStaticCtx(
+            MenuContext ctx, List<MenuItemSpec> listItems, Map<String, List<?>> resolvedLists) {
         if (listItems.isEmpty()) {
-            return 1;
+            return ctx.withPageCount(1);
         }
         MenuItemSpec listItem = listItems.get(0);
+        PagedListView view =
+                ctx.pagedViews().get(listItem.list().orElseThrow().source().id());
+        if (view != null) {
+            return ctx.withPage(view.page()).withPageCount(view.pageCount());
+        }
         List<?> entries = entriesOf(listItem, resolvedLists);
-        return Pagination.paginate(entries, listItem.slots().slots(), ctx.page())
+        int count = Pagination.paginate(entries, listItem.slots().slots(), ctx.page())
                 .pageCount();
+        return ctx.withPageCount(count);
     }
 
     /** The pre-resolved entries backing {@code listItem}, or an empty list when its source resolved to nothing. */
@@ -281,8 +294,12 @@ public final class MenuRenderer {
         ListSpec listSpec = item.list().orElseThrow();
         List<?> entries = entriesOf(item, resolvedLists);
         List<Integer> contentSlots = item.slots().slots();
+        // A paged source's rows are already the page the query returned, so they are laid out at local page zero;
+        // slicing them again at the viewer's page index would show page zero of an already-paged later page. Pinned
+        // rows are still among the entries, so the PinnedEntry path fixes them to their claimed slot as before.
+        int renderPage = ctx.pagedViews().containsKey(listSpec.source().id()) ? 0 : ctx.page();
         @SuppressWarnings("unchecked") // a list source's element type is opaque to the engine; entries flow as Object
-        Pagination.Page<Object> page = Pagination.paginate((List<Object>) entries, contentSlots, ctx.page());
+        Pagination.Page<Object> page = Pagination.paginate((List<Object>) entries, contentSlots, renderPage);
         // Clear every content slot first so a re-render into a reused window — a page flip to a shorter page, or a
         // refresh that dropped entries — leaves no stale tile behind in a slot this page does not fill.
         for (int slot : contentSlots) {

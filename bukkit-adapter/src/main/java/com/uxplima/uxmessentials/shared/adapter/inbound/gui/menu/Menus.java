@@ -10,6 +10,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
@@ -31,6 +33,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.Bedrock
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
@@ -44,11 +49,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorR
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.GridViewState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ListQueryState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ListViewState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.PagedListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.SelectorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
@@ -84,6 +91,14 @@ public final class Menus {
     private final MenuRenderer renderer;
     private final Scheduler scheduler;
     private final ListSourceRegistry lists;
+
+    /**
+     * The streaming counterpart to {@link #lists}: the sources that answer for one page of a large corpus rather than
+     * handing the whole of it over. Empty on every engine wired without one — a list/spec-only test fixture and any
+     * production menu set with no paged source — in which case {@link #resolveLists} finds every source in {@link #lists}
+     * and never consults this registry, so those opens stay byte-identical to before this seam existed.
+     */
+    private final PagedListSourceRegistry pagedLists;
 
     /**
      * The editor renderer, present only on an engine wired for typed property editors. A list/spec-only engine (most
@@ -218,6 +233,37 @@ public final class Menus {
             @Nullable LastMenu lastMenu,
             BedrockDetector bedrock,
             BedrockScreen bedrockScreen) {
+        this(
+                renderer,
+                scheduler,
+                lists,
+                editorRenderer,
+                openActionRegistry,
+                openConditionRegistry,
+                lastMenu,
+                bedrock,
+                bedrockScreen,
+                new PagedListSourceRegistry());
+    }
+
+    /**
+     * The paged-source-aware canonical constructor: the same engine plus the {@link PagedListSourceRegistry} whose
+     * sources answer for one page of a large corpus rather than the whole of it. Every other constructor delegates here
+     * with an empty registry, so the roughly ninety existing {@code new Menus(...)} call-sites compile unchanged and
+     * resolve every list through the in-memory {@link #lists} exactly as before — an open there never consults the paged
+     * registry. Only production wiring, which holds the feature-populated paged registry, passes it.
+     */
+    public Menus(
+            MenuRenderer renderer,
+            Scheduler scheduler,
+            ListSourceRegistry lists,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable ActionRegistry openActionRegistry,
+            @Nullable ConditionRegistry openConditionRegistry,
+            @Nullable LastMenu lastMenu,
+            BedrockDetector bedrock,
+            BedrockScreen bedrockScreen,
+            PagedListSourceRegistry pagedLists) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.lists = Objects.requireNonNull(lists, "lists");
@@ -227,6 +273,7 @@ public final class Menus {
         this.lastMenu = lastMenu;
         this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
         this.bedrockScreen = Objects.requireNonNull(bedrockScreen, "bedrockScreen");
+        this.pagedLists = Objects.requireNonNull(pagedLists, "pagedLists");
     }
 
     /** Registers a parsed spec under its id; a feature does this once at wiring time. */
@@ -349,7 +396,7 @@ public final class Menus {
                 .withLocalPlaceholders(spec.placeholders())
                 .withExecutor(executor);
         scheduler.async(() -> {
-            Map<String, List<?>> resolved = resolveLists(spec, ctx);
+            ResolvedLists resolved = resolveLists(spec, ctx);
             scheduler.onEntity(
                     viewer,
                     () -> openResolved(viewer, specId, spec, subject, resolved, startPage, args, executor, record));
@@ -737,24 +784,25 @@ public final class Menus {
         Objects.requireNonNull(onClose, "onClose");
         MenuContext ctx = MenuContext.of(viewer, null, 0).withLocalPlaceholders(spec.placeholders());
         scheduler.async(() -> {
-            Map<String, List<?>> resolved = resolveLists(spec, ctx);
+            ResolvedLists resolved = resolveLists(spec, ctx);
             scheduler.onEntity(viewer, () -> openPreviewResolved(viewer, spec, ctx, resolved, onClose));
         });
     }
 
     /** On the viewer's entity thread: build the preview holder + window, render it, attach the back hook, show it. */
     private void openPreviewResolved(
-            PlayerRef viewer, MenuSpec spec, MenuContext ctx, Map<String, List<?>> resolved, Runnable onClose) {
+            PlayerRef viewer, MenuSpec spec, MenuContext ctx, ResolvedLists resolved, Runnable onClose) {
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live == null || !live.isOnline()) {
             return;
         }
         MenuHolder holder = new MenuHolder("preview:" + spec.rows(), spec, ctx);
-        holder.setResolvedLists(resolved);
+        holder.setResolvedLists(resolved.rows());
+        MenuContext renderCtx = attachPagedViews(holder, ctx, resolved.paged());
         holder.attachCloseHook(onClose);
-        Inventory inv = createWindow(holder, spec, renderer.title(spec, ctx));
+        Inventory inv = createWindow(holder, spec, renderer.title(spec, renderCtx));
         holder.attach(inv);
-        renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
+        renderer.populate(inv, spec, renderCtx, holder::recordSlot, holder.resolvedLists());
         live.openInventory(inv);
     }
 
@@ -782,20 +830,112 @@ public final class Menus {
     }
 
     /**
-     * Resolve every list source the spec names, keyed by source id. Runs off the viewer's region thread because a
-     * source may read a database; an unregistered source resolves to an empty list so a wiring gap renders an empty
-     * grid rather than failing the open. This is the only place a source is queried for one open.
+     * The rows one open resolved for every list the spec names, keyed by source id (a paged source's rows and an
+     * in-memory source's whole corpus are stored the same way, so the render path does not care which kind produced
+     * them), plus the paging metadata each paged source additionally reported. That metadata is applied to the holder
+     * on the viewer's entity thread by {@link #attachPagedViews}; it never rides back onto a tick thread.
      */
-    private Map<String, List<?>> resolveLists(MenuSpec spec, MenuContext ctx) {
-        Map<String, List<?>> resolved = new HashMap<>();
+    private record ResolvedLists(Map<String, List<?>> rows, Map<String, PagedListMeta> paged) {}
+
+    /** What a paged source reported beyond its rows: the corpus total, and the page size and sorts the request used. */
+    private record PagedListMeta(long total, int size, List<String> sorts) {}
+
+    /**
+     * Resolve every list source the spec names. Runs off the viewer's region thread because a source may read a
+     * database; an unregistered source resolves to an empty list so a wiring gap renders an empty grid rather than
+     * failing the open. This is the only place a source is queried for one open. A paged source is asked for a single
+     * default page — page zero, the spec's first declared sort, no filters — because on first open there is no holder
+     * yet to carry the viewer's page; that {@link PageRequest} is a plain immutable value, so building and using it off
+     * the entity thread touches no per-viewer state.
+     */
+    private ResolvedLists resolveLists(MenuSpec spec, MenuContext ctx) {
+        Map<String, List<?>> rows = new HashMap<>();
+        Map<String, PagedListMeta> paged = new HashMap<>();
         for (MenuItemSpec item : spec.items().values()) {
-            item.list().ifPresent(listSpec -> {
-                String sourceId = listSpec.source().id();
-                resolved.put(
-                        sourceId, lists.get(sourceId).map(fn -> fn.apply(ctx)).orElse(List.of()));
-            });
+            item.list().ifPresent(listSpec -> resolveListSource(item, listSpec, ctx, rows, paged));
         }
-        return resolved;
+        return new ResolvedLists(rows, paged);
+    }
+
+    /** Resolve one list-backed item's source: the in-memory registry first, then the paged one, else an empty list. */
+    private void resolveListSource(
+            MenuItemSpec item,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec listSpec,
+            MenuContext ctx,
+            Map<String, List<?>> rows,
+            Map<String, PagedListMeta> paged) {
+        String sourceId = listSpec.source().id();
+        Optional<Function<MenuContext, List<?>>> plain = lists.get(sourceId);
+        if (plain.isPresent()) {
+            rows.put(sourceId, plain.get().apply(ctx));
+            return;
+        }
+        Optional<BiFunction<MenuContext, PageRequest, PagedResult<?>>> pagedSource = pagedLists.get(sourceId);
+        if (pagedSource.isEmpty()) {
+            rows.put(sourceId, List.of());
+            return;
+        }
+        resolvePagedSource(item, listSpec, sourceId, pagedSource.get(), ctx, rows, paged);
+    }
+
+    /** Ask a paged source for the default page, store its rows (pinned first) under the id, and note its reported total. */
+    private void resolvePagedSource(
+            MenuItemSpec item,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec listSpec,
+            String sourceId,
+            BiFunction<MenuContext, PageRequest, PagedResult<?>> source,
+            MenuContext ctx,
+            Map<String, List<?>> rows,
+            Map<String, PagedListMeta> paged) {
+        int size = pageSize(item, listSpec);
+        String sort = listSpec.sorts().isEmpty() ? "" : listSpec.sorts().get(0);
+        PagedResult<?> result = source.apply(ctx, new PageRequest(0, size, sort, Map.of()));
+        List<Object> combined = new ArrayList<>(result.pinned());
+        combined.addAll(boundedRows(sourceId, size, result.rows()));
+        rows.put(sourceId, combined);
+        paged.put(sourceId, new PagedListMeta(result.totalCount(), size, listSpec.sorts()));
+    }
+
+    /** The page size the default request uses: the spec's explicit page-size, or the item's slot count when it is zero. */
+    private static int pageSize(
+            MenuItemSpec item, com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec listSpec) {
+        return listSpec.pageSize() != 0
+                ? listSpec.pageSize()
+                : item.slots().slots().size();
+    }
+
+    /**
+     * The page's rows, trimmed to {@code size} when the source returned more than a page holds. A source over-returning
+     * is its own bug, not something to hide: rendering only the first {@code size} while logging keeps the page honest,
+     * where silently keeping them all would read to the operator as "the viewer saw everything".
+     */
+    private List<?> boundedRows(String sourceId, int size, List<?> rows) {
+        if (rows.size() <= size) {
+            return rows;
+        }
+        LOG.warning("event=paged_source_overflowed id=" + sourceId + " size=" + size + " rows=" + rows.size());
+        return List.copyOf(rows.subList(0, size));
+    }
+
+    /**
+     * On the viewer's entity thread: record each paged list's reported total on its {@link ListQueryState} — the single
+     * place per open that state is written — and return a render context carrying an immutable {@link PagedListView} per
+     * list so the renderer knows which lists are already paged and what page count their indicator reads. Returns the
+     * context unchanged when the open queried no paged source, so an in-memory-only open is untouched.
+     */
+    private MenuContext attachPagedViews(MenuHolder holder, MenuContext ctx, Map<String, PagedListMeta> paged) {
+        if (paged.isEmpty()) {
+            return ctx;
+        }
+        Map<String, PagedListView> views = new HashMap<>();
+        paged.forEach((listId, meta) -> {
+            ListQueryState state = holder.queryState(listId, meta.sorts());
+            state.recordTotal(meta.total());
+            views.put(listId, new PagedListView(state.page(), meta.total(), meta.size()));
+        });
+        MenuContext renderCtx = ctx.withPagedViews(views);
+        holder.setCtx(renderCtx);
+        return renderCtx;
     }
 
     /**
@@ -816,7 +956,7 @@ public final class Menus {
             String specId,
             MenuSpec spec,
             @Nullable Object subject,
-            Map<String, List<?>> resolved,
+            ResolvedLists resolved,
             int page,
             Map<String, String> arguments,
             PlayerRef executor,
@@ -855,17 +995,20 @@ public final class Menus {
         }
         // The resolved list cache is threaded through so a list-backed menu's entries page as form buttons.
         if (bedrock.isBedrock(viewer.uuid()) && !spec.chestOnly()) {
-            sendBedrockForm(live, spec, ctx, resolved);
+            sendBedrockForm(live, spec, ctx, resolved.rows());
             afterBedrockOpen(spec, live, ctx, viewer, specId, subject, page, arguments, record);
             return;
         }
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
-        holder.setResolvedLists(resolved);
-        Inventory inv = createWindow(holder, spec, renderer.title(spec, ctx));
+        holder.setResolvedLists(resolved.rows());
+        // Record each paged list's reported total on the holder's query state and take an immutable render context that
+        // carries a view of each, all on this entity thread — so the mutable state is never touched off it.
+        MenuContext renderCtx = attachPagedViews(holder, ctx, resolved.paged());
+        Inventory inv = createWindow(holder, spec, renderer.title(spec, renderCtx));
         holder.attach(inv);
-        renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
+        renderer.populate(inv, spec, renderCtx, holder::recordSlot, holder.resolvedLists());
         if (spec.bottomInventory()) {
-            paintBottom(holder, spec, ctx, live);
+            paintBottom(holder, spec, renderCtx, live);
         }
         live.openInventory(inv);
         if (record) {
@@ -1201,11 +1344,11 @@ public final class Menus {
     private void resendBedrockPage(PlayerRef viewer, MenuSpec spec, MenuContext baseCtx, int page) {
         MenuContext newCtx = baseCtx.withPage(Math.max(0, page));
         scheduler.async(() -> {
-            Map<String, List<?>> resolved = resolveLists(spec, newCtx);
+            ResolvedLists resolved = resolveLists(spec, newCtx);
             scheduler.onEntity(viewer, () -> {
                 Player p = Bukkit.getPlayer(viewer.uuid());
                 if (p != null) {
-                    sendBedrockForm(p, spec, newCtx, resolved);
+                    sendBedrockForm(p, spec, newCtx, resolved.rows());
                 }
             });
         });
