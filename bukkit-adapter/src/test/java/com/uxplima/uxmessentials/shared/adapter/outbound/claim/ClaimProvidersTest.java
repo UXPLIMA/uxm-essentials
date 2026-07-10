@@ -51,9 +51,9 @@ class ClaimProvidersTest {
     @Test
     void detectAll_doesNotThrow_whenNoClaimPluginInstalled() {
         // The probe constructs every candidate (uxmClaims, Lands, GriefPrevention, GriefDefender,
-        // ExcellentClaims, SimpleClaimSystem, RClaim, XClaim, Homestead) and calls active() on each. Most of
-        // those SDKs are absent from the test classpath (Lands and GriefPrevention resolve only as ownership-
-        // test stubs), so a provider that touched an absent SDK before its present-guard would throw
+        // ExcellentClaims, SimpleClaimSystem, RClaim, XClaim, Homestead, WorldGuard) and calls active() on each.
+        // Most of those SDKs are absent from the test classpath (Lands and GriefPrevention resolve only as
+        // ownership-test stubs), so a provider that touched an absent SDK before its present-guard would throw
         // NoClassDefFoundError here. It must not.
         assertThatCode(() -> ClaimProviders.detectAll(ClaimProvidersConfig.defaults(), plugin, server, noOpLog()))
                 .doesNotThrowAnyException();
@@ -90,7 +90,8 @@ class ClaimProvidersTest {
                 new SimpleClaimSystemClaimProvider(plugin, server, noOpLog()),
                 new RClaimClaimProvider(plugin, server, noOpLog()),
                 new XClaimClaimProvider(plugin, server, noOpLog()),
-                new HomesteadClaimProvider(plugin, server, noOpLog()));
+                new HomesteadClaimProvider(plugin, server, noOpLog()),
+                new WorldGuardClaimProvider(plugin, server, noOpLog()));
     }
 
     private static Logger noOpLog() {
