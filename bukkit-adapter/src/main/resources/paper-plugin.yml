@@ -78,6 +78,9 @@ dependencies:
     Residence:
       load: BEFORE
       required: false
+    PlotSquared:
+      load: BEFORE
+      required: false
     # Menu-engine optional integrations — consumed behind the hooks SPI (shared.adapter.outbound.hooks). Each is
     # reached only past a plugin-present guard, so the menu engine (and the plugin as a whole) runs fully without
     # any of them; the no-op default carries no SDK type, so an absent one never loads an external class. Loaded
