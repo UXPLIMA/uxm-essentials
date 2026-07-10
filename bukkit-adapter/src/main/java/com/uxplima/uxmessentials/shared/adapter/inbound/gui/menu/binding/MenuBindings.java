@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageReques
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListControlSyntax;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
@@ -172,6 +174,49 @@ public final class MenuBindings {
         for (Map.Entry<String, MenuItemSpec> entry : spec.items().entrySet()) {
             collectItemMissing(spec, entry.getKey(), entry.getValue(), placeholderKnown, missing);
         }
+        collectListControlMissing(spec, missing);
+    }
+
+    /**
+     * Validate every {@code list-sort} action this menu wires. A sort button carries the source id of the paged list it
+     * drives ({@code list-sort:pw:browse}); the engine can see the linkage between that id and the list items the same
+     * menu declares, so a button that names a list this menu does not contain, or one whose source declares no
+     * {@code sorts} to cycle, is a loud startup error rather than a click that silently does nothing — an operator who
+     * wires a sort button expects it to sort. {@code list-filter} and {@code list-search} carry no such static
+     * precondition (any key is valid), so an unknown list id there is caught at click time as a logged no-op instead.
+     * The scan mirrors the action-id validation above: the menu's open/close actions and every item's click actions,
+     * each resolved against the action registry so {@code list-sort} only triggers this once it is a registered action.
+     */
+    private void collectListControlMissing(MenuSpec spec, Set<String> missing) {
+        Map<String, ListSpec> paged = new HashMap<>();
+        for (MenuItemSpec item : spec.items().values()) {
+            item.list().ifPresent(list -> paged.put(list.source().id(), list));
+        }
+        List<Ref> actionRefs = new ArrayList<>(spec.openActions());
+        actionRefs.addAll(spec.closeActions());
+        for (MenuItemSpec item : spec.items().values()) {
+            item.click().actions().values().forEach(actionRefs::addAll);
+        }
+        for (Ref ref : actionRefs) {
+            checkSortRef(spec, ref, paged, missing);
+        }
+    }
+
+    /** Report a single {@code list-sort} ref that targets a list this menu lacks or a source that offers no sorts. */
+    private void checkSortRef(MenuSpec spec, Ref ref, Map<String, ListSpec> paged, Set<String> missing) {
+        Ref resolved = ref.resolve(actions::has);
+        if (!resolved.id().equals(ListControlSyntax.SORT_ACTION)) {
+            return;
+        }
+        ListControlSyntax.parseSort(resolved.value()).ifPresent(sort -> {
+            String where = "menu '" + spec.title() + "' action 'list-sort:" + sort.listId() + "'";
+            ListSpec target = paged.get(sort.listId());
+            if (target == null) {
+                missing.add(where + " names a paged list this menu does not contain");
+            } else if (target.sorts().isEmpty()) {
+                missing.add(where + " but its list source declares no sorts, so the button cannot sort");
+            }
+        });
     }
 
     private void collectItemMissing(

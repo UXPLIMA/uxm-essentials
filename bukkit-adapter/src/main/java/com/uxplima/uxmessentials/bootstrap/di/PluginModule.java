@@ -108,6 +108,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.InfoPlace
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.InputActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ListControlActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LuckPermsGroupSource;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuControlActions;
@@ -436,6 +437,12 @@ public final class PluginModule {
         // drive the very window they fire in through the MenuControl the click supplies, so they need only the shared
         // bindings and the operator logger — no live handle is threaded here.
         MenuControlActions.register(menuBindings, kernel.log());
+        // The paged-list-control slice (list-sort, list-filter, list-search) registers alongside the other slices;
+        // like them it has its own entry point so the MenuVocabulary signature stays untouched. Its actions drive the
+        // very paged list they name through the MenuControl the click supplies — the same page-flip re-query path — so
+        // they need only the shared bindings and the operator logger; the search prompt reuses the shared text-input
+        // seam the input: step already drives.
+        ListControlActions.register(menuBindings, kernel.log());
         // The sound slice (broadcast-sound/soundall to every online player, rawsound/raw-sound for a verbatim
         // namespaced resource-pack key) registers alongside the other slices; like them it has its own entry point
         // so the MenuVocabulary signature stays untouched. It shares the <key> [volume] [pitch] grammar the

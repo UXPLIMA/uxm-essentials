@@ -71,6 +71,68 @@ class MenuBindingsValidatePagedTest {
                 .isEmpty();
     }
 
+    @Test
+    void reportsAListSortButtonWhoseSourceDeclaresNoSorts() {
+        MenuBindings bindings = new MenuBindings();
+        bindings.pagedList("playerwarps:browse", (ctx, page) -> PagedResult.of(List.of(), 0));
+        bindings.action("list-sort", ctx -> {});
+
+        assertThat(bindings.validate(List.of(sortMenu("playerwarps:browse", "playerwarps:browse", ""))))
+                .singleElement()
+                .asString()
+                .contains(TITLE)
+                .contains("list-sort:playerwarps:browse")
+                .contains("no sorts");
+    }
+
+    @Test
+    void reportsAListSortNamingAListTheMenuDoesNotContain() {
+        MenuBindings bindings = new MenuBindings();
+        bindings.pagedList("playerwarps:browse", (ctx, page) -> PagedResult.of(List.of(), 0));
+        bindings.action("list-sort", ctx -> {});
+
+        assertThat(bindings.validate(
+                        List.of(sortMenu("playerwarps:browse", "playerwarps:other", "sorts = [\"RATING\"]"))))
+                .singleElement()
+                .asString()
+                .contains("list-sort:playerwarps:other")
+                .contains("does not contain");
+    }
+
+    @Test
+    void aListSortOnASourceThatOffersSortsValidatesClean() {
+        MenuBindings bindings = new MenuBindings();
+        bindings.pagedList("playerwarps:browse", (ctx, page) -> PagedResult.of(List.of(), 0));
+        bindings.action("list-sort", ctx -> {});
+
+        assertThat(bindings.validate(
+                        List.of(sortMenu("playerwarps:browse", "playerwarps:browse", "sorts = [\"RATING\"]"))))
+                .isEmpty();
+    }
+
+    /**
+     * A menu whose paged list is backed by {@code source} (optionally declaring {@code sortsLine}) and whose one button
+     * runs {@code list-sort:sortTarget}, so {@code validate} sees the linkage between the sort button and the list.
+     */
+    private static MenuSpec sortMenu(String source, String sortTarget, String sortsLine) {
+        String hocon = """
+                title = "%s"
+                rows = 6
+                items {
+                  sortBtn { slot = 45, material = ARROW, name = "s", click { left = ["list-sort:%s"] } }
+                  warps {
+                    slots = ["0-8"]
+                    list {
+                      source = "%s"
+                      %s
+                      template { material = STONE, name = "entry" }
+                    }
+                  }
+                }
+                """.formatted(TITLE, sortTarget, source, sortsLine);
+        return new MenuSpecLoader().parse(hocon);
+    }
+
     /**
      * A one-item menu whose single item is a list backed by {@code source}, optionally carrying a {@code page-size}
      * and a {@code sorts} line. The template is deliberately inert — a bare material and a literal name, no

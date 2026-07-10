@@ -63,6 +63,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Continuati
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDragSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemRuleSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListControlSyntax.SortDirection;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
@@ -1248,6 +1250,112 @@ public final class MenuListener implements Listener {
         public void resetPagination() {
             scheduler.onEntity(holder.ctx().viewer(), () -> repaginate(holder, 0));
         }
+
+        @Override
+        public void sortList(String listId, SortDirection direction) {
+            Objects.requireNonNull(listId, "listId");
+            Objects.requireNonNull(direction, "direction");
+            scheduler.onEntity(
+                    holder.ctx().viewer(),
+                    () -> applyListControl(holder, listId, state -> applySort(state, direction)));
+        }
+
+        @Override
+        public void filterList(String listId, String key, String value) {
+            Objects.requireNonNull(listId, "listId");
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(value, "value");
+            scheduler.onEntity(
+                    holder.ctx().viewer(), () -> applyListControl(holder, listId, state -> state.filter(key, value)));
+        }
+
+        @Override
+        public void searchList(String listId, String key) {
+            Objects.requireNonNull(listId, "listId");
+            Objects.requireNonNull(key, "key");
+            scheduler.onEntity(holder.ctx().viewer(), () -> beginListSearch(holder, listId, key));
+        }
+    }
+
+    /** Advance, step back, or reset {@code state}'s sort; each mutation zeroes the page, which the re-query then reads. */
+    private static void applySort(ListQueryState state, SortDirection direction) {
+        switch (direction) {
+            case NEXT -> state.nextSort();
+            case PREVIOUS -> state.previousSort();
+            case RESET -> state.resetSort();
+        }
+    }
+
+    /**
+     * The one entry a {@code list-sort}/{@code list-filter}/{@code list-search} change takes into the paged re-query,
+     * so the three controls and a page flip share the query, the in-flight flag, the thread hops and the render. Runs on
+     * the viewer's entity thread. It finds the paged list the control names (an unknown id is a logged no-op, never a
+     * crash), drops out for a plain list or one not shown as paged (neither can sort or filter at the source), then —
+     * unless a query is already in flight — mutates the list's query state (which zeroes its page) and issues the same
+     * off-thread query {@link #startPagedQuery} runs for a flip, targeting page zero because the changed sort or filter
+     * makes any later page meaningless.
+     */
+    private void applyListControl(MenuHolder holder, String listId, Consumer<ListQueryState> mutation) {
+        MenuItemSpec listItem = listItemBySource(holder.spec(), listId);
+        if (listItem == null) {
+            LOG.warning("event=list_control_unknown_list menu=" + holder.specId() + " id=" + listId);
+            return;
+        }
+        ListSpec listSpec = listItem.list().orElseThrow();
+        String sourceId = listSpec.source().id();
+        PagedListView view = holder.ctx().pagedViews().get(sourceId);
+        if (view == null) {
+            return;
+        }
+        BiFunction<MenuContext, PageRequest, PagedResult<?>> source =
+                pagedLists.get(sourceId).orElse(null);
+        if (source == null || holder.pagedFlipInFlight()) {
+            return;
+        }
+        ListQueryState state = holder.queryState(sourceId, listSpec.sorts());
+        mutation.accept(state);
+        startPagedQuery(holder, source, state, sourceId, view.size(), 0, listSpec.sorts());
+    }
+
+    /**
+     * Open the {@code list-search} text prompt, reusing the same {@link MenuTextPrompt} seam an {@code input:} step
+     * drives, and on submit store the typed line as the list's {@code key} filter through the shared
+     * {@link #applyListControl} re-query; a cancel changes nothing. Runs on the viewer's entity thread, where the seam
+     * delivers both callbacks. An engine wired without a prompt, or a list this menu does not carry, is a logged no-op.
+     * The prompt carries no label of its own — the operator's per-key input mode supplies the surface — so no
+     * player-facing text is produced here.
+     */
+    private void beginListSearch(MenuHolder holder, String listId, String key) {
+        if (textPrompt == null) {
+            LOG.warning("event=list_search_unavailable menu=" + holder.specId() + " id=" + listId);
+            return;
+        }
+        if (listItemBySource(holder.spec(), listId) == null) {
+            LOG.warning("event=list_control_unknown_list menu=" + holder.specId() + " id=" + listId);
+            return;
+        }
+        Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
+        if (live == null) {
+            return;
+        }
+        textPrompt.prompt(
+                live,
+                holder.ctx().viewer(),
+                key,
+                Component.empty(),
+                null,
+                text -> applyListControl(holder, listId, state -> state.filter(key, text)),
+                () -> {});
+    }
+
+    /** The list-backed item whose source id is {@code sourceId}, or null when this menu carries no such list. */
+    @Nullable private static MenuItemSpec listItemBySource(MenuSpec spec, String sourceId) {
+        for (MenuItemSpec item : spec.items().values()) {
+            if (item.list().isPresent() && item.list().get().source().id().equals(sourceId)) {
+                return item;
+            }
+        }
+        return null;
     }
 
     /**

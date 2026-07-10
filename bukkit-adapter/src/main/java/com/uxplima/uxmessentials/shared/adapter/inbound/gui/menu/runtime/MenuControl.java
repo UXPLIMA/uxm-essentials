@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListControlSyntax.SortDirection;
+
 /**
  * The handle the engine hands a menu action so a click can drive the very window it fired in — repaint the whole
  * menu, repaint one slot, or reset it to the first page — rather than only touching the world outside it. The
@@ -28,6 +30,15 @@ public interface MenuControl {
 
         @Override
         public void resetPagination() {}
+
+        @Override
+        public void sortList(String listId, SortDirection direction) {}
+
+        @Override
+        public void filterList(String listId, String key, String value) {}
+
+        @Override
+        public void searchList(String listId, String key) {}
     };
 
     /** Repaint the whole menu at its current page, rebuilding its click routing from the spec. */
@@ -38,4 +49,24 @@ public interface MenuControl {
 
     /** Reset the menu to page zero and repaint it there. */
     void resetPagination();
+
+    /**
+     * Move the paged list named by {@code listId} to the next / previous / first offered sort, then re-query its source
+     * for page zero and repaint. A list id this menu does not carry is a logged no-op, not a crash; a list that offers
+     * no sorts leaves the order unchanged and simply re-queries.
+     */
+    void sortList(String listId, SortDirection direction);
+
+    /**
+     * Set (or, for an empty {@code value}, clear) the filter {@code key} on the paged list named by {@code listId},
+     * then re-query its source for page zero and repaint. A list id this menu does not carry is a logged no-op.
+     */
+    void filterList(String listId, String key, String value);
+
+    /**
+     * Prompt the viewer for a line of text and, on submit, store it as the filter {@code key} on the paged list named
+     * by {@code listId}, then re-query its source for page zero and repaint. A cancel changes nothing. A list id this
+     * menu does not carry, or an engine wired without a text prompt, is a logged no-op.
+     */
+    void searchList(String listId, String key);
 }
