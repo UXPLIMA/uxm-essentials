@@ -38,6 +38,13 @@ public final class MenuHolder implements InventoryHolder {
      */
     private Map<String, List<?>> resolvedLists = Map.of();
 
+    /**
+     * One {@link ListQueryState} per paged list id this open has shown, created the first time a list asks for its
+     * state and kept for the life of the menu so paging, sorting and filtering a list survive the redraws between
+     * clicks. Plain like the holder's other fields: one viewer owns it, mutating it on their entity thread.
+     */
+    private final Map<String, ListQueryState> queryStates = new HashMap<>();
+
     @Nullable private Cancellable refreshHandle;
 
     /**
@@ -152,6 +159,17 @@ public final class MenuHolder implements InventoryHolder {
     /** The cached list-source entries every redraw of this menu renders from, never re-querying the source. */
     public Map<String, List<?>> resolvedLists() {
         return resolvedLists;
+    }
+
+    /**
+     * The paged-list query state for {@code listId}, created on the first ask from the {@code sorts} the spec offers
+     * and returned unchanged on every later ask for the same id, so the viewer's page, sort and filters persist for
+     * the life of the menu. A different id gets its own independent state.
+     */
+    public ListQueryState queryState(String listId, List<String> sorts) {
+        Objects.requireNonNull(listId, "listId");
+        Objects.requireNonNull(sorts, "sorts");
+        return queryStates.computeIfAbsent(listId, id -> new ListQueryState(sorts));
     }
 
     public void recordSlot(int slot, RenderedSlot rs) {
