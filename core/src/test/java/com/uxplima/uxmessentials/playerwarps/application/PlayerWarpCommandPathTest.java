@@ -15,7 +15,10 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -33,10 +36,12 @@ import org.junit.jupiter.api.Test;
 /**
  * The player-warps command paths through the real use cases against an in-memory repository and a recording
  * teleporter — the same wiring the Brigadier handlers drive, minus Bukkit. It proves that {@code /setpwarp}
- * persists a warp keyed per owner and re-anchors in place, that a set past the resolved per-owner limit is
- * refused, that {@code /pwarp} delegates execution to the teleport context, that ownership and the public flag
- * gate cross-owner use, that {@code /pwarp del} removes a warp, that {@code /pwarps} lists own warps and only a
- * player's public warps, and that the visibility toggles flip the public flag.
+ * persists a warp under its globally-unique name and re-anchors in place, that a name already held by another
+ * player is refused, that a set past the resolved per-owner limit is refused, that {@code /pwarp} delegates
+ * execution to the teleport context, that the fail-closed access gate lets an owner reach their own private warp
+ * but refuses another player until the warp is public, that {@code /pwarp del} removes only the caller's own
+ * warp, that {@code /pwarps} lists own warps and only a player's public warps, and that the visibility toggles
+ * flip the access axis.
  */
 class PlayerWarpCommandPathTest {
 
@@ -60,23 +65,29 @@ class PlayerWarpCommandPathTest {
     }
 
     @Test
-    void setPwarpPersistsTheWarpForItsOwner() {
-        Result<Unit, PlayerWarpError> result = setWarp(10).set(alice, PlayerWarpName.of("base"), at(10, 64, 20));
+    void setPwarpPersistsTheWarpUnderItsGlobalName() {
+        Result<Unit, PlayerWarpError> result =
+                setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(10, 64, 20));
 
         assertThat(result.isOk()).isTrue();
-        assertThat(repository.exists(alice, PlayerWarpName.of("base"))).isTrue();
-        assertThat(repository.exists(bob, PlayerWarpName.of("base"))).isFalse();
+        assertThat(repository.existsByName(PlayerWarpName.of("base"))).isTrue();
+        PlayerWarp stored = repository.findByName(PlayerWarpName.of("base")).orElseThrow();
+        assertThat(stored.owner().uuid()).isEqualTo(alice.uuid());
+        assertThat(stored.ownerName()).isEqualTo("Alice");
+        assertThat(stored.id()).isPresent();
     }
 
     @Test
-    void setPwarpOnAnExistingNameReanchorsInPlace() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
+    void setPwarpOnTheOwnersOwnNameReanchorsInPlace() {
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
 
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(100, 70, 100));
+        Result<Unit, PlayerWarpError> moved =
+                setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(100, 70, 100));
 
+        assertThat(moved.isOk()).isTrue();
         assertThat(repository.ownedBy(alice)).hasSize(1);
         assertThat(repository
-                        .find(alice, PlayerWarpName.of("base"))
+                        .findByName(PlayerWarpName.of("base"))
                         .orElseThrow()
                         .location()
                         .blockX())
@@ -84,11 +95,27 @@ class PlayerWarpCommandPathTest {
     }
 
     @Test
-    void setPwarpPastTheResolvedLimitIsRefused() {
-        setWarp(2).set(alice, PlayerWarpName.of("one"), at(0, 0, 0));
-        setWarp(2).set(alice, PlayerWarpName.of("two"), at(1, 1, 1));
+    void setPwarpOnANameOwnedByAnotherPlayerIsRefused() {
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
 
-        Result<Unit, PlayerWarpError> third = setWarp(2).set(alice, PlayerWarpName.of("three"), at(2, 2, 2));
+        Result<Unit, PlayerWarpError> taken = setWarp(10).set(bob, "Bob", PlayerWarpName.of("base"), at(5, 5, 5));
+
+        assertThat(taken.errorOrThrow()).isEqualTo(PlayerWarpError.NAME_TAKEN);
+        assertThat(repository.ownedBy(bob)).isEmpty();
+        assertThat(repository
+                        .findByName(PlayerWarpName.of("base"))
+                        .orElseThrow()
+                        .owner()
+                        .uuid())
+                .isEqualTo(alice.uuid());
+    }
+
+    @Test
+    void setPwarpPastTheResolvedLimitIsRefused() {
+        setWarp(2).set(alice, "Alice", PlayerWarpName.of("one"), at(0, 0, 0));
+        setWarp(2).set(alice, "Alice", PlayerWarpName.of("two"), at(1, 1, 1));
+
+        Result<Unit, PlayerWarpError> third = setWarp(2).set(alice, "Alice", PlayerWarpName.of("three"), at(2, 2, 2));
 
         assertThat(third.errorOrThrow()).isEqualTo(PlayerWarpError.LIMIT_REACHED);
         assertThat(repository.count(alice)).isEqualTo(2);
@@ -96,9 +123,9 @@ class PlayerWarpCommandPathTest {
 
     @Test
     void pwarpDelegatesExecutionToTheTeleportContext() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(7, 64, 7));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(7, 64, 7));
 
-        Result<Unit, PlayerWarpError> result = usePwarp().use(alice, PlayerWarpName.of("base"));
+        Result<Unit, PlayerWarpError> result = usePwarp().useFor(alice, PlayerWarpName.of("base"));
 
         assertThat(result.isOk()).isTrue();
         assertThat(teleporter.hops).isEqualTo(1);
@@ -107,9 +134,9 @@ class PlayerWarpCommandPathTest {
 
     @Test
     void anotherPlayersPrivateWarpIsRefused() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
 
-        Result<Unit, PlayerWarpError> result = usePwarp().useFor(bob, alice, PlayerWarpName.of("base"));
+        Result<Unit, PlayerWarpError> result = usePwarp().useFor(bob, PlayerWarpName.of("base"));
 
         assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NOT_PUBLIC);
         assertThat(teleporter.hops).isZero();
@@ -117,10 +144,10 @@ class PlayerWarpCommandPathTest {
 
     @Test
     void aPublicWarpIsUsableByAnotherPlayer() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
         visibility().setPublic(alice, PlayerWarpName.of("base"));
 
-        Result<Unit, PlayerWarpError> result = usePwarp().useFor(bob, alice, PlayerWarpName.of("base"));
+        Result<Unit, PlayerWarpError> result = usePwarp().useFor(bob, PlayerWarpName.of("base"));
 
         assertThat(result.isOk()).isTrue();
         assertThat(teleporter.hops).isEqualTo(1);
@@ -128,27 +155,38 @@ class PlayerWarpCommandPathTest {
 
     @Test
     void aMissingWarpIsRejected() {
-        Result<Unit, PlayerWarpError> result = usePwarp().use(alice, PlayerWarpName.of("ghost"));
+        Result<Unit, PlayerWarpError> result = usePwarp().useFor(alice, PlayerWarpName.of("ghost"));
 
         assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
         assertThat(teleporter.hops).isZero();
     }
 
     @Test
-    void delPwarpRemovesTheWarp() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
+    void delPwarpRemovesTheOwnersWarp() {
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
 
         Result<Unit, PlayerWarpError> result =
                 new DelPlayerWarp(repository, notifier, events).delete(alice, PlayerWarpName.of("base"));
 
         assertThat(result.isOk()).isTrue();
-        assertThat(repository.exists(alice, PlayerWarpName.of("base"))).isFalse();
+        assertThat(repository.existsByName(PlayerWarpName.of("base"))).isFalse();
+    }
+
+    @Test
+    void delPwarpOnAnotherPlayersWarpIsRefused() {
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
+
+        Result<Unit, PlayerWarpError> result =
+                new DelPlayerWarp(repository, notifier, events).delete(bob, PlayerWarpName.of("base"));
+
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
+        assertThat(repository.existsByName(PlayerWarpName.of("base"))).isTrue();
     }
 
     @Test
     void pwarpsOwnListsOwnedWarps() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
-        setWarp(10).set(alice, PlayerWarpName.of("farm"), at(1, 1, 1));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("farm"), at(1, 1, 1));
 
         List<PlayerWarp> owned = new ListPlayerWarps(repository, notifier).own(alice);
 
@@ -157,8 +195,8 @@ class PlayerWarpCommandPathTest {
 
     @Test
     void pwarpsForAnotherPlayerListsOnlyTheirPublicWarps() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
-        setWarp(10).set(alice, PlayerWarpName.of("secret"), at(1, 1, 1));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("secret"), at(1, 1, 1));
         visibility().setPublic(alice, PlayerWarpName.of("base"));
 
         List<PlayerWarp> shown = new ListPlayerWarps(repository, notifier).publicOf(bob, alice, "Alice");
@@ -168,7 +206,7 @@ class PlayerWarpCommandPathTest {
 
     @Test
     void crossOwnerEntriesUseTheOtherOwnerEntryKeyCarryingTheOwner() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
         visibility().setPublic(alice, PlayerWarpName.of("base"));
         RecordingSink sink = new RecordingSink();
         PlayerWarpNotifier recording = new PlayerWarpNotifier(new KeyMessages(), sink);
@@ -182,22 +220,22 @@ class PlayerWarpCommandPathTest {
     }
 
     @Test
-    void visibilityTogglesFlipThePublicFlag() {
-        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
+    void visibilityTogglesFlipTheAccessAxis() {
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
 
         visibility().setPublic(alice, PlayerWarpName.of("base"));
         assertThat(repository
-                        .find(alice, PlayerWarpName.of("base"))
+                        .findByName(PlayerWarpName.of("base"))
                         .orElseThrow()
-                        .isPublic())
-                .isTrue();
+                        .access())
+                .isEqualTo(WarpAccess.PUBLIC);
 
         visibility().setPrivate(alice, PlayerWarpName.of("base"));
         assertThat(repository
-                        .find(alice, PlayerWarpName.of("base"))
+                        .findByName(PlayerWarpName.of("base"))
                         .orElseThrow()
-                        .isPublic())
-                .isFalse();
+                        .access())
+                .isEqualTo(WarpAccess.PRIVATE);
     }
 
     private SetPlayerWarp setWarp(int limit) {
@@ -210,77 +248,75 @@ class PlayerWarpCommandPathTest {
     }
 
     private SetPlayerWarpVisibility visibility() {
-        return new SetPlayerWarpVisibility(repository, notifier);
+        return new SetPlayerWarpVisibility(repository, notifier, Clock.system(ZoneOffset.UTC));
     }
 
     private static Position at(double x, double y, double z) {
         return Position.of(WORLD, x, y, z);
     }
 
-    /** A map-backed {@link PlayerWarpRepository} keyed per owner, keeping warps in insertion order. */
+    /**
+     * A map-backed {@link PlayerWarpRepository} keyed by the global warp name, assigning a surrogate id on
+     * insert and keeping warps in insertion order.
+     */
     private static final class FakePlayerWarpRepository implements PlayerWarpRepository {
-        private final Map<UUID, Map<String, PlayerWarp>> byOwner = new LinkedHashMap<>();
+        private final Map<PlayerWarpName, PlayerWarp> byName = new LinkedHashMap<>();
+        private long nextId = 0L;
 
         @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
-            return Optional.ofNullable(set(owner).get(name.value()));
+        public Optional<PlayerWarp> findByName(PlayerWarpName name) {
+            return Optional.ofNullable(byName.get(name));
+        }
+
+        @Override
+        public Optional<PlayerWarp> findById(PlayerWarpId id) {
+            return byName.values().stream()
+                    .filter(warp -> warp.id().equals(Optional.of(id)))
+                    .findFirst();
         }
 
         @Override
         public List<PlayerWarp> ownedBy(PlayerRef owner) {
-            return List.copyOf(set(owner).values());
+            return byName.values().stream()
+                    .filter(warp -> warp.owner().uuid().equals(owner.uuid()))
+                    .toList();
         }
 
         @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
-            List<PlayerWarp> shown = new ArrayList<>();
-            for (PlayerWarp warp : set(owner).values()) {
-                if (warp.isPublic()) {
-                    shown.add(warp);
-                }
-            }
-            return List.copyOf(shown);
+        public List<PlayerWarp> publicOwnedBy(PlayerRef owner) {
+            return byName.values().stream()
+                    .filter(warp -> warp.owner().uuid().equals(owner.uuid()))
+                    .filter(warp -> warp.status() == WarpStatus.ACTIVE && warp.access() == WarpAccess.PUBLIC)
+                    .toList();
         }
 
         @Override
         public int count(PlayerRef owner) {
-            return set(owner).size();
+            return (int) byName.values().stream()
+                    .filter(warp -> warp.owner().uuid().equals(owner.uuid()))
+                    .count();
         }
 
         @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
-            return set(owner).containsKey(name.value());
+        public boolean existsByName(PlayerWarpName name) {
+            return byName.containsKey(name);
         }
 
         @Override
-        public void save(PlayerWarp warp) {
-            byOwner.computeIfAbsent(warp.owner().uuid(), u -> new LinkedHashMap<>())
-                    .put(warp.name().value(), warp);
+        public PlayerWarpId save(PlayerWarp warp) {
+            PlayerWarpId id = warp.id().orElseGet(() -> new PlayerWarpId(++nextId));
+            byName.put(warp.name(), warp.id().isPresent() ? warp : warp.withId(id));
+            return id;
         }
 
         @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            set(owner).remove(name.value());
+        public void deleteById(PlayerWarpId id) {
+            byName.values().removeIf(warp -> warp.id().equals(Optional.of(id)));
         }
 
         @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
-            PlayerWarp warp = set(owner).get(name.value());
-            if (warp != null) {
-                set(owner).put(name.value(), warp.incrementedVisitors());
-            }
-        }
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {}
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return 0.0;
-        }
-
-        private Map<String, PlayerWarp> set(PlayerRef owner) {
-            return byOwner.getOrDefault(owner.uuid(), Map.of());
+        public void recordVisit(PlayerWarpId id) {
+            // Visit counting is an atomic store-side write exercised in the persistence tests, not here.
         }
     }
 
@@ -288,6 +324,7 @@ class PlayerWarpCommandPathTest {
         int hops;
         private PlayerWarp lastWarp = PlayerWarp.create(
                 new PlayerRef(new UUID(0L, 0L), "none"),
+                "none",
                 PlayerWarpName.of("none"),
                 Position.of(WORLD, 0, 0, 0),
                 java.time.Instant.EPOCH);

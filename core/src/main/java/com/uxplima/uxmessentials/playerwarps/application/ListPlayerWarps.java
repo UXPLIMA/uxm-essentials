@@ -60,7 +60,7 @@ public final class ListPlayerWarps {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(ownerName, "ownerName");
-        List<PlayerWarp> shown = repository.publicOf(owner);
+        List<PlayerWarp> shown = repository.publicOwnedBy(owner);
         if (shown.isEmpty()) {
             notifier.send(viewer, PlayerwarpsMessageKey.PWARP_LIST_OTHER_EMPTY, Map.of("player", ownerName));
             return shown;

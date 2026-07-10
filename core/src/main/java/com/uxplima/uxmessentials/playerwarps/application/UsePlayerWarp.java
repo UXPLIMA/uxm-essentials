@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleport
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -16,13 +17,16 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 
 /**
- * {@code /pwarp <name> [owner]}: teleport a player to a player-warp. With no owner the actor warps to their
- * own warp; with an owner they warp to that player's warp, which is permitted only when the warp is public.
- * Access is by ownership and the public flag — the actor always reaches their own warp, public or private,
- * and reaches another owner's warp only when it is public. Execution is then <em>delegated</em> to the
- * teleport context through {@link PlayerWarpTeleporter}; this use case never moves the player itself, so the
- * shared cooldown, the move-cancellable warmup, and the region-aware async hop are all the teleport context's
- * concern.
+ * {@code /pwarp <name>}: teleport a player to a player-warp resolved by its server-wide-unique name. This is a
+ * deliberately <em>fail-closed minimal</em> access gate: the actor always reaches a warp they own, and reaches
+ * another owner's warp only when its access is {@link WarpAccess#PUBLIC}. Password, whitelist, and private warps
+ * are all owner-only here — the rich gate (password verification, whitelist, bans, roles, the economy charge)
+ * lands in a later task and can only ever <em>widen</em> this, never narrow it, so this stance is the safe one.
+ *
+ * <p>Execution is then <em>delegated</em> to the teleport context through {@link PlayerWarpTeleporter}; this use
+ * case never moves the player itself, so the shared cooldown, the move-cancellable warmup, and the region-aware
+ * async hop are all the teleport context's concern. The {@link Permissions} port survives only for the
+ * {@code bypass.safety} node; the safety check itself is delegated to {@link WarpSafetyChecker}.
  */
 public final class UsePlayerWarp {
 
@@ -45,73 +49,41 @@ public final class UsePlayerWarp {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
     }
 
-    /** Teleport {@code who} to their own warp {@code name}. */
-    public Result<Unit, PlayerWarpError> use(PlayerRef who, PlayerWarpName name) {
-        return useFor(who, who, name, Optional.empty());
-    }
-
-    public Result<Unit, PlayerWarpError> use(PlayerRef who, PlayerWarpName name, String password) {
-        return useFor(who, who, name, Optional.of(password));
-    }
-
     /**
-     * Teleport {@code actor} to the warp {@code name} owned by {@code owner}. A missing warp is rejected with
-     * {@link PlayerWarpError#NOT_FOUND}; a private warp owned by someone else is refused with
+     * Teleport {@code actor} to the warp {@code name}. A missing warp is rejected with
+     * {@link PlayerWarpError#NOT_FOUND}; a non-public warp owned by someone else is refused with
      * {@link PlayerWarpError#NOT_PUBLIC}. The actor always reaches their own warp.
      */
-    public Result<Unit, PlayerWarpError> useFor(PlayerRef actor, PlayerRef owner, PlayerWarpName name) {
-        return useFor(actor, owner, name, Optional.empty());
-    }
-
-    public Result<Unit, PlayerWarpError> useFor(
-            PlayerRef actor, PlayerRef owner, PlayerWarpName name, Optional<String> password) {
+    public Result<Unit, PlayerWarpError> useFor(PlayerRef actor, PlayerWarpName name) {
         Objects.requireNonNull(actor, "actor");
-        Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(name, "name");
-        Optional<PlayerWarp> warp = repository.find(owner, name);
+        Optional<PlayerWarp> warp = repository.findByName(name);
         if (warp.isEmpty()) {
             notifier.send(actor, PlayerWarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
             return Result.err(PlayerWarpError.NOT_FOUND);
         }
-        return admitAndGo(actor, owner, warp.get(), password);
+        return admitAndGo(actor, warp.get());
     }
 
-    private Result<Unit, PlayerWarpError> admitAndGo(
-            PlayerRef actor, PlayerRef owner, PlayerWarp warp, Optional<String> enteredPassword) {
-        if (!actor.uuid().equals(owner.uuid()) && !warp.isPublic()) {
+    /**
+     * The overload the command surface calls when it still resolves an explicit owner argument. Warp names are
+     * globally unique now, so the warp is found by name alone and {@code owner} is only a caller-side hint; the
+     * owner used for the access gate is always the resolved warp's own owner.
+     */
+    public Result<Unit, PlayerWarpError> useFor(PlayerRef actor, PlayerRef owner, PlayerWarpName name) {
+        Objects.requireNonNull(owner, "owner");
+        return useFor(actor, name);
+    }
+
+    private Result<Unit, PlayerWarpError> admitAndGo(PlayerRef actor, PlayerWarp warp) {
+        PlayerRef owner = warp.owner();
+        if (!actor.uuid().equals(owner.uuid()) && warp.access() != WarpAccess.PUBLIC) {
             notifier.send(
                     actor,
                     PlayerWarpError.NOT_PUBLIC.messageKey(),
                     Map.of("warp", warp.name().value()));
             return Result.err(PlayerWarpError.NOT_PUBLIC);
         }
-
-        // Lock check
-        if (warp.isLocked()
-                && !actor.uuid().equals(owner.uuid())
-                && !permissions.has(actor, "uxmessentials.playerwarp.bypass.lock")) {
-            notifier.send(
-                    actor,
-                    PlayerWarpError.LOCKED.messageKey(),
-                    Map.of("warp", warp.name().value()));
-            return Result.err(PlayerWarpError.LOCKED);
-        }
-
-        // Password check
-        if (warp.password().isPresent()
-                && !actor.uuid().equals(owner.uuid())
-                && !permissions.has(actor, "uxmessentials.playerwarp.bypass.password")) {
-            String required = warp.password().get();
-            if (enteredPassword.isEmpty() || !enteredPassword.get().equals(required)) {
-                notifier.send(
-                        actor,
-                        PlayerWarpError.WRONG_PASSWORD.messageKey(),
-                        Map.of("warp", warp.name().value()));
-                return Result.err(PlayerWarpError.WRONG_PASSWORD);
-            }
-        }
-
-        // Safety check
         if (!safetyChecker.isSafe(warp.location())
                 && !permissions.has(actor, "uxmessentials.playerwarp.bypass.safety")) {
             notifier.send(
@@ -130,7 +102,7 @@ public final class UsePlayerWarp {
         // that loses concurrent visits to a last-writer-wins race and would needlessly invalidate the owner's
         // cross-server cache on every teleport. The warp we hand the teleporter shows the pre-visit count, which
         // is fine for this request.
-        repository.recordVisit(owner, warp.name());
+        repository.recordVisit(warp.id().orElseThrow());
 
         teleporter.teleportTo(actor, warp);
         return Result.ok();

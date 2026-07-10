@@ -6,176 +6,146 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
+import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmessentials.warps.domain.WarpCost;
 
 /**
- * One player-owned warp: the {@link PlayerRef owner} who created it, a {@link PlayerWarpName} unique within
- * that owner's set, the {@link Position} it points at, a public/private visibility flag, and optional gates/custom
- * settings (visitors, password, locked state, welcome message, effects, warmup/cooldown overrides, and a custom icon).
+ * One player-owned warp, identified by a durable surrogate {@link PlayerWarpId} that the database assigns on the
+ * first save. Its {@link PlayerWarpName} is server-wide unique — two players can never hold the same name — so the
+ * name alone addresses a warp, and access is governed by an ordered {@link WarpAccess} axis
+ * (public / password / whitelist / private) crossed with a {@link WarpStatus} lifecycle
+ * (active / suspended / archived), not a single public flag.
+ *
+ * <p>Around that identity the aggregate composes the presentation, economy, and social facets a browsable warp
+ * network needs: an optional {@link DisplayName}, {@link WarpCategory}, {@link WarpDescription} and {@link IconSpec}
+ * for listing; a {@link WarpCost} entry price and accrued {@link WarpEarnings}; denormalised {@link RatingSummary}
+ * and {@link VisitSummary} rollups plus a favourite count for sorting without scanning child tables; optional
+ * {@link Sponsorship} and {@link RentState} for paid placement; and the {@link WarpEffects} / {@link WarpTimingOverrides}
+ * a warp customises its teleport with. The password itself is never held here — only a {@link #passwordSet} flag;
+ * the hash lives in persistence and is verified through a hashing port, so the domain never touches a secret.
  */
 public record PlayerWarp(
+        Optional<PlayerWarpId> id,
         PlayerRef owner,
+        String ownerName,
         PlayerWarpName name,
+        Optional<DisplayName> displayName,
         Position location,
-        boolean isPublic,
+        Optional<String> serverId,
+        Optional<WarpCategory> category,
+        Optional<WarpDescription> description,
+        Optional<IconSpec> icon,
+        WarpAccess access,
+        boolean passwordSet,
+        WarpStatus status,
+        WarpCost price,
+        WarpEarnings earnings,
+        RatingSummary ratings,
+        VisitSummary visits,
+        int favouriteCount,
+        Optional<Sponsorship> sponsorship,
+        Optional<RentState> rent,
+        WarpEffects effects,
+        WarpTimingOverrides timing,
         Instant createdAt,
-        long visitors,
-        Optional<String> password,
-        boolean isLocked,
-        java.util.List<WelcomeMessage> welcomeMessages,
-        Optional<String> departureSound,
-        Optional<String> arrivalSound,
-        Optional<String> departureParticle,
-        Optional<String> arrivalParticle,
-        Optional<Double> warmupOverrideSeconds,
-        Optional<Double> cooldownOverrideSeconds,
-        Optional<String> iconMaterial) {
+        Instant updatedAt) {
 
     public PlayerWarp {
+        Objects.requireNonNull(id, "id");
         Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(ownerName, "ownerName");
         Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(serverId, "serverId");
+        Objects.requireNonNull(category, "category");
+        Objects.requireNonNull(description, "description");
+        Objects.requireNonNull(icon, "icon");
+        Objects.requireNonNull(access, "access");
+        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(price, "price");
+        Objects.requireNonNull(earnings, "earnings");
+        Objects.requireNonNull(ratings, "ratings");
+        Objects.requireNonNull(visits, "visits");
+        Objects.requireNonNull(sponsorship, "sponsorship");
+        Objects.requireNonNull(rent, "rent");
+        Objects.requireNonNull(effects, "effects");
+        Objects.requireNonNull(timing, "timing");
         Objects.requireNonNull(createdAt, "createdAt");
-        Objects.requireNonNull(password, "password");
-        Objects.requireNonNull(welcomeMessages, "welcomeMessages");
-        Objects.requireNonNull(departureSound, "departureSound");
-        Objects.requireNonNull(arrivalSound, "arrivalSound");
-        Objects.requireNonNull(departureParticle, "departureParticle");
-        Objects.requireNonNull(arrivalParticle, "arrivalParticle");
-        Objects.requireNonNull(warmupOverrideSeconds, "warmupOverrideSeconds");
-        Objects.requireNonNull(cooldownOverrideSeconds, "cooldownOverrideSeconds");
-        Objects.requireNonNull(iconMaterial, "iconMaterial");
+        Objects.requireNonNull(updatedAt, "updatedAt");
+        if (favouriteCount < 0) {
+            throw new IllegalArgumentException("favourite count must not be negative: " + favouriteCount);
+        }
     }
 
-    public PlayerWarp(PlayerRef owner, PlayerWarpName name, Position location, boolean isPublic, Instant createdAt) {
-        this(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                0L,
-                Optional.empty(),
-                false,
-                java.util.List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty());
-    }
-
-    public PlayerWarp(
-            PlayerRef owner,
-            PlayerWarpName name,
-            Position location,
-            boolean isPublic,
-            Instant createdAt,
-            long visitors,
-            Optional<String> password,
-            boolean isLocked) {
-        this(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                java.util.List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty());
-    }
-
-    /** A new private warp owned by {@code owner}, created now at {@code location}. */
-    public static PlayerWarp create(PlayerRef owner, PlayerWarpName name, Position location, Instant createdAt) {
+    /**
+     * A brand-new warp owned by {@code owner}, at {@code location}, created now. It has no id until its first
+     * save assigns one, starts {@link WarpAccess#PRIVATE} and {@link WarpStatus#ACTIVE}, carries no password, is
+     * free, and has empty economy / rating / visit rollups and no optional facets. {@code ownerName} is the
+     * owner's display name captured at creation so a browse can render the author without a lookup.
+     */
+    public static PlayerWarp create(
+            PlayerRef owner, String ownerName, PlayerWarpName name, Position location, Instant now) {
         return new PlayerWarp(
+                Optional.empty(),
                 owner,
+                ownerName,
                 name,
+                Optional.empty(),
                 location,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                WarpAccess.PRIVATE,
                 false,
-                createdAt,
-                0L,
-                Optional.empty(),
-                false,
-                java.util.List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
+                WarpStatus.ACTIVE,
+                WarpCost.free(),
+                WarpEarnings.zero("default"),
+                RatingSummary.empty(),
+                VisitSummary.empty(),
+                0,
                 Optional.empty(),
                 Optional.empty(),
-                Optional.empty(),
-                Optional.empty());
+                WarpEffects.none(),
+                WarpTimingOverrides.none(),
+                now,
+                now);
     }
 
-    /** A pre-filled builder for the internal transitions; the public surface is unchanged. */
+    /** A pre-filled builder for the internal transitions; the public surface stays the {@code with*} methods. */
     PlayerWarpBuilder toBuilder() {
         return new PlayerWarpBuilder(this);
     }
 
-    /** A copy re-anchored to {@code newLocation}, keeping the owner, name, visibility, and creation time. */
-    public PlayerWarp movedTo(Position newLocation) {
-        return toBuilder()
-                .location(Objects.requireNonNull(newLocation, "newLocation"))
-                .build();
+    /** A copy re-anchored to {@code newLocation}, keeping every other field and stamping {@code now} as the edit time. */
+    public PlayerWarp movedTo(Position newLocation, Instant now) {
+        Objects.requireNonNull(newLocation, "newLocation");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().location(newLocation).updatedAt(now).build();
     }
 
-    /** A copy with the visibility set to {@code makePublic}, keeping everything else. */
-    public PlayerWarp withVisibility(boolean makePublic) {
-        return toBuilder().isPublic(makePublic).build();
+    /** A copy with the access axis set to {@code newAccess}, stamping {@code now} as the edit time. */
+    public PlayerWarp withAccess(WarpAccess newAccess, Instant now) {
+        Objects.requireNonNull(newAccess, "newAccess");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().access(newAccess).updatedAt(now).build();
     }
 
-    public PlayerWarp incrementedVisitors() {
-        return toBuilder().visitors(visitors + 1).build();
+    /** A copy with the display name swapped, stamping {@code now} as the edit time. */
+    public PlayerWarp withDisplayName(Optional<DisplayName> newDisplayName, Instant now) {
+        Objects.requireNonNull(newDisplayName, "newDisplayName");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().displayName(newDisplayName).updatedAt(now).build();
     }
 
-    public PlayerWarp withPassword(Optional<String> newPassword) {
-        return toBuilder()
-                .password(newPassword.map(String::strip).filter(n -> !n.isEmpty()))
-                .build();
-    }
-
-    public PlayerWarp withLocked(boolean locked) {
-        return toBuilder().isLocked(locked).build();
-    }
-
-    public PlayerWarp withWelcomeMessages(java.util.List<WelcomeMessage> messages) {
-        return toBuilder().welcomeMessages(Objects.requireNonNull(messages)).build();
-    }
-
-    public PlayerWarp withDepartureSound(Optional<String> sound) {
-        return toBuilder().departureSound(sound).build();
-    }
-
-    public PlayerWarp withArrivalSound(Optional<String> sound) {
-        return toBuilder().arrivalSound(sound).build();
-    }
-
-    public PlayerWarp withDepartureParticle(Optional<String> particle) {
-        return toBuilder().departureParticle(particle).build();
-    }
-
-    public PlayerWarp withArrivalParticle(Optional<String> particle) {
-        return toBuilder().arrivalParticle(particle).build();
-    }
-
-    public PlayerWarp withWarmupOverride(Optional<Double> seconds) {
-        return toBuilder().warmupOverrideSeconds(seconds).build();
-    }
-
-    public PlayerWarp withCooldownOverride(Optional<Double> seconds) {
-        return toBuilder().cooldownOverrideSeconds(seconds).build();
-    }
-
-    public PlayerWarp withIconMaterial(Optional<String> material) {
-        return toBuilder().iconMaterial(material).build();
+    /**
+     * A copy carrying the surrogate id the repository assigned on insert. This is an identity assignment, not a
+     * field edit, so it deliberately does not bump {@link #updatedAt}: the warp is the same warp, now addressable
+     * by its key.
+     */
+    public PlayerWarp withId(PlayerWarpId assignedId) {
+        Objects.requireNonNull(assignedId, "assignedId");
+        return toBuilder().id(Optional.of(assignedId)).build();
     }
 }

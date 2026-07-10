@@ -19,15 +19,18 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
  * {@code /setpwarp <name>}: create a player-owned warp at the player's current position, or re-anchor an
- * existing one of the same name in place. A name the owner already has re-anchors the row (keeping its
- * visibility and creation time) and saves with the {@code moved} feedback; a brand-new name is gated against
- * the owner's resolved {@link PlayerWarpLimit} — hitting the cap returns {@link PlayerWarpError#LIMIT_REACHED}
- * and renders the limit message — otherwise it is stored as a new private warp and publishes
- * {@code PlayerWarpCreated}.
+ * existing one of the same name in place. Because warp names are now server-wide unique, a {@code /setpwarp}
+ * onto a name that already exists is only a re-anchor when the caller owns that name — it keeps the warp's
+ * access, status, and creation time and saves with the {@code moved} feedback. A name held by <em>another</em>
+ * player is refused with {@link PlayerWarpError#NAME_TAKEN}: the whole point of global names is that they cannot
+ * collide across owners. A brand-new name is gated against the owner's resolved {@link PlayerWarpLimit} — hitting
+ * the cap returns {@link PlayerWarpError#LIMIT_REACHED} — otherwise it is stored as a new private warp and
+ * publishes {@code PlayerWarpCreated}.
  *
- * <p>The owner's limit is resolved through {@link PlayerWarpQuota} scoped to the warp's world, so a
- * world-scoped {@code uxmessentials.pwarp.limit.<world>.<n>} node folds in. A new warp is always private
- * until the owner makes it public.
+ * <p>The owner's limit is resolved through {@link PlayerWarpQuota} scoped to the warp's world, so a world-scoped
+ * {@code uxmessentials.pwarp.limit.<world>.<n>} node folds in. {@code ownerName} is the player's display name,
+ * captured onto the new warp so a browse can render its author without a lookup; the edit timestamp comes from
+ * the injected {@link Clock}, never from the domain.
  */
 public final class SetPlayerWarp {
 
@@ -53,9 +56,10 @@ public final class SetPlayerWarp {
         this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
     }
 
-    /** Create or re-anchor {@code owner}'s warp {@code name} at {@code at}. */
-    public Result<Unit, PlayerWarpError> set(PlayerRef owner, PlayerWarpName name, Position at) {
+    /** Create {@code owner}'s warp {@code name} at {@code at}, or re-anchor it when the owner already holds it. */
+    public Result<Unit, PlayerWarpError> set(PlayerRef owner, String ownerName, PlayerWarpName name, Position at) {
         Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(ownerName, "ownerName");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(at, "at");
 
@@ -67,30 +71,39 @@ public final class SetPlayerWarp {
             return Result.err(PlayerWarpError.WORLD_BLACKLISTED);
         }
 
-        Optional<PlayerWarp> existing = repository.find(owner, name);
-        return existing.isPresent() ? reanchor(owner, existing.get(), at) : create(owner, name, at);
+        Optional<PlayerWarp> existing = repository.findByName(name);
+        if (existing.isEmpty()) {
+            return create(owner, ownerName, name, at);
+        }
+        return reanchorOrReject(owner, existing.get(), at);
     }
 
-    private Result<Unit, PlayerWarpError> create(PlayerRef owner, PlayerWarpName name, Position at) {
+    private Result<Unit, PlayerWarpError> reanchorOrReject(PlayerRef owner, PlayerWarp existing, Position at) {
+        if (!existing.owner().uuid().equals(owner.uuid())) {
+            notifier.send(
+                    owner,
+                    PlayerWarpError.NAME_TAKEN.messageKey(),
+                    Map.of("warp", existing.name().value()));
+            return Result.err(PlayerWarpError.NAME_TAKEN);
+        }
+        repository.save(existing.movedTo(at, clock.instant()));
+        notifier.send(
+                owner,
+                PlayerwarpsMessageKey.PWARP_MOVED,
+                Map.of("warp", existing.name().value()));
+        return Result.ok();
+    }
+
+    private Result<Unit, PlayerWarpError> create(PlayerRef owner, String ownerName, PlayerWarpName name, Position at) {
         PlayerWarpLimit limit = quota.resolve(owner, at.world());
         if (limit.isReachedAt(repository.count(owner))) {
             notifier.send(
                     owner, PlayerWarpError.LIMIT_REACHED.messageKey(), Map.of("limit", Integer.toString(limit.cap())));
             return Result.err(PlayerWarpError.LIMIT_REACHED);
         }
-        PlayerWarp warp = PlayerWarp.create(owner, name, at, clock.instant());
-        repository.save(warp);
+        repository.save(PlayerWarp.create(owner, ownerName, name, at, clock.instant()));
         events.publish(new PlayerWarpCreated(owner, name, at));
         notifier.send(owner, PlayerwarpsMessageKey.PWARP_SET, Map.of("warp", name.value()));
-        return Result.ok();
-    }
-
-    private Result<Unit, PlayerWarpError> reanchor(PlayerRef owner, PlayerWarp existing, Position at) {
-        repository.save(existing.movedTo(at));
-        notifier.send(
-                owner,
-                PlayerwarpsMessageKey.PWARP_MOVED,
-                Map.of("warp", existing.name().value()));
         return Result.ok();
     }
 }

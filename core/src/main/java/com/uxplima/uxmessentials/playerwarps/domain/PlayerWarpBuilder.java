@@ -6,52 +6,80 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
+import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmessentials.warps.domain.WarpCost;
 
 /**
  * A mutable builder for {@link PlayerWarp}, kept package-private so it is purely an internal mechanism: each
- * {@link PlayerWarp} {@code with*}/transition reads {@link PlayerWarp#toBuilder()}, changes the one field it owns,
- * and calls {@link #build()} — which routes through the canonical {@code PlayerWarp} constructor, so every
- * null-check still fires. Extracting the per-field copy boilerplate here keeps {@code PlayerWarp} small without
- * changing its public surface.
+ * {@link PlayerWarp} transition reads {@link PlayerWarp#toBuilder()}, changes the one or two fields it owns, and
+ * calls {@link #build()} — which routes through the canonical {@code PlayerWarp} constructor, so every null-check
+ * still fires. It seeds every component from the source warp and exposes a setter only for the components the
+ * transitions actually vary; a T5/T6 transition that needs to edit another facet adds its setter here rather than
+ * hand-copying all twenty-odd fields at the call site.
  */
 final class PlayerWarpBuilder {
 
-    private PlayerRef owner;
-    private PlayerWarpName name;
+    private Optional<PlayerWarpId> id;
+    private final PlayerRef owner;
+    private final String ownerName;
+    private final PlayerWarpName name;
+    private Optional<DisplayName> displayName;
     private Position location;
-    private boolean isPublic;
-    private Instant createdAt;
-    private long visitors;
-    private Optional<String> password;
-    private boolean isLocked;
-    private java.util.List<WelcomeMessage> welcomeMessages;
-    private Optional<String> departureSound;
-    private Optional<String> arrivalSound;
-    private Optional<String> departureParticle;
-    private Optional<String> arrivalParticle;
-    private Optional<Double> warmupOverrideSeconds;
-    private Optional<Double> cooldownOverrideSeconds;
-    private Optional<String> iconMaterial;
+    private final Optional<String> serverId;
+    private final Optional<WarpCategory> category;
+    private final Optional<WarpDescription> description;
+    private final Optional<IconSpec> icon;
+    private WarpAccess access;
+    private final boolean passwordSet;
+    private final WarpStatus status;
+    private final WarpCost price;
+    private final WarpEarnings earnings;
+    private final RatingSummary ratings;
+    private final VisitSummary visits;
+    private final int favouriteCount;
+    private final Optional<Sponsorship> sponsorship;
+    private final Optional<RentState> rent;
+    private final WarpEffects effects;
+    private final WarpTimingOverrides timing;
+    private final Instant createdAt;
+    private Instant updatedAt;
 
     PlayerWarpBuilder(PlayerWarp source) {
         Objects.requireNonNull(source, "source");
+        this.id = source.id();
         this.owner = source.owner();
+        this.ownerName = source.ownerName();
         this.name = source.name();
+        this.displayName = source.displayName();
         this.location = source.location();
-        this.isPublic = source.isPublic();
+        this.serverId = source.serverId();
+        this.category = source.category();
+        this.description = source.description();
+        this.icon = source.icon();
+        this.access = source.access();
+        this.passwordSet = source.passwordSet();
+        this.status = source.status();
+        this.price = source.price();
+        this.earnings = source.earnings();
+        this.ratings = source.ratings();
+        this.visits = source.visits();
+        this.favouriteCount = source.favouriteCount();
+        this.sponsorship = source.sponsorship();
+        this.rent = source.rent();
+        this.effects = source.effects();
+        this.timing = source.timing();
         this.createdAt = source.createdAt();
-        this.visitors = source.visitors();
-        this.password = source.password();
-        this.isLocked = source.isLocked();
-        this.welcomeMessages = source.welcomeMessages();
-        this.departureSound = source.departureSound();
-        this.arrivalSound = source.arrivalSound();
-        this.departureParticle = source.departureParticle();
-        this.arrivalParticle = source.arrivalParticle();
-        this.warmupOverrideSeconds = source.warmupOverrideSeconds();
-        this.cooldownOverrideSeconds = source.cooldownOverrideSeconds();
-        this.iconMaterial = source.iconMaterial();
+        this.updatedAt = source.updatedAt();
+    }
+
+    PlayerWarpBuilder id(Optional<PlayerWarpId> value) {
+        this.id = value;
+        return this;
+    }
+
+    PlayerWarpBuilder displayName(Optional<DisplayName> value) {
+        this.displayName = value;
+        return this;
     }
 
     PlayerWarpBuilder location(Position value) {
@@ -59,83 +87,41 @@ final class PlayerWarpBuilder {
         return this;
     }
 
-    PlayerWarpBuilder isPublic(boolean value) {
-        this.isPublic = value;
+    PlayerWarpBuilder access(WarpAccess value) {
+        this.access = value;
         return this;
     }
 
-    PlayerWarpBuilder visitors(long value) {
-        this.visitors = value;
-        return this;
-    }
-
-    PlayerWarpBuilder password(Optional<String> value) {
-        this.password = value;
-        return this;
-    }
-
-    PlayerWarpBuilder isLocked(boolean value) {
-        this.isLocked = value;
-        return this;
-    }
-
-    PlayerWarpBuilder welcomeMessages(java.util.List<WelcomeMessage> value) {
-        this.welcomeMessages = value;
-        return this;
-    }
-
-    PlayerWarpBuilder departureSound(Optional<String> value) {
-        this.departureSound = value;
-        return this;
-    }
-
-    PlayerWarpBuilder arrivalSound(Optional<String> value) {
-        this.arrivalSound = value;
-        return this;
-    }
-
-    PlayerWarpBuilder departureParticle(Optional<String> value) {
-        this.departureParticle = value;
-        return this;
-    }
-
-    PlayerWarpBuilder arrivalParticle(Optional<String> value) {
-        this.arrivalParticle = value;
-        return this;
-    }
-
-    PlayerWarpBuilder warmupOverrideSeconds(Optional<Double> value) {
-        this.warmupOverrideSeconds = value;
-        return this;
-    }
-
-    PlayerWarpBuilder cooldownOverrideSeconds(Optional<Double> value) {
-        this.cooldownOverrideSeconds = value;
-        return this;
-    }
-
-    PlayerWarpBuilder iconMaterial(Optional<String> value) {
-        this.iconMaterial = value;
+    PlayerWarpBuilder updatedAt(Instant value) {
+        this.updatedAt = value;
         return this;
     }
 
     PlayerWarp build() {
         return new PlayerWarp(
+                id,
                 owner,
+                ownerName,
                 name,
+                displayName,
                 location,
-                isPublic,
+                serverId,
+                category,
+                description,
+                icon,
+                access,
+                passwordSet,
+                status,
+                price,
+                earnings,
+                ratings,
+                visits,
+                favouriteCount,
+                sponsorship,
+                rent,
+                effects,
+                timing,
                 createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+                updatedAt);
     }
 }

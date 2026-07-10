@@ -4,26 +4,39 @@ import java.util.List;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Outbound port for durable, per-owner player-warp storage. Every warp fact (owner, name, world, coordinates,
- * visibility, creation time) is a first-class column — there is no opaque JSON blob (the architecture
- * persistence invariant) — so a {@link PlayerWarp} loaded from a row is rebuilt from queryable fields, and the
- * list queries read them in stored creation order.
+ * Outbound port for durable player-warp storage. Every warp fact (owner, name, world, coordinates, access,
+ * status, economy, and the rating/visit rollups) is a first-class column — there is no opaque JSON blob (the
+ * architecture persistence invariant) — so a {@link PlayerWarp} loaded from a row is rebuilt from queryable
+ * fields, and the list queries read them in stored creation order.
  *
- * <p>Player-warps are keyed by {@code (owner, name)}, so a {@code save} upserts on that composite key — a
- * re-anchor or a visibility flip overwrites the same row — and a delete is by owner and name. A cache
- * decorator may sit in front of this port; the contract here is the durable source of truth.
+ * <p>Warp names are now server-wide unique, so lookups key on the {@link PlayerWarpName} or the surrogate
+ * {@link PlayerWarpId}, never on {@code (owner, name)}. A {@link #save} upserts on the surrogate id — assigning a
+ * fresh one on insert and returning it — and a delete is by id. A cache decorator may sit in front of this port;
+ * the contract here is the durable source of truth.
  */
 public interface PlayerWarpRepository {
 
-    /** The warp {@code owner} owns under {@code name}, if one exists. */
-    Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name);
+    /** The warp under {@code name}, if one exists anywhere on the server (names are globally unique). */
+    Optional<PlayerWarp> findByName(PlayerWarpName name);
+
+    /** The warp with the surrogate key {@code id}, if it still exists. */
+    Optional<PlayerWarp> findById(PlayerWarpId id);
 
     /** Every warp {@code owner} owns, in stored creation order, for the {@code /pwarps} list. */
     List<PlayerWarp> ownedBy(PlayerRef owner);
+
+    /**
+     * The {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#ACTIVE active},
+     * {@link com.uxplima.uxmessentials.playerwarps.domain.WarpAccess#PUBLIC public} warps {@code owner} owns, in
+     * stored creation order, for a cross-owner {@code /pwarps} — a private, suspended, or archived warp never
+     * leaks to another player through this query.
+     */
+    List<PlayerWarp> publicOwnedBy(PlayerRef owner);
 
     /**
      * Every warp across every owner, in stored creation order, for the management GUI's admin view (an operator
@@ -36,30 +49,32 @@ public interface PlayerWarpRepository {
         return List.of();
     }
 
-    /** The public warps {@code owner} owns, in stored creation order, for a cross-owner {@code /pwarps}. */
-    List<PlayerWarp> publicOf(PlayerRef owner);
-
     /** How many warps {@code owner} owns (the {@code /setpwarp} limit check). */
     int count(PlayerRef owner);
 
-    /** True when {@code owner} already owns a warp under {@code name} (the {@code /setpwarp} name check). */
-    boolean exists(PlayerRef owner, PlayerWarpName name);
-
-    /** Insert {@code warp} or overwrite the row under its {@code (owner, name)} key (a set, move, or flip). */
-    void save(PlayerWarp warp);
-
-    /** Remove {@code owner}'s warp under {@code name}; a no-op when no such row exists. */
-    void delete(PlayerRef owner, PlayerWarpName name);
+    /** True when a warp already exists under {@code name} anywhere on the server (the global name-collision check). */
+    boolean existsByName(PlayerWarpName name);
 
     /**
-     * Atomically bump the visit counter on {@code owner}'s warp under {@code name} by one. This is a
+     * Insert {@code warp} or overwrite the row under its surrogate {@link PlayerWarpId}, returning the id. A warp
+     * with no id is a new row: the store assigns a fresh key and returns it, so the caller can re-read the saved
+     * aggregate through {@link PlayerWarp#withId}. A warp that already carries an id is updated in place and that
+     * same id is returned.
+     */
+    PlayerWarpId save(PlayerWarp warp);
+
+    /** Remove the warp with surrogate key {@code id}; a no-op when no such row exists. */
+    void deleteById(PlayerWarpId id);
+
+    /**
+     * Atomically bump the visit counter on the warp with surrogate key {@code id} by one. This is a
      * high-frequency, eventually-consistent write — it runs on every teleport to the warp — so it does the
      * increment in the database rather than reading, mutating, and saving the whole row (which would lose
      * concurrent visits to a last-writer-wins race). It deliberately stays off the cross-server sync path:
      * a visitor count drifting by a few on peers until the next real change is fine, and is not worth a
      * cluster-wide cache invalidation per visit.
      */
-    void recordVisit(PlayerRef owner, PlayerWarpName name);
+    void recordVisit(PlayerWarpId id);
 
     /**
      * The warps {@code owner} owns if they are already in memory, without touching the database. A cache
@@ -72,10 +87,4 @@ public interface PlayerWarpRepository {
     default Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {
         return Optional.empty();
     }
-
-    /** Save/update a player's rating for a player warp. */
-    void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating);
-
-    /** Get the average rating for a player warp, or 0.0 if not rated. */
-    double averageRating(PlayerRef owner, PlayerWarpName name);
 }

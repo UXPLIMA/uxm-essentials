@@ -16,32 +16,65 @@ class PlayerWarpTest {
     private static final PlayerRef OWNER = new PlayerRef(UUID.randomUUID(), "Owner");
 
     @Test
-    void newWarpIsPrivateByDefault() {
-        PlayerWarp warp = PlayerWarp.create(OWNER, PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+    void createYieldsAnUnsavedPrivateActiveWarp() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
 
-        assertThat(warp.isPublic()).isFalse();
+        assertThat(warp.id()).isEmpty();
         assertThat(warp.owner()).isEqualTo(OWNER);
+        assertThat(warp.ownerName()).isEqualTo("Owner");
+        assertThat(warp.access()).isEqualTo(WarpAccess.PRIVATE);
+        assertThat(warp.status()).isEqualTo(WarpStatus.ACTIVE);
+        assertThat(warp.passwordSet()).isFalse();
+        assertThat(warp.price().isFree()).isTrue();
+        assertThat(warp.earnings().isZero()).isTrue();
+        assertThat(warp.ratings()).isEqualTo(RatingSummary.empty());
+        assertThat(warp.visits()).isEqualTo(VisitSummary.empty());
+        assertThat(warp.favouriteCount()).isZero();
+        assertThat(warp.displayName()).isEmpty();
+        assertThat(warp.category()).isEmpty();
+        assertThat(warp.sponsorship()).isEmpty();
+        assertThat(warp.rent()).isEmpty();
+        assertThat(warp.createdAt()).isEqualTo(Instant.EPOCH);
+        assertThat(warp.updatedAt()).isEqualTo(Instant.EPOCH);
     }
 
     @Test
-    void movedToReanchorsKeepingNameOwnerVisibilityAndCreation() {
-        PlayerWarp original = PlayerWarp.create(OWNER, PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH)
-                .withVisibility(true);
+    void movedToReanchorsKeepingIdOwnerNameAndBumpsUpdatedAt() {
+        PlayerWarp original = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH)
+                .withId(PlayerWarpId.of(7))
+                .withAccess(WarpAccess.PUBLIC, Instant.EPOCH);
+        Instant later = Instant.EPOCH.plusSeconds(60);
 
-        PlayerWarp moved = original.movedTo(at(100, 70, 100));
+        PlayerWarp moved = original.movedTo(at(100, 70, 100), later);
 
         assertThat(moved.location().blockX()).isEqualTo(100);
-        assertThat(moved.isPublic()).isTrue();
+        assertThat(moved.id()).contains(PlayerWarpId.of(7));
         assertThat(moved.name()).isEqualTo(original.name());
+        assertThat(moved.access()).isEqualTo(WarpAccess.PUBLIC);
         assertThat(moved.createdAt()).isEqualTo(Instant.EPOCH);
+        assertThat(moved.updatedAt()).isEqualTo(later);
     }
 
     @Test
-    void withVisibilityFlipsThePublicFlag() {
-        PlayerWarp warp = PlayerWarp.create(OWNER, PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+    void withAccessChangesTheAccessAxisAndBumpsUpdatedAt() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+        Instant later = Instant.EPOCH.plusSeconds(30);
 
-        assertThat(warp.withVisibility(true).isPublic()).isTrue();
-        assertThat(warp.withVisibility(true).withVisibility(false).isPublic()).isFalse();
+        PlayerWarp shared = warp.withAccess(WarpAccess.PUBLIC, later);
+
+        assertThat(shared.access()).isEqualTo(WarpAccess.PUBLIC);
+        assertThat(shared.updatedAt()).isEqualTo(later);
+        assertThat(shared.withAccess(WarpAccess.PRIVATE, later).access()).isEqualTo(WarpAccess.PRIVATE);
+    }
+
+    @Test
+    void withIdAssignsTheSurrogateWithoutBumpingUpdatedAt() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+
+        PlayerWarp saved = warp.withId(PlayerWarpId.of(42));
+
+        assertThat(saved.id()).contains(PlayerWarpId.of(42));
+        assertThat(saved.updatedAt()).isEqualTo(Instant.EPOCH);
     }
 
     private static Position at(double x, double y, double z) {
