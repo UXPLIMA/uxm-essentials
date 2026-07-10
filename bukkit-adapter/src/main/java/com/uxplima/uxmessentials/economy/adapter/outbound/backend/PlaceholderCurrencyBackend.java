@@ -174,7 +174,10 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
     public Money balance(PlayerRef owner, Currency currency) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(currency, "currency");
-        if (server.isPrimaryThread()) {
+        // The resolve is scheduled onto the global region, so the only thread that may run it inline is the one that
+        // already owns it. On Folia a region tick thread is a tick thread but not the global one, and waiting on a
+        // future it cannot complete would wedge that region.
+        if (scheduler.onGlobalThread()) {
             return readBalance(owner, currency);
         }
         CompletableFuture<Money> resolved = new CompletableFuture<>();

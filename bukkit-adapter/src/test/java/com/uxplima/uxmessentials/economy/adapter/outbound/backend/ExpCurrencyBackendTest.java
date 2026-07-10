@@ -58,7 +58,7 @@ class ExpCurrencyBackendTest {
 
     @Test
     void anOfflineOwnerCannotBeCredited() {
-        ExpCurrencyBackend backend = new ExpCurrencyBackend(server, mock(Scheduler.class), new RecordingLogger());
+        ExpCurrencyBackend backend = new ExpCurrencyBackend(server, new RecordingScheduler(), new RecordingLogger());
         PlayerRef ghost = new PlayerRef(UUID.randomUUID(), "Ghost");
 
         assertThat(backend.worksOffline()).isFalse();
@@ -71,7 +71,7 @@ class ExpCurrencyBackendTest {
         PlayerMock player = server.addPlayer();
         player.setLevel(0);
         player.setExp(0);
-        ExpCurrencyBackend backend = new ExpCurrencyBackend(server, mock(Scheduler.class), new RecordingLogger());
+        ExpCurrencyBackend backend = new ExpCurrencyBackend(server, new RecordingScheduler(), new RecordingLogger());
         PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
         backend.credit(ref, Money.of(XP, BigDecimal.valueOf(10)));
 
@@ -85,12 +85,30 @@ class ExpCurrencyBackendTest {
         PlayerMock player = server.addPlayer();
         player.setLevel(0);
         player.setExp(0);
-        ExpCurrencyBackend backend = new ExpCurrencyBackend(server, mock(Scheduler.class), new RecordingLogger());
+        ExpCurrencyBackend backend = new ExpCurrencyBackend(server, new RecordingScheduler(), new RecordingLogger());
         PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
 
         assertThat(backend.credit(ref, Money.of(XP, BigDecimal.valueOf(100))).isOk())
                 .isTrue();
         assertThat(backend.balance(ref, XP).amount()).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void aCallerThatAlreadyOwnsTheEntityDoesTheWorkInlineWithoutScheduling() {
+        PlayerMock player = server.addPlayer();
+        player.setLevel(0);
+        player.setExp(0);
+        RecordingScheduler onOwnersThread = new RecordingScheduler();
+        onOwnersThread.owns = true;
+        ExpCurrencyBackend backend = new ExpCurrencyBackend(server, onOwnersThread, new RecordingLogger());
+        PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
+
+        assertThat(backend.credit(ref, Money.of(XP, BigDecimal.valueOf(30))).isOk())
+                .isTrue();
+        assertThat(backend.balance(ref, XP).amount()).isEqualByComparingTo("30");
+
+        // Scheduling from the owning thread and then blocking on the result would deadlock, so the hop must be skipped.
+        assertThat(onOwnersThread.entityCalls).isZero();
     }
 
     @Test
@@ -136,18 +154,27 @@ class ExpCurrencyBackendTest {
         assertThat(logger.warnings).isZero();
     }
 
-    /** A server that reports the calling thread as off-tick, so every operation is forced through the entity hop. */
+    /** A server the backend can only reach the player through, so every operation is forced through the entity hop. */
     private static Server offTickServer(UUID id, Player player) {
         Server offTick = mock(Server.class);
-        when(offTick.isPrimaryThread()).thenReturn(false);
         when(offTick.getPlayer(id)).thenReturn(player);
         return offTick;
     }
 
-    /** Records that the entity hop was taken and runs the task inline, or the retired branch when {@code retire}. */
+    /**
+     * Runs the scheduled task the moment it is handed over, the way a real entity thread eventually would, so the
+     * backend's future completes instead of timing out. {@code owns} drives the deadlock guard and {@code retire}
+     * the player-left branch.
+     */
     private static final class RecordingScheduler implements Scheduler {
         private int entityCalls;
         private boolean retire;
+        private boolean owns;
+
+        @Override
+        public boolean ownsEntity(PlayerRef player) {
+            return owns;
+        }
 
         @Override
         public void onEntity(PlayerRef player, Runnable task, Runnable retired) {

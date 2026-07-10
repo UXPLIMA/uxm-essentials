@@ -146,7 +146,10 @@ public final class ExpCurrencyBackend implements CurrencyBackend {
      * once so a persistently wedged hop cannot spam the log.
      */
     private <T> T onOwnerThread(PlayerRef owner, Supplier<T> work, T offline) {
-        if (server.isPrimaryThread()) {
+        // Folia splits the tick across region threads, so "am I on a tick thread" is the wrong question — a caller
+        // on one region's thread must still hop to reach an entity owned by another. The Scheduler port answers the
+        // right one.
+        if (scheduler.ownsEntity(owner)) {
             return work.get();
         }
         CompletableFuture<T> hop = new CompletableFuture<>();

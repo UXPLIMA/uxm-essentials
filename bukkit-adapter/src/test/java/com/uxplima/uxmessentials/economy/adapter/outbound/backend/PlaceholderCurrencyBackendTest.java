@@ -5,11 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.UUID;
 
 import org.bukkit.Server;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +36,10 @@ import org.mockito.ArgumentCaptor;
  * substituted; a debit refuses below the balance and dispatches nothing; an integral currency rounds the amount at
  * the boundary while a decimal one keeps its fraction; a currency that omits {@code integral} is decimal; and a
  * balance that will not parse degrades to zero with a single log line rather than throwing into the command.
+ *
+ * <p>Both the balance read and the command dispatch are global-region work, so off that thread the backend hops
+ * through the {@link Scheduler} port. The fake below runs the scheduled task the moment it is handed over, the way a
+ * real global thread eventually would, which is what lets these tests observe the hop rather than a timeout.
  */
 class PlaceholderCurrencyBackendTest {
 
@@ -72,20 +76,21 @@ class PlaceholderCurrencyBackendTest {
 
     @Test
     void debitBelowTheBalanceReturnsInsufficientFundsAndDispatchesNothing() {
-        Scheduler scheduler = mock(Scheduler.class);
-        CurrencyBackend backend = backend(new RecordingLogger(), scheduler);
+        Server server = mock(Server.class);
+        CurrencyBackend backend = configured(new RecordingLogger(), new RecordingScheduler(), server);
 
         var result = backend.debit(ALICE, Money.of(CROWNS, new BigDecimal("50")));
 
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(TransferError.INSUFFICIENT_FUNDS);
-        verify(scheduler, never()).onGlobal(any());
+        // The balance read legitimately hops to the global region; what must not happen is the take command.
+        verify(server, never()).dispatchCommand(any(), any());
     }
 
     @Test
     void anUnparseableBalanceYieldsZeroAndLogsOnce() {
         RecordingLogger logger = new RecordingLogger();
-        CurrencyBackend backend = backend(logger, mock(Scheduler.class));
+        CurrencyBackend backend = configured(logger, new RecordingScheduler(), mock(Server.class));
 
         assertThat(backend.balance(ALICE, CROWNS)).isEqualTo(Money.zero(CROWNS));
         assertThat(backend.balance(ALICE, CROWNS)).isEqualTo(Money.zero(CROWNS));
@@ -96,34 +101,32 @@ class PlaceholderCurrencyBackendTest {
 
     @Test
     void aConfiguredCurrencyWithoutTheIntegralKeyIsDecimal() {
-        CurrencyBackend backend = backend(new RecordingLogger(), mock(Scheduler.class));
+        CurrencyBackend backend = configured(new RecordingLogger(), new RecordingScheduler(), mock(Server.class));
 
         assertThat(backend.precision()).isEqualTo(Precision.DECIMAL);
     }
 
     @Test
     void aSufficientBalanceDispatchesTheTakeCommandOnce() {
-        Server server = tickThreadServer();
-        Scheduler scheduler = mock(Scheduler.class);
+        Server server = mock(Server.class);
         PlaceholderCurrencyBackend backend =
-                backend((player, placeholder) -> "100", Precision.INTEGRAL, server, scheduler);
+                backend((player, placeholder) -> "100", Precision.INTEGRAL, server, new RecordingScheduler());
 
         var result = backend.debit(ALICE, Money.of(CROWNS, new BigDecimal("50")));
 
         assertThat(result.isOk()).isTrue();
-        assertThat(dispatched(server, scheduler)).isEqualTo("myeco take Alice 50");
+        assertThat(dispatched(server)).isEqualTo("myeco take Alice 50");
     }
 
     @Test
     void creditDispatchesTheGiveCommandOnce() {
-        Server server = tickThreadServer();
-        Scheduler scheduler = mock(Scheduler.class);
+        Server server = mock(Server.class);
         PlaceholderCurrencyBackend backend =
-                backend((player, placeholder) -> "0", Precision.INTEGRAL, server, scheduler);
+                backend((player, placeholder) -> "0", Precision.INTEGRAL, server, new RecordingScheduler());
 
         backend.credit(ALICE, Money.of(CROWNS, new BigDecimal("25")));
 
-        assertThat(dispatched(server, scheduler)).isEqualTo("myeco give Alice 25");
+        assertThat(dispatched(server)).isEqualTo("myeco give Alice 25");
     }
 
     @Test
@@ -132,30 +135,40 @@ class PlaceholderCurrencyBackendTest {
         assertThat(creditedAmount(Precision.DECIMAL)).isEqualTo("50.75");
     }
 
+    @Test
+    void aCallerAlreadyOnTheGlobalThreadReadsTheBalanceWithoutScheduling() {
+        RecordingScheduler onGlobalThread = new RecordingScheduler();
+        onGlobalThread.owns = true;
+        PlaceholderCurrencyBackend backend =
+                backend((player, placeholder) -> "42", Precision.DECIMAL, mock(Server.class), onGlobalThread);
+
+        assertThat(backend.balance(ALICE, CROWNS).amount()).isEqualByComparingTo("42");
+
+        // Scheduling onto the global region from the global region and then blocking on the result would deadlock.
+        assertThat(onGlobalThread.globalCalls).isZero();
+    }
+
     /** The amount as it reaches the give command for a 50.75 credit at {@code precision}. */
     private String creditedAmount(Precision precision) {
-        Server server = tickThreadServer();
-        Scheduler scheduler = mock(Scheduler.class);
-        PlaceholderCurrencyBackend backend = backend((player, placeholder) -> "0", precision, server, scheduler);
+        Server server = mock(Server.class);
+        PlaceholderCurrencyBackend backend =
+                backend((player, placeholder) -> "0", precision, server, new RecordingScheduler());
 
         backend.credit(ALICE, Money.of(CROWNS, new BigDecimal("50.75")));
 
-        return dispatched(server, scheduler).substring("myeco give Alice ".length());
+        return dispatched(server).substring("myeco give Alice ".length());
     }
 
-    /** Capture the single console command the backend hands to the global-thread hop and render it verbatim. */
-    private String dispatched(Server server, Scheduler scheduler) {
-        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
-        verify(scheduler, times(1)).onGlobal(task.capture());
-        task.getValue().run();
+    /** The single console command the backend sent, verbatim. */
+    private String dispatched(Server server) {
         ArgumentCaptor<String> command = ArgumentCaptor.forClass(String.class);
         verify(server).dispatchCommand(any(), command.capture());
         return command.getValue();
     }
 
     /** A backend for the {@code crowns} entry; PlaceholderAPI is absent, so its balance placeholder never resolves. */
-    private CurrencyBackend backend(Logger log, Scheduler scheduler) {
-        return PlaceholderCurrencyBackend.fromConfig("crowns", CONFIG, tickThreadServer(), log, scheduler);
+    private CurrencyBackend configured(Logger log, Scheduler scheduler, Server server) {
+        return PlaceholderCurrencyBackend.fromConfig("crowns", CONFIG, server, log, scheduler);
     }
 
     /** A backend whose balance reader is supplied directly, so the positive path runs without a live PlaceholderAPI. */
@@ -174,11 +187,44 @@ class PlaceholderCurrencyBackendTest {
                 reader);
     }
 
-    /** A server that reports the calling thread as a tick thread, so a balance read resolves inline without a hop. */
-    private static Server tickThreadServer() {
-        Server server = mock(Server.class);
-        when(server.isPrimaryThread()).thenReturn(true);
-        return server;
+    /**
+     * Runs the scheduled task immediately, so the backend's future completes instead of timing out. {@code owns}
+     * drives the deadlock guard that decides whether the backend hops at all.
+     */
+    private static final class RecordingScheduler implements Scheduler {
+        private int globalCalls;
+        private boolean owns;
+
+        @Override
+        public boolean onGlobalThread() {
+            return owns;
+        }
+
+        @Override
+        public void onGlobal(Runnable task) {
+            globalCalls++;
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            throw new UnsupportedOperationException("unused");
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            throw new UnsupportedOperationException("unused");
+        }
+
+        @Override
+        public void async(Runnable task) {
+            throw new UnsupportedOperationException("unused");
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            throw new UnsupportedOperationException("unused");
+        }
     }
 
     /** Serves the {@code backends.placeholder.crowns} block, everything else falls through to the caller's default. */
