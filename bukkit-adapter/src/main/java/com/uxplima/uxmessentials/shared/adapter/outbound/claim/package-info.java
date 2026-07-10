@@ -9,11 +9,12 @@
  * RClaim — depend on a {@code compileOnly} API jar, so their SDK types are absent from the runtime and test
  * classpaths; each reaches its SDK only past a plugin-present guard, and the discoverer constructs a typed
  * provider only once that plugin is known to be loaded, so a server (or test) without the plugin never loads
- * the SDK classes. <b>Reflective</b> providers — uxmClaims, GriefDefender, ExcellentClaims, XClaim and
- * Homestead — have no compile dependency at all and reach their API purely by reflection: GriefDefender
+ * the SDK classes. <b>Reflective</b> providers — uxmClaims, GriefDefender, ExcellentClaims, XClaim, Homestead
+ * and Towny — have no compile dependency at all and reach their API purely by reflection: GriefDefender
  * publishes only a GC-prone commit-pinned JitPack build, ExcellentClaims is premium with no public
- * coordinate, XClaim's JitPack build fails, and Homestead ships only to authenticated GitHub Packages — so
- * a pinned canon-verifiable {@code compileOnly} dependency is not available for any of them, while each
+ * coordinate, XClaim's JitPack build fails, Homestead ships only to authenticated GitHub Packages, and Towny
+ * is bound through its stable {@code TownyAPI} entry point rather than a pinned jar — so a pinned
+ * canon-verifiable {@code compileOnly} dependency is not available or not warranted for any of them, while each
  * exposes a stable static entry point that reflection can bind to.
  *
  * <p>Every lookup is pure-datastore: claims are resolved from in-memory state by world plus block/chunk

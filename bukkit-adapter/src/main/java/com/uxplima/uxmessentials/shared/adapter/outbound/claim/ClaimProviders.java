@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  * provider.
  *
  * <p>Every candidate — uxmClaims, Lands, GriefPrevention, GriefDefender, ExcellentClaims, SimpleClaimSystem,
- * RClaim, XClaim, Homestead, WorldGuard — is constructed and asked {@link ClaimProvider#active()}; those that are both
+ * RClaim, XClaim, Homestead, WorldGuard, Towny — is constructed and asked {@link ClaimProvider#active()}; those that are both
  * active and enabled become composite members, so a server running two claim plugins consults both and their
  * answers are folded per {@link ClaimProvidersConfig#combine()}. Ordering no longer matters. Constructing a
  * candidate never loads its plugin SDK (each typed provider keeps its references behind its own present-guard,
@@ -55,7 +55,8 @@ public final class ClaimProviders {
                 new Candidate("rclaim", new RClaimClaimProvider(plugin, server, log)),
                 new Candidate("xclaim", new XClaimClaimProvider(plugin, server, log)),
                 new Candidate("homestead", new HomesteadClaimProvider(plugin, server, log)),
-                new Candidate("worldguard", new WorldGuardClaimProvider(plugin, server, log)));
+                new Candidate("worldguard", new WorldGuardClaimProvider(plugin, server, log)),
+                new Candidate("towny", new TownyClaimProvider(plugin, server, log)));
         return compose(config, candidates, log);
     }
 
