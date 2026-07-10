@@ -11,14 +11,16 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.Bedrock
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
+import com.uxplima.uxmlib.gui.input.PlayerInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Builds the text-input seam once at bootstrap: loads {@link InputSettings} from {@code text-input.conf}, wraps the
- * already-installed shared {@link AnvilInput} as the anvil backend, installs the single shared chat backend, and hands
- * back the {@link TextInput} every GUI-using context shares. The chat listener is registered here and torn down through
- * {@link Installed#uninstall()}, so on disable/reload exactly one listener comes and goes — mirroring how the anvil
- * input and the menu listener are installed once in {@code PluginModule}.
+ * already-installed shared {@link AnvilInput} as the anvil backend, installs the single shared chat backend, installs a
+ * uxmLib {@link PlayerInput} the sign backend drives, and hands back the {@link TextInput} every GUI-using context
+ * shares. The chat listener and the {@code PlayerInput} sign listener are registered here and torn down through
+ * {@link Installed#uninstall()}, so on disable/reload exactly the listeners this installs come and go — mirroring how
+ * the anvil input and the menu listener are installed once in {@code PluginModule}.
  */
 @NullMarked
 public final class TextInputInstaller {
@@ -67,9 +69,17 @@ public final class TextInputInstaller {
         AnvilTextBackend anvilBackend = new AnvilTextBackend(anvil);
         ChatTextBackend chatBackend = new ChatTextBackend(plugin);
         chatBackend.install();
-        TextInput textInput =
-                new TextInput(settings, guiText, scheduler, anvilBackend, chatBackend, bedrock, bedrockScreen);
-        return new Installed(textInput, settings, chatBackend::uninstall);
+        // uxmLib's PlayerInput owns the transient-sign mechanism; the sign backend only ever asks it for SIGN, and the
+        // seam does its own entity-thread hop, so PlayerInput is built without a scheduler and torn down on disable.
+        PlayerInput playerInput = new PlayerInput(plugin);
+        playerInput.install();
+        SignTextBackend signBackend = new SignTextBackend(playerInput);
+        TextInput textInput = new TextInput(
+                settings, guiText, scheduler, anvilBackend, chatBackend, bedrock, bedrockScreen, signBackend);
+        return new Installed(textInput, settings, () -> {
+            chatBackend.uninstall();
+            playerInput.uninstall();
+        });
     }
 
     /** The wired seam plus its teardown hook. {@code settings} is exposed so a reload can re-read the config. */

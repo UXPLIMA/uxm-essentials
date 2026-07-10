@@ -707,6 +707,14 @@ public final class MenuSpecLoader {
             Map<ClickKind, RequirementSpec> requirements,
             Map<ClickKind, ClickBranch> orElse) {
         if (value.isMap()) {
+            // A gesture written as a bare continuation map — {@code left = { do = "input:…", prompt = … }} or
+            // {@code right = { do = "confirm:…", title = …, yes = […], no = […] }} — is a single continuation step,
+            // not a requirement block. Its prompt/title/yes/no/deny keys are read by modifiedRef; treating it as a
+            // requirement block would drop them, so it is recognised here and parsed as a one-ref action list.
+            if (isContinuationMap(value)) {
+                modifiedRef(value).ifPresent(ref -> actions.put(kind, List.of(ref)));
+                return;
+            }
             actions.put(kind, refs(clickActionsNode(value)));
             RequirementSpec block = parseRequirementSpec(value);
             if (block != RequirementSpec.NONE) {
@@ -716,6 +724,13 @@ public final class MenuSpecLoader {
         } else {
             actions.put(kind, refs(value));
         }
+    }
+
+    /** Whether a map-form gesture's {@code do}/{@code action} token is an {@code input:}/{@code confirm:} step. */
+    private static boolean isContinuationMap(ConfigurationNode value) {
+        String token = actionToken(value);
+        String head = token == null ? "" : continuationHead(token);
+        return head.equals("input") || head.equals("confirm");
     }
 
     /**
@@ -1020,9 +1035,41 @@ public final class MenuSpecLoader {
             return Optional.empty();
         }
         Ref base = Ref.parse(token);
+        String head = continuationHead(token);
+        if (head.equals("input")) {
+            return Optional.of(base.withContinuation(inputContinuation(token, entry)));
+        }
+        if (head.equals("confirm")) {
+            return Optional.of(base.withContinuation(confirmContinuation(entry)));
+        }
         int delay = entry.node("delay").getInt(0);
         double chance = entry.node("chance").getDouble(100.0);
         return Optional.of(base.withModifiers(delay, chance, denyRef(entry)));
+    }
+
+    /** The token head before its first colon — {@code input} in {@code input:pwarp.rename} — trimmed, or the whole token. */
+    private static String continuationHead(String token) {
+        int colon = token.indexOf(':');
+        return (colon < 0 ? token : token.substring(0, colon)).strip();
+    }
+
+    /**
+     * Build an {@code input:} step from its map entry. The point key is the token tail after {@code input:} (the key
+     * the operator's per-key anvil/chat/sign mode is looked up by); {@code prompt}/{@code default} are the label and
+     * pre-fill, carried verbatim for render-time resolution; {@code deny} is the ref list run on a cancel — read as a
+     * list here, unlike the scalar chance-fallback {@code deny} an ordinary action modifier map carries.
+     */
+    private Continuation inputContinuation(String token, ConfigurationNode entry) {
+        int colon = token.indexOf(':');
+        String key = colon < 0 ? "" : token.substring(colon + 1).strip();
+        return new Continuation.Input(
+                key, entry.node("prompt").getString(""), entry.node("default").getString(""), refs(entry.node("deny")));
+    }
+
+    /** Build a {@code confirm:} step from its map entry: the title plus the {@code yes}/{@code no} ref lists. */
+    private Continuation confirmContinuation(ConfigurationNode entry) {
+        return new Continuation.Confirm(
+                entry.node("title").getString(""), refs(entry.node("yes")), refs(entry.node("no")));
     }
 
     /** The action token of a map entry: {@code do} takes precedence, then its {@code action} alias, else none. */

@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The one entry point for capturing a line of text from a player, whether through an anvil or through chat. A call
@@ -53,6 +54,13 @@ public final class TextInput {
     private final BedrockScreen bedrockScreen;
 
     /**
+     * The native-screen backend a {@code sign}/{@code dialog} input point uses, or {@code null} on an engine wired
+     * without one (every test fixture), in which case those two modes fall back to the anvil backend. A dedicated
+     * dialog text backend does not exist yet, so {@code dialog} currently reuses this same native-screen backend.
+     */
+    @Nullable private final TextInputBackend signBackend;
+
+    /**
      * As the seven-argument constructor, but with no Bedrock redirect: every viewer gets the anvil or chat prompt.
      * Kept so the tests and any wiring that predates the Bedrock seam stay a delegating call.
      */
@@ -65,6 +73,11 @@ public final class TextInput {
         this(settings, guiText, scheduler, anvilBackend, chatBackend, BedrockDetector.NONE, BedrockScreen.NONE);
     }
 
+    /**
+     * As the eight-argument constructor, but with no native-screen backend: a {@code sign}/{@code dialog} input point
+     * falls back to the anvil backend. Kept so the tests and any wiring that predates the native-screen backends stay
+     * a delegating call.
+     */
     public TextInput(
             InputSettings settings,
             GuiText guiText,
@@ -73,6 +86,18 @@ public final class TextInput {
             ChatTextBackend chatBackend,
             BedrockDetector bedrock,
             BedrockScreen bedrockScreen) {
+        this(settings, guiText, scheduler, anvilBackend, chatBackend, bedrock, bedrockScreen, null);
+    }
+
+    public TextInput(
+            InputSettings settings,
+            GuiText guiText,
+            Scheduler scheduler,
+            AnvilTextBackend anvilBackend,
+            ChatTextBackend chatBackend,
+            BedrockDetector bedrock,
+            BedrockScreen bedrockScreen,
+            @Nullable TextInputBackend signBackend) {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -80,6 +105,7 @@ public final class TextInput {
         this.chatBackend = Objects.requireNonNull(chatBackend, "chatBackend");
         this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
         this.bedrockScreen = Objects.requireNonNull(bedrockScreen, "bedrockScreen");
+        this.signBackend = signBackend;
     }
 
     /**
@@ -105,7 +131,7 @@ public final class TextInput {
             return;
         }
         InputMode mode = settings.modeFor(request.key());
-        TextInputBackend backend = mode == InputMode.CHAT ? chatBackend : anvilBackend;
+        TextInputBackend backend = backendFor(mode);
         Component prompt = buildPrompt(viewer, request.label(), request.placeholders(), mode);
         backend.open(
                 player,
@@ -113,6 +139,65 @@ public final class TextInput {
                 prompt,
                 request.initialText(),
                 result -> scheduler.onEntity(viewer, () -> route(player, viewer, result, onSubmit, onCancel)));
+    }
+
+    /**
+     * As {@link #prompt}, but with the prompt already resolved to a {@link Component} rather than looked up from a
+     * {@link MessageKey} catalog — the entry point the menu engine uses, whose {@code input:} prompts are arbitrary
+     * {@code @key}-or-MiniMessage strings the engine resolves through its own renderer, not catalog enum keys. The
+     * backend is still chosen from the operator's per-{@code key} mode, and a Bedrock viewer still gets the Cumulus
+     * form regardless of that mode; the cancel-keyword policy and the entity-thread hop are the shared {@link #route}.
+     *
+     * @param player the live player to prompt
+     * @param viewer the viewer reference — locale, identity, and the region the callbacks run on
+     * @param key the input-point key the per-key mode is looked up by
+     * @param prompt the already-resolved prompt label
+     * @param initialText the anvil pre-fill, or {@code null}
+     * @param onSubmit receives the accepted line
+     * @param onCancel runs on cancellation
+     */
+    public void promptResolved(
+            Player player,
+            PlayerRef viewer,
+            String key,
+            Component prompt,
+            @Nullable String initialText,
+            Consumer<String> onSubmit,
+            Runnable onCancel) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(prompt, "prompt");
+        Objects.requireNonNull(onSubmit, "onSubmit");
+        Objects.requireNonNull(onCancel, "onCancel");
+        if (bedrock.isBedrock(viewer.uuid())) {
+            sendResolvedInputForm(player, viewer, prompt, initialText, onSubmit, onCancel);
+            return;
+        }
+        InputMode mode = settings.modeFor(key);
+        TextInputBackend backend = backendFor(mode);
+        // A chat prompt has no cancel button, so it carries the abort hint; a screen backend (anvil/sign) shows the
+        // prompt as its own title and needs none — the same rule buildPrompt applies to a catalog-resolved prompt.
+        Component effective = mode == InputMode.CHAT ? appendCancelHint(viewer, prompt) : prompt;
+        backend.open(
+                player,
+                viewer,
+                effective,
+                initialText,
+                result -> scheduler.onEntity(viewer, () -> route(player, viewer, result, onSubmit, onCancel)));
+    }
+
+    /**
+     * The backend for {@code mode}: chat for {@code CHAT}, the native-screen backend for {@code SIGN}/{@code DIALOG}
+     * (falling back to the anvil when none is wired), and the anvil for {@code ANVIL}. {@code DIALOG} shares the
+     * native-screen backend until a dedicated dialog text backend exists.
+     */
+    private TextInputBackend backendFor(InputMode mode) {
+        return switch (mode) {
+            case CHAT -> chatBackend;
+            case SIGN, DIALOG -> signBackend != null ? signBackend : anvilBackend;
+            case ANVIL -> anvilBackend;
+        };
     }
 
     /**
@@ -136,6 +221,31 @@ public final class TextInput {
                         viewer, () -> route(player, viewer, InputResult.Cancelled.INSTANCE, onSubmit, onCancel)));
     }
 
+    /**
+     * Render the resolved prompt as a Cumulus CustomForm for a Bedrock viewer — the {@link #promptResolved}
+     * counterpart to {@link #sendInputForm}. The prompt is flattened to plain text for the form title and its single
+     * input's label, and both the submit and the close re-enter {@link #route} on the viewer's entity thread, so the
+     * cancel-keyword policy and the Folia hop stay shared with every other backend.
+     */
+    private void sendResolvedInputForm(
+            Player player,
+            PlayerRef viewer,
+            Component prompt,
+            @Nullable String initialText,
+            Consumer<String> onSubmit,
+            Runnable onCancel) {
+        String plain = PlainTextComponentSerializer.plainText().serialize(prompt);
+        bedrockScreen.sendInputForm(
+                player,
+                plain,
+                plain,
+                initialText,
+                value -> scheduler.onEntity(
+                        viewer, () -> route(player, viewer, new InputResult.Submitted(value), onSubmit, onCancel)),
+                () -> scheduler.onEntity(
+                        viewer, () -> route(player, viewer, InputResult.Cancelled.INSTANCE, onSubmit, onCancel)));
+    }
+
     private Component buildPrompt(
             PlayerRef viewer, MessageKey label, Map<String, String> placeholders, InputMode mode) {
         if (mode != InputMode.CHAT) {
@@ -143,8 +253,11 @@ public final class TextInput {
             // title, so render the label without it. A chat prompt keeps the prefix the catalog key carries.
             return guiText.unprefixedText(viewer, label, placeholders);
         }
-        Component prompt = guiText.text(viewer, label, placeholders);
-        // In chat mode a player cannot see a cancel button, so append how to abort.
+        return appendCancelHint(viewer, guiText.text(viewer, label, placeholders));
+    }
+
+    /** Append the "type &lt;keyword&gt; to cancel" hint to a chat prompt, which has no cancel button to click. */
+    private Component appendCancelHint(PlayerRef viewer, Component prompt) {
         Component hint = guiText.text(
                 viewer, GuiMessageKey.INPUT_CANCEL_HINT, Map.of("keyword", settings.primaryCancelKeyword()));
         return prompt.append(Component.space()).append(hint);

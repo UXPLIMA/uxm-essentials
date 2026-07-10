@@ -100,10 +100,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMen
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenuCleanupListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAntiDupeListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuTextPrompt;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.InfoPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.InputActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources;
@@ -339,6 +341,19 @@ public final class PluginModule {
         // anti-spam window is the same code path tests drive with a hand-advanced clock.
         long menuClickCooldownMs =
                 config.scoped(ModuleId.of("custommenus").configRoot()).getLong("click-cooldown-ms", 0L);
+        // The text-input seam an input: menu step drives is built later, inside wireModules (it needs the shared anvil
+        // and the resolved Bedrock detector). The listener is built here, so its capability is threaded in through a
+        // deferred reference the seam populates on enable, before any menu can be clicked — the same late-init pattern
+        // the economy backends use. A confirm: step needs only the confirm opener, already available above.
+        AtomicReference<TextInput> menuTextInputRef = new AtomicReference<>();
+        MenuTextPrompt menuTextPrompt = (player, viewer, key, prompt, initialText, onSubmit, onCancel) -> {
+            TextInput seam = menuTextInputRef.get();
+            if (seam == null) {
+                onCancel.run();
+                return;
+            }
+            seam.promptResolved(player, viewer, key, prompt, initialText, onSubmit, onCancel);
+        };
         MenuListener menuListener = new MenuListener(
                 menuRenderer,
                 menuBindings.actions(),
@@ -350,7 +365,8 @@ public final class PluginModule {
                 menus.confirmOpener(),
                 menuClickCooldownMs,
                 System::currentTimeMillis,
-                menuBindings.pagedLists());
+                menuBindings.pagedLists(),
+                menuTextPrompt);
         menuListener.install();
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —
@@ -365,6 +381,9 @@ public final class PluginModule {
         ServerConnector menuServerConnector = new BukkitServerConnector(plugin, kernel.log());
         resources.serverConnector(menuServerConnector);
         MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
+        // The input slice registers input/confirm so a spec that names input:<key>/confirm:<key> passes validation;
+        // their real continuation-split behaviour lives in the click dispatcher, keyed off the ref's Continuation.
+        InputActions.register(menuBindings, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions(), kernel.log());
         // The string slice of the condition vocabulary (contains, equals-ignorecase, regex, length, is-integer,
         // is-double, is-object) registers alongside the generic conditions; like the action slices it has its own
@@ -500,7 +519,8 @@ public final class PluginModule {
                 guiRegistry,
                 menus,
                 menuBindings,
-                menuCurrencyBackends);
+                menuCurrencyBackends,
+                menuTextInputRef);
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
@@ -660,7 +680,8 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings,
-            AtomicReference<EconomyBackends> menuCurrencyBackends) {
+            AtomicReference<EconomyBackends> menuCurrencyBackends,
+            AtomicReference<TextInput> menuTextInputRef) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
@@ -694,6 +715,10 @@ public final class PluginModule {
                 resolvedScreen == null ? BedrockScreen.NONE : resolvedScreen);
         resources.onClose(input.uninstall());
         TextInput textInput = input.textInput();
+        // Hand the just-built seam to the menu listener's deferred reference so an input: menu step can prompt. Set
+        // here, on enable, before any menu can be clicked — the listener was constructed earlier (it installs before
+        // the modules wire), so this late-init is what closes the ordering gap between the two.
+        menuTextInputRef.set(textInput);
         // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
         // here with the data folder so every GUI-using context loads its layout the same way.
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());

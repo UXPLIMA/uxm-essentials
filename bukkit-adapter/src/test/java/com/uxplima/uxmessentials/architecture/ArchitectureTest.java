@@ -159,7 +159,7 @@ class ArchitectureTest {
             .dependOnClassesThat()
             .resideInAPackage("com.uxplima.uxmlib.gui..")
             .because("spec-driven menus must render through the engine; only the item-storage inventories "
-                    + "(VaultView, DisposalCommand), the anvil text-input seam (AnvilTextBackend, "
+                    + "(VaultView, DisposalCommand), the text-input seam (AnvilTextBackend, SignTextBackend, "
                     + "TextInputInstaller) and the Guis.install site (PluginModule) may touch uxmLib's GUI library");
 
     // The completeness twin of the uxmLib fence above. That rule proves no spec menu reaches for uxmLib's GUI
@@ -285,6 +285,7 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView",
                 "com.uxplima.uxmessentials.itemworld.adapter.inbound.command.DisposalCommand",
                 "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.AnvilTextBackend",
+                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.SignTextBackend",
                 "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller",
                 "com.uxplima.uxmessentials.bootstrap.di.PluginModule");
         return DescribedPredicate.describe("are not the allowed uxmLib-GUI leaves", javaClass -> {

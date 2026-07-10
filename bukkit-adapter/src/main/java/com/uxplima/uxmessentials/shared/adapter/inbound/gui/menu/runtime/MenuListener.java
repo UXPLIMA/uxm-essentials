@@ -59,6 +59,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.Rendered
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Continuation;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDragSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemRuleSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
@@ -131,6 +132,14 @@ public final class MenuListener implements Listener {
      * it, in which case a property that confirms a removal falls back to its uxmLib {@code ConfirmMenu}.
      */
     @Nullable private final ConfirmOpener confirmOpener;
+
+    /**
+     * The text-prompt capability an {@code input:} step drives, or null on an engine wired without one (every menu
+     * test fixture and the composition until the text-input seam is built). When null an {@code input:} step cannot
+     * prompt, so it runs its cancel refs and abandons the continuation rather than dead-ending; a {@code confirm:}
+     * step needs only {@link #confirmOpener} and is unaffected.
+     */
+    @Nullable private final MenuTextPrompt textPrompt;
 
     /** Re-paints an entity list's page on a nav click; stateless, so one instance serves every list this routes. */
     private final ListViewRenderer listViewRenderer = new ListViewRenderer();
@@ -228,14 +237,14 @@ public final class MenuListener implements Listener {
                 confirmOpener,
                 defaultClickCooldownMs,
                 clock,
-                new PagedListSourceRegistry());
+                new PagedListSourceRegistry(),
+                null);
     }
 
     /**
-     * The canonical constructor, carrying the anti-spam cooldown floor, its clock, and the paged list sources a page
-     * flip re-queries. Every shorter form above delegates here with no floor, the real system clock, and (bar this one)
-     * an empty paged registry, so every existing construction and test is unchanged; only production wiring, which holds
-     * the feature-populated paged registry, passes it, and only a test wanting a deterministic clock reaches this shape.
+     * The paged-source-aware form, kept so every construction and test that predates the text-input seam compiles
+     * unchanged. Delegates to the canonical constructor with no text prompt, so a listener built here cannot drive an
+     * {@code input:} step (it runs that step's cancel refs instead) — no menu such a listener routes carries one.
      */
     public MenuListener(
             MenuRenderer renderer,
@@ -249,6 +258,41 @@ public final class MenuListener implements Listener {
             long defaultClickCooldownMs,
             LongSupplier clock,
             PagedListSourceRegistry pagedLists) {
+        this(
+                renderer,
+                actions,
+                conditions,
+                scheduler,
+                plugin,
+                editorRenderer,
+                selectorOpener,
+                confirmOpener,
+                defaultClickCooldownMs,
+                clock,
+                pagedLists,
+                null);
+    }
+
+    /**
+     * The canonical constructor, carrying the anti-spam cooldown floor, its clock, the paged list sources a page flip
+     * re-queries, and the text-prompt capability an {@code input:} step drives. Every shorter form above delegates here
+     * with no floor, the real system clock, an empty paged registry and no text prompt, so every existing construction
+     * and test is unchanged; only production wiring, which holds the feature-populated paged registry and the
+     * text-input seam, passes them.
+     */
+    public MenuListener(
+            MenuRenderer renderer,
+            ActionRegistry actions,
+            ConditionRegistry conditions,
+            Scheduler scheduler,
+            Plugin plugin,
+            @Nullable EditorRenderer editorRenderer,
+            @Nullable SelectorOpener selectorOpener,
+            @Nullable ConfirmOpener confirmOpener,
+            long defaultClickCooldownMs,
+            LongSupplier clock,
+            PagedListSourceRegistry pagedLists,
+            @Nullable MenuTextPrompt textPrompt) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
@@ -263,6 +307,7 @@ public final class MenuListener implements Listener {
         this.defaultClickCooldownMs = defaultClickCooldownMs;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.pagedLists = Objects.requireNonNull(pagedLists, "pagedLists");
+        this.textPrompt = textPrompt;
     }
 
     /** Registers this listener with the server. Called once when the menu engine starts. */
@@ -865,9 +910,103 @@ public final class MenuListener implements Listener {
             }
             return;
         }
-        for (Ref ref : rs.item().click().actionsFor(kind)) {
+        runChain(holder, base, kind, rs.item().click().actionsFor(kind), 0);
+    }
+
+    /**
+     * Walk a gesture's success actions as a continuation-aware chain: an ordinary ref dispatches inline through
+     * {@link #runRef}, but a {@code input:}/{@code confirm:} step ({@link Ref#continuation()}) whose outcome only
+     * arrives on a later callback stops the walk, taking ownership of the rest of the chain. An {@code input:} step
+     * prompts and, on submit, re-enters this walk over the remaining refs with the typed line exposed as
+     * {@code %input%}; a {@code confirm:} step opens the yes/no window and runs one of its two branches on the
+     * decision. Every ordinary ref before the step still runs, so a chain like {@code [message, input:…, action]}
+     * behaves as written. The {@code from} index lets the input-submit path resume mid-list without re-copying.
+     *
+     * <p>This continuation awareness is deliberately only on the success path. A {@code input:}/{@code confirm:} step
+     * that appears inside an else-ladder, a deny list, or a per-requirement action list is unsupported: it falls
+     * through to {@link #runRef}, hits the registered marker action, and is logged and skipped rather than splitting a
+     * nested chain the engine cannot cleanly suspend.
+     */
+    private void runChain(MenuHolder holder, MenuContext base, ClickKind kind, List<Ref> refs, int from) {
+        for (int i = from; i < refs.size(); i++) {
+            Ref ref = refs.get(i);
+            Optional<Continuation> continuation = ref.continuation();
+            if (continuation.isPresent()) {
+                beginContinuation(holder, base, kind, continuation.get(), refs.subList(i + 1, refs.size()));
+                return;
+            }
             runRef(holder, base, kind, ref);
         }
+    }
+
+    /** Dispatch one continuation step, handing it the refs that must run after it resolves. */
+    private void beginContinuation(
+            MenuHolder holder, MenuContext base, ClickKind kind, Continuation continuation, List<Ref> rest) {
+        List<Ref> remaining = List.copyOf(rest);
+        if (continuation instanceof Continuation.Input input) {
+            promptInput(holder, base, kind, input, remaining);
+        } else if (continuation instanceof Continuation.Confirm confirm) {
+            openConfirm(holder, base, kind, confirm);
+        }
+    }
+
+    /**
+     * Run an {@code input:} step: resolve its prompt and pre-fill against the open context (the same {@code @key}/
+     * {@code %token%} path an item name takes), then prompt the viewer. On submit the remaining refs run as a fresh
+     * continuation with the typed line exposed as {@code %input%}; on cancel the step's own {@code deny} refs run and
+     * the remaining refs are abandoned. The prompt already runs on the viewer's entity thread, and the text-prompt
+     * seam delivers both callbacks back on it, so the continuation lands where it can touch the player. An engine wired
+     * without a text prompt cannot prompt, so it runs the cancel refs rather than dead-ending.
+     */
+    private void promptInput(
+            MenuHolder holder, MenuContext base, ClickKind kind, Continuation.Input input, List<Ref> remaining) {
+        if (textPrompt == null) {
+            LOG.warning("event=menu_input_unavailable key=" + input.key());
+            runEach(holder, base, kind, input.onCancel());
+            return;
+        }
+        Player live = Bukkit.getPlayer(base.viewer().uuid());
+        if (live == null) {
+            return;
+        }
+        Component prompt = renderer.itemRenderer().title(input.prompt(), base);
+        String initial = input.defaultText().isBlank() ? null : renderer.plainText(input.defaultText(), base);
+        textPrompt.prompt(
+                live,
+                base.viewer(),
+                input.key(),
+                prompt,
+                initial,
+                text -> runChain(holder, withInput(base, text), kind, remaining, 0),
+                () -> runEach(holder, base, kind, input.onCancel()));
+    }
+
+    /** A copy of {@code base} exposing the submitted line as the {@code %input%} menu-local placeholder. */
+    private static MenuContext withInput(MenuContext base, String text) {
+        Map<String, String> locals = new LinkedHashMap<>(base.localPlaceholders());
+        locals.put("input", text);
+        return base.withLocalPlaceholders(locals);
+    }
+
+    /**
+     * Run a {@code confirm:} step: resolve its title against the open context, then open a yes/no window whose accept
+     * runs the {@code yes} refs and whose decline runs the {@code no} refs — each through the same continuation-aware
+     * walk, on the viewer's entity thread the confirm opener runs its decision on. Unlike {@code input:} it splits no
+     * remaining chain: its two branches carry everything that follows either decision. An engine wired without a
+     * confirm opener runs the {@code no} refs rather than dead-ending.
+     */
+    private void openConfirm(MenuHolder holder, MenuContext base, ClickKind kind, Continuation.Confirm confirm) {
+        if (confirmOpener == null) {
+            LOG.warning("event=menu_confirm_unavailable");
+            runEach(holder, base, kind, confirm.onNo());
+            return;
+        }
+        Component title = renderer.itemRenderer().title(confirm.title(), base);
+        confirmOpener.openConfirm(
+                base.viewer(),
+                title,
+                () -> runChain(holder, base, kind, confirm.onYes(), 0),
+                () -> runChain(holder, base, kind, confirm.onNo(), 0));
     }
 
     /**

@@ -19,13 +19,24 @@ import org.jspecify.annotations.Nullable;
  * runtime runs instead when the chance roll fails. These only mean anything on the action path; a condition,
  * placeholder, or list-source ref parses with the no-modifier defaults (no delay, always fires, no fallback) and
  * ignores them.
+ *
+ * <p>An {@code input:}/{@code confirm:} action ref additionally carries a {@link Continuation}: a step whose outcome
+ * arrives on a later callback, so it splits the gesture's action chain rather than running inline. Every other ref
+ * carries an empty {@code continuation}, so it dispatches exactly as before.
  */
-public record Ref(String id, Map<String, String> args, int delayTicks, double chance, Optional<Ref> deny) {
+public record Ref(
+        String id,
+        Map<String, String> args,
+        int delayTicks,
+        double chance,
+        Optional<Ref> deny,
+        Optional<Continuation> continuation) {
 
     public Ref {
         Objects.requireNonNull(id, "id");
         args = Map.copyOf(Objects.requireNonNull(args, "args"));
         Objects.requireNonNull(deny, "deny");
+        Objects.requireNonNull(continuation, "continuation");
         // Clamp on the way in so the record can never hold a nonsensical modifier however it was built: a negative
         // delay is treated as "now", and a chance is a percent so it lives in [0, 100].
         delayTicks = Math.max(0, delayTicks);
@@ -39,7 +50,7 @@ public record Ref(String id, Map<String, String> args, int delayTicks, double ch
      * reaches for {@link #withModifiers}.
      */
     public Ref(String id, Map<String, String> args) {
-        this(id, args, 0, 100.0, Optional.empty());
+        this(id, args, 0, 100.0, Optional.empty(), Optional.empty());
     }
 
     public static Ref parse(String raw) {
@@ -73,7 +84,17 @@ public record Ref(String id, Map<String, String> args, int delayTicks, double ch
      * is pulled back into range.
      */
     public Ref withModifiers(int delayTicks, double chance, @Nullable Ref deny) {
-        return new Ref(id, args, delayTicks, chance, Optional.ofNullable(deny));
+        return new Ref(id, args, delayTicks, chance, Optional.ofNullable(deny), continuation);
+    }
+
+    /**
+     * A copy of this ref carrying {@code continuation} — the {@code input:}/{@code confirm:} step the loader attaches
+     * when it parses one of those map entries. Every other builder leaves the continuation empty, so only a ref the
+     * loader recognised as a continuation step ever carries one.
+     */
+    public Ref withContinuation(Continuation continuation) {
+        return new Ref(
+                id, args, delayTicks, chance, deny, Optional.of(Objects.requireNonNull(continuation, "continuation")));
     }
 
     /**
@@ -84,7 +105,7 @@ public record Ref(String id, Map<String, String> args, int delayTicks, double ch
      * runtime, in another package, rebuilds a ref. Pure: no Bukkit, just the fields.
      */
     public Ref withIdAndArgs(String id, Map<String, String> args) {
-        return new Ref(id, args, delayTicks, chance, deny);
+        return new Ref(id, args, delayTicks, chance, deny, continuation);
     }
 
     /**
