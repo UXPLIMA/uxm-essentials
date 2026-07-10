@@ -40,6 +40,7 @@ public final class Currency {
     private final boolean exchangeAllowed;
     private final boolean leaderboardEnabled;
     private final boolean permissionRequired;
+    private final String backendId;
 
     private Currency(Builder builder) {
         this.id = builder.id;
@@ -60,6 +61,7 @@ public final class Currency {
         this.exchangeAllowed = builder.exchangeAllowed;
         this.leaderboardEnabled = builder.leaderboardEnabled;
         this.permissionRequired = builder.permissionRequired;
+        this.backendId = builder.backendId;
         if (this.min.compareTo(this.max) > 0) {
             throw new IllegalArgumentException("min-balance must not exceed max-balance for currency " + id);
         }
@@ -167,6 +169,15 @@ public final class Currency {
         return permissionRequired;
     }
 
+    /**
+     * The {@code CurrencyBackend} id that holds this currency's balances. {@code native} — the default — is the
+     * plugin's own DB-backed ledger, the only backend with a guarded compare-and-take debit. Anything else names
+     * a foreign economy; see {@code docs/11-economy-integration.md}.
+     */
+    public String backendId() {
+        return backendId;
+    }
+
     /** Scale a raw amount to this currency's precision, half-up, so a stored figure never carries extra digits. */
     public BigDecimal normalize(BigDecimal amount) {
         return scale(Objects.requireNonNull(amount, "amount"), precision);
@@ -211,6 +222,7 @@ public final class Currency {
         private boolean exchangeAllowed = true;
         private boolean leaderboardEnabled = true;
         private boolean permissionRequired = false;
+        private String backendId = "native";
 
         private Builder(CurrencyId id) {
             this.id = id;
@@ -304,6 +316,16 @@ public final class Currency {
         /** Whether using this currency requires {@code uxmessentials.economy.currency.<id>} (default {@code false}). */
         public Builder permissionRequired(boolean permissionRequired) {
             this.permissionRequired = permissionRequired;
+            return this;
+        }
+
+        /** The backend that holds this currency. Defaults to the native ledger. */
+        public Builder backendId(String backendId) {
+            Objects.requireNonNull(backendId, "backendId");
+            if (backendId.isBlank()) {
+                throw new IllegalArgumentException("backendId must not be blank");
+            }
+            this.backendId = backendId.strip();
             return this;
         }
 
