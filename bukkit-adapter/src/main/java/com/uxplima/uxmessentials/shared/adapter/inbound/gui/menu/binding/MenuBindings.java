@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -15,6 +16,8 @@ import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
@@ -25,7 +28,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requiremen
 
 /**
  * The single entry point a feature uses to give a menu spec its behaviour. Features call {@code action} /
- * {@code condition} / {@code placeholder} / {@code list} once at wiring time to register a handler under an id;
+ * {@code condition} / {@code placeholder} / {@code list} / {@code pagedList} once at wiring time to register a
+ * handler under an id;
  * the engine later resolves a spec's refs back to those handlers through the matching getter. {@link #validate}
  * turns a spec that names an unregistered id into a loud startup failure instead of a broken menu a player meets.
  */
@@ -42,6 +46,8 @@ public final class MenuBindings {
 
     private final ListSourceRegistry lists = new ListSourceRegistry();
 
+    private final PagedListSourceRegistry pagedLists = new PagedListSourceRegistry();
+
     public void action(String id, Consumer<MenuActionContext> handler) {
         actions.register(id, handler);
     }
@@ -55,7 +61,26 @@ public final class MenuBindings {
     }
 
     public void list(String id, Function<MenuContext, List<?>> handler) {
+        // An id is an in-memory source or a paged one, never both: a spec pointing at it could not otherwise say
+        // which contract the engine should ask for.
+        if (pagedLists.has(id)) {
+            throw new IllegalStateException(
+                    "cannot register list source '" + id + "': already registered as a paged list source");
+        }
         lists.register(id, handler);
+    }
+
+    /**
+     * Register the streaming counterpart of {@link #list}. An id may back an in-memory source or a paged one but
+     * never both — they answer different questions (the whole corpus versus one page), so an id claimed by both
+     * would leave a spec's reference ambiguous.
+     */
+    public void pagedList(String id, BiFunction<MenuContext, PageRequest, PagedResult<?>> handler) {
+        if (lists.has(id)) {
+            throw new IllegalStateException(
+                    "cannot register paged list source '" + id + "': already registered as a list source");
+        }
+        pagedLists.register(id, handler);
     }
 
     public Optional<Consumer<MenuActionContext>> action(String id) {
@@ -72,6 +97,10 @@ public final class MenuBindings {
 
     public Optional<Function<MenuContext, List<?>>> list(String id) {
         return lists.get(id);
+    }
+
+    public Optional<BiFunction<MenuContext, PageRequest, PagedResult<?>>> pagedList(String id) {
+        return pagedLists.get(id);
     }
 
     /**
@@ -93,6 +122,15 @@ public final class MenuBindings {
 
     public ListSourceRegistry lists() {
         return lists;
+    }
+
+    /**
+     * The paged-source registry, the streaming counterpart to {@link #lists()}. This accessor is the only path past
+     * the façade to it, so a source that pages its corpus down to the store stays exactly as reachable — and as
+     * engine-internal — as an in-memory one.
+     */
+    public PagedListSourceRegistry pagedLists() {
+        return pagedLists;
     }
 
     /**
