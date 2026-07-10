@@ -10,6 +10,10 @@ import java.util.Objects;
  * <p>{@code pinned} rows claim a fixed content slot through {@link PinnedEntry} and sit outside the page's flow —
  * a sponsored entry that must appear on every page, for instance. They are not counted in {@code totalCount}.
  *
+ * <p>A page has a fixed capacity: because pinned entries occupy content slots too, {@code rows.size() + pinned.size()}
+ * must not exceed the {@code size} the {@link PageRequest} asked for. A source that returns more than fits has the
+ * overflow dropped by the engine, which logs it at warn rather than discarding it silently.
+ *
  * <p>Not to be confused with {@code Pagination.Page}, which is the engine's slot-placement result for an
  * in-memory list. This type is the data a source returns; that type is where the renderer puts it.
  */

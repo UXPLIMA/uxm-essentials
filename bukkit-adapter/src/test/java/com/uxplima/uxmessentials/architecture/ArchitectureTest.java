@@ -305,7 +305,11 @@ class ArchitectureTest {
     private static DescribedPredicate<JavaClass> menuInternals() {
         String runtime = "com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.";
         java.util.Set<String> runtimeInternals = java.util.Set.of(
-                runtime + "MenuHolder", runtime + "MenuListener", runtime + "MenuRefresh", runtime + "Cancellable");
+                runtime + "MenuHolder",
+                runtime + "MenuListener",
+                runtime + "MenuRefresh",
+                runtime + "Cancellable",
+                runtime + "PagedListView");
         return JavaClass.Predicates.resideInAPackage("..gui.menu.render..")
                 .or(DescribedPredicate.describe(
                         "are menu runtime internals", javaClass -> runtimeInternals.contains(javaClass.getFullName())))

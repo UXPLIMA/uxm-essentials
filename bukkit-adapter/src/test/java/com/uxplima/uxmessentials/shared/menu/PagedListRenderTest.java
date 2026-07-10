@@ -167,6 +167,32 @@ class PagedListRenderTest {
     }
 
     @Test
+    void aFullPageWithAPinnedRowDropsTheOverflowRowAndLogsBothCounts() {
+        List<Object> full = rows("r", 45);
+        FakePagedSource source =
+                new FakePagedSource(request -> new PagedResult<>(full, 45, List.<Object>of(new NamedPin("PIN", 44))));
+        Menus menus = pagedMenus(source);
+
+        List<LogRecord> logged = captureMenusLog(() -> {
+            Inventory inv = openTop(menus);
+            assertThat(filledContentSlots(inv)).isEqualTo(45);
+            assertThat(plainName(inv, 44)).isEqualTo("PIN");
+            assertThat(plainName(inv, 0)).isEqualTo("r0");
+            assertThat(plainName(inv, 43)).isEqualTo("r43");
+        });
+
+        long overflows = logged.stream()
+                .filter(record -> record.getMessage().contains("event=paged_source_overflowed"))
+                .count();
+        assertThat(overflows).isEqualTo(1);
+        assertThat(logged.stream().map(LogRecord::getMessage))
+                .anyMatch(message -> message.contains("id=pw:browse")
+                        && message.contains("size=45")
+                        && message.contains("rows=45")
+                        && message.contains("pinned=1"));
+    }
+
+    @Test
     void aPinnedRowLandsInItsFixedSlot() {
         FakePagedSource source = new FakePagedSource(
                 request -> new PagedResult<>(List.<Object>of("a", "b"), 2, List.<Object>of(new NamedPin("PIN", 44))));
