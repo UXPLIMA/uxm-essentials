@@ -52,7 +52,7 @@ class ClaimProvidersTest {
     void detectAll_doesNotThrow_whenNoClaimPluginInstalled() {
         // The probe constructs every candidate (uxmClaims, Lands, GriefPrevention, GriefDefender,
         // ExcellentClaims, SimpleClaimSystem, RClaim, XClaim, Homestead, WorldGuard, Towny, BentoBox, Residence,
-        // PlotSquared) and calls active() on each.
+        // PlotSquared, SuperiorSkyblock2) and calls active() on each.
         // Most of those SDKs are absent from the test classpath (Lands and GriefPrevention resolve only as
         // ownership-test stubs), so a provider that touched an absent SDK before its present-guard would throw
         // NoClassDefFoundError here. It must not.
@@ -96,7 +96,8 @@ class ClaimProvidersTest {
                 new TownyClaimProvider(plugin, server, noOpLog()),
                 new BentoBoxClaimProvider(plugin, server, noOpLog()),
                 new ResidenceClaimProvider(plugin, server, noOpLog()),
-                new PlotSquaredClaimProvider(plugin, server, noOpLog()));
+                new PlotSquaredClaimProvider(plugin, server, noOpLog()),
+                new SuperiorSkyblockClaimProvider(plugin, server, noOpLog()));
     }
 
     private static Logger noOpLog() {
