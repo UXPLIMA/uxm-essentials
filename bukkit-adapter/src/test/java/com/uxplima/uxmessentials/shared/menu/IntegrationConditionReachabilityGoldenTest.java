@@ -23,7 +23,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
@@ -76,8 +75,7 @@ class IntegrationConditionReachabilityGoldenTest {
 
         Logger log = new NoopLogger();
         bindings = new MenuBindings();
-        Hooks hooks = Hooks.resolve(server, log, List.of());
-        Currencies currencies = new Currencies(hooks, server, log, "vault");
+        Currencies currencies = new Currencies(() -> null, log, "vault");
         IntegrationConditions.register(bindings, PermissionQuery.ABSENT, currencies, new NoopCooldowns(), server, log);
 
         GuiText guiText = new GuiText(new KeyMessages());

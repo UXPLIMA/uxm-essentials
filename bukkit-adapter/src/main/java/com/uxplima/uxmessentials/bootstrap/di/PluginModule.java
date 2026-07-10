@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -125,6 +126,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
@@ -424,13 +426,15 @@ public final class PluginModule {
             menus.shutdown();
         });
 
-        // The multi-currency seam over those hooks plus native Exp and the reflective economies (PlayerPoints,
-        // CoinsEngine, zEssentials). Built here because it reads the just-resolved Vault economy capability; the
-        // configured default currency (custommenus config, vault out of the box) is what a Phase-2 economy action
-        // with no explicit currency spec falls back to. Phase-2/3 vocab reads this façade from resources.currencies().
+        // The multi-currency seam over the economy's own backend set: a Phase-2 economy action and a warp fee now
+        // spend through the same backend. The configured default currency (custommenus config, vault out of the box)
+        // is what an action with no explicit currency spec falls back to; Phase-2/3 vocab reads this façade from
+        // resources.currencies(). The economy module wires much later (wireEconomy, below), so the façade takes a
+        // deferred reference to the registries and reads it on the first click — filled the moment economy is up.
+        AtomicReference<EconomyBackends> menuCurrencyBackends = new AtomicReference<>();
         String defaultCurrency =
                 config.scoped(ModuleId.of("custommenus").configRoot()).getString("default-currency", "vault");
-        Currencies menuCurrencies = new Currencies(hooks, plugin.getServer(), kernel.log(), defaultCurrency);
+        Currencies menuCurrencies = new Currencies(menuCurrencyBackends::get, kernel.log(), defaultCurrency);
         resources.currencies(menuCurrencies);
         // The economy slice of the vocabulary (give/take/set-money, give/take exp|levels|permission, points) is the
         // first consumer of that façade; it also grants/revokes permission nodes through the Vault permission seam,
@@ -493,7 +497,8 @@ public final class PluginModule {
                 hooks,
                 guiRegistry,
                 menus,
-                menuBindings);
+                menuBindings,
+                menuCurrencyBackends);
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
@@ -652,7 +657,8 @@ public final class PluginModule {
             Hooks hooks,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            AtomicReference<EconomyBackends> menuCurrencyBackends) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
@@ -709,7 +715,8 @@ public final class PluginModule {
                     guiRegistry,
                     textInput,
                     menus,
-                    menuBindings);
+                    menuBindings,
+                    menuCurrencyBackends);
         });
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -736,7 +743,8 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            AtomicReference<EconomyBackends> menuCurrencyBackends) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
@@ -779,7 +787,8 @@ public final class PluginModule {
                     guiRegistry,
                     textInput,
                     menus,
-                    menuBindings);
+                    menuBindings,
+                    menuCurrencyBackends);
         } else if (module.id().equals(ModuleId.of("warps"))) {
             wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("kits"))) {
@@ -1109,7 +1118,8 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            AtomicReference<EconomyBackends> menuCurrencyBackends) {
         EconomyWiring.Wired wired = EconomyWiring.wire(
                 plugin,
                 ctx,
@@ -1120,6 +1130,9 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath());
+        // Fill the deferred reference the menu-currency façade was handed at menu-wiring time (above): from here on
+        // a give-money click resolves against the same backend and currency registries a warp fee spends through.
+        menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
         wired.commands().forEach(resources::addCommand);

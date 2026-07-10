@@ -4,24 +4,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import org.bukkit.Server;
-
+import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
+import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.CurrencyId;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.EconomyQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.FakeCurrencyBackend;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PluginHook;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.AfterEach;
@@ -33,7 +33,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of the economy action pack. The money actions run over a real {@link Currencies} whose default
- * {@code vault} back-end wraps an in-memory {@link FakeEconomy} (a present Vault hook over the fake), so a deposit /
+ * {@code vault} spec resolves a synthetic currency over an in-memory {@link FakeCurrencyBackend}, so a deposit /
  * withdraw / set is asserted concretely against the fake balance; the {@code playerpoints} back-end is absent in the
  * mock, so a {@code playerpoints}-routed action is proved not to touch the default vault balance. The experience and
  * level actions ride Paper's native {@code giveExp} / {@code giveExpLevels}, which MockBukkit models over its
@@ -47,7 +47,7 @@ class EconomyActionsTest {
     private PlayerMock viewer;
     private MenuBindings bindings;
     private RecordingLogger log;
-    private FakeEconomy economy;
+    private FakeCurrencyBackend economy;
     private Currencies currencies;
 
     @BeforeEach
@@ -56,7 +56,7 @@ class EconomyActionsTest {
         viewer = server.addPlayer("Viewer");
         bindings = new MenuBindings();
         log = new RecordingLogger();
-        economy = new FakeEconomy();
+        economy = new FakeCurrencyBackend("vault");
         currencies = currenciesOver(economy);
         EconomyActions.register(bindings, currencies, PermissionQuery.ABSENT, log);
     }
@@ -287,82 +287,19 @@ class EconomyActionsTest {
         handler.accept(ctx);
     }
 
-    /** A real {@link Currencies} whose default {@code vault} back-end wraps {@code fake} (a present Vault hook). */
-    private Currencies currenciesOver(EconomyQuery fake) {
-        PluginHook<EconomyQuery> hook = new PluginHook<>() {
-            @Override
-            public String pluginName() {
-                return "Vault";
-            }
-
-            @Override
-            public Class<EconomyQuery> capability() {
-                return EconomyQuery.class;
-            }
-
-            @Override
-            public EconomyQuery whenAbsent() {
-                return EconomyQuery.ABSENT;
-            }
-
-            @Override
-            public EconomyQuery whenPresent(Server ignored) {
-                return fake;
-            }
-
-            @Override
-            public boolean isPresent(Server ignored) {
-                return true;
-            }
-        };
-        Hooks hooks = Hooks.resolve(server, log, List.of(hook));
-        return new Currencies(hooks, server, log, "vault");
+    /** A real {@link Currencies} whose default {@code vault} spec resolves a synthetic currency over {@code backend}. */
+    private Currencies currenciesOver(FakeCurrencyBackend backend) {
+        return new Currencies(
+                () -> new EconomyBackends(
+                        CurrencyBackendRegistry.of(List.of(backend)),
+                        CurrencyRegistry.single(
+                                Currency.builder(CurrencyId.of("coins")).build())),
+                log,
+                "vault");
     }
 
     private static Map.Entry<UUID, String> entry(UUID player, String node) {
         return Map.entry(player, node);
-    }
-
-    /** An in-memory {@link EconomyQuery} the vault provider delegates to, counting the moves it is asked to make. */
-    private static final class FakeEconomy implements EconomyQuery {
-
-        private final Map<UUID, Double> balances = new HashMap<>();
-        private int deposits;
-        private int withdrawals;
-
-        @Override
-        public boolean available() {
-            return true;
-        }
-
-        @Override
-        public double balance(UUID player) {
-            return balances.getOrDefault(player, 0.0);
-        }
-
-        @Override
-        public boolean has(UUID player, double amount) {
-            return balance(player) >= amount;
-        }
-
-        @Override
-        public boolean withdraw(UUID player, double amount) {
-            withdrawals++;
-            balances.merge(player, -amount, Double::sum);
-            return true;
-        }
-
-        @Override
-        public boolean deposit(UUID player, double amount) {
-            deposits++;
-            balances.merge(player, amount, Double::sum);
-            return true;
-        }
-
-        @Override
-        public String format(double amount) {
-            return "$" + amount;
-        }
     }
 
     /** A {@link PermissionQuery} that records every grant and revoke, standing in for the Vault permission service. */

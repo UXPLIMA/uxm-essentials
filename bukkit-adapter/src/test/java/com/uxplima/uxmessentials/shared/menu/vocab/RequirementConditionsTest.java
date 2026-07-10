@@ -3,26 +3,27 @@ package com.uxplima.uxmessentials.shared.menu.vocab;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiPredicate;
 
 import org.bukkit.Material;
-import org.bukkit.Server;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
+import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.CurrencyId;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.EconomyQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PluginHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.FakeCurrencyBackend;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -35,8 +36,8 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of the requirement condition pack. The {@code has-money} condition runs over a real
- * {@link Currencies} whose default {@code vault} back-end wraps an in-memory {@link FakeEconomy} (a present Vault
- * hook), so a balance threshold is asserted concretely and a {@code playerpoints}-routed check is proved to leave the
+ * {@link Currencies} whose default {@code vault} spec resolves a synthetic currency over an in-memory
+ * {@link FakeCurrencyBackend}, so a balance threshold is asserted concretely and a {@code playerpoints}-routed check is proved to leave the
  * vault balance untouched. The experience, level, item, empty-slot, slot and PDC-meta conditions read the
  * {@link PlayerMock}'s own live state through a real {@link PlayerMeta}. Every condition is asserted both ways, and
  * the fail-closed contract is pinned by the offline-viewer and malformed-argument cases.
@@ -46,7 +47,7 @@ class RequirementConditionsTest {
     private ServerMock server;
     private PlayerMock viewer;
     private MenuBindings bindings;
-    private FakeEconomy economy;
+    private FakeCurrencyBackend economy;
     private PlayerMeta playerMeta;
 
     @BeforeEach
@@ -54,7 +55,7 @@ class RequirementConditionsTest {
         server = MockBukkit.mock();
         viewer = server.addPlayer("Viewer");
         bindings = new MenuBindings();
-        economy = new FakeEconomy();
+        economy = new FakeCurrencyBackend("vault");
         playerMeta = new PlayerMeta(MockBukkit.createMockPlugin());
         RequirementConditions.register(bindings, currenciesOver(economy), playerMeta, new RecordingLogger());
     }
@@ -254,74 +255,15 @@ class RequirementConditionsTest {
         return stack;
     }
 
-    /** A real {@link Currencies} whose default {@code vault} back-end wraps {@code fake} (a present Vault hook). */
-    private Currencies currenciesOver(EconomyQuery fake) {
-        PluginHook<EconomyQuery> hook = new PluginHook<>() {
-            @Override
-            public String pluginName() {
-                return "Vault";
-            }
-
-            @Override
-            public Class<EconomyQuery> capability() {
-                return EconomyQuery.class;
-            }
-
-            @Override
-            public EconomyQuery whenAbsent() {
-                return EconomyQuery.ABSENT;
-            }
-
-            @Override
-            public EconomyQuery whenPresent(Server ignored) {
-                return fake;
-            }
-
-            @Override
-            public boolean isPresent(Server ignored) {
-                return true;
-            }
-        };
-        Hooks hooks = Hooks.resolve(server, new RecordingLogger(), List.of(hook));
-        return new Currencies(hooks, server, new RecordingLogger(), "vault");
-    }
-
-    /** An in-memory {@link EconomyQuery} the vault provider delegates to. */
-    private static final class FakeEconomy implements EconomyQuery {
-
-        private final Map<UUID, Double> balances = new HashMap<>();
-
-        @Override
-        public boolean available() {
-            return true;
-        }
-
-        @Override
-        public double balance(UUID player) {
-            return balances.getOrDefault(player, 0.0);
-        }
-
-        @Override
-        public boolean has(UUID player, double amount) {
-            return balance(player) >= amount;
-        }
-
-        @Override
-        public boolean withdraw(UUID player, double amount) {
-            balances.merge(player, -amount, Double::sum);
-            return true;
-        }
-
-        @Override
-        public boolean deposit(UUID player, double amount) {
-            balances.merge(player, amount, Double::sum);
-            return true;
-        }
-
-        @Override
-        public String format(double amount) {
-            return "$" + amount;
-        }
+    /** A real {@link Currencies} whose default {@code vault} spec resolves a synthetic currency over {@code backend}. */
+    private Currencies currenciesOver(FakeCurrencyBackend backend) {
+        return new Currencies(
+                () -> new EconomyBackends(
+                        CurrencyBackendRegistry.of(List.of(backend)),
+                        CurrencyRegistry.single(
+                                Currency.builder(CurrencyId.of("coins")).build())),
+                new RecordingLogger(),
+                "vault");
     }
 
     /** Discards every log line; these tests assert behaviour, not log output. */

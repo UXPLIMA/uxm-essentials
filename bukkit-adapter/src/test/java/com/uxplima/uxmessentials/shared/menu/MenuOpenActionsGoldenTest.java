@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.shared.menu;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -22,7 +21,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHol
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -108,7 +106,7 @@ class MenuOpenActionsGoldenTest {
         Logger log = new NoopLogger();
         bindings = new MenuBindings();
         bindings.action("record", ctx -> captured.set(ctx.arg()));
-        Currencies currencies = new Currencies(Hooks.resolve(server, log, List.of()), server, log, "vault");
+        Currencies currencies = new Currencies(() -> null, log, "vault");
         RequirementConditions.register(bindings, currencies, new PlayerMeta(plugin), log);
 
         GuiText guiText = new GuiText(new KeyMessages());

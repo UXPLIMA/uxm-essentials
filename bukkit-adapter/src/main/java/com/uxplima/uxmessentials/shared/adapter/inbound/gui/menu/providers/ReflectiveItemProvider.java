@@ -22,8 +22,8 @@ import org.jspecify.annotations.Nullable;
  * {@link ReflectiveOperationException} (the API absent, or its shape shifted under a version bump) or unchecked
  * failure from the lookup is logged exactly once and degraded to empty rather than aborting the render.
  *
- * <p>This is the same discipline {@code ReflectiveCurrencyProvider} and the migration {@code PlayerPointsBalanceFeed}
- * use. Crucially, a subclass names the integrated plugin's SDK only by string class-name through {@link
+ * <p>This is the same discipline the migration {@code PlayerPointsBalanceFeed} uses. Crucially, a subclass names
+ * the integrated plugin's SDK only by string class-name through {@link
  * Class#forName(String)} and reflective lookups, so no field or method signature here carries an SDK type:
  * constructing one of these on a server without the plugin loads none of its classes, and the present-guard
  * short-circuits before any reflection runs.

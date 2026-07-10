@@ -20,7 +20,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -59,7 +58,7 @@ class ViewRequirementBlockGoldenTest {
 
         Logger log = new NoopLogger();
         bindings = new MenuBindings();
-        Currencies currencies = new Currencies(Hooks.resolve(server, log, List.of()), server, log, "vault");
+        Currencies currencies = new Currencies(() -> null, log, "vault");
         RequirementConditions.register(bindings, currencies, new PlayerMeta(plugin), log);
         // Two deterministic conditions so the flat-AND backward-compat case does not depend on inventory state.
         bindings.condition("cond-true", (ctx, args) -> true);

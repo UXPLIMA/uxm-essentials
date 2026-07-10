@@ -7,7 +7,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,19 +16,21 @@ import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 
 import org.bukkit.Location;
-import org.bukkit.Server;
 import org.bukkit.World;
 
+import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
+import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.CurrencyId;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.EconomyQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
+import com.uxplima.uxmessentials.shared.adapter.outbound.currency.FakeCurrencyBackend;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PluginHook;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -58,7 +59,7 @@ class IntegrationConditionsTest {
     private World world;
     private PlayerMock viewer;
     private MenuBindings bindings;
-    private FakeEconomy economy;
+    private FakeCurrencyBackend economy;
     private FakePermissions permissions;
     private FakeCooldowns cooldowns;
 
@@ -69,7 +70,7 @@ class IntegrationConditionsTest {
         viewer = server.addPlayer("Viewer");
         viewer.teleport(new Location(world, 0, 64, 0));
         bindings = new MenuBindings();
-        economy = new FakeEconomy();
+        economy = new FakeCurrencyBackend("vault");
         permissions = new FakePermissions("vip");
         cooldowns = new FakeCooldowns();
         IntegrationConditions.register(
@@ -261,36 +262,15 @@ class IntegrationConditionsTest {
         action.accept(ctx);
     }
 
-    /** A real {@link Currencies} whose default {@code vault} back-end wraps {@code fake} (a present Vault hook). */
-    private Currencies currenciesOver(EconomyQuery fake) {
-        PluginHook<EconomyQuery> hook = new PluginHook<>() {
-            @Override
-            public String pluginName() {
-                return "Vault";
-            }
-
-            @Override
-            public Class<EconomyQuery> capability() {
-                return EconomyQuery.class;
-            }
-
-            @Override
-            public EconomyQuery whenAbsent() {
-                return EconomyQuery.ABSENT;
-            }
-
-            @Override
-            public EconomyQuery whenPresent(Server ignored) {
-                return fake;
-            }
-
-            @Override
-            public boolean isPresent(Server ignored) {
-                return true;
-            }
-        };
-        Hooks hooks = Hooks.resolve(server, new RecordingLogger(), List.of(hook));
-        return new Currencies(hooks, server, new RecordingLogger(), "vault");
+    /** A real {@link Currencies} whose default {@code vault} spec resolves a synthetic currency over {@code backend}. */
+    private Currencies currenciesOver(FakeCurrencyBackend backend) {
+        return new Currencies(
+                () -> new EconomyBackends(
+                        CurrencyBackendRegistry.of(List.of(backend)),
+                        CurrencyRegistry.single(
+                                Currency.builder(CurrencyId.of("coins")).build())),
+                new RecordingLogger(),
+                "vault");
     }
 
     /** Whether {@code type} (or a nested class it declares) names {@code prefix} in any field or method signature. */
@@ -389,44 +369,6 @@ class IntegrationConditionsTest {
         @Override
         public void stampLabel(PlayerRef who, String label) {
             stamped.add(label);
-        }
-    }
-
-    /** An in-memory {@link EconomyQuery} the vault provider delegates to. */
-    private static final class FakeEconomy implements EconomyQuery {
-
-        private final Map<UUID, Double> balances = new HashMap<>();
-
-        @Override
-        public boolean available() {
-            return true;
-        }
-
-        @Override
-        public double balance(UUID player) {
-            return balances.getOrDefault(player, 0.0);
-        }
-
-        @Override
-        public boolean has(UUID player, double amount) {
-            return balance(player) >= amount;
-        }
-
-        @Override
-        public boolean withdraw(UUID player, double amount) {
-            balances.merge(player, -amount, Double::sum);
-            return true;
-        }
-
-        @Override
-        public boolean deposit(UUID player, double amount) {
-            balances.merge(player, amount, Double::sum);
-            return true;
-        }
-
-        @Override
-        public String format(double amount) {
-            return "$" + amount;
         }
     }
 

@@ -291,7 +291,7 @@ public final class IntegrationConditions {
      * {@code com.gamingmesh} type: constructing this on a server without JobsReborn loads none of its classes, and
      * the present-guard short-circuits before any reflection runs. Any {@link ReflectiveOperationException} (the API
      * absent, or its shape shifted under a version bump) or unchecked failure is logged exactly once and degraded to
-     * {@code false} — the same discipline {@code ReflectiveCurrencyProvider} and {@code ReflectiveItemProvider} use.
+     * {@code false} — the same discipline {@code ReflectiveItemProvider} uses.
      */
     private static final class JobsIntegration {
 

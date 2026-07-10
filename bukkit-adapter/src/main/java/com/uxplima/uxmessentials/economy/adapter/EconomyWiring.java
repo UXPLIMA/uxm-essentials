@@ -383,6 +383,7 @@ public final class EconomyWiring {
                 snapshots,
                 resolved,
                 backends,
+                currencies,
                 plugin,
                 settings.registerProvider(),
                 currencies.defaultCurrency(),
@@ -654,6 +655,7 @@ public final class EconomyWiring {
      * @param snapshots the per-currency baltop snapshots whose refresh loop is armed/stopped
      * @param provider the resolved provider this plugin uses (registered or deferred)
      * @param backends the closed backend set the routing provider resolves each currency against
+     * @param currencies the closed currency set the menu-currency façade resolves menu specs against
      * @param plugin the owning plugin, for the registration drop on stop
      * @param registered whether this plugin registered the native provider (so stop only unregisters then)
      * @param defaultCurrency the default currency the {@code balance}/{@code baltop_position} placeholders read
@@ -672,6 +674,7 @@ public final class EconomyWiring {
             BaltopSnapshots snapshots,
             EconomyProvider provider,
             CurrencyBackendRegistry backends,
+            CurrencyRegistry currencies,
             Plugin plugin,
             boolean registered,
             Currency defaultCurrency,
@@ -694,6 +697,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(snapshots, "snapshots");
             Objects.requireNonNull(provider, "provider");
             Objects.requireNonNull(backends, "backends");
+            Objects.requireNonNull(currencies, "currencies");
             Objects.requireNonNull(plugin, "plugin");
             Objects.requireNonNull(defaultCurrency, "defaultCurrency");
             Objects.requireNonNull(amountFormat, "amountFormat");
