@@ -44,7 +44,7 @@ public final class CurrencyBackends {
 
         List<CurrencyBackend> backends = new ArrayList<>();
         backends.add(new NativeCurrencyBackend(wallets));
-        backends.add(wrap(new ExpCurrencyBackend(server)));
+        backends.add(wrap(new ExpCurrencyBackend(server, scheduler, log)));
         if (present(server, "Vault")) {
             backends.add(wrap(new VaultCurrencyBackend(hooks)));
         }
