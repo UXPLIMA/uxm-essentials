@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.application.port;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,5 +50,35 @@ public interface ClaimProvider {
          * should not be permitted to teleport to it.
          */
         boolean isBanned(UUID player);
+
+        /**
+         * Returns {@code true} when {@code player} owns this claim, as distinct from merely being a
+         * trusted member of it. Callers that must gate an action on ownership — creating a public
+         * warp on your own land, for instance — need this narrower question than {@link
+         * #isTrusted(UUID)}, which answers owner-or-member.
+         *
+         * <p>This is the authoritative ownership check regardless of whether {@link #owner()} can
+         * name a UUID: a provider whose model owns land collectively, or by team, may still answer
+         * whether a given player is one of the owners.
+         *
+         * <p>The default preserves the legacy behaviour of treating any trusted player as an owner,
+         * so providers written against the older two-method contract keep their existing meaning
+         * until they supply a real owner check.
+         */
+        default boolean isOwner(UUID player) {
+            Objects.requireNonNull(player, "player");
+            return isTrusted(player);
+        }
+
+        /**
+         * Returns the single owner of this claim, or empty when the claim has no one individual
+         * owner. Empty is a legitimate answer, not a failure: a Towny town plot or any collectively
+         * held claim is owned by a group, so no single UUID applies. Callers must therefore treat
+         * empty as "no single owner here" and fall back to {@link #isOwner(UUID)} to decide whether
+         * a specific player owns the land.
+         */
+        default Optional<UUID> owner() {
+            return Optional.empty();
+        }
     }
 }
