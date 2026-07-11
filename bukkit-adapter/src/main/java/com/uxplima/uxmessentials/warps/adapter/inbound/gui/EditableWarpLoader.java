@@ -35,7 +35,8 @@ final class EditableWarpLoader {
             if (repo == null) {
                 return null;
             }
-            return repo.find(owner, PlayerWarpName.of(name))
+            return repo.findByName(PlayerWarpName.of(name))
+                    .filter(warp -> warp.owner().uuid().equals(owner.uuid()))
                     .map(warp -> EditableWarp.ofPlayer(warp, repo))
                     .orElse(null);
         }

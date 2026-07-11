@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -65,6 +66,64 @@ class PlayerWarpTest {
         assertThat(shared.access()).isEqualTo(WarpAccess.PUBLIC);
         assertThat(shared.updatedAt()).isEqualTo(later);
         assertThat(shared.withAccess(WarpAccess.PRIVATE, later).access()).isEqualTo(WarpAccess.PRIVATE);
+    }
+
+    @Test
+    void withIconCarriesTheIconAndBumpsUpdatedAt() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+        Instant later = Instant.EPOCH.plusSeconds(15);
+
+        PlayerWarp iconed = warp.withIcon(Optional.of(IconSpec.of("DIAMOND")), later);
+
+        assertThat(iconed.icon()).contains(IconSpec.of("DIAMOND"));
+        assertThat(iconed.updatedAt()).isEqualTo(later);
+    }
+
+    @Test
+    void withDescriptionCarriesTheDescriptionAndBumpsUpdatedAt() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+        Instant later = Instant.EPOCH.plusSeconds(20);
+
+        PlayerWarp described = warp.withDescription(Optional.of(WarpDescription.of("come visit")), later);
+
+        assertThat(described.description()).contains(WarpDescription.of("come visit"));
+        assertThat(described.updatedAt()).isEqualTo(later);
+    }
+
+    @Test
+    void withEffectsCarriesTheEffectsAndBumpsUpdatedAt() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+        Instant later = Instant.EPOCH.plusSeconds(25);
+        WarpEffects effects = new WarpEffects(
+                Optional.of("ENTITY_ENDERMAN_TELEPORT"), Optional.empty(), Optional.empty(), Optional.empty());
+
+        PlayerWarp effected = warp.withEffects(effects, later);
+
+        assertThat(effected.effects()).isEqualTo(effects);
+        assertThat(effected.updatedAt()).isEqualTo(later);
+    }
+
+    @Test
+    void withTimingCarriesTheOverridesAndBumpsUpdatedAt() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+        Instant later = Instant.EPOCH.plusSeconds(30);
+        WarpTimingOverrides timing = new WarpTimingOverrides(Optional.of(3.0), Optional.of(5.0));
+
+        PlayerWarp timed = warp.withTiming(timing, later);
+
+        assertThat(timed.timing()).isEqualTo(timing);
+        assertThat(timed.updatedAt()).isEqualTo(later);
+    }
+
+    @Test
+    void withCategoryIdCarriesTheCategoryAndBumpsUpdatedAt() {
+        PlayerWarp warp = PlayerWarp.create(OWNER, "Owner", PlayerWarpName.of("base"), at(0, 64, 0), Instant.EPOCH);
+        Instant later = Instant.EPOCH.plusSeconds(35);
+
+        PlayerWarp filed = warp.withCategoryId(Optional.of("shops"), later);
+
+        assertThat(filed.categoryId()).contains("shops");
+        assertThat(filed.updatedAt()).isEqualTo(later);
     }
 
     @Test

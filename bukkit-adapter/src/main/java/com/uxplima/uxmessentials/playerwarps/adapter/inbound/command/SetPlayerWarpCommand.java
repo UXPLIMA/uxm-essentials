@@ -52,8 +52,9 @@ public final class SetPlayerWarpCommand extends PlayerWarpCommandSupport impleme
         // Capture the position on the entity thread before hopping off; the use case's find + count + save touch
         // the database, so it runs off the tick thread.
         var who = ref(sender);
+        var ownerName = sender.getName();
         var at = position(sender);
-        services.scheduler().async(() -> services.setPlayerWarp().set(who, name, at));
+        services.scheduler().async(() -> services.setPlayerWarp().set(who, ownerName, name, at));
         return Command.SINGLE_SUCCESS;
     }
 }

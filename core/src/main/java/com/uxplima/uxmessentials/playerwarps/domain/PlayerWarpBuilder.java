@@ -25,9 +25,9 @@ final class PlayerWarpBuilder {
     private Optional<DisplayName> displayName;
     private Position location;
     private final Optional<String> serverId;
-    private final Optional<String> categoryId;
-    private final Optional<WarpDescription> description;
-    private final Optional<IconSpec> icon;
+    private Optional<String> categoryId;
+    private Optional<WarpDescription> description;
+    private Optional<IconSpec> icon;
     private WarpAccess access;
     private final boolean passwordSet;
     private final WarpStatus status;
@@ -38,8 +38,8 @@ final class PlayerWarpBuilder {
     private final int favouriteCount;
     private final Optional<Sponsorship> sponsorship;
     private final Optional<RentState> rent;
-    private final WarpEffects effects;
-    private final WarpTimingOverrides timing;
+    private WarpEffects effects;
+    private WarpTimingOverrides timing;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -88,6 +88,31 @@ final class PlayerWarpBuilder {
 
     PlayerWarpBuilder access(WarpAccess value) {
         this.access = value;
+        return this;
+    }
+
+    PlayerWarpBuilder categoryId(Optional<String> value) {
+        this.categoryId = value;
+        return this;
+    }
+
+    PlayerWarpBuilder description(Optional<WarpDescription> value) {
+        this.description = value;
+        return this;
+    }
+
+    PlayerWarpBuilder icon(Optional<IconSpec> value) {
+        this.icon = value;
+        return this;
+    }
+
+    PlayerWarpBuilder effects(WarpEffects value) {
+        this.effects = value;
+        return this;
+    }
+
+    PlayerWarpBuilder timing(WarpTimingOverrides value) {
+        this.timing = value;
         return this;
     }
 

@@ -138,6 +138,41 @@ public record PlayerWarp(
         return toBuilder().displayName(newDisplayName).updatedAt(now).build();
     }
 
+    /** A copy with the browse icon swapped, stamping {@code now} as the edit time. */
+    public PlayerWarp withIcon(Optional<IconSpec> newIcon, Instant now) {
+        Objects.requireNonNull(newIcon, "newIcon");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().icon(newIcon).updatedAt(now).build();
+    }
+
+    /** A copy with the description swapped, stamping {@code now} as the edit time. */
+    public PlayerWarp withDescription(Optional<WarpDescription> newDescription, Instant now) {
+        Objects.requireNonNull(newDescription, "newDescription");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().description(newDescription).updatedAt(now).build();
+    }
+
+    /** A copy with the teleport effects replaced, stamping {@code now} as the edit time. */
+    public PlayerWarp withEffects(WarpEffects newEffects, Instant now) {
+        Objects.requireNonNull(newEffects, "newEffects");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().effects(newEffects).updatedAt(now).build();
+    }
+
+    /** A copy with the per-warp warmup/cooldown overrides replaced, stamping {@code now} as the edit time. */
+    public PlayerWarp withTiming(WarpTimingOverrides newTiming, Instant now) {
+        Objects.requireNonNull(newTiming, "newTiming");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().timing(newTiming).updatedAt(now).build();
+    }
+
+    /** A copy filed under a different browse category (or none), stamping {@code now} as the edit time. */
+    public PlayerWarp withCategoryId(Optional<String> newCategoryId, Instant now) {
+        Objects.requireNonNull(newCategoryId, "newCategoryId");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().categoryId(newCategoryId).updatedAt(now).build();
+    }
+
     /**
      * A copy carrying the surrogate id the repository assigned on insert. This is an identity assignment, not a
      * field edit, so it deliberately does not bump {@link #updatedAt}: the warp is the same warp, now addressable

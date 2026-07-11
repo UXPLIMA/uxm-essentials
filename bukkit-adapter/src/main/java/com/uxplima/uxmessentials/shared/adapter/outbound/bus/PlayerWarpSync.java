@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
@@ -66,8 +67,13 @@ public final class PlayerWarpSync {
         }
 
         @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
-            return delegate.find(owner, name);
+        public Optional<PlayerWarp> findByName(PlayerWarpName name) {
+            return delegate.findByName(name);
+        }
+
+        @Override
+        public Optional<PlayerWarp> findById(PlayerWarpId id) {
+            return delegate.findById(id);
         }
 
         @Override
@@ -81,8 +87,8 @@ public final class PlayerWarpSync {
         }
 
         @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
-            return delegate.publicOf(owner);
+        public List<PlayerWarp> publicOwnedBy(PlayerRef owner) {
+            return delegate.publicOwnedBy(owner);
         }
 
         @Override
@@ -91,20 +97,25 @@ public final class PlayerWarpSync {
         }
 
         @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
-            return delegate.exists(owner, name);
+        public boolean existsByName(PlayerWarpName name) {
+            return delegate.existsByName(name);
         }
 
         @Override
-        public void save(PlayerWarp warp) {
-            delegate.save(warp);
+        public PlayerWarpId save(PlayerWarp warp) {
+            PlayerWarpId id = delegate.save(warp);
             announce(warp.owner());
+            return id;
         }
 
         @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            delegate.delete(owner, name);
-            announce(owner);
+        public void deleteById(PlayerWarpId id) {
+            // The frame is keyed by owner, but a delete-by-id no longer carries the owner directly. Resolve the warp
+            // through the delegate before removing it so the announcement still names the owner whose cached set
+            // peers must drop; a no-op when the id is already gone (there is nothing to announce).
+            Optional<PlayerWarp> existing = delegate.findById(id);
+            delegate.deleteById(id);
+            existing.ifPresent(warp -> announce(warp.owner()));
         }
 
         @Override
@@ -113,24 +124,11 @@ public final class PlayerWarpSync {
         }
 
         @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
+        public void recordVisit(PlayerWarpId id) {
             // A visit count is high-frequency, eventually-consistent data; letting peers drift a few visits
             // behind until the owner's next real change is fine, and not worth a cluster-wide invalidation per
             // teleport, so this forwards to the delegate without announcing.
-            delegate.recordVisit(owner, name);
-        }
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {
-            // A rating is not part of the cached owner set (the cache reads averageRating from the delegate, not
-            // the cached map), so the cached repository does not invalidate on rate — there is nothing for a peer
-            // to drop, so this write does not announce.
-            delegate.rate(owner, name, player, rating);
-        }
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return delegate.averageRating(owner, name);
+            delegate.recordVisit(id);
         }
 
         private void announce(PlayerRef owner) {

@@ -4,12 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
@@ -32,9 +30,9 @@ import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
-import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.support.InMemoryPlayerWarpRepository;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -69,7 +67,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * plain name at every property slot, the back button, and the confirm-gated delete button, slot for slot against a
  * baseline frozen from the retired view's layout (the property order and per-property icons/label keys
  * {@code PlayerWarpEditorView} builds, plus the layout's back/delete placement). Each property button also carries a
- * value-lore line wrapping its current value through the {@code value-lore} catalog key.
+ * value-lore line wrapping its current value through the {@code value-lore} catalog key. The lock and password
+ * controls were dropped with the surrogate-id rebuild (they return as the P4 access gate), so the grid is ten
+ * properties, not the retired twelve.
  *
  * <p>Two real clicks through the engine's own {@link MenuListener} then prove the child pickers and the delete gate
  * are engine-native on this path: clicking the visibility (enum) slot opens an engine selector child (a selector
@@ -84,7 +84,7 @@ class PlayerWarpEditorGoldenTest {
     private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
 
     // The editor's property slots, in the order PlayerWarpEditorView builds its properties.
-    private static final List<Integer> EDITOR_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24);
+    private static final List<Integer> EDITOR_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22);
     private static final int VISIBILITY_SLOT = EDITOR_SLOTS.get(3);
     private static final int BACK_SLOT = 49;
     private static final int DELETE_SLOT = 53;
@@ -96,7 +96,7 @@ class PlayerWarpEditorGoldenTest {
     private GuiText guiText;
     private Messages messages;
     private Scheduler scheduler;
-    private FakeRepository repository;
+    private InMemoryPlayerWarpRepository repository;
     private PlayerWarpEditorView editorView;
 
     @BeforeEach
@@ -108,10 +108,11 @@ class PlayerWarpEditorGoldenTest {
         messages = new KeyMessages();
         guiText = new GuiText(messages);
         scheduler = new SyncScheduler();
-        repository = new FakeRepository();
+        repository = new InMemoryPlayerWarpRepository();
 
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(messages, new SilentSink());
-        SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
+        SetPlayerWarpVisibility visibility =
+                new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
         TextInput textInput =
                 TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
@@ -191,11 +192,11 @@ class PlayerWarpEditorGoldenTest {
         Inventory confirm = player.getOpenInventory().getTopInventory();
         assertThat(confirm.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(((MenuHolder) confirm.getHolder()).confirm()).isPresent(); // a confirm holder, not the editor
-        assertThat(repository.find(viewer, PlayerWarpName.of("alpha"))).isPresent(); // still present until confirmed
+        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isPresent(); // still present until confirmed
 
         fireClick(ConfirmRenderer.YES_SLOT, ClickType.LEFT); // confirm runs the same DelPlayerWarp use case
 
-        assertThat(repository.find(viewer, PlayerWarpName.of("alpha"))).isEmpty();
+        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isEmpty();
     }
 
     /**
@@ -210,19 +211,17 @@ class PlayerWarpEditorGoldenTest {
         baseline.put(EDITOR_SLOTS.get(1), prop(Material.COMPASS, PlayerwarpsMessageKey.PWARP_GUI_PROP_MOVE));
         baseline.put(EDITOR_SLOTS.get(2), prop(Material.ITEM_FRAME, PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON));
         baseline.put(EDITOR_SLOTS.get(3), prop(Material.ENDER_EYE, PlayerwarpsMessageKey.PWARP_GUI_PROP_VISIBILITY));
-        baseline.put(EDITOR_SLOTS.get(4), prop(Material.TRIPWIRE_HOOK, PlayerwarpsMessageKey.PWARP_GUI_PROP_LOCK));
-        baseline.put(EDITOR_SLOTS.get(5), prop(Material.IRON_DOOR, PlayerwarpsMessageKey.PWARP_GUI_PROP_PASSWORD));
         baseline.put(
-                EDITOR_SLOTS.get(6), prop(Material.NOTE_BLOCK, PlayerwarpsMessageKey.PWARP_GUI_PROP_DEPARTURE_SOUND));
-        baseline.put(EDITOR_SLOTS.get(7), prop(Material.JUKEBOX, PlayerwarpsMessageKey.PWARP_GUI_PROP_ARRIVAL_SOUND));
+                EDITOR_SLOTS.get(4), prop(Material.NOTE_BLOCK, PlayerwarpsMessageKey.PWARP_GUI_PROP_DEPARTURE_SOUND));
+        baseline.put(EDITOR_SLOTS.get(5), prop(Material.JUKEBOX, PlayerwarpsMessageKey.PWARP_GUI_PROP_ARRIVAL_SOUND));
         baseline.put(
-                EDITOR_SLOTS.get(8),
+                EDITOR_SLOTS.get(6),
                 prop(Material.BLAZE_POWDER, PlayerwarpsMessageKey.PWARP_GUI_PROP_DEPARTURE_PARTICLE));
         baseline.put(
-                EDITOR_SLOTS.get(9),
+                EDITOR_SLOTS.get(7),
                 prop(Material.GLOWSTONE_DUST, PlayerwarpsMessageKey.PWARP_GUI_PROP_ARRIVAL_PARTICLE));
-        baseline.put(EDITOR_SLOTS.get(10), prop(Material.CLOCK, PlayerwarpsMessageKey.PWARP_GUI_PROP_WARMUP));
-        baseline.put(EDITOR_SLOTS.get(11), prop(Material.CLOCK, PlayerwarpsMessageKey.PWARP_GUI_PROP_COOLDOWN));
+        baseline.put(EDITOR_SLOTS.get(8), prop(Material.CLOCK, PlayerwarpsMessageKey.PWARP_GUI_PROP_WARMUP));
+        baseline.put(EDITOR_SLOTS.get(9), prop(Material.CLOCK, PlayerwarpsMessageKey.PWARP_GUI_PROP_COOLDOWN));
         baseline.put(BACK_SLOT, new Snapshot(Material.ARROW, PlayerwarpsMessageKey.PWARP_GUI_EDITOR_BACK.key()));
         baseline.put(DELETE_SLOT, new Snapshot(Material.BARRIER, PlayerwarpsMessageKey.PWARP_GUI_EDITOR_DELETE.key()));
         return baseline;
@@ -259,12 +258,13 @@ class PlayerWarpEditorGoldenTest {
     }
 
     private void store(String name) {
-        repository.save(new PlayerWarp(viewer, PlayerWarpName.of(name), AT, false, Instant.ofEpochMilli(1_000)));
+        repository.save(
+                PlayerWarp.create(viewer, viewer.name(), PlayerWarpName.of(name), AT, Instant.ofEpochMilli(1_000)));
     }
 
     private OwnedWarp owned(String name) {
         return new OwnedWarp(
-                viewer, repository.find(viewer, PlayerWarpName.of(name)).orElseThrow());
+                viewer, repository.findByName(PlayerWarpName.of(name)).orElseThrow());
     }
 
     private static boolean hasAnyOption(Inventory inv, Material material) {
@@ -313,71 +313,6 @@ class PlayerWarpEditorGoldenTest {
     private record Snapshot(Material material, String name) {}
 
     // --- fakes ---
-
-    private static final class FakeRepository implements PlayerWarpRepository {
-        private final Map<String, PlayerWarp> byKey = new LinkedHashMap<>();
-
-        private static String key(PlayerRef owner, PlayerWarpName name) {
-            return owner.uuid() + "/" + name.value();
-        }
-
-        @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
-            return Optional.ofNullable(byKey.get(key(owner, name)));
-        }
-
-        @Override
-        public List<PlayerWarp> ownedBy(PlayerRef owner) {
-            List<PlayerWarp> owned = new ArrayList<>();
-            for (PlayerWarp warp : byKey.values()) {
-                if (warp.owner().equals(owner)) {
-                    owned.add(warp);
-                }
-            }
-            return List.copyOf(owned);
-        }
-
-        @Override
-        public List<PlayerWarp> all() {
-            return List.copyOf(byKey.values());
-        }
-
-        @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
-            return ownedBy(owner).stream().filter(PlayerWarp::isPublic).toList();
-        }
-
-        @Override
-        public int count(PlayerRef owner) {
-            return ownedBy(owner).size();
-        }
-
-        @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
-            return byKey.containsKey(key(owner, name));
-        }
-
-        @Override
-        public void save(PlayerWarp warp) {
-            byKey.put(key(warp.owner(), warp.name()), warp);
-        }
-
-        @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            byKey.remove(key(owner, name));
-        }
-
-        @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {}
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return 0.0;
-        }
-    }
 
     private static final class SilentSink implements MessageSink {
         @Override

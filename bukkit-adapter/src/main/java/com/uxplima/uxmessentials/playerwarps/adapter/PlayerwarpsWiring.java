@@ -136,7 +136,7 @@ public final class PlayerwarpsWiring {
                 Clock.systemUTC(),
                 ctx.config().getStringList("world-blacklist", List.of()));
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, kernel.events());
-        SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
+        SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier, Clock.systemUTC());
         PlayerWarpListMenu listMenu = buildGui(
                 plugin,
                 kernel,
@@ -218,7 +218,7 @@ public final class PlayerwarpsWiring {
     }
 
     /** The editor's property-button slots, the code default matching the bundled pwarp-editor.conf. */
-    private static final List<Integer> EDITOR_PROPERTY_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24);
+    private static final List<Integer> EDITOR_PROPERTY_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22);
 
     /**
      * The 6-row editor code default used when no {@code pwarp-editor.conf} is present. The shared

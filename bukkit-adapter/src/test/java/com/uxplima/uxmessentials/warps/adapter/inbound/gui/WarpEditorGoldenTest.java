@@ -352,7 +352,8 @@ class WarpEditorGoldenTest {
     }
 
     private PlayerWarp playerWarp(String name) {
-        return PlayerWarp.create(viewer, PlayerWarpName.of(name), Position.of(WORLD, 0, 64, 0), Instant.EPOCH);
+        return PlayerWarp.create(
+                viewer, viewer.name(), PlayerWarpName.of(name), Position.of(WORLD, 0, 64, 0), Instant.EPOCH);
     }
 
     private static final PlayerRef OWNER = new PlayerRef(UUID.randomUUID(), "Owner");
@@ -401,11 +402,17 @@ class WarpEditorGoldenTest {
     /** A player-warp repository that records stored warps for the player-warp editor path. */
     private static final class RecordingPlayerWarps implements PlayerWarpRepository {
         private final List<PlayerWarp> warps = new CopyOnWriteArrayList<>();
+        private final java.util.concurrent.atomic.AtomicLong ids = new java.util.concurrent.atomic.AtomicLong();
 
         @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
+        public Optional<PlayerWarp> findByName(PlayerWarpName name) {
+            return warps.stream().filter(w -> w.name().equals(name)).findFirst();
+        }
+
+        @Override
+        public Optional<PlayerWarp> findById(com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId id) {
             return warps.stream()
-                    .filter(w -> w.owner().equals(owner) && w.name().equals(name))
+                    .filter(w -> w.id().filter(id::equals).isPresent())
                     .findFirst();
         }
 
@@ -415,7 +422,7 @@ class WarpEditorGoldenTest {
         }
 
         @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
+        public List<PlayerWarp> publicOwnedBy(PlayerRef owner) {
             return List.of();
         }
 
@@ -425,33 +432,27 @@ class WarpEditorGoldenTest {
         }
 
         @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
-            return find(owner, name).isPresent();
+        public boolean existsByName(PlayerWarpName name) {
+            return findByName(name).isPresent();
         }
 
         @Override
-        public void save(PlayerWarp warp) {
-            warps.removeIf(existing ->
-                    existing.owner().equals(warp.owner()) && existing.name().equals(warp.name()));
-            warps.add(warp);
+        public com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId save(PlayerWarp warp) {
+            com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId id = warp.id()
+                    .orElseGet(
+                            () -> com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId.of(ids.incrementAndGet()));
+            warps.removeIf(existing -> existing.name().equals(warp.name()));
+            warps.add(warp.id().isPresent() ? warp : warp.withId(id));
+            return id;
         }
 
         @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            warps.removeIf(existing ->
-                    existing.owner().equals(owner) && existing.name().equals(name));
+        public void deleteById(com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId id) {
+            warps.removeIf(existing -> existing.id().filter(id::equals).isPresent());
         }
 
         @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {}
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return 0.0;
-        }
+        public void recordVisit(com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId id) {}
     }
 
     /** An empty category repository — the category selector reads it but this test never picks a category. */

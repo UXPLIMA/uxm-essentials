@@ -1,10 +1,14 @@
 package com.uxplima.uxmessentials.warps.adapter.inbound.gui;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpEffects;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
@@ -130,79 +134,109 @@ interface EditableWarp {
         };
     }
 
-    /** Wrap a loaded player warp; every change is written back through {@code repository}. */
+    /**
+     * Wrap a loaded player warp; every change is written back through {@code repository}. The surrogate-id rebuild
+     * dropped the lock, password, and welcome-message facets from the player-warp aggregate (they return in the P4
+     * access gate), so the lock/password/welcome members of this shared interface are inert on the player side:
+     * the shared server-warp editor never opens a player warp (the dedicated {@code PlayerWarpEditorView} does), so
+     * these members exist only to satisfy the interface the server branch needs. The sounds, particles, warmup, and
+     * cooldown edits map onto the aggregate's {@code WarpEffects} / {@code WarpTimingOverrides} facets; each edit
+     * stamps its own timestamp because this adapter, not the domain, owns the wall clock.
+     */
     static EditableWarp ofPlayer(PlayerWarp warp, PlayerWarpRepository repository) {
         return new EditableWarp() {
             private PlayerWarp current = warp;
 
             @Override
             public boolean isLocked() {
-                return current.isLocked();
+                // Player warps no longer model a lock; the shared editor's lock control is server-warp only.
+                return false;
             }
 
             @Override
             public List<WelcomeMessage> welcomeMessages() {
-                return current.welcomeMessages();
+                // Welcome messages were dropped from player warps; the shared editor's welcome control is server only.
+                return List.of();
             }
 
             @Override
             public void setIconMaterial(Optional<String> material) {
-                save(current.withIconMaterial(material));
+                save(current.withIcon(material.map(IconSpec::of), Instant.now()));
             }
 
             @Override
             public void setLocked(boolean locked) {
-                save(current.withLocked(locked));
+                // No lock facet on a player warp; the server-warp lock control never reaches this branch.
             }
 
             @Override
             public void setPassword(Optional<String> password) {
-                save(current.withPassword(password));
+                // No password facet on a player warp; it returns as the P4 access gate. Nothing to write here.
             }
 
             @Override
             public void clearSounds() {
-                save(current.withDepartureSound(Optional.empty()).withArrivalSound(Optional.empty()));
+                WarpEffects e = current.effects();
+                save(current.withEffects(
+                        new WarpEffects(Optional.empty(), Optional.empty(), e.departureParticle(), e.arrivalParticle()),
+                        Instant.now()));
             }
 
             @Override
             public void clearParticles() {
-                save(current.withDepartureParticle(Optional.empty()).withArrivalParticle(Optional.empty()));
+                WarpEffects e = current.effects();
+                save(current.withEffects(
+                        new WarpEffects(e.departureSound(), e.arrivalSound(), Optional.empty(), Optional.empty()),
+                        Instant.now()));
             }
 
             @Override
             public void setWarmupOverride(Optional<Double> seconds) {
-                save(current.withWarmupOverride(seconds));
+                save(current.withTiming(
+                        new WarpTimingOverrides(seconds, current.timing().cooldownSeconds()), Instant.now()));
             }
 
             @Override
             public void setCooldownOverride(Optional<Double> seconds) {
-                save(current.withCooldownOverride(seconds));
+                save(current.withTiming(
+                        new WarpTimingOverrides(current.timing().warmupSeconds(), seconds), Instant.now()));
             }
 
             @Override
             public void setDepartureSound(Optional<String> sound) {
-                save(current.withDepartureSound(sound));
+                WarpEffects e = current.effects();
+                save(current.withEffects(
+                        new WarpEffects(sound, e.arrivalSound(), e.departureParticle(), e.arrivalParticle()),
+                        Instant.now()));
             }
 
             @Override
             public void setArrivalSound(Optional<String> sound) {
-                save(current.withArrivalSound(sound));
+                WarpEffects e = current.effects();
+                save(current.withEffects(
+                        new WarpEffects(e.departureSound(), sound, e.departureParticle(), e.arrivalParticle()),
+                        Instant.now()));
             }
 
             @Override
             public void setDepartureParticle(Optional<String> particle) {
-                save(current.withDepartureParticle(particle));
+                WarpEffects e = current.effects();
+                save(current.withEffects(
+                        new WarpEffects(e.departureSound(), e.arrivalSound(), particle, e.arrivalParticle()),
+                        Instant.now()));
             }
 
             @Override
             public void setArrivalParticle(Optional<String> particle) {
-                save(current.withArrivalParticle(particle));
+                WarpEffects e = current.effects();
+                save(current.withEffects(
+                        new WarpEffects(e.departureSound(), e.arrivalSound(), e.departureParticle(), particle),
+                        Instant.now()));
             }
 
             @Override
             public void setWelcomeMessages(List<WelcomeMessage> messages) {
-                save(current.withWelcomeMessages(messages));
+                // Welcome messages were dropped from player warps; the server-warp welcome control never lands here.
             }
 
             private void save(PlayerWarp updated) {

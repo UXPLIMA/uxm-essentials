@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
@@ -38,16 +39,18 @@ public final class WarpTeleportRegistry {
     }
 
     public void register(UUID player, PlayerWarp warp) {
+        // Player warps no longer carry welcome messages (dropped in the surrogate-id rebuild), so the arrival
+        // listener plays only the warp's effects and icon; the welcome list is empty on this path.
         pending.put(
                 player,
                 new PendingWarpNotification(
                         warp.name().value(),
-                        warp.welcomeMessages(),
-                        warp.departureSound(),
-                        warp.arrivalSound(),
-                        warp.departureParticle(),
-                        warp.arrivalParticle(),
-                        warp.iconMaterial()));
+                        java.util.List.of(),
+                        warp.effects().departureSound(),
+                        warp.effects().arrivalSound(),
+                        warp.effects().departureParticle(),
+                        warp.effects().arrivalParticle(),
+                        warp.icon().map(IconSpec::value)));
     }
 
     public Optional<PendingWarpNotification> getAndRemove(UUID player) {

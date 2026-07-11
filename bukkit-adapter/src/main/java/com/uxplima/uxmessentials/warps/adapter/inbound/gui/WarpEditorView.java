@@ -238,7 +238,8 @@ public final class WarpEditorView {
             if (repo == null) {
                 return null;
             }
-            return repo.find(warpOwner, PlayerWarpName.of(warpName))
+            return repo.findByName(PlayerWarpName.of(warpName))
+                    .filter(warp -> warp.owner().uuid().equals(warpOwner.uuid()))
                     .map(WarpDisplay::of)
                     .orElse(null);
         }

@@ -39,8 +39,8 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
         registry.register(who.uuid(), warp);
-        var warmup = warp.warmupOverrideSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
-        var cooldown = warp.cooldownOverrideSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
+        var warmup = warp.timing().warmupSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
+        var cooldown = warp.timing().cooldownSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
         engine.launch(who, Destination.at(warp.location(), warmup, cooldown), TeleportKind.WARP);
     }
 }

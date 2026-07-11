@@ -18,8 +18,10 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -160,7 +162,7 @@ public final class PlayerWarpListMenu {
 
     /** The entry's icon: the warp's configured material, falling back to {@link #FALLBACK_ICON} as the old list did. */
     private Material iconMaterial(PlayerWarp warp) {
-        return warp.iconMaterial().map(this::matchOrFallback).orElse(FALLBACK_ICON);
+        return warp.icon().map(IconSpec::value).map(this::matchOrFallback).orElse(FALLBACK_ICON);
     }
 
     private Material matchOrFallback(String raw) {
@@ -170,7 +172,7 @@ public final class PlayerWarpListMenu {
 
     /** The localised public/private word for the bound entry, resolved for the viewer's locale. */
     private String visibilityWord(MenuContext ctx) {
-        boolean isPublic = warpOf(ctx).isPublic();
+        boolean isPublic = warpOf(ctx).access() == WarpAccess.PUBLIC;
         return messages.resolve(
                 ctx.viewer(),
                 isPublic ? PlayerwarpsMessageKey.PWARP_GUI_VALUE_PUBLIC : PlayerwarpsMessageKey.PWARP_GUI_VALUE_PRIVATE,
@@ -209,7 +211,7 @@ public final class PlayerWarpListMenu {
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
         PlayerWarpName name = PlayerWarpName.of(text);
         scheduler.async(() -> {
-            setPlayerWarp.set(viewer, name, at);
+            setPlayerWarp.set(viewer, viewer.name(), name, at);
             scheduler.onEntity(viewer, () -> open(player, viewer));
         });
     }

@@ -5,12 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
@@ -35,9 +33,9 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
-import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.support.InMemoryPlayerWarpRepository;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -95,7 +93,7 @@ class PlayerWarpListGoldenTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private SyncScheduler scheduler;
-    private FakeRepository repository;
+    private InMemoryPlayerWarpRepository repository;
     private TextInput textInput;
     private boolean managePerm;
 
@@ -111,7 +109,7 @@ class PlayerWarpListGoldenTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        repository = new FakeRepository();
+        repository = new InMemoryPlayerWarpRepository();
         managePerm = false;
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         Guis.install(plugin);
@@ -232,11 +230,12 @@ class PlayerWarpListGoldenTest {
                 event -> {},
                 java.time.Clock.systemUTC(),
                 List.of());
-        SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
+        SetPlayerWarpVisibility visibility =
+                new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
         EntityEditorLayout editorLayout = new EntityEditorLayout(
                 6,
-                List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24),
+                List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22),
                 49,
                 java.util.OptionalInt.of(53),
                 Material.ARROW,
@@ -285,83 +284,14 @@ class PlayerWarpListGoldenTest {
     }
 
     private void store(PlayerRef owner, String name) {
-        repository.save(new PlayerWarp(owner, PlayerWarpName.of(name), AT, false, Instant.ofEpochMilli(1_000)));
+        repository.save(
+                PlayerWarp.create(owner, owner.name(), PlayerWarpName.of(name), AT, Instant.ofEpochMilli(1_000)));
     }
 
     /** What one rendered slot looks like for comparison: its material and the plain-text of its display name. */
     private record Snapshot(Material material, String name) {}
 
     // --- fakes ---
-
-    private static final class FakeRepository implements PlayerWarpRepository {
-        private final Map<String, PlayerWarp> byKey = new LinkedHashMap<>();
-
-        private static String key(PlayerRef owner, PlayerWarpName name) {
-            return owner.uuid() + "/" + name.value();
-        }
-
-        @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
-            return Optional.ofNullable(byKey.get(key(owner, name)));
-        }
-
-        @Override
-        public List<PlayerWarp> ownedBy(PlayerRef owner) {
-            List<PlayerWarp> owned = new ArrayList<>();
-            for (PlayerWarp warp : byKey.values()) {
-                if (warp.owner().equals(owner)) {
-                    owned.add(warp);
-                }
-            }
-            return List.copyOf(owned);
-        }
-
-        @Override
-        public List<PlayerWarp> all() {
-            return List.copyOf(byKey.values());
-        }
-
-        @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
-            return ownedBy(owner).stream().filter(PlayerWarp::isPublic).toList();
-        }
-
-        @Override
-        public int count(PlayerRef owner) {
-            return ownedBy(owner).size();
-        }
-
-        @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
-            return byKey.containsKey(key(owner, name));
-        }
-
-        @Override
-        public void save(PlayerWarp warp) {
-            byKey.put(key(warp.owner(), warp.name()), warp);
-        }
-
-        @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            byKey.remove(key(owner, name));
-        }
-
-        @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
-            PlayerWarp warp = byKey.get(key(owner, name));
-            if (warp != null) {
-                byKey.put(key(owner, name), warp.incrementedVisitors());
-            }
-        }
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return 0.0;
-        }
-    }
 
     private static final class ManagePermissions implements Permissions {
         private final java.util.function.BooleanSupplier grants;

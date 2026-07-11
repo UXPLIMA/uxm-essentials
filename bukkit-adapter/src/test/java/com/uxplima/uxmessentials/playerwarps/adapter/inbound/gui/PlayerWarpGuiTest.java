@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,9 +22,11 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
-import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.playerwarps.support.InMemoryPlayerWarpRepository;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -37,11 +37,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -59,12 +56,13 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the player-warps property editor. A text property (password) routes a validated anvil
- * line to the store; a number property (warmup) steps, clamps, and persists; a toggle property (lock) flips and
- * persists; the visibility change persists; and delete is confirm-gated. The editor is laid out from a
- * code-default layout (no hardcoded slots in the view), and the scheduler runs every hop inline so the
- * off-thread writes land synchronously. The list itself now renders through the menu engine and is covered by
- * {@code PlayerWarpListGoldenTest}.
+ * MockBukkit coverage of the player-warps property editor. A number property (warmup) steps, clamps, and persists;
+ * the visibility change persists through the same use case {@code /pwarp public} drives; and delete is
+ * confirm-gated. The editor is laid out from a code-default layout (no hardcoded slots in the view), and the
+ * scheduler runs every hop inline so the off-thread writes land synchronously. The list itself now renders through
+ * the menu engine and is covered by {@code PlayerWarpListGoldenTest}. The lock and password controls were dropped
+ * with the surrogate-id rebuild (they return richer as the P4 access gate), so they are no longer editor
+ * properties and no longer covered here.
  */
 class PlayerWarpGuiTest {
 
@@ -72,13 +70,11 @@ class PlayerWarpGuiTest {
     private static final Position AT = Position.of(WORLD, 1, 64, 1);
 
     // Editor property slots, in the order PlayerWarpEditorView builds its properties:
-    // name, move, icon, visibility, lock, password, dep-sound, arr-sound, dep-particle, arr-particle, warmup, cooldown.
-    private static final List<Integer> EDITOR_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24);
+    // name, move, icon, visibility, dep-sound, arr-sound, dep-particle, arr-particle, warmup, cooldown.
+    private static final List<Integer> EDITOR_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22);
     private static final int ICON_SLOT = EDITOR_SLOTS.get(2);
     private static final int VISIBILITY_SLOT = EDITOR_SLOTS.get(3);
-    private static final int LOCK_SLOT = EDITOR_SLOTS.get(4);
-    private static final int PASSWORD_SLOT = EDITOR_SLOTS.get(5);
-    private static final int WARMUP_SLOT = EDITOR_SLOTS.get(10);
+    private static final int WARMUP_SLOT = EDITOR_SLOTS.get(8);
     private static final int DELETE_SLOT = 53;
     private static final int CONFIRM_SLOT =
             11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
@@ -89,7 +85,7 @@ class PlayerWarpGuiTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
-    private FakeRepository repository;
+    private InMemoryPlayerWarpRepository repository;
     private PlayerWarpEditorView editorView;
 
     @BeforeEach
@@ -100,12 +96,13 @@ class PlayerWarpGuiTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        repository = new FakeRepository();
+        repository = new InMemoryPlayerWarpRepository();
         Guis.install(plugin);
 
         Messages messages = new KeyMessages();
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(messages, new SilentSink());
-        SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
+        SetPlayerWarpVisibility visibility =
+                new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
         TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
 
@@ -164,7 +161,7 @@ class PlayerWarpGuiTest {
     @Test
     void iconButtonWearsTheWarpsConfiguredMaterial() {
         store(viewer, "alpha");
-        repository.save(warp("alpha").withIconMaterial(Optional.of("DIAMOND")));
+        repository.save(warp("alpha").withIcon(Optional.of(IconSpec.of("DIAMOND")), Instant.EPOCH));
         editorView.open(player, viewer, owned("alpha"));
 
         Inventory inv = player.getOpenInventory().getTopInventory();
@@ -181,59 +178,33 @@ class PlayerWarpGuiTest {
     }
 
     @Test
-    void textPropertyRoutesAnvilInputToTheStore() {
-        store(viewer, "alpha");
-        EditableProperty password =
-                editorView.grid().propertyAt(PASSWORD_SLOT, owned("alpha")).orElseThrow();
-        assertThat(password).isInstanceOf(TextProperty.class);
-
-        ((TextProperty) password).applyInput(ClickContexts.carrier(player, viewer), "hunter2");
-
-        assertThat(warp("alpha").password()).contains("hunter2");
-    }
-
-    @Test
     void numberPropertyStepsClampsAndPersists() {
         store(viewer, "alpha");
         editorView.open(player, viewer, owned("alpha"));
-        assertThat(warp("alpha").warmupOverrideSeconds()).isEmpty();
+        assertThat(warp("alpha").timing().warmupSeconds()).isEmpty();
 
         fireClick(WARMUP_SLOT, ClickType.LEFT); // one whole second up (the step is 10 tenths)
 
-        assertThat(warp("alpha").warmupOverrideSeconds()).contains(1.0);
+        assertThat(warp("alpha").timing().warmupSeconds()).contains(1.0);
 
         // A right-click at zero stays clamped to "no override" rather than going negative.
         editorView.open(player, viewer, owned("alpha"));
         store(viewer, "beta");
         editorView.open(player, viewer, owned("beta"));
         fireClick(WARMUP_SLOT, ClickType.RIGHT);
-        assertThat(warp("beta").warmupOverrideSeconds()).isEmpty();
-    }
-
-    @Test
-    void togglePropertyFlipsLockAndPersists() {
-        store(viewer, "alpha");
-        editorView.open(player, viewer, owned("alpha"));
-        assertThat(warp("alpha").isLocked()).isFalse();
-
-        EditableProperty lock =
-                editorView.grid().propertyAt(LOCK_SLOT, owned("alpha")).orElseThrow();
-        assertThat(lock).isInstanceOf(ToggleProperty.class);
-        fireClick(LOCK_SLOT, ClickType.LEFT);
-
-        assertThat(warp("alpha").isLocked()).isTrue();
+        assertThat(warp("beta").timing().warmupSeconds()).isEmpty();
     }
 
     @Test
     void visibilityChangePersistsThroughTheUseCase() {
         store(viewer, "alpha");
         editorView.open(player, viewer, owned("alpha"));
-        assertThat(warp("alpha").isPublic()).isFalse();
+        assertThat(warp("alpha").access()).isEqualTo(WarpAccess.PRIVATE);
 
         fireClick(VISIBILITY_SLOT, ClickType.LEFT); // opens the selector
         clickFirstSelectorOption(); // the first option (public) is selected
 
-        assertThat(warp("alpha").isPublic()).isTrue();
+        assertThat(warp("alpha").access()).isEqualTo(WarpAccess.PUBLIC);
     }
 
     @Test
@@ -251,20 +222,21 @@ class PlayerWarpGuiTest {
         editorView.open(player, viewer, owned("alpha"));
 
         fireClick(DELETE_SLOT, ClickType.LEFT); // opens the confirm menu, does not delete
-        assertThat(repository.find(viewer, PlayerWarpName.of("alpha"))).isPresent();
+        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isPresent();
 
         fireClick(CONFIRM_SLOT, ClickType.LEFT); // the confirm button deletes
-        assertThat(repository.find(viewer, PlayerWarpName.of("alpha"))).isEmpty();
+        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isEmpty();
     }
 
     // --- helpers ---
 
     private void store(PlayerRef owner, String name) {
-        repository.save(new PlayerWarp(owner, PlayerWarpName.of(name), AT, false, Instant.ofEpochMilli(1_000)));
+        repository.save(
+                PlayerWarp.create(owner, owner.name(), PlayerWarpName.of(name), AT, Instant.ofEpochMilli(1_000)));
     }
 
     private PlayerWarp warp(String name) {
-        return repository.find(viewer, PlayerWarpName.of(name)).orElseThrow();
+        return repository.findByName(PlayerWarpName.of(name)).orElseThrow();
     }
 
     private OwnedWarp owned(String name) {
@@ -291,76 +263,6 @@ class PlayerWarpGuiTest {
     }
 
     // --- fakes ---
-
-    private static final class FakeRepository implements PlayerWarpRepository {
-        private final Map<String, PlayerWarp> byKey = new LinkedHashMap<>();
-
-        private static String key(PlayerRef owner, PlayerWarpName name) {
-            return owner.uuid() + "/" + name.value();
-        }
-
-        @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
-            return Optional.ofNullable(byKey.get(key(owner, name)));
-        }
-
-        @Override
-        public List<PlayerWarp> ownedBy(PlayerRef owner) {
-            List<PlayerWarp> owned = new ArrayList<>();
-            for (PlayerWarp warp : byKey.values()) {
-                if (warp.owner().equals(owner)) {
-                    owned.add(warp);
-                }
-            }
-            return List.copyOf(owned);
-        }
-
-        @Override
-        public List<PlayerWarp> all() {
-            return List.copyOf(byKey.values());
-        }
-
-        @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
-            return ownedBy(owner).stream().filter(PlayerWarp::isPublic).toList();
-        }
-
-        @Override
-        public int count(PlayerRef owner) {
-            return ownedBy(owner).size();
-        }
-
-        @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
-            return byKey.containsKey(key(owner, name));
-        }
-
-        @Override
-        public void save(PlayerWarp warp) {
-            byKey.put(key(warp.owner(), warp.name()), warp);
-        }
-
-        @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            byKey.remove(key(owner, name));
-        }
-
-        @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
-            PlayerWarp warp = byKey.get(key(owner, name));
-            if (warp != null) {
-                byKey.put(key(owner, name), warp.incrementedVisitors());
-            }
-        }
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return 0.0;
-        }
-    }
 
     private static final class SilentSink implements MessageSink {
         @Override

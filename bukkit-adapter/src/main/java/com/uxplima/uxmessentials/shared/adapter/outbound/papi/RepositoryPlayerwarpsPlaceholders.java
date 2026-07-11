@@ -73,6 +73,6 @@ public final class RepositoryPlayerwarpsPlaceholders implements PlayerwarpsPlace
                 position.blockX(),
                 position.blockY(),
                 position.blockZ(),
-                warp.visitors());
+                warp.visits().count());
     }
 }

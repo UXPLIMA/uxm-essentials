@@ -3,13 +3,13 @@ package com.uxplima.uxmessentials.playerwarps.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
@@ -59,9 +60,10 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * Pins that {@code /pwarp} resolves the player-warp store <em>off</em> the command (tick/region) thread. A
- * {@code /pwarp} subcommand that gates on the warp existing — here {@code rating} — must not read the database
- * on the thread Brigadier dispatched it on; the read belongs in a {@link Scheduler#async} task that bridges its
- * feedback back to the player's region thread, the same shape {@code /home} uses.
+ * {@code /pwarp} subcommand that reads the database to decide its outcome — here {@code edit}, which looks the warp
+ * up before opening its editor or reporting it missing — must not read on the thread Brigadier dispatched it on; the
+ * read belongs in a {@link Scheduler#async} task that bridges its feedback back to the player's region thread, the
+ * same shape {@code /home} uses.
  *
  * <p>The scheduler here is a <em>deferring</em> double: {@code async} captures the task without running it, and
  * {@code onEntity} runs inline (the region bridge). So after dispatch the repository has seen zero reads —
@@ -69,9 +71,6 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * read happen and the feedback land.
  */
 class PlayerWarpOffThreadReadTest {
-
-    private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
-    private static final PlayerWarpName HUB = PlayerWarpName.of("hub");
 
     private ServerMock server;
     private org.bukkit.plugin.Plugin plugin;
@@ -100,20 +99,19 @@ class PlayerWarpOffThreadReadTest {
     }
 
     @Test
-    void ratingResolvesTheWarpOffTheCommandThread() {
-        repository.store(new PlayerWarp(ref(), HUB, Position.of(WORLD, 1, 64, 1), true, Instant.ofEpochMilli(1_000)));
+    void editResolvesTheWarpOffTheCommandThread() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
 
-        execute(dispatcher, "pwarp rating hub Alice");
+        execute(dispatcher, "pwarp edit hub");
 
-        // The command returned without touching the database — the read was handed to scheduler.async.
+        // The command returned without touching the database — the existence read was handed to scheduler.async.
         assertThat(repository.reads).isZero();
         assertThat(scheduler.deferred).hasSize(1);
 
         scheduler.drain();
 
-        // Draining the captured task is what performed the existence/visibility read and the rating feedback,
-        // which the region bridge (onEntity, run inline here) delivered to the player.
+        // Draining the captured task is what performed the existence read and the not-found feedback, which the
+        // region bridge (onEntity, run inline here) delivered to the player — no warp named "hub" exists.
         assertThat(repository.reads).isPositive();
         assertThat(player.nextMessage()).isNotNull();
     }
@@ -148,7 +146,8 @@ class PlayerWarpOffThreadReadTest {
                 java.time.Clock.systemUTC(),
                 List.of());
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
-        SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
+        SetPlayerWarpVisibility visibility =
+                new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
         return new PlayerWarpServices(
                 setPlayerWarp,
                 delPlayerWarp,
@@ -174,7 +173,7 @@ class PlayerWarpOffThreadReadTest {
                 TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         EntityEditorLayout editorLayout = new EntityEditorLayout(
                 6,
-                List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24),
+                List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22),
                 49,
                 java.util.OptionalInt.of(53),
                 org.bukkit.Material.ARROW,
@@ -200,19 +199,24 @@ class PlayerWarpOffThreadReadTest {
                 menus, scheduler, permissions, messages, repository, setPlayerWarp, textInput, editor);
     }
 
-    /** Counts repository reads and serves a single owner's warps from memory. */
+    /** Counts repository reads and serves warps from memory, assigning a surrogate id on the first save of a warp. */
     private static final class CountingRepository implements PlayerWarpRepository {
         private final Map<String, PlayerWarp> byName = new LinkedHashMap<>();
+        private final AtomicLong ids = new AtomicLong();
         private int reads;
 
-        void store(PlayerWarp warp) {
-            byName.put(warp.name().value(), warp);
+        @Override
+        public Optional<PlayerWarp> findByName(PlayerWarpName name) {
+            reads++;
+            return Optional.ofNullable(byName.get(name.value()));
         }
 
         @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
+        public Optional<PlayerWarp> findById(PlayerWarpId id) {
             reads++;
-            return Optional.ofNullable(byName.get(name.value()));
+            return byName.values().stream()
+                    .filter(warp -> warp.id().filter(id::equals).isPresent())
+                    .findFirst();
         }
 
         @Override
@@ -222,7 +226,7 @@ class PlayerWarpOffThreadReadTest {
         }
 
         @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
+        public List<PlayerWarp> publicOwnedBy(PlayerRef owner) {
             reads++;
             return List.copyOf(byName.values());
         }
@@ -234,40 +238,29 @@ class PlayerWarpOffThreadReadTest {
         }
 
         @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
+        public boolean existsByName(PlayerWarpName name) {
             reads++;
             return byName.containsKey(name.value());
         }
 
         @Override
-        public void save(PlayerWarp warp) {
-            store(warp);
+        public PlayerWarpId save(PlayerWarp warp) {
+            PlayerWarpId id = warp.id().orElseGet(() -> PlayerWarpId.of(ids.incrementAndGet()));
+            byName.put(warp.name().value(), warp.id().isPresent() ? warp : warp.withId(id));
+            return id;
         }
 
         @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            byName.remove(name.value());
+        public void deleteById(PlayerWarpId id) {
+            byName.values().removeIf(warp -> warp.id().filter(id::equals).isPresent());
         }
 
         @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
-            PlayerWarp warp = byName.get(name.value());
-            if (warp != null) {
-                byName.put(name.value(), warp.incrementedVisitors());
-            }
-        }
+        public void recordVisit(PlayerWarpId id) {}
 
         @Override
         public Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {
             return Optional.of(List.copyOf(byName.values()));
-        }
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return 4.0;
         }
     }
 

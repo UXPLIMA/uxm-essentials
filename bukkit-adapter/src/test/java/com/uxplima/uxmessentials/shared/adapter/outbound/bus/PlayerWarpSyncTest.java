@@ -10,11 +10,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -26,7 +29,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins the player-warps cross-server sync seam: the broadcasting decorator publishes a {@link PlayerWarpChanged}
  * carrying the affected owner after every local write that changes that owner's set — a {@code save} (a set, a
- * move, or a visibility flip all upsert the same row) and a {@code delete} — and the listener drops exactly that
+ * move, or a visibility flip all upsert the same row) and a {@code deleteById} — and the listener drops exactly that
  * owner from the {@link CachedPlayerWarpRepository} on a remote frame so the next {@code /pwarp} reloads the
  * authoritative row. A frame of another type leaves the cache untouched. This mirrors {@code WalletSyncTest}.
  */
@@ -41,7 +44,7 @@ class PlayerWarpSyncTest {
         PlayerWarpRepository repo =
                 PlayerWarpSync.repository(new CachedPlayerWarpRepository(new RecordingDelegate()), bus);
 
-        repo.save(PlayerWarp.create(OWNER, PlayerWarpName.of("base"), position(), Instant.EPOCH));
+        repo.save(PlayerWarp.create(OWNER, "owner", PlayerWarpName.of("base"), position(), Instant.EPOCH));
 
         assertThat(bus.published).singleElement().isInstanceOfSatisfying(PlayerWarpChanged.class, frame -> {
             assertThat(frame.owner()).isEqualTo(OWNER.uuid());
@@ -54,10 +57,10 @@ class PlayerWarpSyncTest {
         CapturingBus bus = new CapturingBus("survival-1");
         PlayerWarpRepository repo =
                 PlayerWarpSync.repository(new CachedPlayerWarpRepository(new RecordingDelegate()), bus);
-        PlayerWarp warp = PlayerWarp.create(OWNER, PlayerWarpName.of("base"), position(), Instant.EPOCH);
+        PlayerWarp warp = PlayerWarp.create(OWNER, "owner", PlayerWarpName.of("base"), position(), Instant.EPOCH);
 
-        // A move/relocate upserts the same (owner, name) row through save, so it announces like any other set.
-        repo.save(warp.movedTo(Position.of(WORLD, 9, 9, 9)));
+        // A move/relocate upserts the same row through save, so it announces like any other set.
+        repo.save(warp.movedTo(Position.of(WORLD, 9, 9, 9), Instant.EPOCH));
 
         assertThat(bus.published).singleElement().isInstanceOf(PlayerWarpChanged.class);
         assertThat(((PlayerWarpChanged) bus.published.get(0)).owner()).isEqualTo(OWNER.uuid());
@@ -68,10 +71,10 @@ class PlayerWarpSyncTest {
         CapturingBus bus = new CapturingBus("survival-1");
         PlayerWarpRepository repo =
                 PlayerWarpSync.repository(new CachedPlayerWarpRepository(new RecordingDelegate()), bus);
-        PlayerWarp warp = PlayerWarp.create(OWNER, PlayerWarpName.of("base"), position(), Instant.EPOCH);
+        PlayerWarp warp = PlayerWarp.create(OWNER, "owner", PlayerWarpName.of("base"), position(), Instant.EPOCH);
 
         // A /setpwarp public/private flip also upserts the same row through save, so it announces.
-        repo.save(warp.withVisibility(true));
+        repo.save(warp.withAccess(WarpAccess.PUBLIC, Instant.EPOCH));
 
         assertThat(bus.published).singleElement().isInstanceOf(PlayerWarpChanged.class);
         assertThat(((PlayerWarpChanged) bus.published.get(0)).owner()).isEqualTo(OWNER.uuid());
@@ -80,10 +83,14 @@ class PlayerWarpSyncTest {
     @Test
     void aDeleteAnnouncesThatOwnerToPeers() {
         CapturingBus bus = new CapturingBus("survival-1");
-        PlayerWarpRepository repo =
-                PlayerWarpSync.repository(new CachedPlayerWarpRepository(new RecordingDelegate()), bus);
+        RecordingDelegate delegate = new RecordingDelegate();
+        // Seed the warp straight on the delegate (no announcement) so the delete stands alone; the decorator resolves
+        // the owner from the surrogate id before removing the row, which is why the row must already carry one.
+        PlayerWarpId id =
+                delegate.save(PlayerWarp.create(OWNER, "owner", PlayerWarpName.of("base"), position(), Instant.EPOCH));
+        PlayerWarpRepository repo = PlayerWarpSync.repository(new CachedPlayerWarpRepository(delegate), bus);
 
-        repo.delete(OWNER, PlayerWarpName.of("base"));
+        repo.deleteById(id);
 
         assertThat(bus.published)
                 .singleElement()
@@ -100,7 +107,7 @@ class PlayerWarpSyncTest {
 
         // A visit count is high-frequency, eventually-consistent data, so the decorator forwards it without a
         // frame — peers are not invalidated per teleport.
-        repo.recordVisit(OWNER, PlayerWarpName.of("base"));
+        repo.recordVisit(PlayerWarpId.of(1));
 
         assertThat(bus.published).isEmpty();
     }
@@ -164,11 +171,21 @@ class PlayerWarpSyncTest {
 
         private final Map<UUID, List<PlayerWarp>> stored = new HashMap<>();
         private final AtomicInteger reads = new AtomicInteger();
+        private final AtomicLong ids = new AtomicLong();
 
         @Override
-        public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
-            return ownedBy(owner).stream()
+        public Optional<PlayerWarp> findByName(PlayerWarpName name) {
+            return stored.values().stream()
+                    .flatMap(List::stream)
                     .filter(warp -> warp.name().equals(name))
+                    .findFirst();
+        }
+
+        @Override
+        public Optional<PlayerWarp> findById(PlayerWarpId id) {
+            return stored.values().stream()
+                    .flatMap(List::stream)
+                    .filter(warp -> warp.id().filter(id::equals).isPresent())
                     .findFirst();
         }
 
@@ -179,7 +196,7 @@ class PlayerWarpSyncTest {
         }
 
         @Override
-        public List<PlayerWarp> publicOf(PlayerRef owner) {
+        public List<PlayerWarp> publicOwnedBy(PlayerRef owner) {
             return List.of();
         }
 
@@ -189,30 +206,27 @@ class PlayerWarpSyncTest {
         }
 
         @Override
-        public boolean exists(PlayerRef owner, PlayerWarpName name) {
-            return find(owner, name).isPresent();
+        public boolean existsByName(PlayerWarpName name) {
+            return findByName(name).isPresent();
         }
 
         @Override
-        public void save(PlayerWarp warp) {
-            stored.computeIfAbsent(warp.owner().uuid(), id -> new ArrayList<>()).add(warp);
+        public PlayerWarpId save(PlayerWarp warp) {
+            PlayerWarpId id = warp.id().orElseGet(() -> PlayerWarpId.of(ids.incrementAndGet()));
+            PlayerWarp stamped = warp.id().isPresent() ? warp : warp.withId(id);
+            stored.computeIfAbsent(warp.owner().uuid(), key -> new ArrayList<>())
+                    .add(stamped);
+            return id;
         }
 
         @Override
-        public void delete(PlayerRef owner, PlayerWarpName name) {
-            stored.getOrDefault(owner.uuid(), new ArrayList<>())
-                    .removeIf(warp -> warp.name().equals(name));
+        public void deleteById(PlayerWarpId id) {
+            stored.values()
+                    .forEach(list ->
+                            list.removeIf(warp -> warp.id().filter(id::equals).isPresent()));
         }
 
         @Override
-        public void recordVisit(PlayerRef owner, PlayerWarpName name) {}
-
-        @Override
-        public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}
-
-        @Override
-        public double averageRating(PlayerRef owner, PlayerWarpName name) {
-            return 0.0;
-        }
+        public void recordVisit(PlayerWarpId id) {}
     }
 }

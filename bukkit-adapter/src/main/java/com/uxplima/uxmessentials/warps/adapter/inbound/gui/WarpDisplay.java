@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.warps.adapter.inbound.gui;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.warps.domain.Warp;
@@ -49,17 +50,21 @@ public record WarpDisplay(
     }
 
     static WarpDisplay of(PlayerWarp w) {
+        // Player warps no longer model a lock, a password, or welcome messages in the surrogate-id rebuild — those
+        // fold into the P4 access gate and are absent here — so this shared projection defaults them: an unlocked
+        // warp with no password and no welcome list. The presentation values that survive (icon, effects, timing)
+        // read from the new facets.
         return new WarpDisplay(
                 w.location(),
-                w.iconMaterial(),
-                w.isLocked(),
-                w.password(),
-                w.welcomeMessages(),
-                w.departureSound(),
-                w.arrivalSound(),
-                w.departureParticle(),
-                w.arrivalParticle(),
-                w.warmupOverrideSeconds(),
-                w.cooldownOverrideSeconds());
+                w.icon().map(IconSpec::value),
+                false,
+                Optional.empty(),
+                List.of(),
+                w.effects().departureSound(),
+                w.effects().arrivalSound(),
+                w.effects().departureParticle(),
+                w.effects().arrivalParticle(),
+                w.timing().warmupSeconds(),
+                w.timing().cooldownSeconds());
     }
 }
