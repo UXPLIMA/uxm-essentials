@@ -5,18 +5,25 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.ToIntFunction;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingTally;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpEarnings;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
@@ -88,7 +95,18 @@ final class PlayerWarpTestSupport {
     static final class Repo implements PlayerWarpRepository {
         private final Map<PlayerWarpName, PlayerWarp> byName = new LinkedHashMap<>();
         final List<PlayerWarpId> deleted = new ArrayList<>();
+        final Map<PlayerWarpId, RatingSummary> ratingUpdates = new LinkedHashMap<>();
+        final Map<PlayerWarpId, Integer> favouriteCounts = new LinkedHashMap<>();
+        private ToIntFunction<PlayerWarpId> favouriteSource = warp -> 0;
         private long nextId;
+
+        /**
+         * Recompute {@code favourite_count} from {@code favourites} on every {@link #refreshFavouriteCount}, mirroring
+         * the real correlated-count UPDATE so a test can assert the persisted count converges on the true row count.
+         */
+        void countFavouritesFrom(Favourites favourites) {
+            this.favouriteSource = favourites::countFor;
+        }
 
         /** Insert {@code warp}, assigning an id, and return the stored (id-bearing) aggregate. */
         PlayerWarp put(PlayerWarp warp) {
@@ -152,6 +170,93 @@ final class PlayerWarpTestSupport {
 
         @Override
         public void recordVisit(PlayerWarpId id) {}
+
+        @Override
+        public void updateRating(PlayerWarpId id, RatingSummary summary) {
+            ratingUpdates.put(id, summary);
+        }
+
+        @Override
+        public void refreshFavouriteCount(PlayerWarpId id) {
+            favouriteCounts.put(id, favouriteSource.applyAsInt(id));
+        }
+    }
+
+    /** An in-memory rating store: one star per {@code (warp, player)}, tallying and averaging like the real one. */
+    static final class Ratings implements WarpRatingStore {
+        private record Vote(PlayerWarpId warp, UUID player) {}
+
+        private final Map<Vote, Integer> stars = new LinkedHashMap<>();
+
+        @Override
+        public void put(PlayerWarpId warp, UUID player, int value, Instant at) {
+            stars.put(new Vote(warp, player), value);
+        }
+
+        @Override
+        public RatingTally tally(PlayerWarpId warp) {
+            long sum = 0L;
+            int count = 0;
+            for (Map.Entry<Vote, Integer> entry : stars.entrySet()) {
+                if (entry.getKey().warp().equals(warp)) {
+                    sum += entry.getValue();
+                    count++;
+                }
+            }
+            return new RatingTally(sum, count);
+        }
+
+        @Override
+        public double globalMean() {
+            if (stars.isEmpty()) {
+                return 0.0;
+            }
+            long sum = 0L;
+            for (int value : stars.values()) {
+                sum += value;
+            }
+            return (double) sum / stars.size();
+        }
+
+        /** Seed a foreign warp's existing vote, so a test can shape the global mean the Bayesian prior reads. */
+        void seed(PlayerWarpId warp, UUID player, int value) {
+            stars.put(new Vote(warp, player), value);
+        }
+    }
+
+    /** An in-memory favourite store mirroring the port; the fake repo recomputes the count from its rows. */
+    static final class Favourites implements WarpFavouriteStore {
+        private record Star(UUID player, PlayerWarpId warp) {}
+
+        private final Set<Star> stars = new LinkedHashSet<>();
+
+        @Override
+        public void add(UUID player, PlayerWarpId warp) {
+            stars.add(new Star(player, warp));
+        }
+
+        @Override
+        public void remove(UUID player, PlayerWarpId warp) {
+            stars.remove(new Star(player, warp));
+        }
+
+        @Override
+        public boolean contains(UUID player, PlayerWarpId warp) {
+            return stars.contains(new Star(player, warp));
+        }
+
+        @Override
+        public List<PlayerWarpId> listFor(UUID player) {
+            return stars.stream()
+                    .filter(star -> star.player().equals(player))
+                    .map(Star::warp)
+                    .toList();
+        }
+
+        /** The true favourite-row count for {@code warp}, the source the real correlated-count UPDATE recomputes. */
+        int countFor(PlayerWarpId warp) {
+            return (int) stars.stream().filter(star -> star.warp().equals(warp)).count();
+        }
     }
 
     /** A member store whose roles are set up per test through {@link #grant}. */

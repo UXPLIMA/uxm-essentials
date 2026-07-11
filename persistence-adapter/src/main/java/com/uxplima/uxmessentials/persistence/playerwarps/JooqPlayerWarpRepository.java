@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -153,6 +154,37 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
         // One guarded statement, not a read-modify-write, so two concurrent visits both land instead of racing.
         write(dsl -> dsl.update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.VISIT_COUNT, PLAYER_WARPS.VISIT_COUNT.add(1L))
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .execute());
+    }
+
+    @Override
+    public void updateRating(PlayerWarpId id, RatingSummary summary) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(summary, "summary");
+        // One guarded UPDATE overwriting the whole rollup the browse sorts on; the rate use case recomputes the
+        // Bayesian score from the rating rows and hands the finished summary here, so the sort column never drifts.
+        write(dsl -> dsl.update(PLAYER_WARPS)
+                .set(PLAYER_WARPS.RATING_SUM, summary.sum())
+                .set(PLAYER_WARPS.RATING_COUNT, summary.count())
+                .set(PLAYER_WARPS.RATING_AVERAGE, summary.average())
+                .set(PLAYER_WARPS.RATING_SCORE, summary.score())
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .execute());
+    }
+
+    @Override
+    public void refreshFavouriteCount(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        // Recompute from the source rows, not a +/-1 bump, so a double-click race can never drift the stored count.
+        // The correlated COUNT reads a different table (player_warp_favourites), so it stays portable — unlike the
+        // self-referential UPDATE ... SET x = (SELECT ... FROM the-same-table) that MySQL forbids.
+        write(dsl -> dsl.update(PLAYER_WARPS)
+                .set(
+                        PLAYER_WARPS.FAVOURITE_COUNT,
+                        DSL.selectCount()
+                                .from(PLAYER_WARP_FAVOURITES)
+                                .where(PLAYER_WARP_FAVOURITES.WARP_ID.eq(id.value())))
                 .where(PLAYER_WARPS.ID.eq(id.value()))
                 .execute());
     }

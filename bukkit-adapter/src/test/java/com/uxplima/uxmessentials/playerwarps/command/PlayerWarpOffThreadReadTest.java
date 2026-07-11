@@ -20,9 +20,11 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEdito
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
+import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
@@ -31,12 +33,16 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPassword
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
 import com.uxplima.uxmessentials.playerwarps.domain.BanRecord;
+import com.uxplima.uxmessentials.playerwarps.domain.BayesianRating;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingTally;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
@@ -182,7 +188,10 @@ class PlayerWarpOffThreadReadTest {
                 repository,
                 null,
                 scheduler,
-                listView(messages, permissions, setPlayerWarp, visibility, archivePlayerWarp));
+                listView(messages, permissions, setPlayerWarp, visibility, archivePlayerWarp),
+                new RatePlayerWarp(
+                        repository, new NoRatings(), notifier, new BayesianRating(10), java.time.Clock.systemUTC()),
+                new FavouritePlayerWarp(repository, new NoFavourites(), notifier));
     }
 
     /** A minimal real management list (this test does not open it; it only needs a non-null view in services). */
@@ -327,6 +336,39 @@ class PlayerWarpOffThreadReadTest {
     private static final class NoTeleport implements PlayerWarpTeleporter {
         @Override
         public void teleportTo(PlayerRef who, PlayerWarp warp) {}
+    }
+
+    private static final class NoRatings implements WarpRatingStore {
+        @Override
+        public void put(PlayerWarpId warp, UUID player, int stars, java.time.Instant at) {}
+
+        @Override
+        public RatingTally tally(PlayerWarpId warp) {
+            return RatingTally.empty();
+        }
+
+        @Override
+        public double globalMean() {
+            return 0.0;
+        }
+    }
+
+    private static final class NoFavourites implements WarpFavouriteStore {
+        @Override
+        public void add(UUID player, PlayerWarpId warp) {}
+
+        @Override
+        public void remove(UUID player, PlayerWarpId warp) {}
+
+        @Override
+        public boolean contains(UUID player, PlayerWarpId warp) {
+            return false;
+        }
+
+        @Override
+        public List<PlayerWarpId> listFor(UUID player) {
+            return List.of();
+        }
     }
 
     private static final class NoBans implements WarpBanStore {

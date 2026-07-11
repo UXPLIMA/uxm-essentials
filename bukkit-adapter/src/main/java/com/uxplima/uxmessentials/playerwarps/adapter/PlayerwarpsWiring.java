@@ -25,10 +25,12 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListM
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
+import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
@@ -36,7 +38,10 @@ import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
+import com.uxplima.uxmessentials.playerwarps.domain.BayesianRating;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -66,6 +71,7 @@ import org.jspecify.annotations.NullMarked;
 public final class PlayerwarpsWiring {
 
     private static final int DEFAULT_LIMIT = 3;
+    private static final int DEFAULT_CONFIDENCE = 10;
 
     private PlayerwarpsWiring() {}
 
@@ -171,6 +177,15 @@ public final class PlayerwarpsWiring {
         ArchivePlayerWarp archivePlayerWarp =
                 new ArchivePlayerWarp(repository, warpAuthorization, notifier, kernel.events(), Clock.systemUTC());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier, Clock.systemUTC());
+        // The rate verb tallies the per-vote star rows and writes the Bayesian rollup back through the repository;
+        // the favourite verb toggles the star store and recomputes favourite_count. Both are any-viewer writes, so
+        // they go through the same broadcasting repository as every other write. The confidence C is this module's
+        // own tunable — higher pulls a warp's score harder toward the global mean, so few votes cannot top the sort.
+        WarpRatingStore ratingStore = PlayerWarpRepositories.ratingStore(persistence);
+        WarpFavouriteStore favouriteStore = PlayerWarpRepositories.favouriteStore(persistence, Clock.systemUTC());
+        RatePlayerWarp ratePlayerWarp = new RatePlayerWarp(
+                repository, ratingStore, notifier, new BayesianRating(ratingConfidence(ctx)), Clock.systemUTC());
+        FavouritePlayerWarp favouritePlayerWarp = new FavouritePlayerWarp(repository, favouriteStore, notifier);
         PlayerWarpListMenu listMenu = buildGui(
                 plugin,
                 kernel,
@@ -196,6 +211,8 @@ public final class PlayerwarpsWiring {
                 setPlayerWarp,
                 archivePlayerWarp,
                 visibility,
+                ratePlayerWarp,
+                favouritePlayerWarp,
                 notifier,
                 editorView,
                 listMenu);
@@ -361,6 +378,8 @@ public final class PlayerwarpsWiring {
             SetPlayerWarp setPlayerWarp,
             ArchivePlayerWarp archivePlayerWarp,
             SetPlayerWarpVisibility visibility,
+            RatePlayerWarp ratePlayerWarp,
+            FavouritePlayerWarp favouritePlayerWarp,
             PlayerWarpNotifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
@@ -375,11 +394,18 @@ public final class PlayerwarpsWiring {
                 repository,
                 editorView,
                 kernel.scheduler(),
-                listMenu);
+                listMenu,
+                ratePlayerWarp,
+                favouritePlayerWarp);
     }
 
     private static int defaultLimit(ModuleContext ctx) {
         return Math.max(0, ctx.config().getInt("default-limit", DEFAULT_LIMIT));
+    }
+
+    /** The Bayesian smoothing constant C for the rating score, clamped non-negative; the module's {@code ratings} block. */
+    private static int ratingConfidence(ModuleContext ctx) {
+        return Math.max(0, ctx.config().getInt("ratings.confidence", DEFAULT_CONFIDENCE));
     }
 
     /**

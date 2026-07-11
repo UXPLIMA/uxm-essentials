@@ -7,7 +7,9 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
@@ -71,6 +73,19 @@ public final class PlayerWarpRepositories {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(clock, "clock");
         return new JooqWarpWhitelistStore(persistence.dsl(), clock);
+    }
+
+    /** The jOOQ {@link WarpRatingStore} — the per-vote star rows the rate use case tallies the rollup from. */
+    public static WarpRatingStore ratingStore(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqWarpRatingStore(persistence.dsl());
+    }
+
+    /** The jOOQ {@link WarpFavouriteStore} — a player's starred warps, its rows the source of {@code favourite_count}. */
+    public static WarpFavouriteStore favouriteStore(Persistence persistence, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(clock, "clock");
+        return new JooqWarpFavouriteStore(persistence.dsl(), clock);
     }
 
     /**

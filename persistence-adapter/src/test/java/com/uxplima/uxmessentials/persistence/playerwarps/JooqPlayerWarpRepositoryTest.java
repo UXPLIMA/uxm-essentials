@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpFavourites.PLAYER_WARP_FAVOURITES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpRatings.PLAYER_WARP_RATINGS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -173,6 +175,43 @@ class JooqPlayerWarpRepositoryTest {
     }
 
     @Test
+    void updateRatingOverwritesTheDenormalisedRollup() {
+        PlayerWarpId id = repo.save(fullWarp()); // fullWarp seeds RatingSummary.of(90, 20, 4.5, 4.2)
+        RatingSummary rollup = RatingSummary.of(37L, 10, 3.7, 3.55);
+
+        repo.updateRating(id, rollup);
+
+        PlayerWarp reloaded = repo.findById(id).orElseThrow();
+        assertThat(reloaded.ratings().sum()).isEqualTo(37L);
+        assertThat(reloaded.ratings().count()).isEqualTo(10);
+        assertThat(reloaded.ratings().average()).isCloseTo(3.7, within(1e-9));
+        assertThat(reloaded.ratings().score()).isCloseTo(3.55, within(1e-9));
+    }
+
+    @Test
+    void refreshFavouriteCountRecomputesFromTheFavouriteRows() {
+        PlayerWarpId id = repo.save(fullWarp()); // fullWarp seeds favouriteCount 9
+        UUID first = UUID.randomUUID();
+        seedFavourite(id.value(), first);
+        seedFavourite(id.value(), UUID.randomUUID());
+        seedFavourite(id.value(), UUID.randomUUID());
+
+        repo.refreshFavouriteCount(id);
+        assertThat(repo.findById(id).orElseThrow().favouriteCount()).isEqualTo(3);
+
+        // Remove one row and refresh: the count converges on the true row count, it is not a running +/-1 bump.
+        persistence
+                .dsl()
+                .transaction(configuration -> DSL.using(configuration)
+                        .deleteFrom(PLAYER_WARP_FAVOURITES)
+                        .where(PLAYER_WARP_FAVOURITES.WARP_ID.eq(id.value()))
+                        .and(PLAYER_WARP_FAVOURITES.PLAYER_UUID.eq(first.toString()))
+                        .execute());
+        repo.refreshFavouriteCount(id);
+        assertThat(repo.findById(id).orElseThrow().favouriteCount()).isEqualTo(2);
+    }
+
+    @Test
     void ownerScopedQueriesReadOnlyTheOwnersWarps() {
         repo.save(newWarp(OWNER, "alpha", 1_000L).withAccess(WarpAccess.PUBLIC, Instant.ofEpochMilli(1_000L)));
         repo.save(newWarp(OWNER, "beta", 2_000L)); // stays PRIVATE
@@ -184,6 +223,18 @@ class JooqPlayerWarpRepositoryTest {
         assertThat(repo.existsByName(PlayerWarpName.of("gamma"))).isTrue();
         assertThat(repo.existsByName(PlayerWarpName.of("delta"))).isFalse();
         assertThat(repo.all()).extracting(w -> w.name().value()).containsExactlyInAnyOrder("alpha", "beta", "gamma");
+    }
+
+    /** Seed a committed favourite row for {@code warpId} (the pool runs autoCommit off), for the count recompute. */
+    private void seedFavourite(long warpId, UUID player) {
+        persistence
+                .dsl()
+                .transaction(configuration -> DSL.using(configuration)
+                        .insertInto(PLAYER_WARP_FAVOURITES)
+                        .set(PLAYER_WARP_FAVOURITES.PLAYER_UUID, player.toString())
+                        .set(PLAYER_WARP_FAVOURITES.WARP_ID, warpId)
+                        .set(PLAYER_WARP_FAVOURITES.ADDED_AT, 1L)
+                        .execute());
     }
 
     private static void assertMatches(PlayerWarp actual, PlayerWarp expected) {

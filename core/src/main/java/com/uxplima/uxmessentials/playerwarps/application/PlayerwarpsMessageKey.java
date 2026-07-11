@@ -56,6 +56,13 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_RATED("pwarp.rated"),
     PWARP_RATING("pwarp.rating"),
     PWARP_RATING_INVALID("pwarp.rating-invalid"),
+    PWARP_CANNOT_RATE_OWN("pwarp.cannot-rate-own"),
+
+    // favouriting — any-viewer star toggle kept consistent with favourite_count
+    PWARP_FAVOURITED("pwarp.favourited"),
+    PWARP_UNFAVOURITED("pwarp.unfavourited"),
+    PWARP_ALREADY_FAVOURITED("pwarp.already-favourited"),
+    PWARP_NOT_FAVOURITED("pwarp.not-favourited"),
 
     // management edits — role-gated single-warp verbs
     PWARP_NO_PERMISSION("pwarp.no-permission"),

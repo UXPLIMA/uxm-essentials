@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.PlayerWarpChanged;
@@ -129,6 +130,19 @@ public final class PlayerWarpSync {
             // behind until the owner's next real change is fine, and not worth a cluster-wide invalidation per
             // teleport, so this forwards to the delegate without announcing.
             delegate.recordVisit(id);
+        }
+
+        @Override
+        public void updateRating(PlayerWarpId id, RatingSummary summary) {
+            // The rating rollup is eventually-consistent denormalised data like the visit count; forward it without a
+            // cluster-wide announce, letting peers pick it up on the owner's next real change.
+            delegate.updateRating(id, summary);
+        }
+
+        @Override
+        public void refreshFavouriteCount(PlayerWarpId id) {
+            // Same reasoning as updateRating: an eventually-consistent counter, forwarded without announcing.
+            delegate.refreshFavouriteCount(id);
         }
 
         private void announce(PlayerRef owner) {

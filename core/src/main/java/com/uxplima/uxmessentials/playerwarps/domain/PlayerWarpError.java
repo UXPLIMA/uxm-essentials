@@ -53,6 +53,12 @@ public enum PlayerWarpError {
     /** The warp cannot be created in this world because it is blacklisted. */
     WORLD_BLACKLISTED(PlayerwarpsMessageKey.PWARP_WORLD_BLACKLISTED),
 
+    /** A rating outside the 1..5 star range — {@code /pwarp rate} rejects it before any vote is recorded. */
+    RATING_INVALID(PlayerwarpsMessageKey.PWARP_RATING_INVALID),
+
+    /** The owner tried to rate their own warp — self-rating is barred so it cannot cheaply inflate the score. */
+    CANNOT_RATE_OWN(PlayerwarpsMessageKey.PWARP_CANNOT_RATE_OWN),
+
     /** The actor holds no role, or too low a role, to perform this management action on the warp. */
     NO_PERMISSION(PlayerwarpsMessageKey.PWARP_NO_PERMISSION),
 

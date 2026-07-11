@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -124,6 +125,24 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
         // Eventually consistent per the port contract: bump the durable counter but do not invalidate — a cached
         // owner set drifting by a few visits until its next real write is acceptable and spares a cache churn.
         delegate.recordVisit(id);
+    }
+
+    @Override
+    public void updateRating(PlayerWarpId id, RatingSummary summary) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(summary, "summary");
+        // Eventually consistent like recordVisit: write the durable rollup but do not invalidate. The rater is not
+        // the owner, so we would have to resolve the owner just to know whose cached set to drop, and a cached rating
+        // drifting until the owner's next real write is acceptable for a rare vote.
+        delegate.updateRating(id, summary);
+    }
+
+    @Override
+    public void refreshFavouriteCount(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        // Same as updateRating: a durable, eventually-consistent denormalised counter that does not justify a cache
+        // churn on the owner's set.
+        delegate.refreshFavouriteCount(id);
     }
 
     @Override
