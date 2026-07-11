@@ -16,6 +16,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrowseMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
@@ -35,6 +36,7 @@ import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
@@ -212,6 +214,7 @@ class PlayerWarpOffThreadReadTest {
                 null,
                 scheduler,
                 listView(messages, permissions, setPlayerWarp, visibility, archivePlayerWarp),
+                browseView(messages, permissions, notifier),
                 new RatePlayerWarp(
                         repository, new NoRatings(), notifier, new BayesianRating(10), java.time.Clock.systemUTC()),
                 new FavouritePlayerWarp(repository, new NoFavourites(), notifier),
@@ -275,6 +278,31 @@ class PlayerWarpOffThreadReadTest {
                 (p, v) -> {});
         return new PlayerWarpListMenu(
                 menus, scheduler, permissions, messages, repository, setPlayerWarp, textInput, editor);
+    }
+
+    /** A minimal browse menu over a stub read model, wired so the services holder is complete; unopened by this test. */
+    private PlayerWarpBrowseMenu browseView(Messages messages, Permissions permissions, PlayerWarpNotifier notifier) {
+        GuiText guiText = new GuiText(messages);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        PlayerWarpBrowse browse =
+                query -> com.uxplima.uxmessentials.playerwarps.domain.Page.empty(query.page(), query.pageSize());
+        UsePlayerWarp use = new UsePlayerWarp(
+                repository,
+                new NoTeleport(),
+                notifier,
+                position -> true,
+                permissions,
+                new NoBans(),
+                new NoMembers(),
+                new NoWhitelist(),
+                new NoPasswords(),
+                new OpenCooldowns(),
+                Optional.empty(),
+                java.time.Clock.systemUTC());
+        return new PlayerWarpBrowseMenu(menus, scheduler, browse, use, messages);
     }
 
     /** Counts repository reads and serves warps from memory, assigning a surrogate id on the first save of a warp. */

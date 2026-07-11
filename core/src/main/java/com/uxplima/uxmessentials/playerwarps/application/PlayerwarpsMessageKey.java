@@ -113,6 +113,26 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_LIST_CREATE("pwarp.gui.list.create"),
     PWARP_GUI_LIST_CREATE_PROMPT("pwarp.gui.list.create-prompt"),
 
+    // browse menu — the paged public browse (opened by bare /pwarp), one card per public warp read a page at a time
+    PWARP_GUI_BROWSE_TITLE("pwarp.gui.browse.title"),
+    PWARP_GUI_BROWSE_ENTRY_NAME("pwarp.gui.browse.entry-name"),
+    PWARP_GUI_BROWSE_LORE_OWNER("pwarp.gui.browse.lore-owner"),
+    PWARP_GUI_BROWSE_LORE_WORLD("pwarp.gui.browse.lore-world"),
+    PWARP_GUI_BROWSE_LORE_SERVER("pwarp.gui.browse.lore-server"),
+    PWARP_GUI_BROWSE_LORE_VISITS("pwarp.gui.browse.lore-visits"),
+    PWARP_GUI_BROWSE_LORE_RATING("pwarp.gui.browse.lore-rating"),
+    PWARP_GUI_BROWSE_LORE_FAVOURITES("pwarp.gui.browse.lore-favourites"),
+    PWARP_GUI_BROWSE_LORE_PRICE("pwarp.gui.browse.lore-price"),
+    PWARP_GUI_BROWSE_LORE_ACCESS("pwarp.gui.browse.lore-access"),
+    PWARP_GUI_BROWSE_LORE_CLICK("pwarp.gui.browse.lore-click"),
+    PWARP_GUI_BROWSE_PREV("pwarp.gui.browse.prev"),
+    PWARP_GUI_BROWSE_NEXT("pwarp.gui.browse.next"),
+    PWARP_GUI_BROWSE_SORT("pwarp.gui.browse.sort"),
+    PWARP_GUI_BROWSE_SEARCH("pwarp.gui.browse.search"),
+    PWARP_GUI_BROWSE_MINE("pwarp.gui.browse.mine"),
+    PWARP_GUI_BROWSE_FAVOURITES("pwarp.gui.browse.favourites"),
+    PWARP_GUI_BROWSE_ALL("pwarp.gui.browse.all"),
+
     // management GUI — editor frame
     PWARP_GUI_EDITOR_TITLE("pwarp.gui.editor.title"),
     PWARP_GUI_EDITOR_VALUE_LORE("pwarp.gui.editor.value-lore"),

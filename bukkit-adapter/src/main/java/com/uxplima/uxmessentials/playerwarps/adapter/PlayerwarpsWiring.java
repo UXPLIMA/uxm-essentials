@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRenameNotice;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommands;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrowseMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
@@ -227,6 +228,16 @@ public final class PlayerwarpsWiring {
                 textInput,
                 menus);
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        // The paged public browse bare /pwarp opens: one card per public warp read a page at a time through the
+        // browse read model, teleporting through the same UsePlayerWarp gate the command drives. The read model is
+        // the jOOQ LIMIT/OFFSET+COUNT projection, never a full-table scan, so opening it is one bounded page query.
+        PlayerWarpBrowseMenu browseMenu = new PlayerWarpBrowseMenu(
+                menus,
+                kernel.scheduler(),
+                PlayerWarpRepositories.browse(persistence, Clock.systemUTC()),
+                usePlayerWarp,
+                kernel.messages());
+        browseMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "playerwarps",
                 PlayerwarpsMessageKey.PWARP_GUI_LIST_TITLE,
@@ -250,7 +261,8 @@ public final class PlayerwarpsWiring {
                 transferPlayerWarp,
                 notifier,
                 editorView,
-                listMenu);
+                listMenu,
+                browseMenu);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
     }
@@ -424,7 +436,8 @@ public final class PlayerwarpsWiring {
             PlayerWarpNotifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
-            PlayerWarpListMenu listMenu) {
+            PlayerWarpListMenu listMenu,
+            PlayerWarpBrowseMenu browseMenu) {
         return new PlayerWarpServices(
                 setPlayerWarp,
                 archivePlayerWarp,
@@ -436,6 +449,7 @@ public final class PlayerwarpsWiring {
                 editorView,
                 kernel.scheduler(),
                 listMenu,
+                browseMenu,
                 ratePlayerWarp,
                 favouritePlayerWarp,
                 manageMembers,

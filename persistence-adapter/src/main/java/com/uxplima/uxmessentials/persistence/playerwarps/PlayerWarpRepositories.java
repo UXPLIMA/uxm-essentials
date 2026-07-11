@@ -55,6 +55,19 @@ public final class PlayerWarpRepositories {
         return new CachedPlayerWarpRepository(new JooqPlayerWarpRepository(persistence.dsl(), names));
     }
 
+    /**
+     * The jOOQ {@link com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse} — the paged read model
+     * the browse GUI binds. It issues one bounded {@code LIMIT}/{@code OFFSET} page query plus a {@code COUNT} over the
+     * same predicate, never a full-table scan, so opening the browse costs the same on a hundred-thousand-warp server
+     * as on an eight-warp one. The {@code clock} evaluates the live-sponsorship flag on each card as of the read.
+     */
+    public static com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse browse(
+            Persistence persistence, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(clock, "clock");
+        return new JooqPlayerWarpBrowse(persistence.dsl(), clock);
+    }
+
     /** The jOOQ {@link WarpBanStore} — one row per {@code (warp, player)}, active-at expiry evaluated in-store. */
     public static WarpBanStore banStore(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");

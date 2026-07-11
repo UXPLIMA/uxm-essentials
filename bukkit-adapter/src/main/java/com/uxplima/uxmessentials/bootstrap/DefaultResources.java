@@ -108,6 +108,7 @@ final class DefaultResources {
             "modules/npc/gui/npc-editor.conf",
             "modules/npc/gui/npc-list.conf",
             "modules/playerwarps/gui/playerwarp-list.conf",
+            "modules/playerwarps/gui/pwarp-browse.conf",
             "modules/playerwarps/gui/pwarp-editor.conf",
             "modules/poses/gui/poses-settings.conf",
             "modules/presence/gui/presence-settings.conf",

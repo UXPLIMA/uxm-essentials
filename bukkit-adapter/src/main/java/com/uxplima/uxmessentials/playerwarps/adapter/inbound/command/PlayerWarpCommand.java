@@ -154,16 +154,18 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     }
 
     /**
-     * {@code /pwarp} with no arguments: open the management list. A player sees and edits their own warps; a
-     * holder of {@code uxmessentials.pwarp.gui} sees and manages every player's (the list re-checks the node per
-     * open and scopes the entity set itself). The open is scheduled on the player's entity thread by the view.
+     * {@code /pwarp} with no arguments: open the paged public browse. One card per public warp, read a page at a
+     * time from the browse read model, with the sort/search/scope controls and page arrows on its bottom row; a
+     * card click teleports through the same use case a bare {@code /pwarp <name>} drives. The open is scheduled on
+     * the player's entity thread by the view, which captures their position there for the distance sort. A later
+     * task points this at the {@code pwarp-categories} landing instead.
      */
     private int openGui(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        services.listView().open(sender, ref(sender));
+        services.browseView().open(sender, ref(sender));
         return Command.SINGLE_SUCCESS;
     }
 

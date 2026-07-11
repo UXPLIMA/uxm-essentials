@@ -49,6 +49,9 @@ class ShippedSpecBindingsDriftTest {
             "messaging:clear-mail",
             "messaging:mail-back",
             "close",
+            "list-sort",
+            "list-filter",
+            "list-search",
             "itemworld:open-workbench",
             "itemworld:open-anvil",
             "itemworld:open-cartography",
@@ -70,6 +73,7 @@ class ShippedSpecBindingsDriftTest {
             "holograms:create",
             "playerwarps:edit",
             "playerwarps:create",
+            "playerwarps:browse-click",
             "npc:edit",
             "npc:create",
             "worlds:edit",
@@ -309,6 +313,9 @@ class ShippedSpecBindingsDriftTest {
             "pwarp_y",
             "pwarp_z",
             "pwarp_visibility",
+            "pwarp_browse_icon",
+            "pwarp_browse_name",
+            "pwarp_browse_lore",
             "npc_icon",
             "npc_name",
             "npc_type",
@@ -527,6 +534,14 @@ class ShippedSpecBindingsDriftTest {
             "economy:bank-members",
             "economy:loan-list");
 
+    /**
+     * Paged list-source ids any shipped spec may reference. Registered through {@code pagedList} rather than
+     * {@code list}, because a paged source is the one kind that may carry {@code page-size} and {@code sorts} on its
+     * list block — the browse menu declares sorts, so validating it as a plain list would wrongly flag those knobs.
+     * Keep in sync with the ids registered as paged sources in production wiring.
+     */
+    private static final Set<String> EXPECTED_PAGED_LISTS = Set.of("playerwarps:browse");
+
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {
         Path modulesDir = repoRoot().resolve("bukkit-adapter/src/main/resources/modules");
@@ -541,6 +556,10 @@ class ShippedSpecBindingsDriftTest {
         EXPECTED_CONDITIONS.forEach(id -> bindings.condition(id, (ctx, args) -> true));
         EXPECTED_PLACEHOLDERS.forEach(id -> bindings.placeholder(id, ctx -> ""));
         EXPECTED_LISTS.forEach(id -> bindings.list(id, ctx -> List.of()));
+        EXPECTED_PAGED_LISTS.forEach(id -> bindings.pagedList(
+                id,
+                (ctx, request) ->
+                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult.of(List.of(), 0)));
 
         assertThat(bindings.validate(specs))
                 .as("shipped menu specs reference binding ids not registered in production wiring; register them "

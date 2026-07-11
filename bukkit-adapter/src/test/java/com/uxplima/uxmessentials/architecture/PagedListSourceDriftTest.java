@@ -38,7 +38,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 class PagedListSourceDriftTest {
 
     /** Source ids production wiring registers as paged (via {@code MenuBindings.pagedList}). Keep in sync with it. */
-    private static final Set<String> PAGED_SOURCES = Set.of();
+    private static final Set<String> PAGED_SOURCES = Set.of("playerwarps:browse");
 
     @Test
     void noShippedSpecPagesANonPagedSource() {

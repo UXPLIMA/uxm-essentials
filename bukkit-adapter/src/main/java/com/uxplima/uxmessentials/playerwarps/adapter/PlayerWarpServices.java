@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.adapter;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrowseMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
@@ -42,8 +43,10 @@ import org.jspecify.annotations.NullMarked;
  * @param editorView the per-warp settings editor GUI reused from the warps module (opened by {@code /pwarp edit})
  * @param scheduler the kernel scheduler the commands run their repository reads through off the tick thread,
  *     bridging any Bukkit feedback back to the player's region thread (the homes async-read pattern)
- * @param listView the management-GUI list opened by {@code /pwarp} with no arguments (the menu-engine panel),
- *     owner-scoped for a player and cross-owner for a holder of {@code uxmessentials.pwarp.gui}
+ * @param listView the management-GUI list (the owner-scoped {@code /pwarp} edit panel, opened from the admin hub and
+ *     the editor's back button), owner-scoped for a player and cross-owner for a holder of {@code uxmessentials.pwarp.gui}
+ * @param browseView the paged public browse opened by {@code /pwarp} with no arguments — one card per public warp read
+ *     a page at a time from the browse read model, with the sort/search/scope controls on its bottom row
  * @param ratePlayerWarp {@code /pwarp rate <name> <1-5>} — the any-viewer star rating that drives the browse sort
  * @param favouritePlayerWarp {@code /pwarp favourite <name>} — the any-viewer favourite toggle
  * @param manageMembers {@code /pwarp members add|remove} — grant/revoke a co-owner or manager (owner-only)
@@ -66,6 +69,7 @@ public record PlayerWarpServices(
         @org.jspecify.annotations.Nullable WarpEditorView editorView,
         Scheduler scheduler,
         PlayerWarpListMenu listView,
+        PlayerWarpBrowseMenu browseView,
         RatePlayerWarp ratePlayerWarp,
         FavouritePlayerWarp favouritePlayerWarp,
         ManageMembers manageMembers,
@@ -85,6 +89,7 @@ public record PlayerWarpServices(
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(listView, "listView");
+        Objects.requireNonNull(browseView, "browseView");
         Objects.requireNonNull(ratePlayerWarp, "ratePlayerWarp");
         Objects.requireNonNull(favouritePlayerWarp, "favouritePlayerWarp");
         Objects.requireNonNull(manageMembers, "manageMembers");
