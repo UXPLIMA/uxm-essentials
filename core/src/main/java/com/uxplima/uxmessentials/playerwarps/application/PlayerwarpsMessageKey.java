@@ -111,6 +111,12 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_RENT_REMINDER("pwarp.rent.reminder"),
     PWARP_RENT_MAIL_SENDER("pwarp.rent.mail-sender"),
 
+    // cross-server teleport — routing a warp that lives on another backend of the network
+    PWARP_CROSS_SERVER_SENDING("pwarp.cross-server.sending"),
+    PWARP_CROSS_SERVER_UNAVAILABLE("pwarp.cross-server.unavailable"),
+    PWARP_CROSS_SERVER_ARRIVED("pwarp.cross-server.arrived"),
+    PWARP_CROSS_SERVER_FAILED("pwarp.cross-server.failed"),
+
     // admin group — operator verbs that act on any warp by its surrogate id, gated by the admin node
     PWARP_ADMIN_RESTORED("pwarp.admin.restored"),
     PWARP_ADMIN_PURGE_CONFIRM("pwarp.admin.purge-confirm"),

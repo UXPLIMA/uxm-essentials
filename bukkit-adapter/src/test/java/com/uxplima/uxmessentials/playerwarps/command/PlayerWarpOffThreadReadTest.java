@@ -209,6 +209,8 @@ class PlayerWarpOffThreadReadTest {
                         new NoPasswords(),
                         new OpenCooldowns(),
                         Optional.empty(),
+                        "local",
+                        Optional.empty(),
                         java.time.Clock.systemUTC()),
                 new ListPlayerWarps(repository, notifier),
                 visibility,
@@ -317,6 +319,8 @@ class PlayerWarpOffThreadReadTest {
                 new NoWhitelist(),
                 new NoPasswords(),
                 new OpenCooldowns(),
+                Optional.empty(),
+                "local",
                 Optional.empty(),
                 java.time.Clock.systemUTC());
         return new PlayerWarpBrowseMenu(

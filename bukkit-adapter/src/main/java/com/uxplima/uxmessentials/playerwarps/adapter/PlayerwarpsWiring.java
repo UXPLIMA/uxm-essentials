@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManag
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpPeopleMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitCrossServerTeleport;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitRatingRewardGranter;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RentSweep;
@@ -39,6 +40,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.outbound.SponsorExpirySweep
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
+import com.uxplima.uxmessentials.playerwarps.application.CrossServerArrival;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
@@ -62,6 +64,8 @@ import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
+import com.uxplima.uxmessentials.playerwarps.application.port.CrossServerTeleport;
+import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleportStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
@@ -85,6 +89,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -188,6 +194,14 @@ public final class PlayerwarpsWiring {
         // The password store backs both the ordered access gate (a PASSWORD warp verifies the entered plaintext)
         // and the edit verbs' set/clear-password writes, so it is built once here and shared with both.
         PlayerWarpPasswordStore passwordStore = PlayerWarpRepositories.passwordStore(persistence);
+        // The cross-server sub-group: when cross-server.enabled is on, a warp tagged for another backend is routed
+        // across the proxy instead of hopped locally — the gate charges here, records the pending row, connects the
+        // player, and the target backend completes the hop on join (or refunds). Off, both seams are empty and the
+        // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop. localServerId is
+        // this backend's network.server-id, the same source the P3 server-id claim used.
+        String localServerId = bus.publisher().serverId();
+        CrossServerParts crossServer = buildCrossServer(
+                ctx, plugin, kernel, persistence, repository, teleporter, notifier, economy, localServerId);
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
@@ -200,6 +214,8 @@ public final class PlayerwarpsWiring {
                 passwordStore,
                 kernel.cooldowns(),
                 economy,
+                localServerId,
+                crossServer.seam(),
                 Clock.systemUTC());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
@@ -418,7 +434,8 @@ public final class PlayerwarpsWiring {
         // sponsorship and stamps its post-expiry cooldown. Disabled (the sub-group off, or economy absent so it was
         // forced off) it is null and nothing is scheduled.
         SponsorExpirySweep sponsorSweep = buildSponsorSweep(ctx, kernel, repository, sponsorConfig);
-        PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
+        PlayerwarpsJoinListener joinWarmer =
+                new PlayerwarpsJoinListener(repository, kernel.scheduler(), crossServer.arrival());
         return new Wired(
                 PlayerWarpCommands.all(services, kernel.messages()),
                 List.of(joinWarmer),
@@ -472,6 +489,54 @@ public final class PlayerwarpsWiring {
         return new SponsorExpirySweep(
                 repository, config, kernel.scheduler(), interval, Clock.systemUTC(), kernel.log());
     }
+
+    /**
+     * Build the cross-server sub-group's send seam and arrival handler when {@code cross-server.enabled} is on,
+     * else two empty {@link Optional}s. The two share one {@link PendingTeleportStore} over the network-shared
+     * {@code player_warp_pending_teleports} table — the send half writes the row and connects the player, the
+     * arrival half reads it on join and completes the local hop (or refunds). The {@link ServerConnector} is built
+     * fresh over the standard proxy channel, exactly as the {@code npc}/{@code holograms} connectors are; when no
+     * proxy is in front its {@code isAvailable()} degrades a send to an unavailable-notice-plus-refund. Disabled,
+     * nothing is instantiated and the gate fails a remote warp closed.
+     */
+    private static CrossServerParts buildCrossServer(
+            ModuleContext ctx,
+            Plugin plugin,
+            KernelPorts kernel,
+            Persistence persistence,
+            PlayerWarpRepository repository,
+            PlayerWarpTeleporter teleporter,
+            PlayerWarpNotifier notifier,
+            Optional<PlayerWarpEconomy> economy,
+            String localServerId) {
+        if (!ctx.config().getBoolean("cross-server.enabled", false)) {
+            return new CrossServerParts(Optional.empty(), Optional.empty());
+        }
+        Clock clock = Clock.systemUTC();
+        PendingTeleportStore store = PlayerWarpRepositories.pendingTeleportStore(persistence);
+        ServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
+        CrossServerTeleport seam = new BukkitCrossServerTeleport(
+                store, connector, kernel.scheduler(), economy, notifier, localServerId, clock);
+        Duration arrivalDelay =
+                Duration.ofMillis(Math.max(0, ctx.config().getInt("cross-server.arrival-delay-ticks", 20)) * 50L);
+        Duration requestTtl =
+                Duration.ofSeconds(Math.max(1L, ctx.config().getLong("cross-server.request-ttl-seconds", 30L)));
+        CrossServerArrival arrival = new CrossServerArrival(
+                store,
+                repository,
+                teleporter,
+                economy,
+                notifier,
+                kernel.scheduler(),
+                localServerId,
+                arrivalDelay,
+                requestTtl,
+                clock);
+        return new CrossServerParts(Optional.of(seam), Optional.of(arrival));
+    }
+
+    /** The cross-server sub-group's two wired seams — both empty when the sub-group is off. */
+    private record CrossServerParts(Optional<CrossServerTeleport> seam, Optional<CrossServerArrival> arrival) {}
 
     /**
      * Read the {@code sponsor} config block into the immutable {@link SponsorConfig}. When the sub-group is enabled but

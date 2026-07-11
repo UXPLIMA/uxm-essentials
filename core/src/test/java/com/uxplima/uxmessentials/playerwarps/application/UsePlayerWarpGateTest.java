@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.playerwarps.application.port.CrossServerTeleport;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
@@ -65,6 +66,10 @@ import org.junit.jupiter.api.Test;
  * access(4) → safe-landing(5) → cost(6). The closing jqwik property pins the security invariant that the new
  * gate is never looser than the T5 fail-closed stub: a non-owner is admitted only via PUBLIC access, a correct
  * password, being on the whitelist, or membership.
+ *
+ * <p>A final section covers the post-gate <em>routing</em> decision: a warp tagged for another backend hands off
+ * to the {@link CrossServerTeleport} seam (carrying the exact charge) instead of the local teleporter, and — when
+ * the seam is absent because the sub-group is off — is refused with a refund rather than a broken local hop.
  */
 class UsePlayerWarpGateTest {
 
@@ -476,9 +481,90 @@ class UsePlayerWarpGateTest {
         }
     }
 
+    // ---- Step 7: post-gate cross-server routing. ----
+
+    @Test
+    void aRemoteWarpRoutesToTheCrossServerSeamInsteadOfTheLocalTeleporter() {
+        Fixture f = new Fixture();
+        f.put(remoteWarp(WarpCost.free()));
+        f.crossServerPort = Optional.of(f.crossServer);
+
+        Result<Unit, PlayerWarpError> result = f.gate().useFor(VISITOR, NAME);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(f.teleporter.hops)
+                .as("a remote warp never takes the local hop")
+                .isZero();
+        assertThat(f.crossServer.sends).isEqualTo(1);
+        assertThat(f.crossServer.lastWarp).isEqualTo(NAME.value());
+        assertThat(f.crossServer.lastCharged).as("a free warp charges nothing").isEmpty();
+    }
+
+    @Test
+    void aRemotePricedWarpChargesThenHandsTheExactChargeToTheSeam() {
+        Fixture f = new Fixture();
+        f.put(remoteWarp(PRICE));
+        f.economyPort = Optional.of(f.economy);
+        f.crossServerPort = Optional.of(f.crossServer);
+
+        Result<Unit, PlayerWarpError> result = f.gate().useFor(VISITOR, NAME);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(f.economy.charges).isEqualTo(1);
+        assertThat(f.teleporter.hops).isZero();
+        assertThat(f.crossServer.lastCharged).contains(PRICE);
+        assertThat(f.repository.visits)
+                .as("the visit is recorded on the target backend, not on send")
+                .isZero();
+    }
+
+    @Test
+    void aLocalWarpStillUsesTheNormalTeleporter() {
+        Fixture f = new Fixture();
+        f.put(warp(WarpAccess.PUBLIC, WarpStatus.ACTIVE, WarpCost.free())); // serverId empty == local
+        f.crossServerPort = Optional.of(f.crossServer);
+
+        Result<Unit, PlayerWarpError> result = f.gate().useFor(VISITOR, NAME);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(f.teleporter.hops).isEqualTo(1);
+        assertThat(f.crossServer.sends)
+                .as("a local warp never touches the cross-server seam")
+                .isZero();
+    }
+
+    @Test
+    void aRemoteWarpWithTheSubGroupOffIsRefusedWithARefundNotABrokenLocalHop() {
+        Fixture f = new Fixture();
+        f.put(remoteWarp(PRICE));
+        f.economyPort = Optional.of(f.economy);
+        // crossServerPort stays empty — the sub-group is off.
+
+        Result<Unit, PlayerWarpError> result = f.gate().useFor(VISITOR, NAME);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(f.teleporter.hops)
+                .as("never a broken local hop into another server")
+                .isZero();
+        assertThat(f.economy.charges).isEqualTo(1);
+        assertThat(f.economy.refunds)
+                .as("the charge is returned since the player never moved")
+                .isEqualTo(1);
+        assertThat(f.economy.lastRefundAmount).isEqualByComparingTo(PRICE.amount());
+    }
+
     // ---- Fixture and fakes. ----
 
     private static PlayerWarp warp(WarpAccess access, WarpStatus status, WarpCost price) {
+        return warp(access, status, price, Optional.empty());
+    }
+
+    /** A PUBLIC, ACTIVE warp tagged for another backend, so the gate routes it across the proxy. */
+    private static PlayerWarp remoteWarp(WarpCost price) {
+        return warp(WarpAccess.PUBLIC, WarpStatus.ACTIVE, price, Optional.of("other-server"));
+    }
+
+    private static PlayerWarp warp(WarpAccess access, WarpStatus status, WarpCost price, Optional<String> serverId) {
         return new PlayerWarp(
                 Optional.of(PlayerWarpId.of(1L)),
                 OWNER,
@@ -486,7 +572,7 @@ class UsePlayerWarpGateTest {
                 NAME,
                 Optional.empty(),
                 SAFE_SPOT,
-                Optional.empty(),
+                serverId,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -518,7 +604,9 @@ class UsePlayerWarpGateTest {
         final FakePermissions permissions = new FakePermissions();
         final MutableSafety safety = new MutableSafety();
         final FakeEconomy economy = new FakeEconomy();
+        final RecordingCrossServer crossServer = new RecordingCrossServer();
         Optional<PlayerWarpEconomy> economyPort = Optional.empty();
+        Optional<CrossServerTeleport> crossServerPort = Optional.empty();
 
         void put(PlayerWarp warp) {
             repository.put(warp);
@@ -537,7 +625,25 @@ class UsePlayerWarpGateTest {
                     passwords,
                     cooldowns,
                     economyPort,
+                    "local",
+                    crossServerPort,
                     Clock.fixed(NOW, ZoneOffset.UTC));
+        }
+    }
+
+    /** A cross-server seam that records the warp name and the exact charge each remote route was handed. */
+    private static final class RecordingCrossServer implements CrossServerTeleport {
+        int sends;
+
+        @org.jspecify.annotations.Nullable String lastWarp;
+
+        Optional<WarpCost> lastCharged = Optional.empty();
+
+        @Override
+        public void send(PlayerRef who, PlayerWarp warp, Optional<WarpCost> charged) {
+            sends++;
+            lastWarp = warp.name().value();
+            lastCharged = charged;
         }
     }
 
@@ -790,6 +896,9 @@ class UsePlayerWarpGateTest {
     private static final class FakeEconomy implements PlayerWarpEconomy {
         Result<Unit, ChargeError> result = Result.ok();
         int charges;
+        int refunds;
+
+        @org.jspecify.annotations.Nullable BigDecimal lastRefundAmount;
 
         @Override
         public Result<Unit, ChargeError> chargeAndAccrue(
@@ -810,6 +919,8 @@ class UsePlayerWarpGateTest {
 
         @Override
         public Result<Unit, ChargeError> refund(PlayerRef to, BigDecimal amount, String currencyId) {
+            refunds++;
+            lastRefundAmount = amount;
             return Result.ok();
         }
 

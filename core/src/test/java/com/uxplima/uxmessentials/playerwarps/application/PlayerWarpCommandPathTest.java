@@ -288,6 +288,8 @@ class PlayerWarpCommandPathTest {
                 new NoPasswords(),
                 new OpenCooldowns(),
                 Optional.empty(),
+                "local",
+                Optional.empty(),
                 Clock.system(ZoneOffset.UTC));
     }
 

@@ -139,6 +139,8 @@ class PwarpBrowseMenuTest {
                 mock(PlayerWarpPasswordStore.class),
                 mock(Cooldowns.class),
                 Optional.empty(),
+                "local",
+                Optional.empty(),
                 CLOCK);
     }
 

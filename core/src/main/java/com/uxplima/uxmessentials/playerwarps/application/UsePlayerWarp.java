@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.playerwarps.application.port.CrossServerTeleport;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
@@ -25,6 +26,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
+import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -57,6 +59,11 @@ import org.jspecify.annotations.Nullable;
  * teleport context through {@link PlayerWarpTeleporter}, so the shared cooldown, the move-cancellable warmup,
  * and the region-aware async hop stay the teleport context's concern. Bypass nodes live under the
  * {@code uxmessentials.pwarp.bypass.*} prefix, aligned to the {@code /pwarp} command's own node namespace.
+ *
+ * <p>A warp tagged for another backend of the network takes a different post-charge route: rather than the local
+ * hop it hands off to the optional {@link CrossServerTeleport} seam, which records the intent and connects the
+ * player across the proxy. The charge stays the gate's concern and is passed through so a route that never leaves
+ * (the sub-group off, or the proxy unreachable) refunds exactly what was debited.
  */
 public final class UsePlayerWarp {
 
@@ -77,6 +84,8 @@ public final class UsePlayerWarp {
     private final PlayerWarpPasswordStore passwordStore;
     private final Cooldowns cooldowns;
     private final Optional<PlayerWarpEconomy> economy;
+    private final String localServerId;
+    private final Optional<CrossServerTeleport> crossServer;
     private final Clock clock;
 
     public UsePlayerWarp(
@@ -91,6 +100,8 @@ public final class UsePlayerWarp {
             PlayerWarpPasswordStore passwordStore,
             Cooldowns cooldowns,
             Optional<PlayerWarpEconomy> economy,
+            String localServerId,
+            Optional<CrossServerTeleport> crossServer,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
@@ -103,6 +114,8 @@ public final class UsePlayerWarp {
         this.passwordStore = Objects.requireNonNull(passwordStore, "passwordStore");
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.economy = Objects.requireNonNull(economy, "economy");
+        this.localServerId = Objects.requireNonNull(localServerId, "localServerId");
+        this.crossServer = Objects.requireNonNull(crossServer, "crossServer");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -145,9 +158,16 @@ public final class UsePlayerWarp {
     }
 
     private Result<Unit, PlayerWarpError> admitAndGo(PlayerRef actor, PlayerWarp warp, Optional<String> password) {
-        PlayerWarpError refusal = gate(actor, warp, password);
-        if (refusal != null) {
-            return refuse(actor, warp, refusal);
+        Admission admission = gate(actor, warp, password);
+        if (admission.refusal() != null) {
+            return refuse(actor, warp, admission.refusal());
+        }
+        // The gate has passed and, for a priced non-member, already charged. If the warp lives on another backend,
+        // the local hop would land nowhere, so route it across the proxy instead — carrying the exact charge so an
+        // arrival failure refunds precisely.
+        if (isRemote(warp)) {
+            routeCrossServer(actor, warp, admission.charged());
+            return Result.ok();
         }
         notifier.send(
                 actor,
@@ -161,31 +181,70 @@ public final class UsePlayerWarp {
         return Result.ok();
     }
 
+    /** True when the warp is tagged for a backend other than this one, so it needs the cross-server route. */
+    private boolean isRemote(PlayerWarp warp) {
+        return warp.serverId().map(id -> !id.equals(localServerId)).orElse(false);
+    }
+
     /**
-     * Run the ordered gate, returning the first refusing {@link PlayerWarpError} or {@code null} to admit.
-     * Membership short-circuits both the access step and the cost step; every other step applies uniformly.
+     * Hand a remote warp to the {@link CrossServerTeleport} seam when the sub-group is on; when it is off the seam
+     * is absent, so rather than a broken local hop the player is told the warp is unreachable and any charge is
+     * refunded — they never moved.
      */
-    private @Nullable PlayerWarpError gate(PlayerRef actor, PlayerWarp warp, Optional<String> password) {
+    private void routeCrossServer(PlayerRef actor, PlayerWarp warp, Optional<WarpCost> charged) {
+        if (crossServer.isPresent()) {
+            crossServer.get().send(actor, warp, charged);
+            return;
+        }
+        notifier.send(
+                actor,
+                PlayerwarpsMessageKey.PWARP_CROSS_SERVER_UNAVAILABLE,
+                Map.of("warp", warp.name().value(), "server", warp.serverId().orElse("")));
+        charged.ifPresent(
+                cost -> economy.ifPresent(provider -> provider.refund(actor, cost.amount(), cost.currencyId())));
+    }
+
+    /**
+     * Run the ordered gate, returning the first refusing {@link PlayerWarpError} or an admission carrying the exact
+     * amount the cost step debited (empty when nothing was charged). Membership short-circuits both the access step
+     * and the cost step; every other step applies uniformly.
+     */
+    private Admission gate(PlayerRef actor, PlayerWarp warp, Optional<String> password) {
         PlayerWarpError status = checkStatus(warp);
         if (status != null) {
-            return status;
+            return Admission.refused(status);
         }
         PlayerWarpError ban = checkBan(actor, warp, clock.instant());
         if (ban != null) {
-            return ban;
+            return Admission.refused(ban);
         }
         boolean member = isMember(actor, warp);
         if (!member) {
             PlayerWarpError access = checkAccess(actor, warp, password);
             if (access != null) {
-                return access;
+                return Admission.refused(access);
             }
         }
         PlayerWarpError safety = checkSafety(actor, warp);
         if (safety != null) {
-            return safety;
+            return Admission.refused(safety);
         }
-        return member ? null : charge(actor, warp);
+        return member ? Admission.free() : charge(actor, warp);
+    }
+
+    /** The gate outcome: a {@code refusal} (then {@code charged} is empty) or an admission carrying any charge taken. */
+    private record Admission(@Nullable PlayerWarpError refusal, Optional<WarpCost> charged) {
+        static Admission refused(PlayerWarpError error) {
+            return new Admission(error, Optional.empty());
+        }
+
+        static Admission free() {
+            return new Admission(null, Optional.empty());
+        }
+
+        static Admission paid(WarpCost cost) {
+            return new Admission(null, Optional.of(cost));
+        }
     }
 
     /** Step 1 — a warp that is not ACTIVE refuses everyone, with no bypass. */
@@ -260,10 +319,11 @@ public final class UsePlayerWarp {
      * economy provider all skip the debit and admit for free (the {@code WarpEconomy} soft-coupling precedent).
      * A priced warp with a provider present charges through {@link PlayerWarpEconomy#chargeAndAccrue}; any
      * {@link ChargeError} refuses {@link PlayerWarpError#CANNOT_AFFORD} so no visit is recorded and no hop occurs.
+     * A successful charge carries the exact price forward so a cross-server route can refund it if arrival fails.
      */
-    private @Nullable PlayerWarpError charge(PlayerRef actor, PlayerWarp warp) {
+    private Admission charge(PlayerRef actor, PlayerWarp warp) {
         if (warp.price().amount().signum() <= 0 || permissions.has(actor, BYPASS_COST) || economy.isEmpty()) {
-            return null;
+            return Admission.free();
         }
         Result<Unit, ChargeError> charged = economy.get()
                 .chargeAndAccrue(
@@ -271,7 +331,7 @@ public final class UsePlayerWarp {
                         warp.id().orElseThrow(),
                         warp.price().amount(),
                         warp.price().currencyId());
-        return charged.isErr() ? PlayerWarpError.CANNOT_AFFORD : null;
+        return charged.isErr() ? Admission.refused(PlayerWarpError.CANNOT_AFFORD) : Admission.paid(warp.price());
     }
 
     /** The per-warp password-attempt cooldown label, keyed by the warp's surrogate id. */

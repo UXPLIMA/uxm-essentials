@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleportStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
@@ -115,5 +116,15 @@ public final class PlayerWarpRepositories {
     public static PlayerWarpPasswordStore passwordStore(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqPlayerWarpPasswordStore(persistence.dsl(), new Pbkdf2PasswordHasher());
+    }
+
+    /**
+     * The jOOQ {@link PendingTeleportStore} — one row per player over the network-shared
+     * {@code player_warp_pending_teleports} table, the handoff between a cross-server teleport's origin and target
+     * backends. Every operation is a single indexed statement on the {@code player_uuid} primary key.
+     */
+    public static PendingTeleportStore pendingTeleportStore(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqPendingTeleportStore(persistence.dsl());
     }
 }
