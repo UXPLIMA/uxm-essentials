@@ -90,4 +90,34 @@ class TransferPlayerWarpTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
     }
+
+    @Test
+    void aSponsoredWarpCannotBeTransferred() {
+        sponsor(warp);
+
+        Result<Unit, PlayerWarpError> result = transfer.transfer(owner, HUB, newOwner);
+
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.SPONSORED_LOCKED);
+        // The warp stays with its owner — a sponsored slot is bought against them, so it must not move mid-term.
+        assertThat(repository.stored("hub").owner().uuid()).isEqualTo(owner.uuid());
+        assertThat(sink.delivered).anyMatch(text -> text.startsWith("pwarp.sponsored-locked"));
+    }
+
+    @Test
+    void adminSetOwnerAlsoRefusesASponsoredWarp() {
+        sponsor(warp);
+
+        Result<Unit, PlayerWarpError> result = transfer.adminSetOwner(warp.id().orElseThrow(), newOwner);
+
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.SPONSORED_LOCKED);
+        assertThat(repository.stored("hub").owner().uuid()).isEqualTo(owner.uuid());
+    }
+
+    /** Give {@code warp} a sponsorship still live at the fixed clock, so the no-transfer guard trips. */
+    private void sponsor(PlayerWarp warp) {
+        repository.save(warp.withSponsorship(
+                java.util.Optional.of(new com.uxplima.uxmessentials.playerwarps.domain.Sponsorship(
+                        PlayerWarpTestSupport.CLOCK.instant().plusSeconds(3600), 0)),
+                PlayerWarpTestSupport.CLOCK.instant()));
+    }
 }

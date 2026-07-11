@@ -34,8 +34,10 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewM
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RentSweep;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.SponsorExpirySweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
@@ -52,10 +54,12 @@ import com.uxplima.uxmessentials.playerwarps.application.RentReminders;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.SettleRent;
+import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
@@ -230,6 +234,14 @@ public final class PlayerwarpsWiring {
                 new EditPlayerWarp(repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC());
         TransferPlayerWarp transferPlayerWarp =
                 new TransferPlayerWarp(repository, warpAuthorization, notifier, Clock.systemUTC());
+        // The sponsorship sub-group: an owner buys a paid, time-limited pinned browse slot through the same
+        // WarpAuthorization (owner-only) and the economy seam already built. When economy is disabled the sub-group is
+        // forced off (a paid feature cannot run for free), so its command branch, its manage button, its pinned slots,
+        // and its expiry sweep all stay dark. The read model the browse and the landing share is built once here.
+        SponsorConfig sponsorConfig = sponsorConfig(ctx, kernel, economy);
+        PlayerWarpBrowse browse = PlayerWarpRepositories.browse(persistence, Clock.systemUTC());
+        BuySponsorship buySponsorship =
+                new BuySponsorship(repository, warpAuthorization, economy, notifier, sponsorConfig, Clock.systemUTC());
         PlayerWarpListMenu listMenu = buildGui(
                 plugin,
                 kernel,
@@ -252,10 +264,11 @@ public final class PlayerwarpsWiring {
         PlayerWarpBrowseMenu browseMenu = new PlayerWarpBrowseMenu(
                 menus,
                 kernel.scheduler(),
-                PlayerWarpRepositories.browse(persistence, Clock.systemUTC()),
+                browse,
                 usePlayerWarp,
                 kernel.messages(),
-                (viewer, name) -> viewHolder[0].open(viewer, name));
+                (viewer, name) -> viewHolder[0].open(viewer, name),
+                sponsorConfig);
         // The browse tile opens the view, the view opens the manage panel, and the manage panel's back button reopens
         // the view — a three-way construction cycle, so a one-slot holder breaks it: the manage menu is built after the
         // view, and the view's manage-open runs through this holder filled a step later.
@@ -298,9 +311,11 @@ public final class PlayerwarpsWiring {
                 withdrawEarnings,
                 transferPlayerWarp,
                 archivePlayerWarp,
+                buySponsorship,
                 kernel.playerLookup(),
                 kernel.messages(),
                 notifier,
+                sponsorConfig,
                 viewMenu::open,
                 (viewer, name) -> peopleHolder[0].openMembers(viewer, name),
                 (viewer, name) -> peopleHolder[0].openWhitelist(viewer, name),
@@ -340,7 +355,10 @@ public final class PlayerwarpsWiring {
                 menus,
                 kernel.scheduler(),
                 com.uxplima.uxmessentials.persistence.warps.WarpRepositories.categories(persistence),
-                browseMenu::open);
+                browse,
+                browseMenu::open,
+                (viewer, name) -> viewHolder[0].open(viewer, name),
+                sponsorConfig);
         browseMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         viewMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         manageMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
@@ -368,6 +386,8 @@ public final class PlayerwarpsWiring {
                 withdrawEarnings,
                 editPlayerWarp,
                 transferPlayerWarp,
+                buySponsorship,
+                sponsorConfig,
                 notifier,
                 editorView,
                 listMenu,
@@ -378,9 +398,18 @@ public final class PlayerwarpsWiring {
         // Disabled, or with no economy to charge against, it is null and nothing is scheduled — a disabled sub-group
         // schedules no task and charges nothing.
         RentSweep rentSweep = buildRentSweep(ctx, persistence, kernel, repository, economy);
+        // The sponsor expiry sweep: a config-gated, off-tick, batched sweep that frees the slot of every lapsed
+        // sponsorship and stamps its post-expiry cooldown. Disabled (the sub-group off, or economy absent so it was
+        // forced off) it is null and nothing is scheduled.
+        SponsorExpirySweep sponsorSweep = buildSponsorSweep(ctx, kernel, repository, sponsorConfig);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(
-                PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota, rentSweep);
+                PlayerWarpCommands.all(services, kernel.messages()),
+                List.of(joinWarmer),
+                repository,
+                quota,
+                rentSweep,
+                sponsorSweep);
     }
 
     /**
@@ -410,6 +439,45 @@ public final class PlayerwarpsWiring {
         RentReminders reminders = new RentReminders(repository, mailer, config, clock);
         Duration interval = Duration.ofMinutes(Math.max(1L, ctx.config().getLong("rent.check-interval-minutes", 60L)));
         return new RentSweep(repository, settle, reminders, config, kernel.scheduler(), interval, clock, kernel.log());
+    }
+
+    /**
+     * Build the sponsor expiry sweep when the {@code sponsor} sub-group is on, else {@code null}. The config is already
+     * forced off when economy is absent (see {@link #sponsorConfig}), so an enabled config here always has an economy
+     * to have charged against; the sweep itself only frees slots and stamps cooldowns, no money moves in it.
+     */
+    private static @org.jspecify.annotations.Nullable SponsorExpirySweep buildSponsorSweep(
+            ModuleContext ctx, KernelPorts kernel, PlayerWarpRepository repository, SponsorConfig config) {
+        if (!config.enabled()) {
+            return null;
+        }
+        Duration interval =
+                Duration.ofMinutes(Math.max(1L, ctx.config().getLong("sponsor.check-interval-minutes", 60L)));
+        return new SponsorExpirySweep(
+                repository, config, kernel.scheduler(), interval, Clock.systemUTC(), kernel.log());
+    }
+
+    /**
+     * Read the {@code sponsor} config block into the immutable {@link SponsorConfig}. When the sub-group is enabled but
+     * no economy provider is present it is forced off with an operator warning — a paid pinned slot cannot be sold for
+     * free, so running the feature with nothing to charge against would only ever hand out placement gratis.
+     */
+    private static SponsorConfig sponsorConfig(
+            ModuleContext ctx, KernelPorts kernel, Optional<PlayerWarpEconomy> economy) {
+        var cfg = ctx.config();
+        boolean enabled = cfg.getBoolean("sponsor.enabled", false);
+        if (enabled && economy.isEmpty()) {
+            kernel.log().warn("event=playerwarp_sponsor_no_economy detail=sponsor_enabled_but_economy_absent_off");
+            enabled = false;
+        }
+        return new SponsorConfig(
+                enabled,
+                Math.max(0, cfg.getInt("sponsor.slots", 5)),
+                Math.max(1, cfg.getInt("sponsor.duration-days", 7)),
+                BigDecimal.valueOf(Math.max(0L, cfg.getLong("sponsor.price", 1000L))),
+                cfg.getString("sponsor.currency", "default"),
+                Math.max(1, cfg.getInt("sponsor.max-concurrent-per-player", 1)),
+                Duration.ofDays(Math.max(0L, cfg.getLong("sponsor.cooldown-days", 3L))));
     }
 
     /** Read the {@code rent} config block into the immutable {@link RentConfig} the policy and reminders resolve through. */
@@ -609,6 +677,8 @@ public final class PlayerwarpsWiring {
             WithdrawEarnings withdrawEarnings,
             EditPlayerWarp editPlayerWarp,
             TransferPlayerWarp transferPlayerWarp,
+            BuySponsorship buySponsorship,
+            SponsorConfig sponsorConfig,
             PlayerWarpNotifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
@@ -635,7 +705,9 @@ public final class PlayerwarpsWiring {
                 manageBans,
                 withdrawEarnings,
                 editPlayerWarp,
-                transferPlayerWarp);
+                transferPlayerWarp,
+                buySponsorship,
+                sponsorConfig);
     }
 
     private static int defaultLimit(ModuleContext ctx) {
@@ -658,13 +730,15 @@ public final class PlayerwarpsWiring {
      * @param repository the cached player-warp repository the PAPI seam reads owned warps from
      * @param quota the per-owner count-limit reducer the PAPI seam reads the limit through
      * @param rentSweep the off-tick rent lifecycle sweep, or {@code null} when the rent sub-group is disabled
+     * @param sponsorSweep the off-tick sponsor expiry sweep, or {@code null} when the sponsor sub-group is disabled
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             PlayerWarpRepository repository,
             PlayerWarpQuota quota,
-            @org.jspecify.annotations.Nullable RentSweep rentSweep) {
+            @org.jspecify.annotations.Nullable RentSweep rentSweep,
+            @org.jspecify.annotations.Nullable SponsorExpirySweep sponsorSweep) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -673,17 +747,23 @@ public final class PlayerwarpsWiring {
             Objects.requireNonNull(quota, "quota");
         }
 
-        /** Arm the rent sweep, when one was wired; a no-op when the rent sub-group is off. */
+        /** Arm the rent and sponsor sweeps, when they were wired; a no-op for a sub-group that is off. */
         public void startBackgroundWork() {
             if (rentSweep != null) {
                 rentSweep.start();
             }
+            if (sponsorSweep != null) {
+                sponsorSweep.start();
+            }
         }
 
-        /** Halt the rent sweep on module disable/reload so no orphaned off-tick task survives. */
+        /** Halt the rent and sponsor sweeps on module disable/reload so no orphaned off-tick task survives. */
         public void stop() {
             if (rentSweep != null) {
                 rentSweep.stop();
+            }
+            if (sponsorSweep != null) {
+                sponsorSweep.stop();
             }
         }
     }

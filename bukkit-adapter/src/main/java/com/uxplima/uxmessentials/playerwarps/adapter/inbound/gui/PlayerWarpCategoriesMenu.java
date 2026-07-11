@@ -11,11 +11,16 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpCard;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
@@ -42,8 +47,9 @@ import org.jspecify.annotations.NullMarked;
  * <p>The category buttons are the {@code playerwarps:categories} list source: a bounded snapshot of the shared
  * {@code warp_categories} set (player-warps share the categories the warps context defines) taken off the tick thread
  * when the menu opens and carried on the engine {@link Subject}. The snapshot is defensive — a read failure or an empty
- * set simply draws no category buttons rather than aborting the open. The sponsor slots are reserved for P6 (paid
- * placement): their view condition reads a sub-feature flag that is off until then, so today they never render.
+ * set simply draws no category buttons rather than aborting the open. The sponsor slots render the currently-active
+ * sponsors ({@code sponsored_until > now}, ordered by slot) as a second bounded snapshot; each drills into the
+ * sponsored warp's {@code pwarp-view}. When the sponsor sub-group is off the snapshot is empty and the slots stay blank.
  */
 @NullMarked
 public final class PlayerWarpCategoriesMenu {
@@ -54,43 +60,61 @@ public final class PlayerWarpCategoriesMenu {
     /** The category list-source id the spec's grid binds and this menu registers. */
     public static final String CATEGORY_SOURCE = "playerwarps:categories";
 
+    /** The sponsor list-source id the reserved slots bind and this menu registers. */
+    public static final String SPONSOR_SOURCE = "playerwarps:sponsors";
+
     /** Disk-first then bundled, mirroring the sibling player-warps menus, so an operator edit to the spec takes effect. */
     private static final String SPEC_RESOURCE = "modules/playerwarps/gui/pwarp-categories.conf";
 
     /** The icon a category with no configured display material falls back to. */
     private static final Material FALLBACK_ICON = Material.CHEST;
 
-    /**
-     * Whether the sponsor sub-feature is enabled; false until P6 wires the flag, so the reserved sponsor slots never
-     * render yet. Mirrors the manage panel's sponsor button, which is gated on the same not-yet-live flag.
-     */
-    private static final boolean SPONSOR_ENABLED = false;
+    /** The icon a sponsored warp with no configured (or an unresolvable rich) icon token falls back to. */
+    private static final Material SPONSOR_FALLBACK_ICON = Material.DIAMOND;
+
+    /** The reserved sponsor slots on the landing, so the snapshot never reads more sponsors than can be drawn. */
+    private static final int SPONSOR_SLOTS = 3;
 
     private final Menus menus;
     private final Scheduler scheduler;
     private final WarpCategoryRepository categories;
+    private final PlayerWarpBrowse browse;
     private final BrowseOpener browseOpener;
+    private final BiConsumer<PlayerRef, PlayerWarpName> openView;
+    private final boolean sponsorEnabled;
 
     public PlayerWarpCategoriesMenu(
-            Menus menus, Scheduler scheduler, WarpCategoryRepository categories, BrowseOpener browseOpener) {
+            Menus menus,
+            Scheduler scheduler,
+            WarpCategoryRepository categories,
+            PlayerWarpBrowse browse,
+            BrowseOpener browseOpener,
+            BiConsumer<PlayerRef, PlayerWarpName> openView,
+            SponsorConfig sponsorConfig) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.categories = Objects.requireNonNull(categories, "categories");
+        this.browse = Objects.requireNonNull(browse, "browse");
         this.browseOpener = Objects.requireNonNull(browseOpener, "browseOpener");
+        this.openView = Objects.requireNonNull(openView, "openView");
+        this.sponsorEnabled =
+                Objects.requireNonNull(sponsorConfig, "sponsorConfig").enabled();
     }
 
-    /** Register the category source, the entry placeholders, the sponsor condition, the actions, and the spec. */
+    /** Register the category and sponsor sources, the entry placeholders, the actions, and the spec. */
     public void register(MenuBindings bindings, Path dataFolder, Logger log) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list(CATEGORY_SOURCE, ctx -> ctx.subject(Subject.class).categories());
+        bindings.list(SPONSOR_SOURCE, ctx -> ctx.subject(Subject.class).sponsors());
         bindings.placeholder("pwarp_category_icon", this::icon);
         bindings.placeholder(
                 "pwarp_category_name", ctx -> ctx.entry(WarpCategory.class).displayName());
-        bindings.condition(
-                "playerwarps:categories-sponsor",
-                (ctx, args) -> ctx.subject(Subject.class).sponsorEnabled());
+        bindings.placeholder("pwarp_sponsor_icon", this::sponsorIcon);
+        bindings.placeholder("pwarp_sponsor_name", ctx -> sponsorName(ctx.entry(WarpCard.class)));
+        bindings.placeholder(
+                "pwarp_sponsor_owner", ctx -> ctx.entry(WarpCard.class).ownerName());
         bindings.action("playerwarps:browse-all", ctx -> browseOpener.open(ctx.player(), ctx.viewer(), Map.of()));
         bindings.action("playerwarps:browse-mine", ctx -> openBrowse(ctx, "owner"));
         bindings.action("playerwarps:browse-favourites", ctx -> openBrowse(ctx, "favouritesOf"));
@@ -98,19 +122,20 @@ public final class PlayerWarpCategoriesMenu {
                 "playerwarps:browse-top",
                 ctx -> browseOpener.open(ctx.player(), ctx.viewer(), Map.of("sort", "rating")));
         bindings.action("playerwarps:category-open", this::openCategory);
+        bindings.action("playerwarps:sponsor-open", this::openSponsor);
         menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
     }
 
     /**
-     * Open the landing for {@code viewer}. The bounded category set is snapshotted off the tick thread, then the window
-     * is painted on the viewer's entity thread. The live {@code player} is kept only for call-site symmetry with the
-     * browse opener the command drives; the engine resolves the live player from the viewer to render.
+     * Open the landing for {@code viewer}. The bounded category and sponsor sets are snapshotted off the tick thread,
+     * then the window is painted on the viewer's entity thread. The live {@code player} is kept only for call-site
+     * symmetry with the browse opener the command drives; the engine resolves the live player from the viewer to render.
      */
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         scheduler.async(() -> {
-            Subject subject = new Subject(snapshotCategories(), SPONSOR_ENABLED);
+            Subject subject = new Subject(snapshotCategories(), snapshotSponsors());
             scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, subject));
         });
     }
@@ -127,9 +152,43 @@ public final class PlayerWarpCategoriesMenu {
         browseOpener.open(ctx.player(), ctx.viewer(), Map.of("category", category.id()));
     }
 
+    /** Drill into the clicked sponsor's detail panel, the same {@code pwarp-view} a browse tile opens. */
+    private void openSponsor(MenuActionContext ctx) {
+        WarpCard sponsor = ctx.entry(WarpCard.class);
+        openView.accept(ctx.viewer(), PlayerWarpName.of(sponsor.name()));
+    }
+
     /** The category cell's icon token — the category's configured display material, else the fallback. */
     private String icon(MenuContext ctx) {
         return ctx.entry(WarpCategory.class).displayMaterial().orElse(FALLBACK_ICON.name());
+    }
+
+    /** The sponsor cell's icon token — the warp's own icon, else the sponsor fallback. */
+    private String sponsorIcon(MenuContext ctx) {
+        String token = ctx.entry(WarpCard.class).icon();
+        return token != null && !token.isBlank() ? token : SPONSOR_FALLBACK_ICON.name();
+    }
+
+    /** The sponsored warp's display name, falling back to its unique name when it sets none. */
+    private static String sponsorName(WarpCard card) {
+        String display = card.displayName();
+        return display != null && !display.isBlank() ? display : card.name();
+    }
+
+    /**
+     * The active sponsors for the reserved slots, a small bounded read (at most {@link #SPONSOR_SLOTS}) off the tick
+     * thread; empty when the sponsor sub-group is off or the read faults, so the slots simply stay blank rather than
+     * aborting the landing.
+     */
+    private List<WarpCard> snapshotSponsors() {
+        if (!sponsorEnabled) {
+            return List.of();
+        }
+        try {
+            return browse.activeSponsors(SPONSOR_SLOTS);
+        } catch (RuntimeException failure) {
+            return List.of();
+        }
     }
 
     /**
@@ -195,18 +254,18 @@ public final class PlayerWarpCategoriesMenu {
     }
 
     /**
-     * The subject of an open landing: the snapshotted category set the list source reads and whether the sponsor
-     * sub-feature is enabled. Both are resolved at open and read only by the render-time list source and the sponsor
-     * view condition, so the menu touches no per-viewer mutable state.
+     * The subject of an open landing: the snapshotted category set and the active-sponsor set the two list sources
+     * read. Both are resolved at open and read only by the render-time list sources, so the menu touches no per-viewer
+     * mutable state.
      *
      * @param categories the bounded category snapshot taken off the tick thread at open (empty when none or unreadable)
-     * @param sponsorEnabled whether the P6 sponsor sub-feature is enabled; false until P6, so the sponsor slots never
-     *     render yet
+     * @param sponsors the bounded active-sponsor snapshot (empty when the sponsor sub-group is off or unreadable)
      */
-    public record Subject(List<WarpCategory> categories, boolean sponsorEnabled) {
+    public record Subject(List<WarpCategory> categories, List<WarpCard> sponsors) {
 
         public Subject {
             categories = List.copyOf(Objects.requireNonNull(categories, "categories"));
+            sponsors = List.copyOf(Objects.requireNonNull(sponsors, "sponsors"));
         }
     }
 }

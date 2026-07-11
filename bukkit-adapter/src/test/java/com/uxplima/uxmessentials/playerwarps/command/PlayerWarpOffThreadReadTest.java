@@ -243,7 +243,15 @@ class PlayerWarpOffThreadReadTest {
                         new NoPasswords(),
                         java.time.Clock.systemUTC()),
                 new TransferPlayerWarp(
-                        repository, new WarpAuthorization(new NoMembers()), notifier, java.time.Clock.systemUTC()));
+                        repository, new WarpAuthorization(new NoMembers()), notifier, java.time.Clock.systemUTC()),
+                new com.uxplima.uxmessentials.playerwarps.application.BuySponsorship(
+                        repository,
+                        new WarpAuthorization(new NoMembers()),
+                        Optional.empty(),
+                        notifier,
+                        com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled(),
+                        java.time.Clock.systemUTC()),
+                com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled());
     }
 
     /** A minimal real management list (this test does not open it; it only needs a non-null view in services). */
@@ -306,7 +314,14 @@ class PlayerWarpOffThreadReadTest {
                 new OpenCooldowns(),
                 Optional.empty(),
                 java.time.Clock.systemUTC());
-        return new PlayerWarpBrowseMenu(menus, scheduler, browse, use, messages, (viewer, name) -> {});
+        return new PlayerWarpBrowseMenu(
+                menus,
+                scheduler,
+                browse,
+                use,
+                messages,
+                (viewer, name) -> {},
+                com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled());
     }
 
     /** A minimal categories landing over an empty category set, wired so the services holder is complete; unopened here. */
@@ -333,7 +348,16 @@ class PlayerWarpOffThreadReadTest {
             @Override
             public void delete(String id) {}
         };
-        return new PlayerWarpCategoriesMenu(menus, scheduler, categories, (player, viewer, filters) -> {});
+        PlayerWarpBrowse browse =
+                query -> com.uxplima.uxmessentials.playerwarps.domain.Page.empty(query.page(), query.pageSize());
+        return new PlayerWarpCategoriesMenu(
+                menus,
+                scheduler,
+                categories,
+                browse,
+                (player, viewer, filters) -> {},
+                (viewer, name) -> {},
+                com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled());
     }
 
     /** Counts repository reads and serves warps from memory, assigning a surrogate id on the first save of a warp. */

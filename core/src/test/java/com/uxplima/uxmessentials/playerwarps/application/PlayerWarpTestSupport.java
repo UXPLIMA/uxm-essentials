@@ -196,6 +196,53 @@ final class PlayerWarpTestSupport {
         }
 
         final Map<PlayerWarpId, Integer> reminded = new LinkedHashMap<>();
+
+        final Map<PlayerWarpId, Instant> sponsorCooldowns = new LinkedHashMap<>();
+
+        /** Seed a warp's post-expiry cooldown, so a test can drive the SPONSOR_COOLDOWN refusal. */
+        void putSponsorCooldown(PlayerWarpId id, Instant until) {
+            sponsorCooldowns.put(id, until);
+        }
+
+        @Override
+        public Optional<Instant> sponsorCooldownUntil(PlayerWarpId id) {
+            return Optional.ofNullable(sponsorCooldowns.get(id));
+        }
+
+        @Override
+        public int activeSponsorCount(PlayerRef owner, Instant now) {
+            return (int) byName.values().stream()
+                    .filter(warp -> warp.owner().uuid().equals(owner.uuid()))
+                    .filter(warp -> warp.sponsorship()
+                            .map(sponsorship -> sponsorship.isActiveAt(now))
+                            .orElse(false))
+                    .count();
+        }
+
+        @Override
+        public Set<Integer> activeSponsorSlots(Instant now) {
+            return byName.values().stream()
+                    .flatMap(warp -> warp.sponsorship().stream())
+                    .filter(sponsorship -> sponsorship.isActiveAt(now))
+                    .map(com.uxplima.uxmessentials.playerwarps.domain.Sponsorship::slot)
+                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        }
+
+        @Override
+        public List<PlayerWarp> expiredSponsorships(Instant now, int limit) {
+            return byName.values().stream()
+                    .filter(warp -> warp.sponsorship()
+                            .map(sponsorship -> !sponsorship.isActiveAt(now))
+                            .orElse(false))
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public void expireSponsorship(PlayerWarpId id, Instant cooldownUntil) {
+            sponsorCooldowns.put(id, cooldownUntil);
+            findById(id).ifPresent(warp -> save(warp.withSponsorship(Optional.empty(), CLOCK.instant())));
+        }
     }
 
     /** An in-memory rating store: one star per {@code (warp, player)}, tallying and averaging like the real one. */
@@ -390,7 +437,13 @@ final class PlayerWarpTestSupport {
 
         @Nullable BigDecimal lastCollectAmount;
 
+        @Nullable PlayerRef lastChargeOwner;
+
+        @Nullable BigDecimal lastChargeAmount;
+
         private Result<Unit, ChargeError> collectResult = Result.ok();
+
+        private Result<Unit, ChargeError> chargeOwnerResult = Result.ok();
 
         private final Optional<ChargeError> failure;
 
@@ -401,6 +454,11 @@ final class PlayerWarpTestSupport {
         /** Make the next {@link #collectRent} return {@code result}, for the rent settle paths. */
         void collectReturns(Result<Unit, ChargeError> result) {
             this.collectResult = result;
+        }
+
+        /** Make the next {@link #chargeOwner} return {@code result}, for the sponsorship afford path. */
+        void chargeOwnerReturns(Result<Unit, ChargeError> result) {
+            this.chargeOwnerResult = result;
         }
 
         private Economy(Optional<ChargeError> failure) {
@@ -442,6 +500,13 @@ final class PlayerWarpTestSupport {
             lastCollectOwner = owner;
             lastCollectAmount = amount;
             return collectResult;
+        }
+
+        @Override
+        public Result<Unit, ChargeError> chargeOwner(PlayerRef owner, BigDecimal amount, String currencyId) {
+            lastChargeOwner = owner;
+            lastChargeAmount = amount;
+            return chargeOwnerResult;
         }
     }
 

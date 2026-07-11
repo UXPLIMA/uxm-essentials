@@ -26,8 +26,11 @@ class WarpRoleCapabilityTest {
         matrix.put(WarpRole.OWNER, EnumSet.allOf(WarpCapability.class));
         matrix.put(
                 WarpRole.CO_OWNER,
-                EnumSet.complementOf(
-                        EnumSet.of(WarpCapability.DELETE, WarpCapability.TRANSFER, WarpCapability.MANAGE_MEMBERS)));
+                EnumSet.complementOf(EnumSet.of(
+                        WarpCapability.DELETE,
+                        WarpCapability.TRANSFER,
+                        WarpCapability.MANAGE_MEMBERS,
+                        WarpCapability.SPONSOR)));
         matrix.put(
                 WarpRole.MANAGER,
                 EnumSet.of(WarpCapability.EDIT_METADATA, WarpCapability.MANAGE_WHITELIST, WarpCapability.MANAGE_BANS));
@@ -52,10 +55,11 @@ class WarpRoleCapabilityTest {
     }
 
     @Test
-    void coOwnerLacksExactlyDeleteTransferAndManageMembers() {
+    void coOwnerLacksDeleteTransferManageMembersAndSponsor() {
         assertThat(WarpRole.CO_OWNER.can(WarpCapability.DELETE)).isFalse();
         assertThat(WarpRole.CO_OWNER.can(WarpCapability.TRANSFER)).isFalse();
         assertThat(WarpRole.CO_OWNER.can(WarpCapability.MANAGE_MEMBERS)).isFalse();
+        assertThat(WarpRole.CO_OWNER.can(WarpCapability.SPONSOR)).isFalse();
         assertThat(WarpRole.CO_OWNER.can(WarpCapability.WITHDRAW)).isTrue();
         assertThat(WarpRole.CO_OWNER.can(WarpCapability.EDIT_PRICE)).isTrue();
     }
@@ -73,5 +77,6 @@ class WarpRoleCapabilityTest {
         assertThat(WarpRole.MANAGER.can(WarpCapability.DELETE)).isFalse();
         assertThat(WarpRole.MANAGER.can(WarpCapability.MANAGE_MEMBERS)).isFalse();
         assertThat(WarpRole.MANAGER.can(WarpCapability.WITHDRAW)).isFalse();
+        assertThat(WarpRole.MANAGER.can(WarpCapability.SPONSOR)).isFalse();
     }
 }

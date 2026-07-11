@@ -1087,6 +1087,9 @@ permissions:
   uxmessentials.pwarp.transfer:
     description: '/pwarp transfer <name> <player> to hand ownership of one of your warps to another player.'
     default: true
+  uxmessentials.pwarp.sponsor:
+    description: '/pwarp sponsor <name> [days] to buy a paid, time-limited pinned browse slot for one of your warps.'
+    default: true
   uxmessentials.pwarp.withdraw:
     description: '/pwarp withdraw <name> to pay one of your warps'' accrued earnings out to its owner.'
     default: true

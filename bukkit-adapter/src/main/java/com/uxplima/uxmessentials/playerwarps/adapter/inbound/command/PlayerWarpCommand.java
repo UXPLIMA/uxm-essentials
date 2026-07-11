@@ -82,6 +82,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     private static final String FAVOURITE_PERMISSION = "uxmessentials.pwarp.favourite";
     private static final String RATE_PERMISSION = "uxmessentials.pwarp.rate";
     private static final String TRANSFER_PERMISSION = "uxmessentials.pwarp.transfer";
+    private static final String SPONSOR_PERMISSION = "uxmessentials.pwarp.sponsor";
     private static final String WITHDRAW_PERMISSION = "uxmessentials.pwarp.withdraw";
     private static final String MEMBERS_PERMISSION = "uxmessentials.pwarp.members";
     private static final String BAN_PERMISSION = "uxmessentials.pwarp.ban";
@@ -132,6 +133,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                         .then(nameArg()
                                 .then(CommandSuggestions.playerArgument("player")
                                         .executes(this::runTransfer))))
+                .then(sponsorSubtree())
                 .then(membersSubtree())
                 .then(banSubtree())
                 .then(verb("unban", BAN_PERMISSION)
@@ -353,6 +355,41 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                         targetName,
                         newOwner -> services.transferPlayerWarp().transfer(target.who(), target.name(), newOwner)));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * {@code /pwarp sponsor <name> [days]}: buy a paid pinned browse slot. The verb literal is gated both on the
+     * {@code uxmessentials.pwarp.sponsor} node and on the sponsor sub-group being enabled, so a disabled sub-group
+     * offers no active branch. The optional {@code days} is bounded positive at parse; when omitted the configured
+     * default term is used, and the use case clamps it to the configured maximum either way.
+     */
+    private LiteralArgumentBuilder<CommandSourceStack> sponsorSubtree() {
+        return Commands.literal("sponsor")
+                .requires(src ->
+                        services.sponsorConfig().enabled() && src.getSender().hasPermission(SPONSOR_PERMISSION))
+                .then(nameArg()
+                        .executes(this::runSponsor)
+                        .then(Commands.argument("days", IntegerArgumentType.integer(1))
+                                .executes(this::runSponsor)));
+    }
+
+    private int runSponsor(CommandContext<CommandSourceStack> ctx) {
+        Target target = target(ctx);
+        if (target == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        int days = daysOr(ctx, services.sponsorConfig().durationDays());
+        services.scheduler().async(() -> services.buySponsorship().buy(target.who(), target.name(), days));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** The {@code days} argument when this branch supplied it, else {@code fallback} (the configured default term). */
+    private static int daysOr(CommandContext<CommandSourceStack> ctx, int fallback) {
+        try {
+            return ctx.getArgument("days", Integer.class);
+        } catch (IllegalArgumentException absent) {
+            return fallback;
+        }
     }
 
     // People-management verbs: members / ban / unban / whitelist. Each resolves the (possibly offline) target off

@@ -31,8 +31,8 @@ public enum WarpRole {
     // derived (every capability) rather than listed, so a new WarpCapability is automatically owner-allowed and only
     // needs a deliberate decision for the two delegate tiers.
     private static final Set<WarpCapability> OWNER_CAPS = EnumSet.allOf(WarpCapability.class);
-    private static final Set<WarpCapability> CO_OWNER_CAPS = EnumSet.complementOf(
-            EnumSet.of(WarpCapability.DELETE, WarpCapability.TRANSFER, WarpCapability.MANAGE_MEMBERS));
+    private static final Set<WarpCapability> CO_OWNER_CAPS = EnumSet.complementOf(EnumSet.of(
+            WarpCapability.DELETE, WarpCapability.TRANSFER, WarpCapability.MANAGE_MEMBERS, WarpCapability.SPONSOR));
     private static final Set<WarpCapability> MANAGER_CAPS =
             EnumSet.of(WarpCapability.EDIT_METADATA, WarpCapability.MANAGE_WHITELIST, WarpCapability.MANAGE_BANS);
 
@@ -42,8 +42,9 @@ public enum WarpRole {
      * <ul>
      *   <li>{@link #OWNER} — every capability.
      *   <li>{@link #CO_OWNER} — every capability except {@link WarpCapability#DELETE},
-     *       {@link WarpCapability#TRANSFER}, and {@link WarpCapability#MANAGE_MEMBERS} (a trusted delegate may run
-     *       the warp and even withdraw its earnings, but never dispose of it or promote further delegates).
+     *       {@link WarpCapability#TRANSFER}, {@link WarpCapability#MANAGE_MEMBERS}, and
+     *       {@link WarpCapability#SPONSOR} (a trusted delegate may run the warp and even withdraw its earnings, but
+     *       never dispose of it, promote further delegates, or spend the owner's money on paid placement).
      *   <li>{@link #MANAGER} — only {@link WarpCapability#EDIT_METADATA}, {@link WarpCapability#MANAGE_WHITELIST},
      *       and {@link WarpCapability#MANAGE_BANS} (presentation and the guest list, never the money or the
      *       lifecycle).

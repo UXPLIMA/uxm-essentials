@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.application.port;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -149,5 +150,52 @@ public interface PlayerWarpRepository {
      */
     default Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {
         return Optional.empty();
+    }
+
+    /**
+     * The post-expiry sponsor cooldown instant for the warp {@code id} — the {@code sponsor_cooldown_until} V73
+     * column — or empty when the warp carries none. {@code BuySponsorship} reads it to refuse a re-sponsor while the
+     * warp is still cooling down. Persistence-only (never a fact on the aggregate), so it has its own reader. The
+     * default returns empty; the jOOQ adapter overrides it.
+     */
+    default Optional<Instant> sponsorCooldownUntil(PlayerWarpId id) {
+        return Optional.empty();
+    }
+
+    /**
+     * How many of {@code owner}'s warps hold a live sponsorship as of {@code now} ({@code sponsored_until > now}) —
+     * the concurrent-sponsorship count {@code BuySponsorship} caps per player. A bounded count query, never a scan of
+     * the owner's aggregates. The default returns {@code 0}; the jOOQ adapter overrides it.
+     */
+    default int activeSponsorCount(PlayerRef owner, Instant now) {
+        return 0;
+    }
+
+    /**
+     * The sponsor slots currently occupied by a live sponsorship as of {@code now} ({@code sponsored_until > now} with
+     * a non-NULL {@code sponsor_slot}), so {@code BuySponsorship} can pick the lowest free slot. A small bounded read.
+     * The default returns an empty set; the jOOQ adapter overrides it.
+     */
+    default Set<Integer> activeSponsorSlots(Instant now) {
+        return Set.of();
+    }
+
+    /**
+     * A bounded page of warps whose sponsorship term has lapsed ({@code sponsored_until <= now}) but that still hold a
+     * {@code sponsor_slot}, oldest-expiry first, for the sponsor expiry sweep. Indexed on {@code sponsored_until}
+     * ({@code idx_player_warps_sponsored}) and capped at {@code limit}, so the sweep is always a bounded index range
+     * scan, never a full-table scan. The default returns an empty list; the jOOQ adapter overrides it.
+     */
+    default List<PlayerWarp> expiredSponsorships(Instant now, int limit) {
+        return List.of();
+    }
+
+    /**
+     * Free the warp {@code id}'s sponsor slot (set {@code sponsor_slot} to NULL) and stamp its post-expiry cooldown
+     * ({@code sponsor_cooldown_until = cooldownUntil}) in one guarded UPDATE — the expiry sweep's write. The default
+     * is a no-op; the jOOQ adapter overrides it.
+     */
+    default void expireSponsorship(PlayerWarpId id, Instant cooldownUntil) {
+        // No-op for an in-memory store that does not track sponsor expiry.
     }
 }

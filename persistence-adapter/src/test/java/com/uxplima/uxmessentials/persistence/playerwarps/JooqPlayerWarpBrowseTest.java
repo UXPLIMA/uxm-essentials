@@ -635,6 +635,28 @@ class JooqPlayerWarpBrowseTest {
     }
 
     @Test
+    void activeSponsorsReturnsLivePublicSponsorsOrderedBySlot() {
+        seedSponsor("second", 1, 20_000L, WarpAccess.PUBLIC, WarpStatus.ACTIVE);
+        seedSponsor("first", 0, 20_000L, WarpAccess.PUBLIC, WarpStatus.ACTIVE);
+        seedSponsor("lapsed", 2, 5_000L, WarpAccess.PUBLIC, WarpStatus.ACTIVE); // sponsored_until 5_000 < now
+        seedSponsor("hidden", 3, 20_000L, WarpAccess.PRIVATE, WarpStatus.ACTIVE); // never public-browsed
+        seedSponsor("down", 4, 20_000L, WarpAccess.PUBLIC, WarpStatus.SUSPENDED); // not active
+
+        List<WarpCard> sponsors = browse.activeSponsors(10);
+
+        assertThat(sponsors).extracting(WarpCard::name).containsExactly("first", "second");
+        assertThat(sponsors).allMatch(WarpCard::sponsored);
+    }
+
+    @Test
+    void activeSponsorsRespectsTheLimit() {
+        seedSponsor("aaa", 0, 20_000L, WarpAccess.PUBLIC, WarpStatus.ACTIVE);
+        seedSponsor("bbb", 1, 20_000L, WarpAccess.PUBLIC, WarpStatus.ACTIVE);
+
+        assertThat(browse.activeSponsors(1)).extracting(WarpCard::name).containsExactly("aaa");
+    }
+
+    @Test
     void ownerFilterNarrowsToOneOwner() {
         save(
                 OWNER,
@@ -748,6 +770,15 @@ class JooqPlayerWarpBrowseTest {
                 10,
                 3,
                 null);
+    }
+
+    /** Seed a warp holding a sponsorship in {@code slot} until {@code until}, at the given access and status. */
+    private void seedSponsor(String name, int slot, long until, WarpAccess access, WarpStatus status) {
+        PlayerWarp warp = build(OWNER, name, WORLD_A, 0, 0, access, status, null, null, null, 1L, 0, 0, 0, 0, 0, null);
+        repo.save(warp.withSponsorship(
+                Optional.of(new com.uxplima.uxmessentials.playerwarps.domain.Sponsorship(
+                        Instant.ofEpochMilli(until), slot)),
+                Instant.ofEpochMilli(1L)));
     }
 
     private Page<WarpCard> browsePublic(WarpSort sort) {

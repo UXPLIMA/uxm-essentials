@@ -76,7 +76,19 @@ public enum PlayerWarpError {
     WITHDRAW_FAILED(PlayerwarpsMessageKey.PWARP_WITHDRAW_FAILED),
 
     /** The chosen name collides with a {@code /pwarp} verb literal, so it would be unreachable as a warp name. */
-    RESERVED_NAME(PlayerwarpsMessageKey.PWARP_RESERVED_NAME);
+    RESERVED_NAME(PlayerwarpsMessageKey.PWARP_RESERVED_NAME),
+
+    /** A transfer was refused because the warp is currently sponsored — an active sponsorship locks the owner. */
+    SPONSORED_LOCKED(PlayerwarpsMessageKey.PWARP_SPONSORED_LOCKED),
+
+    /** {@code /pwarp sponsor} refused because the warp is still within its post-expiry sponsor cooldown. */
+    SPONSOR_COOLDOWN(PlayerwarpsMessageKey.PWARP_SPONSOR_COOLDOWN),
+
+    /** {@code /pwarp sponsor} refused because the owner already holds the maximum concurrent sponsorships. */
+    SPONSOR_LIMIT(PlayerwarpsMessageKey.PWARP_SPONSOR_LIMIT),
+
+    /** {@code /pwarp sponsor} refused because every sponsor slot is currently taken. */
+    SPONSOR_FULL(PlayerwarpsMessageKey.PWARP_SPONSOR_FULL);
 
     private final PlayerwarpsMessageKey messageKey;
 

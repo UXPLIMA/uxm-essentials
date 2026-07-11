@@ -19,9 +19,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
+import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
@@ -91,6 +93,7 @@ public final class PlayerWarpManageMenu {
     private final WithdrawEarnings withdrawEarnings;
     private final TransferPlayerWarp transferPlayerWarp;
     private final ArchivePlayerWarp archivePlayerWarp;
+    private final BuySponsorship buySponsorship;
     private final PlayerLookup players;
     private final Messages messages;
     private final PlayerWarpNotifier notifier;
@@ -99,6 +102,8 @@ public final class PlayerWarpManageMenu {
     private final BiConsumer<PlayerRef, PlayerWarpName> openWhitelist;
     private final BiConsumer<PlayerRef, PlayerWarpName> openBans;
     private final BiConsumer<PlayerRef, PlayerWarpName> openIcon;
+    private final boolean sponsorEnabled;
+    private final int sponsorDefaultDays;
 
     public PlayerWarpManageMenu(
             Menus menus,
@@ -109,9 +114,11 @@ public final class PlayerWarpManageMenu {
             WithdrawEarnings withdrawEarnings,
             TransferPlayerWarp transferPlayerWarp,
             ArchivePlayerWarp archivePlayerWarp,
+            BuySponsorship buySponsorship,
             PlayerLookup players,
             Messages messages,
             PlayerWarpNotifier notifier,
+            SponsorConfig sponsorConfig,
             BiConsumer<PlayerRef, PlayerWarpName> openView,
             BiConsumer<PlayerRef, PlayerWarpName> openMembers,
             BiConsumer<PlayerRef, PlayerWarpName> openWhitelist,
@@ -125,9 +132,13 @@ public final class PlayerWarpManageMenu {
         this.withdrawEarnings = Objects.requireNonNull(withdrawEarnings, "withdrawEarnings");
         this.transferPlayerWarp = Objects.requireNonNull(transferPlayerWarp, "transferPlayerWarp");
         this.archivePlayerWarp = Objects.requireNonNull(archivePlayerWarp, "archivePlayerWarp");
+        this.buySponsorship = Objects.requireNonNull(buySponsorship, "buySponsorship");
         this.players = Objects.requireNonNull(players, "players");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        Objects.requireNonNull(sponsorConfig, "sponsorConfig");
+        this.sponsorEnabled = sponsorConfig.enabled();
+        this.sponsorDefaultDays = sponsorConfig.durationDays();
         this.openView = Objects.requireNonNull(openView, "openView");
         this.openMembers = Objects.requireNonNull(openMembers, "openMembers");
         this.openWhitelist = Objects.requireNonNull(openWhitelist, "openWhitelist");
@@ -144,8 +155,8 @@ public final class PlayerWarpManageMenu {
         bindings.placeholder("pwarp_manage_lore", this::lore);
         // The capability gate: pwarp-viewer-can:<CAP> reads the role off the subject and answers role.can(CAP). It is a
         // single-segment id because the engine splits the :CAP value on the first colon — a namespaced head would keep
-        // the whole feature:action:value token and never resolve. The sponsor button waits on the P6 sub-feature flag,
-        // which is off until then, so it never renders yet.
+        // the whole feature:action:value token and never resolve. The sponsor button is drawn only when the sponsor
+        // sub-group is enabled, which the subject carries from config.
         bindings.condition("pwarp-viewer-can", this::viewerCan);
         bindings.condition(
                 "playerwarps:manage-sponsor", (ctx, args) -> subject(ctx).sponsorEnabled());
@@ -168,6 +179,7 @@ public final class PlayerWarpManageMenu {
         bindings.action("pwarp-price", this::setPrice);
         bindings.action("pwarp-password", this::setPassword);
         bindings.action("pwarp-transfer", this::transfer);
+        bindings.action("pwarp-sponsor", this::buySponsor);
         bindings.action("playerwarps:manage-access", this::cycleAccess);
         bindings.action("playerwarps:manage-clearpw", this::clearPassword);
         bindings.action("playerwarps:manage-move", this::move);
@@ -206,7 +218,7 @@ public final class PlayerWarpManageMenu {
                 notifier.send(viewer, PlayerWarpError.NO_PERMISSION.messageKey(), Map.of("warp", name.value()));
                 return;
             }
-            menus.open(viewer, MANAGE_SPEC_ID, new Subject(warp, role.get(), false));
+            menus.open(viewer, MANAGE_SPEC_ID, new Subject(warp, role.get(), sponsorEnabled));
         });
     }
 
@@ -364,6 +376,30 @@ public final class PlayerWarpManageMenu {
                 open(viewer, name);
             }
         });
+    }
+
+    /**
+     * Buy sponsorship for the warp with the term typed on the prompt (blank or unparsable falls back to the configured
+     * default). The purchase — the guarded owner debit and the slot write — runs off the tick thread through
+     * {@link BuySponsorship}, which delivers its own success or refusal notice; the panel reopens so the new state shows.
+     */
+    private void buySponsor(MenuActionContext ctx) {
+        PlayerRef viewer = ctx.viewer();
+        PlayerWarpName name = subject(ctx).name();
+        int days = parseDays(ctx.arg());
+        scheduler.async(() -> {
+            buySponsorship.buy(viewer, name, days);
+            open(viewer, name);
+        });
+    }
+
+    /** The term from a typed line, or the configured default when it is blank or not a positive integer. */
+    private int parseDays(String raw) {
+        try {
+            return Math.max(1, Integer.parseInt(raw.strip()));
+        } catch (NumberFormatException notANumber) {
+            return sponsorDefaultDays;
+        }
     }
 
     /** Archive the warp (a recoverable delete; the confirm's accept branch) off the tick thread; the window stays closed. */

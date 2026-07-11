@@ -96,6 +96,13 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_CANNOT_TARGET_OWNER("pwarp.cannot-target-owner"),
     PWARP_RESERVED_NAME("pwarp.reserved-name"),
 
+    // sponsorship — paid, time-limited pinned browse placement bought by the owner
+    PWARP_SPONSORED("pwarp.sponsored"),
+    PWARP_SPONSORED_LOCKED("pwarp.sponsored-locked"),
+    PWARP_SPONSOR_COOLDOWN("pwarp.sponsor-cooldown"),
+    PWARP_SPONSOR_LIMIT("pwarp.sponsor-limit"),
+    PWARP_SPONSOR_FULL("pwarp.sponsor-full"),
+
     // rent lifecycle — the offline reminder mail and the system sender it is left under
     PWARP_RENT_REMINDER("pwarp.rent.reminder"),
     PWARP_RENT_MAIL_SENDER("pwarp.rent.mail-sender"),
@@ -128,6 +135,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_BROWSE_LORE_FAVOURITES("pwarp.gui.browse.lore-favourites"),
     PWARP_GUI_BROWSE_LORE_PRICE("pwarp.gui.browse.lore-price"),
     PWARP_GUI_BROWSE_LORE_ACCESS("pwarp.gui.browse.lore-access"),
+    PWARP_GUI_BROWSE_LORE_SPONSORED("pwarp.gui.browse.lore-sponsored"),
     PWARP_GUI_BROWSE_LORE_CLICK("pwarp.gui.browse.lore-click"),
     PWARP_GUI_BROWSE_PREV("pwarp.gui.browse.prev"),
     PWARP_GUI_BROWSE_NEXT("pwarp.gui.browse.next"),
@@ -199,6 +207,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_MANAGE_TRANSFER_PROMPT("pwarp.gui.manage.transfer-prompt"),
     PWARP_GUI_MANAGE_TRANSFER_CONFIRM("pwarp.gui.manage.transfer-confirm"),
     PWARP_GUI_MANAGE_SPONSOR("pwarp.gui.manage.sponsor"),
+    PWARP_GUI_MANAGE_SPONSOR_PROMPT("pwarp.gui.manage.sponsor-prompt"),
     PWARP_GUI_MANAGE_DELETE("pwarp.gui.manage.delete"),
     PWARP_GUI_MANAGE_DELETE_CONFIRM("pwarp.gui.manage.delete-confirm"),
     PWARP_GUI_MANAGE_BACK("pwarp.gui.manage.back"),
@@ -215,6 +224,8 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_CATEGORIES_ENTRY_NAME("pwarp.gui.categories.entry-name"),
     PWARP_GUI_CATEGORIES_ENTRY_LORE("pwarp.gui.categories.entry-lore"),
     PWARP_GUI_CATEGORIES_SPONSOR("pwarp.gui.categories.sponsor"),
+    PWARP_GUI_CATEGORIES_SPONSOR_NAME("pwarp.gui.categories.sponsor-name"),
+    PWARP_GUI_CATEGORIES_SPONSOR_LORE("pwarp.gui.categories.sponsor-lore"),
     PWARP_GUI_CATEGORIES_PREV("pwarp.gui.categories.prev"),
     PWARP_GUI_CATEGORIES_NEXT("pwarp.gui.categories.next"),
     PWARP_GUI_CATEGORIES_CLOSE("pwarp.gui.categories.close"),

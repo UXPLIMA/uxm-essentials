@@ -299,18 +299,31 @@ class PwarpManageMenuTest {
                 prompt);
         server.getPluginManager().registerEvents(listener, plugin);
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(new KeyMessages(), noopSink());
+        WarpAuthorization authorization = new WarpAuthorization(members);
+        com.uxplima.uxmessentials.playerwarps.application.SponsorConfig sponsorConfig =
+                com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled();
+        com.uxplima.uxmessentials.playerwarps.application.BuySponsorship buySponsorship =
+                new com.uxplima.uxmessentials.playerwarps.application.BuySponsorship(
+                        repository,
+                        authorization,
+                        java.util.Optional.empty(),
+                        notifier,
+                        sponsorConfig,
+                        java.time.Clock.systemUTC());
         menu = new PlayerWarpManageMenu(
                 menus,
                 scheduler,
                 repository,
-                new WarpAuthorization(members),
+                authorization,
                 editPlayerWarp,
                 withdrawEarnings,
                 transferPlayerWarp,
                 archivePlayerWarp,
+                buySponsorship,
                 mock(PlayerLookup.class),
                 new KeyMessages(),
                 notifier,
+                sponsorConfig,
                 (ref, name) -> {},
                 (ref, name) -> {},
                 (ref, name) -> {},

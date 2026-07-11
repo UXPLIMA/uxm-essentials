@@ -64,4 +64,12 @@ public interface PlayerWarpEconomy {
 
     /** Credit {@code amount} of {@code currencyId} back to {@code to}, used by the refund paths in P7. */
     Result<Unit, ChargeError> refund(PlayerRef to, BigDecimal amount, String currencyId);
+
+    /**
+     * Guarded debit of {@code owner} by {@code amount} in {@code currencyId}, with nowhere to accrue — the sponsorship
+     * fee leaves circulation (deflationary, like the rent shortfall and the entry-fee cut), so this is a plain owner
+     * debit and nothing is banked. The debit is the DB-guarded, double-spend-safe point; there is no check-then-charge,
+     * so it either takes in full or reports {@link ChargeError#INSUFFICIENT_FUNDS}. Used by {@code BuySponsorship}.
+     */
+    Result<Unit, ChargeError> chargeOwner(PlayerRef owner, BigDecimal amount, String currencyId);
 }

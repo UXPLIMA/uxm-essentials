@@ -289,6 +289,60 @@ class JooqPlayerWarpRepositoryTest {
         assertThat(remindedStage(id)).isZero();
     }
 
+    @Test
+    void activeSponsorCountAndSlotsReadOnlyLiveSponsors() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        seedSponsor("live-a", OWNER, now.plusSeconds(3600), 0);
+        seedSponsor("live-b", OTHER, now.plusSeconds(7200), 2);
+        seedSponsor("expired", OWNER, now.minusSeconds(60), 1); // lapsed — not live
+        repo.save(newWarp(OWNER, "plain", 1L)); // never sponsored
+
+        assertThat(repo.activeSponsorSlots(now)).containsExactlyInAnyOrder(0, 2);
+        assertThat(repo.activeSponsorCount(OWNER, now)).isEqualTo(1);
+        assertThat(repo.activeSponsorCount(OTHER, now)).isEqualTo(1);
+    }
+
+    @Test
+    void expiredSponsorshipsReturnsLapsedSlottedWarpsOldestExpiryFirst() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        seedSponsor("older", OWNER, now.minusSeconds(7200), 0);
+        seedSponsor("newer", OWNER, now.minusSeconds(3600), 1);
+        seedSponsor("still-live", OWNER, now.plusSeconds(3600), 2); // not yet lapsed
+
+        assertThat(repo.expiredSponsorships(now, 10))
+                .extracting(w -> w.name().value())
+                .containsExactly("older", "newer");
+    }
+
+    @Test
+    void expireSponsorshipFreesTheSlotAndStampsTheCooldown() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        PlayerWarpId id = seedSponsor("lapsed", OWNER, now.minusSeconds(60), 3);
+        Instant cooldownUntil = now.plusSeconds(259_200);
+
+        repo.expireSponsorship(id, cooldownUntil);
+
+        assertThat(repo.sponsorCooldownUntil(id)).contains(cooldownUntil);
+        assertThat(sponsorSlotOf(id)).isNull(); // the slot is freed
+        // A freed slot no longer counts as active nor as a re-sweep candidate.
+        assertThat(repo.activeSponsorSlots(now)).doesNotContain(3);
+        assertThat(repo.expiredSponsorships(now, 10)).isEmpty();
+    }
+
+    private PlayerWarpId seedSponsor(String name, PlayerRef owner, Instant until, int slot) {
+        Instant stamp = Instant.ofEpochMilli(1L);
+        return repo.save(newWarp(owner, name, 1L).withSponsorship(Optional.of(new Sponsorship(until, slot)), stamp));
+    }
+
+    private @org.jspecify.annotations.Nullable Integer sponsorSlotOf(PlayerWarpId id) {
+        return persistence
+                .dsl()
+                .select(PLAYER_WARPS.SPONSOR_SLOT)
+                .from(PLAYER_WARPS)
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .fetchOne(PLAYER_WARPS.SPONSOR_SLOT);
+    }
+
     private PlayerWarpId seedRent(String name, WarpStatus status, RentState rent) {
         Instant stamp = Instant.ofEpochMilli(1L);
         return repo.save(newWarp(OWNER, name, 1L).withStatus(status, stamp).withRent(rent, stamp));

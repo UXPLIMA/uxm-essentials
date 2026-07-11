@@ -238,6 +238,11 @@ class RentSweepTest {
                 PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId) {
             return Result.ok();
         }
+
+        @Override
+        public Result<Unit, ChargeError> chargeOwner(PlayerRef owner, BigDecimal amount, String currencyId) {
+            return Result.ok();
+        }
     }
 
     /** Counts the reminder mails the pass leaves. */

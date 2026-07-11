@@ -56,8 +56,13 @@ public final class TransferPlayerWarp {
             notifier.send(actor, PlayerWarpError.NO_PERMISSION.messageKey(), Map.of("warp", name.value()));
             return Result.err(PlayerWarpError.NO_PERMISSION);
         }
-        // A sponsored warp cannot be transferred (spec §6). Sponsorship lands in P6, so the guard hook belongs here
-        // when it does; today no warp is sponsored, so there is nothing to check yet.
+        // A sponsored warp cannot be transferred (spec §6): a paid pinned slot is bought against the owner, and the
+        // per-player concurrent cap and the post-expiry cooldown are both keyed to the current owner, so handing the
+        // warp off mid-sponsorship would let a colluding pair sidestep either. Refuse until the sponsorship lapses.
+        if (isSponsored(warp)) {
+            notifier.send(actor, PlayerWarpError.SPONSORED_LOCKED.messageKey(), Map.of("warp", name.value()));
+            return Result.err(PlayerWarpError.SPONSORED_LOCKED);
+        }
         repository.save(warp.transferredTo(newOwner, newOwner.name(), clock.instant()));
         notifier.send(
                 actor,
@@ -80,7 +85,21 @@ public final class TransferPlayerWarp {
         if (found.isEmpty()) {
             return Result.err(PlayerWarpError.NOT_FOUND);
         }
-        repository.save(found.get().transferredTo(newOwner, newOwner.name(), clock.instant()));
+        PlayerWarp warp = found.get();
+        // The admin path is by-id and skips the role gate, but the sponsored-lock is not an authorization rule — it
+        // protects the sponsorship invariants, which an operator reassignment would break just as an owner one would,
+        // so it holds here too. The command renders the operator-facing result itself.
+        if (isSponsored(warp)) {
+            return Result.err(PlayerWarpError.SPONSORED_LOCKED);
+        }
+        repository.save(warp.transferredTo(newOwner, newOwner.name(), clock.instant()));
         return Result.ok();
+    }
+
+    /** True while {@code warp} holds a sponsorship still live at the current instant. */
+    private boolean isSponsored(PlayerWarp warp) {
+        return warp.sponsorship()
+                .map(sponsorship -> sponsorship.isActiveAt(clock.instant()))
+                .orElse(false);
     }
 }

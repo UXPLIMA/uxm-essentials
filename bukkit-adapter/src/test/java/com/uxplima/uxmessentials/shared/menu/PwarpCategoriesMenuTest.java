@@ -184,7 +184,14 @@ class PwarpCategoriesMenuTest {
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
-        menu = new PlayerWarpCategoriesMenu(menus, scheduler, new StubCategories(), this::recordBrowse);
+        menu = new PlayerWarpCategoriesMenu(
+                menus,
+                scheduler,
+                new StubCategories(),
+                query -> new com.uxplima.uxmessentials.playerwarps.domain.Page<>(java.util.List.of(), 0L, 0, 50),
+                this::recordBrowse,
+                (viewer, name) -> {},
+                com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled());
         menu.register(bindings, dataFolder, NOOP);
     }
 

@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrows
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpCategoriesMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
@@ -16,6 +17,7 @@ import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
@@ -58,6 +60,9 @@ import org.jspecify.annotations.NullMarked;
  * @param editPlayerWarp {@code /pwarp rename|displayname|description|icon|category|access|password|price|move} —
  *     the single-warp edit verbs, each gated on its own {@code WarpCapability} inside the use case
  * @param transferPlayerWarp {@code /pwarp transfer <name> <player>} — hand a warp to a new owner (owner-only)
+ * @param buySponsorship {@code /pwarp sponsor <name> [days]} — buy a paid pinned browse slot (owner-only)
+ * @param sponsorConfig the sponsor sub-group tunables; the command reads its {@code enabled} flag to gate the
+ *     {@code sponsor} subcommand's registration and its {@code duration-days} as the default term
  */
 @NullMarked
 public record PlayerWarpServices(
@@ -80,7 +85,9 @@ public record PlayerWarpServices(
         ManageBans manageBans,
         WithdrawEarnings withdrawEarnings,
         EditPlayerWarp editPlayerWarp,
-        TransferPlayerWarp transferPlayerWarp) {
+        TransferPlayerWarp transferPlayerWarp,
+        BuySponsorship buySponsorship,
+        SponsorConfig sponsorConfig) {
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
@@ -102,6 +109,8 @@ public record PlayerWarpServices(
         Objects.requireNonNull(withdrawEarnings, "withdrawEarnings");
         Objects.requireNonNull(editPlayerWarp, "editPlayerWarp");
         Objects.requireNonNull(transferPlayerWarp, "transferPlayerWarp");
+        Objects.requireNonNull(buySponsorship, "buySponsorship");
+        Objects.requireNonNull(sponsorConfig, "sponsorConfig");
     }
 
     /**

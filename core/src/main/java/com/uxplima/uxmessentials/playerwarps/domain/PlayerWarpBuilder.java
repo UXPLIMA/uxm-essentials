@@ -36,7 +36,7 @@ final class PlayerWarpBuilder {
     private final RatingSummary ratings;
     private final VisitSummary visits;
     private final int favouriteCount;
-    private final Optional<Sponsorship> sponsorship;
+    private Optional<Sponsorship> sponsorship;
     private Optional<RentState> rent;
     private WarpEffects effects;
     private WarpTimingOverrides timing;
@@ -98,6 +98,11 @@ final class PlayerWarpBuilder {
 
     PlayerWarpBuilder rent(Optional<RentState> value) {
         this.rent = value;
+        return this;
+    }
+
+    PlayerWarpBuilder sponsorship(Optional<Sponsorship> value) {
+        this.sponsorship = value;
         return this;
     }
 

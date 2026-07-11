@@ -191,6 +191,29 @@ class PwarpBrowseMenuTest {
     }
 
     @Test
+    void theSourcePinsActiveSponsorsAndDropsThemFromTheScrollingFlow() {
+        browse.seed(cards(TOTAL)); // the flow includes warp0
+        browse.seedSponsors(List.of(sponsorCard())); // ...which is also the active sponsor
+        wireEngine(new com.uxplima.uxmessentials.playerwarps.application.SponsorConfig(
+                true, 5, 7, BigDecimal.valueOf(1000), "default", 1, java.time.Duration.ofDays(3)));
+        var source = bindings.pagedList(PlayerWarpBrowseMenu.LIST_SOURCE).orElseThrow();
+
+        PagedResult<?> page = source.apply(subjectContext(), new PageRequest(0, PAGE_SIZE, "rating", Map.of()));
+
+        // The active sponsor is pinned to the top content slot, flagged sponsored, on the page.
+        assertThat(page.pinned()).hasSize(1);
+        PlayerWarpBrowseMenu.Tile pinned =
+                (PlayerWarpBrowseMenu.Tile) page.pinned().get(0);
+        assertThat(pinned.name()).isEqualTo("warp0");
+        assertThat(pinned.pinnedSlot()).isZero();
+        assertThat(pinned.sponsored()).isTrue();
+        // ...and it is never drawn a second time in the scrolling flow.
+        assertThat(page.rows())
+                .noneSatisfy(row ->
+                        assertThat(((PlayerWarpBrowseMenu.Tile) row).name()).isEqualTo("warp0"));
+    }
+
+    @Test
     void theOwnerAndFavouritesPresetFiltersNarrowTheQueryToThatSubject() {
         browse.seed(cards(TOTAL));
         wireEngine();
@@ -271,8 +294,13 @@ class PwarpBrowseMenuTest {
         return top();
     }
 
-    /** Build a real engine wired with the paged registry and the list controls, then register the browse menu on it. */
+    /** Build a real engine and register the browse menu with the sponsor sub-group off (the default for most tests). */
     private void wireEngine() {
+        wireEngine(com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled());
+    }
+
+    /** Build a real engine wired with the paged registry and the list controls, then register the browse menu on it. */
+    private void wireEngine(com.uxplima.uxmessentials.playerwarps.application.SponsorConfig sponsorConfig) {
         bindings = new MenuBindings();
         ListControlActions.register(bindings, NOOP);
         GuiText guiText = new GuiText(new KeyMessages());
@@ -303,7 +331,13 @@ class PwarpBrowseMenuTest {
                 bindings.pagedLists());
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
         menu = new PlayerWarpBrowseMenu(
-                menus, scheduler, browse, usePlayerWarp, new KeyMessages(), (v, name) -> viewOpened.add(name));
+                menus,
+                scheduler,
+                browse,
+                usePlayerWarp,
+                new KeyMessages(),
+                (v, name) -> viewOpened.add(name),
+                sponsorConfig);
         menu.register(bindings, dataFolder, NOOP);
     }
 
@@ -346,6 +380,29 @@ class PwarpBrowseMenuTest {
         return IntStream.range(0, count).mapToObj(PwarpBrowseMenuTest::card).toList();
     }
 
+    /** A card for warp0 flagged as a live sponsor, so it pins and drops from the flow that also holds warp0. */
+    private static WarpCard sponsorCard() {
+        return new WarpCard(
+                PlayerWarpId.of(1),
+                "warp0",
+                null,
+                "Owner",
+                "world",
+                null,
+                null,
+                null,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                BigDecimal.ZERO,
+                "default",
+                WarpAccess.PUBLIC,
+                true,
+                false);
+    }
+
     private static WarpCard card(int i) {
         return new WarpCard(
                 PlayerWarpId.of(i + 1),
@@ -380,9 +437,14 @@ class PwarpBrowseMenuTest {
     private static final class SpyBrowse implements PlayerWarpBrowse {
         private final List<WarpQuery> queries = new CopyOnWriteArrayList<>();
         private List<WarpCard> cards = List.of();
+        private List<WarpCard> sponsors = List.of();
 
         void seed(List<WarpCard> cards) {
             this.cards = List.copyOf(cards);
+        }
+
+        void seedSponsors(List<WarpCard> sponsors) {
+            this.sponsors = List.copyOf(sponsors);
         }
 
         WarpQuery last() {
@@ -395,6 +457,11 @@ class PwarpBrowseMenuTest {
             int from = Math.min(query.page() * query.pageSize(), cards.size());
             int to = Math.min(from + query.pageSize(), cards.size());
             return new Page<>(cards.subList(from, to), cards.size(), query.page(), query.pageSize());
+        }
+
+        @Override
+        public List<WarpCard> activeSponsors(int limit) {
+            return sponsors.subList(0, Math.min(limit, sponsors.size()));
         }
     }
 

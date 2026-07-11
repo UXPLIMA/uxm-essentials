@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -248,6 +249,69 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
         Objects.requireNonNull(id, "id");
         write(dsl -> dsl.update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.RENT_REMINDED_STAGE, stage)
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .execute());
+    }
+
+    @Override
+    public Optional<Instant> sponsorCooldownUntil(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        return read(dsl -> dsl.select(PLAYER_WARPS.SPONSOR_COOLDOWN_UNTIL)
+                .from(PLAYER_WARPS)
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .fetchOptional(PLAYER_WARPS.SPONSOR_COOLDOWN_UNTIL)
+                .filter(Objects::nonNull)
+                .map(Instant::ofEpochMilli));
+    }
+
+    @Override
+    public int activeSponsorCount(PlayerRef owner, Instant now) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(now, "now");
+        return read(dsl -> dsl.fetchCount(
+                PLAYER_WARPS,
+                PLAYER_WARPS
+                        .OWNER
+                        .eq(owner.uuid().toString())
+                        .and(PLAYER_WARPS.SPONSORED_UNTIL.isNotNull())
+                        .and(PLAYER_WARPS.SPONSORED_UNTIL.gt(now.toEpochMilli()))));
+    }
+
+    @Override
+    public Set<Integer> activeSponsorSlots(Instant now) {
+        Objects.requireNonNull(now, "now");
+        return read(dsl -> dsl.select(PLAYER_WARPS.SPONSOR_SLOT)
+                .from(PLAYER_WARPS)
+                .where(PLAYER_WARPS.SPONSOR_SLOT.isNotNull())
+                .and(PLAYER_WARPS.SPONSORED_UNTIL.isNotNull())
+                .and(PLAYER_WARPS.SPONSORED_UNTIL.gt(now.toEpochMilli()))
+                .fetchSet(PLAYER_WARPS.SPONSOR_SLOT));
+    }
+
+    @Override
+    public List<PlayerWarp> expiredSponsorships(Instant now, int limit) {
+        Objects.requireNonNull(now, "now");
+        // Bounded index range scan on idx_player_warps_sponsored, oldest-expiry first, never a full-table scan. A warp
+        // whose slot is already freed (NULL sponsor_slot) never matches, so a second sweep pass skips it.
+        return read(dsl -> dsl.selectFrom(PLAYER_WARPS)
+                .where(PLAYER_WARPS.SPONSOR_SLOT.isNotNull())
+                .and(PLAYER_WARPS.SPONSORED_UNTIL.isNotNull())
+                .and(PLAYER_WARPS.SPONSORED_UNTIL.le(now.toEpochMilli()))
+                .orderBy(PLAYER_WARPS.SPONSORED_UNTIL.asc(), PLAYER_WARPS.ID.asc())
+                .limit(limit)
+                .fetch()
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
+    }
+
+    @Override
+    public void expireSponsorship(PlayerWarpId id, Instant cooldownUntil) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(cooldownUntil, "cooldownUntil");
+        // Free the slot and stamp the cooldown in one guarded UPDATE; sponsored_until is left as-is (now in the past),
+        // so the freed slot no longer counts as active either way.
+        write(dsl -> dsl.update(PLAYER_WARPS)
+                .setNull(PLAYER_WARPS.SPONSOR_SLOT)
+                .set(PLAYER_WARPS.SPONSOR_COOLDOWN_UNTIL, cooldownUntil.toEpochMilli())
                 .where(PLAYER_WARPS.ID.eq(id.value()))
                 .execute());
     }

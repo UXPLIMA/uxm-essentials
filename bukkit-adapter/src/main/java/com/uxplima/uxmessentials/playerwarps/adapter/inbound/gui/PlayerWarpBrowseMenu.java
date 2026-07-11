@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
+import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.domain.Page;
@@ -35,6 +37,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PinnedEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
@@ -96,6 +99,8 @@ public final class PlayerWarpBrowseMenu {
     private final UsePlayerWarp usePlayerWarp;
     private final Messages messages;
     private final BiConsumer<PlayerRef, PlayerWarpName> openView;
+    private final boolean sponsorEnabled;
+    private final int sponsorSlots;
 
     public PlayerWarpBrowseMenu(
             Menus menus,
@@ -103,13 +108,17 @@ public final class PlayerWarpBrowseMenu {
             PlayerWarpBrowse browse,
             UsePlayerWarp usePlayerWarp,
             Messages messages,
-            BiConsumer<PlayerRef, PlayerWarpName> openView) {
+            BiConsumer<PlayerRef, PlayerWarpName> openView,
+            SponsorConfig sponsorConfig) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.browse = Objects.requireNonNull(browse, "browse");
         this.usePlayerWarp = Objects.requireNonNull(usePlayerWarp, "usePlayerWarp");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.openView = Objects.requireNonNull(openView, "openView");
+        Objects.requireNonNull(sponsorConfig, "sponsorConfig");
+        this.sponsorEnabled = sponsorConfig.enabled();
+        this.sponsorSlots = sponsorConfig.slots();
     }
 
     /** Register the paged source, the tile placeholders, the click action, and the spec; called once at wiring time. */
@@ -153,17 +162,70 @@ public final class PlayerWarpBrowseMenu {
     private PagedResult<Tile> page(MenuContext ctx, PageRequest request) {
         Subject subject = ctx.subject(Subject.class);
         Map<String, String> filters = merge(subject.presetFilters(), request.filters());
+        List<Tile> pinned = pinnedSponsors(request.size());
+        if (pinned.isEmpty()) {
+            WarpQuery query = query(
+                    ctx.viewer().uuid(),
+                    subject.viewerPosition(),
+                    resolveSort(request.sort()),
+                    request.page(),
+                    pageSize(request.size()),
+                    filters);
+            Page<WarpCard> page = browse.page(query);
+            List<Tile> tiles =
+                    page.items().stream().map(PlayerWarpBrowseMenu::toTile).toList();
+            return PagedResult.of(tiles, page.totalCount());
+        }
+        // Pinned sponsors claim the top content slots on every page, so the flow only has the remaining slots to fill:
+        // window the read by that effective size and report a total that makes the engine's pageCount — which divides
+        // by the full grid size — page the flow correctly over the smaller window. The pinned warps are dropped from
+        // the flow so a sponsor is never drawn twice.
+        int effective = Math.max(1, request.size() - pinned.size());
         WarpQuery query = query(
                 ctx.viewer().uuid(),
                 subject.viewerPosition(),
                 resolveSort(request.sort()),
                 request.page(),
-                pageSize(request.size()),
+                pageSize(effective),
                 filters);
         Page<WarpCard> page = browse.page(query);
-        List<Tile> tiles =
-                page.items().stream().map(PlayerWarpBrowseMenu::toTile).toList();
-        return PagedResult.of(tiles, page.totalCount());
+        Set<String> pinnedNames = pinned.stream().map(Tile::name).collect(Collectors.toUnmodifiableSet());
+        List<Tile> tiles = page.items().stream()
+                .filter(card -> !pinnedNames.contains(card.name()))
+                .map(PlayerWarpBrowseMenu::toTile)
+                .toList();
+        return new PagedResult<>(tiles, reportedTotal(page.totalCount(), effective, request.size()), pinned);
+    }
+
+    /**
+     * The active sponsors as pinned tiles, ordered by their slot and capped to what the config allows and the page
+     * can hold. A bounded off-tick read via the browse read model; empty when the sponsor sub-group is off, so a
+     * disabled sub-group pins nothing.
+     */
+    private List<Tile> pinnedSponsors(int size) {
+        if (!sponsorEnabled || sponsorSlots <= 0) {
+            return List.of();
+        }
+        int limit = Math.min(sponsorSlots, size);
+        List<WarpCard> sponsors = browse.activeSponsors(limit);
+        List<Tile> pinned = new ArrayList<>();
+        for (int i = 0; i < sponsors.size() && i < limit; i++) {
+            pinned.add(toTile(sponsors.get(i), i));
+        }
+        return pinned;
+    }
+
+    /**
+     * The total to report so the engine's {@code pageCount(size)} — which divides the reported total by the full grid
+     * {@code size} — yields the number of pages a flow windowed by {@code effective} actually needs. Only the page-nav
+     * bounding reads this total; the browse shows no count.
+     */
+    private static long reportedTotal(long realTotal, int effective, int size) {
+        if (realTotal <= 0) {
+            return 0L;
+        }
+        long pages = (realTotal + effective - 1) / effective;
+        return pages * (long) size;
     }
 
     /**
@@ -255,6 +317,9 @@ public final class PlayerWarpBrowseMenu {
                 viewer,
                 PlayerwarpsMessageKey.PWARP_GUI_BROWSE_LORE_ACCESS,
                 Map.of("access", tile.access().name().toLowerCase(Locale.ROOT))));
+        if (tile.sponsored()) {
+            lines.add(resolve(viewer, PlayerwarpsMessageKey.PWARP_GUI_BROWSE_LORE_SPONSORED, Map.of()));
+        }
         lines.add(
                 resolve(viewer, PlayerwarpsMessageKey.PWARP_GUI_BROWSE_LORE_CLICK, Map.of("warp", displayName(tile))));
         return String.join("\n", lines);
@@ -283,8 +348,16 @@ public final class PlayerWarpBrowseMenu {
         scheduler.async(() -> usePlayerWarp.useFor(viewer, name, Optional.empty()));
     }
 
-    /** Map a read-model card to the render-only tile the placeholders read; pure data, safe on the query thread. */
+    /** Map a read-model card to a flow tile (never pinned); pure data, safe on the query thread. */
     private static Tile toTile(WarpCard card) {
+        return toTile(card, Tile.FLOWS);
+    }
+
+    /**
+     * Map a read-model card to a tile pinned to {@code pinnedSlot} (or {@link Tile#FLOWS} to scroll with the flow).
+     * Pure data — no message resolution and no Bukkit call — so it is safe on the off-thread page query.
+     */
+    private static Tile toTile(WarpCard card, int pinnedSlot) {
         return new Tile(
                 card.name(),
                 card.displayName(),
@@ -298,7 +371,9 @@ public final class PlayerWarpBrowseMenu {
                 card.favourites(),
                 card.price(),
                 card.currency(),
-                card.access());
+                card.access(),
+                card.sponsored(),
+                pinnedSlot);
     }
 
     private static String displayName(Tile tile) {
@@ -431,7 +506,13 @@ public final class PlayerWarpBrowseMenu {
             int favourites,
             BigDecimal price,
             String currency,
-            WarpAccess access) {
+            WarpAccess access,
+            boolean sponsored,
+            int pinnedSlot)
+            implements PinnedEntry {
+
+        /** The pinned-slot sentinel for a tile that flows through the scrolling content slots rather than a fixed one. */
+        public static final int FLOWS = -1;
 
         public Tile {
             Objects.requireNonNull(name, "name");
@@ -440,6 +521,12 @@ public final class PlayerWarpBrowseMenu {
             Objects.requireNonNull(price, "price");
             Objects.requireNonNull(currency, "currency");
             Objects.requireNonNull(access, "access");
+        }
+
+        /** The content slot a sponsored tile pins to, or {@link #FLOWS} for an ordinary tile that scrolls. */
+        @Override
+        public int pinnedSlot() {
+            return pinnedSlot;
         }
     }
 }

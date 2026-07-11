@@ -230,6 +230,22 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         return economy.credit(to, Money.of(currency, amount)).mapErr(JooqPlayerWarpEconomy::chargeErrorFor);
     }
 
+    @Override
+    public Result<Unit, ChargeError> chargeOwner(PlayerRef owner, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(amount, "amount");
+        Objects.requireNonNull(currencyId, "currencyId");
+        Currency currency = resolve(currencyId);
+        BigDecimal due = currency.normalize(amount);
+        if (due.signum() <= 0) {
+            return Result.ok();
+        }
+        // A plain guarded owner debit with nowhere to accrue — the sponsorship fee leaves circulation, exactly like
+        // the entry-fee cut and the rent shortfall. The debit is the DB-guarded, double-spend-safe point, so there is
+        // no check-then-charge: it either takes in full or reports INSUFFICIENT_FUNDS.
+        return economy.debit(owner, Money.of(currency, due)).mapErr(JooqPlayerWarpEconomy::chargeErrorFor);
+    }
+
     /**
      * {@code net = price − cut}, where {@code cut = price × cutPercent / 100}, each figure scaled to the
      * currency's precision so the banked amount never carries stray digits. The cut is not credited anywhere —

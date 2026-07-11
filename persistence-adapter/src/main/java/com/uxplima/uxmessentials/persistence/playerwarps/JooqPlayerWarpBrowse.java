@@ -100,6 +100,29 @@ public final class JooqPlayerWarpBrowse extends JooqRepository implements Player
         });
     }
 
+    @Override
+    public List<WarpCard> activeSponsors(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        long now = clock.millis();
+        // A small bounded read ordered by sponsor_slot for the pinned browse tiles — the sponsors live at
+        // sponsored_until > now with a slot, indexed on idx_player_warps_sponsored, capped at limit. No viewer join is
+        // needed (the pinned tiles carry no per-viewer favourite marker), so the favourite column reads as absent.
+        return read(dsl -> dsl.select(CARD_FIELDS)
+                .from(PLAYER_WARPS)
+                .leftJoin(VF)
+                .on(DSL.falseCondition())
+                .where(PLAYER_WARPS.SPONSOR_SLOT.isNotNull())
+                .and(PLAYER_WARPS.SPONSORED_UNTIL.isNotNull())
+                .and(PLAYER_WARPS.SPONSORED_UNTIL.gt(now))
+                .and(PLAYER_WARPS.STATUS.eq(WarpStatus.ACTIVE.name()))
+                .and(PLAYER_WARPS.ACCESS.eq(WarpAccess.PUBLIC.name()))
+                .orderBy(PLAYER_WARPS.SPONSOR_SLOT.asc(), PLAYER_WARPS.ID.asc())
+                .limit(limit)
+                .fetch(record -> toCard(record, now)));
+    }
+
     private static long countMatching(DSLContext dsl, Condition where) {
         Integer count = dsl.selectCount().from(PLAYER_WARPS).where(where).fetchOne(0, Integer.class);
         return count == null ? 0L : count;

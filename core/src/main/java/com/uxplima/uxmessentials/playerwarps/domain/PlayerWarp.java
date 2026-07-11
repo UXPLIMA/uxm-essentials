@@ -200,6 +200,18 @@ public record PlayerWarp(
     }
 
     /**
+     * A copy carrying a new (or cleared) {@link Sponsorship}, stamping {@code now} as the edit time. Buying a
+     * sponsorship sets the promoted slot and its expiry; the sponsor expiry sweep frees the slot through the
+     * persistence-only {@code sponsor_slot}/{@code sponsor_cooldown_until} writer rather than this whole-aggregate
+     * edit, so the two stay orthogonal (as the rent transition does).
+     */
+    public PlayerWarp withSponsorship(Optional<Sponsorship> newSponsorship, Instant now) {
+        Objects.requireNonNull(newSponsorship, "newSponsorship");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().sponsorship(newSponsorship).updatedAt(now).build();
+    }
+
+    /**
      * A copy addressed by a different globally-unique {@link PlayerWarpName}, stamping {@code now} as the edit
      * time. The surrogate id is unchanged, so this renames the same row in place rather than creating a new warp.
      */

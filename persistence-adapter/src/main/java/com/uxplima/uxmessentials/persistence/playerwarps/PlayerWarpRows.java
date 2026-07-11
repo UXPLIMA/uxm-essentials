@@ -157,11 +157,14 @@ final class PlayerWarpRows {
 
     private static Optional<Sponsorship> sponsorship(PlayerWarpsRecord row) {
         Long until = row.getSponsoredUntil();
-        if (until == null) {
+        Integer slot = row.getSponsorSlot();
+        // A sponsorship is a promotion in a numbered slot, so it needs both facets. The expiry sweep frees the slot
+        // (NULL) while leaving the now-past sponsored_until behind, so a slot-freed row carries no live sponsorship —
+        // and a subsequent whole-aggregate save writes both back as NULL, self-healing the stale timestamp.
+        if (until == null || slot == null) {
             return Optional.empty();
         }
-        Integer slot = row.getSponsorSlot();
-        return Optional.of(new Sponsorship(Instant.ofEpochMilli(until), slot == null ? 0 : slot));
+        return Optional.of(new Sponsorship(Instant.ofEpochMilli(until), slot));
     }
 
     private static Optional<RentState> rent(PlayerWarpsRecord row) {

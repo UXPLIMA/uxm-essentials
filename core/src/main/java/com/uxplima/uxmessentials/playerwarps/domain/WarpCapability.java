@@ -43,5 +43,8 @@ public enum WarpCapability {
     MANAGE_MEMBERS,
 
     /** Withdraw the warp's accrued earnings to the owner's balance. */
-    WITHDRAW
+    WITHDRAW,
+
+    /** Buy a paid, time-limited sponsored browse slot for the warp — spends the owner's own money, owner-only. */
+    SPONSOR
 }

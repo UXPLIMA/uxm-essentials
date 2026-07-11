@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.playerwarps.application.port;
 
+import java.util.List;
+
 import com.uxplima.uxmessentials.playerwarps.domain.Page;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCard;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpQuery;
@@ -19,4 +21,14 @@ public interface PlayerWarpBrowse {
 
     /** One page of cards matching {@code query}, ordered by its {@link WarpQuery#sort()}, with the total count. */
     Page<WarpCard> page(WarpQuery query);
+
+    /**
+     * The currently-active sponsors ({@code sponsored_until > now} with a slot), ordered by {@code sponsor_slot}, capped
+     * at {@code limit} — a small bounded read for the pinned browse slots, never a full-table scan. Each returned card's
+     * {@link WarpCard#sponsored()} is {@code true}. The default returns an empty list so a store that does not implement
+     * it simply pins nothing; the jOOQ read model overrides it.
+     */
+    default List<WarpCard> activeSponsors(int limit) {
+        return List.of();
+    }
 }
