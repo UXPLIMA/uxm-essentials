@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.migration.RecordWriter;
 import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
+import com.uxplima.uxmessentials.migration.convert.athelion.AthelionPlayerWarpsConvert;
 import com.uxplima.uxmessentials.migration.convert.ax.AxPlayerWarpsConfig;
 import com.uxplima.uxmessentials.migration.convert.ax.AxPlayerWarpsConvert;
 import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsConvert;
@@ -125,6 +126,7 @@ public final class MigrationWiring {
         built.add(new DecentHologramsConvert(worlds, decentHologramsDirectory(plugin)));
         built.add(new FancyHologramsConvert(worlds, fancyHologramsFile(plugin)));
         built.add(new AxPlayerWarpsConvert(axPlayerWarpsConfig(plugin, migrationConfig), worlds, log));
+        built.add(new AthelionPlayerWarpsConvert(worlds, athelionDataFile(plugin, migrationConfig), log));
         return new SourceRegistry(built);
     }
 
@@ -136,6 +138,16 @@ public final class MigrationWiring {
         String password = ax.getString("password", "");
         Path pluginsDir = plugin.getDataFolder().toPath().getParent();
         return new AxPlayerWarpsConfig(Optional.of(jdbcUrl), username, password, Optional.ofNullable(pluginsDir));
+    }
+
+    /**
+     * The Athelion {@code data.yml} the source reads, from the {@code modules.migration.athelionplayerwarps.data-file}
+     * override or the default {@code plugins/PlayerWarps/data.yml} Athelion writes.
+     */
+    private static Path athelionDataFile(Plugin plugin, ConfigStore migrationConfig) {
+        String configured =
+                migrationConfig.scoped("athelionplayerwarps").getString("data-file", "PlayerWarps/data.yml");
+        return pluginsDirectory(plugin).resolve(configured);
     }
 
     /** The {@code plugins/DecentHolograms/holograms} directory the DecentHolograms source reads its files from. */
@@ -186,7 +198,7 @@ public final class MigrationWiring {
     /**
      * The shared player-warp import writer, built over the player-warps ports the P4 module owns — the same
      * repository, password store, and social stores {@code /setpwarp} and the browse GUI use, so an imported warp
-     * can never reach a state a live command could not. The AxPlayerWarps source (and the Athelion / Olzie sources
+     * can never reach a state a live command could not. The AxPlayerWarps and Athelion sources (and the Olzie source
      * to come) all funnel through this one writer.
      */
     private static PlayerWarpRecordWriter playerWarpWriter(Persistence persistence, Clock clock, Logger log) {

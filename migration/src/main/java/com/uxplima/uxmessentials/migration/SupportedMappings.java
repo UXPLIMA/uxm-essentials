@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.migration.convert.SourceId;
+import com.uxplima.uxmessentials.migration.convert.athelion.AthelionPlayerWarpsMappings;
 import com.uxplima.uxmessentials.migration.convert.ax.AxPlayerWarpsMappings;
 import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsMappings;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXMappings;
@@ -18,8 +19,8 @@ import org.jspecify.annotations.NullMarked;
  * single greppable answer to "what does the importer claim to migrate?", scoped by source. The built
  * sources are EssentialsX (a full on-disk source), the live economy sources Vault and PlayerPoints
  * (balance only), LiteBans (a JDBC source for bans/ip-bans/mutes/warns), the two hologram sources
- * DecentHolograms and FancyHolograms (on-disk sources for server-wide holograms), and AxPlayerWarps (a JDBC
- * source for player-owned warps). Only built sources
+ * DecentHolograms and FancyHolograms (on-disk sources for server-wide holograms), and the two player-warp sources
+ * AxPlayerWarps (a JDBC source) and Athelion PlayerWarps (a serialised {@code data.yml} source). Only built sources
  * contribute rows — a planned source has no code table, so it appears nowhere here until it is built
  * (planned ≠ stubbed, §1.2). The drift guard reads this aggregate to assert the three-way equality
  * code ⇄ doc ⇄ fixtures.
@@ -34,7 +35,8 @@ public final class SupportedMappings {
             Map.entry(SourceId.of("litebans"), LiteBansMappings.rows()),
             Map.entry(SourceId.of("decentholograms"), DecentHologramsMappings.rows()),
             Map.entry(SourceId.of("fancyholograms"), FancyHologramsMappings.rows()),
-            Map.entry(SourceId.of("axplayerwarps"), AxPlayerWarpsMappings.rows()));
+            Map.entry(SourceId.of("axplayerwarps"), AxPlayerWarpsMappings.rows()),
+            Map.entry(SourceId.of("athelionplayerwarps"), AthelionPlayerWarpsMappings.rows()));
 
     private SupportedMappings() {}
 
