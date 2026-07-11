@@ -265,6 +265,79 @@ class JooqPlayerWarpEconomyContractTest {
         assertThat(economy.balance(payer, COINS).amount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
+    @Test
+    void rentIsTakenFromTheWarpBankAloneWhenItCovers() {
+        PlayerRef owner = randomPlayer();
+        PlayerWarpId warp = seedWarp(owner, "citadel");
+        setBank(warp, new BigDecimal("200"));
+        JooqPlayerWarpEconomy bridge = bridge(new BigDecimal("10"), false, true);
+
+        assertThat(bridge.collectRent(warp, owner, new BigDecimal("100"), "default")
+                        .isOk())
+                .isTrue();
+
+        // The warp pays its own rent: 100 comes straight out of the bank, the owner's wallet is never touched.
+        assertThat(bank(warp)).isEqualByComparingTo(new BigDecimal("100"));
+        assertThat(economy.balance(owner, COINS).amount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void rentTakesTheShortfallFromTheOwnerWalletWhenTheBankIsThin() {
+        PlayerRef owner = randomPlayer();
+        economy.credit(owner, Money.of(COINS, new BigDecimal("100")));
+        PlayerWarpId warp = seedWarp(owner, "haven");
+        setBank(warp, new BigDecimal("40"));
+        JooqPlayerWarpEconomy bridge = bridge(new BigDecimal("10"), false, true);
+
+        assertThat(bridge.collectRent(warp, owner, new BigDecimal("100"), "default")
+                        .isOk())
+                .isTrue();
+
+        // Bank covers 40, the wallet covers the 60 shortfall.
+        assertThat(bank(warp)).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(economy.balance(owner, COINS).amount()).isEqualByComparingTo(new BigDecimal("40"));
+    }
+
+    @Test
+    void rentNeitherBankNorWalletCanCoverRollsBackTheBankDeduction() {
+        PlayerRef owner = randomPlayer();
+        economy.credit(owner, Money.of(COINS, new BigDecimal("10")));
+        PlayerWarpId warp = seedWarp(owner, "keep");
+        setBank(warp, new BigDecimal("30"));
+        JooqPlayerWarpEconomy bridge = bridge(new BigDecimal("10"), false, true);
+
+        Result<Unit, ChargeError> result = bridge.collectRent(warp, owner, new BigDecimal("100"), "default");
+
+        assertThat(result.errorOrThrow()).isEqualTo(ChargeError.INSUFFICIENT_FUNDS);
+        // The bank deduction was unwound: the bank holds exactly what it did, the owner's wallet is untouched.
+        assertThat(bank(warp)).isEqualByComparingTo(new BigDecimal("30"));
+        assertThat(economy.balance(owner, COINS).amount()).isEqualByComparingTo(new BigDecimal("10"));
+    }
+
+    @Test
+    void rentOfZeroIsANoOp() {
+        PlayerRef owner = randomPlayer();
+        PlayerWarpId warp = seedWarp(owner, "toll");
+        setBank(warp, new BigDecimal("50"));
+        JooqPlayerWarpEconomy bridge = bridge(new BigDecimal("10"), false, true);
+
+        assertThat(bridge.collectRent(warp, owner, BigDecimal.ZERO, "default").isOk())
+                .isTrue();
+
+        assertThat(bank(warp)).isEqualByComparingTo(new BigDecimal("50"));
+    }
+
+    /** Set the warp's earnings bank directly (a committed write; the pool runs autoCommit off). */
+    private void setBank(PlayerWarpId warp, BigDecimal amount) {
+        persistence
+                .dsl()
+                .transaction(configuration -> DSL.using(configuration)
+                        .update(PLAYER_WARPS)
+                        .set(PLAYER_WARPS.EARNED_AMOUNT, amount)
+                        .where(PLAYER_WARPS.ID.eq(warp.value()))
+                        .execute());
+    }
+
     private JooqPlayerWarpEconomy bridge(BigDecimal cutPercent, boolean autoPayout, boolean worksOffline) {
         CurrencyBackendRegistry backends =
                 CurrencyBackendRegistry.of(List.<CurrencyBackend>of(new StubBackend("native", worksOffline)));

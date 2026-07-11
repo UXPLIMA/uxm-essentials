@@ -48,6 +48,20 @@ public interface PlayerWarpEconomy {
     /** Pay out the warp's accrued earnings to {@code to} (the owner), used by {@code /pwarp withdraw} (P4-T6). */
     Result<Unit, ChargeError> withdraw(PlayerWarpId warp, PlayerRef to);
 
+    /**
+     * Collect one {@code amount} of rent for {@code warp}, spending the warp's own bank first and the
+     * {@code owner}'s wallet for the shortfall — a warp that earns pays its own rent. The bank is deducted by up to
+     * {@code amount} in one guarded {@code UPDATE}; only the part the bank could not cover is then debited from the
+     * owner's wallet via the DB-guarded debit. If the bank fully covers the rent there is no wallet debit at all.
+     *
+     * <p>There is no check-then-charge: when the wallet cannot cover the shortfall the guarded debit reports
+     * {@link ChargeError#INSUFFICIENT_FUNDS}, and this call then <em>rolls back</em> the bank deduction with a
+     * compensating credit so the bank is never left short without the rent actually being collected. The bank is
+     * only spent when its currency matches the rent currency; a bank holding a different currency is left alone and
+     * the whole rent is taken from the wallet.
+     */
+    Result<Unit, ChargeError> collectRent(PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId);
+
     /** Credit {@code amount} of {@code currencyId} back to {@code to}, used by the refund paths in P7. */
     Result<Unit, ChargeError> refund(PlayerRef to, BigDecimal amount, String currencyId);
 }

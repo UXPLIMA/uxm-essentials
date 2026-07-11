@@ -812,6 +812,12 @@ class UsePlayerWarpGateTest {
         public Result<Unit, ChargeError> refund(PlayerRef to, BigDecimal amount, String currencyId) {
             return Result.ok();
         }
+
+        @Override
+        public Result<Unit, ChargeError> collectRent(
+                PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId) {
+            return Result.ok();
+        }
     }
 
     private static final class KeyMessages implements Messages {

@@ -96,6 +96,10 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_CANNOT_TARGET_OWNER("pwarp.cannot-target-owner"),
     PWARP_RESERVED_NAME("pwarp.reserved-name"),
 
+    // rent lifecycle — the offline reminder mail and the system sender it is left under
+    PWARP_RENT_REMINDER("pwarp.rent.reminder"),
+    PWARP_RENT_MAIL_SENDER("pwarp.rent.mail-sender"),
+
     // admin group — operator verbs that act on any warp by its surrogate id, gated by the admin node
     PWARP_ADMIN_RESTORED("pwarp.admin.restored"),
     PWARP_ADMIN_PURGE_CONFIRM("pwarp.admin.purge-confirm"),

@@ -2,9 +2,11 @@ package com.uxplima.uxmessentials.playerwarps.adapter;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.bukkit.event.Listener;
@@ -13,6 +15,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.JooqPlayerWarpEconomy;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpDataMigration;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRenameNotice;
@@ -29,6 +32,8 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManag
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpPeopleMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RentSweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
@@ -41,8 +46,12 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.RentConfig;
+import com.uxplima.uxmessentials.playerwarps.application.RentPolicy;
+import com.uxplima.uxmessentials.playerwarps.application.RentReminders;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.SettleRent;
 import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
@@ -364,8 +373,74 @@ public final class PlayerwarpsWiring {
                 listMenu,
                 browseMenu,
                 categoriesMenu);
+        // The rent sub-group: a config-gated, off-tick, batched sweep that charges due warps (bank-first, then the
+        // owner's wallet), suspends then archives the unpaid, and mails owners a heads-up before their term lapses.
+        // Disabled, or with no economy to charge against, it is null and nothing is scheduled — a disabled sub-group
+        // schedules no task and charges nothing.
+        RentSweep rentSweep = buildRentSweep(ctx, persistence, kernel, repository, economy);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
-        return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
+        return new Wired(
+                PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota, rentSweep);
+    }
+
+    /**
+     * Build the rent sweep when the {@code rent} sub-group is on and there is an economy to charge against, else
+     * {@code null}. Rent with no economy provider could only ever suspend every warp, so it is left off with an
+     * operator warning rather than silently starving the network. The mail seam is a fresh {@link JooqMailRepository}
+     * over the always-present messaging {@code mail} table, so an offline owner still gets their reminder.
+     */
+    private static @org.jspecify.annotations.Nullable RentSweep buildRentSweep(
+            ModuleContext ctx,
+            Persistence persistence,
+            KernelPorts kernel,
+            PlayerWarpRepository repository,
+            Optional<PlayerWarpEconomy> economy) {
+        RentConfig config = rentConfig(ctx);
+        if (!config.enabled()) {
+            return null;
+        }
+        if (economy.isEmpty()) {
+            kernel.log().warn("event=playerwarp_rent_no_economy detail=rent_enabled_but_economy_absent_sweep_off");
+            return null;
+        }
+        Clock clock = Clock.systemUTC();
+        SettleRent settle = new SettleRent(repository, economy.orElseThrow(), new RentPolicy(), config, clock);
+        MailRentMailer mailer =
+                new MailRentMailer(MessagingStores.mail(persistence), kernel.messages(), clock, kernel.log());
+        RentReminders reminders = new RentReminders(repository, mailer, config, clock);
+        Duration interval = Duration.ofMinutes(Math.max(1L, ctx.config().getLong("rent.check-interval-minutes", 60L)));
+        return new RentSweep(repository, settle, reminders, config, kernel.scheduler(), interval, clock, kernel.log());
+    }
+
+    /** Read the {@code rent} config block into the immutable {@link RentConfig} the policy and reminders resolve through. */
+    private static RentConfig rentConfig(ModuleContext ctx) {
+        var cfg = ctx.config();
+        return new RentConfig(
+                cfg.getBoolean("rent.enabled", false),
+                BigDecimal.valueOf(Math.max(0L, cfg.getLong("rent.amount", 100L))),
+                cfg.getString("rent.currency", "default"),
+                Duration.ofDays(Math.max(1L, cfg.getLong("rent.period-days", 7L))),
+                Duration.ofDays(Math.max(0L, cfg.getLong("rent.grace-days", 3L))),
+                reminderWindows(cfg.getStringList("rent.reminder-hours", List.of("24", "12", "6", "1"))),
+                Set.copyOf(cfg.getStringList("rent.exempt.players", List.of())),
+                Set.copyOf(cfg.getStringList("rent.exempt.categories", List.of())),
+                Set.copyOf(cfg.getStringList("rent.exempt.worlds", List.of())));
+    }
+
+    /** Parse the {@code reminder-hours} list into positive-hour windows, tolerating a malformed entry. */
+    private static List<Duration> reminderWindows(List<String> hours) {
+        List<Duration> windows = new java.util.ArrayList<>();
+        for (String hour : hours) {
+            try {
+                long value = Long.parseLong(hour.strip());
+                if (value > 0) {
+                    windows.add(Duration.ofHours(value));
+                }
+            } catch (NumberFormatException ignored) {
+                // tolerate a malformed reminder-hours entry rather than crashing module enable
+            }
+        }
+        return List.copyOf(windows);
     }
 
     /**
@@ -574,26 +649,42 @@ public final class PlayerwarpsWiring {
 
     /**
      * Everything the player-warps module contributes once wired: the Brigadier commands, the join cache-warmer,
-     * and the read ports the PAPI seam queries. The context holds no repeating scheduled work and no in-memory
-     * store beyond the repository cache, so there is nothing to drain on stop — the module's {@code stop()}
-     * clears its own bookkeeping and the cache expires.
+     * the read ports the PAPI seam queries, and the optional rent sweep. The only repeating scheduled work is the
+     * rent sweep, and it is present only when the {@code rent} sub-group is on with an economy to charge against;
+     * {@link #startBackgroundWork()} arms it and {@link #stop()} halts it on module disable/reload.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join cache-warmer the plugin registers
      * @param repository the cached player-warp repository the PAPI seam reads owned warps from
      * @param quota the per-owner count-limit reducer the PAPI seam reads the limit through
+     * @param rentSweep the off-tick rent lifecycle sweep, or {@code null} when the rent sub-group is disabled
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             PlayerWarpRepository repository,
-            PlayerWarpQuota quota) {
+            PlayerWarpQuota quota,
+            @org.jspecify.annotations.Nullable RentSweep rentSweep) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(quota, "quota");
+        }
+
+        /** Arm the rent sweep, when one was wired; a no-op when the rent sub-group is off. */
+        public void startBackgroundWork() {
+            if (rentSweep != null) {
+                rentSweep.start();
+            }
+        }
+
+        /** Halt the rent sweep on module disable/reload so no orphaned off-tick task survives. */
+        public void stop() {
+            if (rentSweep != null) {
+                rentSweep.stop();
+            }
         }
     }
 }

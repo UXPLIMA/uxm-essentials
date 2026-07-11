@@ -225,6 +225,92 @@ class JooqPlayerWarpRepositoryTest {
         assertThat(repo.all()).extracting(w -> w.name().value()).containsExactlyInAnyOrder("alpha", "beta", "gamma");
     }
 
+    @Test
+    void dueForRentReturnsOnlyLapsedActiveWarpsOldestDueFirst() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        seedRent("older", WarpStatus.ACTIVE, rent(now.minusSeconds(7200)));
+        seedRent("newer", WarpStatus.ACTIVE, rent(now.minusSeconds(3600)));
+        seedRent("paid", WarpStatus.ACTIVE, rent(now.plusSeconds(3600))); // still paid through
+        seedRent("down", WarpStatus.SUSPENDED, rent(now.minusSeconds(9000))); // not ACTIVE
+        repo.save(newWarp(OWNER, "solo", 500L)); // no rent term (NULL), so never enrolled
+
+        assertThat(repo.dueForRent(now, 10)).extracting(w -> w.name().value()).containsExactly("older", "newer");
+    }
+
+    @Test
+    void dueForRentRespectsTheBatchLimit() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        for (int i = 0; i < 5; i++) {
+            seedRent("due" + i, WarpStatus.ACTIVE, rent(now.minusSeconds(3600L + i)));
+        }
+        assertThat(repo.dueForRent(now, 2)).hasSize(2);
+    }
+
+    @Test
+    void suspendedForRentReturnsSuspendedWarpsClosestToArchiveFirst() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        seedRent("far", WarpStatus.SUSPENDED, suspendedRent(now, now.plusSeconds(86_400)));
+        seedRent("soon", WarpStatus.SUSPENDED, suspendedRent(now, now.plusSeconds(3600)));
+        seedRent("active", WarpStatus.ACTIVE, rent(now.minusSeconds(60)));
+
+        assertThat(repo.suspendedForRent(10)).extracting(w -> w.name().value()).containsExactly("soon", "far");
+    }
+
+    @Test
+    void remindableForRentFiltersByHorizonAndStageAndProjectsTheRow() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        Instant horizon = now.plusSeconds(24 * 3600);
+        PlayerWarpId within = seedRent("within", WarpStatus.ACTIVE, rent(now.plusSeconds(20 * 3600)));
+        seedRent("beyond", WarpStatus.ACTIVE, rent(now.plusSeconds(40 * 3600))); // past the horizon
+        seedRent("lapsed", WarpStatus.ACTIVE, rent(now.minusSeconds(3600))); // already due, not a reminder
+        PlayerWarpId maxed = seedRent("maxed", WarpStatus.ACTIVE, rent(now.plusSeconds(10 * 3600)));
+        repo.markRentReminded(maxed, 4); // already reminded for every window
+        seedRent("suspended", WarpStatus.SUSPENDED, suspendedRent(now, now.plusSeconds(3600)));
+
+        var candidates = repo.remindableForRent(now, horizon, 4, 10);
+
+        assertThat(candidates).hasSize(1);
+        assertThat(candidates.get(0).id()).isEqualTo(within);
+        assertThat(candidates.get(0).warp().value()).isEqualTo("within");
+        assertThat(candidates.get(0).owner().uuid()).isEqualTo(OWNER.uuid());
+        assertThat(candidates.get(0).remindedStage()).isZero();
+        assertThat(candidates.get(0).paidUntil()).isEqualTo(now.plusSeconds(20 * 3600));
+    }
+
+    @Test
+    void markRentRemindedSetsAndResetsTheStageCounter() {
+        Instant now = Instant.ofEpochMilli(1_000_000L);
+        PlayerWarpId id = seedRent("staged", WarpStatus.ACTIVE, rent(now.plusSeconds(20 * 3600)));
+
+        repo.markRentReminded(id, 3);
+        assertThat(remindedStage(id)).isEqualTo(3);
+
+        repo.markRentReminded(id, 0);
+        assertThat(remindedStage(id)).isZero();
+    }
+
+    private PlayerWarpId seedRent(String name, WarpStatus status, RentState rent) {
+        Instant stamp = Instant.ofEpochMilli(1L);
+        return repo.save(newWarp(OWNER, name, 1L).withStatus(status, stamp).withRent(rent, stamp));
+    }
+
+    private static RentState rent(Instant paidUntil) {
+        return new RentState(paidUntil, Optional.empty(), Optional.empty());
+    }
+
+    private static RentState suspendedRent(Instant suspendedAt, Instant archiveAfter) {
+        return new RentState(suspendedAt.minusSeconds(1), Optional.of(suspendedAt), Optional.of(archiveAfter));
+    }
+
+    private int remindedStage(PlayerWarpId id) {
+        return persistence
+                .dsl()
+                .select(PLAYER_WARPS.RENT_REMINDED_STAGE)
+                .from(PLAYER_WARPS)
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .fetchOne(PLAYER_WARPS.RENT_REMINDED_STAGE);
+    }
+
     /** Seed a committed favourite row for {@code warpId} (the pool runs autoCommit off), for the count recompute. */
     private void seedFavourite(long warpId, UUID player) {
         persistence

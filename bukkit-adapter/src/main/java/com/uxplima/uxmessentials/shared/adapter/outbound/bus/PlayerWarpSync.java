@@ -1,11 +1,13 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentReminderCandidate;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
@@ -143,6 +145,28 @@ public final class PlayerWarpSync {
         public void refreshFavouriteCount(PlayerWarpId id) {
             // Same reasoning as updateRating: an eventually-consistent counter, forwarded without announcing.
             delegate.refreshFavouriteCount(id);
+        }
+
+        @Override
+        public List<PlayerWarp> dueForRent(Instant now, int limit) {
+            // A cross-owner sweep read; forward straight through — the rent charge's own save() announces the flip.
+            return delegate.dueForRent(now, limit);
+        }
+
+        @Override
+        public List<PlayerWarp> suspendedForRent(int limit) {
+            return delegate.suspendedForRent(limit);
+        }
+
+        @Override
+        public List<RentReminderCandidate> remindableForRent(Instant now, Instant horizon, int maxStage, int limit) {
+            return delegate.remindableForRent(now, horizon, maxStage, limit);
+        }
+
+        @Override
+        public void markRentReminded(PlayerWarpId id, int stage) {
+            // A persistence-only dedup counter, not a fact on the aggregate, so it neither invalidates nor announces.
+            delegate.markRentReminded(id, stage);
         }
 
         private void announce(PlayerRef owner) {

@@ -148,6 +148,71 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     }
 
     @Override
+    public Result<Unit, ChargeError> collectRent(
+            PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(warp, "warp");
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(amount, "amount");
+        Objects.requireNonNull(currencyId, "currencyId");
+        Currency currency = resolve(currencyId);
+        BigDecimal due = currency.normalize(amount);
+        if (due.signum() <= 0) {
+            return Result.ok();
+        }
+        // Spend the warp's own bank first (a warp that earns pays its own rent), then the owner's wallet for the
+        // shortfall. The debit is the DB-guarded, double-spend-safe point; there is no check-then-charge.
+        BigDecimal fromBank = spendBank(warp, currency, due);
+        BigDecimal shortfall = currency.normalize(due.subtract(fromBank));
+        if (shortfall.signum() <= 0) {
+            return Result.ok();
+        }
+        Result<Unit, TransferError> debited = economy.debit(owner, Money.of(currency, shortfall));
+        if (debited.isOk()) {
+            return Result.ok();
+        }
+        // The wallet could not cover the shortfall: unwind the bank deduction so the bank is never left short
+        // without the rent actually being collected, then report why the charge could not take.
+        refundBank(warp, currency, fromBank);
+        return Result.err(chargeErrorFor(debited.errorOrThrow()));
+    }
+
+    /**
+     * Deduct up to {@code due} from the warp bank as one guarded UPDATE and return how much it covered. The bank is
+     * only spent when it currently holds the same currency the rent is charged in; a bank denominated in another
+     * currency is left untouched and the whole rent falls to the wallet. The deduction is guarded on the exact read
+     * value, so a bank changed concurrently matches no row and contributes nothing rather than double-spending.
+     */
+    private BigDecimal spendBank(PlayerWarpId warp, Currency currency, BigDecimal due) {
+        Optional<BankSnapshot> found = snapshot(warp);
+        if (found.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BankSnapshot bank = found.get();
+        if (bank.amount().signum() <= 0 || !resolve(bank.currencyId()).id().equals(currency.id())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal use = bank.amount().min(due);
+        return deductBankGuarded(warp, bank.amount(), use) == 0 ? BigDecimal.ZERO : use;
+    }
+
+    /** Subtract {@code delta} from the bank only if it still holds exactly {@code expected}; the row count says who won. */
+    private int deductBankGuarded(PlayerWarpId warp, BigDecimal expected, BigDecimal delta) {
+        return write(dsl -> dsl.update(PLAYER_WARPS)
+                .set(PLAYER_WARPS.EARNED_AMOUNT, PLAYER_WARPS.EARNED_AMOUNT.sub(delta))
+                .where(PLAYER_WARPS.ID.eq(warp.value()))
+                .and(PLAYER_WARPS.EARNED_AMOUNT.eq(expected))
+                .execute());
+    }
+
+    /** Put a spent-but-uncollected bank deduction back; a re-accrue that hits no row is logged, never thrown. */
+    private void refundBank(PlayerWarpId warp, Currency currency, BigDecimal amount) {
+        if (amount.signum() <= 0) {
+            return;
+        }
+        reAccrue(warp, Money.of(currency, amount));
+    }
+
+    @Override
     public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");

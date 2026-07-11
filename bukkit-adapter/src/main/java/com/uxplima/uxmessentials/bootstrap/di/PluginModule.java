@@ -1692,6 +1692,10 @@ public final class PluginModule {
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands
         // hold, so a placeholder matches what /setpwarp enforces and the /pwarps list shows.
         links.placeholders.playerwarps(new RepositoryPlayerwarpsPlaceholders(wired.repository(), wired.quota()));
+        // Arm the rent sweep when the rent sub-group is on (a no-op otherwise), and halt it on disable/reload so no
+        // orphaned off-tick task survives.
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
     }
 
     private static void wireScoreboard(

@@ -11,6 +11,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpVisits
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpWhitelist.PLAYER_WARP_WHITELIST;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -23,6 +24,7 @@ import java.util.function.LongSupplier;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerWarpsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentReminderCandidate;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
@@ -187,6 +189,79 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                                 .where(PLAYER_WARP_FAVOURITES.WARP_ID.eq(id.value())))
                 .where(PLAYER_WARPS.ID.eq(id.value()))
                 .execute());
+    }
+
+    @Override
+    public List<PlayerWarp> dueForRent(Instant now, int limit) {
+        Objects.requireNonNull(now, "now");
+        // Bounded index range scan on idx_player_warps_rent, oldest-due first, never a full-table scan. A warp with
+        // no rent term (NULL rent_paid_until) never matches, so it is exempt until the sub-group enrols it.
+        return read(dsl -> dsl.selectFrom(PLAYER_WARPS)
+                .where(PLAYER_WARPS.STATUS.eq(WarpStatus.ACTIVE.name()))
+                .and(PLAYER_WARPS.RENT_PAID_UNTIL.isNotNull())
+                .and(PLAYER_WARPS.RENT_PAID_UNTIL.le(now.toEpochMilli()))
+                .orderBy(PLAYER_WARPS.RENT_PAID_UNTIL.asc(), PLAYER_WARPS.ID.asc())
+                .limit(limit)
+                .fetch()
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
+    }
+
+    @Override
+    public List<PlayerWarp> suspendedForRent(int limit) {
+        // Every suspended warp is a retry/archive candidate; those closest to their archive deadline come first, so
+        // an oversubscribed sweep archives the most-overdue before it hits the batch cap.
+        return read(dsl -> dsl.selectFrom(PLAYER_WARPS)
+                .where(PLAYER_WARPS.STATUS.eq(WarpStatus.SUSPENDED.name()))
+                .orderBy(PLAYER_WARPS.RENT_ARCHIVE_AFTER.asc(), PLAYER_WARPS.ID.asc())
+                .limit(limit)
+                .fetch()
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
+    }
+
+    @Override
+    public List<RentReminderCandidate> remindableForRent(Instant now, Instant horizon, int maxStage, int limit) {
+        Objects.requireNonNull(now, "now");
+        Objects.requireNonNull(horizon, "horizon");
+        // Active warps whose term falls inside the reminder horizon and that have not yet been reminded for every
+        // window — a light projection, never the full aggregate, so the reminder pass reads only what it mails on.
+        return read(dsl -> dsl.select(
+                        PLAYER_WARPS.ID,
+                        PLAYER_WARPS.OWNER,
+                        PLAYER_WARPS.OWNER_NAME,
+                        PLAYER_WARPS.NAME,
+                        PLAYER_WARPS.RENT_PAID_UNTIL,
+                        PLAYER_WARPS.RENT_REMINDED_STAGE)
+                .from(PLAYER_WARPS)
+                .where(PLAYER_WARPS.STATUS.eq(WarpStatus.ACTIVE.name()))
+                .and(PLAYER_WARPS.RENT_PAID_UNTIL.isNotNull())
+                .and(PLAYER_WARPS.RENT_PAID_UNTIL.gt(now.toEpochMilli()))
+                .and(PLAYER_WARPS.RENT_PAID_UNTIL.le(horizon.toEpochMilli()))
+                .and(PLAYER_WARPS.RENT_REMINDED_STAGE.lt(maxStage))
+                .orderBy(PLAYER_WARPS.RENT_PAID_UNTIL.asc(), PLAYER_WARPS.ID.asc())
+                .limit(limit)
+                .fetch()
+                .map(this::toReminderCandidate));
+    }
+
+    @Override
+    public void markRentReminded(PlayerWarpId id, int stage) {
+        Objects.requireNonNull(id, "id");
+        write(dsl -> dsl.update(PLAYER_WARPS)
+                .set(PLAYER_WARPS.RENT_REMINDED_STAGE, stage)
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .execute());
+    }
+
+    private RentReminderCandidate toReminderCandidate(
+            org.jooq.Record6<Long, String, String, String, Long, Integer> row) {
+        UUID ownerUuid = UUID.fromString(row.value2());
+        String ownerName = row.value3() != null ? row.value3() : names.apply(ownerUuid);
+        return new RentReminderCandidate(
+                PlayerWarpId.of(row.value1()),
+                new PlayerRef(ownerUuid, ownerName),
+                PlayerWarpName.of(row.value4()),
+                Instant.ofEpochMilli(row.value5()),
+                row.value6());
     }
 
     /**

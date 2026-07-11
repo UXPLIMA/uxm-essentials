@@ -188,6 +188,18 @@ public record PlayerWarp(
     }
 
     /**
+     * A copy carrying a new {@link RentState}, stamping {@code now} as the edit time. This is the rent lifecycle's
+     * transition — a renewal advances {@link RentState#paidUntil} and clears the suspend/archive marks, a suspension
+     * stamps them — and is kept orthogonal to {@link #withStatus}: the sweep pairs the two (suspend flips the status
+     * <em>and</em> writes the marks) so each stays a single-responsibility edit.
+     */
+    public PlayerWarp withRent(RentState newRent, Instant now) {
+        Objects.requireNonNull(newRent, "newRent");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().rent(Optional.of(newRent)).updatedAt(now).build();
+    }
+
+    /**
      * A copy addressed by a different globally-unique {@link PlayerWarpName}, stamping {@code now} as the edit
      * time. The surrogate id is unchanged, so this renames the same row in place rather than creating a new warp.
      */

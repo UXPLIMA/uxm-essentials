@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentReminderCandidate;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
@@ -143,6 +145,30 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
         // Same as updateRating: a durable, eventually-consistent denormalised counter that does not justify a cache
         // churn on the owner's set.
         delegate.refreshFavouriteCount(id);
+    }
+
+    @Override
+    public List<PlayerWarp> dueForRent(Instant now, int limit) {
+        // A cross-owner sweep read, not per-owner cacheable; read it straight from the durable store.
+        return delegate.dueForRent(now, limit);
+    }
+
+    @Override
+    public List<PlayerWarp> suspendedForRent(int limit) {
+        return delegate.suspendedForRent(limit);
+    }
+
+    @Override
+    public List<RentReminderCandidate> remindableForRent(Instant now, Instant horizon, int maxStage, int limit) {
+        return delegate.remindableForRent(now, horizon, maxStage, limit);
+    }
+
+    @Override
+    public void markRentReminded(PlayerWarpId id, int stage) {
+        Objects.requireNonNull(id, "id");
+        // rent_reminded_stage is persistence-only — never a fact on the cached aggregate — so a bump cannot make the
+        // cached owner set stale; forward it like recordVisit without invalidating.
+        delegate.markRentReminded(id, stage);
     }
 
     @Override

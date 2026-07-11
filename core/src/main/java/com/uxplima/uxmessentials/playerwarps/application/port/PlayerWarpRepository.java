@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerwarps.application.port;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -92,6 +93,51 @@ public interface PlayerWarpRepository {
      * stored count away from the true row count. The favourite use case calls it after a star or un-star commits.
      */
     void refreshFavouriteCount(PlayerWarpId id);
+
+    /**
+     * A bounded page of {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#ACTIVE active} warps whose
+     * paid rent term has lapsed ({@code rent_paid_until <= now}), oldest-due first, for the rent sweep's charge
+     * pass. Indexed on {@code rent_paid_until} ({@code idx_player_warps_rent}) and capped at {@code limit} so the
+     * sweep is always a bounded index range scan, never a full-table scan. A warp with no rent term (NULL
+     * {@code rent_paid_until}) never matches, so it is exempt until the sub-group enrols it. The default returns an
+     * empty list so an undecorated store simply charges nothing; the jOOQ adapter overrides it.
+     */
+    default List<PlayerWarp> dueForRent(Instant now, int limit) {
+        return List.of();
+    }
+
+    /**
+     * A bounded page of {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#SUSPENDED suspended} warps
+     * for the rent sweep's retry/archive pass, those closest to their archive deadline first. Capped at
+     * {@code limit}. Each is re-charged (restoring it on success) or, if its grace window has lapsed, archived —
+     * the policy decides per warp from the aggregate's rent state. The default returns an empty list; the jOOQ
+     * adapter overrides it.
+     */
+    default List<PlayerWarp> suspendedForRent(int limit) {
+        return List.of();
+    }
+
+    /**
+     * A bounded page of {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#ACTIVE active} warps whose
+     * paid term falls within {@code (now, horizon]} and whose {@code rent_reminded_stage} is still below
+     * {@code maxStage}, for the reminder pass — the candidates that might still owe a heads-up mail. Capped at
+     * {@code limit} and read as a light projection ({@link RentReminderCandidate}), never the full aggregate. The
+     * default returns an empty list; the jOOQ adapter overrides it.
+     */
+    default List<RentReminderCandidate> remindableForRent(Instant now, Instant horizon, int maxStage, int limit) {
+        return List.of();
+    }
+
+    /**
+     * Set the {@code rent_reminded_stage} dedup counter on the warp with surrogate key {@code id} to {@code stage}
+     * in one guarded UPDATE — the reminder pass bumps it after mailing a window, and the settle pass resets it to
+     * {@code 0} once rent is paid so the next term's reminders start fresh. This column is persistence-only (it is
+     * never a fact on the aggregate), so it has its own writer rather than riding a whole-row save. The default is
+     * a no-op; the jOOQ adapter overrides it.
+     */
+    default void markRentReminded(PlayerWarpId id, int stage) {
+        // No-op for an in-memory store that does not track the reminder dedup counter.
+    }
 
     /**
      * The warps {@code owner} owns if they are already in memory, without touching the database. A cache

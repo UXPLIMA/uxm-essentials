@@ -189,6 +189,13 @@ final class PlayerWarpTestSupport {
         public void refreshFavouriteCount(PlayerWarpId id) {
             favouriteCounts.put(id, favouriteSource.applyAsInt(id));
         }
+
+        @Override
+        public void markRentReminded(PlayerWarpId id, int stage) {
+            reminded.put(id, stage);
+        }
+
+        final Map<PlayerWarpId, Integer> reminded = new LinkedHashMap<>();
     }
 
     /** An in-memory rating store: one star per {@code (warp, player)}, tallying and averaging like the real one. */
@@ -377,10 +384,23 @@ final class PlayerWarpTestSupport {
 
         @Nullable PlayerWarpId lastWithdrawWarp;
 
+        @Nullable PlayerWarpId lastCollectWarp;
+
+        @Nullable PlayerRef lastCollectOwner;
+
+        @Nullable BigDecimal lastCollectAmount;
+
+        private Result<Unit, ChargeError> collectResult = Result.ok();
+
         private final Optional<ChargeError> failure;
 
         Economy() {
             this(Optional.empty());
+        }
+
+        /** Make the next {@link #collectRent} return {@code result}, for the rent settle paths. */
+        void collectReturns(Result<Unit, ChargeError> result) {
+            this.collectResult = result;
         }
 
         private Economy(Optional<ChargeError> failure) {
@@ -413,6 +433,15 @@ final class PlayerWarpTestSupport {
         @Override
         public Result<Unit, ChargeError> refund(PlayerRef to, BigDecimal amount, String currencyId) {
             return Result.ok();
+        }
+
+        @Override
+        public Result<Unit, ChargeError> collectRent(
+                PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId) {
+            lastCollectWarp = warp;
+            lastCollectOwner = owner;
+            lastCollectAmount = amount;
+            return collectResult;
         }
     }
 
