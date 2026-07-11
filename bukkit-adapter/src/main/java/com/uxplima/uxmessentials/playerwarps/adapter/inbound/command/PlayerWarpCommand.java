@@ -611,17 +611,24 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (!matcher.matches()) {
             return Optional.empty();
         }
-        long amount = Long.parseLong(matcher.group(1));
-        Duration span =
-                switch (Character.toLowerCase(matcher.group(2).charAt(0))) {
-                    case 's' -> Duration.ofSeconds(amount);
-                    case 'm' -> Duration.ofMinutes(amount);
-                    case 'h' -> Duration.ofHours(amount);
-                    case 'd' -> Duration.ofDays(amount);
-                    case 'w' -> Duration.ofDays(amount * 7L);
-                    default -> Duration.ZERO;
-                };
-        return span.isZero() ? Optional.empty() : Optional.of(span);
+        // A wildly out-of-range digit run (Long overflow, or a Duration that exceeds its own bounds) is not a valid
+        // duration — treat it like any other non-duration token and let it fold into the ban reason, never throwing
+        // out of the command handler.
+        try {
+            long amount = Long.parseLong(matcher.group(1));
+            Duration span =
+                    switch (Character.toLowerCase(matcher.group(2).charAt(0))) {
+                        case 's' -> Duration.ofSeconds(amount);
+                        case 'm' -> Duration.ofMinutes(amount);
+                        case 'h' -> Duration.ofHours(amount);
+                        case 'd' -> Duration.ofDays(amount);
+                        case 'w' -> Duration.ofDays(Math.multiplyExact(amount, 7L));
+                        default -> Duration.ZERO;
+                    };
+            return span.isZero() ? Optional.empty() : Optional.of(span);
+        } catch (NumberFormatException | ArithmeticException overflow) {
+            return Optional.empty();
+        }
     }
 
     /**

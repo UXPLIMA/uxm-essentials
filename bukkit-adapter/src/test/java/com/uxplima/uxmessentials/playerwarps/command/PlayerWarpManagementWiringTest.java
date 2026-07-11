@@ -148,6 +148,23 @@ class PlayerWarpManagementWiringTest {
     }
 
     @Test
+    void banWithAnOutOfRangeDurationTokenFoldsItIntoTheReasonWithoutThrowing() {
+        PlayerMock alice = op("Alice");
+
+        // A digit run that overflows Long / Duration must not throw out of the handler; it is not a valid duration,
+        // so it folds into the reason and the ban is permanent.
+        dispatch(alice, "pwarp ban base Bob 99999999999999999999d cheating");
+
+        verify(manageBans)
+                .ban(
+                        eq(refOf(alice)),
+                        eq(PlayerWarpName.of("base")),
+                        eq(bobRef()),
+                        eq(Optional.<Duration>empty()),
+                        eq(Optional.of("99999999999999999999d cheating")));
+    }
+
+    @Test
     void unbanReachesItsUseCase() {
         PlayerMock alice = op("Alice");
 
