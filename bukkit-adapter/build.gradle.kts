@@ -1,3 +1,5 @@
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
     id("uxmessentials.java-conventions")
     alias(libs.plugins.shadow)
@@ -154,6 +156,11 @@ sourceSets {
 dependencies {
     "jmhImplementation"(libs.bundles.jmh)
     "jmhAnnotationProcessor"(libs.jmh.ap)
+    // The player-warp browse benchmark drives the real jOOQ read-model against an embedded SQLite file, so the JMH
+    // source set compiles and runs against core, the persistence adapter, and the default DB bundle.
+    "jmhImplementation"(project(":core"))
+    "jmhImplementation"(project(":persistence-adapter"))
+    "jmhImplementation"(libs.bundles.db)
 }
 
 tasks.processResources {
@@ -179,6 +186,13 @@ val localeParityCheck by tasks.registering(JavaExec::class) {
     dependsOn(tasks.named("compileTestJava"), tasks.processResources)
 }
 tasks.named("check") { dependsOn(localeParityCheck) }
+
+// JMH's annotation processor emits harness classes under …/jmh_generated/… that Thread.yield() in a spin loop
+// and are not tagged @Generated, so Error Prone's ThreadPriorityCheck fires on them and the shared -Werror fatals
+// it. Exclude only that generated path from Error Prone; the benchmark's own source stays fully checked.
+tasks.named<JavaCompile>("compileJmhJava") {
+    options.errorprone.excludedPaths.set(".*/jmh_generated/.*")
+}
 
 val jmh by tasks.registering(JavaExec::class) {
     group = "benchmark"

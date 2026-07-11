@@ -11,11 +11,14 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpVisits
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpWhitelist.PLAYER_WARP_WHITELIST;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerWarpsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -27,6 +30,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
+import org.jooq.Query;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,6 +48,7 @@ import org.jspecify.annotations.NullMarked;
 public final class JooqPlayerWarpRepository extends JooqRepository implements PlayerWarpRepository {
 
     private final Function<UUID, String> names;
+    private final LongSupplier randomSort;
 
     /** Backward-compatible: no profile resolver, so a null {@code owner_name} falls back to the uuid string. */
     public JooqPlayerWarpRepository(DSLContext dsl) {
@@ -51,8 +56,18 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
     }
 
     public JooqPlayerWarpRepository(DSLContext dsl, Function<UUID, String> names) {
+        this(dsl, names, () -> ThreadLocalRandom.current().nextLong());
+    }
+
+    /**
+     * @param randomSort the source of the {@code random_sort} ordering key stamped on each insert (and rewritten
+     *     by {@link #reshuffle()}). A {@code RandomGenerator} in production; a test injects a deterministic
+     *     supplier so a seeded RANDOM browse is reproducible. Never {@code Math.random()} on this hot write path.
+     */
+    public JooqPlayerWarpRepository(DSLContext dsl, Function<UUID, String> names, LongSupplier randomSort) {
         super(dsl);
         this.names = Objects.requireNonNull(names, "names");
+        this.randomSort = Objects.requireNonNull(randomSort, "randomSort");
     }
 
     @Override
@@ -142,11 +157,35 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                 .execute());
     }
 
+    /**
+     * Assign every warp a fresh {@code random_sort} key so the RANDOM browse order is not frozen forever. One
+     * transaction: read the ids, then batch an update per row binding a new random long. It is done application-side
+     * because no single SQL {@code RANDOM()} name is portable across SQLite, MySQL, and PostgreSQL. Meant to be
+     * called on a config cadence off the tick thread; wiring that scheduled task is a P6 follow-up. Returns how many
+     * rows were reshuffled.
+     */
+    public int reshuffle() {
+        return write(dsl -> {
+            List<Long> ids = dsl.select(PLAYER_WARPS.ID).from(PLAYER_WARPS).fetch(PLAYER_WARPS.ID);
+            List<Query> updates = new ArrayList<>(ids.size());
+            for (Long id : ids) {
+                updates.add(dsl.update(PLAYER_WARPS)
+                        .set(PLAYER_WARPS.RANDOM_SORT, randomSort.getAsLong())
+                        .where(PLAYER_WARPS.ID.eq(id)));
+            }
+            return updates.isEmpty() ? 0 : dsl.batch(updates).execute().length;
+        });
+    }
+
     private PlayerWarpId insert(DSLContext dsl, PlayerWarp warp) {
         long id = nextId(dsl);
         PlayerWarpsRecord record = dsl.newRecord(PLAYER_WARPS);
         PlayerWarpRows.apply(record, warp);
         record.setId(id);
+        // random_sort is a persistence-only ordering key the RANDOM browse pages by; stamp it once here. The
+        // update branch never touches it, so a visibility flip keeps a warp's place in the shuffle stable until a
+        // reshuffle rewrites it.
+        record.setRandomSort(randomSort.getAsLong());
         // A brand-new warp has no password, so the three password_* columns stay unset (NULL) on the insert.
         dsl.insertInto(PLAYER_WARPS).set(record).execute();
         return PlayerWarpId.of(id);
