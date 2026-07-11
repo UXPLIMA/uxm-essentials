@@ -125,6 +125,7 @@ dependencies {
     testImplementation(libs.bundles.db)
     testImplementation(libs.bundles.db.mysql)
     testImplementation(libs.bundles.db.pg)
+    testImplementation(libs.h2) // in-process H2 fixture for the AxPlayerWarps importer round-trip
     testImplementation(libs.caffeine)
     testImplementation(libs.gson)
     testImplementation(libs.configurate.yaml)

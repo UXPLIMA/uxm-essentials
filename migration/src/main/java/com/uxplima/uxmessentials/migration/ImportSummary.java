@@ -20,6 +20,7 @@ public final class ImportSummary {
     private final ImportMode mode;
     private final LongAdder users = new LongAdder();
     private final LongAdder warps = new LongAdder();
+    private final LongAdder playerWarps = new LongAdder();
     private final LongAdder kits = new LongAdder();
     private final LongAdder jails = new LongAdder();
     private final LongAdder mutes = new LongAdder();
@@ -49,6 +50,7 @@ public final class ImportSummary {
         switch (rec) {
             case ImportRecord.UserRecord ignored -> users.increment();
             case ImportRecord.WarpRecord ignored -> warps.increment();
+            case ImportRecord.PlayerWarpRecord ignored -> playerWarps.increment();
             case ImportRecord.KitRecord ignored -> kits.increment();
             case ImportRecord.ModerationRecord moderation -> countModeration(moderation);
             case ImportRecord.BanRecord ignored -> bans.increment();
@@ -83,6 +85,10 @@ public final class ImportSummary {
 
     public long warps() {
         return warps.sum();
+    }
+
+    public long playerWarps() {
+        return playerWarps.sum();
     }
 
     public long kits() {
@@ -126,7 +132,7 @@ public final class ImportSummary {
      * once here (it is one record) even though it feeds two of the finish line's counters.
      */
     public long total() {
-        return users() + warps() + kits() + moderation() + bans() + ipBans() + warns() + holograms();
+        return users() + warps() + playerWarps() + kits() + moderation() + bans() + ipBans() + warns() + holograms();
     }
 
     private long moderation() {
@@ -138,9 +144,9 @@ public final class ImportSummary {
 
     /** A one-line, audit-friendly rendering of the totals plus the run duration. */
     public String describe(Duration elapsed) {
-        return "source=" + source + " dry_run=" + dryRun() + " users=" + users() + " warps=" + warps() + " kits="
-                + kits() + " jails=" + jails() + " mutes=" + mutes() + " bans=" + bans() + " ip_bans=" + ipBans()
-                + " warns=" + warns() + " holograms=" + holograms() + " skipped=" + skipped() + " failed=" + failed()
-                + " duration_ms=" + elapsed.toMillis();
+        return "source=" + source + " dry_run=" + dryRun() + " users=" + users() + " warps=" + warps()
+                + " player_warps=" + playerWarps() + " kits=" + kits() + " jails=" + jails() + " mutes=" + mutes()
+                + " bans=" + bans() + " ip_bans=" + ipBans() + " warns=" + warns() + " holograms=" + holograms()
+                + " skipped=" + skipped() + " failed=" + failed() + " duration_ms=" + elapsed.toMillis();
     }
 }

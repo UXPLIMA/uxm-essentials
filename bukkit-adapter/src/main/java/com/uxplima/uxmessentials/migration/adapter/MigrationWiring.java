@@ -25,10 +25,13 @@ import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.MigrationAudit;
 import com.uxplima.uxmessentials.migration.MigrationModule;
+import com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter;
 import com.uxplima.uxmessentials.migration.RecordWriter;
 import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
+import com.uxplima.uxmessentials.migration.convert.ax.AxPlayerWarpsConfig;
+import com.uxplima.uxmessentials.migration.convert.ax.AxPlayerWarpsConvert;
 import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
@@ -41,6 +44,7 @@ import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
+import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -120,7 +124,18 @@ public final class MigrationWiring {
         built.add(new LiteBansConvert(liteBansConfig(plugin, migrationConfig), log));
         built.add(new DecentHologramsConvert(worlds, decentHologramsDirectory(plugin)));
         built.add(new FancyHologramsConvert(worlds, fancyHologramsFile(plugin)));
+        built.add(new AxPlayerWarpsConvert(axPlayerWarpsConfig(plugin, migrationConfig), worlds, log));
         return new SourceRegistry(built);
+    }
+
+    /** Read the {@code modules.migration.axplayerwarps} subtree into the source's connection config. */
+    private static AxPlayerWarpsConfig axPlayerWarpsConfig(Plugin plugin, ConfigStore migrationConfig) {
+        ConfigStore ax = migrationConfig.scoped("axplayerwarps");
+        String jdbcUrl = ax.getString("jdbc-url", "");
+        String username = ax.getString("username", "");
+        String password = ax.getString("password", "");
+        Path pluginsDir = plugin.getDataFolder().toPath().getParent();
+        return new AxPlayerWarpsConfig(Optional.of(jdbcUrl), username, password, Optional.ofNullable(pluginsDir));
     }
 
     /** The {@code plugins/DecentHolograms/holograms} directory the DecentHolograms source reads its files from. */
@@ -161,10 +176,28 @@ public final class MigrationWiring {
         Currency defaultCurrency = currencies.defaultCurrency();
         Clock clock = Clock.systemUTC();
         WalletRepository wallets = WalletRepositories.repository(persistence, currencies, clock);
-        RecordWriter live =
-                new RepositoryRecordWriter(homes, warps, wallets, moderation, kits, holograms, defaultCurrency, clock);
-        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits, holograms, clock);
+        PlayerWarpRecordWriter playerWarps = playerWarpWriter(persistence, clock, log);
+        RecordWriter live = new RepositoryRecordWriter(
+                homes, warps, wallets, moderation, kits, holograms, playerWarps, defaultCurrency, clock);
+        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits, holograms, playerWarps, clock);
         return new Writers(live, dryRun);
+    }
+
+    /**
+     * The shared player-warp import writer, built over the player-warps ports the P4 module owns — the same
+     * repository, password store, and social stores {@code /setpwarp} and the browse GUI use, so an imported warp
+     * can never reach a state a live command could not. The AxPlayerWarps source (and the Athelion / Olzie sources
+     * to come) all funnel through this one writer.
+     */
+    private static PlayerWarpRecordWriter playerWarpWriter(Persistence persistence, Clock clock, Logger log) {
+        return new PlayerWarpRecordWriter(
+                PlayerWarpRepositories.cached(persistence),
+                PlayerWarpRepositories.passwordStore(persistence),
+                PlayerWarpRepositories.memberStore(persistence, log),
+                PlayerWarpRepositories.whitelistStore(persistence, clock),
+                PlayerWarpRepositories.banStore(persistence),
+                PlayerWarpRepositories.favouriteStore(persistence, clock),
+                PlayerWarpRepositories.ratingStore(persistence));
     }
 
     /**

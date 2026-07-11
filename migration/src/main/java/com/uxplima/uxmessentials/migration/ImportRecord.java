@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedHologram;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedPlayerWarp;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedWarp;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -42,6 +43,22 @@ public sealed interface ImportRecord {
         @Override
         public String kind() {
             return "warp";
+        }
+    }
+
+    /**
+     * A mapped player-owned warp — the shape the player-warp importers (AxPlayerWarps, Athelion, Olzie) all
+     * stream. Unlike {@link WarpRecord} it carries the pre-aggregate {@link ImportedPlayerWarp}, since the writer
+     * still has to sanitise and globally de-collide the name and hash the password before an aggregate exists.
+     */
+    record PlayerWarpRecord(ImportedPlayerWarp warp) implements ImportRecord {
+        public PlayerWarpRecord {
+            Objects.requireNonNull(warp, "warp");
+        }
+
+        @Override
+        public String kind() {
+            return "player-warp";
         }
     }
 

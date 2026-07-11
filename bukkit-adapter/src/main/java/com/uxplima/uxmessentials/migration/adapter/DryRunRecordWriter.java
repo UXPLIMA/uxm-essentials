@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
+import com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordWriter;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
@@ -39,6 +40,7 @@ public final class DryRunRecordWriter implements RecordWriter {
     private final ModerationRepository moderation;
     private final KitRepository kits;
     private final HologramRepository holograms;
+    private final PlayerWarpRecordWriter playerWarps;
     private final Clock clock;
 
     public DryRunRecordWriter(
@@ -46,11 +48,13 @@ public final class DryRunRecordWriter implements RecordWriter {
             ModerationRepository moderation,
             KitRepository kits,
             HologramRepository holograms,
+            PlayerWarpRecordWriter playerWarps,
             Clock clock) {
         this.warps = Objects.requireNonNull(warps, "warps");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
         this.holograms = Objects.requireNonNull(holograms, "holograms");
+        this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -61,6 +65,7 @@ public final class DryRunRecordWriter implements RecordWriter {
         return switch (record) {
             case ImportRecord.UserRecord ignored -> RecordOutcome.WRITTEN;
             case ImportRecord.WarpRecord warp -> warpOutcome(warp.warp().warp().name(), options);
+            case ImportRecord.PlayerWarpRecord warp -> playerWarps.preview(warp.warp());
             case ImportRecord.KitRecord kit -> kitOutcome(kit.kit().definition().id(), options);
             case ImportRecord.ModerationRecord rec -> moderationOutcome(rec.moderation(), options);
             case ImportRecord.BanRecord ban -> banOutcome(ban.target(), options);

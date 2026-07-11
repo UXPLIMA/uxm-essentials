@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.migration.BalancePolicy;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
+import com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordWriter;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
@@ -60,6 +61,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
     private final ModerationRepository moderation;
     private final KitRepository kits;
     private final HologramRepository holograms;
+    private final PlayerWarpRecordWriter playerWarps;
     private final Currency defaultCurrency;
     private final Clock clock;
 
@@ -70,6 +72,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
             ModerationRepository moderation,
             KitRepository kits,
             HologramRepository holograms,
+            PlayerWarpRecordWriter playerWarps,
             Currency defaultCurrency,
             Clock clock) {
         this.homes = Objects.requireNonNull(homes, "homes");
@@ -78,6 +81,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
         this.holograms = Objects.requireNonNull(holograms, "holograms");
+        this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -89,6 +93,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         return switch (record) {
             case ImportRecord.UserRecord user -> writeUser(user.user(), options);
             case ImportRecord.WarpRecord warp -> writeWarp(warp.warp().warp(), options);
+            case ImportRecord.PlayerWarpRecord warp -> playerWarps.write(warp.warp());
             case ImportRecord.KitRecord kit -> writeKit(kit.kit(), options);
             case ImportRecord.ModerationRecord rec -> writeModeration(rec.moderation(), options);
             case ImportRecord.BanRecord ban -> writeBan(ban, options);

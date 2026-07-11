@@ -53,6 +53,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
         switch (rec) {
             case ImportRecord.UserRecord user -> recordUser(source, user, outcome);
             case ImportRecord.WarpRecord warp -> recordWarp(source, warp, outcome);
+            case ImportRecord.PlayerWarpRecord warp -> recordPlayerWarp(source, warp, outcome);
             case ImportRecord.KitRecord kit -> recordKit(source, kit, outcome);
             case ImportRecord.ModerationRecord moderation -> recordModeration(source, moderation, outcome);
             case ImportRecord.BanRecord ban -> recordBan(source, ban, outcome);
@@ -80,6 +81,16 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
                 rec.user().homes().size(),
                 rec.user().balance().isPresent(),
                 rec.user().mail().size(),
+                outcome.token(),
+                outcome.ok());
+    }
+
+    private void recordPlayerWarp(SourceId source, ImportRecord.PlayerWarpRecord rec, RecordOutcome outcome) {
+        audit.info(
+                "event=migration_import_player_warp source={} warp={} owner={} conflict={} ok={}",
+                source,
+                rec.warp().name(),
+                rec.warp().owner(),
                 outcome.token(),
                 outcome.ok());
     }
