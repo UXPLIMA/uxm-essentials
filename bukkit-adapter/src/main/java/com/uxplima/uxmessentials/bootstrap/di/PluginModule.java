@@ -1191,6 +1191,8 @@ public final class PluginModule {
         menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
+        links.economyCurrencies = wired.currencies();
+        links.economyBackends = wired.backends();
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.start();
@@ -1681,7 +1683,10 @@ public final class PluginModule {
                 textInput,
                 guiRegistry,
                 menus,
-                menuBindings);
+                menuBindings,
+                links.economyProvider,
+                links.economyCurrencies,
+                links.economyBackends);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands
@@ -1913,6 +1918,12 @@ public final class PluginModule {
         private com.uxplima.uxmessentials.economy.application.port.@org.jspecify.annotations.Nullable EconomyProvider
                 economyProvider;
         private com.uxplima.uxmessentials.economy.domain.@org.jspecify.annotations.Nullable Currency economyCurrency;
+        // The currency + backend registries a warp fee resolves through: player-warps builds its jOOQ economy
+        // bridge over these plus the live provider, so a null here (economy disabled) leaves a priced warp free.
+        private com.uxplima.uxmessentials.economy.domain.@org.jspecify.annotations.Nullable CurrencyRegistry
+                economyCurrencies;
+        private com.uxplima.uxmessentials.economy.application.port.@org.jspecify.annotations.Nullable CurrencyBackendRegistry
+                economyBackends;
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;

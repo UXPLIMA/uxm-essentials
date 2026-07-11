@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerwarps.adapter;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -9,6 +10,10 @@ import java.util.function.Consumer;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
+import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.persistence.playerwarps.JooqPlayerWarpEconomy;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpDataMigration;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRenameNotice;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
@@ -87,7 +92,10 @@ public final class PlayerwarpsWiring {
             TextInput textInput,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            @org.jspecify.annotations.Nullable EconomyProvider economyProvider,
+            @org.jspecify.annotations.Nullable CurrencyRegistry economyCurrencies,
+            @org.jspecify.annotations.Nullable CurrencyBackendRegistry economyBackends) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -121,8 +129,11 @@ public final class PlayerwarpsWiring {
         // UsePlayerWarp is built once so the /pwarp command, the browse menu, and the shared warp editor's "go to"
         // button all teleport through the same path; the go-to handle the warps editor reads is bound to it here.
         // The ordered access gate reads the ban/member/whitelist/password stores and rate-limits password attempts
-        // through the shared Cooldowns port. The economy seam stays absent for now (T4 supplies the provider-backed
-        // impl); with it empty a priced warp teleports for free — the WarpEconomy soft-coupling precedent.
+        // through the shared Cooldowns port. The economy seam is the jOOQ bridge over the resolved provider — a
+        // priced warp charges the visitor and banks the owner's cut through it; when economy is disabled it stays
+        // empty and a priced warp teleports for free (the WarpEconomy soft-coupling precedent).
+        Optional<PlayerWarpEconomy> economy =
+                playerWarpEconomy(ctx, persistence, kernel, economyProvider, economyCurrencies, economyBackends);
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
@@ -134,7 +145,7 @@ public final class PlayerwarpsWiring {
                 PlayerWarpRepositories.whitelistStore(persistence, Clock.systemUTC()),
                 PlayerWarpRepositories.passwordStore(persistence),
                 kernel.cooldowns(),
-                Optional.<PlayerWarpEconomy>empty(),
+                economy,
                 Clock.systemUTC());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
@@ -183,6 +194,33 @@ public final class PlayerwarpsWiring {
                 listMenu);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
+    }
+
+    /**
+     * Build the jOOQ economy bridge over the resolved provider, or {@link Optional#empty()} when economy is
+     * disabled (any of the provider or the two currency registries absent) so a priced warp stays free — the
+     * {@code WarpEconomy} soft-coupling precedent. The owner-cut percentage and the auto-payout switch are read
+     * from this module's own {@code payout} config block, keeping the seam as narrow as the gate needs.
+     */
+    private static Optional<PlayerWarpEconomy> playerWarpEconomy(
+            ModuleContext ctx,
+            Persistence persistence,
+            KernelPorts kernel,
+            @org.jspecify.annotations.Nullable EconomyProvider economyProvider,
+            @org.jspecify.annotations.Nullable CurrencyRegistry economyCurrencies,
+            @org.jspecify.annotations.Nullable CurrencyBackendRegistry economyBackends) {
+        if (economyProvider == null || economyCurrencies == null || economyBackends == null) {
+            return Optional.empty();
+        }
+        BigDecimal cutPercent = BigDecimal.valueOf(ctx.config().getDouble("payout.cut-percent", 10.0));
+        boolean autoPayout = ctx.config().getBoolean("payout.auto-payout", false);
+        return Optional.of(new JooqPlayerWarpEconomy(
+                persistence,
+                economyProvider,
+                economyCurrencies,
+                economyBackends,
+                new JooqPlayerWarpEconomy.PayoutConfig(cutPercent, autoPayout),
+                kernel.log()));
     }
 
     /**
