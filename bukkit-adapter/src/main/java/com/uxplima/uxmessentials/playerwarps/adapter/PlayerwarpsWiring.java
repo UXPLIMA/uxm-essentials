@@ -98,7 +98,7 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
-        runLegacyMigration(persistence, kernel);
+        runLegacyMigration(plugin, persistence, kernel, bus.publisher().serverId());
         // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
         // wraps that same cache so a local write announces it to peers (the homes seam, copied for player-warps).
         com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository cached =
@@ -175,23 +175,53 @@ public final class PlayerwarpsWiring {
 
     /**
      * Copy the shipped player-warp data from the V70 {@code _v1_legacy} tables into the new surrogate-id schema,
-     * once, off the tick thread. The routine self-disables by dropping the legacy tables after a successful copy,
-     * so scheduling it on every enable is safe: after the first run there is nothing left to migrate and it returns
-     * immediately. It stays off the tick thread because the whole scan and its writes must never block enable.
+     * once, off the tick thread, then claim this backend's {@code server_id} onto the NULL-{@code server_id} rows
+     * (the migrated ones and any left by the basic create path) in the same pass. The routine self-disables by
+     * dropping the legacy tables after a successful copy, so scheduling it on every enable is safe: after the first
+     * run there is nothing left to migrate and it returns immediately. It stays off the tick thread because the whole
+     * scan and its writes must never block enable.
      *
      * <p>A now-duplicate name is renamed on the way in, and the owner is told through a callback so the migration
      * itself need not know about the messaging module. Reaching the offline-mailbox from here would mean threading
      * the messaging context's send-mail port through this wiring, which it does not yet carry, so a rename is
      * recorded in the operator log for now; delivering it as mail to the owner is a follow-up.
+     *
+     * <p>The world list is read here, on the enable thread, because {@code Server#getWorlds()} is a main-thread read;
+     * the immutable uid snapshot is then handed to the off-tick task. A world loaded after enable stays NULL until
+     * the next enable's claim, which is acceptable — the cross-server phase only needs a stable home tag, and P4's
+     * rich-create can stamp a warp on create.
      */
-    private static void runLegacyMigration(Persistence persistence, KernelPorts kernel) {
+    private static void runLegacyMigration(
+            Plugin plugin, Persistence persistence, KernelPorts kernel, String serverId) {
         Consumer<PlayerWarpRenameNotice> onRename = notice -> kernel.log()
                 .info(
                         "event=playerwarp_renamed owner={} from={} to={}",
                         notice.owner(),
                         notice.oldName(),
                         notice.newName());
-        kernel.scheduler().async(() -> PlayerWarpDataMigration.run(persistence, onRename, kernel.log()));
+        List<String> localWorldUids = plugin.getServer().getWorlds().stream()
+                .map(world -> world.getUID().toString())
+                .toList();
+        kernel.scheduler().async(() -> {
+            PlayerWarpDataMigration.run(persistence, onRename, kernel.log());
+            claimServerId(persistence, kernel, serverId, localWorldUids);
+        });
+    }
+
+    /**
+     * Stamp this backend's {@code network.server-id} onto the freshly-migrated (and any other) NULL-{@code server_id}
+     * rows living in this backend's worlds, logging the affected-row count. A blank server-id is a misconfiguration
+     * that must not crash enable, so the claim is skipped with a debug line and the rows are left for the next pass.
+     */
+    private static void claimServerId(
+            Persistence persistence, KernelPorts kernel, String serverId, List<String> localWorldUids) {
+        if (serverId.isBlank()) {
+            kernel.log().debug("event=playerwarp_server_claim_skipped reason=blank_server_id");
+            return;
+        }
+        int claimed = com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpServerClaimer.claim(
+                persistence, serverId, localWorldUids);
+        kernel.log().info("event=playerwarp_server_claim server={} claimed={}", serverId, claimed);
     }
 
     /**
