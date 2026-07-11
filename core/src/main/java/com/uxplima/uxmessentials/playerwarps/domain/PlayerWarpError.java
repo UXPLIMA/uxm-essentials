@@ -25,6 +25,22 @@ public enum PlayerWarpError {
     /** A non-owner tried to use a warp that is still private. */
     NOT_PUBLIC(PlayerwarpsMessageKey.PWARP_NOT_PUBLIC),
 
+    /** The warp is not {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#ACTIVE active} — it is
+     * suspended or archived, so nobody (not even the owner) may use it until its status is settled. */
+    SUSPENDED(PlayerwarpsMessageKey.PWARP_SUSPENDED),
+
+    /** The actor is banned from this warp and holds no ban bypass. */
+    BANNED(PlayerwarpsMessageKey.PWARP_BANNED),
+
+    /** A non-member tried to use a whitelist-access warp they are not on the whitelist for. */
+    NOT_WHITELISTED(PlayerwarpsMessageKey.PWARP_NOT_WHITELISTED),
+
+    /** Too many wrong password attempts in a row — the per-warp attempt cooldown is still cooling down. */
+    RATE_LIMITED(PlayerwarpsMessageKey.PWARP_RATE_LIMITED),
+
+    /** The entry charge did not complete (the payer could not pay, or the accrual failed), so no visit occurred. */
+    CANNOT_AFFORD(PlayerwarpsMessageKey.PWARP_CANNOT_AFFORD),
+
     /** The warp destination is physically unsafe (lava, void, suffocation). */
     UNSAFE_LOCATION(PlayerwarpsMessageKey.PWARP_UNSAFE),
 

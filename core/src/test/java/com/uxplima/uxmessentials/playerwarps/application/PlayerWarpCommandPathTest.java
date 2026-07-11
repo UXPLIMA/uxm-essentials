@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,15 +12,23 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
+import com.uxplima.uxmessentials.playerwarps.domain.BanRecord;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -244,7 +253,22 @@ class PlayerWarpCommandPathTest {
     }
 
     private UsePlayerWarp usePwarp() {
-        return new UsePlayerWarp(repository, teleporter, notifier, pos -> true, new StubPermissions(10));
+        // The command paths under test exercise only the owner-reaches-own and public-admits-non-member rules, so
+        // the ban/member/whitelist/password stores are empty no-ops and the cooldown gate is open; the economy seam
+        // stays absent (a priced warp would teleport for free) — none of these paths set a price.
+        return new UsePlayerWarp(
+                repository,
+                teleporter,
+                notifier,
+                pos -> true,
+                new StubPermissions(10),
+                new NoBans(),
+                new NoMembers(),
+                new NoWhitelist(),
+                new NoPasswords(),
+                new OpenCooldowns(),
+                Optional.empty(),
+                Clock.system(ZoneOffset.UTC));
     }
 
     private SetPlayerWarpVisibility visibility() {
@@ -354,6 +378,96 @@ class PlayerWarpCommandPathTest {
                 PlayerRef who, QuotaFamily family, @org.jspecify.annotations.Nullable WorldRef world, long fallback) {
             return QuotaResult.limited(limit);
         }
+    }
+
+    /** No player is ever banned. */
+    private static final class NoBans implements WarpBanStore {
+        @Override
+        public void ban(PlayerWarpId warp, BanRecord record) {}
+
+        @Override
+        public void unban(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public Optional<BanRecord> find(PlayerWarpId warp, UUID player) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<BanRecord> list(PlayerWarpId warp) {
+            return List.of();
+        }
+    }
+
+    /** No warp has members. */
+    private static final class NoMembers implements WarpMemberStore {
+        @Override
+        public void put(PlayerWarpId warp, WarpMember member) {}
+
+        @Override
+        public void remove(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public Optional<WarpRole> roleOf(PlayerWarpId warp, UUID player) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<WarpMember> list(PlayerWarpId warp) {
+            return List.of();
+        }
+    }
+
+    /** Nobody is whitelisted. */
+    private static final class NoWhitelist implements WarpWhitelistStore {
+        @Override
+        public void add(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public void remove(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public boolean contains(PlayerWarpId warp, UUID player) {
+            return false;
+        }
+
+        @Override
+        public List<UUID> list(PlayerWarpId warp) {
+            return List.of();
+        }
+    }
+
+    /** No warp has a password. */
+    private static final class NoPasswords implements PlayerWarpPasswordStore {
+        @Override
+        public void set(PlayerWarpId warp, String plaintext) {}
+
+        @Override
+        public void clear(PlayerWarpId warp) {}
+
+        @Override
+        public boolean matches(PlayerWarpId warp, String plaintext) {
+            return false;
+        }
+    }
+
+    /** No cooldown is ever active. */
+    private static final class OpenCooldowns implements Cooldowns {
+        @Override
+        public Result<Unit, Duration> check(PlayerRef who, CooldownKind kind) {
+            return Result.ok();
+        }
+
+        @Override
+        public void stamp(PlayerRef who, CooldownKind kind) {}
+
+        @Override
+        public Result<Unit, Duration> checkLabel(PlayerRef who, String label) {
+            return Result.ok();
+        }
+
+        @Override
+        public void stampLabel(PlayerRef who, String label) {}
     }
 
     private static final class KeyMessages implements Messages {

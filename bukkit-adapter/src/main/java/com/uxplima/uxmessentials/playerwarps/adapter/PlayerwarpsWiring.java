@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.adapter;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import org.bukkit.event.Listener;
@@ -26,6 +27,7 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -118,12 +120,22 @@ public final class PlayerwarpsWiring {
         PlayerWarpQuota quota = new PlayerWarpQuota(kernel.permissions(), defaultLimit(ctx));
         // UsePlayerWarp is built once so the /pwarp command, the browse menu, and the shared warp editor's "go to"
         // button all teleport through the same path; the go-to handle the warps editor reads is bound to it here.
+        // The ordered access gate reads the ban/member/whitelist/password stores and rate-limits password attempts
+        // through the shared Cooldowns port. The economy seam stays absent for now (T4 supplies the provider-backed
+        // impl); with it empty a priced warp teleports for free — the WarpEconomy soft-coupling precedent.
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
                 notifier,
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
-                kernel.permissions());
+                kernel.permissions(),
+                PlayerWarpRepositories.banStore(persistence),
+                PlayerWarpRepositories.memberStore(persistence, kernel.log()),
+                PlayerWarpRepositories.whitelistStore(persistence, Clock.systemUTC()),
+                PlayerWarpRepositories.passwordStore(persistence),
+                kernel.cooldowns(),
+                Optional.<PlayerWarpEconomy>empty(),
+                Clock.systemUTC());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
         }

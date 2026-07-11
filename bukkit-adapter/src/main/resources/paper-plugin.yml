@@ -1052,14 +1052,20 @@ permissions:
   uxmessentials.pwarp.gui:
     description: 'Manage every player''s warps in the /pwarp GUI (a player without it edits only their own).'
     default: op
-  uxmessentials.playerwarp.bypass.lock:
-    description: 'Enter a locked player warp owned by someone else (skips the lock check on /pwarp).'
+  uxmessentials.pwarp.bypass.ban:
+    description: 'Enter a player warp you are banned from (skips the ban check on /pwarp).'
     default: op
-  uxmessentials.playerwarp.bypass.password:
+  uxmessentials.pwarp.bypass.password:
     description: 'Enter a password-protected player warp without the password (skips the check on /pwarp).'
     default: op
-  uxmessentials.playerwarp.bypass.safety:
+  uxmessentials.pwarp.bypass.whitelist:
+    description: 'Enter a whitelist-only player warp without being on the whitelist (skips the check on /pwarp).'
+    default: op
+  uxmessentials.pwarp.bypass.safety:
     description: 'Use a player warp whose destination is unsafe (skips the safe-landing check on /pwarp).'
+    default: op
+  uxmessentials.pwarp.bypass.cost:
+    description: 'Use a priced player warp without paying its entry cost (skips the charge on /pwarp).'
     default: op
   # scoreboard context (docs/permissions.md "Scoreboard"). A per-player sidebar plus a tablist header/footer
   # rendered from operator MiniMessage content; the module ships disabled. uxmessentials.scoreboard.use is the

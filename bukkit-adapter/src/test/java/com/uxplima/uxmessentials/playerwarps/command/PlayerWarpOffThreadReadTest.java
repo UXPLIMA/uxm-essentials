@@ -26,11 +26,18 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
+import com.uxplima.uxmessentials.playerwarps.domain.BanRecord;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -40,6 +47,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -48,6 +56,8 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -151,7 +161,19 @@ class PlayerWarpOffThreadReadTest {
         return new PlayerWarpServices(
                 setPlayerWarp,
                 delPlayerWarp,
-                new UsePlayerWarp(repository, new NoTeleport(), notifier, position -> true, permissions),
+                new UsePlayerWarp(
+                        repository,
+                        new NoTeleport(),
+                        notifier,
+                        position -> true,
+                        permissions,
+                        new NoBans(),
+                        new NoMembers(),
+                        new NoWhitelist(),
+                        new NoPasswords(),
+                        new OpenCooldowns(),
+                        Optional.empty(),
+                        java.time.Clock.systemUTC()),
                 new ListPlayerWarps(repository, notifier),
                 visibility,
                 new NamingLookup(),
@@ -303,6 +325,91 @@ class PlayerWarpOffThreadReadTest {
     private static final class NoTeleport implements PlayerWarpTeleporter {
         @Override
         public void teleportTo(PlayerRef who, PlayerWarp warp) {}
+    }
+
+    private static final class NoBans implements WarpBanStore {
+        @Override
+        public void ban(PlayerWarpId warp, BanRecord record) {}
+
+        @Override
+        public void unban(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public Optional<BanRecord> find(PlayerWarpId warp, UUID player) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<BanRecord> list(PlayerWarpId warp) {
+            return List.of();
+        }
+    }
+
+    private static final class NoMembers implements WarpMemberStore {
+        @Override
+        public void put(PlayerWarpId warp, WarpMember member) {}
+
+        @Override
+        public void remove(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public Optional<WarpRole> roleOf(PlayerWarpId warp, UUID player) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<WarpMember> list(PlayerWarpId warp) {
+            return List.of();
+        }
+    }
+
+    private static final class NoWhitelist implements WarpWhitelistStore {
+        @Override
+        public void add(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public void remove(PlayerWarpId warp, UUID player) {}
+
+        @Override
+        public boolean contains(PlayerWarpId warp, UUID player) {
+            return false;
+        }
+
+        @Override
+        public List<UUID> list(PlayerWarpId warp) {
+            return List.of();
+        }
+    }
+
+    private static final class NoPasswords implements PlayerWarpPasswordStore {
+        @Override
+        public void set(PlayerWarpId warp, String plaintext) {}
+
+        @Override
+        public void clear(PlayerWarpId warp) {}
+
+        @Override
+        public boolean matches(PlayerWarpId warp, String plaintext) {
+            return false;
+        }
+    }
+
+    private static final class OpenCooldowns implements Cooldowns {
+        @Override
+        public Result<Unit, Duration> check(PlayerRef who, CooldownKind kind) {
+            return Result.ok();
+        }
+
+        @Override
+        public void stamp(PlayerRef who, CooldownKind kind) {}
+
+        @Override
+        public Result<Unit, Duration> checkLabel(PlayerRef who, String label) {
+            return Result.ok();
+        }
+
+        @Override
+        public void stampLabel(PlayerRef who, String label) {}
     }
 
     private final class NamingLookup implements PlayerLookup {
