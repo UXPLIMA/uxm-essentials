@@ -1,9 +1,12 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpMembers.PLAYER_WARP_MEMBERS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,11 +34,13 @@ class JooqWarpMemberStoreTest {
 
     private Persistence persistence;
     private JooqWarpMemberStore store;
+    private RecordingLogger log;
 
     @BeforeEach
     void setUp(@TempDir Path dataFolder) {
         persistence = Persistence.open(new SqliteConfig(), dataFolder, List.of("db/migration"), new NoopLogger());
-        store = new JooqWarpMemberStore(persistence.dsl());
+        log = new RecordingLogger();
+        store = new JooqWarpMemberStore(persistence.dsl(), log);
     }
 
     @AfterEach
@@ -90,6 +95,35 @@ class JooqWarpMemberStoreTest {
         assertThat(store.roleOf(WARP, UUID.randomUUID())).isEmpty();
     }
 
+    @Test
+    void anUnparseableRoleTokenIsSkippedAndWarned() {
+        UUID player = UUID.randomUUID();
+        // Write a row whose role token names no WarpRole constant (a future enum rename, a raw DB edit, or an
+        // importer). This bypasses put, which only accepts the enum, so it is the only way to reach the parse-miss.
+        insertRawMember(player, "ARCHON");
+
+        assertThat(store.list(WARP)).isEmpty();
+        assertThat(store.roleOf(WARP, player)).isEmpty();
+
+        assertThat(log.warnings).isNotEmpty();
+        assertThat(log.warnings.get(0).message()).contains("playerwarp_member_role_unparseable");
+        assertThat(log.warnings.get(0).args()).contains("ARCHON");
+    }
+
+    private void insertRawMember(UUID player, String role) {
+        // Pooled connections run with autoCommit off, so the write must go through a transaction to actually land —
+        // the same idiom the other jOOQ persistence tests use for seeding a raw row.
+        persistence
+                .dsl()
+                .transaction(cfg -> cfg.dsl()
+                        .insertInto(PLAYER_WARP_MEMBERS)
+                        .set(PLAYER_WARP_MEMBERS.WARP_ID, WARP.value())
+                        .set(PLAYER_WARP_MEMBERS.PLAYER_UUID, player.toString())
+                        .set(PLAYER_WARP_MEMBERS.ROLE, role)
+                        .set(PLAYER_WARP_MEMBERS.ADDED_AT, ADDED_AT.toEpochMilli())
+                        .execute());
+    }
+
     /** A config that selects the embedded SQLite backend with every default — no network coordinates. */
     private record SqliteConfig() implements ConfigStore {
         @Override
@@ -121,4 +155,26 @@ class JooqWarpMemberStoreTest {
         @Override
         public void debug(String message, Object... args) {}
     }
+
+    /** Captures every {@code warn} call so the unparseable-role path can be asserted on. */
+    private static final class RecordingLogger implements Logger {
+
+        private final List<Warning> warnings = new ArrayList<>();
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {
+            warnings.add(new Warning(message, Arrays.asList(args)));
+        }
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
+    private record Warning(String message, List<Object> args) {}
 }
