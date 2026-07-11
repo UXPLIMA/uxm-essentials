@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManag
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpPeopleMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitRatingRewardGranter;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RentSweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.SponsorExpirySweep;
@@ -48,6 +49,8 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.RatingRewardConfig;
+import com.uxplima.uxmessentials.playerwarps.application.RatingRewards;
 import com.uxplima.uxmessentials.playerwarps.application.RentConfig;
 import com.uxplima.uxmessentials.playerwarps.application.RentPolicy;
 import com.uxplima.uxmessentials.playerwarps.application.RentReminders;
@@ -67,9 +70,11 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleport
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingRewardStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
 import com.uxplima.uxmessentials.playerwarps.domain.BayesianRating;
+import com.uxplima.uxmessentials.playerwarps.domain.RewardSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -79,8 +84,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import org.jspecify.annotations.NullMarked;
 
@@ -218,8 +225,17 @@ public final class PlayerwarpsWiring {
         // own tunable — higher pulls a warp's score harder toward the global mean, so few votes cannot top the sort.
         WarpRatingStore ratingStore = PlayerWarpRepositories.ratingStore(persistence);
         WarpFavouriteStore favouriteStore = PlayerWarpRepositories.favouriteStore(persistence, Clock.systemUTC());
+        // The rating-reward sub-group: when ratings.rewards is on, a rating grants a deduped reward to the rater
+        // (once per warp) and the owner (once per unique rater). Off, the bundle is empty and nothing is granted or
+        // recorded — a disabled sub-group instantiates no granter and writes no reward row.
+        Optional<RatingRewards> ratingRewards = ratingRewards(ctx, kernel, persistence, economy);
         RatePlayerWarp ratePlayerWarp = new RatePlayerWarp(
-                repository, ratingStore, notifier, new BayesianRating(ratingConfidence(ctx)), Clock.systemUTC());
+                repository,
+                ratingStore,
+                notifier,
+                new BayesianRating(ratingConfidence(ctx)),
+                Clock.systemUTC(),
+                ratingRewards);
         FavouritePlayerWarp favouritePlayerWarp = new FavouritePlayerWarp(repository, favouriteStore, notifier);
         // The role-gated people/money verbs (T6b-2) all gate through the shared WarpAuthorization and reuse the
         // member/whitelist/ban stores and the economy seam already built above — no new persistence, just use cases.
@@ -717,6 +733,39 @@ public final class PlayerwarpsWiring {
     /** The Bayesian smoothing constant C for the rating score, clamped non-negative; the module's {@code ratings} block. */
     private static int ratingConfidence(ModuleContext ctx) {
         return Math.max(0, ctx.config().getInt("ratings.confidence", DEFAULT_CONFIDENCE));
+    }
+
+    /**
+     * Build the rating-reward collaborators when the {@code ratings.rewards} sub-group is on, else
+     * {@link Optional#empty()} so the rate use case grants nothing and writes no reward row. The granter reuses the
+     * already-resolved economy seam for money credits and the shared console-command runner for command rewards; a
+     * money reward with no economy present is a logged no-op inside the granter (a command-only reward still fires),
+     * so the sub-group is not forced off by a missing economy the way the paid sponsor/rent groups are.
+     */
+    private static Optional<RatingRewards> ratingRewards(
+            ModuleContext ctx, KernelPorts kernel, Persistence persistence, Optional<PlayerWarpEconomy> economy) {
+        RatingRewardConfig config = ratingRewardConfig(ctx);
+        if (!config.enabled()) {
+            return Optional.empty();
+        }
+        WarpRatingRewardStore store = PlayerWarpRepositories.ratingRewardStore(persistence);
+        BukkitRatingRewardGranter granter = new BukkitRatingRewardGranter(
+                economy, kernel.scheduler(), new BukkitClickCommandRunner(), kernel.log());
+        return Optional.of(new RatingRewards(store, granter, config));
+    }
+
+    /** Read the {@code ratings.rewards} config block into the immutable {@link RatingRewardConfig}. */
+    private static RatingRewardConfig ratingRewardConfig(ModuleContext ctx) {
+        ConfigStore cfg = ctx.config();
+        boolean enabled = cfg.getBoolean("ratings.rewards.enabled", false);
+        return new RatingRewardConfig(
+                enabled, rewardSpec(cfg, "ratings.rewards.rater"), rewardSpec(cfg, "ratings.rewards.owner"));
+    }
+
+    /** Read one {@code {money, currency, command}} reward block into a normalised {@link RewardSpec}. */
+    private static RewardSpec rewardSpec(ConfigStore cfg, String base) {
+        BigDecimal money = BigDecimal.valueOf(Math.max(0L, cfg.getLong(base + ".money", 0L)));
+        return RewardSpec.of(money, cfg.getString(base + ".currency", "default"), cfg.getString(base + ".command", ""));
     }
 
     /**

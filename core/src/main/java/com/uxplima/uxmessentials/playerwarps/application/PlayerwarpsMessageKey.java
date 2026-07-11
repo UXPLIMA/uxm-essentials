@@ -62,6 +62,10 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_RATING_INVALID("pwarp.rating-invalid"),
     PWARP_CANNOT_RATE_OWN("pwarp.cannot-rate-own"),
 
+    // rating rewards — the reward a rater earns for rating a warp, and the reward its owner earns per unique rater
+    PWARP_RATE_REWARDED("pwarp.rate-rewarded"),
+    PWARP_RATE_REWARD_OWNER("pwarp.rate-reward-owner"),
+
     // favouriting — any-viewer star toggle kept consistent with favourite_count
     PWARP_FAVOURITED("pwarp.favourited"),
     PWARP_UNFAVOURITED("pwarp.unfavourited"),

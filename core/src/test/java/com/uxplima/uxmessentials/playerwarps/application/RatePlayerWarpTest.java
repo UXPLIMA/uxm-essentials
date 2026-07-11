@@ -45,7 +45,8 @@ class RatePlayerWarpTest {
                 ratings,
                 PlayerWarpTestSupport.notifier(sink),
                 new BayesianRating(10),
-                PlayerWarpTestSupport.CLOCK);
+                PlayerWarpTestSupport.CLOCK,
+                java.util.Optional.empty());
         owner = PlayerWarpTestSupport.ref("Owner");
         rater = PlayerWarpTestSupport.ref("Rater");
         warpId = repository.put(PlayerWarpTestSupport.warp(owner, "hub")).id().orElseThrow();

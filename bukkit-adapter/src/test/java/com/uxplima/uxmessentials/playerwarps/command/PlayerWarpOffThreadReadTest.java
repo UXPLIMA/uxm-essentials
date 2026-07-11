@@ -220,7 +220,12 @@ class PlayerWarpOffThreadReadTest {
                 browseView(messages, permissions, notifier),
                 categoriesView(messages),
                 new RatePlayerWarp(
-                        repository, new NoRatings(), notifier, new BayesianRating(10), java.time.Clock.systemUTC()),
+                        repository,
+                        new NoRatings(),
+                        notifier,
+                        new BayesianRating(10),
+                        java.time.Clock.systemUTC(),
+                        java.util.Optional.empty()),
                 new FavouritePlayerWarp(repository, new NoFavourites(), notifier),
                 new ManageMembers(
                         repository,

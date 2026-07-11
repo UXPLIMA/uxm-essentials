@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingRewardStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -92,6 +93,12 @@ public final class PlayerWarpRepositories {
     public static WarpRatingStore ratingStore(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqWarpRatingStore(persistence.dsl());
+    }
+
+    /** The jOOQ {@link WarpRatingRewardStore} — the {@code (subject, warp, rewardId)} ledger that dedups a rating reward. */
+    public static WarpRatingRewardStore ratingRewardStore(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqWarpRatingRewardStore(persistence.dsl());
     }
 
     /** The jOOQ {@link WarpFavouriteStore} — a player's starred warps, its rows the source of {@code favourite_count}. */
