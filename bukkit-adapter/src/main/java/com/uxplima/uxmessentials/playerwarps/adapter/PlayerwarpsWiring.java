@@ -3,10 +3,13 @@ package com.uxplima.uxmessentials.playerwarps.adapter;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpDataMigration;
+import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRenameNotice;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommands;
@@ -95,6 +98,7 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
+        runLegacyMigration(persistence, kernel);
         // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
         // wraps that same cache so a local write announces it to peers (the homes seam, copied for player-warps).
         com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository cached =
@@ -167,6 +171,27 @@ public final class PlayerwarpsWiring {
                 listMenu);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
+    }
+
+    /**
+     * Copy the shipped player-warp data from the V70 {@code _v1_legacy} tables into the new surrogate-id schema,
+     * once, off the tick thread. The routine self-disables by dropping the legacy tables after a successful copy,
+     * so scheduling it on every enable is safe: after the first run there is nothing left to migrate and it returns
+     * immediately. It stays off the tick thread because the whole scan and its writes must never block enable.
+     *
+     * <p>A now-duplicate name is renamed on the way in, and the owner is told through a callback so the migration
+     * itself need not know about the messaging module. Reaching the offline-mailbox from here would mean threading
+     * the messaging context's send-mail port through this wiring, which it does not yet carry, so a rename is
+     * recorded in the operator log for now; delivering it as mail to the owner is a follow-up.
+     */
+    private static void runLegacyMigration(Persistence persistence, KernelPorts kernel) {
+        Consumer<PlayerWarpRenameNotice> onRename = notice -> kernel.log()
+                .info(
+                        "event=playerwarp_renamed owner={} from={} to={}",
+                        notice.owner(),
+                        notice.oldName(),
+                        notice.newName());
+        kernel.scheduler().async(() -> PlayerWarpDataMigration.run(persistence, onRename, kernel.log()));
     }
 
     /**
