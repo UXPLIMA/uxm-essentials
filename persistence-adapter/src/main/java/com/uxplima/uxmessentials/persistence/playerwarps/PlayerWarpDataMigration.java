@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerWarpRatingsV1LegacyRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerWarpsRecord;
@@ -44,9 +45,14 @@ import org.jspecify.annotations.Nullable;
  * warp, every rehomed rating and both drops commit together, or a failure rolls the lot back and the next enable
  * retries from the untouched legacy tables. A second enable then finds no legacy table and returns immediately.
  *
- * <p><b>What each legacy row becomes.</b> Rows are read in a deterministic {@code created_at, owner, name} order so
- * the first claimant of a now-globally-unique name keeps it and later duplicates are renamed ({@code base} →
- * {@code base2}, …); each rename emits a {@link PlayerWarpRenameNotice}. {@code access} is derived from the legacy
+ * <p><b>What each legacy row becomes.</b> Each legacy name is first coerced into the V70 {@link PlayerWarpName}
+ * shape — lowercase {@code [a-z0-9_-]}, {@value PlayerWarpName#MIN_LENGTH}..{@value PlayerWarpName#MAX_LENGTH}
+ * characters — because the old schema let a name be any charset up to 64 characters, and a name that no longer
+ * constructs would throw on the very next read and break the browse for everyone. Rows are then read in a
+ * deterministic {@code created_at, owner, name} order so the first claimant of a now-globally-unique name keeps it
+ * and later duplicates are renamed ({@code base} → {@code base2}, …). A {@link PlayerWarpRenameNotice} is emitted
+ * whenever the stored name ends up different from the legacy name for <em>any</em> reason — a charset or length fix
+ * as well as a collision suffix. {@code access} is derived from the legacy
  * flags — a set password wins ({@code PASSWORD}), then {@code is_locked} maps to owner-only {@code PRIVATE}, then
  * {@code is_public} to {@code PUBLIC}, else {@code PRIVATE}. A legacy plaintext password is run through the
  * {@link PasswordHasher} and stored only as its salted digest; the plaintext is never persisted or logged. The
@@ -59,6 +65,12 @@ import org.jspecify.annotations.Nullable;
 public final class PlayerWarpDataMigration extends JooqRepository {
 
     private static final String LEGACY_WARPS_TABLE = PLAYER_WARPS_V1_LEGACY.getName();
+
+    /** Every character the V70 name charset forbids; each match is folded to a dash during sanitising. */
+    private static final Pattern NON_NAME_CHAR = Pattern.compile("[^a-z0-9_-]");
+
+    /** The base handed out when a legacy name sanitises to nothing (an all-whitespace or empty name). */
+    private static final String FALLBACK_NAME = "warp";
 
     private final PasswordHasher hasher;
     private final Consumer<PlayerWarpRenameNotice> onRename;
@@ -105,7 +117,11 @@ public final class PlayerWarpDataMigration extends JooqRepository {
         long nextId = maxId(dsl) + 1;
         int welcomeDropped = 0;
         for (PlayerWarpsV1LegacyRecord row : legacy) {
-            String name = allocator.allocate(row.getName());
+            String allocated = allocator.allocate(sanitize(row.getName()));
+            // Belt and braces: the sanitised, collision-resolved name must satisfy the new value object.
+            // Constructing it here turns any future logic slip into a loud failure during this one-shot run
+            // rather than a row that silently poisons the global browse on the very next read.
+            String name = PlayerWarpName.of(allocated).value();
             long id = nextId++;
             insertWarp(dsl, id, name, row);
             byKey.put(new LegacyKey(row.getOwner(), row.getName()), new WarpRef(id, row.getCreatedAt()));
@@ -260,11 +276,38 @@ public final class PlayerWarpDataMigration extends JooqRepository {
     private static void recordRename(
             List<PlayerWarpRenameNotice> renames, PlayerWarpsV1LegacyRecord row, String resolved) {
         String legacyName = row.getName();
-        // The natural form is the legacy name lower-cased (lookups are case-insensitive); a rename is only real
-        // when collision resolution or the 32-char cap changed it, never for pure case normalisation.
-        if (!resolved.equals(legacyName.toLowerCase(Locale.ROOT))) {
+        // A notice fires whenever the stored name differs from the legacy name for any reason — a charset or length
+        // fix as much as a collision suffix. Legacy names were already lower-cased on the old write path, so a warp
+        // that needed no change compares equal here and stays silent.
+        if (!resolved.equals(legacyName)) {
             renames.add(new PlayerWarpRenameNotice(UUID.fromString(row.getOwner()), legacyName, resolved));
         }
+    }
+
+    /**
+     * Coerce a legacy name into the shape the V70 {@link PlayerWarpName} enforces so it always constructs: lower-case
+     * and strip, fold every character outside {@code [a-z0-9_-]} (spaces, punctuation, unicode) to a dash, fall back
+     * to a generic base when nothing survives, cap the result at {@link PlayerWarpName#MAX_LENGTH} and pad it up to
+     * {@link PlayerWarpName#MIN_LENGTH}. This is plain string work, not SQL, so the regex fold is safe here.
+     */
+    private static String sanitize(String legacyName) {
+        String folded = NON_NAME_CHAR
+                .matcher(legacyName.strip().toLowerCase(Locale.ROOT))
+                .replaceAll("-");
+        String base = folded.isBlank() ? FALLBACK_NAME : folded;
+        String capped = base.length() > PlayerWarpName.MAX_LENGTH ? base.substring(0, PlayerWarpName.MAX_LENGTH) : base;
+        return pad(capped);
+    }
+
+    private static String pad(String name) {
+        if (name.length() >= PlayerWarpName.MIN_LENGTH) {
+            return name;
+        }
+        StringBuilder padded = new StringBuilder(name);
+        while (padded.length() < PlayerWarpName.MIN_LENGTH) {
+            padded.append('-');
+        }
+        return padded.toString();
     }
 
     private static long maxId(DSLContext dsl) {
