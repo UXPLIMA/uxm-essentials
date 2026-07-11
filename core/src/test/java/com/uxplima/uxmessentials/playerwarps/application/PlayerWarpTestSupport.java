@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerwarps.application;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -14,11 +15,16 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.ToIntFunction;
 
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
+import com.uxplima.uxmessentials.playerwarps.domain.BanRecord;
+import com.uxplima.uxmessentials.playerwarps.domain.ChargeError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
@@ -34,7 +40,10 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared fakes for the role-gated management use-case tests: an in-memory repository that records deletes, a
@@ -289,6 +298,121 @@ final class PlayerWarpTestSupport {
 
         private static String key(PlayerWarpId warp, UUID player) {
             return warp.value() + ":" + player;
+        }
+    }
+
+    /** A whitelist store recording the last add/remove so a test can assert the row the verb touched. */
+    static final class Whitelist implements WarpWhitelistStore {
+        private final Set<String> rows = new LinkedHashSet<>();
+
+        @Nullable UUID lastAdded;
+
+        @Nullable UUID lastRemoved;
+
+        @Override
+        public void add(PlayerWarpId warp, UUID player) {
+            rows.add(key(warp, player));
+            lastAdded = player;
+        }
+
+        @Override
+        public void remove(PlayerWarpId warp, UUID player) {
+            rows.remove(key(warp, player));
+            lastRemoved = player;
+        }
+
+        @Override
+        public boolean contains(PlayerWarpId warp, UUID player) {
+            return rows.contains(key(warp, player));
+        }
+
+        @Override
+        public List<UUID> list(PlayerWarpId warp) {
+            return List.of();
+        }
+
+        private static String key(PlayerWarpId warp, UUID player) {
+            return warp.value() + ":" + player;
+        }
+    }
+
+    /** A ban store recording the last {@link BanRecord} it was handed and the last unban, for shape assertions. */
+    static final class Bans implements WarpBanStore {
+        private final Map<UUID, BanRecord> byPlayer = new LinkedHashMap<>();
+
+        @Nullable BanRecord lastBan;
+
+        @Nullable UUID lastUnban;
+
+        @Override
+        public void ban(PlayerWarpId warp, BanRecord record) {
+            byPlayer.put(record.player(), record);
+            lastBan = record;
+        }
+
+        @Override
+        public void unban(PlayerWarpId warp, UUID player) {
+            byPlayer.remove(player);
+            lastUnban = player;
+        }
+
+        @Override
+        public Optional<BanRecord> find(PlayerWarpId warp, UUID player) {
+            return Optional.ofNullable(byPlayer.get(player));
+        }
+
+        @Override
+        public List<BanRecord> list(PlayerWarpId warp) {
+            return List.copyOf(byPlayer.values());
+        }
+    }
+
+    /**
+     * A player-warp economy fake recording the target and warp of the last {@link #withdraw}, so a test can assert
+     * the payout routed to the owner. The {@code failure} arm lets a test drive the provider-fault path.
+     */
+    static final class Economy implements PlayerWarpEconomy {
+
+        @Nullable PlayerRef lastWithdrawTo;
+
+        @Nullable PlayerWarpId lastWithdrawWarp;
+
+        private final Optional<ChargeError> failure;
+
+        Economy() {
+            this(Optional.empty());
+        }
+
+        private Economy(Optional<ChargeError> failure) {
+            this.failure = failure;
+        }
+
+        /** An economy whose {@link #withdraw} always faults with {@code error}, for the failure-path test. */
+        static Economy failing(ChargeError error) {
+            return new Economy(Optional.of(error));
+        }
+
+        @Override
+        public Result<Unit, ChargeError> chargeAndAccrue(
+                PlayerRef payer, PlayerWarpId warp, BigDecimal price, String currencyId) {
+            return Result.ok();
+        }
+
+        @Override
+        public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public Result<Unit, ChargeError> withdraw(PlayerWarpId warp, PlayerRef to) {
+            lastWithdrawWarp = warp;
+            lastWithdrawTo = to;
+            return failure.<Result<Unit, ChargeError>>map(Result::err).orElseGet(Result::ok);
+        }
+
+        @Override
+        public Result<Unit, ChargeError> refund(PlayerRef to, BigDecimal amount, String currencyId) {
+            return Result.ok();
         }
     }
 

@@ -63,7 +63,17 @@ public enum PlayerWarpError {
     NO_PERMISSION(PlayerwarpsMessageKey.PWARP_NO_PERMISSION),
 
     /** A price currency change was refused because the warp's earnings bank is not empty — withdraw it first. */
-    CURRENCY_LOCKED(PlayerwarpsMessageKey.PWARP_CURRENCY_LOCKED);
+    CURRENCY_LOCKED(PlayerwarpsMessageKey.PWARP_CURRENCY_LOCKED),
+
+    /** A member grant named {@link com.uxplima.uxmessentials.playerwarps.domain.WarpRole#OWNER} — a warp keeps its
+     * single owner, so only co-owner and manager may be granted. */
+    INVALID_ROLE(PlayerwarpsMessageKey.PWARP_INVALID_ROLE),
+
+    /** A member or ban verb aimed at the warp's own owner — the owner is neither a member nor bannable on their warp. */
+    CANNOT_TARGET_OWNER(PlayerwarpsMessageKey.PWARP_CANNOT_TARGET_OWNER),
+
+    /** A withdraw could not pay the accrued earnings to the owner (the economy provider faulted). */
+    WITHDRAW_FAILED(PlayerwarpsMessageKey.PWARP_WITHDRAW_FAILED);
 
     private final PlayerwarpsMessageKey messageKey;
 

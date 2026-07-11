@@ -27,6 +27,9 @@ import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarp
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
+import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
+import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
+import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
@@ -35,12 +38,15 @@ import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
+import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
 import com.uxplima.uxmessentials.playerwarps.domain.BayesianRating;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
@@ -146,15 +152,19 @@ public final class PlayerwarpsWiring {
         // authorization (a member's role decides which edit verbs they may run), so it is built once and shared.
         WarpMemberStore memberStore = PlayerWarpRepositories.memberStore(persistence, kernel.log());
         WarpAuthorization warpAuthorization = new WarpAuthorization(memberStore);
+        // The ban and whitelist stores back both the ordered access gate (T3) and the management verbs (T6b-2),
+        // so they are built once here and shared with the ManageBans / ManageWhitelist use cases below.
+        WarpBanStore banStore = PlayerWarpRepositories.banStore(persistence);
+        WarpWhitelistStore whitelistStore = PlayerWarpRepositories.whitelistStore(persistence, Clock.systemUTC());
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
                 notifier,
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
                 kernel.permissions(),
-                PlayerWarpRepositories.banStore(persistence),
+                banStore,
                 memberStore,
-                PlayerWarpRepositories.whitelistStore(persistence, Clock.systemUTC()),
+                whitelistStore,
                 PlayerWarpRepositories.passwordStore(persistence),
                 kernel.cooldowns(),
                 economy,
@@ -186,6 +196,13 @@ public final class PlayerwarpsWiring {
         RatePlayerWarp ratePlayerWarp = new RatePlayerWarp(
                 repository, ratingStore, notifier, new BayesianRating(ratingConfidence(ctx)), Clock.systemUTC());
         FavouritePlayerWarp favouritePlayerWarp = new FavouritePlayerWarp(repository, favouriteStore, notifier);
+        // The role-gated people/money verbs (T6b-2) all gate through the shared WarpAuthorization and reuse the
+        // member/whitelist/ban stores and the economy seam already built above — no new persistence, just use cases.
+        ManageMembers manageMembers =
+                new ManageMembers(repository, warpAuthorization, memberStore, notifier, Clock.systemUTC());
+        ManageWhitelist manageWhitelist = new ManageWhitelist(repository, warpAuthorization, whitelistStore, notifier);
+        ManageBans manageBans = new ManageBans(repository, warpAuthorization, banStore, notifier, Clock.systemUTC());
+        WithdrawEarnings withdrawEarnings = new WithdrawEarnings(repository, warpAuthorization, notifier, economy);
         PlayerWarpListMenu listMenu = buildGui(
                 plugin,
                 kernel,
@@ -213,6 +230,10 @@ public final class PlayerwarpsWiring {
                 visibility,
                 ratePlayerWarp,
                 favouritePlayerWarp,
+                manageMembers,
+                manageWhitelist,
+                manageBans,
+                withdrawEarnings,
                 notifier,
                 editorView,
                 listMenu);
@@ -380,6 +401,10 @@ public final class PlayerwarpsWiring {
             SetPlayerWarpVisibility visibility,
             RatePlayerWarp ratePlayerWarp,
             FavouritePlayerWarp favouritePlayerWarp,
+            ManageMembers manageMembers,
+            ManageWhitelist manageWhitelist,
+            ManageBans manageBans,
+            WithdrawEarnings withdrawEarnings,
             PlayerWarpNotifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
@@ -396,7 +421,11 @@ public final class PlayerwarpsWiring {
                 kernel.scheduler(),
                 listMenu,
                 ratePlayerWarp,
-                favouritePlayerWarp);
+                favouritePlayerWarp,
+                manageMembers,
+                manageWhitelist,
+                manageBans,
+                withdrawEarnings);
     }
 
     private static int defaultLimit(ModuleContext ctx) {

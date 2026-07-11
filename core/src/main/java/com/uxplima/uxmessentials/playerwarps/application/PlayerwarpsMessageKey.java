@@ -78,6 +78,19 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_ARCHIVED("pwarp.archived"),
     PWARP_RESTORED("pwarp.restored"),
 
+    // role-gated people management + the earnings bank
+    PWARP_MEMBER_ADDED("pwarp.member-added"),
+    PWARP_MEMBER_REMOVED("pwarp.member-removed"),
+    PWARP_WHITELIST_ADDED("pwarp.whitelist-added"),
+    PWARP_WHITELIST_REMOVED("pwarp.whitelist-removed"),
+    PWARP_BAN_SET("pwarp.ban-set"),
+    PWARP_BAN_LIFTED("pwarp.ban-lifted"),
+    PWARP_WITHDRAWN("pwarp.withdrawn"),
+    PWARP_WITHDRAW_FAILED("pwarp.withdraw-failed"),
+    PWARP_NOTHING_TO_WITHDRAW("pwarp.nothing-to-withdraw"),
+    PWARP_INVALID_ROLE("pwarp.invalid-role"),
+    PWARP_CANNOT_TARGET_OWNER("pwarp.cannot-target-owner"),
+
     // management GUI — list
     PWARP_GUI_LIST_TITLE("pwarp.gui.list.title"),
     PWARP_GUI_LIST_ENTRY_NAME("pwarp.gui.list.entry-name"),

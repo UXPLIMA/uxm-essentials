@@ -7,10 +7,14 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListM
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
+import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
+import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
+import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -40,6 +44,10 @@ import org.jspecify.annotations.NullMarked;
  *     owner-scoped for a player and cross-owner for a holder of {@code uxmessentials.pwarp.gui}
  * @param ratePlayerWarp {@code /pwarp rate <name> <1-5>} — the any-viewer star rating that drives the browse sort
  * @param favouritePlayerWarp {@code /pwarp favourite <name>} — the any-viewer favourite toggle
+ * @param manageMembers {@code /pwarp members add|remove} — grant/revoke a co-owner or manager (owner-only)
+ * @param manageWhitelist {@code /pwarp whitelist add|remove} — the guest-list verbs (owner/co-owner/manager)
+ * @param manageBans {@code /pwarp ban|unban} — bar or restore a player (owner/co-owner/manager)
+ * @param withdrawEarnings {@code /pwarp withdraw} — pay the warp bank out to the owner (owner/co-owner)
  */
 @NullMarked
 public record PlayerWarpServices(
@@ -54,7 +62,11 @@ public record PlayerWarpServices(
         Scheduler scheduler,
         PlayerWarpListMenu listView,
         RatePlayerWarp ratePlayerWarp,
-        FavouritePlayerWarp favouritePlayerWarp) {
+        FavouritePlayerWarp favouritePlayerWarp,
+        ManageMembers manageMembers,
+        ManageWhitelist manageWhitelist,
+        ManageBans manageBans,
+        WithdrawEarnings withdrawEarnings) {
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
@@ -68,6 +80,10 @@ public record PlayerWarpServices(
         Objects.requireNonNull(listView, "listView");
         Objects.requireNonNull(ratePlayerWarp, "ratePlayerWarp");
         Objects.requireNonNull(favouritePlayerWarp, "favouritePlayerWarp");
+        Objects.requireNonNull(manageMembers, "manageMembers");
+        Objects.requireNonNull(manageWhitelist, "manageWhitelist");
+        Objects.requireNonNull(manageBans, "manageBans");
+        Objects.requireNonNull(withdrawEarnings, "withdrawEarnings");
     }
 
     /**

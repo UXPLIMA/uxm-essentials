@@ -22,6 +22,9 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListM
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
+import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
+import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
+import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
@@ -29,6 +32,7 @@ import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
+import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
@@ -192,7 +196,21 @@ class PlayerWarpOffThreadReadTest {
                 listView(messages, permissions, setPlayerWarp, visibility, archivePlayerWarp),
                 new RatePlayerWarp(
                         repository, new NoRatings(), notifier, new BayesianRating(10), java.time.Clock.systemUTC()),
-                new FavouritePlayerWarp(repository, new NoFavourites(), notifier));
+                new FavouritePlayerWarp(repository, new NoFavourites(), notifier),
+                new ManageMembers(
+                        repository,
+                        new WarpAuthorization(new NoMembers()),
+                        new NoMembers(),
+                        notifier,
+                        java.time.Clock.systemUTC()),
+                new ManageWhitelist(repository, new WarpAuthorization(new NoMembers()), new NoWhitelist(), notifier),
+                new ManageBans(
+                        repository,
+                        new WarpAuthorization(new NoMembers()),
+                        new NoBans(),
+                        notifier,
+                        java.time.Clock.systemUTC()),
+                new WithdrawEarnings(repository, new WarpAuthorization(new NoMembers()), notifier, Optional.empty()));
     }
 
     /** A minimal real management list (this test does not open it; it only needs a non-null view in services). */
