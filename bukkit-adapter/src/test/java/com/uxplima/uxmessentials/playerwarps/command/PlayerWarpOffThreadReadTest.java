@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.BayesianRating;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.RatingTally;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
@@ -290,6 +291,12 @@ class PlayerWarpOffThreadReadTest {
 
         @Override
         public void recordVisit(PlayerWarpId id) {}
+
+        @Override
+        public void updateRating(PlayerWarpId id, RatingSummary summary) {}
+
+        @Override
+        public void refreshFavouriteCount(PlayerWarpId id) {}
 
         @Override
         public Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {

@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -88,6 +89,16 @@ public final class InMemoryPlayerWarpRepository implements PlayerWarpRepository 
     public void recordVisit(PlayerWarpId id) {
         // A visit is a durable, out-of-band counter bump in the real store; no test double reads it back, so this
         // stays a no-op rather than reconstructing the aggregate just to advance a count nothing asserts.
+    }
+
+    @Override
+    public void updateRating(PlayerWarpId id, RatingSummary summary) {
+        // Like the visit counter, the rating rollup is a durable side-write the GUI and golden tests never read back.
+    }
+
+    @Override
+    public void refreshFavouriteCount(PlayerWarpId id) {
+        // The favourite count is a durable side-write these tests never read back, so it stays a no-op.
     }
 
     @Override

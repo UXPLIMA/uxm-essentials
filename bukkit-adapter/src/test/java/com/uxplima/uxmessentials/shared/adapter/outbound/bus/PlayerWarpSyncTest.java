@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -228,5 +229,11 @@ class PlayerWarpSyncTest {
 
         @Override
         public void recordVisit(PlayerWarpId id) {}
+
+        @Override
+        public void updateRating(PlayerWarpId id, RatingSummary summary) {}
+
+        @Override
+        public void refreshFavouriteCount(PlayerWarpId id) {}
     }
 }

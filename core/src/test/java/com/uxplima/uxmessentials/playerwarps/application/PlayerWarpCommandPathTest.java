@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
@@ -349,6 +350,16 @@ class PlayerWarpCommandPathTest {
         @Override
         public void recordVisit(PlayerWarpId id) {
             // Visit counting is an atomic store-side write exercised in the persistence tests, not here.
+        }
+
+        @Override
+        public void updateRating(PlayerWarpId id, RatingSummary summary) {
+            // Rating rollups are asserted in the persistence tests; the command-path fake ignores them.
+        }
+
+        @Override
+        public void refreshFavouriteCount(PlayerWarpId id) {
+            // Favourite counts are asserted in the persistence tests; the command-path fake ignores them.
         }
     }
 

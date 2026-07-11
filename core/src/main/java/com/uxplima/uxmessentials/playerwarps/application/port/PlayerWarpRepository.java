@@ -82,22 +82,16 @@ public interface PlayerWarpRepository {
      * sum, count, average, and the Bayesian score the "top rated" browse sorts on. A guarded single-row UPDATE the
      * rate use case runs after recomputing the rollup from the {@code WarpRatingStore}, so the sort column stays in
      * step with the vote rows without the browse ever touching the per-vote table.
-     *
-     * <p>The default is a no-op so a test double that does not maintain the rollup need not implement it; the durable
-     * jOOQ store and both the cache and cross-server decorators override it — production never hits this default.
      */
-    default void updateRating(PlayerWarpId id, RatingSummary summary) {}
+    void updateRating(PlayerWarpId id, RatingSummary summary);
 
     /**
      * Recompute {@code favourite_count} on the warp with surrogate key {@code id} from the live favourite rows —
      * {@code SET favourite_count = (SELECT COUNT(*) FROM player_warp_favourites WHERE warp_id = id)} — rather than a
      * {@code +1}/{@code -1} bump, so a double-click that races the favourite membership check can never drift the
      * stored count away from the true row count. The favourite use case calls it after a star or un-star commits.
-     *
-     * <p>The default is a no-op, overridden by the durable jOOQ store and both decorators, exactly as
-     * {@link #updateRating} is.
      */
-    default void refreshFavouriteCount(PlayerWarpId id) {}
+    void refreshFavouriteCount(PlayerWarpId id);
 
     /**
      * The warps {@code owner} owns if they are already in memory, without touching the database. A cache

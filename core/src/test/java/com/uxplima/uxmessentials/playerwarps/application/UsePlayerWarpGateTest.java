@@ -595,6 +595,16 @@ class UsePlayerWarpGateTest {
         public void recordVisit(PlayerWarpId id) {
             visits++;
         }
+
+        @Override
+        public void updateRating(PlayerWarpId id, RatingSummary summary) {
+            // The gate tests exercise access and visits, not the rating rollup, so this fake ignores it.
+        }
+
+        @Override
+        public void refreshFavouriteCount(PlayerWarpId id) {
+            // The gate tests exercise access and visits, not favourite counts, so this fake ignores it.
+        }
     }
 
     private static final class RecordingTeleporter implements PlayerWarpTeleporter {

@@ -457,6 +457,14 @@ class WarpEditorGoldenTest {
 
         @Override
         public void recordVisit(com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId id) {}
+
+        @Override
+        public void updateRating(
+                com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId id,
+                com.uxplima.uxmessentials.playerwarps.domain.RatingSummary summary) {}
+
+        @Override
+        public void refreshFavouriteCount(com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId id) {}
     }
 
     /** An empty category repository — the category selector reads it but this test never picks a category. */
