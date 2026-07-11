@@ -151,6 +151,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_VIEW_FAVOURITE("pwarp.gui.view.favourite"),
     PWARP_GUI_VIEW_UNFAVOURITE("pwarp.gui.view.unfavourite"),
     PWARP_GUI_VIEW_RATE("pwarp.gui.view.rate"),
+    PWARP_GUI_VIEW_MANAGE("pwarp.gui.view.manage"),
     PWARP_GUI_VIEW_BACK("pwarp.gui.view.back"),
 
     // five-star rating menu (pwarp-rate) — reached from the detail panel's rate button
@@ -161,6 +162,42 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_RATE_STAR_4("pwarp.gui.rate.star-4"),
     PWARP_GUI_RATE_STAR_5("pwarp.gui.rate.star-5"),
     PWARP_GUI_RATE_BACK("pwarp.gui.rate.back"),
+
+    // capability-gated single-warp management panel (pwarp-manage), opened from the detail panel's manage button. Each
+    // button is view-gated by the viewer's WarpRole capability and drives one P4 use case; the info tile reflects
+    // state.
+    PWARP_GUI_MANAGE_TITLE("pwarp.gui.manage.title"),
+    PWARP_GUI_MANAGE_ENTRY_NAME("pwarp.gui.manage.entry-name"),
+    PWARP_GUI_MANAGE_LORE_OWNER("pwarp.gui.manage.lore-owner"),
+    PWARP_GUI_MANAGE_LORE_ACCESS("pwarp.gui.manage.lore-access"),
+    PWARP_GUI_MANAGE_LORE_PRICE("pwarp.gui.manage.lore-price"),
+    PWARP_GUI_MANAGE_LORE_BANK("pwarp.gui.manage.lore-bank"),
+    PWARP_GUI_MANAGE_LORE_CATEGORY("pwarp.gui.manage.lore-category"),
+    PWARP_GUI_MANAGE_RENAME("pwarp.gui.manage.rename"),
+    PWARP_GUI_MANAGE_RENAME_PROMPT("pwarp.gui.manage.rename-prompt"),
+    PWARP_GUI_MANAGE_DISPLAY_NAME("pwarp.gui.manage.display-name"),
+    PWARP_GUI_MANAGE_DISPLAY_NAME_PROMPT("pwarp.gui.manage.display-name-prompt"),
+    PWARP_GUI_MANAGE_DESCRIPTION("pwarp.gui.manage.description"),
+    PWARP_GUI_MANAGE_DESCRIPTION_PROMPT("pwarp.gui.manage.description-prompt"),
+    PWARP_GUI_MANAGE_ICON("pwarp.gui.manage.icon"),
+    PWARP_GUI_MANAGE_ICON_PROMPT("pwarp.gui.manage.icon-prompt"),
+    PWARP_GUI_MANAGE_CATEGORY("pwarp.gui.manage.category"),
+    PWARP_GUI_MANAGE_CATEGORY_PROMPT("pwarp.gui.manage.category-prompt"),
+    PWARP_GUI_MANAGE_ACCESS("pwarp.gui.manage.access"),
+    PWARP_GUI_MANAGE_PASSWORD("pwarp.gui.manage.password"),
+    PWARP_GUI_MANAGE_PASSWORD_PROMPT("pwarp.gui.manage.password-prompt"),
+    PWARP_GUI_MANAGE_PASSWORD_CLEAR_CONFIRM("pwarp.gui.manage.password-clear-confirm"),
+    PWARP_GUI_MANAGE_PRICE("pwarp.gui.manage.price"),
+    PWARP_GUI_MANAGE_PRICE_PROMPT("pwarp.gui.manage.price-prompt"),
+    PWARP_GUI_MANAGE_MOVE("pwarp.gui.manage.move"),
+    PWARP_GUI_MANAGE_BANK("pwarp.gui.manage.bank"),
+    PWARP_GUI_MANAGE_TRANSFER("pwarp.gui.manage.transfer"),
+    PWARP_GUI_MANAGE_TRANSFER_PROMPT("pwarp.gui.manage.transfer-prompt"),
+    PWARP_GUI_MANAGE_TRANSFER_CONFIRM("pwarp.gui.manage.transfer-confirm"),
+    PWARP_GUI_MANAGE_SPONSOR("pwarp.gui.manage.sponsor"),
+    PWARP_GUI_MANAGE_DELETE("pwarp.gui.manage.delete"),
+    PWARP_GUI_MANAGE_DELETE_CONFIRM("pwarp.gui.manage.delete-confirm"),
+    PWARP_GUI_MANAGE_BACK("pwarp.gui.manage.back"),
 
     // management GUI — editor frame
     PWARP_GUI_EDITOR_TITLE("pwarp.gui.editor.title"),

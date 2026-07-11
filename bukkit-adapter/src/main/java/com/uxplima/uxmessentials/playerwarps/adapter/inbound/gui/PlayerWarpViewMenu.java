@@ -87,6 +87,7 @@ public final class PlayerWarpViewMenu {
     private final Messages messages;
     private final PlayerWarpNotifier notifier;
     private final BiConsumer<Player, PlayerRef> openBrowse;
+    private final BiConsumer<PlayerRef, PlayerWarpName> openManage;
 
     public PlayerWarpViewMenu(
             Menus menus,
@@ -99,7 +100,8 @@ public final class PlayerWarpViewMenu {
             RatePlayerWarp ratePlayerWarp,
             Messages messages,
             PlayerWarpNotifier notifier,
-            BiConsumer<Player, PlayerRef> openBrowse) {
+            BiConsumer<Player, PlayerRef> openBrowse,
+            BiConsumer<PlayerRef, PlayerWarpName> openManage) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -111,6 +113,7 @@ public final class PlayerWarpViewMenu {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.openBrowse = Objects.requireNonNull(openBrowse, "openBrowse");
+        this.openManage = Objects.requireNonNull(openManage, "openManage");
     }
 
     /** Register the placeholders, view conditions, click actions, and both specs; called once at wiring time. */
@@ -128,6 +131,10 @@ public final class PlayerWarpViewMenu {
                 "playerwarps:not-favourited", (ctx, args) -> !subject(ctx).viewerFavourited());
         bindings.condition("playerwarps:favourited", (ctx, args) -> subject(ctx).viewerFavourited());
         bindings.condition("playerwarps:not-owner", (ctx, args) -> !subject(ctx).viewerOwner());
+        // The manage button shows only to a viewer who owns the warp or holds a role on it (a member: owner, co-owner,
+        // or manager) — the same set the pwarp-manage capability gate admits — so a stranger never sees it.
+        bindings.condition(
+                "playerwarps:viewer-member", (ctx, args) -> subject(ctx).viewerMember());
         // Teleport and rate carry a value in their ref token (the typed password as %input%, the star count), which the
         // engine can only split off a single-segment head — a namespaced feature:action id would keep the whole
         // feature:action:value token as its id and never resolve. So these two use single-segment ids; the value-free
@@ -137,6 +144,9 @@ public final class PlayerWarpViewMenu {
         bindings.action("playerwarps:view-favourite", ctx -> toggleFavourite(ctx, true));
         bindings.action("playerwarps:view-unfavourite", ctx -> toggleFavourite(ctx, false));
         bindings.action("playerwarps:view-rate", ctx -> menus.open(ctx.viewer(), RATE_SPEC_ID, subject(ctx)));
+        bindings.action(
+                "playerwarps:view-manage",
+                ctx -> openManage.accept(ctx.viewer(), subject(ctx).name()));
         bindings.action("playerwarps:view-back", ctx -> openBrowse.accept(ctx.player(), ctx.viewer()));
         bindings.action(
                 "playerwarps:rate-back", ctx -> open(ctx.viewer(), subject(ctx).name()));

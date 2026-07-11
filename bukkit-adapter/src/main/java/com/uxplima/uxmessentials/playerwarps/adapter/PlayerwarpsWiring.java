@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrows
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManageMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
@@ -243,6 +244,10 @@ public final class PlayerwarpsWiring {
                 usePlayerWarp,
                 kernel.messages(),
                 (viewer, name) -> viewHolder[0].open(viewer, name));
+        // The browse tile opens the view, the view opens the manage panel, and the manage panel's back button reopens
+        // the view — a three-way construction cycle, so a one-slot holder breaks it: the manage menu is built after the
+        // view, and the view's manage-open runs through this holder filled a step later.
+        PlayerWarpManageMenu[] manageHolder = new PlayerWarpManageMenu[1];
         // The per-warp detail panel (pwarp-view) and the five-star rating menu (pwarp-rate) behind it. It resolves the
         // clicked warp off the tick thread — a bounded findByName plus the viewer's favourite and membership flags —
         // and
@@ -258,10 +263,29 @@ public final class PlayerwarpsWiring {
                 ratePlayerWarp,
                 kernel.messages(),
                 notifier,
-                browseMenu::open);
+                browseMenu::open,
+                (viewer, name) -> manageHolder[0].open(viewer, name));
         viewHolder[0] = viewMenu;
+        // The capability-gated management panel (pwarp-manage) the view's manage button opens: it resolves the warp and
+        // the viewer's WarpRole off the tick thread and routes each button through the same single-warp use cases the
+        // /pwarp verbs drive, gated by the viewer's role. Its back button reopens the view.
+        PlayerWarpManageMenu manageMenu = new PlayerWarpManageMenu(
+                menus,
+                kernel.scheduler(),
+                repository,
+                warpAuthorization,
+                editPlayerWarp,
+                withdrawEarnings,
+                transferPlayerWarp,
+                archivePlayerWarp,
+                kernel.playerLookup(),
+                kernel.messages(),
+                notifier,
+                viewMenu::open);
+        manageHolder[0] = manageMenu;
         browseMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         viewMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        manageMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "playerwarps",
                 PlayerwarpsMessageKey.PWARP_GUI_LIST_TITLE,

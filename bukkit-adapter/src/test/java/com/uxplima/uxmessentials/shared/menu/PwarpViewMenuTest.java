@@ -13,6 +13,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +43,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -94,6 +97,7 @@ class PwarpViewMenuTest {
     private FavouritePlayerWarp favouritePlayerWarp;
     private RatePlayerWarp ratePlayerWarp;
     private PlayerWarpViewMenu menu;
+    private final List<PlayerWarpName> managed = new ArrayList<>();
 
     @TempDir
     Path dataFolder;
@@ -190,6 +194,33 @@ class PwarpViewMenuTest {
         assertThat(inv.getItem(15).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
     }
 
+    @Test
+    void theManageButtonShowsForTheWarpOwner() {
+        Inventory inv = openView(warp(viewer, WarpAccess.PUBLIC)); // the viewer owns this warp
+
+        assertThat(inv.getItem(16).getType()).isEqualTo(Material.COMPARATOR);
+    }
+
+    @Test
+    void theManageButtonIsHiddenForAStranger() {
+        // The viewer neither owns nor holds a role on this warp (members.roleOf is stubbed empty in setUp).
+        Inventory inv = openView(warp(otherOwner, WarpAccess.PUBLIC));
+
+        assertThat(inv.getItem(16).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+    }
+
+    @Test
+    void theManageButtonShowsForAManagerAndOpensTheManagePanel() {
+        when(members.roleOf(any(), any())).thenReturn(Optional.of(WarpRole.MANAGER));
+        PlayerWarp warp = warp(otherOwner, WarpAccess.PUBLIC); // owned by another, but the viewer is a manager on it
+        Inventory inv = openView(warp);
+        assertThat(inv.getItem(16).getType()).isEqualTo(Material.COMPARATOR);
+
+        fireClick(16, ClickType.LEFT); // the manage button opens the pwarp-manage panel for this warp
+
+        assertThat(managed).containsExactly(warp.name());
+    }
+
     /** Stub the warp read, wire a real engine with the recording prompt, then open the detail panel and return its window. */
     private Inventory openView(PlayerWarp warp) {
         when(repository.findByName(warp.name())).thenReturn(Optional.of(warp));
@@ -231,7 +262,8 @@ class PwarpViewMenuTest {
                 ratePlayerWarp,
                 new KeyMessages(),
                 notifier,
-                (bukkitPlayer, ref) -> {});
+                (bukkitPlayer, ref) -> {},
+                (ref, name) -> managed.add(name));
         menu.register(bindings, dataFolder, NOOP);
     }
 
