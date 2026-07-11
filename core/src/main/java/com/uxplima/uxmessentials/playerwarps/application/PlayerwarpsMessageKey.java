@@ -198,6 +198,42 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_MANAGE_DELETE("pwarp.gui.manage.delete"),
     PWARP_GUI_MANAGE_DELETE_CONFIRM("pwarp.gui.manage.delete-confirm"),
     PWARP_GUI_MANAGE_BACK("pwarp.gui.manage.back"),
+    PWARP_GUI_MANAGE_MEMBERS("pwarp.gui.manage.members"),
+    PWARP_GUI_MANAGE_WHITELIST("pwarp.gui.manage.whitelist"),
+    PWARP_GUI_MANAGE_BANS("pwarp.gui.manage.bans"),
+
+    // people sub-menus — members (co-owners / managers)
+    PWARP_GUI_MEMBERS_TITLE("pwarp.gui.members.title"),
+    PWARP_GUI_MEMBERS_ENTRY_NAME("pwarp.gui.members.entry-name"),
+    PWARP_GUI_MEMBERS_ENTRY_LORE("pwarp.gui.members.entry-lore"),
+    PWARP_GUI_MEMBERS_ADD_COOWNER("pwarp.gui.members.add-coowner"),
+    PWARP_GUI_MEMBERS_ADD_MANAGER("pwarp.gui.members.add-manager"),
+    PWARP_GUI_MEMBERS_ADD_PROMPT("pwarp.gui.members.add-prompt"),
+    PWARP_GUI_MEMBERS_PREV("pwarp.gui.members.prev"),
+    PWARP_GUI_MEMBERS_NEXT("pwarp.gui.members.next"),
+    PWARP_GUI_MEMBERS_BACK("pwarp.gui.members.back"),
+
+    // people sub-menus — whitelist
+    PWARP_GUI_WHITELIST_TITLE("pwarp.gui.whitelist.title"),
+    PWARP_GUI_WHITELIST_ENTRY_NAME("pwarp.gui.whitelist.entry-name"),
+    PWARP_GUI_WHITELIST_ENTRY_LORE("pwarp.gui.whitelist.entry-lore"),
+    PWARP_GUI_WHITELIST_ADD("pwarp.gui.whitelist.add"),
+    PWARP_GUI_WHITELIST_ADD_PROMPT("pwarp.gui.whitelist.add-prompt"),
+    PWARP_GUI_WHITELIST_PREV("pwarp.gui.whitelist.prev"),
+    PWARP_GUI_WHITELIST_NEXT("pwarp.gui.whitelist.next"),
+    PWARP_GUI_WHITELIST_BACK("pwarp.gui.whitelist.back"),
+
+    // people sub-menus — bans
+    PWARP_GUI_BANS_TITLE("pwarp.gui.bans.title"),
+    PWARP_GUI_BANS_ENTRY_NAME("pwarp.gui.bans.entry-name"),
+    PWARP_GUI_BANS_ENTRY_LORE("pwarp.gui.bans.entry-lore"),
+    PWARP_GUI_BANS_ADD("pwarp.gui.bans.add"),
+    PWARP_GUI_BANS_ADD_PROMPT("pwarp.gui.bans.add-prompt"),
+    PWARP_GUI_BANS_NO_REASON("pwarp.gui.bans.no-reason"),
+    PWARP_GUI_BANS_PERMANENT("pwarp.gui.bans.permanent"),
+    PWARP_GUI_BANS_PREV("pwarp.gui.bans.prev"),
+    PWARP_GUI_BANS_NEXT("pwarp.gui.bans.next"),
+    PWARP_GUI_BANS_BACK("pwarp.gui.bans.back"),
 
     // management GUI — editor frame
     PWARP_GUI_EDITOR_TITLE("pwarp.gui.editor.title"),

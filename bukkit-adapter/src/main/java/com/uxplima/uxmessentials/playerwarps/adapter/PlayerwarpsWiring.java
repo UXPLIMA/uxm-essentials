@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEdito
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManageMenu;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpPeopleMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
@@ -266,9 +267,14 @@ public final class PlayerwarpsWiring {
                 browseMenu::open,
                 (viewer, name) -> manageHolder[0].open(viewer, name));
         viewHolder[0] = viewMenu;
+        // The three people sub-menus (pwarp-members / pwarp-whitelist / pwarp-bans) the manage panel's people buttons
+        // open. The manage panel opens them and their back button reopens it, so a one-slot holder breaks that cycle:
+        // the people menu is built after the manage panel and reads it back through this holder.
+        PlayerWarpPeopleMenu[] peopleHolder = new PlayerWarpPeopleMenu[1];
         // The capability-gated management panel (pwarp-manage) the view's manage button opens: it resolves the warp and
         // the viewer's WarpRole off the tick thread and routes each button through the same single-warp use cases the
-        // /pwarp verbs drive, gated by the viewer's role. Its back button reopens the view.
+        // /pwarp verbs drive, gated by the viewer's role. Its back button reopens the view; its people buttons open the
+        // members / whitelist / bans sub-menus.
         PlayerWarpManageMenu manageMenu = new PlayerWarpManageMenu(
                 menus,
                 kernel.scheduler(),
@@ -281,11 +287,34 @@ public final class PlayerwarpsWiring {
                 kernel.playerLookup(),
                 kernel.messages(),
                 notifier,
-                viewMenu::open);
+                viewMenu::open,
+                (viewer, name) -> peopleHolder[0].openMembers(viewer, name),
+                (viewer, name) -> peopleHolder[0].openWhitelist(viewer, name),
+                (viewer, name) -> peopleHolder[0].openBans(viewer, name));
         manageHolder[0] = manageMenu;
+        // The people sub-menus snapshot the warp's bounded members / whitelist / bans list off the tick thread and
+        // route
+        // each row/add click through the same ManageMembers / ManageWhitelist / ManageBans use cases the /pwarp verbs
+        // drive; each back button reopens the manage panel.
+        PlayerWarpPeopleMenu peopleMenu = new PlayerWarpPeopleMenu(
+                menus,
+                kernel.scheduler(),
+                repository,
+                kernel.playerLookup(),
+                memberStore,
+                whitelistStore,
+                banStore,
+                manageMembers,
+                manageWhitelist,
+                manageBans,
+                kernel.messages(),
+                notifier,
+                manageMenu::open);
+        peopleHolder[0] = peopleMenu;
         browseMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         viewMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         manageMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        peopleMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "playerwarps",
                 PlayerwarpsMessageKey.PWARP_GUI_LIST_TITLE,

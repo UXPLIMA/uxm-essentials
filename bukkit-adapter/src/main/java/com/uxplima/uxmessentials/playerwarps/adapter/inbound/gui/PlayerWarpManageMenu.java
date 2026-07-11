@@ -96,6 +96,9 @@ public final class PlayerWarpManageMenu {
     private final Messages messages;
     private final PlayerWarpNotifier notifier;
     private final BiConsumer<PlayerRef, PlayerWarpName> openView;
+    private final BiConsumer<PlayerRef, PlayerWarpName> openMembers;
+    private final BiConsumer<PlayerRef, PlayerWarpName> openWhitelist;
+    private final BiConsumer<PlayerRef, PlayerWarpName> openBans;
 
     public PlayerWarpManageMenu(
             Menus menus,
@@ -109,7 +112,10 @@ public final class PlayerWarpManageMenu {
             PlayerLookup players,
             Messages messages,
             PlayerWarpNotifier notifier,
-            BiConsumer<PlayerRef, PlayerWarpName> openView) {
+            BiConsumer<PlayerRef, PlayerWarpName> openView,
+            BiConsumer<PlayerRef, PlayerWarpName> openMembers,
+            BiConsumer<PlayerRef, PlayerWarpName> openWhitelist,
+            BiConsumer<PlayerRef, PlayerWarpName> openBans) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -122,6 +128,9 @@ public final class PlayerWarpManageMenu {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.openView = Objects.requireNonNull(openView, "openView");
+        this.openMembers = Objects.requireNonNull(openMembers, "openMembers");
+        this.openWhitelist = Objects.requireNonNull(openWhitelist, "openWhitelist");
+        this.openBans = Objects.requireNonNull(openBans, "openBans");
     }
 
     /** Register the placeholders, the capability condition, the click actions, and the spec; called once at wiring time. */
@@ -159,6 +168,15 @@ public final class PlayerWarpManageMenu {
         bindings.action("playerwarps:manage-withdraw", this::withdraw);
         bindings.action("playerwarps:manage-delete", this::delete);
         bindings.action("playerwarps:manage-back", this::back);
+        bindings.action(
+                "playerwarps:manage-members",
+                ctx -> openMembers.accept(ctx.viewer(), subject(ctx).name()));
+        bindings.action(
+                "playerwarps:manage-whitelist",
+                ctx -> openWhitelist.accept(ctx.viewer(), subject(ctx).name()));
+        bindings.action(
+                "playerwarps:manage-bans",
+                ctx -> openBans.accept(ctx.viewer(), subject(ctx).name()));
     }
 
     /**

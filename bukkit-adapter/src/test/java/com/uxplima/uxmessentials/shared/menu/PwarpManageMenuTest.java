@@ -92,6 +92,9 @@ class PwarpManageMenuTest {
     private static final int DISPLAY_NAME_SLOT = 11;
     private static final int ACCESS_SLOT = 19;
     private static final int PRICE_SLOT = 21;
+    private static final int MEMBERS_SLOT = 29;
+    private static final int WHITELIST_SLOT = 31;
+    private static final int BANS_SLOT = 33;
     private static final int BANK_SLOT = 38;
     private static final int TRANSFER_SLOT = 40;
     private static final int SPONSOR_SLOT = 42;
@@ -150,6 +153,10 @@ class PwarpManageMenuTest {
         assertThat(inv.getItem(BANK_SLOT).getType()).isEqualTo(Material.GOLD_BLOCK);
         assertThat(inv.getItem(TRANSFER_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
         assertThat(inv.getItem(DELETE_SLOT).getType()).isEqualTo(Material.BARRIER);
+        // The owner holds every capability, so all three people buttons (members / whitelist / bans) render.
+        assertThat(inv.getItem(MEMBERS_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
+        assertThat(inv.getItem(WHITELIST_SLOT).getType()).isEqualTo(Material.WRITABLE_BOOK);
+        assertThat(inv.getItem(BANS_SLOT).getType()).isEqualTo(Material.IRON_AXE);
         // The sponsor button waits on the P6 sub-feature flag, off for now, so it never renders yet.
         assertThat(inv.getItem(SPONSOR_SLOT).getType()).isEqualTo(FILLER);
     }
@@ -165,12 +172,17 @@ class PwarpManageMenuTest {
         assertThat(managerView.getItem(DELETE_SLOT).getType()).isEqualTo(FILLER);
         // RENAME is not a metadata capability, so a manager cannot rename either.
         assertThat(managerView.getItem(RENAME_SLOT).getType()).isEqualTo(FILLER);
+        // A MANAGER holds MANAGE_WHITELIST + MANAGE_BANS but not MANAGE_MEMBERS (owner-only), so members is hidden.
+        assertThat(managerView.getItem(MEMBERS_SLOT).getType()).isEqualTo(FILLER);
+        assertThat(managerView.getItem(WHITELIST_SLOT).getType()).isEqualTo(Material.WRITABLE_BOOK);
+        assertThat(managerView.getItem(BANS_SLOT).getType()).isEqualTo(Material.IRON_AXE);
 
-        // The OWNER, resolved from ownership on a viewer-owned warp, sees exactly those three buttons.
+        // The OWNER, resolved from ownership on a viewer-owned warp, sees exactly those three buttons and members too.
         Inventory ownerView = openAsOwner(WarpAccess.PUBLIC);
         assertThat(ownerView.getItem(PRICE_SLOT).getType()).isEqualTo(Material.GOLD_INGOT);
         assertThat(ownerView.getItem(TRANSFER_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
         assertThat(ownerView.getItem(DELETE_SLOT).getType()).isEqualTo(Material.BARRIER);
+        assertThat(ownerView.getItem(MEMBERS_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
     }
 
     @Test
@@ -285,6 +297,9 @@ class PwarpManageMenuTest {
                 mock(PlayerLookup.class),
                 new KeyMessages(),
                 notifier,
+                (ref, name) -> {},
+                (ref, name) -> {},
+                (ref, name) -> {},
                 (ref, name) -> {});
         menu.register(bindings, dataFolder, NOOP);
     }
