@@ -25,8 +25,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * admin-gated, confirm-guarded {@link #hardDelete hardDelete} actually drops the row and frees the name for reuse,
  * publishing {@code PlayerWarpDeleted} so downstream (cross-server invalidation, cascade cleanup) can react.
  *
- * <p>All three verbs gate on {@link WarpCapability#DELETE} through {@link WarpAuthorization}: the owner and (for
- * archive/restore) any co-owner may run them, while managers and strangers are refused. Resolving the warp first
+ * <p>All three verbs gate on {@link WarpCapability#DELETE} through {@link WarpAuthorization}, which only the owner
+ * holds — co-owners, managers, and strangers are refused, since removing a warp out from under its owner is not a
+ * delegable act. Resolving the warp first
  * means a name no warp exists under is {@link PlayerWarpError#NOT_FOUND}, distinct from a warp the actor may not
  * touch ({@link PlayerWarpError#NO_PERMISSION}). The command layer, not this use case, decides which verb a given
  * button or subcommand runs and gates the admin node behind {@code hardDelete}.

@@ -52,6 +52,8 @@ class TransferPlayerWarpTest {
         assertThat(saved.owner().uuid()).isEqualTo(newOwner.uuid());
         assertThat(saved.ownerName()).isEqualTo("Heir");
         assertThat(saved.id()).isEqualTo(warp.id());
+        // A transfer hands over the warp, not a clean slate: the accrued bank stays put (spec §1).
+        assertThat(saved.earnings()).isEqualTo(warp.earnings());
         assertThat(sink.delivered).anyMatch(text -> text.startsWith("pwarp.transferred"));
     }
 
