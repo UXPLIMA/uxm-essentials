@@ -71,4 +71,23 @@ class TransferPlayerWarpTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
     }
+
+    @Test
+    void adminSetOwnerReassignsByIdWithNoRoleGate() {
+        Result<Unit, PlayerWarpError> result = transfer.adminSetOwner(warp.id().orElseThrow(), newOwner);
+
+        assertThat(result.isOk()).isTrue();
+        PlayerWarp saved = repository.stored("hub");
+        assertThat(saved.owner().uuid()).isEqualTo(newOwner.uuid());
+        assertThat(saved.ownerName()).isEqualTo("Heir");
+        assertThat(saved.id()).isEqualTo(warp.id());
+    }
+
+    @Test
+    void adminSetOwnerAgainstAStaleIdIsNotFound() {
+        Result<Unit, PlayerWarpError> result =
+                transfer.adminSetOwner(com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId.of(9_999L), newOwner);
+
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
+    }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
@@ -86,6 +87,39 @@ class ArchivePlayerWarpTest {
         assertThat(events.published).hasSize(1);
         assertThat(events.published.get(0)).isInstanceOf(PlayerWarpDeleted.class);
         assertThat(sink.delivered).anyMatch(text -> text.startsWith("pwarp.deleted"));
+    }
+
+    @Test
+    void adminRestoreFlipsAnArchivedWarpToActiveByIdWithNoRoleGate() {
+        archive.archive(owner, HUB);
+        PlayerWarpId id = warp.id().orElseThrow();
+
+        Result<Unit, PlayerWarpError> result = archive.adminRestore(id);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(repository.stored("hub").status()).isEqualTo(WarpStatus.ACTIVE);
+    }
+
+    @Test
+    void adminHardDeleteDropsTheRowByIdAndPublishesTheDeletedEventWithNoRoleGate() {
+        PlayerWarpId id = warp.id().orElseThrow();
+
+        Result<Unit, PlayerWarpError> result = archive.adminHardDelete(id);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(repository.deleted).containsExactly(id);
+        assertThat(repository.findByName(HUB)).isEmpty();
+        assertThat(events.published).hasSize(1);
+        assertThat(events.published.get(0)).isInstanceOf(PlayerWarpDeleted.class);
+    }
+
+    @Test
+    void adminVerbsAgainstAStaleIdAreNotFound() {
+        PlayerWarpId ghost = PlayerWarpId.of(9_999L);
+
+        assertThat(archive.adminRestore(ghost).errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
+        assertThat(archive.adminHardDelete(ghost).errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
+        assertThat(repository.deleted).isEmpty();
     }
 
     @Test

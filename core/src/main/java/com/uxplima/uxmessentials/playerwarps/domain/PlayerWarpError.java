@@ -73,7 +73,10 @@ public enum PlayerWarpError {
     CANNOT_TARGET_OWNER(PlayerwarpsMessageKey.PWARP_CANNOT_TARGET_OWNER),
 
     /** A withdraw could not pay the accrued earnings to the owner (the economy provider faulted). */
-    WITHDRAW_FAILED(PlayerwarpsMessageKey.PWARP_WITHDRAW_FAILED);
+    WITHDRAW_FAILED(PlayerwarpsMessageKey.PWARP_WITHDRAW_FAILED),
+
+    /** The chosen name collides with a {@code /pwarp} verb literal, so it would be unreachable as a warp name. */
+    RESERVED_NAME(PlayerwarpsMessageKey.PWARP_RESERVED_NAME);
 
     private final PlayerwarpsMessageKey messageKey;
 

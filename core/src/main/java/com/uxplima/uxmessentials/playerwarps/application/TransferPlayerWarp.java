@@ -8,6 +8,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -62,6 +63,24 @@ public final class TransferPlayerWarp {
                 actor,
                 PlayerwarpsMessageKey.PWARP_TRANSFERRED,
                 Map.of("warp", name.value(), "player", newOwner.name()));
+        return Result.ok();
+    }
+
+    /**
+     * Operator reassignment of the warp with surrogate id {@code id} to {@code newOwner}, skipping the per-warp role
+     * gate. This is the by-id admin path {@code /pwarp admin setowner} runs; the command's {@code admin} node is the
+     * authorization, so ownership moves without re-checking a role — a missing id is
+     * {@link PlayerWarpError#NOT_FOUND}. Only the owner identity and cached name change; the warp keeps its members,
+     * whitelist, bans, earnings, and history. The command renders the operator-facing result itself.
+     */
+    public Result<Unit, PlayerWarpError> adminSetOwner(PlayerWarpId id, PlayerRef newOwner) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(newOwner, "newOwner");
+        Optional<PlayerWarp> found = repository.findById(id);
+        if (found.isEmpty()) {
+            return Result.err(PlayerWarpError.NOT_FOUND);
+        }
+        repository.save(found.get().transferredTo(newOwner, newOwner.name(), clock.instant()));
         return Result.ok();
     }
 }

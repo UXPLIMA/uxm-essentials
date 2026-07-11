@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpLimit;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.ReservedWarpNames;
 import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpCreated;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -62,6 +63,11 @@ public final class SetPlayerWarp {
         Objects.requireNonNull(ownerName, "ownerName");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(at, "at");
+
+        if (ReservedWarpNames.isReserved(name)) {
+            notifier.send(owner, PlayerWarpError.RESERVED_NAME.messageKey(), Map.of("warp", name.value()));
+            return Result.err(PlayerWarpError.RESERVED_NAME);
+        }
 
         if (worldBlacklist.contains(at.world().name())) {
             notifier.send(

@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.ReservedWarpNames;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpDescription;
@@ -182,6 +183,10 @@ public final class EditPlayerWarp {
     public Result<Unit, PlayerWarpError> rename(PlayerRef actor, PlayerWarpName name, PlayerWarpName newName) {
         Objects.requireNonNull(newName, "newName");
         return gate(actor, name, WarpCapability.RENAME, warp -> {
+            if (ReservedWarpNames.isReserved(newName)) {
+                notifier.send(actor, PlayerWarpError.RESERVED_NAME.messageKey(), Map.of("warp", newName.value()));
+                return Result.err(PlayerWarpError.RESERVED_NAME);
+            }
             if (!newName.equals(name) && repository.existsByName(newName)) {
                 notifier.send(actor, PlayerWarpError.NAME_TAKEN.messageKey(), Map.of("warp", newName.value()));
                 return Result.err(PlayerWarpError.NAME_TAKEN);

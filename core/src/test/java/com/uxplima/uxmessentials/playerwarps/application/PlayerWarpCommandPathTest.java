@@ -121,6 +121,17 @@ class PlayerWarpCommandPathTest {
     }
 
     @Test
+    void setPwarpOnAReservedVerbNameIsRefused() {
+        // "set" is a /pwarp verb literal; a warp named after it would be shadowed and unreachable, so creation is
+        // refused before any row is written — the whole point of reserving the command-verb tokens.
+        Result<Unit, PlayerWarpError> result = setWarp(10).set(alice, "Alice", PlayerWarpName.of("set"), at(0, 0, 0));
+
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.RESERVED_NAME);
+        assertThat(repository.existsByName(PlayerWarpName.of("set"))).isFalse();
+        assertThat(repository.ownedBy(alice)).isEmpty();
+    }
+
+    @Test
     void setPwarpPastTheResolvedLimitIsRefused() {
         setWarp(2).set(alice, "Alice", PlayerWarpName.of("one"), at(0, 0, 0));
         setWarp(2).set(alice, "Alice", PlayerWarpName.of("two"), at(1, 1, 1));

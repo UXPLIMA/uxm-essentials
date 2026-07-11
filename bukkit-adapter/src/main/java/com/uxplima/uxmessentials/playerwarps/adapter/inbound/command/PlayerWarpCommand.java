@@ -1,9 +1,13 @@
 package com.uxplima.uxmessentials.playerwarps.adapter.inbound.command;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.bukkit.entity.Player;
 
@@ -13,6 +17,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
@@ -22,14 +27,19 @@ import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.DisplayName;
 import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpDescription;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import org.jspecify.annotations.NullMarked;
 
@@ -40,12 +50,16 @@ import org.jspecify.annotations.NullMarked;
  * rename, the metadata/access/price edits, the social verbs (rate, favourite), transfer, withdraw, info, and list.
  *
  * <p>Every subcommand is gated by its own {@code uxmessentials.pwarp.<verb>} node through Brigadier
- * {@code .requires(...)}, so only {@code pwarp} is a command-catalog id; the verbs are literals inside the tree
- * (management/admin verbs land in the next task). Each handler resolves any tick-thread state — the actor's
- * {@link PlayerRef}, and their {@link Position} for {@code set}/{@code move} — then hands the repository I/O to the
- * injected scheduler and returns immediately, so the command thread never blocks. A malformed name is turned into a
- * friendly notice, never a stack trace, and the teleport password is threaded straight to the access gate: it is
- * never echoed, logged, or tab-completed.
+ * {@code .requires(...)}, so only {@code pwarp} is a command-catalog id; the verbs are literals inside the tree.
+ * The self-service verbs let anyone run them but the use case's {@code WarpAuthorization} decides by role which
+ * warps they touch; the {@code members}/{@code ban}/{@code whitelist} people-management verbs work the same way,
+ * while the operator {@code admin} group ({@code restore}/{@code purge}/{@code setowner}/{@code reload}) acts on any
+ * warp by its surrogate id under a single {@code uxmessentials.pwarp.admin} node — that node <em>is</em> the
+ * authorization, so those verbs skip the per-warp role gate, and the irreversible {@code purge} is confirm-gated.
+ * Each handler resolves any tick-thread state — the actor's {@link PlayerRef}, and their {@link Position} for
+ * {@code set}/{@code move} — then hands the repository I/O to the injected scheduler and returns immediately, so the
+ * command thread never blocks. A malformed name is turned into a friendly notice, never a stack trace, and the
+ * teleport password is threaded straight to the access gate: it is never echoed, logged, or tab-completed.
  */
 @NullMarked
 public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements CommandRegistration {
@@ -69,6 +83,13 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     private static final String RATE_PERMISSION = "uxmessentials.pwarp.rate";
     private static final String TRANSFER_PERMISSION = "uxmessentials.pwarp.transfer";
     private static final String WITHDRAW_PERMISSION = "uxmessentials.pwarp.withdraw";
+    private static final String MEMBERS_PERMISSION = "uxmessentials.pwarp.members";
+    private static final String BAN_PERMISSION = "uxmessentials.pwarp.ban";
+    private static final String WHITELIST_PERMISSION = "uxmessentials.pwarp.whitelist";
+    private static final String ADMIN_PERMISSION = "uxmessentials.pwarp.admin";
+
+    /** A single {@code <number><unit>} ban duration token — {@code 7d}, {@code 12h}, {@code 30m}; anything else is a reason. */
+    private static final Pattern BAN_DURATION = Pattern.compile("(\\d+)([smhdw])", Pattern.CASE_INSENSITIVE);
 
     public PlayerWarpCommand(PlayerWarpServices services, Messages messages) {
         super(services, messages);
@@ -111,6 +132,14 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                         .then(nameArg()
                                 .then(CommandSuggestions.playerArgument("player")
                                         .executes(this::runTransfer))))
+                .then(membersSubtree())
+                .then(banSubtree())
+                .then(verb("unban", BAN_PERMISSION)
+                        .then(nameArg()
+                                .then(CommandSuggestions.playerArgument("player")
+                                        .executes(this::runUnban))))
+                .then(whitelistSubtree())
+                .then(adminSubtree())
                 .then(listSubtree())
                 .then(nameArg()
                         .executes(this::run)
@@ -317,15 +346,295 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         String targetName = ctx.getArgument("player", String.class);
         // Resolve the (possibly offline) target profile off the tick thread; an unknown target bridges the
         // not-found notice back to the actor's region thread rather than transferring to nobody.
+        services.scheduler()
+                .async(() -> withPlayer(
+                        target,
+                        targetName,
+                        newOwner -> services.transferPlayerWarp().transfer(target.who(), target.name(), newOwner)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    // People-management verbs: members / ban / unban / whitelist. Each resolves the (possibly offline) target off
+    // the tick thread through withPlayer, then drives its use case, whose WarpAuthorization gates the action by role.
+
+    private LiteralArgumentBuilder<CommandSourceStack> membersSubtree() {
+        return verb("members", MEMBERS_PERMISSION)
+                .then(nameArg()
+                        .then(Commands.literal("add").then(memberRoleArgs()))
+                        .then(Commands.literal("remove")
+                                .then(CommandSuggestions.playerArgument("player")
+                                        .executes(this::runMemberRemove))));
+    }
+
+    /** The {@code add <player> <role>} tail: one role literal per grantable role (co-owner / manager, never owner). */
+    private RequiredArgumentBuilder<CommandSourceStack, String> memberRoleArgs() {
+        RequiredArgumentBuilder<CommandSourceStack, String> player = CommandSuggestions.playerArgument("player");
+        for (WarpRole role : WarpRole.values()) {
+            if (role != WarpRole.OWNER) {
+                player.then(Commands.literal(roleToken(role)).executes(ctx -> runMemberAdd(ctx, role)));
+            }
+        }
+        return player;
+    }
+
+    private int runMemberAdd(CommandContext<CommandSourceStack> ctx, WarpRole role) {
+        Target target = target(ctx);
+        if (target == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String playerName = ctx.getArgument("player", String.class);
+        services.scheduler()
+                .async(() -> withPlayer(
+                        target,
+                        playerName,
+                        member -> services.manageMembers().addMember(target.who(), target.name(), member, role)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runMemberRemove(CommandContext<CommandSourceStack> ctx) {
+        Target target = target(ctx);
+        if (target == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String playerName = ctx.getArgument("player", String.class);
+        services.scheduler()
+                .async(() -> withPlayer(
+                        target,
+                        playerName,
+                        member -> services.manageMembers().removeMember(target.who(), target.name(), member)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> banSubtree() {
+        return verb("ban", BAN_PERMISSION)
+                .then(nameArg()
+                        .then(CommandSuggestions.playerArgument("player")
+                                .executes(this::runBan)
+                                .then(Commands.argument("duration", StringArgumentType.word())
+                                        .executes(this::runBan)
+                                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                                .executes(this::runBan)))));
+    }
+
+    private int runBan(CommandContext<CommandSourceStack> ctx) {
+        Target target = target(ctx);
+        if (target == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String playerName = ctx.getArgument("player", String.class);
+        String durationToken = argOr(ctx, "duration");
+        Optional<Duration> duration = durationToken.isBlank() ? Optional.empty() : parseBanDuration(durationToken);
+        Optional<String> reason = banReason(durationToken, duration, argOr(ctx, "reason"));
+        services.scheduler()
+                .async(() -> withPlayer(
+                        target,
+                        playerName,
+                        banned -> services.manageBans().ban(target.who(), target.name(), banned, duration, reason)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runUnban(CommandContext<CommandSourceStack> ctx) {
+        Target target = target(ctx);
+        if (target == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String playerName = ctx.getArgument("player", String.class);
+        services.scheduler()
+                .async(() -> withPlayer(
+                        target,
+                        playerName,
+                        banned -> services.manageBans().unban(target.who(), target.name(), banned)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> whitelistSubtree() {
+        return verb("whitelist", WHITELIST_PERMISSION)
+                .then(nameArg()
+                        .then(Commands.literal("add")
+                                .then(CommandSuggestions.playerArgument("player")
+                                        .executes(this::runWhitelistAdd)))
+                        .then(Commands.literal("remove")
+                                .then(CommandSuggestions.playerArgument("player")
+                                        .executes(this::runWhitelistRemove))));
+    }
+
+    private int runWhitelistAdd(CommandContext<CommandSourceStack> ctx) {
+        Target target = target(ctx);
+        if (target == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String playerName = ctx.getArgument("player", String.class);
+        services.scheduler()
+                .async(() -> withPlayer(
+                        target,
+                        playerName,
+                        guest -> services.manageWhitelist().whitelist(target.who(), target.name(), guest)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runWhitelistRemove(CommandContext<CommandSourceStack> ctx) {
+        Target target = target(ctx);
+        if (target == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String playerName = ctx.getArgument("player", String.class);
+        services.scheduler()
+                .async(() -> withPlayer(
+                        target,
+                        playerName,
+                        guest -> services.manageWhitelist().unwhitelist(target.who(), target.name(), guest)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    // Admin group: operator verbs on any warp by its surrogate id, gated by uxmessentials.pwarp.admin (op). The id
+    // read runs off the tick thread; the operator-facing result bridges back to their region thread as feedback.
+
+    private LiteralArgumentBuilder<CommandSourceStack> adminSubtree() {
+        return verb("admin", ADMIN_PERMISSION)
+                .then(Commands.literal("restore").then(idArg().executes(this::runAdminRestore)))
+                .then(Commands.literal("purge").then(purgeIdArg()))
+                .then(Commands.literal("delete").then(purgeIdArg()))
+                .then(Commands.literal("setowner")
+                        .then(idArg().then(CommandSuggestions.playerArgument("player")
+                                .executes(this::runAdminSetOwner))))
+                .then(Commands.literal("reload").executes(this::runAdminReload));
+    }
+
+    /** {@code <id>} for {@code purge}/{@code delete}: bare id warns; the {@code confirm} suffix performs the delete. */
+    private RequiredArgumentBuilder<CommandSourceStack, Long> purgeIdArg() {
+        return idArg().executes(this::runAdminPurgePrompt)
+                .then(Commands.literal("confirm").executes(this::runAdminPurge));
+    }
+
+    private int runAdminRestore(CommandContext<CommandSourceStack> ctx) {
+        return runAdminById(
+                ctx, services.archivePlayerWarp()::adminRestore, PlayerwarpsMessageKey.PWARP_ADMIN_RESTORED);
+    }
+
+    /** First {@code purge}/{@code delete} invocation: warn the operator and require the {@code confirm} step (invariant 5). */
+    private int runAdminPurgePrompt(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        long id = ctx.getArgument("id", Long.class);
+        feedback.send(sender, PlayerwarpsMessageKey.PWARP_ADMIN_PURGE_CONFIRM, Map.of("id", Long.toString(id)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runAdminPurge(CommandContext<CommandSourceStack> ctx) {
+        return runAdminById(
+                ctx, services.archivePlayerWarp()::adminHardDelete, PlayerwarpsMessageKey.PWARP_ADMIN_PURGED);
+    }
+
+    private int runAdminSetOwner(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        long id = ctx.getArgument("id", Long.class);
+        String playerName = ctx.getArgument("player", String.class);
+        PlayerRef admin = ref(sender);
         services.scheduler().async(() -> {
-            Optional<PlayerRef> newOwner = services.players().findByName(targetName);
+            Optional<PlayerRef> newOwner = services.players().findByName(playerName);
             if (newOwner.isEmpty()) {
-                onPlayer(target.who(), () -> unknownPlayer(target.sender(), targetName));
+                onPlayer(admin, () -> unknownPlayer(sender, playerName));
                 return;
             }
-            services.transferPlayerWarp().transfer(target.who(), target.name(), newOwner.get());
+            Result<Unit, PlayerWarpError> result =
+                    services.transferPlayerWarp().adminSetOwner(PlayerWarpId.of(id), newOwner.get());
+            Map<String, String> placeholders =
+                    Map.of("id", Long.toString(id), "player", newOwner.get().name());
+            onPlayer(
+                    admin,
+                    () -> feedback.send(
+                            sender, adminKey(result, PlayerwarpsMessageKey.PWARP_ADMIN_SETOWNER), placeholders));
         });
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * {@code admin reload}: this is not the module-reload authority — that lives on the {@code /uxmess reload} path —
+     * so point the operator there rather than reimplementing a hot-reload the services holder cannot reach.
+     */
+    private int runAdminReload(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        feedback.send(sender, PlayerwarpsMessageKey.PWARP_ADMIN_RELOAD_HINT, Map.of());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * The shared shape of an admin-by-id verb: read the {@code id} on the tick thread, run {@code action} off it, and
+     * bridge the operator-facing result back — {@code okKey} on success, the not-found notice on a stale id.
+     */
+    private int runAdminById(
+            CommandContext<CommandSourceStack> ctx,
+            Function<PlayerWarpId, Result<Unit, PlayerWarpError>> action,
+            PlayerwarpsMessageKey okKey) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        long id = ctx.getArgument("id", Long.class);
+        PlayerRef admin = ref(sender);
+        Map<String, String> placeholders = Map.of("id", Long.toString(id));
+        services.scheduler().async(() -> {
+            Result<Unit, PlayerWarpError> result = action.apply(PlayerWarpId.of(id));
+            onPlayer(admin, () -> feedback.send(sender, adminKey(result, okKey), placeholders));
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static PlayerwarpsMessageKey adminKey(Result<Unit, PlayerWarpError> result, PlayerwarpsMessageKey okKey) {
+        return result.isOk() ? okKey : PlayerwarpsMessageKey.PWARP_ADMIN_NOT_FOUND;
+    }
+
+    private static RequiredArgumentBuilder<CommandSourceStack, Long> idArg() {
+        return Commands.argument("id", LongArgumentType.longArg(1));
+    }
+
+    /** The {@code /pwarp members add <player> <role>} literal token for a grantable role: {@code co-owner}, {@code manager}. */
+    private static String roleToken(WarpRole role) {
+        return role.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /**
+     * Parse a single {@code <number><unit>} ban-duration token ({@code 7d}, {@code 12h}) into a positive
+     * {@link Duration}, or {@link Optional#empty()} when the token is not a duration (which the caller reads as a
+     * permanent ban whose token begins the reason instead).
+     */
+    private static Optional<Duration> parseBanDuration(String token) {
+        Matcher matcher = BAN_DURATION.matcher(token);
+        if (!matcher.matches()) {
+            return Optional.empty();
+        }
+        long amount = Long.parseLong(matcher.group(1));
+        Duration span =
+                switch (Character.toLowerCase(matcher.group(2).charAt(0))) {
+                    case 's' -> Duration.ofSeconds(amount);
+                    case 'm' -> Duration.ofMinutes(amount);
+                    case 'h' -> Duration.ofHours(amount);
+                    case 'd' -> Duration.ofDays(amount);
+                    case 'w' -> Duration.ofDays(amount * 7L);
+                    default -> Duration.ZERO;
+                };
+        return span.isZero() ? Optional.empty() : Optional.of(span);
+    }
+
+    /**
+     * The reason for a ban given the first optional token and the greedy remainder. When the first token was a
+     * duration the reason is just the remainder; when it was not a duration the ban is permanent and that token
+     * begins the reason, folded back in ahead of the remainder so nothing the operator typed is lost.
+     */
+    private static Optional<String> banReason(String durationToken, Optional<Duration> duration, String reasonText) {
+        if (!durationToken.isBlank() && duration.isEmpty()) {
+            String combined = reasonText.isBlank() ? durationToken : durationToken + " " + reasonText;
+            return optionalText(combined);
+        }
+        return optionalText(reasonText);
     }
 
     private int runListOwn(CommandContext<CommandSourceStack> ctx) {

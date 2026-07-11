@@ -94,6 +94,15 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_NOTHING_TO_WITHDRAW("pwarp.nothing-to-withdraw"),
     PWARP_INVALID_ROLE("pwarp.invalid-role"),
     PWARP_CANNOT_TARGET_OWNER("pwarp.cannot-target-owner"),
+    PWARP_RESERVED_NAME("pwarp.reserved-name"),
+
+    // admin group — operator verbs that act on any warp by its surrogate id, gated by the admin node
+    PWARP_ADMIN_RESTORED("pwarp.admin.restored"),
+    PWARP_ADMIN_PURGE_CONFIRM("pwarp.admin.purge-confirm"),
+    PWARP_ADMIN_PURGED("pwarp.admin.purged"),
+    PWARP_ADMIN_SETOWNER("pwarp.admin.setowner"),
+    PWARP_ADMIN_NOT_FOUND("pwarp.admin.not-found"),
+    PWARP_ADMIN_RELOAD_HINT("pwarp.admin.reload-hint"),
 
     // management GUI — list
     PWARP_GUI_LIST_TITLE("pwarp.gui.list.title"),

@@ -8,6 +8,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
@@ -82,6 +83,40 @@ public final class ArchivePlayerWarp {
             notifier.send(actor, PlayerwarpsMessageKey.PWARP_DELETED, Map.of("warp", name.value()));
             return Result.ok();
         });
+    }
+
+    /**
+     * Operator restore of the warp with surrogate id {@code id} to {@link WarpStatus#ACTIVE}, skipping the per-warp
+     * role gate. This is the by-id admin path {@code /pwarp admin restore} runs; the command's {@code admin} node is
+     * the authorization, so this method resolves the warp and settles its status without re-checking a role — a
+     * missing id is {@link PlayerWarpError#NOT_FOUND}. The command renders the operator-facing result itself.
+     */
+    public Result<Unit, PlayerWarpError> adminRestore(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        Optional<PlayerWarp> found = repository.findById(id);
+        if (found.isEmpty()) {
+            return Result.err(PlayerWarpError.NOT_FOUND);
+        }
+        repository.save(found.get().withStatus(WarpStatus.ACTIVE, clock.instant()));
+        return Result.ok();
+    }
+
+    /**
+     * Operator hard-delete of the warp with surrogate id {@code id}: drop the row and publish
+     * {@code PlayerWarpDeleted}, skipping the per-warp role gate (spec invariant 5, the irreversible path). The
+     * command places this behind the {@code admin} node and a confirm step; a missing id is
+     * {@link PlayerWarpError#NOT_FOUND}.
+     */
+    public Result<Unit, PlayerWarpError> adminHardDelete(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        Optional<PlayerWarp> found = repository.findById(id);
+        if (found.isEmpty()) {
+            return Result.err(PlayerWarpError.NOT_FOUND);
+        }
+        PlayerWarp warp = found.get();
+        repository.deleteById(warp.id().orElseThrow());
+        events.publish(new PlayerWarpDeleted(warp.owner(), warp.name()));
+        return Result.ok();
     }
 
     /** Resolve {@code name}, gate {@code actor} on DELETE, then run {@code body}; otherwise NOT_FOUND / NO_PERMISSION. */

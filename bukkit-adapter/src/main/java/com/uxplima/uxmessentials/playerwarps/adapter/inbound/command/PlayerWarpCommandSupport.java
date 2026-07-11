@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -153,6 +154,21 @@ abstract class PlayerWarpCommandSupport {
         }
         services.scheduler().async(() -> action.accept(target.who(), target.name()));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Resolve {@code playerName} to a (possibly offline) profile, then run {@code action} on it — the shared shape of
+     * every verb that takes a player target ({@code transfer}, {@code members}, {@code ban}, {@code whitelist}). Runs
+     * inside a scheduler task: an unknown target bridges the not-found notice back to the actor's region thread
+     * rather than acting on nobody, so the caller need not repeat the lookup-or-reject dance.
+     */
+    final void withPlayer(Target target, String playerName, Consumer<PlayerRef> action) {
+        Optional<PlayerRef> resolved = services.players().findByName(playerName);
+        if (resolved.isEmpty()) {
+            onPlayer(target.who(), () -> unknownPlayer(target.sender(), playerName));
+            return;
+        }
+        action.accept(resolved.get());
     }
 
     /** A {@code /pwarp <literal>} subcommand node gated by {@code permission}. */

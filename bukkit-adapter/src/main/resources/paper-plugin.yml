@@ -1090,6 +1090,24 @@ permissions:
   uxmessentials.pwarp.withdraw:
     description: '/pwarp withdraw <name> to pay one of your warps'' accrued earnings out to its owner.'
     default: true
+  # People-management verbs folded under /pwarp — each lets a player run the verb, and the warp authorization
+  # matrix inside the use case still decides which warps they may manage by role, not these nodes. ban covers /pwarp
+  # ban and /pwarp unban both.
+  uxmessentials.pwarp.members:
+    description: '/pwarp members <name> add|remove <player> to grant or revoke a co-owner or manager on one of your warps.'
+    default: true
+  uxmessentials.pwarp.ban:
+    description: '/pwarp ban|unban <name> <player> to bar a player from one of your warps or lift that bar.'
+    default: true
+  uxmessentials.pwarp.whitelist:
+    description: '/pwarp whitelist <name> add|remove <player> to manage a whitelist-access warp''s guest list.'
+    default: true
+  # Operator admin group — /pwarp admin restore|purge|setowner|reload acts on ANY warp by its surrogate id, so this
+  # single node is the authorization and the verbs skip the per-warp role gate. purge is irreversible and
+  # confirm-gated.
+  uxmessentials.pwarp.admin:
+    description: '/pwarp admin restore|purge|setowner|reload to manage any player''s warp by its id.'
+    default: op
   # Player-warps management GUI — /pwarp with no arguments opens the list-and-editor panel, and the playerwarps
   # entry on the /uxmess gui hub gates on this node. A player without it still opens the GUI for their own warps;
   # holding it widens the list to every player's warps so an operator can manage all. Admin/manage tier.
