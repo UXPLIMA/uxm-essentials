@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import org.bukkit.Material;
@@ -66,10 +67,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The bottom bar drives the list through the shared list-control actions: a sort-cycle button advances the
  * offered sorts, a search button prompts for a name filter, and the scope buttons switch between the public browse,
- * the viewer's own warps, and their favourites. A tile's left click teleports the viewer through the same
- * {@link UsePlayerWarp} use case {@code /pwarp <name>} drives; the richer {@code pwarp-view} detail open replaces it
- * in a later task. The viewer's position is captured on the entity thread at open (for the distance sort); the
- * engine runs every page query off it.
+ * the viewer's own warps, and their favourites. A tile's left click opens the {@code pwarp-view} detail panel for that
+ * warp; a right click is the quick-teleport shortcut, straight through the same {@link UsePlayerWarp} use case
+ * {@code /pwarp <name>} drives. The viewer's position is captured on the entity thread at open (for the distance sort);
+ * the engine runs every page query off it.
  */
 @NullMarked
 public final class PlayerWarpBrowseMenu {
@@ -94,14 +95,21 @@ public final class PlayerWarpBrowseMenu {
     private final PlayerWarpBrowse browse;
     private final UsePlayerWarp usePlayerWarp;
     private final Messages messages;
+    private final BiConsumer<PlayerRef, PlayerWarpName> openView;
 
     public PlayerWarpBrowseMenu(
-            Menus menus, Scheduler scheduler, PlayerWarpBrowse browse, UsePlayerWarp usePlayerWarp, Messages messages) {
+            Menus menus,
+            Scheduler scheduler,
+            PlayerWarpBrowse browse,
+            UsePlayerWarp usePlayerWarp,
+            Messages messages,
+            BiConsumer<PlayerRef, PlayerWarpName> openView) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.browse = Objects.requireNonNull(browse, "browse");
         this.usePlayerWarp = Objects.requireNonNull(usePlayerWarp, "usePlayerWarp");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.openView = Objects.requireNonNull(openView, "openView");
     }
 
     /** Register the paged source, the tile placeholders, the click action, and the spec; called once at wiring time. */
@@ -114,6 +122,7 @@ public final class PlayerWarpBrowseMenu {
         bindings.placeholder("pwarp_browse_name", this::name);
         bindings.placeholder("pwarp_browse_lore", this::lore);
         bindings.action("playerwarps:browse-click", this::click);
+        bindings.action("playerwarps:browse-teleport", this::teleport);
         menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
     }
 
@@ -244,11 +253,21 @@ public final class PlayerWarpBrowseMenu {
     }
 
     /**
-     * Left-click a tile: teleport the viewer to its warp through the same {@link UsePlayerWarp} gate the command
-     * drives. The warp read runs off the tick thread; the window closes on the viewer's entity thread this click
-     * already runs on. A later task swaps this teleport for the {@code pwarp-view} detail open.
+     * Left-click a tile: open the {@code pwarp-view} detail panel for that warp, where the viewer can read its full
+     * detail and choose to teleport, favourite, or rate it. The panel resolves the warp itself off the tick thread and
+     * opens on the viewer's entity thread, so the click here only hands the clicked warp's name to the panel opener.
      */
     private void click(MenuActionContext ctx) {
+        Tile tile = ctx.entry(Tile.class);
+        openView.accept(ctx.viewer(), PlayerWarpName.of(tile.name()));
+    }
+
+    /**
+     * Right-click a tile: the quick-teleport shortcut, straight to the warp through the same {@link UsePlayerWarp} gate
+     * the command and the detail panel drive, skipping the panel. The warp read runs off the tick thread; the window
+     * closes on the viewer's entity thread this click already runs on.
+     */
+    private void teleport(MenuActionContext ctx) {
         Tile tile = ctx.entry(Tile.class);
         PlayerRef viewer = ctx.viewer();
         PlayerWarpName name = PlayerWarpName.of(tile.name());

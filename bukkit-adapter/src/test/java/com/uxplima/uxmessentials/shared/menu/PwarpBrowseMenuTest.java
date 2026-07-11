@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -108,6 +109,7 @@ class PwarpBrowseMenuTest {
 
     private PlayerWarpBrowseMenu menu;
     private MenuBindings bindings;
+    private List<PlayerWarpName> viewOpened;
 
     @TempDir
     Path dataFolder;
@@ -120,6 +122,7 @@ class PwarpBrowseMenuTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         scheduler = new SyncScheduler();
         browse = new SpyBrowse();
+        viewOpened = new java.util.ArrayList<>();
         repository = mock(PlayerWarpRepository.class);
         teleporter = mock(PlayerWarpTeleporter.class);
         WarpSafetyChecker safety = mock(WarpSafetyChecker.class);
@@ -214,16 +217,29 @@ class PwarpBrowseMenuTest {
     }
 
     @Test
-    void clickingACardTeleportsTheViewerThroughUsePlayerWarp() {
+    void leftClickingACardOpensTheDetailViewForThatWarpRatherThanTeleporting() {
+        browse.seed(cards(TOTAL));
+        open();
+
+        fireClick(0, ClickType.LEFT); // the first card tile
+
+        // The left click now hands the clicked warp to the pwarp-view opener instead of teleporting directly.
+        assertThat(viewOpened).containsExactly(PlayerWarpName.of("warp0"));
+        verify(teleporter, never()).teleportTo(any(), any());
+    }
+
+    @Test
+    void rightClickingACardQuickTeleportsThroughUsePlayerWarp() {
         browse.seed(cards(TOTAL));
         PlayerWarp owned = PlayerWarp.create(viewer, viewer.name(), PlayerWarpName.of("warp0"), at(), CLOCK.instant())
                 .withId(PlayerWarpId.of(1));
         when(repository.findByName(PlayerWarpName.of("warp0"))).thenReturn(Optional.of(owned));
         open();
 
-        fireClick(0, ClickType.LEFT); // the first card tile
+        fireClick(0, ClickType.RIGHT); // the quick-teleport shortcut
 
         verify(teleporter).teleportTo(eq(viewer), any(PlayerWarp.class));
+        assertThat(viewOpened).isEmpty();
     }
 
     private Inventory open() {
@@ -263,7 +279,8 @@ class PwarpBrowseMenuTest {
                 System::currentTimeMillis,
                 bindings.pagedLists());
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
-        menu = new PlayerWarpBrowseMenu(menus, scheduler, browse, usePlayerWarp, new KeyMessages());
+        menu = new PlayerWarpBrowseMenu(
+                menus, scheduler, browse, usePlayerWarp, new KeyMessages(), (v, name) -> viewOpened.add(name));
         menu.register(bindings, dataFolder, NOOP);
     }
 

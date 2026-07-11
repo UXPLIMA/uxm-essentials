@@ -110,6 +110,8 @@ final class DefaultResources {
             "modules/playerwarps/gui/playerwarp-list.conf",
             "modules/playerwarps/gui/pwarp-browse.conf",
             "modules/playerwarps/gui/pwarp-editor.conf",
+            "modules/playerwarps/gui/pwarp-view.conf",
+            "modules/playerwarps/gui/pwarp-rate.conf",
             "modules/poses/gui/poses-settings.conf",
             "modules/presence/gui/presence-settings.conf",
             "modules/scoreboard/gui/scoreboard-settings.conf",

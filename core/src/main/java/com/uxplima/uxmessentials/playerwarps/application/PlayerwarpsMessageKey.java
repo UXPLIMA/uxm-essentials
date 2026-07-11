@@ -133,6 +133,35 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_BROWSE_FAVOURITES("pwarp.gui.browse.favourites"),
     PWARP_GUI_BROWSE_ALL("pwarp.gui.browse.all"),
 
+    // per-warp detail panel (pwarp-view) — the browse tile opens this; teleport / favourite / rate / info
+    PWARP_GUI_VIEW_TITLE("pwarp.gui.view.title"),
+    PWARP_GUI_VIEW_ENTRY_NAME("pwarp.gui.view.entry-name"),
+    PWARP_GUI_VIEW_LORE_OWNER("pwarp.gui.view.lore-owner"),
+    PWARP_GUI_VIEW_LORE_WORLD("pwarp.gui.view.lore-world"),
+    PWARP_GUI_VIEW_LORE_SERVER("pwarp.gui.view.lore-server"),
+    PWARP_GUI_VIEW_LORE_VISITS("pwarp.gui.view.lore-visits"),
+    PWARP_GUI_VIEW_LORE_UNIQUE("pwarp.gui.view.lore-unique"),
+    PWARP_GUI_VIEW_LORE_RATING("pwarp.gui.view.lore-rating"),
+    PWARP_GUI_VIEW_LORE_FAVOURITES("pwarp.gui.view.lore-favourites"),
+    PWARP_GUI_VIEW_LORE_PRICE("pwarp.gui.view.lore-price"),
+    PWARP_GUI_VIEW_LORE_ACCESS("pwarp.gui.view.lore-access"),
+    PWARP_GUI_VIEW_TELEPORT("pwarp.gui.view.teleport"),
+    PWARP_GUI_VIEW_TELEPORT_LOCKED("pwarp.gui.view.teleport-locked"),
+    PWARP_GUI_VIEW_PASSWORD_PROMPT("pwarp.gui.view.password-prompt"),
+    PWARP_GUI_VIEW_FAVOURITE("pwarp.gui.view.favourite"),
+    PWARP_GUI_VIEW_UNFAVOURITE("pwarp.gui.view.unfavourite"),
+    PWARP_GUI_VIEW_RATE("pwarp.gui.view.rate"),
+    PWARP_GUI_VIEW_BACK("pwarp.gui.view.back"),
+
+    // five-star rating menu (pwarp-rate) — reached from the detail panel's rate button
+    PWARP_GUI_RATE_TITLE("pwarp.gui.rate.title"),
+    PWARP_GUI_RATE_STAR_1("pwarp.gui.rate.star-1"),
+    PWARP_GUI_RATE_STAR_2("pwarp.gui.rate.star-2"),
+    PWARP_GUI_RATE_STAR_3("pwarp.gui.rate.star-3"),
+    PWARP_GUI_RATE_STAR_4("pwarp.gui.rate.star-4"),
+    PWARP_GUI_RATE_STAR_5("pwarp.gui.rate.star-5"),
+    PWARP_GUI_RATE_BACK("pwarp.gui.rate.back"),
+
     // management GUI — editor frame
     PWARP_GUI_EDITOR_TITLE("pwarp.gui.editor.title"),
     PWARP_GUI_EDITOR_VALUE_LORE("pwarp.gui.editor.value-lore"),

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrows
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
@@ -229,15 +230,38 @@ public final class PlayerwarpsWiring {
                 menus);
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         // The paged public browse bare /pwarp opens: one card per public warp read a page at a time through the
-        // browse read model, teleporting through the same UsePlayerWarp gate the command drives. The read model is
-        // the jOOQ LIMIT/OFFSET+COUNT projection, never a full-table scan, so opening it is one bounded page query.
+        // browse read model. The read model is the jOOQ LIMIT/OFFSET+COUNT projection, never a full-table scan, so
+        // opening it is one bounded page query. A tile's left click opens the per-warp detail panel; a right click is
+        // the quick-teleport shortcut through the same UsePlayerWarp gate the command drives. The browse and the view
+        // open each other (a tile opens the view, the view's back button reopens the browse), so a one-slot holder
+        // breaks the construction cycle — the browse is built first with a deferred view opener, the view second.
+        PlayerWarpViewMenu[] viewHolder = new PlayerWarpViewMenu[1];
         PlayerWarpBrowseMenu browseMenu = new PlayerWarpBrowseMenu(
                 menus,
                 kernel.scheduler(),
                 PlayerWarpRepositories.browse(persistence, Clock.systemUTC()),
                 usePlayerWarp,
-                kernel.messages());
+                kernel.messages(),
+                (viewer, name) -> viewHolder[0].open(viewer, name));
+        // The per-warp detail panel (pwarp-view) and the five-star rating menu (pwarp-rate) behind it. It resolves the
+        // clicked warp off the tick thread — a bounded findByName plus the viewer's favourite and membership flags —
+        // and
+        // routes its buttons through the same UsePlayerWarp / FavouritePlayerWarp / RatePlayerWarp use cases.
+        PlayerWarpViewMenu viewMenu = new PlayerWarpViewMenu(
+                menus,
+                kernel.scheduler(),
+                repository,
+                favouriteStore,
+                memberStore,
+                usePlayerWarp,
+                favouritePlayerWarp,
+                ratePlayerWarp,
+                kernel.messages(),
+                notifier,
+                browseMenu::open);
+        viewHolder[0] = viewMenu;
         browseMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        viewMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "playerwarps",
                 PlayerwarpsMessageKey.PWARP_GUI_LIST_TITLE,

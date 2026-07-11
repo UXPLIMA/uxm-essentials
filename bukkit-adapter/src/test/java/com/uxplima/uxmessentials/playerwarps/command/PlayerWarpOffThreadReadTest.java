@@ -302,7 +302,7 @@ class PlayerWarpOffThreadReadTest {
                 new OpenCooldowns(),
                 Optional.empty(),
                 java.time.Clock.systemUTC());
-        return new PlayerWarpBrowseMenu(menus, scheduler, browse, use, messages);
+        return new PlayerWarpBrowseMenu(menus, scheduler, browse, use, messages, (viewer, name) -> {});
     }
 
     /** Counts repository reads and serves warps from memory, assigning a surrogate id on the first save of a warp. */
