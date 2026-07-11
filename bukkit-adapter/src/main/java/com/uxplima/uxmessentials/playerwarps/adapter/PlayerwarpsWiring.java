@@ -212,7 +212,13 @@ public final class PlayerwarpsWiring {
         if (economyProvider == null || economyCurrencies == null || economyBackends == null) {
             return Optional.empty();
         }
-        BigDecimal cutPercent = BigDecimal.valueOf(ctx.config().getDouble("payout.cut-percent", 10.0));
+        double rawCutPercent = ctx.config().getDouble("payout.cut-percent", 10.0);
+        if (rawCutPercent < 0.0 || rawCutPercent > 100.0) {
+            // PayoutConfig clamps this to [0, 100] so a typo can never bank a negative or over-price cut; warn once
+            // here, at the read site, so the operator sees their configured value was out of range and corrected.
+            kernel.log().warn("event=playerwarp_cut_percent_clamped configured={} clamped_to=[0,100]", rawCutPercent);
+        }
+        BigDecimal cutPercent = BigDecimal.valueOf(rawCutPercent);
         boolean autoPayout = ctx.config().getBoolean("payout.auto-payout", false);
         return Optional.of(new JooqPlayerWarpEconomy(
                 persistence,

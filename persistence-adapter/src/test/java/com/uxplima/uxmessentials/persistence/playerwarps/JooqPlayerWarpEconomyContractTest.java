@@ -202,6 +202,69 @@ class JooqPlayerWarpEconomyContractTest {
         assertThat(bridge.canAfford(who, new BigDecimal("26"), "default")).isFalse();
     }
 
+    @Test
+    void aWarpDeletedInTheChargeWindowRefundsThePayerAndReportsAccrualFailed() {
+        PlayerRef payer = randomPlayer();
+        economy.credit(payer, Money.of(COINS, new BigDecimal("200")));
+        PlayerWarpId warp = seedWarp(randomPlayer(), "voidhold");
+        JooqPlayerWarpEconomy bridge = bridge(new BigDecimal("10"), false, true);
+        BigDecimal balanceBefore = economy.balance(payer, COINS).amount();
+        // The warp row vanishes in the window between the debit and the accrue — a concurrent /pwarp delete or
+        // admin purge. The debit still takes, but the guarded accrue UPDATE now matches no row: this is the exact
+        // silent-money-loss defect (0 rows, no throw, no compensation) the row-count check closes.
+        deleteWarpRow(warp);
+
+        Result<Unit, ChargeError> result = bridge.chargeAndAccrue(payer, warp, new BigDecimal("50"), "default");
+
+        assertThat(result.errorOrThrow()).isEqualTo(ChargeError.ACCRUAL_FAILED);
+        // The compensating credit ran: the payer is exactly whole, debited nothing net.
+        assertThat(economy.balance(payer, COINS).amount()).isEqualByComparingTo(balanceBefore);
+        // Nothing was banked: the row is gone and the accrue neither re-created it nor left a phantom balance.
+        assertThat(bank(warp)).isNull();
+    }
+
+    @Test
+    void aCutPercentOutOfRangeIsClampedSoTheBankIsNeverNegativeOrOverpaid() {
+        // 150% would drive net = price − cut negative; the record clamps the stored percent to 100.
+        assertThat(new JooqPlayerWarpEconomy.PayoutConfig(new BigDecimal("150"), false).cutPercent())
+                .isEqualByComparingTo(new BigDecimal("100"));
+        // A negative percent would overpay the bank (net > price); it clamps to 0.
+        assertThat(new JooqPlayerWarpEconomy.PayoutConfig(new BigDecimal("-20"), false).cutPercent())
+                .isEqualByComparingTo(BigDecimal.ZERO);
+
+        // End to end at the clamped ceiling: 150% behaves as 100%, so net = 40 − 40 = 0, never a negative delta.
+        PlayerRef payer = randomPlayer();
+        economy.credit(payer, Money.of(COINS, new BigDecimal("100")));
+        PlayerWarpId warp = seedWarp(randomPlayer(), "toll");
+        JooqPlayerWarpEconomy bridge = bridge(new BigDecimal("150"), false, true);
+
+        assertThat(bridge.chargeAndAccrue(payer, warp, new BigDecimal("40"), "default")
+                        .isOk())
+                .isTrue();
+
+        assertThat(bank(warp)).isEqualByComparingTo(BigDecimal.ZERO);
+        // The payer is still debited the full price — the whole fee is the cut — the bank simply banks nothing.
+        assertThat(economy.balance(payer, COINS).amount()).isEqualByComparingTo(new BigDecimal("60"));
+    }
+
+    @Test
+    void anAutoPayoutFaultLeavesTheChargeOkAndTheMoneyBanked() {
+        PlayerRef payer = randomPlayer();
+        economy.credit(payer, Money.of(COINS, new BigDecimal("100")));
+        PlayerWarpId warp = seedWarp(randomPlayer(), "sanctum");
+        JooqPlayerWarpEconomy bridge = bridge(new BigDecimal("10"), true, true);
+        // Corrupt the owner column so the auto-payout snapshot read throws (UUID.fromString rejects it) *after* the
+        // debit and accrue have committed. A convenience-payout fault must never unwind a correctly-banked charge:
+        // the charge still reports ok and the owner's share stays banked for a manual /pwarp withdraw.
+        corruptOwnerUuid(warp);
+
+        Result<Unit, ChargeError> result = bridge.chargeAndAccrue(payer, warp, new BigDecimal("100"), "default");
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(bank(warp)).isEqualByComparingTo(new BigDecimal("90"));
+        assertThat(economy.balance(payer, COINS).amount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
     private JooqPlayerWarpEconomy bridge(BigDecimal cutPercent, boolean autoPayout, boolean worksOffline) {
         CurrencyBackendRegistry backends =
                 CurrencyBackendRegistry.of(List.<CurrencyBackend>of(new StubBackend("native", worksOffline)));
@@ -232,6 +295,27 @@ class JooqPlayerWarpEconomyContractTest {
                 .dsl()
                 .transaction(configuration ->
                         DSL.using(configuration).dropTable(PLAYER_WARPS).execute());
+    }
+
+    /** Delete one warp row, leaving the table intact — a concurrent /pwarp delete in the charge window. */
+    private void deleteWarpRow(PlayerWarpId warp) {
+        persistence
+                .dsl()
+                .transaction(configuration -> DSL.using(configuration)
+                        .deleteFrom(PLAYER_WARPS)
+                        .where(PLAYER_WARPS.ID.eq(warp.value()))
+                        .execute());
+    }
+
+    /** Poison the owner column so any snapshot read of this warp throws when it parses the uuid. */
+    private void corruptOwnerUuid(PlayerWarpId warp) {
+        persistence
+                .dsl()
+                .transaction(configuration -> DSL.using(configuration)
+                        .update(PLAYER_WARPS)
+                        .set(PLAYER_WARPS.OWNER, "not-a-uuid")
+                        .where(PLAYER_WARPS.ID.eq(warp.value()))
+                        .execute());
     }
 
     private static List<Result<Unit, ChargeError>> runConcurrently(

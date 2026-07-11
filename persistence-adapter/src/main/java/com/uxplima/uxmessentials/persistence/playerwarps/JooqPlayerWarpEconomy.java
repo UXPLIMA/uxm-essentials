@@ -106,10 +106,22 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     private Result<Unit, ChargeError> accrueThenPayout(
             PlayerRef payer, PlayerWarpId warp, Currency currency, Money charge) {
         BigDecimal net = netOf(currency, charge.amount());
+        int accrued;
         try {
-            bumpBank(warp, net, currency.id().value());
+            accrued = bumpBank(warp, net, currency.id().value());
         } catch (RuntimeException accrualFailure) {
             return compensate(payer, warp, charge, accrualFailure);
+        }
+        if (accrued == 0) {
+            // The warp row vanished between the debit and this accrue — a concurrent /pwarp delete or admin purge
+            // in the off-tick window (holding the aggregate in memory does not lock the DB row). The increment hit
+            // no rows, so nothing banked; refund the payer exactly as a thrown accrue would rather than debiting
+            // them with nothing to show for it.
+            return compensate(
+                    payer,
+                    warp,
+                    charge,
+                    new IllegalStateException("accrue affected 0 rows: warp " + warp.value() + " no longer exists"));
         }
         autoPayout(warp, currency);
         return Result.ok();
@@ -163,9 +175,13 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         return currency.normalize(price.subtract(cut));
     }
 
-    /** Accrue {@code delta} onto the warp bank as one guarded PK update, recording the currency it now holds. */
-    private void bumpBank(PlayerWarpId warp, BigDecimal delta, String currencyId) {
-        write(dsl -> dsl.update(PLAYER_WARPS)
+    /**
+     * Accrue {@code delta} onto the warp bank as one guarded PK update, recording the currency it now holds, and
+     * return the affected-row count. A {@code 0} means the warp row is gone (a concurrent delete/purge) so nothing
+     * was banked — callers treat that as a failed accrue, not a silent success.
+     */
+    private int bumpBank(PlayerWarpId warp, BigDecimal delta, String currencyId) {
+        return write(dsl -> dsl.update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.EARNED_AMOUNT, PLAYER_WARPS.EARNED_AMOUNT.add(delta))
                 .set(PLAYER_WARPS.EARNED_CURRENCY, currencyId)
                 .where(PLAYER_WARPS.ID.eq(warp.value()))
@@ -211,7 +227,15 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     /** Best-effort return of a failed payout to the bank; a re-accrue that itself throws is logged, not thrown. */
     private void reAccrue(PlayerWarpId warp, Money payout) {
         try {
-            bumpBank(warp, payout.amount(), payout.currency().id().value());
+            if (bumpBank(warp, payout.amount(), payout.currency().id().value()) == 0) {
+                // The warp was deleted after its bank had been zeroed, so the money cannot go back onto a row that
+                // no longer exists — it is genuinely lost from the bank. Surface it as an operator-visible
+                // discrepancy rather than discarding the row count and losing it silently.
+                log.error(
+                        "event=playerwarp_reaccrue_lost warp=" + warp.value() + " currency="
+                                + payout.currency().id().value() + " amount=" + payout.amount(),
+                        new IllegalStateException("re-accrue affected 0 rows: warp no longer exists"));
+            }
         } catch (RuntimeException reAccrualFailure) {
             log.error(
                     "event=playerwarp_reaccrue_failed warp=" + warp.value() + " currency="
@@ -229,7 +253,19 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         if (!config.autoPayout() || !worksOffline(currency)) {
             return;
         }
-        ownerOf(warp).ifPresent(owner -> withdraw(warp, owner));
+        try {
+            ownerOf(warp).ifPresent(owner -> withdraw(warp, owner));
+        } catch (RuntimeException payoutFailure) {
+            // The debit and accrue have already committed, so the owner's share is safely banked and a manual
+            // /pwarp withdraw settles it. A fault in this convenience payout (e.g. the snapshot read throwing) must
+            // never turn a correctly-banked charge into a thrown call — log it (no secret; the money is safe) and
+            // leave the amount in the bank. The charge stays ok either way, which is the contract.
+            log.warn(
+                    "event=playerwarp_auto_payout_failed warp={} currency={} reason={}",
+                    warp.value(),
+                    currency.id().value(),
+                    payoutFailure.toString());
+        }
     }
 
     private boolean worksOffline(Currency currency) {
@@ -290,8 +326,16 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
      * @param autoPayout whether an entry fee is settled to the owner immediately rather than banked for withdraw
      */
     public record PayoutConfig(BigDecimal cutPercent, boolean autoPayout) {
+
+        private static final BigDecimal MAX_PERCENT = BigDecimal.valueOf(100);
+
         public PayoutConfig {
             Objects.requireNonNull(cutPercent, "cutPercent");
+            // Clamp, never reject: a typo'd percent must not crash module enable. The invariant that matters is that
+            // net = price − cut stays in [0, price]; a cut above 100 would drive net negative (adding a negative
+            // delta to the bank) and a cut below 0 would overpay it, so pin the percent to [0, 100]. The wiring
+            // read site log.warns when it had to clamp; the record stays a pure value with no logger.
+            cutPercent = cutPercent.max(BigDecimal.ZERO).min(MAX_PERCENT);
         }
     }
 }
