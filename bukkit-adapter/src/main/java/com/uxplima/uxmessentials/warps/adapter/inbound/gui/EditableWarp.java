@@ -137,11 +137,12 @@ interface EditableWarp {
     /**
      * Wrap a loaded player warp; every change is written back through {@code repository}. The surrogate-id rebuild
      * dropped the lock, password, and welcome-message facets from the player-warp aggregate (they return in the P4
-     * access gate), so the lock/password/welcome members of this shared interface are inert on the player side:
-     * the shared server-warp editor never opens a player warp (the dedicated {@code PlayerWarpEditorView} does), so
-     * these members exist only to satisfy the interface the server branch needs. The sounds, particles, warmup, and
-     * cooldown edits map onto the aggregate's {@code WarpEffects} / {@code WarpTimingOverrides} facets; each edit
-     * stamps its own timestamp because this adapter, not the domain, owns the wall clock.
+     * access gate), so the lock/password/welcome members of this shared interface are inert on the player side. The
+     * shared editor does open for a player warp — {@code /pwarp edit} routes through it — but warp-editor.conf gates
+     * those three controls to server warps ({@code view = warps:editor-server-warp}), so a player warp never renders
+     * them and these no-op members are never reached; they exist only to satisfy the server branch. The sounds,
+     * particles, warmup, and cooldown edits map onto the aggregate's {@code WarpEffects} / {@code WarpTimingOverrides}
+     * facets; each edit stamps its own timestamp because this adapter, not the domain, owns the wall clock.
      */
     static EditableWarp ofPlayer(PlayerWarp warp, PlayerWarpRepository repository) {
         return new EditableWarp() {
@@ -166,12 +167,14 @@ interface EditableWarp {
 
             @Override
             public void setLocked(boolean locked) {
-                // No lock facet on a player warp; the server-warp lock control never reaches this branch.
+                // No lock facet on a player warp. Unreachable: warp-editor.conf gates the lock control to server
+                // warps (view = warps:editor-server-warp), so a player warp never renders it to click.
             }
 
             @Override
             public void setPassword(Optional<String> password) {
-                // No password facet on a player warp; it returns as the P4 access gate. Nothing to write here.
+                // No password facet on a player warp (it returns as the P4 access gate). Unreachable: warp-editor.conf
+                // gates the password control to server warps, so a player warp never renders it to click.
             }
 
             @Override
@@ -236,7 +239,8 @@ interface EditableWarp {
 
             @Override
             public void setWelcomeMessages(List<WelcomeMessage> messages) {
-                // Welcome messages were dropped from player warps; the server-warp welcome control never lands here.
+                // No welcome-message facet on a player warp. Unreachable: warp-editor.conf gates the welcome control
+                // to server warps, so a player warp never renders it to click.
             }
 
             private void save(PlayerWarp updated) {

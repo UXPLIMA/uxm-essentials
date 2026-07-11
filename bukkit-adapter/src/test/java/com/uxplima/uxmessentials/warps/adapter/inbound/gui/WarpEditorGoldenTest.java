@@ -56,10 +56,11 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * The warp-editor golden test: the engine-rendered editor hub must draw the exact three-row property panel the old
  * bespoke {@code WarpEditorView} drew, and each button must run its old handler through the engine. A server warp
- * shows the category button (slot 8); a player warp hides it, exactly as the old window gated it on {@code owner ==
- * null}. The engine window is snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for
- * slot, to the baseline the old view produced. Then, through the engine's own menu listener, the toggle / clear
- * buttons prove they save the warp and the sub-screen buttons prove they open the right engine child window.
+ * shows the category, lock, password, and welcome buttons; a player warp hides all four, because the surrogate-id
+ * rebuild dropped the lock, password, and welcome facets from the player-warp aggregate and categories were always a
+ * server-warp concept. The engine window is snapshotted as {@code (slot -> material, plain name)} and asserted equal,
+ * slot for slot, to the baseline the old view produced. Then, through the engine's own menu listener, the toggle /
+ * clear buttons prove they save the warp and the sub-screen buttons prove they open the right engine child window.
  */
 class WarpEditorGoldenTest {
 
@@ -161,13 +162,14 @@ class WarpEditorGoldenTest {
     }
 
     @Test
-    void aPlayerWarpHidesTheServerOnlyCategoryButton() {
+    void aPlayerWarpHidesTheServerOnlyControls() {
         playerWarps.save(playerWarp("home"));
         editor.open(player, viewer, "home", viewer);
 
         Map<Integer, Snapshot> rendered = snapshot(top());
 
-        assertThat(rendered).doesNotContainKey(CATEGORY_SLOT);
+        // Category, lock, password, and welcome are gated to server warps; a player warp draws none of them.
+        assertThat(rendered).doesNotContainKeys(CATEGORY_SLOT, LOCK_SLOT, PASSWORD_SLOT, WELCOME_SLOT);
         assertThat(rendered).isEqualTo(baseline(false));
     }
 
@@ -313,11 +315,13 @@ class WarpEditorGoldenTest {
         out.put(TELEPORT_SLOT, new Snapshot(Material.ENDER_PEARL, WarpsMessageKey.WARP_EDITOR_TELEPORT_NAME.key()));
         out.put(ICON_SLOT, new Snapshot(Material.ENDER_PEARL, WarpsMessageKey.WARP_EDITOR_ICON_NAME.key()));
         if (serverWarp) {
+            // Category, lock, password, and welcome are server-warp concepts — a player warp carries none of them
+            // after the surrogate-id rebuild, so all four are gated off for a player warp in warp-editor.conf.
             out.put(CATEGORY_SLOT, new Snapshot(Material.BOOK, WarpsMessageKey.WARP_EDITOR_CATEGORY_NAME.key()));
+            out.put(LOCK_SLOT, new Snapshot(Material.LEVER, WarpsMessageKey.WARP_EDITOR_LOCK_NAME.key()));
+            out.put(PASSWORD_SLOT, new Snapshot(Material.PAPER, WarpsMessageKey.WARP_EDITOR_PASSWORD_NAME.key()));
+            out.put(WELCOME_SLOT, new Snapshot(Material.WRITABLE_BOOK, WarpsMessageKey.WARP_EDITOR_WELCOME_NAME.key()));
         }
-        out.put(LOCK_SLOT, new Snapshot(Material.LEVER, WarpsMessageKey.WARP_EDITOR_LOCK_NAME.key()));
-        out.put(PASSWORD_SLOT, new Snapshot(Material.PAPER, WarpsMessageKey.WARP_EDITOR_PASSWORD_NAME.key()));
-        out.put(WELCOME_SLOT, new Snapshot(Material.WRITABLE_BOOK, WarpsMessageKey.WARP_EDITOR_WELCOME_NAME.key()));
         out.put(SOUNDS_SLOT, new Snapshot(Material.JUKEBOX, WarpsMessageKey.WARP_EDITOR_SOUNDS_NAME.key()));
         out.put(PARTICLES_SLOT, new Snapshot(Material.BLAZE_POWDER, WarpsMessageKey.WARP_EDITOR_PARTICLES_NAME.key()));
         out.put(WARMUP_SLOT, new Snapshot(Material.CLOCK, WarpsMessageKey.WARP_EDITOR_WARMUP_NAME.key()));
