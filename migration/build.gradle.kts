@@ -26,4 +26,5 @@ dependencies {
     testImplementation(libs.configurate.yaml)
     testImplementation(libs.configurate.hocon) // config-version ladder fixtures
     testImplementation(libs.h2) // in-process H2 fixture for the LiteBans reader round-trip
+    testImplementation(libs.sqlite.jdbc) // in-process SQLite fixture for the Olzie PlayerWarps reader round-trip
 }

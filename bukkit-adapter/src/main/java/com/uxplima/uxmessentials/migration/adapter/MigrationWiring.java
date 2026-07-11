@@ -40,6 +40,8 @@ import com.uxplima.uxmessentials.migration.convert.fancyholograms.FancyHolograms
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
+import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsConfig;
+import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsConvert;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
@@ -127,7 +129,18 @@ public final class MigrationWiring {
         built.add(new FancyHologramsConvert(worlds, fancyHologramsFile(plugin)));
         built.add(new AxPlayerWarpsConvert(axPlayerWarpsConfig(plugin, migrationConfig), worlds, log));
         built.add(new AthelionPlayerWarpsConvert(worlds, athelionDataFile(plugin, migrationConfig), log));
+        built.add(new OlziePlayerWarpsConvert(olziePlayerWarpsConfig(plugin, migrationConfig), worlds, log));
         return new SourceRegistry(built);
+    }
+
+    /** Read the {@code modules.migration.olzieplayerwarps} subtree into the source's connection config. */
+    private static OlziePlayerWarpsConfig olziePlayerWarpsConfig(Plugin plugin, ConfigStore migrationConfig) {
+        ConfigStore olzie = migrationConfig.scoped("olzieplayerwarps");
+        String jdbcUrl = olzie.getString("jdbc-url", "");
+        String username = olzie.getString("username", "");
+        String password = olzie.getString("password", "");
+        Path pluginsDir = plugin.getDataFolder().toPath().getParent();
+        return new OlziePlayerWarpsConfig(Optional.of(jdbcUrl), username, password, Optional.ofNullable(pluginsDir));
     }
 
     /** Read the {@code modules.migration.axplayerwarps} subtree into the source's connection config. */
@@ -198,8 +211,8 @@ public final class MigrationWiring {
     /**
      * The shared player-warp import writer, built over the player-warps ports the P4 module owns — the same
      * repository, password store, and social stores {@code /setpwarp} and the browse GUI use, so an imported warp
-     * can never reach a state a live command could not. The AxPlayerWarps and Athelion sources (and the Olzie source
-     * to come) all funnel through this one writer.
+     * can never reach a state a live command could not. The AxPlayerWarps, Athelion and Olzie sources all funnel
+     * through this one writer.
      */
     private static PlayerWarpRecordWriter playerWarpWriter(Persistence persistence, Clock clock, Logger log) {
         return new PlayerWarpRecordWriter(

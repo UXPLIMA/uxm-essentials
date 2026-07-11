@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXMappin
 import com.uxplima.uxmessentials.migration.convert.fancyholograms.FancyHologramsMappings;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansMappings;
 import com.uxplima.uxmessentials.migration.convert.live.LiveSourceMappings;
+import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsMappings;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -19,8 +20,9 @@ import org.jspecify.annotations.NullMarked;
  * single greppable answer to "what does the importer claim to migrate?", scoped by source. The built
  * sources are EssentialsX (a full on-disk source), the live economy sources Vault and PlayerPoints
  * (balance only), LiteBans (a JDBC source for bans/ip-bans/mutes/warns), the two hologram sources
- * DecentHolograms and FancyHolograms (on-disk sources for server-wide holograms), and the two player-warp sources
- * AxPlayerWarps (a JDBC source) and Athelion PlayerWarps (a serialised {@code data.yml} source). Only built sources
+ * DecentHolograms and FancyHolograms (on-disk sources for server-wide holograms), and the three player-warp sources
+ * AxPlayerWarps (a JDBC source), Athelion PlayerWarps (a serialised {@code data.yml} source) and Olzie PlayerWarps (a
+ * JDBC source). Only built sources
  * contribute rows — a planned source has no code table, so it appears nowhere here until it is built
  * (planned ≠ stubbed, §1.2). The drift guard reads this aggregate to assert the three-way equality
  * code ⇄ doc ⇄ fixtures.
@@ -36,7 +38,8 @@ public final class SupportedMappings {
             Map.entry(SourceId.of("decentholograms"), DecentHologramsMappings.rows()),
             Map.entry(SourceId.of("fancyholograms"), FancyHologramsMappings.rows()),
             Map.entry(SourceId.of("axplayerwarps"), AxPlayerWarpsMappings.rows()),
-            Map.entry(SourceId.of("athelionplayerwarps"), AthelionPlayerWarpsMappings.rows()));
+            Map.entry(SourceId.of("athelionplayerwarps"), AthelionPlayerWarpsMappings.rows()),
+            Map.entry(SourceId.of("olzieplayerwarps"), OlziePlayerWarpsMappings.rows()));
 
     private SupportedMappings() {}
 
