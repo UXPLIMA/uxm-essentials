@@ -25,6 +25,9 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     // teleport
     PWARP_TELEPORTING("pwarp.teleporting"),
 
+    // one-warp summary (/pwarp info)
+    PWARP_INFO("pwarp.info"),
+
     // listing your own warps
     PWARP_LIST_HEADER("pwarp.list.header"),
     PWARP_LIST_ENTRY("pwarp.list.entry"),
@@ -37,6 +40,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
 
     // failures
     PWARP_NOT_FOUND("pwarp.not-found"),
+    PWARP_INVALID_NAME("pwarp.invalid-name"),
     PWARP_NAME_TAKEN("pwarp.name-taken"),
     PWARP_LIMIT_REACHED("pwarp.limit-reached"),
     PWARP_NOT_PUBLIC("pwarp.not-public"),

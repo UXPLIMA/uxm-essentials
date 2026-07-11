@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListM
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
@@ -36,10 +37,12 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
@@ -156,6 +159,9 @@ public final class PlayerwarpsWiring {
         // so they are built once here and shared with the ManageBans / ManageWhitelist use cases below.
         WarpBanStore banStore = PlayerWarpRepositories.banStore(persistence);
         WarpWhitelistStore whitelistStore = PlayerWarpRepositories.whitelistStore(persistence, Clock.systemUTC());
+        // The password store backs both the ordered access gate (a PASSWORD warp verifies the entered plaintext)
+        // and the edit verbs' set/clear-password writes, so it is built once here and shared with both.
+        PlayerWarpPasswordStore passwordStore = PlayerWarpRepositories.passwordStore(persistence);
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
@@ -165,7 +171,7 @@ public final class PlayerwarpsWiring {
                 banStore,
                 memberStore,
                 whitelistStore,
-                PlayerWarpRepositories.passwordStore(persistence),
+                passwordStore,
                 kernel.cooldowns(),
                 economy,
                 Clock.systemUTC());
@@ -203,6 +209,12 @@ public final class PlayerwarpsWiring {
         ManageWhitelist manageWhitelist = new ManageWhitelist(repository, warpAuthorization, whitelistStore, notifier);
         ManageBans manageBans = new ManageBans(repository, warpAuthorization, banStore, notifier, Clock.systemUTC());
         WithdrawEarnings withdrawEarnings = new WithdrawEarnings(repository, warpAuthorization, notifier, economy);
+        // The single-warp edit verbs and the ownership transfer gate through the same shared WarpAuthorization and
+        // reuse the repository, notifier, and password store built above — no new persistence, just use cases.
+        EditPlayerWarp editPlayerWarp =
+                new EditPlayerWarp(repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC());
+        TransferPlayerWarp transferPlayerWarp =
+                new TransferPlayerWarp(repository, warpAuthorization, notifier, Clock.systemUTC());
         PlayerWarpListMenu listMenu = buildGui(
                 plugin,
                 kernel,
@@ -234,6 +246,8 @@ public final class PlayerwarpsWiring {
                 manageWhitelist,
                 manageBans,
                 withdrawEarnings,
+                editPlayerWarp,
+                transferPlayerWarp,
                 notifier,
                 editorView,
                 listMenu);
@@ -405,6 +419,8 @@ public final class PlayerwarpsWiring {
             ManageWhitelist manageWhitelist,
             ManageBans manageBans,
             WithdrawEarnings withdrawEarnings,
+            EditPlayerWarp editPlayerWarp,
+            TransferPlayerWarp transferPlayerWarp,
             PlayerWarpNotifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
@@ -425,7 +441,9 @@ public final class PlayerwarpsWiring {
                 manageMembers,
                 manageWhitelist,
                 manageBans,
-                withdrawEarnings);
+                withdrawEarnings,
+                editPlayerWarp,
+                transferPlayerWarp);
     }
 
     private static int defaultLimit(ModuleContext ctx) {

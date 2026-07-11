@@ -1,11 +1,17 @@
 package com.uxplima.uxmessentials.playerwarps.application;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -32,6 +38,42 @@ public final class ListPlayerWarps {
     public List<PlayerWarp> ownedList(PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");
         return repository.ownedBy(viewer);
+    }
+
+    /**
+     * Resolve the warp {@code name} by its global name and push a one-line summary — owner, access, price, visits,
+     * and average rating — to {@code viewer}, or the not-found notice when no warp bears the name. This is a pure
+     * read (the {@code /pwarp info} verb): it never mutates the warp, and the returned optional lets a caller reuse
+     * the resolved aggregate without a second lookup.
+     */
+    public Optional<PlayerWarp> info(PlayerRef viewer, PlayerWarpName name) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(name, "name");
+        Optional<PlayerWarp> found = repository.findByName(name);
+        if (found.isEmpty()) {
+            notifier.send(viewer, PlayerWarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
+            return found;
+        }
+        notifier.send(viewer, PlayerwarpsMessageKey.PWARP_INFO, summary(found.get()));
+        return found;
+    }
+
+    /** The placeholder set the {@code pwarp.info} line renders — every value is a plain, pre-formatted string. */
+    private static Map<String, String> summary(PlayerWarp warp) {
+        return Map.of(
+                "warp", warp.name().value(),
+                "owner", warp.ownerName(),
+                "access", warp.access().name(),
+                "price", warp.price().amount().toPlainString(),
+                "visits", Long.toString(warp.visits().count()),
+                "rating", averageStars(warp.ratings()));
+    }
+
+    /** The average star rating rounded to one decimal, formatted without floating-point noise. */
+    private static String averageStars(RatingSummary ratings) {
+        return new BigDecimal(Double.toString(ratings.average()))
+                .setScale(1, RoundingMode.HALF_UP)
+                .toPlainString();
     }
 
     /** The warps {@code viewer} owns, also pushing the header/entries (or the empty notice) to them. */

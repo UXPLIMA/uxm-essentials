@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEdito
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
@@ -30,6 +31,7 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
@@ -138,6 +140,22 @@ class PlayerWarpOffThreadReadTest {
         assertThat(player.nextMessage()).isNotNull();
     }
 
+    @Test
+    void accessEditResolvesTheWarpOffTheCommandThread() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+
+        execute(dispatcher, "pwarp access hub PUBLIC");
+
+        // The edit verb returned without touching the database — the warp lookup was handed to scheduler.async.
+        assertThat(repository.reads).isZero();
+        assertThat(scheduler.deferred).hasSize(1);
+
+        scheduler.drain();
+
+        // Draining performs the EditPlayerWarp lookup (a read) off the command thread.
+        assertThat(repository.reads).isPositive();
+    }
+
     private CommandDispatcher<CommandSourceStack> registerCommand() {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(new PlayerWarpCommand(services, new KeyMessages()).build());
@@ -210,7 +228,15 @@ class PlayerWarpOffThreadReadTest {
                         new NoBans(),
                         notifier,
                         java.time.Clock.systemUTC()),
-                new WithdrawEarnings(repository, new WarpAuthorization(new NoMembers()), notifier, Optional.empty()));
+                new WithdrawEarnings(repository, new WarpAuthorization(new NoMembers()), notifier, Optional.empty()),
+                new EditPlayerWarp(
+                        repository,
+                        new WarpAuthorization(new NoMembers()),
+                        notifier,
+                        new NoPasswords(),
+                        java.time.Clock.systemUTC()),
+                new TransferPlayerWarp(
+                        repository, new WarpAuthorization(new NoMembers()), notifier, java.time.Clock.systemUTC()));
     }
 
     /** A minimal real management list (this test does not open it; it only needs a non-null view in services). */

@@ -1046,6 +1046,50 @@ permissions:
   uxmessentials.pwarp.public:
     description: '/pwarp visibility public|private <name> to toggle a player warp''s visibility.'
     default: true
+  # Self-service edit / social verbs folded under /pwarp — each lets a player run the verb on a warp; ownership of
+  # the target warp is still enforced by the warp authorization matrix inside the use case, not by these nodes.
+  uxmessentials.pwarp.move:
+    description: '/pwarp move <name> to re-anchor one of your player warps at your location.'
+    default: true
+  uxmessentials.pwarp.rename:
+    description: '/pwarp rename <name> <newName> to rename one of your player warps.'
+    default: true
+  uxmessentials.pwarp.displayname:
+    description: '/pwarp displayname <name> [text] to set or clear a player warp''s display name.'
+    default: true
+  uxmessentials.pwarp.description:
+    description: '/pwarp description <name> [text] to set or clear a player warp''s description.'
+    default: true
+  uxmessentials.pwarp.icon:
+    description: '/pwarp icon <name> [icon] to set or clear a player warp''s browse icon.'
+    default: true
+  uxmessentials.pwarp.category:
+    description: '/pwarp category <name> [categoryId] to file a player warp under a browse category.'
+    default: true
+  uxmessentials.pwarp.access:
+    description: '/pwarp access <name> <PUBLIC|PASSWORD|WHITELIST|PRIVATE> to set a player warp''s access axis.'
+    default: true
+  uxmessentials.pwarp.password:
+    description: '/pwarp password <name> <password>|clear to set or clear a player warp''s password.'
+    default: true
+  uxmessentials.pwarp.price:
+    description: '/pwarp price <name> <amount> [currency] to set a player warp''s entry price.'
+    default: true
+  uxmessentials.pwarp.info:
+    description: '/pwarp info <name> to show a player warp''s owner, access, price, visits, and rating.'
+    default: true
+  uxmessentials.pwarp.favourite:
+    description: '/pwarp favourite|unfavourite <name> to star or un-star a player warp.'
+    default: true
+  uxmessentials.pwarp.rate:
+    description: '/pwarp rate <name> <1-5> to award a player warp a star rating.'
+    default: true
+  uxmessentials.pwarp.transfer:
+    description: '/pwarp transfer <name> <player> to hand ownership of one of your warps to another player.'
+    default: true
+  uxmessentials.pwarp.withdraw:
+    description: '/pwarp withdraw <name> to pay one of your warps'' accrued earnings out to its owner.'
+    default: true
   # Player-warps management GUI — /pwarp with no arguments opens the list-and-editor panel, and the playerwarps
   # entry on the /uxmess gui hub gates on this node. A player without it still opens the GUI for their own warps;
   # holding it widens the list to every player's warps so an operator can manage all. Admin/manage tier.

@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
@@ -13,6 +14,7 @@ import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
@@ -48,6 +50,9 @@ import org.jspecify.annotations.NullMarked;
  * @param manageWhitelist {@code /pwarp whitelist add|remove} — the guest-list verbs (owner/co-owner/manager)
  * @param manageBans {@code /pwarp ban|unban} — bar or restore a player (owner/co-owner/manager)
  * @param withdrawEarnings {@code /pwarp withdraw} — pay the warp bank out to the owner (owner/co-owner)
+ * @param editPlayerWarp {@code /pwarp rename|displayname|description|icon|category|access|password|price|move} —
+ *     the single-warp edit verbs, each gated on its own {@code WarpCapability} inside the use case
+ * @param transferPlayerWarp {@code /pwarp transfer <name> <player>} — hand a warp to a new owner (owner-only)
  */
 @NullMarked
 public record PlayerWarpServices(
@@ -66,7 +71,9 @@ public record PlayerWarpServices(
         ManageMembers manageMembers,
         ManageWhitelist manageWhitelist,
         ManageBans manageBans,
-        WithdrawEarnings withdrawEarnings) {
+        WithdrawEarnings withdrawEarnings,
+        EditPlayerWarp editPlayerWarp,
+        TransferPlayerWarp transferPlayerWarp) {
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
@@ -84,6 +91,8 @@ public record PlayerWarpServices(
         Objects.requireNonNull(manageWhitelist, "manageWhitelist");
         Objects.requireNonNull(manageBans, "manageBans");
         Objects.requireNonNull(withdrawEarnings, "withdrawEarnings");
+        Objects.requireNonNull(editPlayerWarp, "editPlayerWarp");
+        Objects.requireNonNull(transferPlayerWarp, "transferPlayerWarp");
     }
 
     /**
