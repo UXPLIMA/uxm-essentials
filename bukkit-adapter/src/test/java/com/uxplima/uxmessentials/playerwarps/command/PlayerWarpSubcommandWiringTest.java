@@ -18,6 +18,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpCategoriesMenu;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
@@ -68,6 +69,19 @@ class PlayerWarpSubcommandWiringTest {
     @AfterEach
     void tearDown() {
         MockBukkit.unmock();
+    }
+
+    @Test
+    void bareSlashPwarpOpensTheCategoriesLanding() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        PlayerWarpCategoriesMenu categories = mock(PlayerWarpCategoriesMenu.class);
+        lenient().when(services.categoriesView()).thenReturn(categories);
+
+        dispatch(player, "pwarp");
+
+        // No-arg /pwarp opens the pwarp-categories landing, not the browse or the management list.
+        verify(categories).open(eq(player), eq(refOf(player)));
     }
 
     @Test

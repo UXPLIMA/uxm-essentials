@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.DisplayName;
-import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
@@ -99,6 +98,7 @@ public final class PlayerWarpManageMenu {
     private final BiConsumer<PlayerRef, PlayerWarpName> openMembers;
     private final BiConsumer<PlayerRef, PlayerWarpName> openWhitelist;
     private final BiConsumer<PlayerRef, PlayerWarpName> openBans;
+    private final BiConsumer<PlayerRef, PlayerWarpName> openIcon;
 
     public PlayerWarpManageMenu(
             Menus menus,
@@ -115,7 +115,8 @@ public final class PlayerWarpManageMenu {
             BiConsumer<PlayerRef, PlayerWarpName> openView,
             BiConsumer<PlayerRef, PlayerWarpName> openMembers,
             BiConsumer<PlayerRef, PlayerWarpName> openWhitelist,
-            BiConsumer<PlayerRef, PlayerWarpName> openBans) {
+            BiConsumer<PlayerRef, PlayerWarpName> openBans,
+            BiConsumer<PlayerRef, PlayerWarpName> openIcon) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -131,6 +132,7 @@ public final class PlayerWarpManageMenu {
         this.openMembers = Objects.requireNonNull(openMembers, "openMembers");
         this.openWhitelist = Objects.requireNonNull(openWhitelist, "openWhitelist");
         this.openBans = Objects.requireNonNull(openBans, "openBans");
+        this.openIcon = Objects.requireNonNull(openIcon, "openIcon");
     }
 
     /** Register the placeholders, the capability condition, the click actions, and the spec; called once at wiring time. */
@@ -157,7 +159,11 @@ public final class PlayerWarpManageMenu {
         bindings.action("pwarp-displayname", ctx -> editOptional(ctx, DisplayName::of, editPlayerWarp::setDisplayName));
         bindings.action(
                 "pwarp-description", ctx -> editOptional(ctx, WarpDescription::of, editPlayerWarp::setDescription));
-        bindings.action("pwarp-icon", ctx -> editOptional(ctx, IconSpec::of, editPlayerWarp::setIcon));
+        // The icon button opens the pwarp-icon palette selector for the subject warp rather than prompting for a
+        // material; the selector's pick routes back through EditPlayerWarp#setIcon, the same use case a typed edit did.
+        bindings.action(
+                "playerwarps:manage-icon",
+                ctx -> openIcon.accept(ctx.viewer(), subject(ctx).name()));
         bindings.action("pwarp-category", ctx -> editOptional(ctx, s -> s, editPlayerWarp::setCategory));
         bindings.action("pwarp-price", this::setPrice);
         bindings.action("pwarp-password", this::setPassword);

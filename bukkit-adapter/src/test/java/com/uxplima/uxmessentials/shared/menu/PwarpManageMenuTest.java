@@ -90,6 +90,7 @@ class PwarpManageMenuTest {
     private static final int INFO_SLOT = 4;
     private static final int RENAME_SLOT = 10;
     private static final int DISPLAY_NAME_SLOT = 11;
+    private static final int ICON_SLOT = 13;
     private static final int ACCESS_SLOT = 19;
     private static final int PRICE_SLOT = 21;
     private static final int MEMBERS_SLOT = 29;
@@ -107,6 +108,7 @@ class PwarpManageMenuTest {
     private PlayerRef otherOwner;
     private SyncScheduler scheduler;
     private RecordingPrompt prompt;
+    private final java.util.List<PlayerWarpName> iconOpened = new java.util.ArrayList<>();
 
     private PlayerWarpRepository repository;
     private WarpMemberStore members;
@@ -210,6 +212,18 @@ class PwarpManageMenuTest {
     }
 
     @Test
+    void clickingTheIconButtonOpensTheIconSelectorForTheWarp() {
+        PlayerWarp warp = openedWarp(viewer, WarpAccess.PUBLIC);
+        openAsOwner(warp);
+
+        fireClick(ICON_SLOT, ClickType.LEFT);
+
+        // The icon button now opens the pwarp-icon selector for the subject warp rather than prompting for a material.
+        assertThat(iconOpened).containsExactly(warp.name());
+        assertThat(prompt.prompts).isZero();
+    }
+
+    @Test
     void clickingTheBankReachesWithdrawEarnings() {
         PlayerWarp warp = openedWarp(viewer, WarpAccess.PUBLIC);
         openAsOwner(warp);
@@ -300,7 +314,8 @@ class PwarpManageMenuTest {
                 (ref, name) -> {},
                 (ref, name) -> {},
                 (ref, name) -> {},
-                (ref, name) -> {});
+                (ref, name) -> {},
+                (ref, name) -> iconOpened.add(name));
         menu.register(bindings, dataFolder, NOOP);
     }
 

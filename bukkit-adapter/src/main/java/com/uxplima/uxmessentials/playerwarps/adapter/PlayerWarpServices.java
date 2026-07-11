@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrowseMenu;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpCategoriesMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
@@ -45,8 +46,9 @@ import org.jspecify.annotations.NullMarked;
  *     bridging any Bukkit feedback back to the player's region thread (the homes async-read pattern)
  * @param listView the management-GUI list (the owner-scoped {@code /pwarp} edit panel, opened from the admin hub and
  *     the editor's back button), owner-scoped for a player and cross-owner for a holder of {@code uxmessentials.pwarp.gui}
- * @param browseView the paged public browse opened by {@code /pwarp} with no arguments — one card per public warp read
- *     a page at a time from the browse read model, with the sort/search/scope controls on its bottom row
+ * @param browseView the paged public browse the landing's quick entries and category buttons open with a preset filter
+ * @param categoriesView the {@code pwarp-categories} landing opened by {@code /pwarp} with no arguments — a hub of quick
+ *     browse entries (all / mine / favourites / top rated) and one button per defined category
  * @param ratePlayerWarp {@code /pwarp rate <name> <1-5>} — the any-viewer star rating that drives the browse sort
  * @param favouritePlayerWarp {@code /pwarp favourite <name>} — the any-viewer favourite toggle
  * @param manageMembers {@code /pwarp members add|remove} — grant/revoke a co-owner or manager (owner-only)
@@ -70,6 +72,7 @@ public record PlayerWarpServices(
         Scheduler scheduler,
         PlayerWarpListMenu listView,
         PlayerWarpBrowseMenu browseView,
+        PlayerWarpCategoriesMenu categoriesView,
         RatePlayerWarp ratePlayerWarp,
         FavouritePlayerWarp favouritePlayerWarp,
         ManageMembers manageMembers,
@@ -90,6 +93,7 @@ public record PlayerWarpServices(
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(listView, "listView");
         Objects.requireNonNull(browseView, "browseView");
+        Objects.requireNonNull(categoriesView, "categoriesView");
         Objects.requireNonNull(ratePlayerWarp, "ratePlayerWarp");
         Objects.requireNonNull(favouritePlayerWarp, "favouritePlayerWarp");
         Objects.requireNonNull(manageMembers, "manageMembers");

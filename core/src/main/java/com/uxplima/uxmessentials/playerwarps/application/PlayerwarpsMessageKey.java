@@ -202,6 +202,28 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_MANAGE_WHITELIST("pwarp.gui.manage.whitelist"),
     PWARP_GUI_MANAGE_BANS("pwarp.gui.manage.bans"),
 
+    // landing — the pwarp-categories menu bare /pwarp opens (quick browse entries + the defined categories)
+    PWARP_GUI_CATEGORIES_TITLE("pwarp.gui.categories.title"),
+    PWARP_GUI_CATEGORIES_BROWSE_ALL("pwarp.gui.categories.browse-all"),
+    PWARP_GUI_CATEGORIES_MINE("pwarp.gui.categories.mine"),
+    PWARP_GUI_CATEGORIES_FAVOURITES("pwarp.gui.categories.favourites"),
+    PWARP_GUI_CATEGORIES_TOP("pwarp.gui.categories.top"),
+    PWARP_GUI_CATEGORIES_ENTRY_NAME("pwarp.gui.categories.entry-name"),
+    PWARP_GUI_CATEGORIES_ENTRY_LORE("pwarp.gui.categories.entry-lore"),
+    PWARP_GUI_CATEGORIES_SPONSOR("pwarp.gui.categories.sponsor"),
+    PWARP_GUI_CATEGORIES_PREV("pwarp.gui.categories.prev"),
+    PWARP_GUI_CATEGORIES_NEXT("pwarp.gui.categories.next"),
+    PWARP_GUI_CATEGORIES_CLOSE("pwarp.gui.categories.close"),
+
+    // the pwarp-icon selector the manage panel's icon button opens
+    PWARP_GUI_ICON_TITLE("pwarp.gui.icon.title"),
+    PWARP_GUI_ICON_ENTRY_NAME("pwarp.gui.icon.entry-name"),
+    PWARP_GUI_ICON_RESET("pwarp.gui.icon.reset"),
+    PWARP_GUI_ICON_RESET_LORE("pwarp.gui.icon.reset-lore"),
+    PWARP_GUI_ICON_PREV("pwarp.gui.icon.prev"),
+    PWARP_GUI_ICON_NEXT("pwarp.gui.icon.next"),
+    PWARP_GUI_ICON_BACK("pwarp.gui.icon.back"),
+
     // people sub-menus — members (co-owners / managers)
     PWARP_GUI_MEMBERS_TITLE("pwarp.gui.members.title"),
     PWARP_GUI_MEMBERS_ENTRY_NAME("pwarp.gui.members.entry-name"),

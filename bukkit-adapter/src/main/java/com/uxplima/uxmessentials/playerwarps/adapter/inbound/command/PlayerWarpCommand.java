@@ -154,18 +154,17 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     }
 
     /**
-     * {@code /pwarp} with no arguments: open the paged public browse. One card per public warp, read a page at a
-     * time from the browse read model, with the sort/search/scope controls and page arrows on its bottom row; a
-     * card click teleports through the same use case a bare {@code /pwarp <name>} drives. The open is scheduled on
-     * the player's entity thread by the view, which captures their position there for the distance sort. A later
-     * task points this at the {@code pwarp-categories} landing instead.
+     * {@code /pwarp} with no arguments: open the {@code pwarp-categories} landing. It is a hub of quick entries into
+     * the paged browse (all / mine / favourites / top rated) plus one button per defined category; each opens the
+     * browse with the matching preset filter. The landing snapshots the bounded category set off the tick thread, then
+     * paints on the player's entity thread; it never materialises the warp table.
      */
     private int openGui(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        services.browseView().open(sender, ref(sender));
+        services.categoriesView().open(sender, ref(sender));
         return Command.SINGLE_SUCCESS;
     }
 

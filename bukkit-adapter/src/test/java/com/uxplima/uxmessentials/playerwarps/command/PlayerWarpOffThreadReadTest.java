@@ -17,6 +17,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrowseMenu;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpCategoriesMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
@@ -75,6 +76,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
+import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -215,6 +218,7 @@ class PlayerWarpOffThreadReadTest {
                 scheduler,
                 listView(messages, permissions, setPlayerWarp, visibility, archivePlayerWarp),
                 browseView(messages, permissions, notifier),
+                categoriesView(messages),
                 new RatePlayerWarp(
                         repository, new NoRatings(), notifier, new BayesianRating(10), java.time.Clock.systemUTC()),
                 new FavouritePlayerWarp(repository, new NoFavourites(), notifier),
@@ -303,6 +307,33 @@ class PlayerWarpOffThreadReadTest {
                 Optional.empty(),
                 java.time.Clock.systemUTC());
         return new PlayerWarpBrowseMenu(menus, scheduler, browse, use, messages, (viewer, name) -> {});
+    }
+
+    /** A minimal categories landing over an empty category set, wired so the services holder is complete; unopened here. */
+    private PlayerWarpCategoriesMenu categoriesView(Messages messages) {
+        GuiText guiText = new GuiText(messages);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        WarpCategoryRepository categories = new WarpCategoryRepository() {
+            @Override
+            public Optional<WarpCategory> find(String id) {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<WarpCategory> all() {
+                return List.of();
+            }
+
+            @Override
+            public void save(WarpCategory category) {}
+
+            @Override
+            public void delete(String id) {}
+        };
+        return new PlayerWarpCategoriesMenu(menus, scheduler, categories, (player, viewer, filters) -> {});
     }
 
     /** Counts repository reads and serves warps from memory, assigning a surrogate id on the first save of a warp. */

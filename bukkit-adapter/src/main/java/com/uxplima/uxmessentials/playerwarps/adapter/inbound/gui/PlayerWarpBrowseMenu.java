@@ -170,12 +170,20 @@ public final class PlayerWarpBrowseMenu {
      * The bounded query for one page, layered over the safe public browse: the scope button chooses owner-only or
      * favourites-only, and the search / category filters narrow further. Access stays PUBLIC and the active-only flag
      * stays set, so a private, suspended, or archived warp can never leak through the browse.
+     *
+     * <p>The scope button (in-menu) and the landing's preset filters are two ways in to the same owner / favourites
+     * narrowing: the {@code scope=mine} / {@code scope=favourites} tokens the bottom-bar buttons set resolve to the
+     * viewer, while the {@code owner=<uuid>} / {@code favouritesOf=<uuid>} keys the pwarp-categories landing pre-applies
+     * carry an explicit subject. An explicit uuid wins; a malformed one is ignored so the browse widens rather than
+     * throwing.
      */
     private static WarpQuery query(
             UUID viewer, Optional<Position> position, WarpSort sort, int page, int size, Map<String, String> filters) {
         String scope = filters.getOrDefault("scope", "");
-        Optional<UUID> owner = scope.equals("mine") ? Optional.of(viewer) : Optional.empty();
-        Optional<UUID> favouritesOf = scope.equals("favourites") ? Optional.of(viewer) : Optional.empty();
+        Optional<UUID> owner = presentUuid(filters.get("owner"))
+                .or(() -> scope.equals("mine") ? Optional.of(viewer) : Optional.empty());
+        Optional<UUID> favouritesOf = presentUuid(filters.get("favouritesOf"))
+                .or(() -> scope.equals("favourites") ? Optional.of(viewer) : Optional.empty());
         return new WarpQuery(
                 present(filters.get("category")),
                 Optional.of(WarpAccess.PUBLIC),
@@ -333,6 +341,18 @@ public final class PlayerWarpBrowseMenu {
     /** A present, non-blank filter value, or empty so an absent or cleared filter widens the result. */
     private static Optional<String> present(@Nullable String value) {
         return value == null || value.isBlank() ? Optional.empty() : Optional.of(value);
+    }
+
+    /** A present, well-formed uuid filter value, or empty so an absent, blank, or malformed one widens the result. */
+    private static Optional<UUID> presentUuid(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(UUID.fromString(value.strip()));
+        } catch (IllegalArgumentException notAUuid) {
+            return Optional.empty();
+        }
     }
 
     private String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {

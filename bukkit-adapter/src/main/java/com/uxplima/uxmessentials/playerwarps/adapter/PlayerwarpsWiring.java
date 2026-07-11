@@ -20,8 +20,10 @@ import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommands;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrowseMenu;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpCategoriesMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpIconMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManageMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpPeopleMenu;
@@ -271,10 +273,13 @@ public final class PlayerwarpsWiring {
         // open. The manage panel opens them and their back button reopens it, so a one-slot holder breaks that cycle:
         // the people menu is built after the manage panel and reads it back through this holder.
         PlayerWarpPeopleMenu[] peopleHolder = new PlayerWarpPeopleMenu[1];
+        // The manage panel's icon button opens the pwarp-icon selector, whose pick reopens the manage panel — another
+        // one-slot holder breaks that cycle: the icon menu is built after the manage panel and reads it back here.
+        PlayerWarpIconMenu[] iconHolder = new PlayerWarpIconMenu[1];
         // The capability-gated management panel (pwarp-manage) the view's manage button opens: it resolves the warp and
         // the viewer's WarpRole off the tick thread and routes each button through the same single-warp use cases the
         // /pwarp verbs drive, gated by the viewer's role. Its back button reopens the view; its people buttons open the
-        // members / whitelist / bans sub-menus.
+        // members / whitelist / bans sub-menus; its icon button opens the pwarp-icon selector.
         PlayerWarpManageMenu manageMenu = new PlayerWarpManageMenu(
                 menus,
                 kernel.scheduler(),
@@ -290,8 +295,14 @@ public final class PlayerwarpsWiring {
                 viewMenu::open,
                 (viewer, name) -> peopleHolder[0].openMembers(viewer, name),
                 (viewer, name) -> peopleHolder[0].openWhitelist(viewer, name),
-                (viewer, name) -> peopleHolder[0].openBans(viewer, name));
+                (viewer, name) -> peopleHolder[0].openBans(viewer, name),
+                (viewer, name) -> iconHolder[0].open(viewer, name));
         manageHolder[0] = manageMenu;
+        // The pwarp-icon palette selector the manage panel's icon button opens: a picked material becomes the warp's
+        // browse icon through the same EditPlayerWarp use case a typed edit drove, then the manage panel re-opens.
+        PlayerWarpIconMenu iconMenu =
+                new PlayerWarpIconMenu(menus, kernel.scheduler(), editPlayerWarp, manageMenu::open);
+        iconHolder[0] = iconMenu;
         // The people sub-menus snapshot the warp's bounded members / whitelist / bans list off the tick thread and
         // route
         // each row/add click through the same ManageMembers / ManageWhitelist / ManageBans use cases the /pwarp verbs
@@ -311,10 +322,22 @@ public final class PlayerwarpsWiring {
                 notifier,
                 manageMenu::open);
         peopleHolder[0] = peopleMenu;
+        // The pwarp-categories landing bare /pwarp opens: a hub of quick browse entries (all / mine / favourites / top
+        // rated) plus one button per defined category. It reuses the shared warp-categories set (player-warps and warps
+        // share it) through a fresh cached jOOQ repository over the same table, snapshotting the bounded set off the
+        // tick thread; every entry hands off to the browse with a preset filter, so the landing never reads the warp
+        // table. Built after the browse it drives.
+        PlayerWarpCategoriesMenu categoriesMenu = new PlayerWarpCategoriesMenu(
+                menus,
+                kernel.scheduler(),
+                com.uxplima.uxmessentials.persistence.warps.WarpRepositories.categories(persistence),
+                browseMenu::open);
         browseMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         viewMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         manageMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         peopleMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        categoriesMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        iconMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "playerwarps",
                 PlayerwarpsMessageKey.PWARP_GUI_LIST_TITLE,
@@ -339,7 +362,8 @@ public final class PlayerwarpsWiring {
                 notifier,
                 editorView,
                 listMenu,
-                browseMenu);
+                browseMenu,
+                categoriesMenu);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
     }
@@ -514,7 +538,8 @@ public final class PlayerwarpsWiring {
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             PlayerWarpListMenu listMenu,
-            PlayerWarpBrowseMenu browseMenu) {
+            PlayerWarpBrowseMenu browseMenu,
+            PlayerWarpCategoriesMenu categoriesMenu) {
         return new PlayerWarpServices(
                 setPlayerWarp,
                 archivePlayerWarp,
@@ -527,6 +552,7 @@ public final class PlayerwarpsWiring {
                 kernel.scheduler(),
                 listMenu,
                 browseMenu,
+                categoriesMenu,
                 ratePlayerWarp,
                 favouritePlayerWarp,
                 manageMembers,

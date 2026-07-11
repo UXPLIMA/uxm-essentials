@@ -191,6 +191,29 @@ class PwarpBrowseMenuTest {
     }
 
     @Test
+    void theOwnerAndFavouritesPresetFiltersNarrowTheQueryToThatSubject() {
+        browse.seed(cards(TOTAL));
+        wireEngine();
+        var source = bindings.pagedList(PlayerWarpBrowseMenu.LIST_SOURCE).orElseThrow();
+        UUID subject = UUID.randomUUID();
+
+        // The my-warps entry pre-applies owner=<uuid>; the query narrows to that owner and touches favourites not.
+        var ownerPage = source.apply(
+                presetContext(Map.of("owner", subject.toString())), new PageRequest(0, PAGE_SIZE, "rating", Map.of()));
+        assertThat(ownerPage).isNotNull();
+        assertThat(browse.last().owner()).contains(subject);
+        assertThat(browse.last().favouritesOf()).isEmpty();
+
+        // The favourites entry pre-applies favouritesOf=<uuid>; the query narrows to that favouriter, owner unset.
+        var favouritesPage = source.apply(
+                presetContext(Map.of("favouritesOf", subject.toString())),
+                new PageRequest(0, PAGE_SIZE, "rating", Map.of()));
+        assertThat(favouritesPage).isNotNull();
+        assertThat(browse.last().favouritesOf()).contains(subject);
+        assertThat(browse.last().owner()).isEmpty();
+    }
+
+    @Test
     void pagingToTheNextPageRequeriesOnePageThatDiffersFromTheFirst() {
         browse.seed(cards(TOTAL));
         Inventory inv = open();
@@ -286,6 +309,10 @@ class PwarpBrowseMenuTest {
 
     private MenuContext subjectContext() {
         return MenuContext.of(viewer, new PlayerWarpBrowseMenu.Subject(Optional.empty(), Map.of()), 0);
+    }
+
+    private MenuContext presetContext(Map<String, String> presetFilters) {
+        return MenuContext.of(viewer, new PlayerWarpBrowseMenu.Subject(Optional.empty(), presetFilters), 0);
     }
 
     private Inventory top() {
