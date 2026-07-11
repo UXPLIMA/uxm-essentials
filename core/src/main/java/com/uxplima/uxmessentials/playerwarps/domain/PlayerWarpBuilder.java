@@ -6,7 +6,6 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 
 /**
@@ -26,7 +25,7 @@ final class PlayerWarpBuilder {
     private Optional<DisplayName> displayName;
     private Position location;
     private final Optional<String> serverId;
-    private final Optional<WarpCategory> category;
+    private final Optional<String> categoryId;
     private final Optional<WarpDescription> description;
     private final Optional<IconSpec> icon;
     private WarpAccess access;
@@ -53,7 +52,7 @@ final class PlayerWarpBuilder {
         this.displayName = source.displayName();
         this.location = source.location();
         this.serverId = source.serverId();
-        this.category = source.category();
+        this.categoryId = source.categoryId();
         this.description = source.description();
         this.icon = source.icon();
         this.access = source.access();
@@ -106,7 +105,7 @@ final class PlayerWarpBuilder {
                 displayName,
                 location,
                 serverId,
-                category,
+                categoryId,
                 description,
                 icon,
                 access,

@@ -6,7 +6,6 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 
 /**
@@ -17,7 +16,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
  * (active / suspended / archived), not a single public flag.
  *
  * <p>Around that identity the aggregate composes the presentation, economy, and social facets a browsable warp
- * network needs: an optional {@link DisplayName}, {@link WarpCategory}, {@link WarpDescription} and {@link IconSpec}
+ * network needs: an optional {@link DisplayName}, a category id, {@link WarpDescription} and {@link IconSpec}
  * for listing; a {@link WarpCost} entry price and accrued {@link WarpEarnings}; denormalised {@link RatingSummary}
  * and {@link VisitSummary} rollups plus a favourite count for sorting without scanning child tables; optional
  * {@link Sponsorship} and {@link RentState} for paid placement; and the {@link WarpEffects} / {@link WarpTimingOverrides}
@@ -32,7 +31,7 @@ public record PlayerWarp(
         Optional<DisplayName> displayName,
         Position location,
         Optional<String> serverId,
-        Optional<WarpCategory> category,
+        Optional<String> categoryId,
         Optional<WarpDescription> description,
         Optional<IconSpec> icon,
         WarpAccess access,
@@ -58,7 +57,7 @@ public record PlayerWarp(
         Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(serverId, "serverId");
-        Objects.requireNonNull(category, "category");
+        Objects.requireNonNull(categoryId, "categoryId");
         Objects.requireNonNull(description, "description");
         Objects.requireNonNull(icon, "icon");
         Objects.requireNonNull(access, "access");

@@ -31,7 +31,7 @@ class PlayerWarpTest {
         assertThat(warp.visits()).isEqualTo(VisitSummary.empty());
         assertThat(warp.favouriteCount()).isZero();
         assertThat(warp.displayName()).isEmpty();
-        assertThat(warp.category()).isEmpty();
+        assertThat(warp.categoryId()).isEmpty();
         assertThat(warp.sponsorship()).isEmpty();
         assertThat(warp.rent()).isEmpty();
         assertThat(warp.createdAt()).isEqualTo(Instant.EPOCH);

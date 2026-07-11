@@ -1,121 +1,206 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
-import com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerWarpsRecord;
+import com.uxplima.uxmessentials.playerwarps.domain.DisplayName;
+import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
+import com.uxplima.uxmessentials.playerwarps.domain.RentState;
+import com.uxplima.uxmessentials.playerwarps.domain.Sponsorship;
+import com.uxplima.uxmessentials.playerwarps.domain.VisitSummary;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpDescription;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpEarnings;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpEffects;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
-import org.jooq.Record;
+import com.uxplima.uxmessentials.warps.domain.WarpCost;
+import org.jspecify.annotations.Nullable;
 
 /**
- * The anti-corruption mapping between a {@code player_warps} row and the domain {@link PlayerWarp}. UUIDs are
- * stored as their canonical 36-character text and the creation time as epoch milliseconds, so the column
- * shape is identical on every backend; the public flag is stored as an {@code INT} ({@code 1} public,
- * {@code 0} private) for the same portability reason. This class is the single place that translation lives.
+ * The anti-corruption mapping between a {@code player_warps} row and the domain {@link PlayerWarp}. Every warp
+ * fact is a first-class typed column — there is no JSON blob anywhere in this table — so the mapping is a plain
+ * column-by-column translation: uuids as their canonical 36-character text, instants as {@code BIGINT} epoch
+ * milliseconds, money as {@code DECIMAL(20,4)}, and the {@link WarpAccess}/{@link WarpStatus} axes as their
+ * uppercase enum names. This class is the single place that translation lives.
  *
- * <p>The owner name is not persisted (only the uuid is), so the repository hands in a uuid-to-name resolver
- * (an adapter-supplied profile lookup); the rebuilt {@link PlayerWarp} then carries the live owner name so the
- * {@code /pwarp} list, the GUI, and the placeholders render the name rather than a raw uuid.
+ * <p>Two subtleties are load-bearing. The owner's display name is stored on the row ({@code owner_name}) but falls
+ * back to the {@code names} resolver when a legacy row left it null, so a browse always renders a name rather than a
+ * raw uuid. And the password is never mapped back onto the aggregate: the domain carries only a {@code passwordSet}
+ * flag (derived from whether {@code password_algorithm} is present), and {@link #apply} deliberately never writes the
+ * three {@code password_*} columns — a save that flips visibility must never disturb a set password. Password writes
+ * are a separate concern handled outside this mapping.
  */
 final class PlayerWarpRows {
 
-    private static final PlayerWarps PLAYER_WARPS = PlayerWarps.PLAYER_WARPS;
-    private static final int PUBLIC = 1;
-    private static final com.google.gson.Gson GSON = new com.google.gson.Gson();
-    private static final java.lang.reflect.Type WELCOME_MESSAGES_TYPE =
-            new com.google.gson.reflect.TypeToken<java.util.List<WelcomeMessage>>() {}.getType();
-
     private PlayerWarpRows() {}
 
-    /** Rebuild a {@link PlayerWarp} from a queried row, resolving the owner's display name through {@code names}. */
-    static PlayerWarp toPlayerWarp(Record row, java.util.function.Function<UUID, String> names) {
-        WorldRef world = new WorldRef(UUID.fromString(row.get(PLAYER_WARPS.WORLD)), row.get(PLAYER_WARPS.WORLD_NAME));
-        Position position = new Position(
-                world,
-                row.get(PLAYER_WARPS.X),
-                row.get(PLAYER_WARPS.Y),
-                row.get(PLAYER_WARPS.Z),
-                row.get(PLAYER_WARPS.YAW),
-                row.get(PLAYER_WARPS.PITCH));
-        UUID ownerUuid = UUID.fromString(row.get(PLAYER_WARPS.OWNER));
-        PlayerRef owner = new PlayerRef(ownerUuid, names.apply(ownerUuid));
+    /** Rebuild a {@link PlayerWarp} from a queried row, resolving a missing owner name through {@code names}. */
+    static PlayerWarp toPlayerWarp(PlayerWarpsRecord row, Function<UUID, String> names) {
+        UUID ownerUuid = UUID.fromString(row.getOwner());
+        String ownerName = row.getOwnerName() != null ? row.getOwnerName() : names.apply(ownerUuid);
         return new PlayerWarp(
-                owner,
-                PlayerWarpName.of(row.get(PLAYER_WARPS.NAME)),
-                position,
-                row.get(PLAYER_WARPS.IS_PUBLIC) == PUBLIC,
-                Instant.ofEpochMilli(row.get(PLAYER_WARPS.CREATED_AT)),
-                row.get(PLAYER_WARPS.VISITORS),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.PASSWORD)),
-                row.get(PLAYER_WARPS.IS_LOCKED) != 0,
-                deserializeWelcomeMessages(
-                        row.get(PLAYER_WARPS.WELCOME_MESSAGE), row.get(PLAYER_WARPS.WELCOME_MESSAGE_TYPE)),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.DEPARTURE_SOUND)),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.ARRIVAL_SOUND)),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.DEPARTURE_PARTICLE)),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.ARRIVAL_PARTICLE)),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.WARMUP_SECONDS)),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.COOLDOWN_SECONDS)),
-                java.util.Optional.ofNullable(row.get(PLAYER_WARPS.ICON_MATERIAL)));
+                Optional.of(PlayerWarpId.of(row.getId())),
+                new PlayerRef(ownerUuid, ownerName),
+                ownerName,
+                PlayerWarpName.of(row.getName()),
+                optional(row.getDisplayName(), DisplayName::of),
+                position(row),
+                Optional.ofNullable(row.getServerId()),
+                Optional.ofNullable(row.getCategoryId()),
+                optional(row.getDescription(), WarpDescription::of),
+                optional(row.getIcon(), IconSpec::of),
+                WarpAccess.parse(row.getAccess()).orElseThrow(() -> unknown("access", row.getAccess())),
+                row.getPasswordAlgorithm() != null,
+                WarpStatus.parse(row.getStatus()).orElseThrow(() -> unknown("status", row.getStatus())),
+                WarpCost.of(row.getPriceAmount(), row.getPriceCurrency()),
+                WarpEarnings.of(row.getEarnedAmount(), row.getEarnedCurrency()),
+                RatingSummary.of(
+                        row.getRatingSum(), row.getRatingCount(), row.getRatingAverage(), row.getRatingScore()),
+                new VisitSummary(row.getVisitCount(), row.getUniqueVisitors()),
+                row.getFavouriteCount(),
+                sponsorship(row),
+                rent(row),
+                effects(row),
+                timing(row),
+                Instant.ofEpochMilli(row.getCreatedAt()),
+                Instant.ofEpochMilli(row.getUpdatedAt()));
     }
 
-    /** Populate a {@link PlayerWarpsRecord} from a domain {@link PlayerWarp} for an upsert. */
+    /**
+     * Populate {@code record} from {@code warp} for an insert or update — every column <em>except</em> the surrogate
+     * {@code id} (the repository owns that: it stamps a fresh id on insert and uses it as the update key) and the
+     * three {@code password_*} columns (never carried on the aggregate; see the class note).
+     */
     static void apply(PlayerWarpsRecord record, PlayerWarp warp) {
+        applyIdentityAndLocation(record, warp);
+        applyPresentation(record, warp);
+        applyMoneyAndRollups(record, warp);
+        applyFacetsAndTimestamps(record, warp);
+    }
+
+    private static void applyIdentityAndLocation(PlayerWarpsRecord record, PlayerWarp warp) {
         Position location = warp.location();
-        record.setOwner(warp.owner().uuid().toString())
-                .setName(warp.name().value())
+        record.setName(warp.name().value())
+                .setOwner(warp.owner().uuid().toString())
+                .setOwnerName(warp.ownerName())
+                .setServerId(warp.serverId().orElse(null))
                 .setWorld(location.world().uid().toString())
                 .setWorldName(location.world().name())
                 .setX(location.x())
                 .setY(location.y())
                 .setZ(location.z())
                 .setYaw(location.yaw())
-                .setPitch(location.pitch())
-                .setIsPublic(warp.isPublic() ? PUBLIC : 0)
+                .setPitch(location.pitch());
+    }
+
+    private static void applyPresentation(PlayerWarpsRecord record, PlayerWarp warp) {
+        record.setDisplayName(warp.displayName().map(DisplayName::value).orElse(null))
+                .setCategoryId(warp.categoryId().orElse(null))
+                .setDescription(warp.description().map(WarpDescription::value).orElse(null))
+                .setIcon(warp.icon().map(IconSpec::value).orElse(null))
+                .setAccess(warp.access().name())
+                .setStatus(warp.status().name());
+    }
+
+    private static void applyMoneyAndRollups(PlayerWarpsRecord record, PlayerWarp warp) {
+        RatingSummary ratings = warp.ratings();
+        VisitSummary visits = warp.visits();
+        record.setPriceAmount(warp.price().amount())
+                .setPriceCurrency(warp.price().currencyId())
+                .setEarnedAmount(warp.earnings().amount())
+                .setEarnedCurrency(warp.earnings().currencyId())
+                .setRatingSum(ratings.sum())
+                .setRatingCount(ratings.count())
+                .setRatingAverage(ratings.average())
+                .setRatingScore(ratings.score())
+                .setVisitCount(visits.count())
+                .setUniqueVisitors(visits.uniqueVisitors())
+                .setFavouriteCount(warp.favouriteCount());
+    }
+
+    private static void applyFacetsAndTimestamps(PlayerWarpsRecord record, PlayerWarp warp) {
+        WarpEffects effects = warp.effects();
+        WarpTimingOverrides timing = warp.timing();
+        record.setSponsoredUntil(warp.sponsorship()
+                        .map(s -> s.activeUntil().toEpochMilli())
+                        .orElse(null))
+                .setSponsorSlot(warp.sponsorship().map(Sponsorship::slot).orElse(null))
+                .setRentPaidUntil(
+                        warp.rent().map(r -> r.paidUntil().toEpochMilli()).orElse(null))
+                .setRentSuspendedAt(millisOrNull(warp.rent().flatMap(RentState::suspendedAt)))
+                .setRentArchiveAfter(millisOrNull(warp.rent().flatMap(RentState::archiveAfter)))
+                .setWarmupSeconds(timing.warmupSeconds().orElse(null))
+                .setCooldownSeconds(timing.cooldownSeconds().orElse(null))
+                .setDepartureSound(effects.departureSound().orElse(null))
+                .setArrivalSound(effects.arrivalSound().orElse(null))
+                .setDepartureParticle(effects.departureParticle().orElse(null))
+                .setArrivalParticle(effects.arrivalParticle().orElse(null))
                 .setCreatedAt(warp.createdAt().toEpochMilli())
-                .setVisitors(warp.visitors())
-                .setPassword(warp.password().orElse(null))
-                .setIsLocked(warp.isLocked() ? 1 : 0)
-                .setWelcomeMessage(serializeWelcomeMessages(warp.welcomeMessages()))
-                .setWelcomeMessageType(warp.welcomeMessages().isEmpty() ? "CHAT" : "JSON")
-                .setDepartureSound(warp.departureSound().orElse(null))
-                .setArrivalSound(warp.arrivalSound().orElse(null))
-                .setDepartureParticle(warp.departureParticle().orElse(null))
-                .setArrivalParticle(warp.arrivalParticle().orElse(null))
-                .setWarmupSeconds(warp.warmupOverrideSeconds().orElse(null))
-                .setCooldownSeconds(warp.cooldownOverrideSeconds().orElse(null))
-                .setIconMaterial(warp.iconMaterial().orElse(null));
+                .setUpdatedAt(warp.updatedAt().toEpochMilli());
     }
 
-    private static java.util.List<WelcomeMessage> deserializeWelcomeMessages(String welcomeMessage, String type) {
-        if (welcomeMessage == null || welcomeMessage.isBlank()) {
-            return java.util.List.of();
-        }
-        if (welcomeMessage.startsWith("[")) {
-            try {
-                java.util.List<WelcomeMessage> list = GSON.fromJson(welcomeMessage, WELCOME_MESSAGES_TYPE);
-                if (list != null) {
-                    return list;
-                }
-            } catch (Exception e) {
-                // fallback if JSON is invalid
-            }
-        }
-        String messageType = type != null ? type : "CHAT";
-        return java.util.List.of(new WelcomeMessage(welcomeMessage, messageType));
+    private static Position position(PlayerWarpsRecord row) {
+        WorldRef world = new WorldRef(UUID.fromString(row.getWorld()), row.getWorldName());
+        return new Position(world, row.getX(), row.getY(), row.getZ(), row.getYaw(), row.getPitch());
     }
 
-    private static @org.jspecify.annotations.Nullable String serializeWelcomeMessages(
-            java.util.List<WelcomeMessage> messages) {
-        if (messages == null || messages.isEmpty()) {
-            return null;
+    private static Optional<Sponsorship> sponsorship(PlayerWarpsRecord row) {
+        Long until = row.getSponsoredUntil();
+        if (until == null) {
+            return Optional.empty();
         }
-        return GSON.toJson(messages);
+        Integer slot = row.getSponsorSlot();
+        return Optional.of(new Sponsorship(Instant.ofEpochMilli(until), slot == null ? 0 : slot));
+    }
+
+    private static Optional<RentState> rent(PlayerWarpsRecord row) {
+        Long paidUntil = row.getRentPaidUntil();
+        if (paidUntil == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new RentState(
+                Instant.ofEpochMilli(paidUntil),
+                instant(row.getRentSuspendedAt()),
+                instant(row.getRentArchiveAfter())));
+    }
+
+    private static WarpEffects effects(PlayerWarpsRecord row) {
+        return new WarpEffects(
+                Optional.ofNullable(row.getDepartureSound()),
+                Optional.ofNullable(row.getArrivalSound()),
+                Optional.ofNullable(row.getDepartureParticle()),
+                Optional.ofNullable(row.getArrivalParticle()));
+    }
+
+    private static WarpTimingOverrides timing(PlayerWarpsRecord row) {
+        return new WarpTimingOverrides(
+                Optional.ofNullable(row.getWarmupSeconds()), Optional.ofNullable(row.getCooldownSeconds()));
+    }
+
+    private static <T> Optional<T> optional(@Nullable String value, Function<String, T> factory) {
+        return value == null ? Optional.empty() : Optional.of(factory.apply(value));
+    }
+
+    private static Optional<Instant> instant(@Nullable Long millis) {
+        return millis == null ? Optional.empty() : Optional.of(Instant.ofEpochMilli(millis));
+    }
+
+    private static @Nullable Long millisOrNull(Optional<Instant> instant) {
+        return instant.map(Instant::toEpochMilli).orElse(null);
+    }
+
+    private static IllegalStateException unknown(String field, String value) {
+        return new IllegalStateException("unrecognised player warp " + field + " token in storage: " + value);
     }
 }

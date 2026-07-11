@@ -12,21 +12,28 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.NullMarked;
 
 /**
- * A Caffeine read-cache decorator over a delegate {@link PlayerWarpRepository}, keyed by owner uuid. A load
- * misses through to the database once and is served from memory until a write to that owner invalidates the
- * entry — write-through at the delegate, invalidate here, never a write-back cache that could lose a mutation.
- * The durable source of truth is always the delegate; this only spares repeated reads of a hot owner's small
- * set.
+ * A Caffeine read-cache decorator over a delegate {@link PlayerWarpRepository}, keyed by owner uuid. The cached
+ * value is a hot owner's whole warp set as an ordered name → warp map, loaded once on a miss and served from memory
+ * until a write to that owner invalidates it — write-through at the delegate, invalidate here, never a write-back
+ * cache that could lose a mutation. The delegate stays the durable source of truth; this only spares repeated reads
+ * of the same owner's small set.
  *
- * <p>The cached value is the whole owner set as an ordered name → warp map, so a {@code /pwarp} that resolves
- * a name, the {@code /setpwarp} count and exists checks, and the {@code /pwarps} list all share one cached
- * read. {@link #count}, {@link #ownedBy}, and {@link #publicOf} are derived from the cached map rather than
- * issuing further queries.
+ * <p>Only the owner-scoped reads are cache-derivable: {@link #ownedBy}, {@link #publicOwnedBy} (filtered from the
+ * cached map), {@link #count} (its size), and {@link #peekOwned} (the tick-thread suggester path, which reads the
+ * cached set on a hit and nothing on a miss without ever loading). Because warp names are now globally unique rather
+ * than owner-scoped, a name is no longer owner-derivable, so {@link #findByName}, {@link #findById},
+ * {@link #existsByName}, and the cross-owner {@link #all} pass straight through to the delegate — teleport
+ * correctness beats a cache hit there.
  */
+@NullMarked
 public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
 
     private static final long DEFAULT_MAX_OWNERS = 10_000L;
@@ -46,10 +53,16 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     @Override
-    public Optional<PlayerWarp> find(PlayerRef owner, PlayerWarpName name) {
-        Objects.requireNonNull(owner, "owner");
+    public Optional<PlayerWarp> findByName(PlayerWarpName name) {
         Objects.requireNonNull(name, "name");
-        return Optional.ofNullable(snapshot(owner).get(name.value()));
+        // A global name is not owner-derivable; go straight to the durable store.
+        return delegate.findByName(name);
+    }
+
+    @Override
+    public Optional<PlayerWarp> findById(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        return delegate.findById(id);
     }
 
     @Override
@@ -59,21 +72,21 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     @Override
-    public List<PlayerWarp> all() {
-        // The cross-owner admin scan is not per-owner cacheable; read it straight from the delegate.
-        return delegate.all();
-    }
-
-    @Override
-    public List<PlayerWarp> publicOf(PlayerRef owner) {
+    public List<PlayerWarp> publicOwnedBy(PlayerRef owner) {
         Objects.requireNonNull(owner, "owner");
         List<PlayerWarp> shown = new ArrayList<>();
         for (PlayerWarp warp : snapshot(owner).values()) {
-            if (warp.isPublic()) {
+            if (warp.status() == WarpStatus.ACTIVE && warp.access() == WarpAccess.PUBLIC) {
                 shown.add(warp);
             }
         }
         return List.copyOf(shown);
+    }
+
+    @Override
+    public List<PlayerWarp> all() {
+        // The cross-owner admin scan is not per-owner cacheable; read it straight from the delegate.
+        return delegate.all();
     }
 
     @Override
@@ -83,25 +96,34 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     @Override
-    public boolean exists(PlayerRef owner, PlayerWarpName name) {
-        Objects.requireNonNull(owner, "owner");
+    public boolean existsByName(PlayerWarpName name) {
         Objects.requireNonNull(name, "name");
-        return snapshot(owner).containsKey(name.value());
+        return delegate.existsByName(name);
     }
 
     @Override
-    public void save(PlayerWarp warp) {
+    public PlayerWarpId save(PlayerWarp warp) {
         Objects.requireNonNull(warp, "warp");
-        delegate.save(warp);
+        PlayerWarpId id = delegate.save(warp);
         cache.invalidate(warp.owner().uuid());
+        return id;
     }
 
     @Override
-    public void delete(PlayerRef owner, PlayerWarpName name) {
-        Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(name, "name");
-        delegate.delete(owner, name);
-        cache.invalidate(owner.uuid());
+    public void deleteById(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        // Resolve the owner before the delete so we know which cached owner set to drop; a no-op when the id is gone.
+        Optional<PlayerWarp> existing = delegate.findById(id);
+        delegate.deleteById(id);
+        existing.ifPresent(warp -> cache.invalidate(warp.owner().uuid()));
+    }
+
+    @Override
+    public void recordVisit(PlayerWarpId id) {
+        Objects.requireNonNull(id, "id");
+        // Eventually consistent per the port contract: bump the durable counter but do not invalidate — a cached
+        // owner set drifting by a few visits until its next real write is acceptable and spares a cache churn.
+        delegate.recordVisit(id);
     }
 
     @Override
@@ -110,34 +132,14 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
         return cache.getIfPresent(owner.uuid()).map(byName -> List.copyOf(byName.values()));
     }
 
-    @Override
-    public void recordVisit(PlayerRef owner, PlayerWarpName name) {
-        Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(name, "name");
-        delegate.recordVisit(owner, name);
-        // Drop the local entry so a subsequent read on this server reflects the bumped count; this is a local
-        // refresh only, the bus decorator above us decides whether peers hear about it (it chooses not to).
-        cache.invalidate(owner.uuid());
-    }
-
-    @Override
-    public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {
-        delegate.rate(owner, name, player, rating);
-    }
-
-    @Override
-    public double averageRating(PlayerRef owner, PlayerWarpName name) {
-        return delegate.averageRating(owner, name);
-    }
-
     /** Drop every cached owner; call on a module reload. */
     public void invalidateAll() {
         cache.invalidateAll();
     }
 
     /**
-     * Drop one cached owner so the next read reloads it from the database. Called by the cross-server bus
-     * client when a peer reports this owner's player-warps changed on another backend.
+     * Drop one cached owner so the next read reloads it from the database. Called by the cross-server bus client
+     * when a peer reports this owner's player-warps changed on another backend.
      */
     public void invalidateOwner(UUID owner) {
         cache.invalidate(Objects.requireNonNull(owner, "owner"));
@@ -148,8 +150,8 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     private Map<String, PlayerWarp> loadFresh(UUID ownerUuid) {
-        // The cache key is the owner uuid; the loader needs a PlayerRef, and the delegate only reads the uuid
-        // (the row carries no owner name), so a name placeholder here never reaches a row.
+        // The cache key is the owner uuid; the delegate keys its query on the uuid alone, so the name placeholder on
+        // this PlayerRef never reaches a row.
         Map<String, PlayerWarp> byName = new LinkedHashMap<>();
         for (PlayerWarp warp : delegate.ownedBy(new PlayerRef(ownerUuid, ownerUuid.toString()))) {
             byName.put(warp.name().value(), warp);
