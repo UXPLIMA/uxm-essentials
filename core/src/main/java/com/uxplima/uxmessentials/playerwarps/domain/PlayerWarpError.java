@@ -51,7 +51,13 @@ public enum PlayerWarpError {
     WRONG_PASSWORD(PlayerwarpsMessageKey.PWARP_WRONG_PASSWORD),
 
     /** The warp cannot be created in this world because it is blacklisted. */
-    WORLD_BLACKLISTED(PlayerwarpsMessageKey.PWARP_WORLD_BLACKLISTED);
+    WORLD_BLACKLISTED(PlayerwarpsMessageKey.PWARP_WORLD_BLACKLISTED),
+
+    /** The actor holds no role, or too low a role, to perform this management action on the warp. */
+    NO_PERMISSION(PlayerwarpsMessageKey.PWARP_NO_PERMISSION),
+
+    /** A price currency change was refused because the warp's earnings bank is not empty — withdraw it first. */
+    CURRENCY_LOCKED(PlayerwarpsMessageKey.PWARP_CURRENCY_LOCKED);
 
     private final PlayerwarpsMessageKey messageKey;
 

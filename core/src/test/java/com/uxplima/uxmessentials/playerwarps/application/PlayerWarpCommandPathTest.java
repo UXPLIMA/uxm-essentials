@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
  * persists a warp under its globally-unique name and re-anchors in place, that a name already held by another
  * player is refused, that a set past the resolved per-owner limit is refused, that {@code /pwarp} delegates
  * execution to the teleport context, that the fail-closed access gate lets an owner reach their own private warp
- * but refuses another player until the warp is public, that {@code /pwarp del} removes only the caller's own
+ * but refuses another player until the warp is public, that {@code /pwarp del} archives only the caller's own
  * warp, that {@code /pwarps} lists own warps and only a player's public warps, and that the visibility toggles
  * flip the access axis.
  */
@@ -171,25 +171,33 @@ class PlayerWarpCommandPathTest {
     }
 
     @Test
-    void delPwarpRemovesTheOwnersWarp() {
+    void delPwarpArchivesTheOwnersWarp() {
         setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
 
-        Result<Unit, PlayerWarpError> result =
-                new DelPlayerWarp(repository, notifier, events).delete(alice, PlayerWarpName.of("base"));
+        Result<Unit, PlayerWarpError> result = archive().archive(alice, PlayerWarpName.of("base"));
 
         assertThat(result.isOk()).isTrue();
-        assertThat(repository.existsByName(PlayerWarpName.of("base"))).isFalse();
+        // Archive is recoverable: the row is kept, retired to ARCHIVED, not deleted.
+        assertThat(repository
+                        .findByName(PlayerWarpName.of("base"))
+                        .orElseThrow()
+                        .status())
+                .isEqualTo(WarpStatus.ARCHIVED);
     }
 
     @Test
     void delPwarpOnAnotherPlayersWarpIsRefused() {
         setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
 
-        Result<Unit, PlayerWarpError> result =
-                new DelPlayerWarp(repository, notifier, events).delete(bob, PlayerWarpName.of("base"));
+        Result<Unit, PlayerWarpError> result = archive().archive(bob, PlayerWarpName.of("base"));
 
-        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NOT_FOUND);
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.NO_PERMISSION);
         assertThat(repository.existsByName(PlayerWarpName.of("base"))).isTrue();
+    }
+
+    private ArchivePlayerWarp archive() {
+        return new ArchivePlayerWarp(
+                repository, new WarpAuthorization(new NoMembers()), notifier, events, Clock.system(ZoneOffset.UTC));
     }
 
     @Test

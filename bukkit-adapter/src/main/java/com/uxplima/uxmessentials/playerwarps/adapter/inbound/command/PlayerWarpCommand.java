@@ -25,10 +25,10 @@ import org.jspecify.annotations.NullMarked;
  * {@code /pwarp <name> [owner]}: teleport to a player-warp. With no owner the sender warps to their own warp;
  * with an owner they warp to that player's warp, permitted only when it is public.
  *
- * <p>{@code /pwarp del <name>} removes one of the sender's own warps, freeing its name for reuse — the
- * folded-in counterpart of the visibility/lock/edit subcommands, gated by {@code uxmessentials.pwarp.delete}.
- * The {@link com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp} use case rejects a missing name
- * through the sink.
+ * <p>{@code /pwarp del <name>} archives one of the sender's own warps (recoverable — the name is retired from
+ * listings but the warp survives), the folded-in counterpart of the visibility/lock/edit subcommands, gated by
+ * {@code uxmessentials.pwarp.delete}. The {@link com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp}
+ * use case rejects a missing name through the sink.
  */
 @NullMarked
 public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements CommandRegistration {
@@ -140,8 +140,8 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         }
         PlayerRef who = ref(sender);
         PlayerWarpName name = PlayerWarpName.of(ctx.getArgument("name", String.class));
-        // The delete reads then writes the database; run it off the tick thread.
-        services.scheduler().async(() -> services.delPlayerWarp().delete(who, name));
+        // /pwarp del archives the warp by default (recoverable); it reads then writes, so run it off the tick thread.
+        services.scheduler().async(() -> services.archivePlayerWarp().archive(who, name));
         return Command.SINGLE_SUCCESS;
     }
 

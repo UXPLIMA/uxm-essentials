@@ -15,7 +15,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -32,23 +32,24 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * Pins that warp removal now folds into {@code /pwarp del <name>} (the way {@code /warp del} sits under
- * {@code /warp}) and still drives the {@link DelPlayerWarp} use case with the player's own ref and the typed
- * name. The delete reads then writes the store, so the command hands it to {@link Scheduler#async}; the inline
- * scheduler here runs that task in the same dispatch so the use-case call is observable. The standalone
- * {@code /delpwarp} literal is gone — this guards the replacement keeps the same behaviour under {@code /pwarp}.
+ * {@code /warp}) and drives the {@link ArchivePlayerWarp} use case — archiving by default (recoverable) — with the
+ * player's own ref and the typed name. The archive reads then writes the store, so the command hands it to
+ * {@link Scheduler#async}; the inline scheduler here runs that task in the same dispatch so the use-case call is
+ * observable. The standalone {@code /delpwarp} literal is gone — this guards the replacement keeps the same
+ * command shape under {@code /pwarp}.
  */
 class PlayerWarpDeleteSubcommandTest {
 
     private ServerMock server;
-    private DelPlayerWarp delPlayerWarp;
+    private ArchivePlayerWarp archivePlayerWarp;
     private PlayerWarpServices services;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        delPlayerWarp = mock(DelPlayerWarp.class);
+        archivePlayerWarp = mock(ArchivePlayerWarp.class);
         services = mock(PlayerWarpServices.class);
-        lenient().when(services.delPlayerWarp()).thenReturn(delPlayerWarp);
+        lenient().when(services.archivePlayerWarp()).thenReturn(archivePlayerWarp);
         lenient().when(services.scheduler()).thenReturn(new RunInline());
     }
 
@@ -58,14 +59,14 @@ class PlayerWarpDeleteSubcommandTest {
     }
 
     @Test
-    void pwarpDelDrivesTheDeleteUseCaseWithTheOwnRefAndName() {
+    void pwarpDelDrivesTheArchiveUseCaseWithTheOwnRefAndName() {
         PlayerMock player = server.addPlayer("Alice");
         player.setOp(true); // the /pwarp node gates on a permission; op satisfies use + delete without wiring
 
         dispatch(player, "pwarp del hub");
 
-        verify(delPlayerWarp)
-                .delete(eq(new PlayerRef(player.getUniqueId(), player.getName())), eq(PlayerWarpName.of("hub")));
+        verify(archivePlayerWarp)
+                .archive(eq(new PlayerRef(player.getUniqueId(), player.getName())), eq(PlayerWarpName.of("hub")));
     }
 
     private void dispatch(PlayerMock sender, String input) {

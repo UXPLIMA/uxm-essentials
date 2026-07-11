@@ -19,14 +19,17 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.playerwarps.support.InMemoryPlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.support.NoWarpMembers;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -103,7 +106,12 @@ class PlayerWarpGuiTest {
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(messages, new SilentSink());
         SetPlayerWarpVisibility visibility =
                 new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
-        DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
+        ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(
+                repository,
+                new WarpAuthorization(new NoWarpMembers()),
+                notifier,
+                event -> {},
+                java.time.Clock.systemUTC());
         TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
 
         EntityEditorLayout editorLayout = new EntityEditorLayout(
@@ -120,7 +128,7 @@ class PlayerWarpGuiTest {
                 scheduler,
                 repository,
                 visibility,
-                delPlayerWarp,
+                archivePlayerWarp,
                 textInput,
                 messages,
                 editorLayout,
@@ -221,11 +229,19 @@ class PlayerWarpGuiTest {
         store(viewer, "alpha");
         editorView.open(player, viewer, owned("alpha"));
 
-        fireClick(DELETE_SLOT, ClickType.LEFT); // opens the confirm menu, does not delete
-        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isPresent();
+        fireClick(DELETE_SLOT, ClickType.LEFT); // opens the confirm menu, changes nothing
+        assertThat(repository
+                        .findByName(PlayerWarpName.of("alpha"))
+                        .orElseThrow()
+                        .status())
+                .isEqualTo(WarpStatus.ACTIVE);
 
-        fireClick(CONFIRM_SLOT, ClickType.LEFT); // the confirm button deletes
-        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isEmpty();
+        fireClick(CONFIRM_SLOT, ClickType.LEFT); // the confirm button archives (recoverable, not a hard delete)
+        assertThat(repository
+                        .findByName(PlayerWarpName.of("alpha"))
+                        .orElseThrow()
+                        .status())
+                .isEqualTo(WarpStatus.ARCHIVED);
     }
 
     // --- helpers ---

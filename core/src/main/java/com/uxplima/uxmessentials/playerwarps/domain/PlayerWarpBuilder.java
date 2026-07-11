@@ -19,9 +19,9 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
 final class PlayerWarpBuilder {
 
     private Optional<PlayerWarpId> id;
-    private final PlayerRef owner;
-    private final String ownerName;
-    private final PlayerWarpName name;
+    private PlayerRef owner;
+    private String ownerName;
+    private PlayerWarpName name;
     private Optional<DisplayName> displayName;
     private Position location;
     private final Optional<String> serverId;
@@ -30,8 +30,8 @@ final class PlayerWarpBuilder {
     private Optional<IconSpec> icon;
     private WarpAccess access;
     private final boolean passwordSet;
-    private final WarpStatus status;
-    private final WarpCost price;
+    private WarpStatus status;
+    private WarpCost price;
     private final WarpEarnings earnings;
     private final RatingSummary ratings;
     private final VisitSummary visits;
@@ -73,6 +73,31 @@ final class PlayerWarpBuilder {
 
     PlayerWarpBuilder id(Optional<PlayerWarpId> value) {
         this.id = value;
+        return this;
+    }
+
+    PlayerWarpBuilder owner(PlayerRef value) {
+        this.owner = value;
+        return this;
+    }
+
+    PlayerWarpBuilder ownerName(String value) {
+        this.ownerName = value;
+        return this;
+    }
+
+    PlayerWarpBuilder name(PlayerWarpName value) {
+        this.name = value;
+        return this;
+    }
+
+    PlayerWarpBuilder status(WarpStatus value) {
+        this.status = value;
+        return this;
+    }
+
+    PlayerWarpBuilder price(WarpCost value) {
+        this.price = value;
         return this;
     }
 

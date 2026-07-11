@@ -173,6 +173,46 @@ public record PlayerWarp(
         return toBuilder().categoryId(newCategoryId).updatedAt(now).build();
     }
 
+    /** A copy with the entry price (and its currency) swapped, stamping {@code now} as the edit time. */
+    public PlayerWarp withPrice(WarpCost newPrice, Instant now) {
+        Objects.requireNonNull(newPrice, "newPrice");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().price(newPrice).updatedAt(now).build();
+    }
+
+    /** A copy moved to a different lifecycle {@link WarpStatus}, stamping {@code now} as the edit time. */
+    public PlayerWarp withStatus(WarpStatus newStatus, Instant now) {
+        Objects.requireNonNull(newStatus, "newStatus");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().status(newStatus).updatedAt(now).build();
+    }
+
+    /**
+     * A copy addressed by a different globally-unique {@link PlayerWarpName}, stamping {@code now} as the edit
+     * time. The surrogate id is unchanged, so this renames the same row in place rather than creating a new warp.
+     */
+    public PlayerWarp renamed(PlayerWarpName newName, Instant now) {
+        Objects.requireNonNull(newName, "newName");
+        Objects.requireNonNull(now, "now");
+        return toBuilder().name(newName).updatedAt(now).build();
+    }
+
+    /**
+     * A copy handed to a new owner, stamping {@code now} as the edit time. Only the owner identity and the cached
+     * {@code ownerName} change: the members, whitelist, bans, accrued earnings, ratings, and visits all stay with
+     * the warp, so a transfer moves stewardship without resetting the warp's history.
+     */
+    public PlayerWarp transferredTo(PlayerRef newOwner, String newOwnerName, Instant now) {
+        Objects.requireNonNull(newOwner, "newOwner");
+        Objects.requireNonNull(newOwnerName, "newOwnerName");
+        Objects.requireNonNull(now, "now");
+        return toBuilder()
+                .owner(newOwner)
+                .ownerName(newOwnerName)
+                .updatedAt(now)
+                .build();
+    }
+
     /**
      * A copy carrying the surrogate id the repository assigned on insert. This is an identity assignment, not a
      * field edit, so it deliberately does not bump {@link #updatedAt}: the warp is the same warp, now addressable

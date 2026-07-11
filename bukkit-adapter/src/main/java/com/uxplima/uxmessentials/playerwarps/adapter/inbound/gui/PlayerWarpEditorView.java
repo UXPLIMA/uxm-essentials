@@ -13,7 +13,7 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
@@ -50,8 +50,9 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Most fields are immutable {@code with*} transitions on the {@link PlayerWarp} aggregate persisted through
  * {@code repository.save}; visibility flows through {@link SetPlayerWarpVisibility} (the same use case the
- * {@code /pwarp public|private} subcommands call), move-here re-anchors at the operator's feet, and delete runs
- * {@link DelPlayerWarp} behind the framework's confirm gate.
+ * {@code /pwarp public|private} subcommands call), move-here re-anchors at the operator's feet, and delete
+ * archives the warp through {@link ArchivePlayerWarp} behind the framework's confirm gate (recoverable — the row
+ * is retired, not dropped).
  */
 @NullMarked
 public final class PlayerWarpEditorView {
@@ -76,7 +77,7 @@ public final class PlayerWarpEditorView {
             Scheduler scheduler,
             PlayerWarpRepository repository,
             SetPlayerWarpVisibility visibility,
-            DelPlayerWarp delPlayerWarp,
+            ArchivePlayerWarp archivePlayerWarp,
             TextInput textInput,
             Messages messages,
             EntityEditorLayout layout,
@@ -87,7 +88,7 @@ public final class PlayerWarpEditorView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
-        Objects.requireNonNull(delPlayerWarp, "delPlayerWarp");
+        Objects.requireNonNull(archivePlayerWarp, "archivePlayerWarp");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sub = Objects.requireNonNull(sub, "sub");
@@ -106,8 +107,8 @@ public final class PlayerWarpEditorView {
                 .onDelete(
                         PlayerwarpsMessageKey.PWARP_GUI_EDITOR_DELETE,
                         PlayerwarpsMessageKey.PWARP_GUI_EDITOR_DELETE_CONFIRM,
-                        (player, owned) ->
-                                delPlayerWarp.delete(owned.owner(), owned.warp().name()))
+                        (player, owned) -> archivePlayerWarp.archive(
+                                owned.owner(), owned.warp().name()))
                 .build();
     }
 

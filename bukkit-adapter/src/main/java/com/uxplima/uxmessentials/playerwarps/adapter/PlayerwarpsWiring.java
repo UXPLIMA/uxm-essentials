@@ -24,7 +24,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEdito
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
@@ -32,9 +32,11 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
+import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -134,6 +136,10 @@ public final class PlayerwarpsWiring {
         // empty and a priced warp teleports for free (the WarpEconomy soft-coupling precedent).
         Optional<PlayerWarpEconomy> economy =
                 playerWarpEconomy(ctx, persistence, kernel, economyProvider, economyCurrencies, economyBackends);
+        // The member store backs both the ordered access gate (a member reaches a private warp) and the management
+        // authorization (a member's role decides which edit verbs they may run), so it is built once and shared.
+        WarpMemberStore memberStore = PlayerWarpRepositories.memberStore(persistence, kernel.log());
+        WarpAuthorization warpAuthorization = new WarpAuthorization(memberStore);
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
@@ -141,7 +147,7 @@ public final class PlayerwarpsWiring {
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
                 kernel.permissions(),
                 PlayerWarpRepositories.banStore(persistence),
-                PlayerWarpRepositories.memberStore(persistence, kernel.log()),
+                memberStore,
                 PlayerWarpRepositories.whitelistStore(persistence, Clock.systemUTC()),
                 PlayerWarpRepositories.passwordStore(persistence),
                 kernel.cooldowns(),
@@ -162,7 +168,8 @@ public final class PlayerwarpsWiring {
                 kernel.events(),
                 Clock.systemUTC(),
                 ctx.config().getStringList("world-blacklist", List.of()));
-        DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, kernel.events());
+        ArchivePlayerWarp archivePlayerWarp =
+                new ArchivePlayerWarp(repository, warpAuthorization, notifier, kernel.events(), Clock.systemUTC());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier, Clock.systemUTC());
         PlayerWarpListMenu listMenu = buildGui(
                 plugin,
@@ -170,7 +177,7 @@ public final class PlayerwarpsWiring {
                 repository,
                 setPlayerWarp,
                 visibility,
-                delPlayerWarp,
+                archivePlayerWarp,
                 guiText,
                 guiLayouts,
                 textInput,
@@ -187,7 +194,7 @@ public final class PlayerwarpsWiring {
                 repository,
                 usePlayerWarp,
                 setPlayerWarp,
-                delPlayerWarp,
+                archivePlayerWarp,
                 visibility,
                 notifier,
                 editorView,
@@ -293,7 +300,7 @@ public final class PlayerwarpsWiring {
             PlayerWarpRepository repository,
             SetPlayerWarp setPlayerWarp,
             SetPlayerWarpVisibility visibility,
-            DelPlayerWarp delPlayerWarp,
+            ArchivePlayerWarp archivePlayerWarp,
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
@@ -309,7 +316,7 @@ public final class PlayerwarpsWiring {
                 kernel.scheduler(),
                 repository,
                 visibility,
-                delPlayerWarp,
+                archivePlayerWarp,
                 textInput,
                 kernel.messages(),
                 editorLayout,
@@ -352,7 +359,7 @@ public final class PlayerwarpsWiring {
             PlayerWarpRepository repository,
             UsePlayerWarp usePlayerWarp,
             SetPlayerWarp setPlayerWarp,
-            DelPlayerWarp delPlayerWarp,
+            ArchivePlayerWarp archivePlayerWarp,
             SetPlayerWarpVisibility visibility,
             PlayerWarpNotifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
@@ -360,7 +367,7 @@ public final class PlayerwarpsWiring {
             PlayerWarpListMenu listMenu) {
         return new PlayerWarpServices(
                 setPlayerWarp,
-                delPlayerWarp,
+                archivePlayerWarp,
                 usePlayerWarp,
                 new ListPlayerWarps(repository, notifier),
                 visibility,

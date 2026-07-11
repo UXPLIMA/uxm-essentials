@@ -57,6 +57,20 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_RATING("pwarp.rating"),
     PWARP_RATING_INVALID("pwarp.rating-invalid"),
 
+    // management edits — role-gated single-warp verbs
+    PWARP_NO_PERMISSION("pwarp.no-permission"),
+    PWARP_CURRENCY_LOCKED("pwarp.currency-locked"),
+    PWARP_DISPLAY_NAME_SET("pwarp.display-name-set"),
+    PWARP_DESCRIPTION_SET("pwarp.description-set"),
+    PWARP_ICON_SET("pwarp.icon-set"),
+    PWARP_CATEGORY_SET("pwarp.category-set"),
+    PWARP_ACCESS_SET("pwarp.access-set"),
+    PWARP_PRICE_SET("pwarp.price-set"),
+    PWARP_RENAMED("pwarp.renamed"),
+    PWARP_TRANSFERRED("pwarp.transferred"),
+    PWARP_ARCHIVED("pwarp.archived"),
+    PWARP_RESTORED("pwarp.restored"),
+
     // management GUI — list
     PWARP_GUI_LIST_TITLE("pwarp.gui.list.title"),
     PWARP_GUI_LIST_ENTRY_NAME("pwarp.gui.list.entry-name"),

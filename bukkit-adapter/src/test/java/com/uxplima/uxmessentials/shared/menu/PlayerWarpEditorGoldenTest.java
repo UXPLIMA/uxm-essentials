@@ -26,13 +26,16 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.OwnedWarp;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.playerwarps.support.InMemoryPlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.support.NoWarpMembers;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -74,7 +77,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * <p>Two real clicks through the engine's own {@link MenuListener} then prove the child pickers and the delete gate
  * are engine-native on this path: clicking the visibility (enum) slot opens an engine selector child (a selector
  * {@link MenuHolder}, not a uxmLib {@code SimpleGui}), and clicking the delete button opens an engine confirm child (a
- * confirm {@link MenuHolder}) whose yes button runs the same {@link DelPlayerWarp} use case the {@code /pwarp del}
+ * confirm {@link MenuHolder}) whose yes button runs the same {@link ArchivePlayerWarp} use case the {@code /pwarp del}
  * command drives — recorded here through the repository.
  */
 class PlayerWarpEditorGoldenTest {
@@ -113,7 +116,12 @@ class PlayerWarpEditorGoldenTest {
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(messages, new SilentSink());
         SetPlayerWarpVisibility visibility =
                 new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
-        DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
+        ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(
+                repository,
+                new WarpAuthorization(new NoWarpMembers()),
+                notifier,
+                event -> {},
+                java.time.Clock.systemUTC());
         TextInput textInput =
                 TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         EntityEditorLayout layout = new EntityEditorLayout(
@@ -130,7 +138,7 @@ class PlayerWarpEditorGoldenTest {
                 scheduler,
                 repository,
                 visibility,
-                delPlayerWarp,
+                archivePlayerWarp,
                 textInput,
                 messages,
                 layout,
@@ -184,19 +192,28 @@ class PlayerWarpEditorGoldenTest {
     }
 
     @Test
-    void deleteButtonOpensTheEngineConfirmAndConfirmYesRunsDelete() {
+    void deleteButtonOpensTheEngineConfirmAndConfirmYesArchives() {
         store("alpha");
         editorView.open(player, viewer, owned("alpha"));
 
-        fireClick(DELETE_SLOT, ClickType.LEFT); // opens the engine confirm window, deletes nothing yet
+        fireClick(DELETE_SLOT, ClickType.LEFT); // opens the engine confirm window, changes nothing yet
         Inventory confirm = player.getOpenInventory().getTopInventory();
         assertThat(confirm.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(((MenuHolder) confirm.getHolder()).confirm()).isPresent(); // a confirm holder, not the editor
-        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isPresent(); // still present until confirmed
+        assertThat(repository
+                        .findByName(PlayerWarpName.of("alpha"))
+                        .orElseThrow()
+                        .status())
+                .isEqualTo(WarpStatus.ACTIVE); // still active until confirmed
 
-        fireClick(ConfirmRenderer.YES_SLOT, ClickType.LEFT); // confirm runs the same DelPlayerWarp use case
+        fireClick(ConfirmRenderer.YES_SLOT, ClickType.LEFT); // confirm runs ArchivePlayerWarp (recoverable archive)
 
-        assertThat(repository.findByName(PlayerWarpName.of("alpha"))).isEmpty();
+        // Delete archives by default: the row is retired to ARCHIVED, not dropped, so it can be restored.
+        assertThat(repository
+                        .findByName(PlayerWarpName.of("alpha"))
+                        .orElseThrow()
+                        .status())
+                .isEqualTo(WarpStatus.ARCHIVED);
     }
 
     /**

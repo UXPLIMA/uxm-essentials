@@ -27,15 +27,17 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.support.InMemoryPlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.support.NoWarpMembers;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -232,7 +234,12 @@ class PlayerWarpListGoldenTest {
                 List.of());
         SetPlayerWarpVisibility visibility =
                 new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
-        DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
+        ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(
+                repository,
+                new WarpAuthorization(new NoWarpMembers()),
+                notifier,
+                event -> {},
+                java.time.Clock.systemUTC());
         EntityEditorLayout editorLayout = new EntityEditorLayout(
                 6,
                 List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22),
@@ -247,7 +254,7 @@ class PlayerWarpListGoldenTest {
                 scheduler,
                 repository,
                 visibility,
-                delPlayerWarp,
+                archivePlayerWarp,
                 textInput,
                 messages,
                 editorLayout,

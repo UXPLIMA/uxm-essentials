@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * adapter-side runtime state, so there is nothing here to drain on stop beyond dropping this holder.
  *
  * @param setPlayerWarp {@code /setpwarp}
- * @param delPlayerWarp {@code /pwarp del}
+ * @param archivePlayerWarp {@code /pwarp del} (archive by default; the admin hard-delete path lives here too)
  * @param usePlayerWarp {@code /pwarp <name> [owner]}
  * @param listPlayerWarps {@code /pwarps [player]}
  * @param visibility {@code /pwarp public|private <name>}
@@ -40,7 +40,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public record PlayerWarpServices(
         SetPlayerWarp setPlayerWarp,
-        DelPlayerWarp delPlayerWarp,
+        ArchivePlayerWarp archivePlayerWarp,
         UsePlayerWarp usePlayerWarp,
         ListPlayerWarps listPlayerWarps,
         SetPlayerWarpVisibility visibility,
@@ -52,7 +52,7 @@ public record PlayerWarpServices(
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
-        Objects.requireNonNull(delPlayerWarp, "delPlayerWarp");
+        Objects.requireNonNull(archivePlayerWarp, "archivePlayerWarp");
         Objects.requireNonNull(usePlayerWarp, "usePlayerWarp");
         Objects.requireNonNull(listPlayerWarps, "listPlayerWarps");
         Objects.requireNonNull(visibility, "visibility");

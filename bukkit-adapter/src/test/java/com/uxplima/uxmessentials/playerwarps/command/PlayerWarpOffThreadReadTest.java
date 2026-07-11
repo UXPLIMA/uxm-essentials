@@ -19,13 +19,14 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpC
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
-import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
@@ -155,12 +156,13 @@ class PlayerWarpOffThreadReadTest {
                 event -> {},
                 java.time.Clock.systemUTC(),
                 List.of());
-        DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
+        ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(
+                repository, new WarpAuthorization(new NoMembers()), notifier, event -> {}, java.time.Clock.systemUTC());
         SetPlayerWarpVisibility visibility =
                 new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
         return new PlayerWarpServices(
                 setPlayerWarp,
-                delPlayerWarp,
+                archivePlayerWarp,
                 new UsePlayerWarp(
                         repository,
                         new NoTeleport(),
@@ -180,7 +182,7 @@ class PlayerWarpOffThreadReadTest {
                 repository,
                 null,
                 scheduler,
-                listView(messages, permissions, setPlayerWarp, visibility, delPlayerWarp));
+                listView(messages, permissions, setPlayerWarp, visibility, archivePlayerWarp));
     }
 
     /** A minimal real management list (this test does not open it; it only needs a non-null view in services). */
@@ -189,7 +191,7 @@ class PlayerWarpOffThreadReadTest {
             Permissions permissions,
             SetPlayerWarp setPlayerWarp,
             SetPlayerWarpVisibility visibility,
-            DelPlayerWarp delPlayerWarp) {
+            ArchivePlayerWarp archivePlayerWarp) {
         GuiText guiText = new GuiText(messages);
         TextInput textInput =
                 TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
@@ -211,7 +213,7 @@ class PlayerWarpOffThreadReadTest {
                 scheduler,
                 repository,
                 visibility,
-                delPlayerWarp,
+                archivePlayerWarp,
                 textInput,
                 messages,
                 editorLayout,
