@@ -88,14 +88,15 @@ class AutoDropsListenerTest {
     void autoSmeltYieldsTheSmeltedOutputAndComposesWithPickup() {
         Block ore = blockWithDrops(Material.IRON_ORE, new ItemStack(Material.RAW_IRON, 2));
         AutoDropsListener listener = new AutoDropsListener(
-                true,
-                false,
-                true,
-                new SmeltMap(Map.of("RAW_IRON", "IRON_INGOT")),
-                false,
-                new SellPrices(Map.of()),
-                Optional.empty(),
-                toggles);
+                new AutoDropsPipeline(
+                        true,
+                        true,
+                        new SmeltMap(Map.of("RAW_IRON", "IRON_INGOT")),
+                        false,
+                        new SellPrices(Map.of()),
+                        Optional.empty(),
+                        toggles),
+                false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
 
@@ -108,14 +109,15 @@ class AutoDropsListenerTest {
     void autoSmeltDropsTheSmeltedOutputOnTheGroundWithoutPickup() {
         Block ore = blockWithDrops(Material.IRON_ORE, new ItemStack(Material.RAW_IRON, 1));
         AutoDropsListener listener = new AutoDropsListener(
-                false,
-                false,
-                true,
-                new SmeltMap(Map.of("RAW_IRON", "IRON_INGOT")),
-                false,
-                new SellPrices(Map.of()),
-                Optional.empty(),
-                toggles);
+                new AutoDropsPipeline(
+                        false,
+                        true,
+                        new SmeltMap(Map.of("RAW_IRON", "IRON_INGOT")),
+                        false,
+                        new SellPrices(Map.of()),
+                        Optional.empty(),
+                        toggles),
+                false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
 
@@ -128,14 +130,15 @@ class AutoDropsListenerTest {
         Block ore = blockWithDrops(Material.DIAMOND_ORE, new ItemStack(Material.DIAMOND, 2));
         RecordingSales sales = new RecordingSales(true);
         AutoDropsListener listener = new AutoDropsListener(
-                true,
-                false,
-                false,
-                new SmeltMap(Map.of()),
-                true,
-                new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
-                Optional.of(sales),
-                toggles);
+                new AutoDropsPipeline(
+                        true,
+                        false,
+                        new SmeltMap(Map.of()),
+                        true,
+                        new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
+                        Optional.of(sales),
+                        toggles),
+                false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
 
@@ -149,14 +152,15 @@ class AutoDropsListenerTest {
     void autoSellIsInertWithoutAnEconomyProvider() {
         Block ore = blockWithDrops(Material.DIAMOND_ORE, new ItemStack(Material.DIAMOND, 2));
         AutoDropsListener listener = new AutoDropsListener(
-                true,
-                false,
-                false,
-                new SmeltMap(Map.of()),
-                true,
-                new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
-                Optional.empty(),
-                toggles);
+                new AutoDropsPipeline(
+                        true,
+                        false,
+                        new SmeltMap(Map.of()),
+                        true,
+                        new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
+                        Optional.empty(),
+                        toggles),
+                false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
 
@@ -168,7 +172,15 @@ class AutoDropsListenerTest {
 
     private AutoDropsListener pickupOnly() {
         return new AutoDropsListener(
-                true, false, false, new SmeltMap(Map.of()), false, new SellPrices(Map.of()), Optional.empty(), toggles);
+                new AutoDropsPipeline(
+                        true,
+                        false,
+                        new SmeltMap(Map.of()),
+                        false,
+                        new SellPrices(Map.of()),
+                        Optional.empty(),
+                        toggles),
+                false);
     }
 
     private Block blockWithDrops(Material type, ItemStack... drops) {

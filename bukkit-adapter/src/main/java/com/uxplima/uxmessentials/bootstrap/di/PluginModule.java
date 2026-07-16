@@ -950,11 +950,17 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("poses"))) {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
         } else if (module.id().equals(ModuleId.of("survival"))) {
-            wireSurvival(ctx, resources, links);
+            wireSurvival(plugin, ctx, resources, links, guiLayouts, menus);
         }
     }
 
-    private static void wireSurvival(ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+    private static void wireSurvival(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            Menus menus) {
         // survival persists nothing: the per-player mechanic toggles are transient PDC stamps and the config is
         // read once into an immutable snapshot. Each mechanic wires only when its config gate is on, so a disabled
         // tree-feller or veinminer contributes no command and no listener. Its one cross-context collaborator is the
@@ -966,7 +972,7 @@ public final class PluginModule {
         Optional<SurvivalSales> sales = provider != null && currency != null
                 ? Optional.of(new ProviderSurvivalSales(provider, currency))
                 : Optional.empty();
-        SurvivalWiring.Wired wired = SurvivalWiring.wire(ctx, sales);
+        SurvivalWiring.Wired wired = SurvivalWiring.wire(ctx, sales, guiLayouts, menus, plugin.getServer());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }

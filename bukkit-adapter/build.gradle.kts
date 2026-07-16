@@ -165,9 +165,12 @@ dependencies {
 }
 
 tasks.processResources {
-    val props = mapOf("version" to project.version)
-    inputs.properties(props)
-    filesMatching("paper-plugin.yml") { expand(props) }
+    val version = project.version.toString()
+    inputs.property("version", version)
+    // paper-plugin.yml carries a single ${version} token. Substitute it with a line-based filter rather than expand():
+    // expand() compiles the whole file into one Groovy template string, whose 65535-char literal ceiling the growing
+    // permission block eventually blows, failing the copy. A per-line replace has no such limit and needs no template.
+    filesMatching("paper-plugin.yml") { filter { line -> line.replace("\${version}", version) } }
     // Fold the message catalogs into the runtime jar. The messages source set has its own
     // resources output that is also on the runtime classpath, so the same catalog file can arrive
     // from both inputs; keep the folded copy.

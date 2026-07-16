@@ -10,10 +10,14 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.bukkit.Material;
+import org.bukkit.Server;
 import org.bukkit.entity.EntityType;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -22,10 +26,13 @@ import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoSellComman
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoSmeltCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoToolCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.FarmProtectCommand;
+import com.uxplima.uxmessentials.survival.adapter.inbound.command.SurvivalCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.TreeFellerCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.VeinminerCommand;
+import com.uxplima.uxmessentials.survival.adapter.inbound.gui.SurvivalSettingsView;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AnvilUnlockListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AutoDropsListener;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AutoDropsPipeline;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AutoToolListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmAssistListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmProtectListener;
@@ -71,24 +78,47 @@ public final class SurvivalWiring {
      * @param ctx the module context carrying the scoped config and kernel ports
      * @param sales the economy seam auto-sell credits through, empty when no economy provider is wired (auto-sell is
      *     then inert)
+     * @param guiLayouts the operator-editable GUI layout loader the {@code /survival} panel reads its geometry from
+     * @param menus the menu engine the {@code /survival} panel opens through
+     * @param server the server the panel resolves the viewer's live {@code Player} from to read their PDC toggles
      */
-    public static Wired wire(ModuleContext ctx, Optional<SurvivalSales> sales) {
+    public static Wired wire(
+            ModuleContext ctx, Optional<SurvivalSales> sales, GuiLayouts guiLayouts, Menus menus, Server server) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(sales, "sales");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(server, "server");
         KernelPorts kernel = ctx.kernel();
         SurvivalConfig config = SurvivalConfig.from(ctx.config());
         PdcSurvivalToggles toggles = new PdcSurvivalToggles();
+        // The break-drop pipeline (auto-pickup / smelt / sell) is built once when at least one of its stages is on, so
+        // the AutoDropsListener and the tree-feller / veinminer cascades all route through the same transform; it is
+        // null when every stage is off, and then the cascades drop naturally on the ground.
+        @Nullable AutoDropsPipeline autoDrops = autoDropsPipeline(config, sales, toggles);
 
         List<CommandRegistration> commands = new ArrayList<>();
         List<Listener> listeners = new ArrayList<>();
+        commands.add(new SurvivalCommand(
+                new SurvivalSettingsView(
+                        new GuiText(kernel.messages()),
+                        kernel.scheduler(),
+                        guiLayouts,
+                        kernel.messages(),
+                        kernel.permissions(),
+                        menus,
+                        server,
+                        toggles,
+                        config),
+                kernel.messages()));
         if (config.treeFeller().enabled()) {
             commands.add(new TreeFellerCommand(toggles, kernel.messages()));
-            listeners.add(new TreeFellerListener(config.treeFeller(), toggles, kernel.scheduler()));
+            listeners.add(new TreeFellerListener(config.treeFeller(), toggles, kernel.scheduler(), autoDrops));
         }
         if (config.veinminer().enabled()) {
             commands.add(new VeinminerCommand(toggles, kernel.messages()));
             Set<Material> triggers = triggerMaterials(config.veinminer(), kernel.log());
-            listeners.add(new VeinminerListener(config.veinminer(), triggers, toggles));
+            listeners.add(new VeinminerListener(config.veinminer(), triggers, toggles, autoDrops));
         }
         if (config.leafDecay().enabled()) {
             listeners.add(new FastLeafDecayListener(config.leafDecay(), kernel.scheduler()));
@@ -117,21 +147,44 @@ public final class SurvivalWiring {
                     mobChances(config.headDrop(), kernel.log()),
                     new ThreadLocalRandomSource()));
         }
-        wireAutos(config, toggles, sales, kernel, commands, listeners);
+        wireAutos(config, toggles, autoDrops, kernel, commands, listeners);
         return new Wired(commands, listeners);
+    }
+
+    /**
+     * The composed break-drop pipeline (auto-pickup → smelt → sell), built once when at least one of the three stages
+     * is enabled and shared by the {@link AutoDropsListener} and the harvesting cascades so a felled trunk or a mined
+     * vein is routed exactly like the block broken by hand. Returns {@code null} when all three are off — the cascades
+     * then fall back to a plain ground-dropping break.
+     */
+    private static @Nullable AutoDropsPipeline autoDropsPipeline(
+            SurvivalConfig config, Optional<SurvivalSales> sales, PdcSurvivalToggles toggles) {
+        if (!config.autoPickup().enabled()
+                && !config.autoSmelt().enabled()
+                && !config.autoSell().enabled()) {
+            return null;
+        }
+        return new AutoDropsPipeline(
+                config.autoPickup().enabled(),
+                config.autoSmelt().enabled(),
+                new SmeltMap(config.autoSmelt().smelt()),
+                config.autoSell().enabled(),
+                new SellPrices(config.autoSell().prices()),
+                sales,
+                toggles);
     }
 
     /**
      * Wire the four auto-* mechanics: the {@code /autopickup}, {@code /autosmelt}, {@code /autosell}, {@code /autotool}
      * toggle commands (each present only when its mechanic is enabled) plus the two listeners. The break-drop trio
-     * (pickup, smelt, sell) share a single {@link AutoDropsListener} because they all act on the same block-break
-     * drops; it registers when at least one of them is on, gating each stage internally. Auto-tool is an independent
-     * listener on a different event.
+     * (pickup, smelt, sell) share a single {@link AutoDropsListener} over the already-built {@code autoDrops} pipeline;
+     * it registers exactly when that pipeline exists (at least one stage on). Auto-tool is an independent listener on a
+     * different event.
      */
     private static void wireAutos(
             SurvivalConfig config,
             PdcSurvivalToggles toggles,
-            Optional<SurvivalSales> sales,
+            @Nullable AutoDropsPipeline autoDrops,
             KernelPorts kernel,
             List<CommandRegistration> commands,
             List<Listener> listeners) {
@@ -144,18 +197,8 @@ public final class SurvivalWiring {
         if (config.autoSell().enabled()) {
             commands.add(new AutoSellCommand(toggles, kernel.messages()));
         }
-        if (config.autoPickup().enabled()
-                || config.autoSmelt().enabled()
-                || config.autoSell().enabled()) {
-            listeners.add(new AutoDropsListener(
-                    config.autoPickup().enabled(),
-                    config.autoPickup().transferXp(),
-                    config.autoSmelt().enabled(),
-                    new SmeltMap(config.autoSmelt().smelt()),
-                    config.autoSell().enabled(),
-                    new SellPrices(config.autoSell().prices()),
-                    sales,
-                    toggles));
+        if (autoDrops != null) {
+            listeners.add(new AutoDropsListener(autoDrops, config.autoPickup().transferXp()));
         }
         if (config.autoTool().enabled()) {
             commands.add(new AutoToolCommand(toggles, kernel.messages()));

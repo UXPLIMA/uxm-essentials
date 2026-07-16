@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig.TreeFeller;
 import com.uxplima.uxmessentials.survival.domain.ConnectedBlockSearch;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Tree-feller: breaking one log of a tree fells every connected log of the same kind, up to {@code max-blocks}, then
@@ -34,6 +35,12 @@ import org.jspecify.annotations.NullMarked;
  * when {@code false} (the shipped default) any log break fells the tree with no shift needed. It is read fresh from
  * the config snapshot on every break, so a reload flips the behaviour immediately.
  *
+ * <h2>Auto-drops</h2>
+ * When one of the auto-* break mechanics (auto-pickup / smelt / sell) is active for the feller, the felled logs are
+ * routed through the shared {@link AutoDropsPipeline} exactly as the log they broke by hand is — so a fell picks up,
+ * smelts, and sells every log, not only the origin. The decision is resolved once per fell and reused for the whole
+ * cascade; with no pipeline (the auto mechanics disabled) the logs drop naturally on the ground.
+ *
  * <h2>Folia</h2>
  * The connected logs are broken inline on the event thread (see {@link SurvivalBlocks}); only the replant is
  * deferred, and it hops to the base block's own region through the injected {@link Scheduler} so it runs a tick later
@@ -45,12 +52,19 @@ public final class TreeFellerListener implements Listener {
     private final TreeFeller config;
     private final PdcSurvivalToggles toggles;
     private final Scheduler scheduler;
+    private final @Nullable AutoDropsPipeline autoDrops;
     private final ConnectedBlockSearch search;
 
     public TreeFellerListener(TreeFeller config, PdcSurvivalToggles toggles, Scheduler scheduler) {
+        this(config, toggles, scheduler, null);
+    }
+
+    public TreeFellerListener(
+            TreeFeller config, PdcSurvivalToggles toggles, Scheduler scheduler, @Nullable AutoDropsPipeline autoDrops) {
         this.config = Objects.requireNonNull(config, "config");
         this.toggles = Objects.requireNonNull(toggles, "toggles");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.autoDrops = autoDrops;
         this.search = new ConnectedBlockSearch(config.maxBlocks());
     }
 
@@ -81,7 +95,7 @@ public final class TreeFellerListener implements Listener {
 
     private void fell(Block origin, Player player) {
         ItemStack tool = player.getInventory().getItemInMainHand();
-        int broken = SurvivalBlocks.breakConnected(search, origin, tool);
+        int broken = SurvivalBlocks.breakConnected(search, origin, tool, cascadeSink(player));
         if (broken == 0) {
             return;
         }
@@ -92,6 +106,22 @@ public final class TreeFellerListener implements Listener {
         if (config.replantSaplings()) {
             scheduleReplant(origin);
         }
+    }
+
+    /**
+     * The sink the cascade routes each felled log's drops through, or {@code null} to drop them naturally. Present
+     * only when an auto-* break mechanic is active for the feller; the stage decision is resolved once here so the
+     * whole trunk is routed on the same terms as the origin break.
+     */
+    private SurvivalBlocks.@Nullable CascadeSink cascadeSink(Player player) {
+        if (autoDrops == null) {
+            return null;
+        }
+        AutoDropsPipeline.Stages stages = autoDrops.stagesFor(player);
+        if (!stages.anyActive()) {
+            return null;
+        }
+        return (where, drops) -> autoDrops.route(player, where, drops, stages);
     }
 
     /** Replant the matching sapling at the felled base a tick later, once the origin log has been cleared. */

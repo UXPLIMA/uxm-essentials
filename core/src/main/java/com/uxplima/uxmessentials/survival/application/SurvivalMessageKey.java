@@ -39,7 +39,22 @@ public enum SurvivalMessageKey implements MessageKey {
 
     // /autotool — the per-player toggle's on and off notices.
     SURVIVAL_AUTOTOOL_ENABLED("survival.autotool-enabled"),
-    SURVIVAL_AUTOTOOL_DISABLED("survival.autotool-disabled");
+    SURVIVAL_AUTOTOOL_DISABLED("survival.autotool-disabled"),
+
+    // /survival — the personal settings panel. The title, back button, the shared value-lore line (carrying the
+    // {value} placeholder) and its on/off words, then one label per toggleable mechanic drawn as a row.
+    SURVIVAL_GUI_TITLE("survival.gui.title"),
+    SURVIVAL_GUI_BACK("survival.gui.back"),
+    SURVIVAL_GUI_VALUE_LORE("survival.gui.value-lore"),
+    SURVIVAL_GUI_VALUE_ON("survival.gui.value-on"),
+    SURVIVAL_GUI_VALUE_OFF("survival.gui.value-off"),
+    SURVIVAL_GUI_TREEFELLER("survival.gui.treefeller"),
+    SURVIVAL_GUI_VEINMINER("survival.gui.veinminer"),
+    SURVIVAL_GUI_FARMPROTECT("survival.gui.farmprotect"),
+    SURVIVAL_GUI_AUTOPICKUP("survival.gui.autopickup"),
+    SURVIVAL_GUI_AUTOSMELT("survival.gui.autosmelt"),
+    SURVIVAL_GUI_AUTOSELL("survival.gui.autosell"),
+    SURVIVAL_GUI_AUTOTOOL("survival.gui.autotool");
 
     private final String key;
 

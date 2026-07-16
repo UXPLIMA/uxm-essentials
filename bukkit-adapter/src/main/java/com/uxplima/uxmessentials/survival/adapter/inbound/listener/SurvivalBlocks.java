@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.survival.adapter.inbound.listener;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -13,6 +15,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import com.uxplima.uxmessentials.survival.domain.BlockPos;
 import com.uxplima.uxmessentials.survival.domain.ConnectedBlockSearch;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The Bukkit-side mechanics both harvesting listeners share: run the pure {@link ConnectedBlockSearch} over a live
@@ -32,11 +35,25 @@ final class SurvivalBlocks {
 
     /**
      * Break every block connected to {@code origin} that shares its material, up to the search's cap, leaving the
-     * origin itself to the event's own break. Drops respect {@code tool} (enchantments, silk touch).
+     * origin itself to the event's own break. Drops respect {@code tool} (enchantments, silk touch), and fall on the
+     * ground as a natural break — the plain cascade with no auto-drops routing.
      *
      * @return how many blocks were broken, the origin excluded
      */
     static int breakConnected(ConnectedBlockSearch search, Block origin, ItemStack tool) {
+        return breakConnected(search, origin, tool, null);
+    }
+
+    /**
+     * Break the connected group as {@link #breakConnected(ConnectedBlockSearch, Block, ItemStack)} does, but when
+     * {@code sink} is present route each broken block's drops through it instead of dropping them on the ground —
+     * this is how the tree-feller and veinminer cascades feed the auto-drops pipeline (auto-pickup / smelt / sell).
+     * With a sink, the block is computed for its drops, cleared to air (no vanilla ground drop), and the sink is
+     * handed the captured drops at that block's location; with none, the block breaks naturally.
+     *
+     * @return how many blocks were broken, the origin excluded
+     */
+    static int breakConnected(ConnectedBlockSearch search, Block origin, ItemStack tool, @Nullable CascadeSink sink) {
         Material type = origin.getType();
         World world = origin.getWorld();
         BlockPos start = new BlockPos(origin.getX(), origin.getY(), origin.getZ());
@@ -47,10 +64,24 @@ final class SurvivalBlocks {
             if (pos.equals(start)) {
                 continue; // the origin is broken by the vanilla event itself; the cascade takes only the extras
             }
-            world.getBlockAt(pos.x(), pos.y(), pos.z()).breakNaturally(tool);
+            Block block = world.getBlockAt(pos.x(), pos.y(), pos.z());
+            if (sink == null) {
+                block.breakNaturally(tool);
+            } else {
+                List<ItemStack> drops = new ArrayList<>(block.getDrops(tool));
+                Location where = block.getLocation();
+                block.setType(Material.AIR);
+                sink.accept(where, drops);
+            }
             broken++;
         }
         return broken;
+    }
+
+    /** Receives one cascade block's captured drops in place of the vanilla ground drop, at the block's location. */
+    @FunctionalInterface
+    interface CascadeSink {
+        void accept(Location where, List<ItemStack> drops);
     }
 
     /** Add {@code damage} durability points to the player's main-hand tool, wearing it out when it runs out. */

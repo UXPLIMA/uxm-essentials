@@ -1264,3 +1264,61 @@ permissions:
   uxmessentials.module.poses:
     description: 'Hot-reload / inspect the poses module (built-in GSit-parity sitting and posing).'
     default: op
+  # survival context (docs/permissions.md "Survival"). Opt-in gameplay mechanics, each an independently toggleable
+  # sub-feature. Each mechanic carries a use node uxmessentials.survival.<mechanic> (whether it acts for the player);
+  # the seven with a personal /command toggle also carry uxmessentials.survival.<mechanic>.toggle (whether the player
+  # may switch it, from the command or the /survival panel). All are self-service (default true) — the mechanics ship
+  # on and a player opts out. uxmessentials.survival.gui opens the /survival settings panel; the module node is the
+  # reload/inspect tier for the context as a whole.
+  uxmessentials.survival.treefeller:
+    description: 'Tree-feller acts for you — break one log to fell the whole trunk.'
+    default: true
+  uxmessentials.survival.treefeller.toggle:
+    description: '/treefeller — switch your personal tree-feller on or off.'
+    default: true
+  uxmessentials.survival.veinminer:
+    description: 'Veinminer acts for you — break one block to mine the connected vein.'
+    default: true
+  uxmessentials.survival.veinminer.toggle:
+    description: '/veinminer — switch your personal veinminer on or off.'
+    default: true
+  uxmessentials.survival.farmprotect:
+    description: 'Farmland protection acts for you — you will not trample your crops.'
+    default: true
+  uxmessentials.survival.farmprotect.toggle:
+    description: '/farmprotect — switch your personal farmland protection on or off.'
+    default: true
+  uxmessentials.survival.farmassist:
+    description: 'Right-click a mature crop to harvest and replant it, spending one seed.'
+    default: true
+  uxmessentials.survival.autopickup:
+    description: 'Auto-pickup acts for you — mined drops go straight to your inventory.'
+    default: true
+  uxmessentials.survival.autopickup.toggle:
+    description: '/autopickup — switch your personal auto-pickup on or off.'
+    default: true
+  uxmessentials.survival.autosmelt:
+    description: 'Auto-smelt acts for you — ores are smelted as you mine them.'
+    default: true
+  uxmessentials.survival.autosmelt.toggle:
+    description: '/autosmelt — switch your personal auto-smelt on or off.'
+    default: true
+  uxmessentials.survival.autosell:
+    description: 'Auto-sell acts for you — priced drops are sold for coin as you mine.'
+    default: true
+  uxmessentials.survival.autosell.toggle:
+    description: '/autosell — switch your personal auto-sell on or off.'
+    default: true
+  uxmessentials.survival.autotool:
+    description: 'Auto-tool acts for you — the best tool swaps to hand as you mine.'
+    default: true
+  uxmessentials.survival.autotool.toggle:
+    description: '/autotool — switch your personal auto-tool on or off.'
+    default: true
+  uxmessentials.survival.gui:
+    description: '/survival — open your personal survival mechanics settings panel.'
+    default: true
+  uxmessentials.module.survival:
+    description: 'Hot-reload / inspect the survival module (opt-in gameplay mechanics).'
+    default: op
+

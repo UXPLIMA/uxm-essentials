@@ -123,6 +123,7 @@ final class DefaultResources {
             "modules/poses/gui/poses-settings.conf",
             "modules/presence/gui/presence-settings.conf",
             "modules/scoreboard/gui/scoreboard-settings.conf",
+            "modules/survival/gui/survival-settings.conf",
             "modules/staff/gui/staff-examine.conf",
             "modules/staff/gui/staff-list.conf",
             "modules/staff/gui/staff-navigator.conf",
