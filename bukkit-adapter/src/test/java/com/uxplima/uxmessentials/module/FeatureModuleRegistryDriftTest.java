@@ -74,6 +74,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("poses"))).isPresent();
         assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
         assertThat(registry.byId(ModuleId.of("ranks"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -101,7 +102,8 @@ class FeatureModuleRegistryDriftTest {
                         "custommenus",
                         "poses",
                         "survival",
-                        "ranks");
+                        "ranks",
+                        "trade");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -618,14 +620,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void ranksIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void ranksShipsEnabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule ranks =
                 registry.byId(ModuleId.of("ranks")).orElseThrow(() -> new AssertionError("ranks is not registered"));
 
-        // ranks is the 25th context — rankup/prestige/autorank progression with a DB-backed rank pointer —
-        // registered last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("ranks");
+        // ranks is the 25th context — rankup/prestige/autorank progression with a DB-backed rank pointer. The later
+        // trade context now lands last, so ranks must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("ranks"))).isPresent();
 
         // It ships ENABLED but inert (nothing happens until an operator authors a ladder): with no modules.conf
         // override it is on, and disabling exactly ranks removes only it while every sibling stays on.
@@ -644,6 +646,34 @@ class FeatureModuleRegistryDriftTest {
         // persistence V74 baseline (always applied), so it declares no MigrationSet of its own.
         assertThat(ranks.commands()).isEmpty();
         assertThat(ranks.migrations()).isEmpty();
+    }
+
+    @Test
+    void tradeIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule trade =
+                registry.byId(ModuleId.of("trade")).orElseThrow(() -> new AssertionError("trade is not registered"));
+
+        // trade is the 26th context — secure player-to-player trading (/trade) — registered last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("trade");
+
+        // It ships ENABLED (a steady-state feature — /trade is offered out of the box): with no modules.conf override
+        // it is on, and disabling exactly trade removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("trade", "teleport", "economy", "holograms", "ranks");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.trade.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("trade");
+        assertThat(off).contains("teleport", "holograms", "ranks");
+
+        // The /trade verbs and the trade-window listeners are contributed through the adapter wiring in the later
+        // phases, not the declarative lists, so the module publishes no command here, and a same-server trade is
+        // transient in-memory state (no DB) in Phase 1, so it declares no MigrationSet.
+        assertThat(trade.commands()).isEmpty();
+        assertThat(trade.migrations()).isEmpty();
     }
 
     @Test

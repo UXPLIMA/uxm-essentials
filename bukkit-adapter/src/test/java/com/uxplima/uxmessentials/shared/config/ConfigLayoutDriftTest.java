@@ -45,6 +45,7 @@ class ConfigLayoutDriftTest {
             "poses",
             "survival",
             "ranks",
+            "trade",
             "migration"
         }) {
             assertThat(modules.resolve(module).resolve("config.conf"))

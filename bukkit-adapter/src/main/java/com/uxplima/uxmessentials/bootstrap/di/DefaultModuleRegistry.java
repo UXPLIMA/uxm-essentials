@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.staff.application.StaffModule;
 import com.uxplima.uxmessentials.survival.application.SurvivalModule;
 import com.uxplima.uxmessentials.tablist.application.TablistModule;
 import com.uxplima.uxmessentials.teleport.application.TeleportModule;
+import com.uxplima.uxmessentials.trade.application.TradeModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
 import com.uxplima.uxmessentials.vote.application.VoteModule;
 import com.uxplima.uxmessentials.warps.application.WarpsModule;
@@ -167,6 +168,12 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // soft-coupled and land with the later phases), and like the steady-state features it ships ENABLED but
         // inert until an operator authors a ladder, so it lands last after survival.
         delegate.register(new RanksModule());
+        // trade is the 26th context — secure player-to-player trading (/trade) with a live dual-inventory window and,
+        // in the later phases, staked money and cross-server escrow. It carries no hard dependency edge in Phase 1
+        // (its collaborators — the economy trade port and the bus transport — land with the money and cross-server
+        // phases), a same-server trade is transient in-memory state (no DB), and like the steady-state features it
+        // ships ENABLED, so it lands last after ranks.
+        delegate.register(new TradeModule());
         // The shared kernel is not a module and never appears here.
     }
 

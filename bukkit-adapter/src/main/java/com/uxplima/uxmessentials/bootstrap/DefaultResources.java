@@ -60,6 +60,7 @@ final class DefaultResources {
             "modules/survival/config.conf",
             "modules/ranks/config.conf",
             "modules/ranks/ranks.conf",
+            "modules/trade/config.conf",
             "modules/migration/config.conf",
             "modules/communication/gui/announcement-editor-list.conf",
             "modules/communication/gui/announcement-editor.conf",

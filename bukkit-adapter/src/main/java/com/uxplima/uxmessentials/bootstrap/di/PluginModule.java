@@ -193,6 +193,7 @@ import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.trade.adapter.TradeWiring;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
@@ -957,7 +958,19 @@ public final class PluginModule {
             wireSurvival(plugin, ctx, resources, links, guiLayouts, menus);
         } else if (module.id().equals(ModuleId.of("ranks"))) {
             wireRanks(plugin, ctx, persistence, resources, links, menus, menuBindings);
+        } else if (module.id().equals(ModuleId.of("trade"))) {
+            wireTrade(ctx, resources);
         }
+    }
+
+    private static void wireTrade(ModuleContext ctx, CloseableResources resources) {
+        // trade persists nothing in Phase 1: a same-server session is transient in-memory state and the config is read
+        // once into an immutable snapshot. The /trade window, its inventory listeners, the economy trade port, and the
+        // cross-server bus escrow land behind this same seam in the later phases; Phase 1 resolves the config only and
+        // contributes no command and no listener, so there is no runtime state to drain on stop.
+        TradeWiring.Wired wired = TradeWiring.wire(ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
     }
 
     private static void wireRanks(
