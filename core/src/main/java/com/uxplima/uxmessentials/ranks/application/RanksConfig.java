@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.ranks.application;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
@@ -18,21 +19,20 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param prestige the prestige settings ({@code prestige.*}); {@link PrestigeSettings#enabled()} ships {@code false}
- * @param autorankEnabled whether the scheduled autorank scan is on ({@code autorank.enabled}, default {@code false})
+ * @param autorank the autorank scan settings ({@code autorank.*}); {@link AutorankSettings#enabled()} ships {@code false}
  */
-public record RanksConfig(boolean enabled, PrestigeSettings prestige, boolean autorankEnabled) {
+public record RanksConfig(boolean enabled, PrestigeSettings prestige, AutorankSettings autorank) {
 
     public RanksConfig {
         Objects.requireNonNull(prestige, "prestige");
+        Objects.requireNonNull(autorank, "autorank");
     }
 
     /** Resolve the ranks config from the module's scoped {@link ConfigStore} ({@code modules.ranks}). */
     public static RanksConfig from(ConfigStore config) {
         Objects.requireNonNull(config, "config");
         return new RanksConfig(
-                config.getBoolean("enabled", true),
-                PrestigeSettings.from(config),
-                config.getBoolean("autorank.enabled", false));
+                config.getBoolean("enabled", true), PrestigeSettings.from(config), AutorankSettings.from(config));
     }
 
     /**
@@ -79,6 +79,40 @@ public record RanksConfig(boolean enabled, PrestigeSettings prestige, boolean au
                     config.getStringList("prestige.requirements", List.of()),
                     config.getStringList("prestige.actions", List.of()),
                     config.getDouble("prestige.reward-multiplier", 1.0));
+        }
+    }
+
+    /**
+     * The autorank mechanic's tunables ({@code autorank.*}): the enable gate, the scan interval, and whether the
+     * scan charges each promotion's cost. Autorank promotes an online player the moment they already meet their
+     * next rank's requirements, without them running {@code /rankup}; the scan reuses the same rankup pipeline, so
+     * {@code charge-cost} simply decides whether that pipeline's cost step runs. The interval is clamped to at
+     * least one second so a misconfigured {@code 0} cannot spin the scheduler.
+     *
+     * @param enabled whether the scheduled autorank scan runs ({@code autorank.enabled}, default {@code false})
+     * @param intervalSeconds seconds between scans ({@code autorank.interval-seconds}, default {@code 300}, min {@code 1})
+     * @param chargeCost whether an autorank promotion charges the rank's cost ({@code autorank.charge-cost}, default {@code true})
+     */
+    public record AutorankSettings(boolean enabled, int intervalSeconds, boolean chargeCost) {
+
+        public AutorankSettings {
+            if (intervalSeconds < 1) {
+                throw new IllegalArgumentException("autorank interval-seconds must be at least 1: " + intervalSeconds);
+            }
+        }
+
+        /** Resolve the autorank settings from the module's scoped {@link ConfigStore} ({@code modules.ranks}). */
+        public static AutorankSettings from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new AutorankSettings(
+                    config.getBoolean("autorank.enabled", false),
+                    Math.max(1, config.getInt("autorank.interval-seconds", 300)),
+                    config.getBoolean("autorank.charge-cost", true));
+        }
+
+        /** The scan interval as a {@link Duration}, both the initial delay and the fixed period the scan repeats at. */
+        public Duration interval() {
+            return Duration.ofSeconds(intervalSeconds);
         }
     }
 }

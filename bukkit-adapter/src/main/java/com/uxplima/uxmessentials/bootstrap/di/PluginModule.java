@@ -977,6 +977,8 @@ public final class PluginModule {
                 : Optional.empty();
         RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy);
         wired.commands().forEach(resources::addCommand);
+        // The autorank scan's repeating task is cancelled on module stop so a disable strands no scheduled work.
+        resources.onClose(wired.stop());
     }
 
     private static void wireSurvival(

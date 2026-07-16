@@ -68,8 +68,20 @@ public final class Rankup {
         this.economy = Objects.requireNonNull(economy, "economy");
     }
 
-    /** Attempt to advance {@code who} one rank up the ladder, returning the typed outcome. */
+    /** Attempt to advance {@code who} one rank up the ladder, charging the next rank's cost, returning the outcome. */
     public RankupResult rankUp(PlayerRef who) {
+        return rankUp(who, true);
+    }
+
+    /**
+     * Attempt to advance {@code who} one rank up the ladder, returning the typed outcome. This is the seam the
+     * autorank scan reuses so it does not duplicate the requirement / advance / action logic: when {@code charge}
+     * is {@code false} the cost step is skipped entirely and a met rank-up promotes for free, so an operator who
+     * turns autorank's {@code charge-cost} off lets an eligible player climb without their balance moving. With
+     * {@code charge} {@code true} the behaviour is identical to {@code /rankup} — the cost is charged before the
+     * pointer advances, so a short balance refuses without promoting.
+     */
+    public RankupResult rankUp(PlayerRef who, boolean charge) {
         Objects.requireNonNull(who, "who");
         Optional<RankStanding> standing = currentRank.of(who.uuid());
         if (standing.isEmpty()) {
@@ -79,14 +91,14 @@ public final class Rankup {
         if (next.isEmpty()) {
             return RankupResult.alreadyMax();
         }
-        return advance(who, standing.get(), next.get());
+        return advance(who, standing.get(), next.get(), charge);
     }
 
-    private RankupResult advance(PlayerRef who, RankStanding standing, Rank target) {
+    private RankupResult advance(PlayerRef who, RankStanding standing, Rank target, boolean charge) {
         if (!requirements.passesAll(who, parseRequirements(target))) {
             return RankupResult.requirementsNotMet();
         }
-        if (!charge(who, target)) {
+        if (charge && !charge(who, target)) {
             return RankupResult.cannotAfford();
         }
         repository.save(who.uuid(), target.id(), standing.prestige());

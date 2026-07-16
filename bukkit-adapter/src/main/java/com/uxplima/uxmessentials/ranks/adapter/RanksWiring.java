@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.PrestigeCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RanksCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RankupCommand;
+import com.uxplima.uxmessentials.ranks.adapter.outbound.AutorankScan;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankActionRunner;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.application.CurrentRank;
@@ -39,6 +40,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCom
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -84,7 +86,22 @@ public final class RanksWiring {
                     new Prestige(currentRank, repository, ladder, requirements, actions, economy, config.prestige());
             commands.add(new PrestigeCommand(prestige, kernel.messages()));
         }
-        return new Wired(List.copyOf(commands), config, currentRank);
+        // Autorank reuses the same Rankup pipeline per online player on a schedule. start() no-ops when the scan is
+        // disabled, so the module always builds it and hands back the stop hook that cancels the repeating task.
+        AutorankScan autorank =
+                new AutorankScan(plugin.getServer(), kernel.scheduler(), rankup, config.autorank(), kernel.log());
+        AutoCloseable autorankTask = autorank.start();
+        Runnable stop = () -> cancelAutorank(autorankTask, kernel.log());
+        return new Wired(List.copyOf(commands), config, currentRank, stop);
+    }
+
+    /** Cancel the autorank repeating task on module stop; a cancel failure is logged, never allowed to strand stop. */
+    private static void cancelAutorank(AutoCloseable task, Logger log) {
+        try {
+            task.close();
+        } catch (Exception failure) {
+            log.error("failed to cancel the autorank scan task", failure);
+        }
     }
 
     private static RankRequirementEvaluator requirementEvaluator(
@@ -117,19 +134,22 @@ public final class RanksWiring {
 
     /**
      * Everything the ranks module contributes once wired: the Brigadier command registrations to publish, the
-     * typed {@link RanksConfig} snapshot, and the {@link CurrentRank} read use case the later phases (prestige,
-     * autorank, GUI, placeholders) build over.
+     * typed {@link RanksConfig} snapshot, the {@link CurrentRank} read use case the later phases (GUI, placeholders)
+     * build over, and the {@link #stop} hook that cancels the autorank scan on module disable.
      *
      * @param commands the Brigadier command registrations to publish
      * @param config the typed ranks config snapshot
      * @param currentRank the read use case resolving a player's rank standing against the ladder
+     * @param stop the teardown hook the module registers, cancelling the autorank scan's repeating task
      */
-    public record Wired(List<CommandRegistration> commands, RanksConfig config, CurrentRank currentRank) {
+    public record Wired(
+            List<CommandRegistration> commands, RanksConfig config, CurrentRank currentRank, Runnable stop) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(config, "config");
             Objects.requireNonNull(currentRank, "currentRank");
+            Objects.requireNonNull(stop, "stop");
         }
     }
 }

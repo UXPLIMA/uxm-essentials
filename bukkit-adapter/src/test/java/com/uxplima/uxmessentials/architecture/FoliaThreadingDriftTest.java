@@ -144,6 +144,10 @@ class FoliaThreadingDriftTest {
                 pkg + "moderation.adapter.outbound.PermissionSanctionBroadcast",
                 "GLOBAL: sanction broadcast fan-out inside scheduler.onGlobal");
         allow.put(
+                pkg + "ranks.adapter.outbound.AutorankScan",
+                "GLOBAL: autorank scan snapshots the online roster inside repeatGlobal, then hops each promotion to "
+                        + "onEntity");
+        allow.put(
                 pkg + "playerstate.adapter.outbound.BukkitNearbyPlayers",
                 "GLOBAL: /near position read resolved via onGlobal before per-entity work");
         allow.put(

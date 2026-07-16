@@ -26,7 +26,9 @@ class RanksConfigTest {
         assertThat(config.prestige().requirements()).isEmpty();
         assertThat(config.prestige().actions()).isEmpty();
         assertThat(config.prestige().rewardMultiplier()).isEqualTo(1.0);
-        assertThat(config.autorankEnabled()).isFalse();
+        assertThat(config.autorank().enabled()).isFalse();
+        assertThat(config.autorank().intervalSeconds()).isEqualTo(300);
+        assertThat(config.autorank().chargeCost()).isTrue();
     }
 
     @Test
@@ -47,7 +49,11 @@ class RanksConfigTest {
                 "prestige.reward-multiplier",
                 1.5,
                 "autorank.enabled",
-                true)));
+                true,
+                "autorank.interval-seconds",
+                600,
+                "autorank.charge-cost",
+                false)));
 
         assertThat(config.enabled()).isFalse();
         assertThat(config.prestige().enabled()).isTrue();
@@ -56,7 +62,9 @@ class RanksConfigTest {
         assertThat(config.prestige().requirements()).containsExactly("money 2500");
         assertThat(config.prestige().actions()).containsExactly("message prestiged");
         assertThat(config.prestige().rewardMultiplier()).isEqualTo(1.5);
-        assertThat(config.autorankEnabled()).isTrue();
+        assertThat(config.autorank().enabled()).isTrue();
+        assertThat(config.autorank().intervalSeconds()).isEqualTo(600);
+        assertThat(config.autorank().chargeCost()).isFalse();
     }
 
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */

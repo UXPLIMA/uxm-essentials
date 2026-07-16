@@ -68,6 +68,36 @@ class RankupTest {
     }
 
     @Test
+    void autorankChargesTheCostWhenTheChargeFlagIsSet() {
+        FakeRepository repo = new FakeRepository(Optional.of(new PlayerRank(RankId.of("first"), Prestige.INITIAL)));
+        FakeEconomy economy = new FakeEconomy(true);
+        FakeActionRunner actions = new FakeActionRunner();
+        Rankup rankup = rankup(repo, allowAll(), actions, Optional.of(economy));
+
+        RankupResult result = rankup.rankUp(WHO, true);
+
+        assertThat(result.status()).isEqualTo(Status.RANKED_UP);
+        assertThat(repo.saved).containsExactly(new Saved(RankId.of("citizen"), Prestige.INITIAL));
+        assertThat(economy.withdrawn).containsExactly(BigDecimal.valueOf(1000L));
+        assertThat(actions.ran).containsExactly(CITIZEN.actions());
+    }
+
+    @Test
+    void autorankPromotesForFreeWithoutChargingWhenTheChargeFlagIsClear() {
+        FakeRepository repo = new FakeRepository(Optional.of(new PlayerRank(RankId.of("first"), Prestige.INITIAL)));
+        FakeEconomy economy = new FakeEconomy(true);
+        FakeActionRunner actions = new FakeActionRunner();
+        Rankup rankup = rankup(repo, allowAll(), actions, Optional.of(economy));
+
+        RankupResult result = rankup.rankUp(WHO, false);
+
+        assertThat(result.status()).isEqualTo(Status.RANKED_UP);
+        assertThat(repo.saved).containsExactly(new Saved(RankId.of("citizen"), Prestige.INITIAL));
+        assertThat(economy.withdrawn).isEmpty();
+        assertThat(actions.ran).containsExactly(CITIZEN.actions());
+    }
+
+    @Test
     void refusesWithoutAdvancingOrChargingWhenARequirementFails() {
         FakeRepository repo = new FakeRepository(Optional.of(new PlayerRank(RankId.of("first"), Prestige.INITIAL)));
         FakeEconomy economy = new FakeEconomy(true);
