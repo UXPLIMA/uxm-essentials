@@ -169,6 +169,9 @@ class FoliaThreadingDriftTest {
                 pkg + "presence.adapter.inbound.listener.SleepExclusionListener",
                 "GLOBAL: sleep-exclusion reconcile hops to onGlobal before the roster scan");
         allow.put(
+                pkg + "survival.adapter.inbound.listener.OnePlayerSleepListener",
+                "GLOBAL: one-player-sleep counts the world roster inside scheduler.onGlobal before advancing the world");
+        allow.put(
                 pkg + "presence.adapter.outbound.BukkitVisibilityApplier",
                 "GLOBAL: vanish visibility fan-out enumerates inside scheduler.onGlobal");
         allow.put(

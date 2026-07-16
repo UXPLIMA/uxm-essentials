@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.survival.application;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -22,6 +24,9 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param leafDecay the fast-leaf-decay mechanic settings
  * @param farmProtect the farmland-protection mechanic settings
  * @param farmAssist the farm-assist mechanic settings
+ * @param anvilUnlocker the anvil-unlocker mechanic settings
+ * @param onePlayerSleep the one-player-sleep mechanic settings
+ * @param headDrop the head-drop mechanic settings
  */
 public record SurvivalConfig(
         boolean enabled,
@@ -29,7 +34,10 @@ public record SurvivalConfig(
         Veinminer veinminer,
         LeafDecay leafDecay,
         FarmProtect farmProtect,
-        FarmAssist farmAssist) {
+        FarmAssist farmAssist,
+        AnvilUnlocker anvilUnlocker,
+        OnePlayerSleep onePlayerSleep,
+        HeadDrop headDrop) {
 
     public SurvivalConfig {
         Objects.requireNonNull(treeFeller, "treeFeller");
@@ -37,6 +45,9 @@ public record SurvivalConfig(
         Objects.requireNonNull(leafDecay, "leafDecay");
         Objects.requireNonNull(farmProtect, "farmProtect");
         Objects.requireNonNull(farmAssist, "farmAssist");
+        Objects.requireNonNull(anvilUnlocker, "anvilUnlocker");
+        Objects.requireNonNull(onePlayerSleep, "onePlayerSleep");
+        Objects.requireNonNull(headDrop, "headDrop");
     }
 
     /** Resolve the survival config from the module's scoped {@link ConfigStore} ({@code modules.survival}). */
@@ -48,7 +59,10 @@ public record SurvivalConfig(
                 Veinminer.from(config),
                 LeafDecay.from(config),
                 FarmProtect.from(config),
-                FarmAssist.from(config));
+                FarmAssist.from(config),
+                AnvilUnlocker.from(config),
+                OnePlayerSleep.from(config),
+                HeadDrop.from(config));
     }
 
     /**
@@ -217,6 +231,89 @@ public record SurvivalConfig(
             return new FarmAssist(
                     config.getBoolean("farmassist.enabled", true),
                     config.getStringList("farmassist.crops", DEFAULT_CROPS));
+        }
+    }
+
+    /**
+     * The anvil-unlocker mechanic under {@code anvilunlocker { … }}: lift vanilla's anvil caps so a high-level combine
+     * is not rejected with "Too Expensive!". Purely an event tweak — it has no per-player state and no command.
+     *
+     * @param enabled whether anvil-unlocker runs ({@code anvilunlocker.enabled}, default {@code true})
+     * @param removeLevelLimit whether to lift the "Too Expensive!" level ceiling so any combine yields a result
+     *     ({@code remove-level-limit}, default {@code true})
+     * @param removeCostLimit whether to also zero the level price of the combine, making it free on top of being
+     *     allowed ({@code remove-cost-limit}, default {@code false})
+     */
+    public record AnvilUnlocker(boolean enabled, boolean removeLevelLimit, boolean removeCostLimit) {
+
+        static AnvilUnlocker from(ConfigStore config) {
+            return new AnvilUnlocker(
+                    config.getBoolean("anvilunlocker.enabled", true),
+                    config.getBoolean("anvilunlocker.remove-level-limit", true),
+                    config.getBoolean("anvilunlocker.remove-cost-limit", false));
+        }
+    }
+
+    /**
+     * The one-player-sleep mechanic under {@code oneplayersleep { … }}: skip the night once enough of a world's
+     * eligible players are sleeping. The threshold is a fixed count <em>or</em> a percentage; the count wins whenever
+     * it is positive (see {@link com.uxplima.uxmessentials.survival.domain.SleepThreshold}), so the shipped default of
+     * {@code required-count = 1} is the eponymous one-player skip.
+     *
+     * @param enabled whether one-player-sleep runs ({@code oneplayersleep.enabled}, default {@code true})
+     * @param requiredPercent the percentage of eligible players that must sleep when {@code required-count} is zero
+     *     ({@code required-percent}, default {@code 50})
+     * @param requiredCount the fixed number of sleeping players that skips the night, taking precedence when positive
+     *     ({@code required-count}, default {@code 1})
+     */
+    public record OnePlayerSleep(boolean enabled, int requiredPercent, int requiredCount) {
+
+        public OnePlayerSleep {
+            requiredPercent = Math.max(0, Math.min(100, requiredPercent));
+            requiredCount = Math.max(0, requiredCount);
+        }
+
+        static OnePlayerSleep from(ConfigStore config) {
+            return new OnePlayerSleep(
+                    config.getBoolean("oneplayersleep.enabled", true),
+                    config.getInt("oneplayersleep.required-percent", 50),
+                    config.getInt("oneplayersleep.required-count", 1));
+        }
+    }
+
+    /**
+     * The head-drop mechanic under {@code headdrop { … }}: a slain entity may drop its head. A player killed by another
+     * player drops their own player head at full odds when {@code player-head-on-pvp} is set; a slain mob drops its head
+     * at {@code mob-chance}, or at a per-mob override from {@code mobs}. Chances are percentages in {@code [0, 100]}.
+     *
+     * @param enabled whether head-drop runs ({@code headdrop.enabled}, default {@code true})
+     * @param playerHeadOnPvp whether a player killed by a player drops their head ({@code player-head-on-pvp}, default
+     *     {@code true})
+     * @param mobChance the default percentage chance a slain mob drops its head ({@code mob-chance}, default {@code 0})
+     * @param mobs per-mob chance overrides keyed by Bukkit entity name ({@code mobs}, default empty)
+     */
+    public record HeadDrop(boolean enabled, boolean playerHeadOnPvp, double mobChance, Map<String, Double> mobs) {
+
+        public HeadDrop {
+            if (!Double.isFinite(mobChance)) {
+                throw new IllegalArgumentException("headdrop mob-chance must be finite");
+            }
+            mobChance = Math.max(0.0, Math.min(100.0, mobChance));
+            Objects.requireNonNull(mobs, "mobs");
+            mobs = Map.copyOf(mobs);
+        }
+
+        static HeadDrop from(ConfigStore config) {
+            double mobChance = config.getDouble("headdrop.mob-chance", 0.0);
+            Map<String, Double> overrides = new LinkedHashMap<>();
+            for (String mob : config.getKeys("headdrop.mobs")) {
+                overrides.put(mob, config.getDouble("headdrop.mobs." + mob, mobChance));
+            }
+            return new HeadDrop(
+                    config.getBoolean("headdrop.enabled", true),
+                    config.getBoolean("headdrop.player-head-on-pvp", true),
+                    mobChance,
+                    overrides);
         }
     }
 }

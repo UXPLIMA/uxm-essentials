@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.bukkit.Material;
+import org.bukkit.entity.EntityType;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -19,20 +20,28 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.FarmProtectCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.TreeFellerCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.VeinminerCommand;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AnvilUnlockListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmAssistListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmProtectListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FastLeafDecayListener;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.HeadDropListener;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.OnePlayerSleepListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.TreeFellerListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.VeinminerListener;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
+import com.uxplima.uxmessentials.survival.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
 import com.uxplima.uxmessentials.survival.domain.Crops;
+import com.uxplima.uxmessentials.survival.domain.DropChance;
+import com.uxplima.uxmessentials.survival.domain.SleepThreshold;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the survival context's adapters over the injected kernel ports and produces the mechanic commands and
  * listeners the plugin registers: the harvesting core (tree-feller, veinminer), fast-leaf-decay, farmland protection
- * ({@code /farmprotect}), and farm-assist. Each mechanic wires only when its config gate is on: with
+ * ({@code /farmprotect}), farm-assist, anvil-unlocker, one-player-sleep, and head-drop. Each mechanic wires only when
+ * its config gate is on: with
  * {@code tree-feller.enabled = false} no {@code /treefeller} command and no tree-feller listener land, and likewise
  * for every other mechanic — so a disabled mechanic contributes nothing, the same "disabled means absent" property
  * the module gate gives at the context level.
@@ -75,7 +84,47 @@ public final class SurvivalWiring {
             Map<Material, Material> cropToSeed = cropSeedMap(config.farmAssist(), kernel.log());
             listeners.add(new FarmAssistListener(cropToSeed));
         }
+        if (config.anvilUnlocker().enabled()) {
+            listeners.add(new AnvilUnlockListener(config.anvilUnlocker()));
+        }
+        if (config.onePlayerSleep().enabled()) {
+            SleepThreshold threshold = new SleepThreshold(
+                    config.onePlayerSleep().requiredCount(),
+                    config.onePlayerSleep().requiredPercent());
+            listeners.add(new OnePlayerSleepListener(threshold, kernel.scheduler()));
+        }
+        if (config.headDrop().enabled()) {
+            listeners.add(new HeadDropListener(
+                    config.headDrop().playerHeadOnPvp(),
+                    new DropChance(config.headDrop().mobChance()),
+                    mobChances(config.headDrop(), kernel.log()),
+                    new ThreadLocalRandomSource()));
+        }
         return new Wired(commands, listeners);
+    }
+
+    /** Resolve each configured per-mob head chance to its {@link EntityType}, warning on and skipping any unknown name. */
+    private static Map<EntityType, DropChance> mobChances(SurvivalConfig.HeadDrop config, Logger log) {
+        Map<EntityType, DropChance> chances = new EnumMap<>(EntityType.class);
+        for (Map.Entry<String, Double> entry : config.mobs().entrySet()) {
+            EntityType type = matchEntityType(entry.getKey());
+            if (type == null) {
+                log.warn("survival headdrop: unknown mob type '{}' — skipping", entry.getKey());
+            } else {
+                chances.put(type, new DropChance(entry.getValue()));
+            }
+        }
+        return chances;
+    }
+
+    /** The {@link EntityType} named {@code name} (case-insensitively), or {@code null} when none matches. */
+    private static @Nullable EntityType matchEntityType(String name) {
+        for (EntityType type : EntityType.values()) {
+            if (type.name().equalsIgnoreCase(name)) {
+                return type;
+            }
+        }
+        return null;
     }
 
     /** Resolve each configured farm-assist crop to its crop→seed material pair, skipping any that will not resolve. */

@@ -48,6 +48,22 @@ class SurvivalConfigTest {
         SurvivalConfig.FarmAssist farm = config.farmAssist();
         assertThat(farm.enabled()).isTrue();
         assertThat(farm.crops()).contains("WHEAT", "CARROTS", "POTATOES", "BEETROOTS", "NETHER_WART");
+
+        SurvivalConfig.AnvilUnlocker anvil = config.anvilUnlocker();
+        assertThat(anvil.enabled()).isTrue();
+        assertThat(anvil.removeLevelLimit()).isTrue();
+        assertThat(anvil.removeCostLimit()).isFalse();
+
+        SurvivalConfig.OnePlayerSleep sleep = config.onePlayerSleep();
+        assertThat(sleep.enabled()).isTrue();
+        assertThat(sleep.requiredPercent()).isEqualTo(50);
+        assertThat(sleep.requiredCount()).isEqualTo(1);
+
+        SurvivalConfig.HeadDrop head = config.headDrop();
+        assertThat(head.enabled()).isTrue();
+        assertThat(head.playerHeadOnPvp()).isTrue();
+        assertThat(head.mobChance()).isZero();
+        assertThat(head.mobs()).isEmpty();
     }
 
     @Test
@@ -63,7 +79,14 @@ class SurvivalConfigTest {
                 Map.entry("leaf-decay.radius", 6),
                 Map.entry("leaf-decay.delay-ticks", 10),
                 Map.entry("farmprotect.enabled", false),
-                Map.entry("farmassist.crops", List.of("WHEAT", "CARROTS")))));
+                Map.entry("farmassist.crops", List.of("WHEAT", "CARROTS")),
+                Map.entry("anvilunlocker.remove-cost-limit", true),
+                Map.entry("oneplayersleep.required-percent", 75),
+                Map.entry("oneplayersleep.required-count", 0),
+                Map.entry("headdrop.player-head-on-pvp", false),
+                Map.entry("headdrop.mob-chance", 25.0),
+                Map.entry("headdrop.mobs", List.of("ZOMBIE", "SKELETON")),
+                Map.entry("headdrop.mobs.ZOMBIE", 40.0))));
 
         assertThat(config.enabled()).isFalse();
         assertThat(config.treeFeller().requireAxe()).isFalse();
@@ -76,6 +99,13 @@ class SurvivalConfigTest {
         assertThat(config.leafDecay().delayTicks()).isEqualTo(10);
         assertThat(config.farmProtect().enabled()).isFalse();
         assertThat(config.farmAssist().crops()).containsExactly("WHEAT", "CARROTS");
+        assertThat(config.anvilUnlocker().removeCostLimit()).isTrue();
+        assertThat(config.onePlayerSleep().requiredPercent()).isEqualTo(75);
+        assertThat(config.onePlayerSleep().requiredCount()).isZero();
+        assertThat(config.headDrop().playerHeadOnPvp()).isFalse();
+        assertThat(config.headDrop().mobChance()).isEqualTo(25.0);
+        // The per-mob map reads a chance for each child key, falling back to the mob-chance for a key without one.
+        assertThat(config.headDrop().mobs()).containsEntry("ZOMBIE", 40.0).containsEntry("SKELETON", 25.0);
     }
 
     /** A map-backed {@link ConfigStore} that honours the boolean/int/double/list getters the config reads. */
@@ -104,6 +134,13 @@ class SurvivalConfigTest {
         @SuppressWarnings("unchecked")
         public List<String> getStringList(String path, List<String> fallback) {
             return values.get(path) instanceof List<?> list ? List.copyOf((List<String>) list) : fallback;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public List<String> getKeys(String path) {
+            // The per-mob override map is modelled here as a string list of child keys at the map's path.
+            return values.get(path) instanceof List<?> list ? List.copyOf((List<String>) list) : List.of();
         }
     }
 }
