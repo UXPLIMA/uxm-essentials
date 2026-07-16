@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.communication.application.port.RandomSource;
 import com.uxplima.uxmessentials.communication.application.port.SequenceCounter;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.JoinGroupPolicies;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
@@ -39,7 +40,7 @@ class CommunicationResolutionTest {
         ResolveJoinMessage resolve = joinWith(MessagePolicy.custom(
                 Ordering.SEQUENTIAL, List.of("<yellow>{player}</yellow> joined — {count} online")));
 
-        ResolvedMessage resolved = resolve.resolve(ALICE);
+        ResolvedMessage resolved = resolve.resolve(false, null, ALICE);
 
         assertThat(resolved.hasTemplate()).isTrue();
         assertThat(resolved.suppressVanilla()).isTrue();
@@ -52,14 +53,14 @@ class CommunicationResolutionTest {
                 joinWith(MessagePolicy.custom(Ordering.SEQUENTIAL, List.of("first {player}", "second {player}")));
 
         // The counter advances per call; the policy wraps modulo the template count.
-        assertThat(resolve.resolve(ALICE).template()).contains("first Alice");
-        assertThat(resolve.resolve(ALICE).template()).contains("second Alice");
-        assertThat(resolve.resolve(ALICE).template()).contains("first Alice"); // wrapped back to index 0
+        assertThat(resolve.resolve(false, null, ALICE).template()).contains("first Alice");
+        assertThat(resolve.resolve(false, null, ALICE).template()).contains("second Alice");
+        assertThat(resolve.resolve(false, null, ALICE).template()).contains("first Alice"); // wrapped back to index 0
     }
 
     @Test
     void aDisabledJoinPolicySuppressesTheLineAndClearsVanilla() {
-        ResolvedMessage resolved = joinWith(MessagePolicy.disabled()).resolve(ALICE);
+        ResolvedMessage resolved = joinWith(MessagePolicy.disabled()).resolve(false, null, ALICE);
 
         assertThat(resolved.hasTemplate()).isFalse();
         assertThat(resolved.suppressVanilla()).isTrue();
@@ -67,10 +68,41 @@ class CommunicationResolutionTest {
 
     @Test
     void aDefaultJoinPolicyLeavesVanillaUntouched() {
-        ResolvedMessage resolved = joinWith(MessagePolicy.vanilla()).resolve(ALICE);
+        ResolvedMessage resolved = joinWith(MessagePolicy.vanilla()).resolve(false, null, ALICE);
 
         assertThat(resolved.hasTemplate()).isFalse();
         assertThat(resolved.suppressVanilla()).isFalse();
+    }
+
+    @Test
+    void aPerGroupJoinPolicyGreetsThatGroupWithItsOwnTemplateAndEveryoneElseWithTheDefault() {
+        JoinGroupPolicies groups = new JoinGroupPolicies(
+                Map.of("vip", MessagePolicy.custom(Ordering.SEQUENTIAL, List.of("vip {player}"))),
+                MessagePolicy.custom(Ordering.SEQUENTIAL, List.of("default {player}")));
+        ResolveJoinMessage resolve = joinWith(groups, MessagePolicy.vanilla());
+
+        assertThat(resolve.resolve(false, "vip", ALICE).template()).contains("vip Alice"); // group hit
+        assertThat(resolve.resolve(false, "member", ALICE).template()).contains("default Alice"); // group miss
+        assertThat(resolve.resolve(false, null, ALICE).template()).contains("default Alice"); // no group at all
+    }
+
+    @Test
+    void theFirstJoinWelcomeReplacesTheOrdinaryLineOnlyOnAFirstJoin() {
+        ResolveJoinMessage resolve = joinWith(
+                JoinGroupPolicies.ofDefault(MessagePolicy.custom(Ordering.SEQUENTIAL, List.of("join {player}"))),
+                MessagePolicy.custom(Ordering.SEQUENTIAL, List.of("welcome {player}")));
+
+        assertThat(resolve.resolve(true, null, ALICE).template()).contains("welcome Alice"); // first join -> welcome
+        assertThat(resolve.resolve(false, null, ALICE).template()).contains("join Alice"); // returning -> join line
+    }
+
+    @Test
+    void aFirstJoinWithNoWelcomeAuthoredFallsThroughToTheOrdinaryJoinLine() {
+        ResolveJoinMessage resolve = joinWith(
+                JoinGroupPolicies.ofDefault(MessagePolicy.custom(Ordering.SEQUENTIAL, List.of("join {player}"))),
+                MessagePolicy.vanilla());
+
+        assertThat(resolve.resolve(true, null, ALICE).template()).contains("join Alice");
     }
 
     @Test
@@ -119,8 +151,13 @@ class CommunicationResolutionTest {
     }
 
     private static ResolveJoinMessage joinWith(MessagePolicy policy) {
+        return joinWith(JoinGroupPolicies.ofDefault(policy), MessagePolicy.vanilla());
+    }
+
+    private static ResolveJoinMessage joinWith(JoinGroupPolicies groups, MessagePolicy firstJoin) {
         ResolveConnectionMessage engine = new ResolveConnectionMessage(new CountingSequence(), fixedRandom(0));
-        return new ResolveJoinMessage(engine, new AtomicReference<>(policy)::get);
+        return new ResolveJoinMessage(
+                engine, new AtomicReference<>(groups)::get, new AtomicReference<>(firstJoin)::get);
     }
 
     private static RandomSource fixedRandom(int value) {

@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AtomicSequenceCounter;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
@@ -97,10 +98,11 @@ class CommunicationAdapterTest {
     void theJoinListenerReplacesTheVanillaLineWithTheCustomTemplate() {
         ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random());
         ConnectionMessageListener listener = new ConnectionMessageListener(
-                new ResolveJoinMessage(engine, settings::joinPolicy),
+                new ResolveJoinMessage(engine, settings::joinPolicies, settings::firstJoinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
                 settings,
-                new BukkitInfoSender(sink));
+                new BukkitInfoSender(sink),
+                ChatMetaSource.empty());
         PlayerJoinEvent join = new PlayerJoinEvent(player, Component.text("Alice joined the game"));
 
         listener.onJoin(join);
@@ -134,10 +136,11 @@ class CommunicationAdapterTest {
         CommunicationSettings offSettings = new CommunicationSettings(dir, new NoopLogger());
         ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random());
         ConnectionMessageListener listener = new ConnectionMessageListener(
-                new ResolveJoinMessage(engine, offSettings::joinPolicy),
+                new ResolveJoinMessage(engine, offSettings::joinPolicies, offSettings::firstJoinPolicy),
                 new ResolveQuitMessage(engine, offSettings::quitPolicy),
                 offSettings,
-                new BukkitInfoSender(sink));
+                new BukkitInfoSender(sink),
+                ChatMetaSource.empty());
         PlayerJoinEvent join = new PlayerJoinEvent(player, Component.text("Alice joined the game"));
 
         listener.onJoin(join);
@@ -145,13 +148,40 @@ class CommunicationAdapterTest {
         assertThat(sink.lines).isEmpty();
     }
 
+    @Test
+    void theJoinListenerSendsTheDedicatedMotdListToTheJoiner(@TempDir Path motdDir) throws Exception {
+        // A dedicated motd list is delivered to the joiner (and takes precedence over the legacy info-page motd).
+        Path dir = motdDir.resolve("modules").resolve("communication");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("join-quit.conf"), """
+                join { mode = DEFAULT }
+                quit { mode = DEFAULT }
+                death { mode = DEFAULT }
+                motd = [ "Hi {player}", "Enjoy your stay" ]
+                """);
+        CommunicationSettings motdSettings = new CommunicationSettings(dir, new NoopLogger());
+        ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random());
+        ConnectionMessageListener listener = new ConnectionMessageListener(
+                new ResolveJoinMessage(engine, motdSettings::joinPolicies, motdSettings::firstJoinPolicy),
+                new ResolveQuitMessage(engine, motdSettings::quitPolicy),
+                motdSettings,
+                new BukkitInfoSender(sink),
+                ChatMetaSource.empty());
+        PlayerJoinEvent join = new PlayerJoinEvent(player, Component.text("Alice joined the game"));
+
+        listener.onJoin(join);
+
+        assertThat(sink.lines).containsExactly("Hi Alice", "Enjoy your stay");
+    }
+
     private ConnectionMessageListener joinListener() {
         ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random());
         return new ConnectionMessageListener(
-                new ResolveJoinMessage(engine, settings::joinPolicy),
+                new ResolveJoinMessage(engine, settings::joinPolicies, settings::firstJoinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
                 settings,
-                new BukkitInfoSender(sink));
+                new BukkitInfoSender(sink),
+                ChatMetaSource.empty());
     }
 
     @Test

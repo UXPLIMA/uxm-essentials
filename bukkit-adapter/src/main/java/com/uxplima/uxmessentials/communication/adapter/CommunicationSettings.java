@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
+import com.uxplima.uxmessentials.communication.domain.JoinGroupPolicies;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -56,9 +57,24 @@ public final class CommunicationSettings {
         this.content = new AtomicReference<>(CommunicationContentCodec.read(mergedContent(moduleDir, log)));
     }
 
-    /** The live join-channel policy; read fresh by {@code ResolveJoinMessage} each connection. */
-    public MessagePolicy joinPolicy() {
+    /** The live join-channel per-group policy table; read fresh by {@code ResolveJoinMessage} each connection. */
+    public JoinGroupPolicies joinPolicies() {
         return current().join();
+    }
+
+    /** The live default join-channel policy (the {@code join} block itself), sans its per-group overrides. */
+    public MessagePolicy joinPolicy() {
+        return current().join().defaultPolicy();
+    }
+
+    /** The live first-join welcome policy; read fresh by {@code ResolveJoinMessage} on a first-ever join. */
+    public MessagePolicy firstJoinPolicy() {
+        return current().firstJoin();
+    }
+
+    /** The live personal MOTD lines sent to a joining player; empty when no {@code motd} list is configured. */
+    public List<String> motdLines() {
+        return current().motd();
     }
 
     /** The live quit-channel policy. */
@@ -96,17 +112,15 @@ public final class CommunicationSettings {
         return current().chat();
     }
 
-    /** The optional first-join welcome template, broadcast only on a player's first-ever join. */
-    public Optional<String> firstJoinTemplate() {
-        return current().firstJoinTemplate();
-    }
-
     /** The optional info-page name shown to a dying player when send-info-after-death is configured. */
     public Optional<String> deathInfoPage() {
         return current().deathInfoPage();
     }
 
-    /** Whether a joining player is sent the {@code motd} info page; on by default, gated by {@code motd-on-join}. */
+    /**
+     * Whether a joining player is sent the legacy {@code motd} info page; on by default, gated by {@code motd-on-join}.
+     * This is the fallback the join listener uses only when no dedicated {@link #motdLines()} list is configured.
+     */
     public boolean motdOnJoin() {
         return current().motdOnJoin();
     }

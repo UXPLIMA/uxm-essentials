@@ -216,8 +216,9 @@ public final class CommunicationWiring {
         ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random);
         return new CommunicationServices(
                 // The connection policies still read straight off the live settings; only the announcer source
-                // widened to the config + enabled-store merge.
-                new ResolveJoinMessage(engine, settings::joinPolicy),
+                // widened to the config + enabled-store merge. Join reads the per-group table and the first-join
+                // welcome; the listener supplies the joiner's primary group and first-join flag.
+                new ResolveJoinMessage(engine, settings::joinPolicies, settings::firstJoinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
                 new ResolveDeathMessage(engine, settings::deathCausePolicies),
                 // The rotation cursor selects only over the merged announcements WITHOUT an interval override; each
@@ -238,7 +239,8 @@ public final class CommunicationWiring {
             Scheduler scheduler,
             ChatMetaSource chatMeta) {
         return List.of(
-                new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings, infoSender),
+                new ConnectionMessageListener(
+                        services.resolveJoin(), services.resolveQuit(), settings, infoSender, chatMeta),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
                 // English-only project (a founding decision): vanilla advancement titles are translatable components,
                 // so the listener renders them through the GlobalTranslator in this locale before flattening to text.

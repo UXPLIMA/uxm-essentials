@@ -47,12 +47,38 @@ class CommunicationSettingsSplitTest {
         });
         assertThat(announcer.defaultInterval().toSeconds()).isEqualTo(60L);
         assertThat(announcer.minOnlinePlayers()).isZero();
-        assertThat(settings.firstJoinTemplate()).contains("hi {player}");
+        // The legacy bare-string first-join maps to a single-template CUSTOM welcome policy.
+        assertThat(settings.firstJoinPolicy().mode()).isEqualTo(PolicyMode.CUSTOM);
+        assertThat(settings.firstJoinPolicy().templates()).containsExactly("hi {player}");
         assertThat(settings.deathInfoPage()).contains("rules");
         assertThat(settings.infoRegistry().find("rules"))
                 .map(InfoPage::lines)
                 .contains(List.of("Rule one", "Rule two"));
         assertThat(settings.infoRegistry().find("motd")).map(InfoPage::lines).contains(List.of("Welcome {player}"));
+    }
+
+    @Test
+    void parsesThePerGroupJoinOverridesAndTheMotdList(@TempDir Path dir) throws Exception {
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("join-quit.conf"), """
+                join {
+                  mode = CUSTOM
+                  ordering = SEQUENTIAL
+                  templates = [ "default {player}" ]
+                  groups { vip = [ "vip {player}" ] }
+                }
+                first-join { mode = CUSTOM, templates = [ "welcome {player}" ] }
+                motd = [ "hello {player}", "have fun" ]
+                """);
+
+        CommunicationSettings settings = new CommunicationSettings(dir, new NoopLogger());
+
+        // The default block greets an unlisted group; a listed group takes its own override (case-insensitively).
+        assertThat(settings.joinPolicies().policyFor("member").templates()).containsExactly("default {player}");
+        assertThat(settings.joinPolicies().policyFor("VIP").templates()).containsExactly("vip {player}");
+        // The block form of first-join parses through the channel policy codec.
+        assertThat(settings.firstJoinPolicy().templates()).containsExactly("welcome {player}");
+        assertThat(settings.motdLines()).containsExactly("hello {player}", "have fun");
     }
 
     @Test
@@ -88,7 +114,8 @@ class CommunicationSettingsSplitTest {
         assertThat(settings.quitPolicy().mode()).isEqualTo(PolicyMode.DEFAULT);
         assertThat(settings.deathPolicy().mode()).isEqualTo(PolicyMode.DEFAULT);
         assertThat(settings.announcerConfig().announcements()).isEmpty();
-        assertThat(settings.firstJoinTemplate()).isEmpty();
+        assertThat(settings.firstJoinPolicy().rendersTemplate()).isFalse();
+        assertThat(settings.motdLines()).isEmpty();
         assertThat(settings.deathInfoPage()).isEmpty();
         assertThat(settings.infoRegistry().isEmpty()).isTrue();
     }
@@ -180,8 +207,8 @@ class CommunicationSettingsSplitTest {
     private static ResolvedMessage resolveJoin(CommunicationSettings settings, String name) {
         ResolveConnectionMessage engine =
                 new ResolveConnectionMessage(new AtomicSequenceCounter(), new ThreadLocalRandomSource());
-        ResolveJoinMessage join = new ResolveJoinMessage(engine, settings::joinPolicy);
-        return join.resolve(PlaceholderBindings.of(Map.of("player", name)));
+        ResolveJoinMessage join = new ResolveJoinMessage(engine, settings::joinPolicies, settings::firstJoinPolicy);
+        return join.resolve(false, null, PlaceholderBindings.of(Map.of("player", name)));
     }
 
     private static final class NoopLogger implements Logger {

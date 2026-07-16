@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.communication.domain.DeathCause;
 import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
+import com.uxplima.uxmessentials.communication.domain.JoinGroupPolicies;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
 import com.uxplima.uxmessentials.communication.domain.PolicyMode;
@@ -80,13 +81,14 @@ final class CommunicationContentCodec {
     static CommunicationContent read(ConfigurationNode root) {
         ConfigurationNode announcer = root.node("announcer");
         return new CommunicationContent(
-                policy(root.node("join")),
+                joinPolicies(root.node("join")),
                 policy(root.node("quit")),
                 deathPolicies(root.node("death")),
                 announcer(announcer),
                 display(announcer.node("display")),
                 advancements(root.node("advancements")),
-                optionalString(root.node("first-join")),
+                firstJoin(root.node("first-join")),
+                strings(root.node("motd")),
                 optionalString(root.node("death-info-page")).map(name -> name.toLowerCase(Locale.ROOT)),
                 // Default true so a fresh install — and an upgraded one whose file predates the key — greets joining
                 // players with the motd; an operator who wants silence sets motd-on-join = false.
@@ -193,6 +195,46 @@ final class CommunicationContentCodec {
                 ChannelDisplay.color(bossBar.node("color").getString("PURPLE")),
                 ChannelDisplay.overlay(bossBar.node("overlay").getString("PROGRESS")),
                 Math.max(1, bossBar.node("seconds").getInt(DEFAULT_BOSS_BAR_SECONDS)));
+    }
+
+    /**
+     * Parse the {@code join} block into a {@link JoinGroupPolicies}. The block itself is the default policy (parsed
+     * by {@link #policy}), and each entry under a nested {@code groups} map is a per-group override — a bare template
+     * list keyed by a permission group name. An empty template list is skipped, so that group falls through to the
+     * default; the block's own {@code ordering} governs how a per-group list rotates, keeping a group override
+     * consistent with the default. A file with no {@code groups} map yields the single-default table, the
+     * pre-per-group behaviour.
+     */
+    private static JoinGroupPolicies joinPolicies(ConfigurationNode node) {
+        MessagePolicy defaultPolicy = policy(node);
+        Ordering ordering = enumToken(node.node("ordering").getString(""), Ordering.class, Ordering.SEQUENTIAL);
+        Map<String, MessagePolicy> byGroup = new LinkedHashMap<>();
+        node.node("groups")
+                .childrenMap()
+                .forEach((key, child) ->
+                        groupOverride(child, ordering).ifPresent(policy -> byGroup.put(String.valueOf(key), policy)));
+        return new JoinGroupPolicies(byGroup, defaultPolicy);
+    }
+
+    /** A per-group override from a bare template list; empty when no usable template is authored. */
+    private static Optional<MessagePolicy> groupOverride(ConfigurationNode node, Ordering ordering) {
+        List<String> templates = strings(node);
+        return templates.isEmpty() ? Optional.empty() : Optional.of(MessagePolicy.custom(ordering, templates));
+    }
+
+    /**
+     * Parse the {@code first-join} node into the welcome {@link MessagePolicy} broadcast on a player's first-ever
+     * join. A block ({@code first-join { mode = CUSTOM, templates = [ ... ] }}) parses through {@link #policy}; the
+     * legacy bare-string form ({@code first-join = "welcome {player}"}) maps to a single-template CUSTOM policy so an
+     * un-migrated file keeps working. An absent or blank value yields {@link MessagePolicy#vanilla()} — no welcome, so
+     * the join falls through to the ordinary per-group line.
+     */
+    private static MessagePolicy firstJoin(ConfigurationNode node) {
+        if (node.isMap()) {
+            return policy(node);
+        }
+        String legacy = node.getString("");
+        return legacy.isBlank() ? MessagePolicy.vanilla() : MessagePolicy.custom(Ordering.SEQUENTIAL, List.of(legacy));
     }
 
     private static MessagePolicy policy(ConfigurationNode node) {

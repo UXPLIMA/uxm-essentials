@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
+import com.uxplima.uxmessentials.communication.domain.JoinGroupPolicies;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import org.jspecify.annotations.NullMarked;
@@ -25,27 +26,29 @@ import org.jspecify.annotations.NullMarked;
  * {@code MessageKey} and never parity-checked. The policy/schedule/page records are the pure domain types the use
  * cases consume directly.
  *
- * @param join the join channel's policy
+ * @param join the join channel's per-group policy table (a default policy plus any per-group overrides)
  * @param quit the quit channel's policy
  * @param death the death channel's per-cause policy table (a default policy plus any per-cause overrides)
  * @param announcer the rotating announcer config
  * @param announcerDisplay the title/boss-bar timing the announcer's non-chat channels render with
  * @param advancements the advancement-notification config (filtering, template, channels, sound)
- * @param firstJoinTemplate the optional broadcast shown only on a player's first-ever join
+ * @param firstJoin the welcome policy broadcast only on a player's first-ever join ({@code DEFAULT} = none)
+ * @param motd the personal MOTD lines sent to a joining player after the join line (empty = none)
  * @param deathInfoPage the optional info-page name shown to a dying player
- * @param motdOnJoin whether the {@code motd} info page is sent to a player when they join
+ * @param motdOnJoin whether the legacy {@code motd} info page is sent to a player when they join
  * @param infoPages the operator's info pages (one auto-registered command each)
  * @param chat the public-chat format policy the chat renderer drives
  */
 @NullMarked
 public record CommunicationContent(
-        MessagePolicy join,
+        JoinGroupPolicies join,
         MessagePolicy quit,
         DeathCausePolicies death,
         AnnouncerConfig announcer,
         ChannelDisplay announcerDisplay,
         AdvancementNoticeConfig advancements,
-        Optional<String> firstJoinTemplate,
+        MessagePolicy firstJoin,
+        List<String> motd,
         Optional<String> deathInfoPage,
         boolean motdOnJoin,
         List<InfoPage> infoPages,
@@ -58,7 +61,8 @@ public record CommunicationContent(
         Objects.requireNonNull(announcer, "announcer");
         Objects.requireNonNull(announcerDisplay, "announcerDisplay");
         Objects.requireNonNull(advancements, "advancements");
-        Objects.requireNonNull(firstJoinTemplate, "firstJoinTemplate");
+        Objects.requireNonNull(firstJoin, "firstJoin");
+        motd = List.copyOf(Objects.requireNonNull(motd, "motd"));
         Objects.requireNonNull(deathInfoPage, "deathInfoPage");
         infoPages = List.copyOf(Objects.requireNonNull(infoPages, "infoPages"));
         Objects.requireNonNull(chat, "chat");
@@ -71,13 +75,14 @@ public record CommunicationContent(
      */
     public static CommunicationContent inert() {
         return new CommunicationContent(
-                MessagePolicy.vanilla(),
+                JoinGroupPolicies.ofDefault(MessagePolicy.vanilla()),
                 MessagePolicy.vanilla(),
                 DeathCausePolicies.ofDefault(MessagePolicy.vanilla()),
                 AnnouncerConfig.empty(),
                 CommunicationContentCodec.defaultDisplay(),
                 AdvancementNoticeConfig.disabled(),
-                Optional.empty(),
+                MessagePolicy.vanilla(),
+                List.of(),
                 Optional.empty(),
                 false,
                 List.of(),
