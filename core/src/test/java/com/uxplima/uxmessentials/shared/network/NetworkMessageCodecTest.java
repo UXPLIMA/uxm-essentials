@@ -29,7 +29,15 @@ class NetworkMessageCodecTest {
                 new IgnoreChanged("survival-1", OWNER),
                 new ServerPing("lobby-2", 1_717_000_000_000L),
                 new VotePartyFired("survival", 25),
-                new VoteCounterChanged("lobby"));
+                new VoteCounterChanged("lobby"),
+                new TradeSignalFrame(
+                        "survival-1",
+                        UUID.fromString("00000000-0000-0000-0000-0000000000cc"),
+                        "READY",
+                        OWNER,
+                        "Alice",
+                        UUID.fromString("00000000-0000-0000-0000-0000000000bb"),
+                        "Bob"));
     }
 
     @ParameterizedTest

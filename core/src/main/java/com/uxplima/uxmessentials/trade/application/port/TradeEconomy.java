@@ -29,4 +29,19 @@ public interface TradeEconomy {
      * applies — the guard is at the source, so two concurrent moves can never both overdraw.
      */
     boolean transfer(PlayerRef from, PlayerRef to, BigDecimal amount, String currencyId);
+
+    /**
+     * Escrow debit: guardedly remove {@code amount} of {@code currencyId} from {@code who}, returning {@code true} when
+     * the debit took and {@code false} when they could not cover it (nothing removed). This is the double-spend-safe
+     * point of a cross-server trade — the money leaves the payer here and lives in the escrow row until the trade
+     * commits (delivered to the counterparty via {@link #deposit}) or is refunded (deposited back to the payer).
+     */
+    boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId);
+
+    /**
+     * Credit {@code amount} of {@code currencyId} to {@code who} — the delivery half of a cross-server trade (the
+     * counterparty's escrowed money reaching the recipient) or a refund (the payer's own escrowed money returning). A
+     * DB-backed credit, so it applies whether or not the player is online.
+     */
+    void deposit(PlayerRef who, BigDecimal amount, String currencyId);
 }

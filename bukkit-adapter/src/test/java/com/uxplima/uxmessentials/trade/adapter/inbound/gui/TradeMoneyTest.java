@@ -189,6 +189,16 @@ class TradeMoneyTest {
             moves.add(new Move(from.name(), to.name(), amount));
             return true;
         }
+
+        @Override
+        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+            throw new UnsupportedOperationException("same-server settlement uses transfer");
+        }
+
+        @Override
+        public void deposit(PlayerRef who, BigDecimal amount, String currencyId) {
+            throw new UnsupportedOperationException("same-server settlement uses transfer");
+        }
     }
 
     /** Resolves any key to its plain key string. */

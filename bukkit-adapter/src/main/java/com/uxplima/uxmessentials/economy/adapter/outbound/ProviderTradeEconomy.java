@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import org.jspecify.annotations.NullMarked;
@@ -27,10 +28,12 @@ public final class ProviderTradeEconomy implements TradeEconomy {
 
     private final EconomyProvider economy;
     private final Currency defaultCurrency;
+    private final Logger logger;
 
-    public ProviderTradeEconomy(EconomyProvider economy, Currency defaultCurrency) {
+    public ProviderTradeEconomy(EconomyProvider economy, Currency defaultCurrency, Logger logger) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        this.logger = Objects.requireNonNull(logger, "logger");
     }
 
     @Override
@@ -48,6 +51,28 @@ public final class ProviderTradeEconomy implements TradeEconomy {
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
         return economy.transfer(from, to, Money.of(target, amount)).isOk();
+    }
+
+    @Override
+    public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(amount, "amount");
+        Currency target = resolve(currencyId);
+        return economy.debit(who, Money.of(target, amount)).isOk();
+    }
+
+    @Override
+    public void deposit(PlayerRef who, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(amount, "amount");
+        Currency target = resolve(currencyId);
+        if (economy.credit(who, Money.of(target, amount)).isErr()) {
+            logger.warn(
+                    "cross-server trade deposit of {} {} to {} was refused by the economy provider",
+                    amount,
+                    target.id().value(),
+                    who.name());
+        }
     }
 
     private Currency resolve(String currencyId) {

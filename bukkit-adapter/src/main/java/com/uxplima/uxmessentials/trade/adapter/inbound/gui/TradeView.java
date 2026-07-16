@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -344,14 +345,38 @@ public final class TradeView {
     }
 
     /**
-     * Both sides confirmed: settle the trade all-or-nothing. First freeze both windows so no offered stack can be
-     * pulled during settlement, then off the tick thread move the staked money (guarded, double-spend-safe) and only on
-     * success swap the item clones — a money failure leaves every stack with its owner, so nothing moves partway.
+     * Both sides confirmed: settle the trade all-or-nothing. First hop to each side's region to read its LIVE window
+     * and freeze it, then off the tick thread move the staked money (guarded, double-spend-safe) and only on success
+     * swap the item clones — a money failure leaves every stack with its owner, so nothing moves partway. Reading the
+     * live window here (rather than the last snapshot) is the Folia sub-tick fix: a stack a player places in the same
+     * tick as the counterpart's confirm, before its deferred re-read runs, is delivered instead of discarded. The
+     * settle runs only once both region reads complete, so it never races an un-read window.
      */
     private void commit(TradeExchange exchange) {
-        freeze(exchange, TradeSide.INITIATOR);
-        freeze(exchange, TradeSide.PARTNER);
-        scheduler.async(() -> settleAndDeliver(exchange));
+        AtomicInteger remaining = new AtomicInteger(TradeSide.values().length);
+        for (TradeSide side : TradeSide.values()) {
+            freezeAndCapture(exchange, side, remaining);
+        }
+    }
+
+    /** Read {@code side}'s live window into the item snapshot, clear and close it, and settle once both sides are read. */
+    private void freezeAndCapture(TradeExchange exchange, TradeSide side, AtomicInteger remaining) {
+        TradeHolder holder = exchange.holder(side);
+        PlayerRef viewer = holder.viewer();
+        scheduler.onEntity(viewer, () -> {
+            Inventory inv = holder.inventoryOrNull();
+            if (inv != null) {
+                exchange.captureItems(side, layout.readOffer(inv));
+                layout.clearOffer(inv);
+            }
+            Player live = Bukkit.getPlayer(viewer.uuid());
+            if (live != null && live.isOnline()) {
+                live.closeInventory();
+            }
+            if (remaining.decrementAndGet() == 0) {
+                scheduler.async(() -> settleAndDeliver(exchange));
+            }
+        });
     }
 
     private void settleAndDeliver(TradeExchange exchange) {
@@ -368,22 +393,6 @@ public final class TradeView {
             giveBack(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.PARTNER));
             notifyBoth(exchange, TradeMessageKey.TRADE_INSUFFICIENT_FUNDS);
         }
-    }
-
-    /** Empty a side's editable region and close its window, so no offered stack survives the async money settlement. */
-    private void freeze(TradeExchange exchange, TradeSide side) {
-        TradeHolder holder = exchange.holder(side);
-        PlayerRef viewer = holder.viewer();
-        scheduler.onEntity(viewer, () -> {
-            Inventory inv = holder.inventoryOrNull();
-            if (inv != null) {
-                layout.clearOffer(inv);
-            }
-            Player live = Bukkit.getPlayer(viewer.uuid());
-            if (live != null && live.isOnline()) {
-                live.closeInventory();
-            }
-        });
     }
 
     /** Deliver the (cloned) stacks {@code incoming} to {@code side}'s player, dropping any overflow at their feet. */

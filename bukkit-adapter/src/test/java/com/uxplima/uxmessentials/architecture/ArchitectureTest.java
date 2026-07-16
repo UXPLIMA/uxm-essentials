@@ -193,9 +193,9 @@ class ArchitectureTest {
             .and(areNotAllowedRawBukkitInventoryLeaves())
             .should(buildsOrOpensARawBukkitInventory())
             .because("spec-driven menus must render through the engine (the Menus facade); only the engine itself "
-                    + "and the sixteen genuine inventory leaves — the itemworld Workstation, the playerstate "
-                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them, and the trade "
-                    + "window — may create or open a raw Bukkit inventory");
+                    + "and the eighteen genuine inventory leaves — the itemworld Workstation, the playerstate "
+                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them, and the local and "
+                    + "cross-server trade windows — may create or open a raw Bukkit inventory");
 
     /**
      * Builds the condition matching either raw-Bukkit-GUI signature: implementing
@@ -256,7 +256,9 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer",
                 "com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector",
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView",
-                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeHolder");
+                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeHolder",
+                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView",
+                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeHolder");
         return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
             String fullName = javaClass.getFullName();
             int nested = fullName.indexOf('$');

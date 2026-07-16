@@ -124,6 +124,16 @@ class TradeSettlementTest {
             return true;
         }
 
+        @Override
+        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+            throw new UnsupportedOperationException("same-server settlement uses transfer");
+        }
+
+        @Override
+        public void deposit(PlayerRef who, BigDecimal amount, String currencyId) {
+            throw new UnsupportedOperationException("same-server settlement uses transfer");
+        }
+
         BigDecimal net(PlayerRef who, String currencyId) {
             BigDecimal total = BigDecimal.ZERO;
             for (Move move : moves) {

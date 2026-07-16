@@ -54,6 +54,12 @@ public enum TradeMessageKey implements MessageKey {
     TRADE_ITEM_BLACKLISTED("trade.item-blacklisted"),
     TRADE_CROSS_SERVER_DISABLED("trade.cross-server-disabled"),
 
+    // Cross-server trade — the bus rendezvous and the escrow-backed two-phase commit.
+    TRADE_CROSS_SERVER_REQUEST_SENT("trade.cross-server-request-sent"),
+    TRADE_CROSS_SERVER_INCOMING("trade.cross-server-incoming"),
+    TRADE_CROSS_SERVER_ESCROWED("trade.cross-server-escrowed"),
+    TRADE_CROSS_SERVER_COMPLETED("trade.cross-server-completed"),
+
     // The bare /trade root's usage line — shown to a sender who ran it without a target or subcommand.
     TRADE_USAGE("trade.usage");
 

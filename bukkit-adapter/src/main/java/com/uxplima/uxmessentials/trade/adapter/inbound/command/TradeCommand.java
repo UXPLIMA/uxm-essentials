@@ -1,9 +1,7 @@
 package com.uxplima.uxmessentials.trade.adapter.inbound.command;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.BiConsumer;
 
 import org.bukkit.Bukkit;
@@ -14,13 +12,10 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
-import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -29,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeSessions;
 import com.uxplima.uxmessentials.trade.application.PendingTradeRequest;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
@@ -62,19 +58,24 @@ public final class TradeCommand implements CommandRegistration {
     private final BiConsumer<Player, Player> opener;
     private final CommandFeedback feedback;
 
+    /** The cross-server view, present only when cross-server trading is wired; {@code null} means local-only. */
+    private final @Nullable CrossServerTradeView crossServer;
+
     public TradeCommand(
             TradeRequests requests,
             TradeCooldown cooldown,
             TradeConfig config,
             TradeSessions sessions,
             BiConsumer<Player, Player> opener,
-            Messages messages) {
+            Messages messages,
+            @Nullable CrossServerTradeView crossServer) {
         this.requests = Objects.requireNonNull(requests, "requests");
         this.cooldown = Objects.requireNonNull(cooldown, "cooldown");
         this.config = Objects.requireNonNull(config, "config");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.opener = Objects.requireNonNull(opener, "opener");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.crossServer = crossServer;
     }
 
     @Override
@@ -84,8 +85,8 @@ public final class TradeCommand implements CommandRegistration {
                 .executes(this::usage)
                 .then(resolutionNode("accept", this::accept))
                 .then(resolutionNode("deny", this::deny))
-                .then(Commands.argument("player", ArgumentTypes.player())
-                        .suggests(CommandSuggestions.singlePlayerTarget())
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .suggests(CommandSuggestions.onlinePlayers())
                         .executes(this::runSend))
                 .build();
     }
@@ -132,17 +133,42 @@ public final class TradeCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
-    private int runSend(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+    private int runSend(CommandContext<CommandSourceStack> ctx) {
         Player sender = playerOrNull(ctx);
         if (sender == null) {
             return 0;
         }
-        Optional<Player> target = resolveTarget(ctx);
-        if (target.isEmpty()) {
-            return 0;
+        String name = StringArgumentType.getString(ctx, "player");
+        Player local = Bukkit.getPlayerExact(name);
+        if (local != null) {
+            send(sender, local);
+        } else {
+            sendRemote(sender, name);
         }
-        send(sender, target.get());
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Open a cross-server trade request to a player who is not on this backend. Refused when cross-server trading is
+     * off (no view wired), and gated on the same self / busy / cooldown checks the local send applies; the target's
+     * backend answers over the bus.
+     */
+    void sendRemote(Player sender, String name) {
+        if (crossServer == null) {
+            notify(sender, TradeMessageKey.TRADE_CROSS_SERVER_DISABLED, Map.of());
+        } else if (sender.getName().equalsIgnoreCase(name)) {
+            notify(sender, TradeMessageKey.TRADE_CANNOT_TRADE_SELF, Map.of());
+        } else if (sessions.isTrading(sender.getUniqueId()) || crossServer.isTrading(sender.getUniqueId())) {
+            notify(sender, TradeMessageKey.TRADE_ALREADY_TRADING, Map.of());
+        } else {
+            long remaining = cooldown.remainingSeconds(sender.getUniqueId());
+            if (remaining > 0) {
+                notify(sender, TradeMessageKey.TRADE_ON_COOLDOWN, Map.of("seconds", Long.toString(remaining)));
+                return;
+            }
+            crossServer.invite(sender, name);
+            cooldown.stamp(sender.getUniqueId());
+        }
     }
 
     /** Open a request from {@code sender} to {@code target}, gating on self / busy / distance / cooldown. */
@@ -249,12 +275,6 @@ public final class TradeCommand implements CommandRegistration {
         }
         feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
         return null;
-    }
-
-    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
     }
 
     private static PendingTradeRequest requireRequest(TradeRequests.Match match) {

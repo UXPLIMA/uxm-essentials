@@ -168,7 +168,7 @@ class TradeRequestFlowTest {
         clock = new MutableClock(Instant.EPOCH);
         requests = new TradeRequests(clock, Duration.ofSeconds(config.requestExpirySeconds()));
         cooldown = new TradeCooldown(clock, Duration.ofSeconds(config.cooldownSeconds()));
-        command = new TradeCommand(requests, cooldown, config, sessions, view::open, new KeyMessages());
+        command = new TradeCommand(requests, cooldown, config, sessions, view::open, new KeyMessages(), null);
     }
 
     private static TradeConfig config(int distance, int cooldownSeconds) {

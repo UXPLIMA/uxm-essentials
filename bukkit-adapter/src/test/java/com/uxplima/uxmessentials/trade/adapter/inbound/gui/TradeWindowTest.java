@@ -127,6 +127,27 @@ class TradeWindowTest {
     }
 
     @Test
+    void aStackPlacedInTheSameTickAsConfirmIsDeliveredNotDiscarded() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        view.open(alice, bob);
+        place(alice, 0, new ItemStack(Material.DIAMOND, 3));
+        view.confirm(holder(alice));
+
+        // Bob drops an emerald into his window and confirms in the same tick, before the deferred re-read (syncOffer)
+        // that would fold it into the offer snapshot has run — so the domain session still shows Bob's offer empty. The
+        // Folia sub-tick fix reads each side's LIVE window at commit, so the emerald is delivered rather than
+        // discarded.
+        holder(bob).getInventory().setItem(layout.editableSlot(0), new ItemStack(Material.EMERALD, 2));
+        view.confirm(holder(bob));
+
+        assertThat(amount(alice, Material.EMERALD)).isEqualTo(2);
+        assertThat(amount(bob, Material.DIAMOND)).isEqualTo(3);
+        assertThat(amount(alice, Material.DIAMOND)).isZero();
+        assertThat(sessions.find(alice.getUniqueId())).isNull();
+    }
+
+    @Test
     void closingReturnsTheOfferedItemsToTheirOwner() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");

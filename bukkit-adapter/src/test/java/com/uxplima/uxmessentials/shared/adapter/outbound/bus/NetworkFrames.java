@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NpcChanged;
 import com.uxplima.uxmessentials.shared.network.PlayerWarpChanged;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
+import com.uxplima.uxmessentials.shared.network.TradeSignalFrame;
 import com.uxplima.uxmessentials.shared.network.VaultChanged;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
 import com.uxplima.uxmessentials.shared.network.VotePartyFired;
@@ -46,6 +47,14 @@ final class NetworkFrames {
                 new PlayerWarpChanged(origin, OWNER),
                 new HologramChanged(origin, "lobby-board"),
                 new NpcChanged(origin, "guide"),
-                new IgnoreChanged(origin, OWNER));
+                new IgnoreChanged(origin, OWNER),
+                new TradeSignalFrame(
+                        origin,
+                        UUID.fromString("00000000-0000-0000-0000-0000000000cc"),
+                        "READY",
+                        OWNER,
+                        "Alice",
+                        TARGET,
+                        "Bob"));
     }
 }

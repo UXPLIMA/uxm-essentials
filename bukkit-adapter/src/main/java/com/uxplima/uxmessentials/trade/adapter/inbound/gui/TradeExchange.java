@@ -102,6 +102,21 @@ final class TradeExchange {
         return Map.copyOf(side == TradeSide.INITIATOR ? initiatorMoney : partnerMoney);
     }
 
+    /**
+     * Overwrite {@code side}'s positional item snapshot with a fresh live read <em>without</em> touching the domain
+     * session — the commit path's two-hop live read (the Folia sub-tick fix). Because the session has already reached
+     * its terminal {@code COMMITTED} state when this runs, the money is settled from the confirmed session while the
+     * items delivered are exactly what physically sits in the window at freeze time, so a stack placed in the same tick
+     * as the counterpart's confirm is delivered rather than discarded.
+     */
+    synchronized void captureItems(TradeSide side, @Nullable ItemStack[] offer) {
+        if (side == TradeSide.INITIATOR) {
+            initiatorOffer = offer;
+        } else {
+            partnerOffer = offer;
+        }
+    }
+
     /** Rebuild {@code side}'s whole offer from its latest item array plus its staked money and re-stake it. */
     private void restake(TradeSide side) {
         @Nullable ItemStack[] items = side == TradeSide.INITIATOR ? initiatorOffer : partnerOffer;

@@ -31,7 +31,8 @@ public sealed interface NetworkMessage
                 IgnoreChanged,
                 ServerPing,
                 VotePartyFired,
-                VoteCounterChanged {
+                VoteCounterChanged,
+                TradeSignalFrame {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -57,7 +58,8 @@ public sealed interface NetworkMessage
         PLAYER_WARP_CHANGED(10),
         HOLOGRAM_CHANGED(11),
         NPC_CHANGED(12),
-        IGNORE_CHANGED(13);
+        IGNORE_CHANGED(13),
+        TRADE_SIGNAL(14);
 
         private final byte wireTag;
 

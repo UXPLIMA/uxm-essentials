@@ -91,6 +91,14 @@ public final class NetworkMessageCodec {
             case VoteCounterChanged counter -> {
                 // origin already written above; the counter frame carries no further body.
             }
+            case TradeSignalFrame trade -> {
+                writeUuid(out, trade.tradeId());
+                out.writeUTF(trade.signal());
+                writeUuid(out, trade.fromUuid());
+                out.writeUTF(trade.fromName());
+                writeUuid(out, trade.toUuid());
+                out.writeUTF(trade.toName());
+            }
         }
     }
 
@@ -110,6 +118,9 @@ public final class NetworkMessageCodec {
             case SERVER_PING -> new ServerPing(origin, in.readLong());
             case VOTE_PARTY_FIRED -> new VotePartyFired(origin, in.readInt());
             case VOTE_COUNTER_CHANGED -> new VoteCounterChanged(origin);
+            case TRADE_SIGNAL ->
+                new TradeSignalFrame(
+                        origin, readUuid(in), in.readUTF(), readUuid(in), in.readUTF(), readUuid(in), in.readUTF());
         };
     }
 

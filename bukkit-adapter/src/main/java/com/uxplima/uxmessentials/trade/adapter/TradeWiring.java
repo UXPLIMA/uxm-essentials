@@ -9,24 +9,35 @@ import java.util.Objects;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.trade.TradeRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.trade.adapter.inbound.command.TradeCommand;
+import com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeMoneyPrompt;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeSessions;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView;
+import com.uxplima.uxmessentials.trade.adapter.inbound.listener.TradeReconcileListener;
+import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeItemDelivery;
+import com.uxplima.uxmessentials.trade.adapter.outbound.BusTradeBus;
 import com.uxplima.uxmessentials.trade.adapter.outbound.LoggingTradeAudit;
+import com.uxplima.uxmessentials.trade.application.CrossServerTrade;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeCooldown;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeRequests;
 import com.uxplima.uxmessentials.trade.application.TradeSettlement;
+import com.uxplima.uxmessentials.trade.application.TradeSignal;
 import com.uxplima.uxmessentials.trade.application.port.TradeAudit;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
+import com.uxplima.uxmessentials.trade.application.port.TradeEscrowStore;
+import com.uxplima.uxmessentials.trade.application.port.TradeItemDelivery;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
@@ -55,9 +66,15 @@ public final class TradeWiring {
      * Build the trade adapters from {@code ctx}, ready to register. The {@code economy} seam is present only when the
      * economy provider is wired; when absent the money row is hidden and a trade moves items only.
      */
-    public static Wired wire(ModuleContext ctx, TextInput textInput, @Nullable TradeEconomy economy) {
+    public static Wired wire(
+            ModuleContext ctx,
+            TextInput textInput,
+            @Nullable TradeEconomy economy,
+            @Nullable Persistence persistence,
+            Bus bus) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(bus, "bus");
         TradeConfig config = TradeConfig.from(ctx.config());
         KernelPorts kernel = ctx.kernel();
         TradeSessions sessions = new TradeSessions();
@@ -84,8 +101,92 @@ public final class TradeWiring {
         Clock clock = Clock.systemUTC();
         TradeRequests requests = new TradeRequests(clock, Duration.ofSeconds(config.requestExpirySeconds()));
         TradeCooldown cooldown = new TradeCooldown(clock, Duration.ofSeconds(config.cooldownSeconds()));
-        TradeCommand command = new TradeCommand(requests, cooldown, config, sessions, view::open, kernel.messages());
-        return new Wired(List.of(command), List.of(view.newListener()), config, sessions, view);
+        // Cross-server escrow lands only when the module opts in (cross-server=true) and the network DB is present; a
+        // same-server-only install wires none of it and /trade to a non-local name is refused.
+        List<Listener> listeners = new java.util.ArrayList<>();
+        listeners.add(view.newListener());
+        @Nullable CrossServerTradeView crossView = null;
+        if (config.crossServer() && persistence != null) {
+            crossView = buildCrossServer(ctx, config, economy, persistence, bus, clock, listeners);
+        }
+        TradeCommand command =
+                new TradeCommand(requests, cooldown, config, sessions, view::open, kernel.messages(), crossView);
+        return new Wired(List.of(command), List.copyOf(listeners), config, sessions, view);
+    }
+
+    /**
+     * Build the cross-server escrow flow: the jOOQ escrow store over the shared DB, the item delivery and bus seams, the
+     * pure {@link CrossServerTrade} coordinator, and the solo trade window. The bus subscriber routes every inbound
+     * signal to both the coordinator (the {@code READY}/{@code COMMIT}/{@code ABORT} escrow engine) and the view (the
+     * rendezvous), and a join listener reconciles a rejoining player's dangling escrow. Returns the view the command
+     * opens a remote trade through and appends the window and reconcile listeners to {@code listeners}.
+     */
+    private static CrossServerTradeView buildCrossServer(
+            ModuleContext ctx,
+            TradeConfig config,
+            @Nullable TradeEconomy economy,
+            Persistence persistence,
+            Bus bus,
+            Clock clock,
+            List<Listener> listeners) {
+        KernelPorts kernel = ctx.kernel();
+        TradeEscrowStore escrows = TradeRepositories.escrowStore(persistence);
+        TradeItemDelivery delivery = new BukkitTradeItemDelivery(kernel.scheduler());
+        BusTradeBus tradeBus = new BusTradeBus(bus.publisher(), config.crossServer(), kernel.log());
+        TradeEconomy escrowEconomy = economy != null ? economy : itemsOnlyEconomy();
+        CrossServerTrade coordinator =
+                new CrossServerTrade(escrows, escrowEconomy, tradeBus, delivery, clock, kernel.log());
+        CrossServerTradeView crossView = new CrossServerTradeView(
+                kernel.messages(), kernel.messageSink(), kernel.scheduler(), coordinator, tradeBus, config);
+        java.util.function.Consumer<TradeSignal> route = signal -> {
+            coordinator.onSignal(signal);
+            crossViewOnSignal(crossView, signal);
+        };
+        tradeBus.subscribe(route);
+        bus.registry().register(tradeBus::onFrame);
+        listeners.add(crossView.newListener());
+        listeners.add(new TradeReconcileListener(kernel.scheduler(), coordinator));
+        return crossView;
+    }
+
+    private static void crossViewOnSignal(CrossServerTradeView crossView, TradeSignal signal) {
+        crossView.onSignal(signal);
+    }
+
+    /** A no-op economy for an items-only cross-server install (no economy provider); money is never staked in v1. */
+    private static TradeEconomy itemsOnlyEconomy() {
+        return new TradeEconomy() {
+            @Override
+            public boolean canAfford(
+                    com.uxplima.uxmessentials.shared.domain.PlayerRef who,
+                    java.math.BigDecimal amount,
+                    String currencyId) {
+                return true;
+            }
+
+            @Override
+            public boolean transfer(
+                    com.uxplima.uxmessentials.shared.domain.PlayerRef from,
+                    com.uxplima.uxmessentials.shared.domain.PlayerRef to,
+                    java.math.BigDecimal amount,
+                    String currencyId) {
+                return true;
+            }
+
+            @Override
+            public boolean withdraw(
+                    com.uxplima.uxmessentials.shared.domain.PlayerRef who,
+                    java.math.BigDecimal amount,
+                    String currencyId) {
+                return true;
+            }
+
+            @Override
+            public void deposit(
+                    com.uxplima.uxmessentials.shared.domain.PlayerRef who,
+                    java.math.BigDecimal amount,
+                    String currencyId) {}
+        };
     }
 
     /**

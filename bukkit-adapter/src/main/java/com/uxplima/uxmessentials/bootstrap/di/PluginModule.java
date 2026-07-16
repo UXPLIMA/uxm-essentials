@@ -961,12 +961,17 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("ranks"))) {
             wireRanks(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
-            wireTrade(ctx, resources, textInput, links);
+            wireTrade(ctx, persistence, resources, textInput, links, bus);
         }
     }
 
     private static void wireTrade(
-            ModuleContext ctx, CloseableResources resources, TextInput textInput, ContextLinks links) {
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            TextInput textInput,
+            ContextLinks links,
+            Bus bus) {
         // trade persists nothing same-server: a live trade is transient in-memory state (the TradeSessions registry and
         // its per-trade TradeExchange), and the config is read once into an immutable snapshot. The window view and its
         // click/drag/close/quit listener stand up here; Phase 3 adds the money row over the shared TextInput seam and
@@ -976,9 +981,10 @@ public final class PluginModule {
         // nothing.
         var provider = links.economyProvider;
         var currency = links.economyCurrency;
-        @org.jspecify.annotations.Nullable TradeEconomy economy =
-                provider != null && currency != null ? new ProviderTradeEconomy(provider, currency) : null;
-        TradeWiring.Wired wired = TradeWiring.wire(ctx, textInput, economy);
+        @org.jspecify.annotations.Nullable TradeEconomy economy = provider != null && currency != null
+                ? new ProviderTradeEconomy(provider, currency, ctx.kernel().log())
+                : null;
+        TradeWiring.Wired wired = TradeWiring.wire(ctx, textInput, economy, persistence, bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::closeAll);
