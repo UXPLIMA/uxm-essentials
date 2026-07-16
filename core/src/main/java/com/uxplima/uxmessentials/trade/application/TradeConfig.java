@@ -27,6 +27,10 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *     default {@code false} — it needs a proxy and the bus configured)
  * @param slotsPerSide how many item slots each participant gets in the trade window ({@code slots-per-side},
  *     default 12)
+ * @param requestExpirySeconds how long a {@code /trade} request stays acceptable before it expires, in seconds
+ *     ({@code request-expiry-seconds}, default 60)
+ * @param audit whether a completed trade emits an audit line on the shared audit channel ({@code audit},
+ *     default {@code true})
  */
 public record TradeConfig(
         boolean enabled,
@@ -35,13 +39,18 @@ public record TradeConfig(
         int requestDistance,
         int cooldownSeconds,
         boolean crossServer,
-        int slotsPerSide) {
+        int slotsPerSide,
+        int requestExpirySeconds,
+        boolean audit) {
 
     /** The default staked-currency set — the single shipped {@code coins} currency. */
     private static final List<String> DEFAULT_CURRENCIES = List.of("coins");
 
     /** The default per-player request cooldown, in seconds. */
     private static final int DEFAULT_COOLDOWN_SECONDS = 5;
+
+    /** The default lifetime of a pending {@code /trade} request, in seconds. */
+    private static final int DEFAULT_REQUEST_EXPIRY_SECONDS = 60;
 
     /** The default item slots per side — a compact grid within a double-chest window. */
     private static final int DEFAULT_SLOTS_PER_SIDE = 12;
@@ -61,6 +70,9 @@ public record TradeConfig(
             throw new IllegalArgumentException(
                     "slots-per-side must be between 1 and " + MAX_SLOTS_PER_SIDE + ": " + slotsPerSide);
         }
+        if (requestExpirySeconds < 1) {
+            throw new IllegalArgumentException("request-expiry-seconds must be at least 1: " + requestExpirySeconds);
+        }
     }
 
     /** Resolve the trade config from the module's scoped {@link ConfigStore} ({@code modules.trade}). */
@@ -73,7 +85,9 @@ public record TradeConfig(
                 config.getInt("request-distance", 0),
                 config.getInt("cooldown-seconds", DEFAULT_COOLDOWN_SECONDS),
                 config.getBoolean("cross-server", false),
-                config.getInt("slots-per-side", DEFAULT_SLOTS_PER_SIDE));
+                config.getInt("slots-per-side", DEFAULT_SLOTS_PER_SIDE),
+                config.getInt("request-expiry-seconds", DEFAULT_REQUEST_EXPIRY_SECONDS),
+                config.getBoolean("audit", true));
     }
 
     /** Whether a request distance is enforced at all — a non-positive distance means unlimited range. */

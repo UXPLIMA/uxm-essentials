@@ -1336,4 +1336,13 @@ permissions:
   uxmessentials.module.survival:
     description: 'Hot-reload / inspect the survival module (opt-in gameplay mechanics).'
     default: op
+  # Trade — secure player-to-player trading. /trade <player> requests a trade and /trade accept|deny answers one;
+  # uxmessentials.trade.use gates the whole command (ships true so every player may trade), and
+  # uxmessentials.module.trade is the reload/inspect tier for the context.
+  uxmessentials.trade.use:
+    description: '/trade — request a trade with another player and accept or deny requests.'
+    default: true
+  uxmessentials.module.trade:
+    description: 'Hot-reload / inspect the trade module.'
+    default: op
 

@@ -27,6 +27,8 @@ class TradeConfigTest {
         assertThat(config.cooldownSeconds()).isEqualTo(5);
         assertThat(config.crossServer()).isFalse();
         assertThat(config.slotsPerSide()).isEqualTo(12);
+        assertThat(config.requestExpirySeconds()).isEqualTo(60);
+        assertThat(config.audit()).isTrue();
     }
 
     @Test
@@ -45,7 +47,11 @@ class TradeConfigTest {
                 "cross-server",
                 true,
                 "slots-per-side",
-                16)));
+                16,
+                "request-expiry-seconds",
+                30,
+                "audit",
+                false)));
 
         assertThat(config.enabled()).isFalse();
         assertThat(config.currenciesAllowed()).containsExactly("coins", "gems");
@@ -55,6 +61,8 @@ class TradeConfigTest {
         assertThat(config.cooldownSeconds()).isEqualTo(10);
         assertThat(config.crossServer()).isTrue();
         assertThat(config.slotsPerSide()).isEqualTo(16);
+        assertThat(config.requestExpirySeconds()).isEqualTo(30);
+        assertThat(config.audit()).isFalse();
     }
 
     @Test

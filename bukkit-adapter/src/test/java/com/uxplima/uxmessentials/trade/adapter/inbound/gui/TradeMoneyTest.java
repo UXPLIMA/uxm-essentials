@@ -54,7 +54,7 @@ class TradeMoneyTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of("BEDROCK"), 0, 5, false, 12);
+        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of("BEDROCK"), 0, 5, false, 12, 60, false);
         layout = new TradeLayout(config.slotsPerSide(), config.currenciesAllowed());
         sessions = new TradeSessions();
         economy = new RecordingEconomy();
@@ -65,7 +65,8 @@ class TradeMoneyTest {
                 config,
                 sessions,
                 (p, v, c, s, x) -> {},
-                new TradeSettlement(economy));
+                new TradeSettlement(economy),
+                receipt -> {});
         server.getPluginManager().registerEvents(view.newListener(), plugin);
     }
 

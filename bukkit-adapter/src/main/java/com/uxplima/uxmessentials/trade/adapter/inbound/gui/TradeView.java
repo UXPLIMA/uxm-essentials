@@ -25,7 +25,9 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
+import com.uxplima.uxmessentials.trade.application.TradeReceipt;
 import com.uxplima.uxmessentials.trade.application.TradeSettlement;
+import com.uxplima.uxmessentials.trade.application.port.TradeAudit;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
 import com.uxplima.uxmessentials.trade.domain.TradeSession;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
@@ -59,6 +61,12 @@ public final class TradeView {
     /** The all-or-nothing money mover, present only when economy is wired; {@code null} means an items-only trade. */
     private final @Nullable TradeSettlement settlement;
 
+    /** The completed-trade audit sink; consulted only when {@link #auditEnabled} is set. */
+    private final TradeAudit audit;
+
+    /** Whether a completed trade emits an audit line — the module's {@code audit} config knob, resolved once. */
+    private final boolean auditEnabled;
+
     /** The materials refused into the window, resolved once from {@code item-blacklist}. */
     private final Set<Material> blacklist;
 
@@ -75,7 +83,8 @@ public final class TradeView {
             TradeConfig config,
             TradeSessions sessions,
             TradeMoneyPrompt moneyPrompt,
-            @Nullable TradeSettlement settlement) {
+            @Nullable TradeSettlement settlement,
+            TradeAudit audit) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -83,6 +92,8 @@ public final class TradeView {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.moneyPrompt = Objects.requireNonNull(moneyPrompt, "moneyPrompt");
         this.settlement = settlement;
+        this.audit = Objects.requireNonNull(audit, "audit");
+        this.auditEnabled = config.audit();
         // Money buttons appear only when economy is wired; without it the trade moves items only and the layout paints
         // its money slots as plain divider filler.
         List<String> currencies = settlement != null ? config.currenciesAllowed() : List.of();
@@ -348,6 +359,9 @@ public final class TradeView {
         if (settlement == null || settlement.settle(exchange.session())) {
             giveBack(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.PARTNER));
             giveBack(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.INITIATOR));
+            if (auditEnabled) {
+                audit.completed(TradeReceipt.of(exchange.session()));
+            }
             notifyBoth(exchange, TradeMessageKey.TRADE_COMPLETED);
         } else {
             giveBack(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.INITIATOR));

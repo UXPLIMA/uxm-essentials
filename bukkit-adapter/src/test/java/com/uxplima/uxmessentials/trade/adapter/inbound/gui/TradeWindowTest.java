@@ -51,12 +51,20 @@ class TradeWindowTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 12);
+        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 12, 60, false);
         layout = new TradeLayout(config.slotsPerSide(), List.of());
         sessions = new TradeSessions();
-        // Phase 2 coverage is items-only: no money prompt is driven and no economy is wired (null settlement).
+        // Phase 2 coverage is items-only: no money prompt is driven and no economy is wired (null settlement); audit is
+        // off in this config, so the no-op sink is never consulted.
         view = new TradeView(
-                new KeyMessages(), new NoopSink(), new SyncScheduler(), config, sessions, (p, v, c, s, x) -> {}, null);
+                new KeyMessages(),
+                new NoopSink(),
+                new SyncScheduler(),
+                config,
+                sessions,
+                (p, v, c, s, x) -> {},
+                null,
+                receipt -> {});
         server.getPluginManager().registerEvents(view.newListener(), plugin);
     }
 
