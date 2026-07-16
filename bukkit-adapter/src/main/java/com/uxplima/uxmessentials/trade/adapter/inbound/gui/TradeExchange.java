@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.trade.adapter.inbound.gui;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -7,6 +10,7 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
+import com.uxplima.uxmessentials.trade.domain.TradeOffer;
 import com.uxplima.uxmessentials.trade.domain.TradeSession;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import org.jspecify.annotations.NullMarked;
@@ -39,6 +43,8 @@ final class TradeExchange {
     private TradeSession session;
     private @Nullable ItemStack @Nullable [] initiatorOffer;
     private @Nullable ItemStack @Nullable [] partnerOffer;
+    private final Map<String, BigDecimal> initiatorMoney = new HashMap<>();
+    private final Map<String, BigDecimal> partnerMoney = new HashMap<>();
 
     TradeExchange(TradeSession session, TradeHolder initiatorHolder, TradeHolder partnerHolder) {
         this.session = Objects.requireNonNull(session, "session");
@@ -68,7 +74,39 @@ final class TradeExchange {
         } else {
             partnerOffer = offer;
         }
-        session = session.withOffer(side, TradeItemCodec.toOffer(offer));
+        restake(side);
+    }
+
+    /**
+     * Set {@code side}'s staked money for {@code currencyId} (a non-positive amount clears that currency) and re-stake
+     * the whole offer, which clears both confirmations — the same anti-scam invariant an item change triggers. A no-op
+     * once the trade has settled.
+     */
+    synchronized void setMoney(TradeSide side, String currencyId, BigDecimal amount) {
+        Objects.requireNonNull(currencyId, "currencyId");
+        Objects.requireNonNull(amount, "amount");
+        if (session.state().isTerminal()) {
+            return;
+        }
+        Map<String, BigDecimal> money = side == TradeSide.INITIATOR ? initiatorMoney : partnerMoney;
+        if (amount.signum() <= 0) {
+            money.remove(currencyId);
+        } else {
+            money.put(currencyId, amount);
+        }
+        restake(side);
+    }
+
+    /** {@code side}'s currently-staked money per currency id — a defensive copy for rendering. */
+    synchronized Map<String, BigDecimal> money(TradeSide side) {
+        return Map.copyOf(side == TradeSide.INITIATOR ? initiatorMoney : partnerMoney);
+    }
+
+    /** Rebuild {@code side}'s whole offer from its latest item array plus its staked money and re-stake it. */
+    private void restake(TradeSide side) {
+        @Nullable ItemStack[] items = side == TradeSide.INITIATOR ? initiatorOffer : partnerOffer;
+        Map<String, BigDecimal> money = side == TradeSide.INITIATOR ? initiatorMoney : partnerMoney;
+        session = session.withOffer(side, new TradeOffer(TradeItemCodec.items(items), Map.copyOf(money)));
     }
 
     /** Mark {@code side} confirmed; when both sides agree, win the settle race and arm the swap. */

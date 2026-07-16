@@ -34,6 +34,17 @@ public enum TradeMessageKey implements MessageKey {
     TRADE_WINDOW_PARTNER_WAITING("trade.window.partner-waiting"),
     TRADE_WINDOW_PARTNER_CONFIRMED("trade.window.partner-confirmed"),
 
+    // Trade window — the money row: the viewer's per-currency "add money" button, its staked-amount line, and the
+    // read-only display of the other side's staked money.
+    TRADE_WINDOW_MONEY("trade.window.money"),
+    TRADE_WINDOW_MONEY_AMOUNT("trade.window.money-amount"),
+    TRADE_WINDOW_PARTNER_MONEY("trade.window.partner-money"),
+
+    // Money prompt — the amount capture and its rejections.
+    TRADE_MONEY_PROMPT("trade.money-prompt"),
+    TRADE_MONEY_INVALID("trade.money-invalid"),
+    TRADE_INSUFFICIENT_FUNDS("trade.insufficient-funds"),
+
     // Refusals — the request or the open could not proceed.
     TRADE_ALREADY_TRADING("trade.already-trading"),
     TRADE_TARGET_BUSY("trade.target-busy"),

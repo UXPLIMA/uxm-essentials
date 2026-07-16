@@ -1,9 +1,13 @@
 package com.uxplima.uxmessentials.trade.adapter.inbound.gui;
 
 import java.util.Objects;
+import java.util.Set;
 
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -12,6 +16,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
 
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -29,10 +34,12 @@ public final class TradeListener implements Listener {
 
     private final TradeView view;
     private final TradeLayout layout;
+    private final Set<Material> blacklist;
 
-    public TradeListener(TradeView view, TradeLayout layout) {
+    public TradeListener(TradeView view, TradeLayout layout, Set<Material> blacklist) {
         this.view = Objects.requireNonNull(view, "view");
         this.layout = Objects.requireNonNull(layout, "layout");
+        this.blacklist = Set.copyOf(Objects.requireNonNull(blacklist, "blacklist"));
     }
 
     @EventHandler
@@ -47,8 +54,21 @@ public final class TradeListener implements Listener {
             view.confirm(holder);
             return;
         }
+        String currency = event.getRawSlot() < top.getSize() ? layout.moneyCurrencyAt(event.getRawSlot()) : null;
+        if (currency != null) {
+            event.setCancelled(true);
+            if (event.getWhoClicked() instanceof Player player) {
+                view.promptMoney(player, holder, currency);
+            }
+            return;
+        }
         if (!editAllowed(event, top)) {
             event.setCancelled(true);
+            return;
+        }
+        if (placesBlacklisted(event, top)) {
+            event.setCancelled(true);
+            view.refuseBlacklisted(holder);
             return;
         }
         view.scheduleSync(holder);
@@ -62,8 +82,14 @@ public final class TradeListener implements Listener {
             return;
         }
         int topSize = top.getSize();
+        boolean intoEditable = event.getRawSlots().stream().anyMatch(raw -> raw < topSize && layout.isEditable(raw));
         if (event.getRawSlots().stream().anyMatch(raw -> raw < topSize && !layout.isEditable(raw))) {
             event.setCancelled(true);
+            return;
+        }
+        if (intoEditable && isBlacklisted(event.getOldCursor())) {
+            event.setCancelled(true);
+            view.refuseBlacklisted(holder);
             return;
         }
         view.scheduleSync(holder);
@@ -85,6 +111,30 @@ public final class TradeListener implements Listener {
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
         view.onLeave(event.getPlayer().getUniqueId());
+    }
+
+    /**
+     * Whether this click would move a blacklisted item into the viewer's own editable region — the only way a fresh
+     * stack enters the window. A place or cursor-swap onto an editable slot carries the item on the cursor; a hotbar
+     * number-key swap carries the hotbar item. Shift-moves into the top are already denied outright by
+     * {@link #editAllowed}, so they never reach here.
+     */
+    private boolean placesBlacklisted(InventoryClickEvent event, Inventory top) {
+        Inventory clicked = event.getClickedInventory();
+        if (clicked == null || !clicked.equals(top) || !layout.isEditable(event.getRawSlot())) {
+            return false;
+        }
+        if (isBlacklisted(event.getCursor())) {
+            return true;
+        }
+        if (event.getClick() == ClickType.NUMBER_KEY) {
+            return isBlacklisted(event.getWhoClicked().getInventory().getItem(event.getHotbarButton()));
+        }
+        return false;
+    }
+
+    private boolean isBlacklisted(@Nullable ItemStack stack) {
+        return stack != null && !stack.getType().isAir() && blacklist.contains(stack.getType());
     }
 
     private boolean editAllowed(InventoryClickEvent event, Inventory top) {

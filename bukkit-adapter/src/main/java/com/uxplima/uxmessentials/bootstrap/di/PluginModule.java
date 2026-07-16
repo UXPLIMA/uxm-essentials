@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderRankEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderSurvivalSales;
+import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderTradeEconomy;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -194,6 +195,7 @@ import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.trade.adapter.TradeWiring;
+import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
@@ -959,18 +961,24 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("ranks"))) {
             wireRanks(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
-            wireTrade(ctx, resources);
+            wireTrade(ctx, resources, textInput, links);
         }
     }
 
-    private static void wireTrade(ModuleContext ctx, CloseableResources resources) {
+    private static void wireTrade(
+            ModuleContext ctx, CloseableResources resources, TextInput textInput, ContextLinks links) {
         // trade persists nothing same-server: a live trade is transient in-memory state (the TradeSessions registry and
-        // its per-trade TradeExchange), and the config is read once into an immutable snapshot. Phase 2 stands up the
-        // trade-window view and its click/drag/close/quit listener; the economy trade port, the /trade request
-        // commands,
-        // and the cross-server bus escrow land behind this same seam in the later phases. closeAll() drains every live
-        // trade on module stop or reload — returning both sides' offered items — so a disable leaves no held stacks.
-        TradeWiring.Wired wired = TradeWiring.wire(ctx);
+        // its per-trade TradeExchange), and the config is read once into an immutable snapshot. The window view and its
+        // click/drag/close/quit listener stand up here; Phase 3 adds the money row over the shared TextInput seam and
+        // the trade economy port, bridged from the provider captured at economy-wiring time (trade registers after
+        // economy) — or left empty when economy is disabled, in which case a trade moves items only. closeAll() drains
+        // every live trade on module stop or reload — returning both sides' offered items — so a disable leaves
+        // nothing.
+        var provider = links.economyProvider;
+        var currency = links.economyCurrency;
+        @org.jspecify.annotations.Nullable TradeEconomy economy =
+                provider != null && currency != null ? new ProviderTradeEconomy(provider, currency) : null;
+        TradeWiring.Wired wired = TradeWiring.wire(ctx, textInput, economy);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::closeAll);

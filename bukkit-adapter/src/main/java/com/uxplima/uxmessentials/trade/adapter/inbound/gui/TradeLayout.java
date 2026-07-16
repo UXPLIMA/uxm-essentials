@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.trade.adapter.inbound.gui;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,15 +47,29 @@ final class TradeLayout {
     private static final int MIRROR_COLUMN_OFFSET = 5;
     private static final int CONFIRM_SLOT = 49; // row 5, centre column
     private static final int PARTNER_STATUS_SLOT = 4; // row 0, centre column
+    private static final int PARTNER_MONEY_SLOT = 13; // row 1, centre column — the other side's staked money, read-only
+
+    /**
+     * The centre-column slots the viewer's own per-currency "add money" buttons occupy, one per allowed currency, in
+     * priority order from just above the confirm button upward. Capped to this list, so a config listing more
+     * currencies than there are slots simply shows the first few as buttons.
+     */
+    private static final List<Integer> MONEY_BUTTON_SLOTS = List.of(40, 31, 22); // rows 4, 3, 2 of the centre column
 
     private final int perSide;
     private final List<Integer> editableSlots;
     private final List<Integer> mirrorSlots;
 
-    TradeLayout(int slotsPerSide) {
+    /** The allowed currency ids the viewer may stake, capped to {@link #MONEY_BUTTON_SLOTS}; empty when money is off. */
+    private final List<String> moneyCurrencies;
+
+    TradeLayout(int slotsPerSide, List<String> moneyCurrencies) {
+        Objects.requireNonNull(moneyCurrencies, "moneyCurrencies");
         this.perSide = Math.min(Math.max(slotsPerSide, 1), MAX_PER_SIDE);
         this.editableSlots = slots(0);
         this.mirrorSlots = slots(MIRROR_COLUMN_OFFSET);
+        int cap = Math.min(moneyCurrencies.size(), MONEY_BUTTON_SLOTS.size());
+        this.moneyCurrencies = List.copyOf(moneyCurrencies.subList(0, cap));
     }
 
     private List<Integer> slots(int columnOffset) {
@@ -86,18 +101,40 @@ final class TradeLayout {
         return CONFIRM_SLOT;
     }
 
-    /** Paint the divider and control frame; the editable, mirror, confirm, and status slots are left for the view. */
+    /**
+     * The allowed currency id whose "add money" button sits at {@code rawSlot}, or {@code null} when {@code rawSlot} is
+     * not one of the viewer's money buttons — the listener routes a money-button click to the amount prompt through it.
+     */
+    @Nullable String moneyCurrencyAt(int rawSlot) {
+        for (int i = 0; i < moneyCurrencies.size(); i++) {
+            if (MONEY_BUTTON_SLOTS.get(i) == rawSlot) {
+                return moneyCurrencies.get(i);
+            }
+        }
+        return null;
+    }
+
+    /** Paint the divider and control frame; the editable, mirror, control, and money slots are left for the view. */
     void seedFrame(Inventory inv) {
         Objects.requireNonNull(inv, "inv");
         ItemStack pane = filler();
         for (int slot = 0; slot < SIZE; slot++) {
-            if (!editableSlots.contains(slot)
-                    && !mirrorSlots.contains(slot)
-                    && slot != CONFIRM_SLOT
-                    && slot != PARTNER_STATUS_SLOT) {
+            if (!editableSlots.contains(slot) && !mirrorSlots.contains(slot) && !isControlSlot(slot)) {
                 inv.setItem(slot, pane.clone());
             }
         }
+    }
+
+    /** Whether {@code slot} carries a control or money item the view paints, so {@link #seedFrame} leaves it alone. */
+    private boolean isControlSlot(int slot) {
+        if (slot == CONFIRM_SLOT || slot == PARTNER_STATUS_SLOT) {
+            return true;
+        }
+        if (moneyCurrencies.isEmpty()) {
+            return false;
+        }
+        return slot == PARTNER_MONEY_SLOT
+                || MONEY_BUTTON_SLOTS.subList(0, moneyCurrencies.size()).contains(slot);
     }
 
     /** Paint the two control items — the viewer's confirm button and the partner's status — for this render. */
@@ -105,6 +142,54 @@ final class TradeLayout {
             Inventory inv, Messages messages, PlayerRef viewer, boolean selfConfirmed, boolean partnerConfirmed) {
         inv.setItem(CONFIRM_SLOT, confirmButton(messages, viewer, selfConfirmed));
         inv.setItem(PARTNER_STATUS_SLOT, partnerStatus(messages, viewer, partnerConfirmed));
+    }
+
+    /**
+     * Paint the money row: one "add money" button per allowed currency showing the viewer's own staked amount, and the
+     * read-only display of the other side's staked money. A no-op when money is off (no economy wired), so those slots
+     * stay the divider filler {@link #seedFrame} laid down.
+     */
+    void renderMoney(
+            Inventory inv,
+            Messages messages,
+            PlayerRef viewer,
+            Map<String, BigDecimal> ownMoney,
+            Map<String, BigDecimal> partnerMoney) {
+        if (moneyCurrencies.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < moneyCurrencies.size(); i++) {
+            String currency = moneyCurrencies.get(i);
+            BigDecimal amount = ownMoney.getOrDefault(currency, BigDecimal.ZERO);
+            inv.setItem(MONEY_BUTTON_SLOTS.get(i), moneyButton(messages, viewer, currency, amount));
+        }
+        inv.setItem(PARTNER_MONEY_SLOT, partnerMoneyDisplay(messages, viewer, partnerMoney));
+    }
+
+    private ItemStack moneyButton(Messages messages, PlayerRef viewer, String currency, BigDecimal amount) {
+        Component name = StyledText.render(
+                messages.resolve(viewer, TradeMessageKey.TRADE_WINDOW_MONEY, Map.of("currency", currency)));
+        return ItemBuilder.of(Material.GOLD_INGOT)
+                .name(name)
+                .lore(amountLine(messages, viewer, currency, amount))
+                .build();
+    }
+
+    private ItemStack partnerMoneyDisplay(Messages messages, PlayerRef viewer, Map<String, BigDecimal> partnerMoney) {
+        Component name =
+                StyledText.render(messages.resolve(viewer, TradeMessageKey.TRADE_WINDOW_PARTNER_MONEY, Map.of()));
+        List<Component> lore = new ArrayList<>();
+        for (String currency : moneyCurrencies) {
+            lore.add(amountLine(messages, viewer, currency, partnerMoney.getOrDefault(currency, BigDecimal.ZERO)));
+        }
+        return ItemBuilder.of(Material.SUNFLOWER).name(name).lore(lore).build();
+    }
+
+    private Component amountLine(Messages messages, PlayerRef viewer, String currency, BigDecimal amount) {
+        return StyledText.render(messages.resolve(
+                viewer,
+                TradeMessageKey.TRADE_WINDOW_MONEY_AMOUNT,
+                Map.of("currency", currency, "amount", amount.toPlainString())));
     }
 
     private ItemStack confirmButton(Messages messages, PlayerRef viewer, boolean confirmed) {

@@ -1,11 +1,17 @@
 package com.uxplima.uxmessentials.trade.adapter.inbound.gui;
 
+import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -19,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
+import com.uxplima.uxmessentials.trade.application.TradeSettlement;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
 import com.uxplima.uxmessentials.trade.domain.TradeSession;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
@@ -47,24 +54,45 @@ public final class TradeView {
     private final Scheduler scheduler;
     private final TradeLayout layout;
     private final TradeSessions sessions;
+    private final TradeMoneyPrompt moneyPrompt;
+
+    /** The all-or-nothing money mover, present only when economy is wired; {@code null} means an items-only trade. */
+    private final @Nullable TradeSettlement settlement;
+
+    /** The materials refused into the window, resolved once from {@code item-blacklist}. */
+    private final Set<Material> blacklist;
+
+    /**
+     * Viewers whose window closed only to show the money prompt — their next {@link #onClose} is a re-open, not a
+     * cancel. Concurrent because the two participants' region threads touch it independently on Folia.
+     */
+    private final Set<UUID> promptingViewers = ConcurrentHashMap.newKeySet();
 
     public TradeView(
             Messages messages,
             MessageSink messageSink,
             Scheduler scheduler,
             TradeConfig config,
-            TradeSessions sessions) {
+            TradeSessions sessions,
+            TradeMoneyPrompt moneyPrompt,
+            @Nullable TradeSettlement settlement) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(config, "config");
-        this.layout = new TradeLayout(config.slotsPerSide());
         this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.moneyPrompt = Objects.requireNonNull(moneyPrompt, "moneyPrompt");
+        this.settlement = settlement;
+        // Money buttons appear only when economy is wired; without it the trade moves items only and the layout paints
+        // its money slots as plain divider filler.
+        List<String> currencies = settlement != null ? config.currenciesAllowed() : List.of();
+        this.layout = new TradeLayout(config.slotsPerSide(), currencies);
+        this.blacklist = parseBlacklist(config.itemBlacklist());
     }
 
-    /** The window listener bound to this view and its layout — the wiring registers it and this view drives it. */
+    /** The window listener bound to this view, its layout, and the item blacklist — the wiring registers it. */
     public TradeListener newListener() {
-        return new TradeListener(this, layout);
+        return new TradeListener(this, layout, blacklist);
     }
 
     /**
@@ -126,10 +154,92 @@ public final class TradeView {
 
     /** A window closed — cancel the trade (if still live) and return both sides' items to their owners. */
     void onClose(TradeHolder holder) {
+        if (promptingViewers.remove(holder.viewer().uuid())) {
+            // The window closed only so the money prompt could take over the screen; the prompt callback reopens it.
+            return;
+        }
         TradeExchange exchange = sessions.find(holder.tradeId());
         if (exchange != null) {
             cancel(exchange);
         }
+    }
+
+    /** Refuse a blacklisted item back into the window — tell the viewer their placement was rejected. */
+    void refuseBlacklisted(TradeHolder holder) {
+        PlayerRef viewer = holder.viewer();
+        messageSink.deliver(viewer, messages.resolve(viewer, TradeMessageKey.TRADE_ITEM_BLACKLISTED, Map.of()));
+    }
+
+    /**
+     * A viewer clicked their "add money" button for {@code currencyId} — prompt them for an amount. The window closes
+     * to show the prompt (suppressed from the cancel path), and the prompt callback re-stakes the money and reopens.
+     */
+    void promptMoney(Player player, TradeHolder holder, String currencyId) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(currencyId, "currencyId");
+        TradeExchange exchange = sessions.find(holder.tradeId());
+        if (settlement == null || exchange == null || exchange.session().state().isTerminal()) {
+            return;
+        }
+        PlayerRef viewer = holder.viewer();
+        promptingViewers.add(viewer.uuid());
+        moneyPrompt.prompt(
+                player,
+                viewer,
+                currencyId,
+                text -> onMoneySubmitted(holder, currencyId, text, player),
+                () -> reopenAfterPrompt(holder, player));
+    }
+
+    private void onMoneySubmitted(TradeHolder holder, String currencyId, String text, Player player) {
+        PlayerRef viewer = holder.viewer();
+        TradeExchange exchange = sessions.find(holder.tradeId());
+        if (exchange != null && !exchange.session().state().isTerminal()) {
+            Optional<BigDecimal> amount = parseAmount(text);
+            if (amount.isEmpty()) {
+                messageSink.deliver(viewer, messages.resolve(viewer, TradeMessageKey.TRADE_MONEY_INVALID, Map.of()));
+            } else {
+                exchange.setMoney(holder.side(), currencyId, amount.get());
+            }
+        }
+        reopenAfterPrompt(holder, player);
+    }
+
+    /** Reopen the viewer's window after the prompt resolves and re-render both sides (a money change reset confirms). */
+    private void reopenAfterPrompt(TradeHolder holder, Player player) {
+        promptingViewers.remove(holder.viewer().uuid());
+        TradeExchange exchange = sessions.find(holder.tradeId());
+        if (exchange == null || exchange.session().state().isTerminal()) {
+            return;
+        }
+        scheduler.onEntity(holder.viewer(), () -> {
+            Inventory inv = holder.inventoryOrNull();
+            if (inv != null && player.isOnline()) {
+                player.openInventory(inv);
+            }
+        });
+        rerender(exchange);
+    }
+
+    /** Parse a typed money amount — a strictly-positive number, else empty (an invalid entry is rejected). */
+    private static Optional<BigDecimal> parseAmount(String text) {
+        try {
+            BigDecimal value = new BigDecimal(text.trim());
+            return value.signum() > 0 ? Optional.of(value) : Optional.empty();
+        } catch (NumberFormatException notANumber) {
+            return Optional.empty();
+        }
+    }
+
+    private static Set<Material> parseBlacklist(List<String> ids) {
+        Set<Material> materials = EnumSet.noneOf(Material.class);
+        for (String id : ids) {
+            Material material = Material.matchMaterial(id);
+            if (material != null) {
+                materials.add(material);
+            }
+        }
+        return materials;
     }
 
     /** A participant changed world — treat it like a close, returning both sides' items. */
@@ -175,7 +285,14 @@ public final class TradeView {
             Inventory inv = Bukkit.createInventory(holder, TradeLayout.SIZE, title(viewer, other));
             holder.attach(inv);
             layout.seedFrame(inv);
-            renderView(inv, viewer, exchange.offer(side.other()), false, false);
+            renderView(
+                    inv,
+                    viewer,
+                    exchange.offer(side.other()),
+                    false,
+                    false,
+                    exchange.money(side),
+                    exchange.money(side.other()));
             live.openInventory(inv);
         });
     }
@@ -192,10 +309,12 @@ public final class TradeView {
         @Nullable ItemStack @Nullable [] otherOffer = exchange.offer(side.other());
         boolean self = exchange.confirmed(side);
         boolean partner = exchange.confirmed(side.other());
+        Map<String, BigDecimal> ownMoney = exchange.money(side);
+        Map<String, BigDecimal> partnerMoney = exchange.money(side.other());
         scheduler.onEntity(viewer, () -> {
             Inventory inv = holder.inventoryOrNull();
             if (inv != null) {
-                renderView(inv, viewer, otherOffer, self, partner);
+                renderView(inv, viewer, otherOffer, self, partner, ownMoney, partnerMoney);
             }
         });
     }
@@ -205,16 +324,64 @@ public final class TradeView {
             PlayerRef viewer,
             @Nullable ItemStack @Nullable [] otherOffer,
             boolean self,
-            boolean partner) {
+            boolean partner,
+            Map<String, BigDecimal> ownMoney,
+            Map<String, BigDecimal> partnerMoney) {
         layout.renderMirror(inv, otherOffer);
         layout.renderControls(inv, messages, viewer, self, partner);
+        layout.renderMoney(inv, messages, viewer, ownMoney, partnerMoney);
     }
 
+    /**
+     * Both sides confirmed: settle the trade all-or-nothing. First freeze both windows so no offered stack can be
+     * pulled during settlement, then off the tick thread move the staked money (guarded, double-spend-safe) and only on
+     * success swap the item clones — a money failure leaves every stack with its owner, so nothing moves partway.
+     */
     private void commit(TradeExchange exchange) {
+        freeze(exchange, TradeSide.INITIATOR);
+        freeze(exchange, TradeSide.PARTNER);
+        scheduler.async(() -> settleAndDeliver(exchange));
+    }
+
+    private void settleAndDeliver(TradeExchange exchange) {
         sessions.remove(exchange);
-        deliverAndClose(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.PARTNER));
-        deliverAndClose(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.INITIATOR));
-        notifyBoth(exchange, TradeMessageKey.TRADE_COMPLETED);
+        if (settlement == null || settlement.settle(exchange.session())) {
+            giveBack(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.PARTNER));
+            giveBack(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.INITIATOR));
+            notifyBoth(exchange, TradeMessageKey.TRADE_COMPLETED);
+        } else {
+            giveBack(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.INITIATOR));
+            giveBack(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.PARTNER));
+            notifyBoth(exchange, TradeMessageKey.TRADE_INSUFFICIENT_FUNDS);
+        }
+    }
+
+    /** Empty a side's editable region and close its window, so no offered stack survives the async money settlement. */
+    private void freeze(TradeExchange exchange, TradeSide side) {
+        TradeHolder holder = exchange.holder(side);
+        PlayerRef viewer = holder.viewer();
+        scheduler.onEntity(viewer, () -> {
+            Inventory inv = holder.inventoryOrNull();
+            if (inv != null) {
+                layout.clearOffer(inv);
+            }
+            Player live = Bukkit.getPlayer(viewer.uuid());
+            if (live != null && live.isOnline()) {
+                live.closeInventory();
+            }
+        });
+    }
+
+    /** Deliver the (cloned) stacks {@code incoming} to {@code side}'s player, dropping any overflow at their feet. */
+    private void giveBack(TradeExchange exchange, TradeSide side, @Nullable ItemStack @Nullable [] incoming) {
+        PlayerRef viewer = exchange.holder(side).viewer();
+        List<ItemStack> gifts = TradeItemCodec.stacks(incoming);
+        scheduler.onEntity(viewer, () -> {
+            Player live = Bukkit.getPlayer(viewer.uuid());
+            if (live != null && live.isOnline()) {
+                deliver(live, gifts);
+            }
+        });
     }
 
     private void cancel(TradeExchange exchange) {
