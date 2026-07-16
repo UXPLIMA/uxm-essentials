@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.communication.adapter.inbound.command.Communica
 import com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView;
 import com.uxplima.uxmessentials.communication.adapter.inbound.gui.CommunicationAdminMenu;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.AdvancementMessageListener;
+import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatFormatListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatLockListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.DeathMessageListener;
@@ -25,6 +26,8 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AtomicSequenceCounter;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSources;
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
@@ -174,6 +177,8 @@ public final class CommunicationWiring {
                 settings,
                 editorView));
         commands.add(new CommunicationGuiCommand(adminMenu, kernel.messages()));
+        // LuckPerms-backed prefix/suffix/group when installed, an empty fallback otherwise (probed once here).
+        ChatMetaSource chatMeta = ChatMetaSources.create(plugin.getServer());
         List<Listener> listeners = listeners(
                 services,
                 registry,
@@ -183,7 +188,8 @@ public final class CommunicationWiring {
                 notifier,
                 channelBroadcaster,
                 optOutStore,
-                kernel.scheduler());
+                kernel.scheduler(),
+                chatMeta);
         return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminMenu);
     }
 
@@ -229,7 +235,8 @@ public final class CommunicationWiring {
             CommunicationNotifier notifier,
             ChannelBroadcaster channelBroadcaster,
             BroadcastOptOutStore optOutStore,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            ChatMetaSource chatMeta) {
         return List.of(
                 new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings, infoSender),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
@@ -242,7 +249,10 @@ public final class CommunicationWiring {
                         CommunicationWiring::probeVanished,
                         scheduler,
                         Locale.ENGLISH),
-                new ChatLockListener(chatLock, notifier));
+                new ChatLockListener(chatLock, notifier),
+                // Registered at NORMAL, before the ChatLock at HIGH: a locked chat is cancelled there and a
+                // cancelled event never reaches the renderer, so the format can never override the lock.
+                new ChatFormatListener(settings::chatFormatPolicy, chatMeta));
     }
 
     /**

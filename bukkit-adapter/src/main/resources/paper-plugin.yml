@@ -1004,6 +1004,9 @@ permissions:
   uxmessentials.communication.chat.bypass:
     description: 'Keep chatting while public chat is locked by /togglechat.'
     default: op
+  uxmessentials.communication.chat.format:
+    description: 'Use MiniMessage formatting in your own public chat messages (when allow-player-format is on).'
+    default: false
   # /communication gui and the communication entry on the /uxmess gui hub gate on this node: the admin panel with
   # the chat-lock toggle, the clearchat and broadcast actions, and the read-only announcer list.
   uxmessentials.communication.gui:

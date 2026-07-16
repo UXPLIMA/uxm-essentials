@@ -46,6 +46,7 @@ final class DefaultResources {
             "modules/communication/announcer.conf",
             "modules/communication/advancements.conf",
             "modules/communication/info-pages.conf",
+            "modules/communication/chat.conf",
             "modules/vote/config.conf",
             "modules/holograms/config.conf",
             "modules/playerwarps/config.conf",

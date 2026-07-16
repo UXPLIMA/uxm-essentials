@@ -13,6 +13,7 @@ import java.util.Set;
 import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
@@ -87,7 +88,45 @@ final class CommunicationContentCodec {
                 // Default true so a fresh install — and an upgraded one whose file predates the key — greets joining
                 // players with the motd; an operator who wants silence sets motd-on-join = false.
                 root.node("motd-on-join").getBoolean(true),
-                infoPages(root.node("info-pages")));
+                infoPages(root.node("info-pages")),
+                chat(root.node("chat")));
+    }
+
+    /**
+     * Parse the {@code chat} block into a {@link ChatFormatPolicy}. An absent block (no {@code chat.conf}) yields
+     * {@link ChatFormatPolicy#disabled()}, so a server without the file keeps vanilla chat. When present the policy
+     * defaults {@code enabled} to {@code false} — the operator opts in explicitly — and falls back to the shipped
+     * near-vanilla format when the {@code format} key is blank, so an enabled-but-empty block still renders. The
+     * {@code group-formats} map drops blank values, and the two name-decoration keys default to empty (no hover /
+     * no click).
+     */
+    private static ChatFormatPolicy chat(ConfigurationNode node) {
+        if (node.virtual()) {
+            return ChatFormatPolicy.disabled();
+        }
+        String format = node.node("format").getString("");
+        if (format.isBlank()) {
+            format = ChatFormatPolicy.vanillaFormat();
+        }
+        return new ChatFormatPolicy(
+                node.node("enabled").getBoolean(false),
+                format,
+                stringMap(node.node("group-formats")),
+                node.node("allow-player-format").getBoolean(false),
+                node.node("name-hover").getString(""),
+                node.node("name-click").getString(""));
+    }
+
+    /** A key→value string map (e.g. {@code group-formats}); a blank value drops that entry. */
+    private static Map<String, String> stringMap(ConfigurationNode node) {
+        Map<String, String> map = new LinkedHashMap<>();
+        node.childrenMap().forEach((key, child) -> {
+            String value = child.getString("");
+            if (!value.isBlank()) {
+                map.put(String.valueOf(key), value);
+            }
+        });
+        return Map.copyOf(map);
     }
 
     /**

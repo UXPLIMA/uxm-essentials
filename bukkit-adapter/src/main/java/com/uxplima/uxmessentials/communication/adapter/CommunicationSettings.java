@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
@@ -22,7 +23,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * The communication context's operator content, loaded once at wiring time from the {@code join-quit.conf},
- * {@code announcer.conf}, {@code advancements.conf}, and {@code info-pages.conf} siblings under
+ * {@code announcer.conf}, {@code advancements.conf}, {@code info-pages.conf}, and {@code chat.conf} siblings under
  * {@code modules/communication/} and held in an
  * {@link AtomicReference} so a reload swaps a fresh {@link CommunicationContent} whole — readers see either the
  * previous or the new content, never a half-applied tree (CLAUDE.md "swapped atomically via AtomicReference on
@@ -39,7 +40,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 public final class CommunicationSettings {
 
     private static final List<String> CONTENT_FILES =
-            List.of("join-quit.conf", "announcer.conf", "advancements.conf", "info-pages.conf");
+            List.of("join-quit.conf", "announcer.conf", "advancements.conf", "info-pages.conf", "chat.conf");
 
     /** The reserved info-page name shown on join when {@code motd-on-join} is on. */
     private static final String MOTD_PAGE = "motd";
@@ -82,6 +83,11 @@ public final class CommunicationSettings {
     /** The live advancement-notification config; read fresh by the advancement listener on each earned advancement. */
     public AdvancementNoticeConfig advancementNotices() {
         return current().advancements();
+    }
+
+    /** The live public-chat format policy; read fresh by the chat renderer on each message. */
+    public ChatFormatPolicy chatFormatPolicy() {
+        return current().chat();
     }
 
     /** The optional first-join welcome template, broadcast only on a player's first-ever join. */
