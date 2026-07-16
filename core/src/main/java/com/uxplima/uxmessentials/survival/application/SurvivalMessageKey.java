@@ -23,7 +23,23 @@ public enum SurvivalMessageKey implements MessageKey {
 
     // /farmprotect — the per-player toggle's on and off notices.
     SURVIVAL_FARMPROTECT_ENABLED("survival.farmprotect-enabled"),
-    SURVIVAL_FARMPROTECT_DISABLED("survival.farmprotect-disabled");
+    SURVIVAL_FARMPROTECT_DISABLED("survival.farmprotect-disabled"),
+
+    // /autopickup — the per-player toggle's on and off notices.
+    SURVIVAL_AUTOPICKUP_ENABLED("survival.autopickup-enabled"),
+    SURVIVAL_AUTOPICKUP_DISABLED("survival.autopickup-disabled"),
+
+    // /autosmelt — the per-player toggle's on and off notices.
+    SURVIVAL_AUTOSMELT_ENABLED("survival.autosmelt-enabled"),
+    SURVIVAL_AUTOSMELT_DISABLED("survival.autosmelt-disabled"),
+
+    // /autosell — the per-player toggle's on and off notices.
+    SURVIVAL_AUTOSELL_ENABLED("survival.autosell-enabled"),
+    SURVIVAL_AUTOSELL_DISABLED("survival.autosell-disabled"),
+
+    // /autotool — the per-player toggle's on and off notices.
+    SURVIVAL_AUTOTOOL_ENABLED("survival.autotool-enabled"),
+    SURVIVAL_AUTOTOOL_DISABLED("survival.autotool-disabled");
 
     private final String key;
 

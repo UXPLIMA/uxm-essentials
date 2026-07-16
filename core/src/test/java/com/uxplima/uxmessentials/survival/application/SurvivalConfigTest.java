@@ -64,6 +64,22 @@ class SurvivalConfigTest {
         assertThat(head.playerHeadOnPvp()).isTrue();
         assertThat(head.mobChance()).isZero();
         assertThat(head.mobs()).isEmpty();
+
+        SurvivalConfig.AutoPickup pickup = config.autoPickup();
+        assertThat(pickup.enabled()).isTrue();
+        assertThat(pickup.transferXp()).isFalse();
+
+        SurvivalConfig.AutoSmelt smelt = config.autoSmelt();
+        assertThat(smelt.enabled()).isTrue();
+        assertThat(smelt.smelt())
+                .containsEntry("RAW_IRON", "IRON_INGOT")
+                .containsEntry("ANCIENT_DEBRIS", "NETHERITE_SCRAP");
+
+        SurvivalConfig.AutoSell sell = config.autoSell();
+        assertThat(sell.enabled()).isFalse();
+        assertThat(sell.prices()).isEmpty();
+
+        assertThat(config.autoTool().enabled()).isTrue();
     }
 
     @Test
@@ -86,7 +102,14 @@ class SurvivalConfigTest {
                 Map.entry("headdrop.player-head-on-pvp", false),
                 Map.entry("headdrop.mob-chance", 25.0),
                 Map.entry("headdrop.mobs", List.of("ZOMBIE", "SKELETON")),
-                Map.entry("headdrop.mobs.ZOMBIE", 40.0))));
+                Map.entry("headdrop.mobs.ZOMBIE", 40.0),
+                Map.entry("autopickup.transfer-xp", true),
+                Map.entry("autosmelt.smelt", List.of("RAW_COPPER")),
+                Map.entry("autosmelt.smelt.RAW_COPPER", "COPPER_INGOT"),
+                Map.entry("autosell.enabled", true),
+                Map.entry("autosell.prices", List.of("DIAMOND")),
+                Map.entry("autosell.prices.DIAMOND", 300.0),
+                Map.entry("autotool.enabled", false))));
 
         assertThat(config.enabled()).isFalse();
         assertThat(config.treeFeller().requireAxe()).isFalse();
@@ -106,6 +129,12 @@ class SurvivalConfigTest {
         assertThat(config.headDrop().mobChance()).isEqualTo(25.0);
         // The per-mob map reads a chance for each child key, falling back to the mob-chance for a key without one.
         assertThat(config.headDrop().mobs()).containsEntry("ZOMBIE", 40.0).containsEntry("SKELETON", 25.0);
+        assertThat(config.autoPickup().transferXp()).isTrue();
+        // An explicit smelt map replaces the shipped defaults entirely.
+        assertThat(config.autoSmelt().smelt()).containsExactly(Map.entry("RAW_COPPER", "COPPER_INGOT"));
+        assertThat(config.autoSell().enabled()).isTrue();
+        assertThat(config.autoSell().prices()).containsEntry("DIAMOND", new java.math.BigDecimal("300.0"));
+        assertThat(config.autoTool().enabled()).isFalse();
     }
 
     /** A map-backed {@link ConfigStore} that honours the boolean/int/double/list getters the config reads. */

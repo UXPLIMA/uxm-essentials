@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.survival.application;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,10 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param anvilUnlocker the anvil-unlocker mechanic settings
  * @param onePlayerSleep the one-player-sleep mechanic settings
  * @param headDrop the head-drop mechanic settings
+ * @param autoPickup the auto-pickup mechanic settings
+ * @param autoSmelt the auto-smelt mechanic settings
+ * @param autoSell the auto-sell mechanic settings
+ * @param autoTool the auto-tool mechanic settings
  */
 public record SurvivalConfig(
         boolean enabled,
@@ -37,7 +42,11 @@ public record SurvivalConfig(
         FarmAssist farmAssist,
         AnvilUnlocker anvilUnlocker,
         OnePlayerSleep onePlayerSleep,
-        HeadDrop headDrop) {
+        HeadDrop headDrop,
+        AutoPickup autoPickup,
+        AutoSmelt autoSmelt,
+        AutoSell autoSell,
+        AutoTool autoTool) {
 
     public SurvivalConfig {
         Objects.requireNonNull(treeFeller, "treeFeller");
@@ -48,6 +57,10 @@ public record SurvivalConfig(
         Objects.requireNonNull(anvilUnlocker, "anvilUnlocker");
         Objects.requireNonNull(onePlayerSleep, "onePlayerSleep");
         Objects.requireNonNull(headDrop, "headDrop");
+        Objects.requireNonNull(autoPickup, "autoPickup");
+        Objects.requireNonNull(autoSmelt, "autoSmelt");
+        Objects.requireNonNull(autoSell, "autoSell");
+        Objects.requireNonNull(autoTool, "autoTool");
     }
 
     /** Resolve the survival config from the module's scoped {@link ConfigStore} ({@code modules.survival}). */
@@ -62,7 +75,11 @@ public record SurvivalConfig(
                 FarmAssist.from(config),
                 AnvilUnlocker.from(config),
                 OnePlayerSleep.from(config),
-                HeadDrop.from(config));
+                HeadDrop.from(config),
+                AutoPickup.from(config),
+                AutoSmelt.from(config),
+                AutoSell.from(config),
+                AutoTool.from(config));
     }
 
     /**
@@ -314,6 +331,106 @@ public record SurvivalConfig(
                     config.getBoolean("headdrop.player-head-on-pvp", true),
                     mobChance,
                     overrides);
+        }
+    }
+
+    /**
+     * The auto-pickup mechanic under {@code autopickup { … }}: a broken block's drops go straight into the breaker's
+     * inventory, overflowing to the ground only when the inventory is full. Players toggle it with {@code /autopickup}.
+     *
+     * @param enabled whether auto-pickup runs ({@code autopickup.enabled}, default {@code true})
+     * @param transferXp whether the block's dropped experience is granted to the player instead of dropping as orbs
+     *     ({@code transfer-xp}, default {@code false})
+     */
+    public record AutoPickup(boolean enabled, boolean transferXp) {
+
+        static AutoPickup from(ConfigStore config) {
+            return new AutoPickup(
+                    config.getBoolean("autopickup.enabled", true), config.getBoolean("autopickup.transfer-xp", false));
+        }
+    }
+
+    /**
+     * The auto-smelt mechanic under {@code autosmelt { … }}: a broken block's smeltable drop is transformed into its
+     * smelted result before it reaches the player, so mining iron ore yields an ingot. It composes with auto-pickup —
+     * the drop is smelted first, then routed. Players toggle it with {@code /autosmelt}.
+     *
+     * @param enabled whether auto-smelt runs ({@code autosmelt.enabled}, default {@code true})
+     * @param smelt the drop-material → smelted-result pairs read from {@code autosmelt.smelt}; defaults to the common
+     *     ore-to-ingot set when the block is absent
+     */
+    public record AutoSmelt(boolean enabled, Map<String, String> smelt) {
+
+        /** The default smelt map: the raw metals to ingots, ancient debris to scrap, and a few common furnace items. */
+        private static final Map<String, String> DEFAULT_SMELT = Map.ofEntries(
+                Map.entry("RAW_IRON", "IRON_INGOT"),
+                Map.entry("RAW_GOLD", "GOLD_INGOT"),
+                Map.entry("RAW_COPPER", "COPPER_INGOT"),
+                Map.entry("ANCIENT_DEBRIS", "NETHERITE_SCRAP"),
+                Map.entry("COBBLESTONE", "STONE"),
+                Map.entry("COBBLED_DEEPSLATE", "DEEPSLATE"),
+                Map.entry("SAND", "GLASS"),
+                Map.entry("RED_SAND", "GLASS"),
+                Map.entry("CLAY_BALL", "BRICK"),
+                Map.entry("WET_SPONGE", "SPONGE"),
+                Map.entry("KELP", "DRIED_KELP"),
+                Map.entry("CHORUS_FRUIT", "POPPED_CHORUS_FRUIT"));
+
+        public AutoSmelt {
+            Objects.requireNonNull(smelt, "smelt");
+            smelt = Map.copyOf(smelt);
+        }
+
+        static AutoSmelt from(ConfigStore config) {
+            Map<String, String> smelt = new LinkedHashMap<>();
+            List<String> keys = config.getKeys("autosmelt.smelt");
+            if (keys.isEmpty()) {
+                smelt.putAll(DEFAULT_SMELT);
+            } else {
+                for (String raw : keys) {
+                    smelt.put(raw, config.getString("autosmelt.smelt." + raw, raw));
+                }
+            }
+            return new AutoSmelt(config.getBoolean("autosmelt.enabled", true), smelt);
+        }
+    }
+
+    /**
+     * The auto-sell mechanic under {@code autosell { … }}: a broken block's priced drops are sold into the economy and
+     * the proceeds credited to the breaker's wallet. It ships <em>disabled</em> — selling for money is a server-economy
+     * decision — and requires the economy module; with no provider present it is inert. Players toggle it with
+     * {@code /autosell}.
+     *
+     * @param enabled whether auto-sell runs ({@code autosell.enabled}, default {@code false})
+     * @param prices the material → per-item price pairs read from {@code autosell.prices}; empty by default
+     */
+    public record AutoSell(boolean enabled, Map<String, BigDecimal> prices) {
+
+        public AutoSell {
+            Objects.requireNonNull(prices, "prices");
+            prices = Map.copyOf(prices);
+        }
+
+        static AutoSell from(ConfigStore config) {
+            Map<String, BigDecimal> prices = new LinkedHashMap<>();
+            for (String material : config.getKeys("autosell.prices")) {
+                prices.put(material, BigDecimal.valueOf(config.getDouble("autosell.prices." + material, 0.0)));
+            }
+            return new AutoSell(config.getBoolean("autosell.enabled", false), prices);
+        }
+    }
+
+    /**
+     * The auto-tool mechanic under {@code autotool { … }}: as the player starts breaking a block, their held hotbar
+     * slot is switched to the strongest tool of the family that block needs. Players toggle it with {@code /autotool}.
+     * It carries no tuning of its own beyond its enable gate — the selection rules live in the domain.
+     *
+     * @param enabled whether auto-tool runs ({@code autotool.enabled}, default {@code true})
+     */
+    public record AutoTool(boolean enabled) {
+
+        static AutoTool from(ConfigStore config) {
+            return new AutoTool(config.getBoolean("autotool.enabled", true));
         }
     }
 }

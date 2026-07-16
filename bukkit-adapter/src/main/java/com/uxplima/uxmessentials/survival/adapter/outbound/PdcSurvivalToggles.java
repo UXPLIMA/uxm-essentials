@@ -29,6 +29,14 @@ public final class PdcSurvivalToggles {
             NamespacedKey.fromString("uxmessentials:survival_veinminer"), "survival_veinminer key");
     private static final NamespacedKey FARM_PROTECT = Objects.requireNonNull(
             NamespacedKey.fromString("uxmessentials:survival_farmprotect"), "survival_farmprotect key");
+    private static final NamespacedKey AUTO_PICKUP = Objects.requireNonNull(
+            NamespacedKey.fromString("uxmessentials:survival_autopickup"), "survival_autopickup key");
+    private static final NamespacedKey AUTO_SMELT = Objects.requireNonNull(
+            NamespacedKey.fromString("uxmessentials:survival_autosmelt"), "survival_autosmelt key");
+    private static final NamespacedKey AUTO_SELL = Objects.requireNonNull(
+            NamespacedKey.fromString("uxmessentials:survival_autosell"), "survival_autosell key");
+    private static final NamespacedKey AUTO_TOOL = Objects.requireNonNull(
+            NamespacedKey.fromString("uxmessentials:survival_autotool"), "survival_autotool key");
 
     /** Whether tree-feller is active for {@code player}, defaulting to {@code defaultOn} when never toggled. */
     public boolean treeFellerActive(Player player, boolean defaultOn) {
@@ -69,6 +77,62 @@ public final class PdcSurvivalToggles {
         Objects.requireNonNull(player, "player");
         boolean nowActive = !farmProtectActive(player, defaultOn);
         PdcFlag.set(player.getPersistentDataContainer(), FARM_PROTECT, nowActive);
+        return nowActive;
+    }
+
+    /** Whether auto-pickup is active for {@code player}, defaulting to {@code defaultOn} when never toggled. */
+    public boolean autoPickupActive(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        return PdcFlag.getOrDefault(player.getPersistentDataContainer(), AUTO_PICKUP, defaultOn);
+    }
+
+    /** Flip auto-pickup for {@code player} relative to its current effective state and return the new state. */
+    public boolean toggleAutoPickup(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        boolean nowActive = !autoPickupActive(player, defaultOn);
+        PdcFlag.set(player.getPersistentDataContainer(), AUTO_PICKUP, nowActive);
+        return nowActive;
+    }
+
+    /** Whether auto-smelt is active for {@code player}, defaulting to {@code defaultOn} when never toggled. */
+    public boolean autoSmeltActive(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        return PdcFlag.getOrDefault(player.getPersistentDataContainer(), AUTO_SMELT, defaultOn);
+    }
+
+    /** Flip auto-smelt for {@code player} relative to its current effective state and return the new state. */
+    public boolean toggleAutoSmelt(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        boolean nowActive = !autoSmeltActive(player, defaultOn);
+        PdcFlag.set(player.getPersistentDataContainer(), AUTO_SMELT, nowActive);
+        return nowActive;
+    }
+
+    /** Whether auto-sell is active for {@code player}, defaulting to {@code defaultOn} when never toggled. */
+    public boolean autoSellActive(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        return PdcFlag.getOrDefault(player.getPersistentDataContainer(), AUTO_SELL, defaultOn);
+    }
+
+    /** Flip auto-sell for {@code player} relative to its current effective state and return the new state. */
+    public boolean toggleAutoSell(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        boolean nowActive = !autoSellActive(player, defaultOn);
+        PdcFlag.set(player.getPersistentDataContainer(), AUTO_SELL, nowActive);
+        return nowActive;
+    }
+
+    /** Whether auto-tool is active for {@code player}, defaulting to {@code defaultOn} when never toggled. */
+    public boolean autoToolActive(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        return PdcFlag.getOrDefault(player.getPersistentDataContainer(), AUTO_TOOL, defaultOn);
+    }
+
+    /** Flip auto-tool for {@code player} relative to its current effective state and return the new state. */
+    public boolean toggleAutoTool(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        boolean nowActive = !autoToolActive(player, defaultOn);
+        PdcFlag.set(player.getPersistentDataContainer(), AUTO_TOOL, nowActive);
         return nowActive;
     }
 }

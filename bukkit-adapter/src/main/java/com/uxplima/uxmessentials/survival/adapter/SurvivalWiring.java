@@ -17,10 +17,16 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoPickupCommand;
+import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoSellCommand;
+import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoSmeltCommand;
+import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoToolCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.FarmProtectCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.TreeFellerCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.VeinminerCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AnvilUnlockListener;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AutoDropsListener;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.AutoToolListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmAssistListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmProtectListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FastLeafDecayListener;
@@ -31,9 +37,13 @@ import com.uxplima.uxmessentials.survival.adapter.inbound.listener.VeinminerList
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
+import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
+import com.uxplima.uxmessentials.survival.domain.AutoToolSelector;
 import com.uxplima.uxmessentials.survival.domain.Crops;
 import com.uxplima.uxmessentials.survival.domain.DropChance;
+import com.uxplima.uxmessentials.survival.domain.SellPrices;
 import com.uxplima.uxmessentials.survival.domain.SleepThreshold;
+import com.uxplima.uxmessentials.survival.domain.SmeltMap;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -55,9 +65,16 @@ public final class SurvivalWiring {
 
     private SurvivalWiring() {}
 
-    /** Build the survival commands and listeners from {@code ctx}, ready to register. */
-    public static Wired wire(ModuleContext ctx) {
+    /**
+     * Build the survival commands and listeners from {@code ctx}, ready to register.
+     *
+     * @param ctx the module context carrying the scoped config and kernel ports
+     * @param sales the economy seam auto-sell credits through, empty when no economy provider is wired (auto-sell is
+     *     then inert)
+     */
+    public static Wired wire(ModuleContext ctx, Optional<SurvivalSales> sales) {
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(sales, "sales");
         KernelPorts kernel = ctx.kernel();
         SurvivalConfig config = SurvivalConfig.from(ctx.config());
         PdcSurvivalToggles toggles = new PdcSurvivalToggles();
@@ -100,7 +117,50 @@ public final class SurvivalWiring {
                     mobChances(config.headDrop(), kernel.log()),
                     new ThreadLocalRandomSource()));
         }
+        wireAutos(config, toggles, sales, kernel, commands, listeners);
         return new Wired(commands, listeners);
+    }
+
+    /**
+     * Wire the four auto-* mechanics: the {@code /autopickup}, {@code /autosmelt}, {@code /autosell}, {@code /autotool}
+     * toggle commands (each present only when its mechanic is enabled) plus the two listeners. The break-drop trio
+     * (pickup, smelt, sell) share a single {@link AutoDropsListener} because they all act on the same block-break
+     * drops; it registers when at least one of them is on, gating each stage internally. Auto-tool is an independent
+     * listener on a different event.
+     */
+    private static void wireAutos(
+            SurvivalConfig config,
+            PdcSurvivalToggles toggles,
+            Optional<SurvivalSales> sales,
+            KernelPorts kernel,
+            List<CommandRegistration> commands,
+            List<Listener> listeners) {
+        if (config.autoPickup().enabled()) {
+            commands.add(new AutoPickupCommand(toggles, kernel.messages()));
+        }
+        if (config.autoSmelt().enabled()) {
+            commands.add(new AutoSmeltCommand(toggles, kernel.messages()));
+        }
+        if (config.autoSell().enabled()) {
+            commands.add(new AutoSellCommand(toggles, kernel.messages()));
+        }
+        if (config.autoPickup().enabled()
+                || config.autoSmelt().enabled()
+                || config.autoSell().enabled()) {
+            listeners.add(new AutoDropsListener(
+                    config.autoPickup().enabled(),
+                    config.autoPickup().transferXp(),
+                    config.autoSmelt().enabled(),
+                    new SmeltMap(config.autoSmelt().smelt()),
+                    config.autoSell().enabled(),
+                    new SellPrices(config.autoSell().prices()),
+                    sales,
+                    toggles));
+        }
+        if (config.autoTool().enabled()) {
+            commands.add(new AutoToolCommand(toggles, kernel.messages()));
+            listeners.add(new AutoToolListener(new AutoToolSelector(), toggles));
+        }
     }
 
     /** Resolve each configured per-mob head chance to its {@link EntityType}, warning on and skipping any unknown name. */

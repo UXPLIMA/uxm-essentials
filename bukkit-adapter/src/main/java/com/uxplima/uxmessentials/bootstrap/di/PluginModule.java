@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
+import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderSurvivalSales;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -181,6 +182,7 @@ import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
+import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
 import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
@@ -948,17 +950,23 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("poses"))) {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
         } else if (module.id().equals(ModuleId.of("survival"))) {
-            wireSurvival(ctx, resources);
+            wireSurvival(ctx, resources, links);
         }
     }
 
-    private static void wireSurvival(ModuleContext ctx, CloseableResources resources) {
+    private static void wireSurvival(ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // survival persists nothing: the per-player mechanic toggles are transient PDC stamps and the config is
         // read once into an immutable snapshot. Each mechanic wires only when its config gate is on, so a disabled
-        // tree-feller or veinminer contributes no command and no listener. It carries no cross-context bridge — its
-        // only collaborators are the shared Scheduler, messages, and (for veinminer material parsing) the log port —
-        // so nothing is captured for a later context, and there is no runtime state to drain on stop.
-        SurvivalWiring.Wired wired = SurvivalWiring.wire(ctx);
+        // tree-feller or veinminer contributes no command and no listener. Its one cross-context collaborator is the
+        // economy provider auto-sell credits through: survival registers after economy, so the provider captured at
+        // economy-wiring time is bridged here into the narrow SurvivalSales seam — or left empty when economy is
+        // disabled, in which case auto-sell is inert. There is no runtime state to drain on stop.
+        var provider = links.economyProvider;
+        var currency = links.economyCurrency;
+        Optional<SurvivalSales> sales = provider != null && currency != null
+                ? Optional.of(new ProviderSurvivalSales(provider, currency))
+                : Optional.empty();
+        SurvivalWiring.Wired wired = SurvivalWiring.wire(ctx, sales);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }
