@@ -115,26 +115,29 @@ class RoutingEconomyProviderTest {
     @Test
     void aNativeTransferTakesTheAtomicRepositoryPathNotCompensation() {
         RecordingLogger log = new RecordingLogger();
-        NativeCurrencyBackend backend = new NativeCurrencyBackend(new InMemoryWalletRepository());
+        InMemoryWalletRepository repo = new InMemoryWalletRepository();
+        NativeCurrencyBackend backend = new NativeCurrencyBackend(repo);
         Currency capped = Currency.builder(CurrencyId.of("coins"))
-                .max(new BigDecimal("150"))
+                .max(new BigDecimal("5"))
                 .build();
         RoutingEconomyProvider provider = new RoutingEconomyProvider(
                 CurrencyBackendRegistry.of(List.of(backend)),
                 CurrencyRegistry.of(List.of(capped), CurrencyId.of("coins")),
                 CLOCK,
                 log);
-        provider.credit(ALICE, Money.of(capped, new BigDecimal("100")));
-        provider.credit(BOB, Money.of(capped, new BigDecimal("100")));
+        // Seed Alice above the cap directly (a plain credit would be clamped); Bob is empty.
+        repo.upsertBalance(ALICE, Money.of(capped, new BigDecimal("100")));
 
-        // The native ledger moves both legs in one repository transaction, never through the compensating
-        // credit path — so the transfer commits (and, because the in-memory repository does not model the
-        // recipient max clamp, Bob ends above the cap) and nothing is logged.
+        // Crediting 100 would breach Bob's cap. This is the same pathological setup as the
+        // compensation-fails test above — but the native ledger runs it as one atomic repository transaction:
+        // the guarded debit and the clamp commit together, so a failed credit leg rolls the debit back rather
+        // than needing a compensating re-credit. Alice therefore keeps every coin and nothing is ever logged,
+        // in contrast to the compensation path, which loses Alice's money and logs the failed refund.
         TransferResult result = provider.transfer(ALICE, BOB, Money.of(capped, new BigDecimal("100")));
 
-        assertThat(result.isOk()).isTrue();
-        assertThat(provider.balance(ALICE, capped).amount()).isEqualByComparingTo("0");
-        assertThat(provider.balance(BOB, capped).amount()).isEqualByComparingTo("200");
+        assertThat(result).isInstanceOf(TransferResult.DenyWith.class);
+        assertThat(provider.balance(ALICE, capped).amount()).isEqualByComparingTo("100");
+        assertThat(provider.balance(BOB, capped).amount()).isEqualByComparingTo("0");
         assertThat(log.errors()).isEmpty();
     }
 

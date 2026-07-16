@@ -38,9 +38,11 @@ public interface WalletRepository {
     void upsertBalance(PlayerRef owner, Money balance);
 
     /**
-     * Atomic two-sided move in one transaction: the guarded debit of {@code from} and the credit of
-     * {@code to} commit together or not at all. Returns {@link TransferError#INSUFFICIENT_FUNDS} when the
-     * guarded {@code UPDATE} changed no rows — the database, not the JVM, serialises the contention.
+     * Atomic two-sided move in one transaction: the guarded debit of {@code from} and the clamp-checked credit
+     * of {@code to} commit together or not at all. Returns {@link TransferError#INSUFFICIENT_FUNDS} when the
+     * guarded {@code UPDATE} changed no rows — the database, not the JVM, serialises the contention — or
+     * {@link TransferError#BALANCE_MAX_EXCEEDED} when crediting {@code to} would push it past the currency's
+     * {@code max-balance}, in which case the debit is rolled back and nothing moves.
      */
     Result<Unit, TransferError> transfer(PlayerRef from, PlayerRef to, Money amount);
 

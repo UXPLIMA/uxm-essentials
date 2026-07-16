@@ -103,14 +103,28 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
         Objects.requireNonNull(from, "from");
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(amount, "amount");
-        return write(dsl -> {
-            if (guardedDebit(dsl, from, amount) == 0) {
-                return Result.err(TransferError.INSUFFICIENT_FUNDS);
-            }
-            upsertOwner(dsl, to);
-            creditRow(dsl, to, amount);
-            return Result.ok();
-        });
+        // The guarded debit of `from` and the clamp-checked credit of `to` commit together or neither does. The
+        // clamp can only be evaluated after the debit has taken (its row must be readable in the same
+        // transaction), so a max breach throws a rollback signal to undo the committed debit — a returned err
+        // would otherwise commit (the write helper only rolls back on a throw), leaving `from` debited while
+        // `to` was never credited. This is the same shape as exchange, across two owners of one currency.
+        try {
+            return write(dsl -> {
+                if (guardedDebit(dsl, from, amount) == 0) {
+                    return Result.err(TransferError.INSUFFICIENT_FUNDS);
+                }
+                BigDecimal max = amount.currency().max();
+                BigDecimal current = balanceWithin(dsl, to, amount.currency());
+                if (current.add(amount.amount()).compareTo(max) > 0) {
+                    throw new RollbackSignal(TransferError.BALANCE_MAX_EXCEEDED);
+                }
+                upsertOwner(dsl, to);
+                creditRow(dsl, to, amount);
+                return Result.ok();
+            });
+        } catch (RollbackSignal rolledBack) {
+            return Result.err(rolledBack.error);
+        }
     }
 
     @Override

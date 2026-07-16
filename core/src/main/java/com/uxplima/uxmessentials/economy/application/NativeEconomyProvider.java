@@ -91,7 +91,13 @@ public final class NativeEconomyProvider implements EconomyProvider {
         repo.ensureOwner(to);
         Result<Unit, TransferError> moved = repo.transfer(from, to, amount);
         if (moved.isErr()) {
-            return TransferResult.insufficientFunds(amount, balance(from, amount.currency()));
+            // INSUFFICIENT_FUNDS reads back the payer's live balance for the "you have X" message; any other
+            // guarded failure (the target at max-balance) is surfaced by its own key rather than mislabelled
+            // as a shortfall on the payer's side.
+            TransferError error = moved.errorOrThrow();
+            return error == TransferError.INSUFFICIENT_FUNDS
+                    ? TransferResult.insufficientFunds(amount, balance(from, amount.currency()))
+                    : TransferResult.denyWith(error.messageKey());
         }
         Money fromAfter = balance(from, amount.currency());
         Money toAfter = balance(to, amount.currency());

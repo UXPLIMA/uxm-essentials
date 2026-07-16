@@ -147,6 +147,23 @@ class JooqWalletRepositoryTest {
     }
 
     @Test
+    void transferPastTargetMaxLeavesBothSidesUntouched() {
+        PlayerRef from = randomPlayer();
+        PlayerRef to = randomPlayer();
+        repository.credit(from, coins(50));
+        Money atMax = Money.of(COINS, new BigDecimal("999999999999"));
+        repository.upsertBalance(to, atMax);
+
+        // Crediting the target would push it past the coins max: the whole transfer rolls back, payer intact.
+        Result<Unit, TransferError> result = repository.transfer(from, to, coins(10));
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(TransferError.BALANCE_MAX_EXCEEDED);
+        assertThat(repository.findByOwner(from).orElseThrow().balanceOf(COINS)).isEqualTo(coins(50));
+        assertThat(repository.findByOwner(to).orElseThrow().balanceOf(COINS)).isEqualTo(atMax);
+    }
+
+    @Test
     void transferToANeverJoinedTargetUpsertsTheOwnerRow() {
         PlayerRef from = randomPlayer();
         PlayerRef neverJoined = randomPlayer();

@@ -191,6 +191,22 @@ class PayTest {
     }
 
     @Test
+    void payThatWouldPushTheTargetPastMaxIsRejectedAndMovesNothing() {
+        com.uxplima.uxmessentials.economy.domain.Currency capped = Currencies.cappedCoins(100);
+        Pay pay = payWith(java.util.Set.of(capped));
+        repo.credit(alice, Money.of(capped, 100));
+        repo.credit(bob, Money.of(capped, 100)); // already at the cap
+
+        PayOutcome outcome = pay.pay(alice, bob, Money.of(capped, 40));
+
+        assertThat(outcome.kind()).isNotEqualTo(PayOutcome.Kind.SENT);
+        assertThat(sink.delivered("wallet.max-exceeded")).isTrue();
+        // Neither side moved: the payer keeps their balance and the maxed-out target is untouched.
+        assertThat(repo.findByOwner(alice).orElseThrow().balanceOf(capped)).isEqualTo(Money.of(capped, 100));
+        assertThat(repo.findByOwner(bob).orElseThrow().balanceOf(capped)).isEqualTo(Money.of(capped, 100));
+    }
+
+    @Test
     void largePayIsStagedThenAppliedOnConfirm() {
         Pay pay = payWith(java.util.Set.of(Currencies.confirmCoins(50)));
         com.uxplima.uxmessentials.economy.domain.Currency currency = Currencies.confirmCoins(50);

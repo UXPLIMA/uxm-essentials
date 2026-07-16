@@ -119,7 +119,13 @@ public final class RoutingEconomyProvider implements EconomyProvider {
     private TransferResult nativeTransfer(NativeCurrencyBackend backend, PlayerRef from, PlayerRef to, Money amount) {
         Result<Unit, TransferError> moved = backend.transferAtomically(from, to, amount);
         if (moved.isErr()) {
-            return TransferResult.insufficientFunds(amount, backend.balance(from, amount.currency()));
+            // A shortfall reads back the payer's live balance for the "you have X" message; the recipient being
+            // at max-balance is its own failure and is surfaced by its own key rather than mislabelled as the
+            // payer having too little.
+            TransferError error = moved.errorOrThrow();
+            return error == TransferError.INSUFFICIENT_FUNDS
+                    ? TransferResult.insufficientFunds(amount, backend.balance(from, amount.currency()))
+                    : TransferResult.denyWith(error.messageKey());
         }
         return allow(backend, from, to, amount);
     }

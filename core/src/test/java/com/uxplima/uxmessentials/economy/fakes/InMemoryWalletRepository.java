@@ -67,10 +67,14 @@ public final class InMemoryWalletRepository implements WalletRepository {
             if (have.compareTo(amount.amount()) < 0) {
                 return Result.err(TransferError.INSUFFICIENT_FUNDS);
             }
+            Key toKey = new Key(to, amount.currency());
+            BigDecimal target = balances.getOrDefault(toKey, BigDecimal.ZERO);
+            if (target.add(amount.amount()).compareTo(amount.currency().max()) > 0) {
+                return Result.err(TransferError.BALANCE_MAX_EXCEEDED);
+            }
             balances.put(fromKey, have.subtract(amount.amount()));
             owners.putIfAbsent(to, to.name());
-            Key toKey = new Key(to, amount.currency());
-            balances.merge(toKey, amount.amount(), BigDecimal::add);
+            balances.put(toKey, target.add(amount.amount()));
             return Result.ok();
         } finally {
             guard.unlock();
