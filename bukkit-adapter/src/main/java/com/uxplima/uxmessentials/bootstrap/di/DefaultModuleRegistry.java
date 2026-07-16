@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.staff.application.StaffModule;
+import com.uxplima.uxmessentials.survival.application.SurvivalModule;
 import com.uxplima.uxmessentials.tablist.application.TablistModule;
 import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
@@ -153,6 +154,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // permissions, and event ports, plus the claim/region gate it consults through a soft-couple in a later
         // phase), and like the steady-state features it ships ENABLED, so it lands last after custommenus.
         delegate.register(new PoseModule());
+        // survival is the 24th context — opt-in gameplay mechanics (Phase 1: tree-feller + veinminer), each an
+        // independently toggleable sub-feature. It carries no hard dependency edge (its collaborators are the shared
+        // Scheduler, messages, and event ports), persists nothing (per-player toggles are PDC stamps), and like the
+        // steady-state features ships ENABLED, so it lands last after poses.
+        delegate.register(new SurvivalModule());
         // The shared kernel is not a module and never appears here.
     }
 

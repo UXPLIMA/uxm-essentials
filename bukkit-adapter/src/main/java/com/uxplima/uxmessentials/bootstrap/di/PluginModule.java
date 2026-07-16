@@ -180,6 +180,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
+import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
 import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
 import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
@@ -946,7 +947,20 @@ public final class PluginModule {
             wireCustomMenus(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("poses"))) {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
+        } else if (module.id().equals(ModuleId.of("survival"))) {
+            wireSurvival(ctx, resources);
         }
+    }
+
+    private static void wireSurvival(ModuleContext ctx, CloseableResources resources) {
+        // survival persists nothing: the per-player mechanic toggles are transient PDC stamps and the config is
+        // read once into an immutable snapshot. Each mechanic wires only when its config gate is on, so a disabled
+        // tree-feller or veinminer contributes no command and no listener. It carries no cross-context bridge — its
+        // only collaborators are the shared Scheduler, messages, and (for veinminer material parsing) the log port —
+        // so nothing is captured for a later context, and there is no runtime state to drain on stop.
+        SurvivalWiring.Wired wired = SurvivalWiring.wire(ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
     }
 
     private static void wirePoses(

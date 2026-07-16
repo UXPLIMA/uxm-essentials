@@ -72,6 +72,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("npc"))).isPresent();
         assertThat(registry.byId(ModuleId.of("custommenus"))).isPresent();
         assertThat(registry.byId(ModuleId.of("poses"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -97,7 +98,8 @@ class FeatureModuleRegistryDriftTest {
                         "staff",
                         "npc",
                         "custommenus",
-                        "poses");
+                        "poses",
+                        "survival");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -555,13 +557,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void posesIsTheLastModuleShipsEnabledAndPublishesNoCommandSurface() {
+    void posesShipsEnabledAndPublishesNoCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule poses =
                 registry.byId(ModuleId.of("poses")).orElseThrow(() -> new AssertionError("poses is not registered"));
 
-        // poses is the 23rd context — built-in GSit-parity sitting and posing — registered last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("poses");
+        // poses is the 23rd context — built-in GSit-parity sitting and posing. The later survival context now lands
+        // last, so poses must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("poses"))).isPresent();
 
         // It ships ENABLED (a steady-state feature — the common poses are on out of the box, player-sit is opt-in):
         // with no modules.conf override it is on, and disabling exactly poses removes only it while every sibling
@@ -576,11 +579,40 @@ class FeatureModuleRegistryDriftTest {
         assertThat(off).doesNotContain("poses");
         assertThat(off).contains("teleport", "holograms", "custommenus");
 
-        // Phase 0 is the wired-but-inert skeleton: the pose verbs (/sit, /lay, /bellyflop, /spin, /crawl) and their
-        // listeners land with the later behaviour phases, so the module publishes no command yet, and it persists
+        // The pose verbs (/sit, /lay, /bellyflop, /spin, /crawl) and their listeners are contributed through the
+        // adapter wiring rather than the declarative lists, so the module publishes no command here, and it persists
         // nothing (a pose is transient in-memory state held in PoseSessions), so it declares no MigrationSet.
         assertThat(poses.commands()).isEmpty();
         assertThat(poses.migrations()).isEmpty();
+    }
+
+    @Test
+    void survivalIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeCommandSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule survival = registry.byId(ModuleId.of("survival"))
+                .orElseThrow(() -> new AssertionError("survival is not registered"));
+
+        // survival is the 24th context — opt-in gameplay mechanics (Phase 1: tree-feller + veinminer) — registered
+        // last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("survival");
+
+        // It ships ENABLED (a steady-state feature — both harvesting mechanics are on out of the box): with no
+        // modules.conf override it is on, and disabling exactly survival removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("survival", "teleport", "economy", "holograms", "poses");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.survival.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("survival");
+        assertThat(off).contains("teleport", "holograms", "poses");
+
+        // The /treefeller and /veinminer toggle commands and the BlockBreakEvent listeners are contributed through
+        // the adapter wiring (gated per mechanic), not the declarative lists, so the module publishes no command
+        // here, and it persists nothing (the per-player toggles are PDC stamps), so it declares no MigrationSet.
+        assertThat(survival.commands()).isEmpty();
+        assertThat(survival.migrations()).isEmpty();
     }
 
     @Test
