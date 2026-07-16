@@ -964,13 +964,16 @@ public final class PluginModule {
     }
 
     private static void wireTrade(ModuleContext ctx, CloseableResources resources) {
-        // trade persists nothing in Phase 1: a same-server session is transient in-memory state and the config is read
-        // once into an immutable snapshot. The /trade window, its inventory listeners, the economy trade port, and the
-        // cross-server bus escrow land behind this same seam in the later phases; Phase 1 resolves the config only and
-        // contributes no command and no listener, so there is no runtime state to drain on stop.
+        // trade persists nothing same-server: a live trade is transient in-memory state (the TradeSessions registry and
+        // its per-trade TradeExchange), and the config is read once into an immutable snapshot. Phase 2 stands up the
+        // trade-window view and its click/drag/close/quit listener; the economy trade port, the /trade request
+        // commands,
+        // and the cross-server bus escrow land behind this same seam in the later phases. closeAll() drains every live
+        // trade on module stop or reload — returning both sides' offered items — so a disable leaves no held stacks.
         TradeWiring.Wired wired = TradeWiring.wire(ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::closeAll);
     }
 
     private static void wireRanks(

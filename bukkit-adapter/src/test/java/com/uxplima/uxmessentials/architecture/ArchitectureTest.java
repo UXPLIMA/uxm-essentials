@@ -170,7 +170,7 @@ class ArchitectureTest {
     // betray a hand-rolled GUI: implementing org.bukkit.inventory.InventoryHolder (every bespoke menu holder
     // carries it) and calling Bukkit.createInventory / HumanEntity.openInventory (building or showing the frame).
     //
-    // Outside the engine package, exactly fourteen production classes are allowed to do either, and all fourteen
+    // Outside the engine package, exactly sixteen production classes are allowed to do either, and all sixteen
     // are genuine non-menu item containers, not spec menus:
     //   - itemworld Workstation opens the vanilla MenuType workstations (anvil, loom, furnace, ...) and the
     //     player's own ender chest — real game containers, no menu spec.
@@ -179,6 +179,8 @@ class ArchitectureTest {
     //     inventory or ender chest that the viewer edits and that reconciles back on close. InvseeCommand,
     //     BukkitInventoryViewer and the staff PlayerstateStaffInspector drive those mirrors through the
     //     OpenContainer / InventoryViewer use cases.
+    //   - trade TradeView / TradeHolder are the two-player trade window: a genuine dual item container each
+    //     participant places real stacks into, driven over a shared TradeSession.
     // Every spec-driven MENU instead renders through the engine (the Menus facade); the engine's own MenuHolder,
     // Menus and EditorRefresh live inside ..gui.menu.. and are exempt by package. A new bespoke createInventory /
     // InventoryHolder GUI appearing anywhere else fails this fence until it is migrated onto the engine, rather
@@ -191,9 +193,9 @@ class ArchitectureTest {
             .and(areNotAllowedRawBukkitInventoryLeaves())
             .should(buildsOrOpensARawBukkitInventory())
             .because("spec-driven menus must render through the engine (the Menus facade); only the engine itself "
-                    + "and the fourteen genuine inventory leaves — the itemworld Workstation, and the playerstate "
-                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them — may create or "
-                    + "open a raw Bukkit inventory");
+                    + "and the sixteen genuine inventory leaves — the itemworld Workstation, the playerstate "
+                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them, and the trade "
+                    + "window — may create or open a raw Bukkit inventory");
 
     /**
      * Builds the condition matching either raw-Bukkit-GUI signature: implementing
@@ -226,11 +228,12 @@ class ArchitectureTest {
     }
 
     /**
-     * The fourteen non-menu inventory leaves allowed to create or open a raw Bukkit inventory outside the engine,
+     * The sixteen non-menu inventory leaves allowed to create or open a raw Bukkit inventory outside the engine,
      * named by fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the
-     * itemworld {@code Workstation} opens vanilla game containers, and the playerstate invsee / endersee / offline
-     * classes are inventory mirrors (and the use cases driving them). Every spec-driven menu renders through the
-     * engine instead, so this allow-list must stay exactly these fourteen.
+     * itemworld {@code Workstation} opens vanilla game containers, the playerstate invsee / endersee / offline
+     * classes are inventory mirrors (and the use cases driving them), and the trade {@code TradeView} / {@code
+     * TradeHolder} are the two-player trade window. Every spec-driven menu renders through the engine instead, so
+     * this allow-list must stay exactly these sixteen.
      *
      * <p>A leaf's nested members carry the same signature (a holder built as a private inner class, a view's nested
      * record), so the match is on the top-level enclosing class, not the exact nested name — mirroring the uxmLib
@@ -251,7 +254,9 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView",
                 "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineHolder",
                 "com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer",
-                "com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector");
+                "com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector",
+                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView",
+                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeHolder");
         return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
             String fullName = javaClass.getFullName();
             int nested = fullName.indexOf('$');

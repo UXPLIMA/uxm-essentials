@@ -9,9 +9,9 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * message resolves through one of these.
  *
  * <p>Per the i18n contract a disabled module still ships its keys so the catalog stays whole and the locale-parity
- * guard sees the full {@code en} key set. This is the Phase-1 seed covering the request/accept flow, the window
- * lifecycle, and the refusals the first behaviour phases will surface; the later phases (money, blacklist,
- * cross-server) add their own keys here as their verbs land.
+ * guard sees the full {@code en} key set. This covers the request/accept flow, the window lifecycle, the refusals,
+ * and the trade window's own control text (its title and the confirm/partner-status items); the later phases (money,
+ * blacklist, cross-server) add their own keys here as their verbs land.
  */
 public enum TradeMessageKey implements MessageKey {
 
@@ -26,6 +26,13 @@ public enum TradeMessageKey implements MessageKey {
     // Window lifecycle — the session opened, was aborted, or completed the swap.
     TRADE_CANCELLED("trade.cancelled"),
     TRADE_COMPLETED("trade.completed"),
+
+    // Trade window — the dual-inventory GUI: its title and the confirm/status control items.
+    TRADE_WINDOW_TITLE("trade.window.title"),
+    TRADE_WINDOW_CONFIRM("trade.window.confirm"),
+    TRADE_WINDOW_CONFIRMED("trade.window.confirmed"),
+    TRADE_WINDOW_PARTNER_WAITING("trade.window.partner-waiting"),
+    TRADE_WINDOW_PARTNER_CONFIRMED("trade.window.partner-confirmed"),
 
     // Refusals — the request or the open could not proceed.
     TRADE_ALREADY_TRADING("trade.already-trading"),
