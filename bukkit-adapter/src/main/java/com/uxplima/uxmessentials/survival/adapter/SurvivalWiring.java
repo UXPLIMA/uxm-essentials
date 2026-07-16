@@ -1,9 +1,12 @@
 package com.uxplima.uxmessentials.survival.adapter;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import org.bukkit.Material;
@@ -13,20 +16,26 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.survival.adapter.inbound.command.FarmProtectCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.TreeFellerCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.VeinminerCommand;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmAssistListener;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FarmProtectListener;
+import com.uxplima.uxmessentials.survival.adapter.inbound.listener.FastLeafDecayListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.TreeFellerListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.VeinminerListener;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
+import com.uxplima.uxmessentials.survival.domain.Crops;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Constructs the survival context's adapters over the injected kernel ports and produces the mechanic commands and
- * {@code BlockBreakEvent} listeners the plugin registers. Each mechanic wires only when its config gate is on: with
+ * listeners the plugin registers: the harvesting core (tree-feller, veinminer), fast-leaf-decay, farmland protection
+ * ({@code /farmprotect}), and farm-assist. Each mechanic wires only when its config gate is on: with
  * {@code tree-feller.enabled = false} no {@code /treefeller} command and no tree-feller listener land, and likewise
- * for veinminer — so a disabled mechanic contributes nothing, the same "disabled means absent" property the module
- * gate gives at the context level.
+ * for every other mechanic — so a disabled mechanic contributes nothing, the same "disabled means absent" property
+ * the module gate gives at the context level.
  *
  * <p>The context persists nothing — the per-player toggle is a transient PDC stamp held in
  * {@link PdcSurvivalToggles} — so there is no repository, migration, or teardown state; the {@link Wired} record is
@@ -55,7 +64,43 @@ public final class SurvivalWiring {
             Set<Material> triggers = triggerMaterials(config.veinminer(), kernel.log());
             listeners.add(new VeinminerListener(config.veinminer(), triggers, toggles));
         }
+        if (config.leafDecay().enabled()) {
+            listeners.add(new FastLeafDecayListener(config.leafDecay(), kernel.scheduler()));
+        }
+        if (config.farmProtect().enabled()) {
+            commands.add(new FarmProtectCommand(toggles, kernel.messages()));
+            listeners.add(new FarmProtectListener(toggles));
+        }
+        if (config.farmAssist().enabled()) {
+            Map<Material, Material> cropToSeed = cropSeedMap(config.farmAssist(), kernel.log());
+            listeners.add(new FarmAssistListener(cropToSeed));
+        }
         return new Wired(commands, listeners);
+    }
+
+    /** Resolve each configured farm-assist crop to its crop→seed material pair, skipping any that will not resolve. */
+    private static Map<Material, Material> cropSeedMap(SurvivalConfig.FarmAssist config, Logger log) {
+        Map<Material, Material> cropToSeed = new EnumMap<>(Material.class);
+        for (String name : config.crops()) {
+            Material crop = Material.matchMaterial(name);
+            Optional<String> seedName = Crops.seedFor(name);
+            if (crop == null) {
+                log.warn("survival farmassist: unknown crop material '{}' — skipping", name);
+            } else if (seedName.isEmpty()) {
+                log.warn("survival farmassist: no seed known for crop '{}' — skipping", name);
+            } else {
+                Material seed = Material.matchMaterial(seedName.get());
+                if (seed == null) {
+                    log.warn(
+                            "survival farmassist: unknown seed material '{}' for crop '{}' — skipping",
+                            seedName.get(),
+                            name);
+                } else {
+                    cropToSeed.put(crop, seed);
+                }
+            }
+        }
+        return cropToSeed;
     }
 
     /** Resolve the configured veinminer trigger names to materials, warning on and skipping any unknown id. */

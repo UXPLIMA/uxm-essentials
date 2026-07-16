@@ -19,7 +19,11 @@ public enum SurvivalMessageKey implements MessageKey {
 
     // /veinminer — the per-player toggle's on and off notices.
     SURVIVAL_VEINMINER_ENABLED("survival.veinminer-enabled"),
-    SURVIVAL_VEINMINER_DISABLED("survival.veinminer-disabled");
+    SURVIVAL_VEINMINER_DISABLED("survival.veinminer-disabled"),
+
+    // /farmprotect — the per-player toggle's on and off notices.
+    SURVIVAL_FARMPROTECT_ENABLED("survival.farmprotect-enabled"),
+    SURVIVAL_FARMPROTECT_DISABLED("survival.farmprotect-disabled");
 
     private final String key;
 

@@ -19,18 +19,36 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param treeFeller the tree-feller mechanic settings
  * @param veinminer the veinminer mechanic settings
+ * @param leafDecay the fast-leaf-decay mechanic settings
+ * @param farmProtect the farmland-protection mechanic settings
+ * @param farmAssist the farm-assist mechanic settings
  */
-public record SurvivalConfig(boolean enabled, TreeFeller treeFeller, Veinminer veinminer) {
+public record SurvivalConfig(
+        boolean enabled,
+        TreeFeller treeFeller,
+        Veinminer veinminer,
+        LeafDecay leafDecay,
+        FarmProtect farmProtect,
+        FarmAssist farmAssist) {
 
     public SurvivalConfig {
         Objects.requireNonNull(treeFeller, "treeFeller");
         Objects.requireNonNull(veinminer, "veinminer");
+        Objects.requireNonNull(leafDecay, "leafDecay");
+        Objects.requireNonNull(farmProtect, "farmProtect");
+        Objects.requireNonNull(farmAssist, "farmAssist");
     }
 
     /** Resolve the survival config from the module's scoped {@link ConfigStore} ({@code modules.survival}). */
     public static SurvivalConfig from(ConfigStore config) {
         Objects.requireNonNull(config, "config");
-        return new SurvivalConfig(config.getBoolean("enabled", true), TreeFeller.from(config), Veinminer.from(config));
+        return new SurvivalConfig(
+                config.getBoolean("enabled", true),
+                TreeFeller.from(config),
+                Veinminer.from(config),
+                LeafDecay.from(config),
+                FarmProtect.from(config),
+                FarmAssist.from(config));
     }
 
     /**
@@ -136,6 +154,69 @@ public record SurvivalConfig(boolean enabled, TreeFeller treeFeller, Veinminer v
                     config.getBoolean("veinminer.tool-durability", true),
                     config.getDouble("veinminer.hunger-cost", 0.0),
                     config.getBoolean("veinminer.sneak-required", true));
+        }
+    }
+
+    /**
+     * The fast-leaf-decay mechanic under {@code leaf-decay { … }}: when a log is broken, the unsupported leaves within
+     * {@code radius} are decayed a short delay later instead of waiting for vanilla's random-tick sweep.
+     *
+     * @param enabled whether fast-leaf-decay runs ({@code leaf-decay.enabled}, default {@code true})
+     * @param radius the half-width of the cube around the broken log swept for leaves ({@code radius}, default 4)
+     * @param delayTicks the tick delay before the sweep runs, so the cascade reads as a ripple ({@code delay-ticks},
+     *     default 4)
+     */
+    public record LeafDecay(boolean enabled, int radius, int delayTicks) {
+
+        public LeafDecay {
+            radius = Math.max(1, radius);
+            delayTicks = Math.max(0, delayTicks);
+        }
+
+        static LeafDecay from(ConfigStore config) {
+            return new LeafDecay(
+                    config.getBoolean("leaf-decay.enabled", true),
+                    config.getInt("leaf-decay.radius", 4),
+                    config.getInt("leaf-decay.delay-ticks", 4));
+        }
+    }
+
+    /**
+     * The farmland-protection mechanic under {@code farmprotect { … }}: a personal {@code /farmprotect} toggle that,
+     * while on, stops the player trampling farmland into dirt. The mechanic carries no tuning of its own beyond its
+     * enable gate — the per-player state lives in PDC.
+     *
+     * @param enabled whether farmprotect runs ({@code farmprotect.enabled}, default {@code true})
+     */
+    public record FarmProtect(boolean enabled) {
+
+        static FarmProtect from(ConfigStore config) {
+            return new FarmProtect(config.getBoolean("farmprotect.enabled", true));
+        }
+    }
+
+    /**
+     * The farm-assist mechanic under {@code farmassist { … }}: right-clicking a mature configured crop harvests its
+     * drops and replants the same crop, spending one matching seed from the player's inventory.
+     *
+     * @param enabled whether farmassist runs ({@code farmassist.enabled}, default {@code true})
+     * @param crops the crop block material ids farm-assist acts on ({@code crops}, default the common farmland crops)
+     */
+    public record FarmAssist(boolean enabled, List<String> crops) {
+
+        /** The default crops — the four farmland crops and nether wart, each with a plantable seed. */
+        private static final List<String> DEFAULT_CROPS =
+                List.of("WHEAT", "CARROTS", "POTATOES", "BEETROOTS", "NETHER_WART");
+
+        public FarmAssist {
+            Objects.requireNonNull(crops, "crops");
+            crops = List.copyOf(crops);
+        }
+
+        static FarmAssist from(ConfigStore config) {
+            return new FarmAssist(
+                    config.getBoolean("farmassist.enabled", true),
+                    config.getStringList("farmassist.crops", DEFAULT_CROPS));
         }
     }
 }

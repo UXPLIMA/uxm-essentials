@@ -27,6 +27,8 @@ public final class PdcSurvivalToggles {
             NamespacedKey.fromString("uxmessentials:survival_treefeller"), "survival_treefeller key");
     private static final NamespacedKey VEINMINER = Objects.requireNonNull(
             NamespacedKey.fromString("uxmessentials:survival_veinminer"), "survival_veinminer key");
+    private static final NamespacedKey FARM_PROTECT = Objects.requireNonNull(
+            NamespacedKey.fromString("uxmessentials:survival_farmprotect"), "survival_farmprotect key");
 
     /** Whether tree-feller is active for {@code player}, defaulting to {@code defaultOn} when never toggled. */
     public boolean treeFellerActive(Player player, boolean defaultOn) {
@@ -53,6 +55,20 @@ public final class PdcSurvivalToggles {
         Objects.requireNonNull(player, "player");
         boolean nowActive = !veinminerActive(player, defaultOn);
         PdcFlag.set(player.getPersistentDataContainer(), VEINMINER, nowActive);
+        return nowActive;
+    }
+
+    /** Whether farmprotect is active for {@code player}, defaulting to {@code defaultOn} when never toggled. */
+    public boolean farmProtectActive(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        return PdcFlag.getOrDefault(player.getPersistentDataContainer(), FARM_PROTECT, defaultOn);
+    }
+
+    /** Flip farmprotect for {@code player} relative to its current effective state and return the new state. */
+    public boolean toggleFarmProtect(Player player, boolean defaultOn) {
+        Objects.requireNonNull(player, "player");
+        boolean nowActive = !farmProtectActive(player, defaultOn);
+        PdcFlag.set(player.getPersistentDataContainer(), FARM_PROTECT, nowActive);
         return nowActive;
     }
 }
