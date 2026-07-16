@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
+import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderRankEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderSurvivalSales;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
@@ -75,6 +76,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
+import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
@@ -953,18 +955,27 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("survival"))) {
             wireSurvival(plugin, ctx, resources, links, guiLayouts, menus);
         } else if (module.id().equals(ModuleId.of("ranks"))) {
-            wireRanks(ctx, persistence, resources);
+            wireRanks(plugin, ctx, persistence, resources, links);
         }
     }
 
-    private static void wireRanks(ModuleContext ctx, Persistence persistence, CloseableResources resources) {
-        // Phase 1 stands up the DB-backed rank pointer, the parsed ladder and the CurrentRank read use case over
-        // the shared persistence DSL (through the ranks persistence factory, so no jOOQ type reaches this layer).
-        // The module publishes no command yet — the /rankup, /prestige and /ranks verbs land with the later
-        // phases — so the command list is empty; registering it here keeps the seam identical to every other
-        // context for when those verbs arrive. The wiring exists to construct the store and prove the ladder
-        // parses at enable; it holds no runtime state to drain on stop.
-        RanksWiring.Wired wired = RanksWiring.wire(ctx, persistence);
+    private static void wireRanks(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
+        // ranks stands up the DB-backed rank pointer, the parsed ladder and the CurrentRank read over the shared
+        // persistence DSL (through the ranks persistence factory, so no jOOQ type reaches this layer), then the
+        // /rankup and /ranks setrank verbs over the Rankup/SetRank use cases. The rank cost charges through the
+        // economy provider captured at economy-wiring time (ranks registers after economy) — bridged here into the
+        // narrow RankEconomy seam, or left empty when economy is disabled, in which case a priced rank is free.
+        var provider = links.economyProvider;
+        var currency = links.economyCurrency;
+        Optional<RankEconomy> economy = provider != null && currency != null
+                ? Optional.of(new ProviderRankEconomy(provider, currency))
+                : Optional.empty();
+        RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy);
         wired.commands().forEach(resources::addCommand);
     }
 

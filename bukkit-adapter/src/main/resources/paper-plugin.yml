@@ -410,6 +410,15 @@ permissions:
   uxmessentials.kit.reset:
     description: '/kit reset <player> [kit] to clear a player''s claim/cooldown stamps.'
     default: op
+  # ranks context (docs/permissions.md "Ranks"). Rankup tracks each player's rank with a DB-backed pointer of
+  # our own; a rank's rankup actions may set a permission-plugin group, run any command, or nothing at all. The
+  # ladder (ranks, order, cost, requirements, actions) is data-driven in modules/ranks/ranks.conf.
+  uxmessentials.ranks.rankup:
+    description: '/rankup to advance to the next rank when you meet its requirements.'
+    default: true
+  uxmessentials.ranks.admin:
+    description: '/ranks setrank <player> <rank> to set a player''s rank directly.'
+    default: op
   # playerstate context (docs/permissions.md "Playerstate"). Toggle/effect verbs over an immutable
   # PlayerStateSnapshot reconciled on the owning region thread. Each verb has its own base node; the single
   # uxmessentials.playerstate.others node gates the [player] target form of every self/other command.

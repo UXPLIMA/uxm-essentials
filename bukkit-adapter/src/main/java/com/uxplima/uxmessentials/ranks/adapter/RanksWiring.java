@@ -2,49 +2,119 @@ package com.uxplima.uxmessentials.ranks.adapter;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.ranks.PlayerRankRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
+import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RanksCommand;
+import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RankupCommand;
+import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankActionRunner;
+import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.application.CurrentRank;
 import com.uxplima.uxmessentials.ranks.application.RankLadders;
 import com.uxplima.uxmessentials.ranks.application.RanksConfig;
+import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
+import com.uxplima.uxmessentials.ranks.application.Rankup;
+import com.uxplima.uxmessentials.ranks.application.SetRank;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
+import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
+import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
+import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
+import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Constructs the ranks context's use cases over the injected kernel ports and the shared persistence DSL. Phase 1
- * parses the ladder from {@code ranks.conf}, wires the DB-backed {@link PlayerRankRepository} through the
- * persistence factory (never naming a jOOQ type here), and builds the {@link CurrentRank} read use case over the
- * two. It publishes no command and registers no listener yet — the {@code /rankup}, {@code /prestige} and
- * {@code /ranks} verbs, their requirement/action evaluation and the autorank scan land as the later phases do —
- * so {@link Wired#commands()} is empty for now; the parsed config, ladder and read use case are exposed on
- * {@link Wired} so those phases build over them.
+ * Constructs the ranks context's use cases over the injected kernel ports and the shared persistence DSL. Phase 2
+ * builds the rankup pipeline: the parsed ladder, the DB-backed {@link PlayerRankRepository}, the
+ * {@link CurrentRank} read, the {@link RankRequirementEvaluator} that resolves a rank's typed requirements against
+ * the economy / playtime / permission / stored-rank / placeholder / inventory seams, and the
+ * {@link RankActionRunner} that runs a rank's configured actions through the shared click-action engine. Those
+ * assemble the {@link Rankup} and {@link SetRank} use cases, published as the {@code /rankup} and
+ * {@code /ranks setrank} commands.
+ *
+ * <p>The rank cost is charged through the {@link RankEconomy} seam bridged in the economy context and handed in
+ * here as an {@link Optional} — empty when economy is disabled, in which case a priced rank is free. The rank
+ * action runner is wired with no click-action economy of its own: a rank's paywall is its {@code cost}, so its
+ * actions are effects and commands, never a second charge.
  */
 @NullMarked
 public final class RanksWiring {
 
     private RanksWiring() {}
 
-    /** Build the ranks use cases from {@code ctx} and the shared {@code persistence} handle, ready to register. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence) {
+    /** Build the ranks use cases and commands from {@code ctx}, the shared {@code persistence} handle and economy. */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Optional<RankEconomy> economy) {
+        Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(economy, "economy");
+        KernelPorts kernel = ctx.kernel();
         RanksConfig config = RanksConfig.from(ctx.config());
         RankLadder ladder = RankLadders.from(ctx.config());
         PlayerRankRepository repository = PlayerRankRepositories.jooq(persistence);
         CurrentRank currentRank = new CurrentRank(repository, ladder);
-        return new Wired(List.of(), config, currentRank);
+        Rankup rankup = new Rankup(
+                currentRank,
+                repository,
+                ladder,
+                requirementEvaluator(plugin, kernel, persistence, currentRank, economy),
+                actionRunner(plugin, kernel),
+                economy);
+        SetRank setRank = new SetRank(repository, ladder);
+        List<CommandRegistration> commands = List.of(
+                new RankupCommand(rankup, kernel.messages()), new RanksCommand(setRank, ladder, kernel.messages()));
+        return new Wired(commands, config, currentRank);
+    }
+
+    private static RankRequirementEvaluator requirementEvaluator(
+            Plugin plugin,
+            KernelPorts kernel,
+            Persistence persistence,
+            CurrentRank currentRank,
+            Optional<RankEconomy> economy) {
+        PlaytimeRepository playtime = PlaytimeRepositories.jooq(persistence);
+        return new BukkitRankRequirementEvaluator(
+                plugin.getServer(), kernel.permissions(), playtime, currentRank, economy, kernel.log());
+    }
+
+    /** The rank action runner over the same shared click-action engine the npc and hologram contexts use. */
+    private static RankActionRunner actionRunner(Plugin plugin, KernelPorts kernel) {
+        ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
+                new BukkitClickCommandRunner(), BlockedCommands.of(List.of()), kernel.log());
+        ClickActionRunner clickRunner = new BukkitClickActionRunner(
+                commandRunner,
+                new BukkitServerConnector(plugin, kernel.log()),
+                kernel.scheduler(),
+                kernel.permissions(),
+                Optional.empty(),
+                kernel.messages(),
+                RanksMessageKey.RANKS_RANKUP_COST,
+                SerializedItems::decode,
+                kernel.log());
+        return new BukkitRankActionRunner(plugin.getServer(), clickRunner, kernel.log());
     }
 
     /**
-     * Everything the ranks module contributes once wired. Phase 1 contributes no command — the list is empty —
-     * but the parsed {@link RanksConfig} and the {@link CurrentRank} read use case are carried so the later
-     * behaviour phases (rankup, prestige, autorank, GUI) build their verbs over them.
+     * Everything the ranks module contributes once wired: the Brigadier command registrations to publish, the
+     * typed {@link RanksConfig} snapshot, and the {@link CurrentRank} read use case the later phases (prestige,
+     * autorank, GUI, placeholders) build over.
      *
-     * @param commands the Brigadier command registrations to publish (empty in Phase 1)
+     * @param commands the Brigadier command registrations to publish
      * @param config the typed ranks config snapshot
      * @param currentRank the read use case resolving a player's rank standing against the ladder
      */

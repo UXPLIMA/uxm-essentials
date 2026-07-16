@@ -25,6 +25,10 @@ public enum RanksMessageKey implements MessageKey {
     RANKS_RANKUP_REQUIREMENTS("ranks.rankup-requirements"),
     RANKS_RANKUP_COST("ranks.rankup-cost"),
 
+    // Admin setrank outcomes — the confirmation of a direct set, and the refusal when the named rank is not a rung.
+    RANKS_SETRANK_SUCCESS("ranks.setrank-success"),
+    RANKS_SETRANK_UNKNOWN_RANK("ranks.setrank-unknown-rank"),
+
     // Prestige outcomes — success, and the refusals: not yet at the top rank, or already at the prestige cap.
     RANKS_PRESTIGE_SUCCESS("ranks.prestige-success"),
     RANKS_PRESTIGE_NOT_MAX_RANK("ranks.prestige-not-max-rank"),
