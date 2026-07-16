@@ -48,6 +48,7 @@ class ShippedSpecBindingsDriftTest {
             "messaging:read-mail",
             "messaging:clear-mail",
             "messaging:mail-back",
+            "ranks:rankup",
             "close",
             "list-sort",
             "list-filter",

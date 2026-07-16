@@ -422,6 +422,9 @@ permissions:
   uxmessentials.ranks.admin:
     description: '/ranks setrank <player> <rank> to set a player''s rank directly.'
     default: op
+  uxmessentials.ranks.gui:
+    description: '/ranks to open the ladder panel (config-gated; registered only when the GUI is enabled).'
+    default: true
   # playerstate context (docs/permissions.md "Playerstate"). Toggle/effect verbs over an immutable
   # PlayerStateSnapshot reconciled on the owning region thread. Each verb has its own base node; the single
   # uxmessentials.playerstate.others node gates the [player] target form of every self/other command.

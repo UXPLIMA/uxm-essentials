@@ -20,19 +20,41 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param prestige the prestige settings ({@code prestige.*}); {@link PrestigeSettings#enabled()} ships {@code false}
  * @param autorank the autorank scan settings ({@code autorank.*}); {@link AutorankSettings#enabled()} ships {@code false}
+ * @param gui the {@code /ranks} panel settings ({@code gui.*}); {@link GuiSettings#enabled()} ships {@code true}
  */
-public record RanksConfig(boolean enabled, PrestigeSettings prestige, AutorankSettings autorank) {
+public record RanksConfig(boolean enabled, PrestigeSettings prestige, AutorankSettings autorank, GuiSettings gui) {
 
     public RanksConfig {
         Objects.requireNonNull(prestige, "prestige");
         Objects.requireNonNull(autorank, "autorank");
+        Objects.requireNonNull(gui, "gui");
     }
 
     /** Resolve the ranks config from the module's scoped {@link ConfigStore} ({@code modules.ranks}). */
     public static RanksConfig from(ConfigStore config) {
         Objects.requireNonNull(config, "config");
         return new RanksConfig(
-                config.getBoolean("enabled", true), PrestigeSettings.from(config), AutorankSettings.from(config));
+                config.getBoolean("enabled", true),
+                PrestigeSettings.from(config),
+                AutorankSettings.from(config),
+                GuiSettings.from(config));
+    }
+
+    /**
+     * The {@code /ranks} panel's one tunable ({@code gui.*}): whether the ladder GUI is on. Unlike prestige and
+     * autorank this ships {@code true} — the panel is a self-service window every player opens to see their standing
+     * and rank up, so a fresh install has it available; an operator flips {@code gui.enabled = false} to drop the
+     * GUI (and its {@code /ranks} no-argument open) entirely, leaving only the admin {@code /ranks setrank}.
+     *
+     * @param enabled whether the {@code /ranks} ladder panel is registered ({@code gui.enabled}, default {@code true})
+     */
+    public record GuiSettings(boolean enabled) {
+
+        /** Resolve the GUI settings from the module's scoped {@link ConfigStore} ({@code modules.ranks}). */
+        public static GuiSettings from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new GuiSettings(config.getBoolean("gui.enabled", true));
+        }
     }
 
     /**

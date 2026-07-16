@@ -37,6 +37,7 @@ public final class PlaceholderContexts {
     private final @Nullable WorldsPlaceholders worldsPlaceholders;
     private final @Nullable MenuPlaceholders menu;
     private final @Nullable PosesPlaceholders poses;
+    private final @Nullable RanksPlaceholders ranks;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -60,6 +61,7 @@ public final class PlaceholderContexts {
         this.worldsPlaceholders = builder.worldsPlaceholders;
         this.menu = builder.menu;
         this.poses = builder.poses;
+        this.ranks = builder.ranks;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -151,6 +153,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(poses);
     }
 
+    public Optional<RanksPlaceholders> ranks() {
+        return Optional.ofNullable(ranks);
+    }
+
     /** True when no context registered a seam — registering the expansion would surface nothing. */
     public boolean isEmpty() {
         return homes == null
@@ -172,7 +178,8 @@ public final class PlaceholderContexts {
                 && scoreboard == null
                 && serverMetrics == null
                 && worldsPlaceholders == null
-                && poses == null;
+                && poses == null
+                && ranks == null;
     }
 
     /** Mutable collector for the seams, filled as each context's adapters are wired in bootstrap. */
@@ -199,6 +206,7 @@ public final class PlaceholderContexts {
         private @Nullable WorldsPlaceholders worldsPlaceholders;
         private @Nullable MenuPlaceholders menu;
         private @Nullable PosesPlaceholders poses;
+        private @Nullable RanksPlaceholders ranks;
 
         private Builder() {}
 
@@ -304,6 +312,11 @@ public final class PlaceholderContexts {
 
         public Builder poses(PosesPlaceholders seam) {
             this.poses = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder ranks(RanksPlaceholders seam) {
+            this.ranks = java.util.Objects.requireNonNull(seam, "seam");
             return this;
         }
 

@@ -166,6 +166,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreDiscordlinkPl
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePosesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreRanksPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
@@ -955,7 +956,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("survival"))) {
             wireSurvival(plugin, ctx, resources, links, guiLayouts, menus);
         } else if (module.id().equals(ModuleId.of("ranks"))) {
-            wireRanks(plugin, ctx, persistence, resources, links);
+            wireRanks(plugin, ctx, persistence, resources, links, menus, menuBindings);
         }
     }
 
@@ -964,21 +965,27 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            Menus menus,
+            MenuBindings menuBindings) {
         // ranks stands up the DB-backed rank pointer, the parsed ladder and the CurrentRank read over the shared
         // persistence DSL (through the ranks persistence factory, so no jOOQ type reaches this layer), then the
         // /rankup and /ranks setrank verbs over the Rankup/SetRank use cases. The rank cost charges through the
         // economy provider captured at economy-wiring time (ranks registers after economy) — bridged here into the
-        // narrow RankEconomy seam, or left empty when economy is disabled, in which case a priced rank is free.
+        // narrow RankEconomy seam, or left empty when economy is disabled, in which case a priced rank is free. The
+        // config-gated /ranks ladder panel registers its spec and bindings into the shared menu engine when on.
         var provider = links.economyProvider;
         var currency = links.economyCurrency;
         Optional<RankEconomy> economy = provider != null && currency != null
                 ? Optional.of(new ProviderRankEconomy(provider, currency))
                 : Optional.empty();
-        RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy);
+        RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         // The autorank scan's repeating task is cancelled on module stop so a disable strands no scheduled work.
         resources.onClose(wired.stop());
+        // The rank / next-rank / prestige placeholders read the DB-backed pointer through the CurrentRank use case and
+        // the parsed ladder, so they answer for an offline player too.
+        links.placeholders.ranks(new StoreRanksPlaceholders(wired.currentRank(), wired.ladder()));
     }
 
     private static void wireSurvival(

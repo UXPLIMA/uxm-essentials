@@ -123,6 +123,7 @@ final class DefaultResources {
             "modules/playerwarps/gui/pwarp-whitelist.conf",
             "modules/playerwarps/gui/pwarp-bans.conf",
             "modules/poses/gui/poses-settings.conf",
+            "modules/ranks/gui/ranks-panel.conf",
             "modules/presence/gui/presence-settings.conf",
             "modules/scoreboard/gui/scoreboard-settings.conf",
             "modules/survival/gui/survival-settings.conf",

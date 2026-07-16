@@ -42,6 +42,9 @@ public final class PlaceholderResolver {
     private static final String ALLOW = "allow";
 
     private static final String REFUSE = "refuse";
+    /** The {@code %uxmessentials_rank_next%} value shown when the player is already at the highest rank. */
+    private static final String MAX_RANK = "max";
+
     private static final String KIT_PREFIX = "kit_";
     private static final String KIT_COOLDOWN_PREFIX = "cooldown_";
     private static final String KIT_AVAILABLE_PREFIX = "available_";
@@ -171,7 +174,32 @@ public final class PlaceholderResolver {
             case "afk", "afk_duration", "vanished" -> Optional.of(presence(who, online, normalized));
             case "kits_list" -> Optional.of(kitsList(who));
             case "muted", "jailed" -> Optional.of(moderation(who, normalized));
+            case "rank", "rank_next", "prestige" -> Optional.of(ranks(who, normalized));
             default -> Optional.empty();
+        };
+    }
+
+    /**
+     * Resolve the three ranks keys against the ranks seam. {@code rank} is the player's current rank display name,
+     * {@code rank_next} the next rank up ({@link #MAX_RANK} when they are already at the top), and {@code prestige}
+     * their prestige level. All read the DB-backed pointer, so they answer for an offline player too. A disabled
+     * module — or a ladder with no ranks — degrades every key to the dash.
+     */
+    private String ranks(PlayerRef who, String key) {
+        Optional<RanksPlaceholders> seam = contexts.ranks();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        Optional<RanksPlaceholders.Standing> standing = seam.get().standing(who);
+        if (standing.isEmpty()) {
+            return EMPTY;
+        }
+        RanksPlaceholders.Standing held = standing.get();
+        return switch (key) {
+            case "rank" -> held.rank();
+            case "rank_next" -> held.next().orElse(MAX_RANK);
+            case "prestige" -> Integer.toString(held.prestige());
+            default -> EMPTY;
         };
     }
 

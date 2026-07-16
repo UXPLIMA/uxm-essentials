@@ -29,6 +29,16 @@ class RanksConfigTest {
         assertThat(config.autorank().enabled()).isFalse();
         assertThat(config.autorank().intervalSeconds()).isEqualTo(300);
         assertThat(config.autorank().chargeCost()).isTrue();
+        assertThat(config.gui().enabled()).isTrue();
+    }
+
+    @Test
+    void theGuiGateDefaultsOnAndReadsBackWhenTurnedOff() {
+        assertThat(RanksConfig.from(new FixedConfig(Map.of())).gui().enabled()).isTrue();
+        assertThat(RanksConfig.from(new FixedConfig(Map.of("gui.enabled", false)))
+                        .gui()
+                        .enabled())
+                .isFalse();
     }
 
     @Test

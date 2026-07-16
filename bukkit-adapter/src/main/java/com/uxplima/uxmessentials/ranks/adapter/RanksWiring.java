@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.PrestigeCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RanksCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RankupCommand;
+import com.uxplima.uxmessentials.ranks.adapter.inbound.gui.RanksPanelMenu;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.AutorankScan;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankActionRunner;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankRequirementEvaluator;
@@ -30,6 +31,8 @@ import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -63,11 +66,19 @@ public final class RanksWiring {
     private RanksWiring() {}
 
     /** Build the ranks use cases and commands from {@code ctx}, the shared {@code persistence} handle and economy. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Optional<RankEconomy> economy) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            Optional<RankEconomy> economy,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         RanksConfig config = RanksConfig.from(ctx.config());
         RankLadder ladder = RankLadders.from(ctx.config());
@@ -77,8 +88,13 @@ public final class RanksWiring {
         RankActionRunner actions = actionRunner(plugin, kernel);
         Rankup rankup = new Rankup(currentRank, repository, ladder, requirements, actions, economy);
         SetRank setRank = new SetRank(repository, ladder);
+        // The ladder GUI is config-gated: when gui.enabled is off, no spec is registered, no binding wired, and the
+        // /ranks command publishes only its admin setrank surface (the panel Optional stays empty).
+        Optional<RanksPanelMenu> panel =
+                ladderPanel(plugin, kernel, config, menus, menuBindings, rankup, currentRank, ladder);
         List<CommandRegistration> commands = new ArrayList<>(List.of(
-                new RankupCommand(rankup, kernel.messages()), new RanksCommand(setRank, ladder, kernel.messages())));
+                new RankupCommand(rankup, kernel.messages()),
+                new RanksCommand(setRank, ladder, panel, kernel.messages())));
         if (config.prestige().enabled()) {
             // Prestige is config-gated: when off, the /prestige verb is not published at all — it reuses the same
             // requirement evaluator, action runner and economy seam a rankup goes through.
@@ -92,7 +108,31 @@ public final class RanksWiring {
                 new AutorankScan(plugin.getServer(), kernel.scheduler(), rankup, config.autorank(), kernel.log());
         AutoCloseable autorankTask = autorank.start();
         Runnable stop = () -> cancelAutorank(autorankTask, kernel.log());
-        return new Wired(List.copyOf(commands), config, currentRank, stop);
+        return new Wired(List.copyOf(commands), config, currentRank, ladder, stop);
+    }
+
+    /**
+     * The {@code /ranks} ladder panel when {@code gui.enabled} is on: built over the same {@link Rankup} pipeline
+     * the {@code /rankup} command runs and registered with the shared menu engine (its spec and per-display
+     * placeholders bound into the shared {@link MenuBindings}), or {@link Optional#empty()} when the GUI is off — in
+     * which case nothing is registered and the {@code /ranks} command stays admin-setrank-only.
+     */
+    private static Optional<RanksPanelMenu> ladderPanel(
+            Plugin plugin,
+            KernelPorts kernel,
+            RanksConfig config,
+            Menus menus,
+            MenuBindings menuBindings,
+            Rankup rankup,
+            CurrentRank currentRank,
+            RankLadder ladder) {
+        if (!config.gui().enabled()) {
+            return Optional.empty();
+        }
+        RanksPanelMenu panel =
+                new RanksPanelMenu(menus, rankup, currentRank, ladder, kernel.scheduler(), kernel.messages());
+        panel.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        return Optional.of(panel);
     }
 
     /** Cancel the autorank repeating task on module stop; a cancel failure is logged, never allowed to strand stop. */
@@ -134,21 +174,28 @@ public final class RanksWiring {
 
     /**
      * Everything the ranks module contributes once wired: the Brigadier command registrations to publish, the
-     * typed {@link RanksConfig} snapshot, the {@link CurrentRank} read use case the later phases (GUI, placeholders)
-     * build over, and the {@link #stop} hook that cancels the autorank scan on module disable.
+     * typed {@link RanksConfig} snapshot, the {@link CurrentRank} read use case and the parsed {@link RankLadder}
+     * the PAPI placeholder seam reads a player's standing and next rank from, and the {@link #stop} hook that
+     * cancels the autorank scan on module disable.
      *
      * @param commands the Brigadier command registrations to publish
      * @param config the typed ranks config snapshot
      * @param currentRank the read use case resolving a player's rank standing against the ladder
+     * @param ladder the parsed ladder, exposed for the {@code %uxmessentials_rank_next%} placeholder seam
      * @param stop the teardown hook the module registers, cancelling the autorank scan's repeating task
      */
     public record Wired(
-            List<CommandRegistration> commands, RanksConfig config, CurrentRank currentRank, Runnable stop) {
+            List<CommandRegistration> commands,
+            RanksConfig config,
+            CurrentRank currentRank,
+            RankLadder ladder,
+            Runnable stop) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(config, "config");
             Objects.requireNonNull(currentRank, "currentRank");
+            Objects.requireNonNull(ladder, "ladder");
             Objects.requireNonNull(stop, "stop");
         }
     }

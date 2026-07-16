@@ -1262,6 +1262,37 @@ class PlaceholderResolverTest {
         assertThat(resolver.resolve(ALICE, true, "server_unknown")).contains("-");
     }
 
+    @Test
+    void ranksPlaceholdersResolveCurrentNextAndPrestige() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .ranks(who -> Optional.of(new RanksPlaceholders.Standing("Citizen", Optional.of("VIP"), 2)))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "rank")).contains("Citizen");
+        assertThat(resolver.resolve(ALICE, true, "rank_next")).contains("VIP");
+        assertThat(resolver.resolve(ALICE, true, "prestige")).contains("2");
+    }
+
+    @Test
+    void rankNextReadsTheMaxMarkerAtTheTopRank() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .ranks(who -> Optional.of(new RanksPlaceholders.Standing("VIP", Optional.empty(), 0)))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "rank")).contains("VIP");
+        assertThat(resolver.resolve(ALICE, true, "rank_next")).contains("max");
+    }
+
+    @Test
+    void ranksPlaceholdersDegradeToTheDashWhenTheModuleIsOff() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "rank")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "rank_next")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "prestige")).contains("-");
+    }
+
     private static PresencePlaceholders presenceSeam(PresencePlaceholders.Snapshot snapshot) {
         return who -> Optional.of(snapshot);
     }
