@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.communication.adapter;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,6 +15,8 @@ import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
+import com.uxplima.uxmessentials.communication.domain.DeathCause;
+import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
@@ -79,7 +82,7 @@ final class CommunicationContentCodec {
         return new CommunicationContent(
                 policy(root.node("join")),
                 policy(root.node("quit")),
-                policy(root.node("death")),
+                deathPolicies(root.node("death")),
                 announcer(announcer),
                 display(announcer.node("display")),
                 advancements(root.node("advancements")),
@@ -203,6 +206,44 @@ final class CommunicationContentCodec {
         }
         Ordering ordering = enumToken(node.node("ordering").getString(""), Ordering.class, Ordering.SEQUENTIAL);
         return MessagePolicy.custom(ordering, templates);
+    }
+
+    /**
+     * Parse the {@code death} block into a {@link DeathCausePolicies}. The block itself is the default policy (its
+     * policy mode, ordering, and templates, parsed by {@link #policy}), and each entry under a nested
+     * {@code causes} map is a per-cause override — a bare template list keyed by a {@link DeathCause} name. An
+     * unknown cause key or an empty template list is skipped, so the cause falls through to the default; the block's
+     * own {@code ordering} governs how a per-cause list rotates, keeping a cause override consistent with the
+     * default. A file with no {@code causes} map yields the single-default table, the pre-per-cause behaviour.
+     */
+    private static DeathCausePolicies deathPolicies(ConfigurationNode node) {
+        MessagePolicy defaultPolicy = policy(node);
+        Ordering ordering = enumToken(node.node("ordering").getString(""), Ordering.class, Ordering.SEQUENTIAL);
+        Map<DeathCause, MessagePolicy> byCause = new EnumMap<>(DeathCause.class);
+        node.node("causes")
+                .childrenMap()
+                .forEach((key, child) -> deathCause(String.valueOf(key))
+                        .ifPresent(cause ->
+                                causeOverride(child, ordering).ifPresent(policy -> byCause.put(cause, policy))));
+        return new DeathCausePolicies(byCause, defaultPolicy);
+    }
+
+    /** A per-cause override from a bare template list; empty when no usable template is authored. */
+    private static Optional<MessagePolicy> causeOverride(ConfigurationNode node, Ordering ordering) {
+        List<String> templates = strings(node);
+        return templates.isEmpty() ? Optional.empty() : Optional.of(MessagePolicy.custom(ordering, templates));
+    }
+
+    /** Match a {@code causes} key to a {@link DeathCause} case-insensitively; an unknown key is dropped. */
+    private static Optional<DeathCause> deathCause(String token) {
+        if (token.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(DeathCause.valueOf(token.trim().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException unknown) {
+            return Optional.empty();
+        }
     }
 
     /**

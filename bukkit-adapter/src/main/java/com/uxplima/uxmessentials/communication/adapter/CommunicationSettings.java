@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
+import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
@@ -65,8 +66,13 @@ public final class CommunicationSettings {
         return current().quit();
     }
 
-    /** The live death-channel policy. */
+    /** The live death-channel default policy (the {@code death} block itself), sans its per-cause overrides. */
     public MessagePolicy deathPolicy() {
+        return current().death().defaultPolicy();
+    }
+
+    /** The live death-channel per-cause policy table; read fresh by {@code ResolveDeathMessage} each death. */
+    public DeathCausePolicies deathCausePolicies() {
         return current().death();
     }
 

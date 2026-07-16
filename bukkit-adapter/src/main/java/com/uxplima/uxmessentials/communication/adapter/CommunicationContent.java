@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
+import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
@@ -26,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param join the join channel's policy
  * @param quit the quit channel's policy
- * @param death the death channel's policy
+ * @param death the death channel's per-cause policy table (a default policy plus any per-cause overrides)
  * @param announcer the rotating announcer config
  * @param announcerDisplay the title/boss-bar timing the announcer's non-chat channels render with
  * @param advancements the advancement-notification config (filtering, template, channels, sound)
@@ -40,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 public record CommunicationContent(
         MessagePolicy join,
         MessagePolicy quit,
-        MessagePolicy death,
+        DeathCausePolicies death,
         AnnouncerConfig announcer,
         ChannelDisplay announcerDisplay,
         AdvancementNoticeConfig advancements,
@@ -72,7 +73,7 @@ public record CommunicationContent(
         return new CommunicationContent(
                 MessagePolicy.vanilla(),
                 MessagePolicy.vanilla(),
-                MessagePolicy.vanilla(),
+                DeathCausePolicies.ofDefault(MessagePolicy.vanilla()),
                 AnnouncerConfig.empty(),
                 CommunicationContentCodec.defaultDisplay(),
                 AdvancementNoticeConfig.disabled(),

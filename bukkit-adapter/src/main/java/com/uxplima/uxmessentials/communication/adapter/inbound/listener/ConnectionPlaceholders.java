@@ -34,8 +34,17 @@ final class ConnectionPlaceholders {
                 .with("world", player.getWorld().getName());
     }
 
-    /** Tokens for a death: the connection tokens plus the rendered vanilla death message as {@code message}. */
-    static PlaceholderBindings death(Player player, int onlineCount, String deathMessage) {
-        return connection(player, onlineCount).with("message", deathMessage);
+    /**
+     * Tokens for a death: the connection tokens plus the rendered vanilla death line as {@code message}, the
+     * killer's name as {@code killer}, and the killer's weapon as {@code killer_weapon}. {@code killer} and
+     * {@code killer_weapon} are the empty string when no player dealt the blow / no weapon applies, so neither
+     * token ever renders raw in a template.
+     */
+    static PlaceholderBindings death(
+            Player player, int onlineCount, String deathMessage, String killer, String killerWeapon) {
+        return connection(player, onlineCount)
+                .with("message", deathMessage)
+                .with("killer", killer)
+                .with("killer_weapon", killerWeapon);
     }
 }

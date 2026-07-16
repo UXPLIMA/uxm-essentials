@@ -18,18 +18,23 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.application.ResolveDeathMessage;
 import com.uxplima.uxmessentials.communication.application.ResolvedMessage;
+import com.uxplima.uxmessentials.communication.domain.DeathCause;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Replaces the vanilla death line per the configured death {@code MessagePolicy} and optionally shows the dying
- * player a configured info page. A {@code DISABLE} channel clears the death message, {@code DEFAULT} leaves the
- * vanilla line, and {@code CUSTOM} swaps in the operator template the {@code ResolveDeathMessage} use case
- * selected, rendered through MiniMessage with {@code {player}}, {@code {count}}, {@code {world}}, and the vanilla
- * {@code {message}} substituted. The templates and the info-page bodies are operator content, never
- * {@code MessageKey}s.
+ * Replaces the vanilla death line per the configured death policy and optionally shows the dying player a
+ * configured info page. The death's cause — classified by {@link DeathCauses} from the killer and last damage —
+ * picks the {@code MessagePolicy} from the per-cause table, so a fall, a mob, and a PVP kill can each read
+ * differently; a cause with no override falls through to the default. A {@code DISABLE} policy clears the death
+ * message, {@code DEFAULT} leaves the vanilla line, and {@code CUSTOM} swaps in the operator template the
+ * {@code ResolveDeathMessage} use case selected, rendered through MiniMessage with {@code {player}},
+ * {@code {count}}, {@code {world}}, the vanilla {@code {message}}, and — when a player dealt the blow —
+ * {@code {killer}} and {@code {killer_weapon}} substituted. The templates and the info-page bodies are operator
+ * content, never {@code MessageKey}s.
  *
  * <p>The send-info-after-death hook is owned here: when the operator names an info page, that page's lines are
  * delivered to the dying player after the death message is settled, so a freshly killed player sees the
@@ -61,14 +66,27 @@ public final class DeathMessageListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
-        PlaceholderBindings bindings = ConnectionPlaceholders.death(player, onlineCount(player), vanillaMessage(event));
-        ResolvedMessage resolved = resolveDeath.resolve(bindings);
+        Player killer = player.getKiller();
+        DeathCause cause = DeathCauses.of(event);
+        PlaceholderBindings bindings = ConnectionPlaceholders.death(
+                player, onlineCount(player), vanillaMessage(event), killerName(killer), killerWeapon(killer));
+        ResolvedMessage resolved = resolveDeath.resolve(cause, bindings);
         if (resolved.hasTemplate()) {
             event.deathMessage(MINI.deserialize(resolved.template().orElseThrow()));
         } else if (resolved.suppressVanilla()) {
             event.deathMessage(null);
         }
         sendInfoPage(player);
+    }
+
+    private static String killerName(@Nullable Player killer) {
+        return killer == null ? "" : killer.getName();
+    }
+
+    private static String killerWeapon(@Nullable Player killer) {
+        return killer == null
+                ? ""
+                : DeathCauses.weaponName(killer.getInventory().getItemInMainHand());
     }
 
     private void sendInfoPage(Player player) {

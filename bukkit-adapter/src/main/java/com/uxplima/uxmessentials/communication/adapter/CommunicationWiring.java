@@ -219,7 +219,7 @@ public final class CommunicationWiring {
                 // widened to the config + enabled-store merge.
                 new ResolveJoinMessage(engine, settings::joinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
-                new ResolveDeathMessage(engine, settings::deathPolicy),
+                new ResolveDeathMessage(engine, settings::deathCausePolicies),
                 // The rotation cursor selects only over the merged announcements WITHOUT an interval override; each
                 // override announcement runs on its own independent timer driven by the AnnouncerTask.
                 new NextAnnouncement(() -> mergedConfig.get().rotating(), random),
