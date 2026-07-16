@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
 import com.uxplima.uxmessentials.poses.application.PoseModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
+import com.uxplima.uxmessentials.ranks.application.RanksModule;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
@@ -159,6 +160,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // Scheduler, messages, and event ports), persists nothing (per-player toggles are PDC stamps), and like the
         // steady-state features ships ENABLED, so it lands last after poses.
         delegate.register(new SurvivalModule());
+        // ranks is the 25th context — rankup/prestige/autorank progression, tracking each player's current rank
+        // with a DB-backed pointer of our own rather than reading a permission plugin's group. It carries no hard
+        // dependency edge in Phase 1 (its collaborators are the shared persistence DSL for the pointer plus the
+        // Scheduler, messages and event ports; the economy/permissions/playtime seams it consults on rankup are
+        // soft-coupled and land with the later phases), and like the steady-state features it ships ENABLED but
+        // inert until an operator authors a ladder, so it lands last after survival.
+        delegate.register(new RanksModule());
         // The shared kernel is not a module and never appears here.
     }
 

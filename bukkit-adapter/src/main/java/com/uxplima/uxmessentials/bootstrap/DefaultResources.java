@@ -58,6 +58,8 @@ final class DefaultResources {
             "modules/custommenus/config.conf",
             "modules/poses/config.conf",
             "modules/survival/config.conf",
+            "modules/ranks/config.conf",
+            "modules/ranks/ranks.conf",
             "modules/migration/config.conf",
             "modules/communication/gui/announcement-editor-list.conf",
             "modules/communication/gui/announcement-editor.conf",

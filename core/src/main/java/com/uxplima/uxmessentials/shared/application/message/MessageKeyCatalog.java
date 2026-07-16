@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
+import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
@@ -69,7 +70,8 @@ public final class MessageKeyCatalog {
             NpcMessageKey.values(),
             CustomMenusMessageKey.values(),
             PosesMessageKey.values(),
-            SurvivalMessageKey.values());
+            SurvivalMessageKey.values(),
+            RanksMessageKey.values());
 
     private MessageKeyCatalog() {}
 

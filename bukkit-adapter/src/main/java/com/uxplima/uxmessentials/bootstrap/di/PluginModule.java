@@ -74,6 +74,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
+import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
@@ -951,7 +952,20 @@ public final class PluginModule {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
         } else if (module.id().equals(ModuleId.of("survival"))) {
             wireSurvival(plugin, ctx, resources, links, guiLayouts, menus);
+        } else if (module.id().equals(ModuleId.of("ranks"))) {
+            wireRanks(ctx, persistence, resources);
         }
+    }
+
+    private static void wireRanks(ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // Phase 1 stands up the DB-backed rank pointer, the parsed ladder and the CurrentRank read use case over
+        // the shared persistence DSL (through the ranks persistence factory, so no jOOQ type reaches this layer).
+        // The module publishes no command yet — the /rankup, /prestige and /ranks verbs land with the later
+        // phases — so the command list is empty; registering it here keeps the seam identical to every other
+        // context for when those verbs arrive. The wiring exists to construct the store and prove the ladder
+        // parses at enable; it holds no runtime state to drain on stop.
+        RanksWiring.Wired wired = RanksWiring.wire(ctx, persistence);
+        wired.commands().forEach(resources::addCommand);
     }
 
     private static void wireSurvival(

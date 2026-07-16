@@ -73,6 +73,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("custommenus"))).isPresent();
         assertThat(registry.byId(ModuleId.of("poses"))).isPresent();
         assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("ranks"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -99,7 +100,8 @@ class FeatureModuleRegistryDriftTest {
                         "npc",
                         "custommenus",
                         "poses",
-                        "survival");
+                        "survival",
+                        "ranks");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -587,14 +589,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void survivalIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeCommandSurface() {
+    void survivalShipsEnabledAndPublishesNoDeclarativeCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule survival = registry.byId(ModuleId.of("survival"))
                 .orElseThrow(() -> new AssertionError("survival is not registered"));
 
-        // survival is the 24th context — opt-in gameplay mechanics (Phase 1: tree-feller + veinminer) — registered
-        // last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("survival");
+        // survival is the 24th context — opt-in gameplay mechanics (Phase 1: tree-feller + veinminer). The later
+        // ranks context now lands last, so survival must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
 
         // It ships ENABLED (a steady-state feature — both harvesting mechanics are on out of the box): with no
         // modules.conf override it is on, and disabling exactly survival removes only it while every sibling stays on.
@@ -613,6 +615,35 @@ class FeatureModuleRegistryDriftTest {
         // here, and it persists nothing (the per-player toggles are PDC stamps), so it declares no MigrationSet.
         assertThat(survival.commands()).isEmpty();
         assertThat(survival.migrations()).isEmpty();
+    }
+
+    @Test
+    void ranksIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule ranks =
+                registry.byId(ModuleId.of("ranks")).orElseThrow(() -> new AssertionError("ranks is not registered"));
+
+        // ranks is the 25th context — rankup/prestige/autorank progression with a DB-backed rank pointer —
+        // registered last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("ranks");
+
+        // It ships ENABLED but inert (nothing happens until an operator authors a ladder): with no modules.conf
+        // override it is on, and disabling exactly ranks removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("ranks", "teleport", "economy", "holograms", "survival");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.ranks.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("ranks");
+        assertThat(off).contains("teleport", "holograms", "survival");
+
+        // The /rankup, /prestige and /ranks verbs are contributed through the adapter wiring in the later phases,
+        // not the declarative lists, so the module publishes no command here, and its player_ranks table is in the
+        // persistence V74 baseline (always applied), so it declares no MigrationSet of its own.
+        assertThat(ranks.commands()).isEmpty();
+        assertThat(ranks.migrations()).isEmpty();
     }
 
     @Test
