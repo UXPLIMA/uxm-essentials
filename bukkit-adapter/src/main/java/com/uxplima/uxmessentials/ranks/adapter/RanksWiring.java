@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.ranks.adapter;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -10,11 +11,13 @@ import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.ranks.PlayerRankRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
+import com.uxplima.uxmessentials.ranks.adapter.inbound.command.PrestigeCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RanksCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RankupCommand;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankActionRunner;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.application.CurrentRank;
+import com.uxplima.uxmessentials.ranks.application.Prestige;
 import com.uxplima.uxmessentials.ranks.application.RankLadders;
 import com.uxplima.uxmessentials.ranks.application.RanksConfig;
 import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
@@ -68,17 +71,20 @@ public final class RanksWiring {
         RankLadder ladder = RankLadders.from(ctx.config());
         PlayerRankRepository repository = PlayerRankRepositories.jooq(persistence);
         CurrentRank currentRank = new CurrentRank(repository, ladder);
-        Rankup rankup = new Rankup(
-                currentRank,
-                repository,
-                ladder,
-                requirementEvaluator(plugin, kernel, persistence, currentRank, economy),
-                actionRunner(plugin, kernel),
-                economy);
+        RankRequirementEvaluator requirements = requirementEvaluator(plugin, kernel, persistence, currentRank, economy);
+        RankActionRunner actions = actionRunner(plugin, kernel);
+        Rankup rankup = new Rankup(currentRank, repository, ladder, requirements, actions, economy);
         SetRank setRank = new SetRank(repository, ladder);
-        List<CommandRegistration> commands = List.of(
-                new RankupCommand(rankup, kernel.messages()), new RanksCommand(setRank, ladder, kernel.messages()));
-        return new Wired(commands, config, currentRank);
+        List<CommandRegistration> commands = new ArrayList<>(List.of(
+                new RankupCommand(rankup, kernel.messages()), new RanksCommand(setRank, ladder, kernel.messages())));
+        if (config.prestige().enabled()) {
+            // Prestige is config-gated: when off, the /prestige verb is not published at all — it reuses the same
+            // requirement evaluator, action runner and economy seam a rankup goes through.
+            Prestige prestige =
+                    new Prestige(currentRank, repository, ladder, requirements, actions, economy, config.prestige());
+            commands.add(new PrestigeCommand(prestige, kernel.messages()));
+        }
+        return new Wired(List.copyOf(commands), config, currentRank);
     }
 
     private static RankRequirementEvaluator requirementEvaluator(

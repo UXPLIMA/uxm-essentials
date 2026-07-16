@@ -29,10 +29,13 @@ public enum RanksMessageKey implements MessageKey {
     RANKS_SETRANK_SUCCESS("ranks.setrank-success"),
     RANKS_SETRANK_UNKNOWN_RANK("ranks.setrank-unknown-rank"),
 
-    // Prestige outcomes — success, and the refusals: not yet at the top rank, or already at the prestige cap.
+    // Prestige outcomes — success, and the refusals: not yet at the top rank, at the prestige cap, requirements
+    // unmet, or cost unaffordable.
     RANKS_PRESTIGE_SUCCESS("ranks.prestige-success"),
     RANKS_PRESTIGE_NOT_MAX_RANK("ranks.prestige-not-max-rank"),
-    RANKS_PRESTIGE_MAX("ranks.prestige-max");
+    RANKS_PRESTIGE_MAX("ranks.prestige-max"),
+    RANKS_PRESTIGE_REQUIREMENTS("ranks.prestige-requirements"),
+    RANKS_PRESTIGE_COST("ranks.prestige-cost");
 
     private final String key;
 

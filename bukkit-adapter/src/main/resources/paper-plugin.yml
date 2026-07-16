@@ -416,6 +416,9 @@ permissions:
   uxmessentials.ranks.rankup:
     description: '/rankup to advance to the next rank when you meet its requirements.'
     default: true
+  uxmessentials.ranks.prestige:
+    description: '/prestige to reset to the first rank for a prestige level once you reach the top rank.'
+    default: true
   uxmessentials.ranks.admin:
     description: '/ranks setrank <player> <rank> to set a player''s rank directly.'
     default: op
