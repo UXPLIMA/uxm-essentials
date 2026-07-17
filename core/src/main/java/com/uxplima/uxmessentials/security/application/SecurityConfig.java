@@ -1,0 +1,86 @@
+package com.uxplima.uxmessentials.security.application;
+
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.security.domain.PinPolicy;
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+
+/**
+ * The typed, immutable view of {@code modules/security/config.conf} for Phase 1: the module enable gate and the
+ * two-factor tunables (which factors are offered, the authenticator issuer label, the verification window, and the
+ * PIN length policy). Resolved once from the module's scoped {@link ConfigStore} on start and, per the atomic-reload
+ * rule, swapped whole on reload — so a command dispatched mid-reload sees one coherent snapshot.
+ *
+ * <p>The HOCON keys are kebab-case under a {@code two-factor { … }} block; the record components are the camelCase
+ * views the application reads. Every knob carries the default the bundled config ships, so an operator who deletes a
+ * line falls back to the shipped value. The op-protection and IP/alt-guard blocks land with the later phases.
+ *
+ * @param enabled the module enable gate ({@code enabled}, default {@code true})
+ * @param twoFactor the two-factor enrolment settings ({@code two-factor.*})
+ */
+public record SecurityConfig(boolean enabled, TwoFactorSettings twoFactor) {
+
+    public SecurityConfig {
+        Objects.requireNonNull(twoFactor, "twoFactor");
+    }
+
+    /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */
+    public static SecurityConfig from(ConfigStore config) {
+        Objects.requireNonNull(config, "config");
+        return new SecurityConfig(config.getBoolean("enabled", true), TwoFactorSettings.from(config));
+    }
+
+    /**
+     * The two-factor enrolment tunables ({@code two-factor.*}): the master switch, which of the two factors a player
+     * may enrol (TOTP authenticator and/or PIN), the issuer label shown in the authenticator app, the ± time-step
+     * tolerance a submitted code is checked within, and the PIN length policy. The numbers are validated here so a
+     * nonsensical value never reaches the domain.
+     *
+     * @param enabled whether two-factor enrolment is offered at all ({@code two-factor.enabled}, default true)
+     * @param totp whether the TOTP authenticator factor is offered ({@code two-factor.totp}, default true)
+     * @param pin whether the PIN factor is offered ({@code two-factor.pin}, default true)
+     * @param issuer the issuer label in the authenticator app ({@code two-factor.issuer}, default "uxmEssentials")
+     * @param codeWindow the ± time-steps of tolerance when checking a code ({@code two-factor.code-window}, default 1)
+     * @param pinPolicy the PIN length policy built from {@code two-factor.pin-min-length}/{@code pin-max-length}
+     */
+    public record TwoFactorSettings(
+            boolean enabled, boolean totp, boolean pin, String issuer, int codeWindow, PinPolicy pinPolicy) {
+
+        /** The default authenticator issuer label. */
+        private static final String DEFAULT_ISSUER = "uxmEssentials";
+
+        /** The default ± time-step tolerance: one step (±30s) absorbs modest clock skew. */
+        private static final int DEFAULT_WINDOW = 1;
+
+        private static final int DEFAULT_PIN_MIN = 4;
+        private static final int DEFAULT_PIN_MAX = 8;
+
+        /** The hard ceiling on the accepted window, so a misconfigured value cannot widen the factor open. */
+        private static final int MAX_WINDOW = 5;
+
+        public TwoFactorSettings {
+            Objects.requireNonNull(issuer, "issuer");
+            Objects.requireNonNull(pinPolicy, "pinPolicy");
+            if (issuer.isBlank()) {
+                throw new IllegalArgumentException("two-factor issuer must not be blank");
+            }
+            if (codeWindow < 0 || codeWindow > MAX_WINDOW) {
+                throw new IllegalArgumentException("two-factor code-window must be between 0 and " + MAX_WINDOW);
+            }
+        }
+
+        /** Resolve the two-factor settings from the module's scoped {@link ConfigStore} ({@code modules.security}). */
+        public static TwoFactorSettings from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            int min = Math.max(1, config.getInt("two-factor.pin-min-length", DEFAULT_PIN_MIN));
+            int max = Math.max(min, config.getInt("two-factor.pin-max-length", DEFAULT_PIN_MAX));
+            return new TwoFactorSettings(
+                    config.getBoolean("two-factor.enabled", true),
+                    config.getBoolean("two-factor.totp", true),
+                    config.getBoolean("two-factor.pin", true),
+                    config.getString("two-factor.issuer", DEFAULT_ISSUER),
+                    Math.min(MAX_WINDOW, Math.max(0, config.getInt("two-factor.code-window", DEFAULT_WINDOW))),
+                    new PinPolicy(min, max));
+        }
+    }
+}

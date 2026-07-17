@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.poses.application.PoseModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
 import com.uxplima.uxmessentials.ranks.application.RanksModule;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardModule;
+import com.uxplima.uxmessentials.security.application.SecurityModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
@@ -175,6 +176,14 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // soft-coupled and land with the later phases), and like the steady-state features it ships ENABLED but
         // inert until an operator authors a ladder, so it lands last after survival.
         delegate.register(new RanksModule());
+        // security is a new bounded context — account-security features (NOT a login system; the server is
+        // premium-only).
+        // Phase 1 is the two-factor enrolment surface (/2fa and /pin) over a DB-backed store with the PIN hashed and
+        // the TOTP secret AES-encrypted at rest. It carries no hard dependency edge in Phase 1 (its collaborator is the
+        // shared persistence DSL plus the Scheduler, messages and event ports; the join-verification freeze,
+        // op-command protection and IP/alt guard land with the later phases), and like the steady-state features it
+        // ships ENABLED but inert until a player enrols a factor. It is registered before trade so trade stays last.
+        delegate.register(new SecurityModule());
         // trade is the 26th context — secure player-to-player trading (/trade) with a live dual-inventory window and,
         // in the later phases, staked money and cross-server escrow. It carries no hard dependency edge in Phase 1
         // (its collaborators — the economy trade port and the bus transport — land with the money and cross-server

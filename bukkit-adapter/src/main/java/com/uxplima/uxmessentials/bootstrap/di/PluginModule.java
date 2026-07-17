@@ -79,6 +79,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
+import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
@@ -965,7 +966,22 @@ public final class PluginModule {
             wireRanks(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(ctx, persistence, resources, textInput, links, bus);
+        } else if (module.id().equals(ModuleId.of("security"))) {
+            wireSecurity(plugin, ctx, persistence, resources);
         }
+    }
+
+    private static void wireSecurity(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // security stands up the DB-backed two-factor store (the PIN hashed, the TOTP secret AES-encrypted under a
+        // key-file kept beside the module's config) and publishes the /2fa and /pin enrolment verbs over the shared
+        // persistence DSL (through the security persistence factory, so no jOOQ type reaches this layer). It carries
+        // no cross-context bridge in Phase 1 — the join-verification freeze, op-command protection and IP/alt guard
+        // land with the later phases. The pending, un-confirmed TOTP secrets are transient in-memory state cleared on
+        // stop so a disable or reload leaves no residual secret.
+        SecurityWiring.Wired wired = SecurityWiring.wire(plugin, ctx, persistence);
+        wired.commands().forEach(resources::addCommand);
+        resources.onClose(wired::stop);
     }
 
     private static void wireTrade(

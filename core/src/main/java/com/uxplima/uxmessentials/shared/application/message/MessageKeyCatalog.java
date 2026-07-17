@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
+import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
@@ -75,6 +76,7 @@ public final class MessageKeyCatalog {
             PosesMessageKey.values(),
             SurvivalMessageKey.values(),
             RanksMessageKey.values(),
+            SecurityMessageKey.values(),
             TradeMessageKey.values());
 
     private MessageKeyCatalog() {}

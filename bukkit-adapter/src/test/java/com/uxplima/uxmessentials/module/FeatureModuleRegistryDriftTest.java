@@ -75,6 +75,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("poses"))).isPresent();
         assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
         assertThat(registry.byId(ModuleId.of("ranks"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("security"))).isPresent();
         assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
@@ -105,6 +106,7 @@ class FeatureModuleRegistryDriftTest {
                         "poses",
                         "survival",
                         "ranks",
+                        "security",
                         "trade");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
