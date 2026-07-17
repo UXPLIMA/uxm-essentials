@@ -14,6 +14,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.KeypadActions;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
+import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.security.application.VerifyResult;
@@ -21,7 +22,6 @@ import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
-import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -49,6 +49,7 @@ public final class VerificationController implements KeypadActions {
     private final VerifyTwoFactor verify;
     private final TrustStore trustStore;
     private final VerificationSessions sessions;
+    private final AttemptLimiter limiter;
     private final ReauthState reauthState;
     private final SecurityConfig.JoinVerification config;
     private final PinKeypadView keypad;
@@ -63,6 +64,7 @@ public final class VerificationController implements KeypadActions {
             VerifyTwoFactor verify,
             TrustStore trustStore,
             VerificationSessions sessions,
+            AttemptLimiter limiter,
             ReauthState reauthState,
             SecurityConfig.JoinVerification config,
             PinKeypadView keypad,
@@ -75,6 +77,7 @@ public final class VerificationController implements KeypadActions {
         this.verify = Objects.requireNonNull(verify, "verify");
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.limiter = Objects.requireNonNull(limiter, "limiter");
         this.reauthState = Objects.requireNonNull(reauthState, "reauthState");
         this.config = Objects.requireNonNull(config, "config");
         this.keypad = Objects.requireNonNull(keypad, "keypad");
@@ -85,13 +88,19 @@ public final class VerificationController implements KeypadActions {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Decide, off the tick thread, whether {@code player} must verify on this join and freeze them if so. */
+    /**
+     * Freeze {@code player} synchronously on join, then decide off the tick thread whether the freeze must stay. The
+     * pending flag is set before the async enrolment lookup runs, so a queued command/chat/interaction packet fired in
+     * the join window is already cancelled by the freeze listeners — "frozen until proven safe". The async decision
+     * clears the freeze again for players who turn out to be not-enrolled, on a trusted device, or locked out.
+     */
     public void onJoin(Player player) {
         Objects.requireNonNull(player, "player");
         if (!config.enabled()) {
             return;
         }
         PlayerRef ref = BukkitRefs.toRef(player);
+        sessions.begin(ref.uuid());
         String ipHash = ipHash(player);
         scheduler.async(() -> decideJoin(ref, ipHash));
     }
@@ -124,18 +133,20 @@ public final class VerificationController implements KeypadActions {
 
     private void decideJoin(PlayerRef ref, @Nullable String ipHash) {
         Instant now = clock.instant();
-        if (sessions.isLockedOut(ref.uuid(), now)) {
+        if (limiter.isLockedOut(ref.uuid(), now)) {
+            sessions.clear(ref.uuid());
             scheduler.onEntity(ref, () -> kick(ref, SecurityMessageKey.SECURITY_VERIFY_LOCKED_OUT));
             return;
         }
         TwoFactorRegistration registration = repository.find(ref.uuid()).orElse(null);
         if (registration == null || !registration.hasAnyFactor()) {
-            return; // not enrolled — never frozen
+            sessions.clear(ref.uuid()); // not enrolled — lift the optimistic freeze
+            return;
         }
         if (config.trustDevices() && ipHash != null && trustStore.isTrusted(ref.uuid(), ipHash, now)) {
-            return; // a trusted device skips the prompt
+            sessions.clear(ref.uuid()); // a trusted device skips the prompt — lift the optimistic freeze
+            return;
         }
-        sessions.begin(ref.uuid());
         boolean totpEnabled = registration.totpEnabled();
         scheduler.onEntity(ref, () -> beginFreeze(ref, totpEnabled));
     }
@@ -169,6 +180,7 @@ public final class VerificationController implements KeypadActions {
 
     private void succeed(Player player, PlayerRef viewer) {
         sessions.clear(viewer.uuid());
+        limiter.recordSuccess(viewer.uuid());
         // A fresh join proof also opens the op-command re-auth window, so the player is not re-asked to verify to run
         // a protected command they were just about to run.
         reauthState.stamp(viewer.uuid(), clock.instant());
@@ -178,17 +190,16 @@ public final class VerificationController implements KeypadActions {
     }
 
     private void fail(Player player, PlayerRef viewer, boolean reopenOnFailure) {
-        int failures = sessions.recordFailure(viewer.uuid());
-        LockoutPolicy policy = config.lockoutPolicy();
-        if (policy.evaluate(failures) == LockoutPolicy.AttemptOutcome.LOCKED_OUT) {
-            sessions.lock(viewer.uuid(), clock.instant().plus(config.lockout()));
+        AttemptLimiter.Outcome outcome = limiter.recordFailure(viewer.uuid(), clock.instant());
+        if (outcome.lockedOut()) {
+            sessions.clear(viewer.uuid());
             kick(viewer, SecurityMessageKey.SECURITY_VERIFY_LOCKED_OUT);
             return;
         }
         notify(
                 viewer,
                 SecurityMessageKey.SECURITY_VERIFY_FAILED,
-                Map.of("remaining", Integer.toString(policy.remaining(failures))));
+                Map.of("remaining", Integer.toString(outcome.remaining())));
         if (reopenOnFailure) {
             reopenKeypad(player, viewer);
         }

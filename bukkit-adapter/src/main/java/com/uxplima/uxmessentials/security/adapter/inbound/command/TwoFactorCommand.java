@@ -206,6 +206,7 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
             case DISABLED -> SecurityMessageKey.SECURITY_2FA_DISABLED;
             case NOT_ENROLLED -> SecurityMessageKey.SECURITY_2FA_DISABLE_NOT_ENROLLED;
             case INVALID_FACTOR -> SecurityMessageKey.SECURITY_2FA_DISABLE_INVALID;
+            case LOCKED_OUT -> SecurityMessageKey.SECURITY_2FA_DISABLE_LOCKED_OUT;
         };
     }
 }

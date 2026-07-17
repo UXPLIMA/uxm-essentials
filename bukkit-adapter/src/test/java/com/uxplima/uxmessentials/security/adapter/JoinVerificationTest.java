@@ -16,17 +16,20 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.bukkit.Location;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.InventoryView;
 
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
+import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
+import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.TotpCode;
 import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -67,6 +70,7 @@ class JoinVerificationTest {
     private FakeRepository repository;
     private FakeTrustStore trustStore;
     private VerificationSessions sessions;
+    private AttemptLimiter limiter;
     private ReauthState reauthState;
     private RecordingSink sink;
     private PinKeypadView keypad;
@@ -81,6 +85,7 @@ class JoinVerificationTest {
         repository = new FakeRepository();
         trustStore = new FakeTrustStore();
         sessions = new VerificationSessions();
+        limiter = new AttemptLimiter(new LockoutPolicy(MAX_ATTEMPTS), Duration.ofMinutes(5));
         reauthState = new ReauthState();
         sink = new RecordingSink();
         Scheduler scheduler = new InlineScheduler();
@@ -92,6 +97,7 @@ class JoinVerificationTest {
                 new VerifyTwoFactor(repository, 1),
                 trustStore,
                 sessions,
+                limiter,
                 reauthState,
                 config(),
                 keypad,
@@ -198,7 +204,7 @@ class JoinVerificationTest {
         }
 
         assertThat(sessions.isPending(player.getUniqueId())).isFalse();
-        assertThat(sessions.isLockedOut(player.getUniqueId(), NOW)).isTrue();
+        assertThat(limiter.isLockedOut(player.getUniqueId(), NOW)).isTrue();
     }
 
     @Test
@@ -212,7 +218,87 @@ class JoinVerificationTest {
 
         // The rejoin is bounced by the lockout, not turned into a fresh freeze.
         assertThat(sessions.isPending(player.getUniqueId())).isFalse();
-        assertThat(sessions.isLockedOut(player.getUniqueId(), NOW)).isTrue();
+        assertThat(limiter.isLockedOut(player.getUniqueId(), NOW)).isTrue();
+    }
+
+    // I-1: the failure budget must survive a disconnect/rejoin — guessing maxAttempts-1, relogging, then one more
+    // guess must lock the account out, not hand the attacker a fresh set of attempts.
+    @SuppressWarnings("removal")
+    @Test
+    void theLockoutSurvivesAReconnectAndCannotBeResetByRejoining() {
+        PlayerMock player = joinedPlayerWithPin();
+
+        // Two wrong guesses (maxAttempts - 1), then disconnect before the lockout-triggering attempt.
+        for (int attempt = 0; attempt < MAX_ATTEMPTS - 1; attempt++) {
+            controller.submit(player, ref(player), "0000");
+        }
+        assertThat(limiter.isLockedOut(player.getUniqueId(), NOW)).isFalse();
+        controller.onQuit(ref(player));
+        player.closeInventory(); // the disconnect drops the open keypad; the quit already cleared the freeze
+
+        // Reconnect: a fresh join re-freezes the player but must NOT reset the accumulated failures.
+        controller.onJoin(player);
+        assertThat(sessions.isPending(player.getUniqueId())).isTrue();
+
+        controller.submit(player, ref(player), "0000"); // the maxAttempts-th failure across the two sessions
+
+        assertThat(limiter.isLockedOut(player.getUniqueId(), NOW)).isTrue();
+    }
+
+    // I-3: the freeze is established synchronously on join. Before the async enrolment lookup resolves an enrolled
+    // player is already pending (a command is cancelled); a non-enrolled player is cleared once the lookup runs.
+    @SuppressWarnings("removal")
+    @Test
+    void anEnrolledPlayerIsFrozenSynchronouslyBeforeTheAsyncLookupResolves() {
+        DeferringScheduler deferred = new DeferringScheduler();
+        VerificationController optimistic = optimisticController(deferred);
+        PlayerMock player = addPlayer();
+        repository.setPin(player.getUniqueId(), PIN);
+
+        optimistic.onJoin(player); // async decision is queued, not yet run
+
+        // In the synchronous window the player is already frozen: a command they fire is cancelled.
+        assertThat(sessions.isPending(player.getUniqueId())).isTrue();
+        PlayerCommandPreprocessEvent command = new PlayerCommandPreprocessEvent(player, "/spawn");
+        server.getPluginManager().callEvent(command);
+        assertThat(command.isCancelled()).isTrue();
+
+        // Once the async lookup resolves, the enrolled player stays frozen.
+        deferred.runQueued();
+        assertThat(sessions.isPending(player.getUniqueId())).isTrue();
+    }
+
+    @Test
+    void aNonEnrolledPlayerIsFrozenOptimisticallyThenClearedWhenTheLookupResolves() {
+        DeferringScheduler deferred = new DeferringScheduler();
+        VerificationController optimistic = optimisticController(deferred);
+        PlayerMock player = addPlayer(); // no factor enrolled
+
+        optimistic.onJoin(player);
+
+        // The optimistic freeze applies to everyone in the synchronous window — "frozen until proven safe".
+        assertThat(sessions.isPending(player.getUniqueId())).isTrue();
+
+        deferred.runQueued(); // the lookup finds no factor and lifts the freeze
+
+        assertThat(sessions.isPending(player.getUniqueId())).isFalse();
+    }
+
+    private VerificationController optimisticController(Scheduler scheduler) {
+        return new VerificationController(
+                repository,
+                new VerifyTwoFactor(repository, 1),
+                trustStore,
+                sessions,
+                limiter,
+                reauthState,
+                config(),
+                keypad,
+                new AutoSubmitTotpPrompt(),
+                scheduler,
+                new KeyMessages(),
+                sink,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private PlayerMock joinedPlayerWithPin() {
@@ -344,6 +430,42 @@ class JoinVerificationTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+    }
+
+    /** Defers {@code async} work to a manual drain so the synchronous join window can be inspected before it runs. */
+    private static final class DeferringScheduler implements Scheduler {
+        private final List<Runnable> queued = new ArrayList<>();
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            queued.add(task);
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            queued.add(task);
+        }
+
+        void runQueued() {
+            List<Runnable> snapshot = new ArrayList<>(queued);
+            queued.clear();
+            snapshot.forEach(Runnable::run);
         }
     }
 }

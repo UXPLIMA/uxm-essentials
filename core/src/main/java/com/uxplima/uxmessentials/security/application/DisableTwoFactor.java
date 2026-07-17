@@ -14,14 +14,20 @@ import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
  * factor — a valid TOTP code or their PIN. Requiring the proof is the point: it stops someone who has walked up to
  * an unlocked session from simply turning the protection off. The single submitted value is checked against whatever
  * factors the player holds, so either a code or a PIN unlocks the removal.
+ *
+ * <p>Because a correct guess here removes the protection entirely, this path shares the {@link AttemptLimiter} with the
+ * join freeze and op re-auth: a locked-out account is refused outright, and every wrong factor counts against the same
+ * durable, account-scoped budget — so {@code /2fa disable} cannot be spammed to brute-force the PIN.
  */
 public final class DisableTwoFactor {
 
     private final TwoFactorRepository repository;
+    private final AttemptLimiter limiter;
     private final int codeWindow;
 
-    public DisableTwoFactor(TwoFactorRepository repository, int codeWindow) {
+    public DisableTwoFactor(TwoFactorRepository repository, AttemptLimiter limiter, int codeWindow) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.limiter = Objects.requireNonNull(limiter, "limiter");
         if (codeWindow < 0) {
             throw new IllegalArgumentException("codeWindow must not be negative: " + codeWindow);
         }
@@ -33,13 +39,19 @@ public final class DisableTwoFactor {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(factor, "factor");
         Objects.requireNonNull(now, "now");
+        if (limiter.isLockedOut(playerId, now)) {
+            return DisableResult.LOCKED_OUT;
+        }
         TwoFactorRegistration registration = repository.find(playerId).orElse(null);
         if (registration == null || !registration.hasAnyFactor()) {
             return DisableResult.NOT_ENROLLED;
         }
         if (!proves(registration, playerId, factor, now)) {
-            return DisableResult.INVALID_FACTOR;
+            return limiter.recordFailure(playerId, now).lockedOut()
+                    ? DisableResult.LOCKED_OUT
+                    : DisableResult.INVALID_FACTOR;
         }
+        limiter.recordSuccess(playerId);
         repository.delete(playerId);
         return DisableResult.DISABLED;
     }

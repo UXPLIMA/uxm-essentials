@@ -33,6 +33,7 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_2FA_DISABLE_USAGE("security.2fa.disable-usage"),
     SECURITY_2FA_DISABLE_NOT_ENROLLED("security.2fa.disable-not-enrolled"),
     SECURITY_2FA_DISABLE_INVALID("security.2fa.disable-invalid"),
+    SECURITY_2FA_DISABLE_LOCKED_OUT("security.2fa.disable-locked-out"),
     SECURITY_2FA_DISABLED("security.2fa.disabled"),
 
     // The bare /2fa root: its usage line, a status line, and the refusal when the whole 2FA feature is switched off.
@@ -65,10 +66,12 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_VERIFY_LOCKED_OUT("security.verify.locked-out"),
 
     // Phase 3 — op-command protection: the prompt when a protected command is blocked pending a fresh proof, the
-    // reply when the re-auth succeeds and the command is retried, and the reply when the submitted code is wrong.
+    // reply when the re-auth succeeds and the command is retried, the reply when the submitted code is wrong, and the
+    // refusal when the shared lockout blocks any further attempt.
     SECURITY_REAUTH_REQUIRED("security.reauth.required"),
     SECURITY_REAUTH_SUCCESS("security.reauth.success"),
     SECURITY_REAUTH_FAILED("security.reauth.failed"),
+    SECURITY_REAUTH_LOCKED_OUT("security.reauth.locked-out"),
 
     // Phase 4 — IP/alt guard: the /alts header/entry/empty lines shown to staff, the staff notice raised when a
     // joining player shares an IP with other accounts, and the kick shown when an IP is over the account cap.

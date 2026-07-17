@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommand
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityGuardListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityJoinListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
+import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.BeginTotpEnrollment;
 import com.uxplima.uxmessentials.security.application.ConfirmTotpEnrollment;
 import com.uxplima.uxmessentials.security.application.DisableTwoFactor;
@@ -65,9 +66,15 @@ public final class SecurityWiring {
         Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
         TwoFactorRepository repository = TwoFactorRepositories.jooq(persistence, keyFile);
         PendingTotpEnrollments pending = new PendingTotpEnrollments();
+        // The durable, account-scoped brute-force limiter is shared by every verification surface — the join freeze,
+        // the op re-auth keypad, and /2fa disable — so a failed proof on any of them counts toward, and a lockout
+        // blocks, all three. Built from the join-verification lockout policy and duration.
+        AttemptLimiter limiter = new AttemptLimiter(
+                config.joinVerification().lockoutPolicy(),
+                config.joinVerification().lockout());
         BeginTotpEnrollment begin = new BeginTotpEnrollment(new SecretGenerator(), pending, twoFactor.issuer());
         ConfirmTotpEnrollment confirm = new ConfirmTotpEnrollment(repository, pending, twoFactor.codeWindow());
-        DisableTwoFactor disable = new DisableTwoFactor(repository, twoFactor.codeWindow());
+        DisableTwoFactor disable = new DisableTwoFactor(repository, limiter, twoFactor.codeWindow());
         SetPin setPin = new SetPin(repository, twoFactor.pinPolicy());
         Clock clock = Clock.systemUTC();
 
@@ -124,6 +131,7 @@ public final class SecurityWiring {
                 verify,
                 trustStore,
                 sessions,
+                limiter,
                 reauthState,
                 config.joinVerification(),
                 keypad,
@@ -141,6 +149,7 @@ public final class SecurityWiring {
         ReauthController reauthController = new ReauthController(
                 repository,
                 verify,
+                limiter,
                 reauthState,
                 reauthSessions,
                 keypad,
@@ -157,7 +166,7 @@ public final class SecurityWiring {
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
                 new SecurityGuardListener(ipGuardController, clientGuard, brands));
-        return new Wired(commands, listeners, pending, sessions, keypad, reauthSessions, reauthState, brands);
+        return new Wired(commands, listeners, pending, sessions, limiter, keypad, reauthSessions, reauthState, brands);
     }
 
     /**
@@ -169,7 +178,8 @@ public final class SecurityWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join/freeze/keypad/op-protection Bukkit listeners to register
      * @param pending the pending un-confirmed TOTP enrolments, cleared on module stop
-     * @param sessions the freeze/lockout registry, cleared on module stop
+     * @param sessions the freeze registry, cleared on module stop
+     * @param limiter the shared durable brute-force limiter, cleared on module stop
      * @param keypad the keypad view whose open windows close on module stop
      * @param reauthSessions the in-flight op-command re-auth prompts, cleared on module stop
      * @param reauthState the per-player last-verified stamps, cleared on module stop
@@ -180,6 +190,7 @@ public final class SecurityWiring {
             List<Listener> listeners,
             PendingTotpEnrollments pending,
             VerificationSessions sessions,
+            AttemptLimiter limiter,
             PinKeypadView keypad,
             ReauthSessions reauthSessions,
             ReauthState reauthState,
@@ -190,17 +201,19 @@ public final class SecurityWiring {
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(pending, "pending");
             Objects.requireNonNull(sessions, "sessions");
+            Objects.requireNonNull(limiter, "limiter");
             Objects.requireNonNull(keypad, "keypad");
             Objects.requireNonNull(reauthSessions, "reauthSessions");
             Objects.requireNonNull(reauthState, "reauthState");
             Objects.requireNonNull(brands, "brands");
         }
 
-        /** Drop every pending secret, freeze and re-auth window, close every keypad, and forget every recorded brand. */
+        /** Drop every pending secret, freeze, lockout and re-auth window, close every keypad, and forget every brand. */
         public void stop() {
             pending.clearAll();
             keypad.closeAll();
             sessions.clearAll();
+            limiter.clearAll();
             reauthSessions.clearAll();
             reauthState.clearAll();
             brands.clearAll();

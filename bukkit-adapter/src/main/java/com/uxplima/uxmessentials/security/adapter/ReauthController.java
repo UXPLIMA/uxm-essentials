@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.KeypadActions;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
+import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.security.application.VerifyResult;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
@@ -38,6 +39,7 @@ public final class ReauthController implements KeypadActions {
 
     private final TwoFactorRepository repository;
     private final VerifyTwoFactor verify;
+    private final AttemptLimiter limiter;
     private final ReauthState reauthState;
     private final ReauthSessions sessions;
     private final PinKeypadView keypad;
@@ -50,6 +52,7 @@ public final class ReauthController implements KeypadActions {
     public ReauthController(
             TwoFactorRepository repository,
             VerifyTwoFactor verify,
+            AttemptLimiter limiter,
             ReauthState reauthState,
             ReauthSessions sessions,
             PinKeypadView keypad,
@@ -60,6 +63,7 @@ public final class ReauthController implements KeypadActions {
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.verify = Objects.requireNonNull(verify, "verify");
+        this.limiter = Objects.requireNonNull(limiter, "limiter");
         this.reauthState = Objects.requireNonNull(reauthState, "reauthState");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.keypad = Objects.requireNonNull(keypad, "keypad");
@@ -107,6 +111,11 @@ public final class ReauthController implements KeypadActions {
     }
 
     private void resolveRequirement(PlayerRef ref, String commandLine) {
+        if (limiter.isLockedOut(ref.uuid(), clock.instant())) {
+            // A locked-out account cannot attempt a protected command — deny it, do not prompt or retry the command.
+            scheduler.onEntity(ref, () -> notify(ref, SecurityMessageKey.SECURITY_REAUTH_LOCKED_OUT));
+            return;
+        }
         TwoFactorRegistration registration = repository.find(ref.uuid()).orElse(null);
         if (registration == null || !registration.hasAnyFactor()) {
             // Nothing to prove against — allow the command through rather than soft-locking an un-enrolled player.
@@ -148,6 +157,7 @@ public final class ReauthController implements KeypadActions {
     private void succeed(PlayerRef viewer) {
         String commandLine = sessions.pendingCommand(viewer.uuid());
         sessions.clear(viewer.uuid());
+        limiter.recordSuccess(viewer.uuid());
         reauthState.stamp(viewer.uuid(), clock.instant());
         keypad.closeFor(viewer);
         notify(viewer, SecurityMessageKey.SECURITY_REAUTH_SUCCESS);
@@ -157,6 +167,15 @@ public final class ReauthController implements KeypadActions {
     }
 
     private void fail(Player player, PlayerRef viewer, boolean reopenOnFailure) {
+        AttemptLimiter.Outcome outcome = limiter.recordFailure(viewer.uuid(), clock.instant());
+        if (outcome.lockedOut()) {
+            // Too many wrong proofs on the shared budget — abandon the prompt and lock the account out of every
+            // surface.
+            sessions.clear(viewer.uuid());
+            keypad.closeFor(viewer);
+            notify(viewer, SecurityMessageKey.SECURITY_REAUTH_LOCKED_OUT);
+            return;
+        }
         notify(viewer, SecurityMessageKey.SECURITY_REAUTH_FAILED);
         if (reopenOnFailure) {
             reopenKeypad(player, viewer);

@@ -21,9 +21,11 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
+import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
+import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
 import com.uxplima.uxmessentials.security.domain.TotpCode;
 import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
@@ -54,10 +56,12 @@ class OpCommandProtectionTest {
     private static final String PIN = "1234";
     private static final Duration WINDOW = Duration.ofSeconds(60);
     private static final String BYPASS = "uxmessentials.security.bypass";
+    private static final int MAX_ATTEMPTS = 3;
 
     private ServerMock server;
     private Plugin plugin;
     private FakeRepository repository;
+    private AttemptLimiter limiter;
     private ReauthState reauthState;
     private ReauthSessions reauthSessions;
     private RecordingSink sink;
@@ -71,6 +75,7 @@ class OpCommandProtectionTest {
         plugin = MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         repository = new FakeRepository();
+        limiter = new AttemptLimiter(new LockoutPolicy(MAX_ATTEMPTS), Duration.ofMinutes(5));
         reauthState = new ReauthState();
         reauthSessions = new ReauthSessions();
         sink = new RecordingSink();
@@ -81,6 +86,7 @@ class OpCommandProtectionTest {
         reauthController = new ReauthController(
                 repository,
                 new VerifyTwoFactor(repository, 1),
+                limiter,
                 reauthState,
                 reauthSessions,
                 keypad,
@@ -143,6 +149,37 @@ class OpCommandProtectionTest {
         assertThat(reauthSessions.isPending(player.getUniqueId())).isTrue();
         assertThat(reauthState.lastVerified(player.getUniqueId())).isNull();
         assertThat(sink.delivered).contains("security.reauth.failed");
+    }
+
+    // I-2: the re-auth keypad shares the durable lockout. Enough wrong proofs lock the account, dropping the prompt and
+    // refusing further attempts on the same shared budget.
+    @Test
+    void repeatedWrongProofsLockOutTheReauthPath() {
+        PlayerMock player = enrolledWithPin();
+        fire(player, "/op Steve");
+
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            reauthController.submit(player, ref(player), "0000");
+        }
+
+        assertThat(limiter.isLockedOut(player.getUniqueId(), NOW)).isTrue();
+        assertThat(reauthSessions.isPending(player.getUniqueId())).isFalse();
+        assertThat(sink.delivered).contains("security.reauth.locked-out");
+    }
+
+    @Test
+    void aLockedOutAccountIsRefusedTheProtectedCommandWithoutAPrompt() {
+        PlayerMock player = enrolledWithPin();
+        // Exhaust the shared budget directly, as failures on any surface would.
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            limiter.recordFailure(player.getUniqueId(), NOW);
+        }
+
+        PlayerCommandPreprocessEvent event = fire(player, "/op Steve");
+
+        assertThat(event.isCancelled()).isTrue(); // the synchronous guard still blocks the command
+        assertThat(reauthSessions.isPending(player.getUniqueId())).isFalse(); // but no re-auth prompt is opened
+        assertThat(sink.delivered).contains("security.reauth.locked-out");
     }
 
     @Test
