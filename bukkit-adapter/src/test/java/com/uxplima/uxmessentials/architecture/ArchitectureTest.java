@@ -193,9 +193,10 @@ class ArchitectureTest {
             .and(areNotAllowedRawBukkitInventoryLeaves())
             .should(buildsOrOpensARawBukkitInventory())
             .because("spec-driven menus must render through the engine (the Menus facade); only the engine itself "
-                    + "and the eighteen genuine inventory leaves — the itemworld Workstation, the playerstate "
-                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them, and the local and "
-                    + "cross-server trade windows — may create or open a raw Bukkit inventory");
+                    + "and the genuine inventory leaves — the itemworld Workstation, the playerstate "
+                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them, the local and "
+                    + "cross-server trade windows, and the vanish silent-container mirror — may create or open a raw "
+                    + "Bukkit inventory");
 
     /**
      * Builds the condition matching either raw-Bukkit-GUI signature: implementing
@@ -228,12 +229,13 @@ class ArchitectureTest {
     }
 
     /**
-     * The sixteen non-menu inventory leaves allowed to create or open a raw Bukkit inventory outside the engine,
-     * named by fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the
-     * itemworld {@code Workstation} opens vanilla game containers, the playerstate invsee / endersee / offline
-     * classes are inventory mirrors (and the use cases driving them), and the trade {@code TradeView} / {@code
-     * TradeHolder} are the two-player trade window. Every spec-driven menu renders through the engine instead, so
-     * this allow-list must stay exactly these sixteen.
+     * The non-menu inventory leaves allowed to create or open a raw Bukkit inventory outside the engine, named by
+     * fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the itemworld
+     * {@code Workstation} opens vanilla game containers, the playerstate invsee / endersee / offline classes are
+     * inventory mirrors (and the use cases driving them), the trade {@code TradeView} / {@code TradeHolder} are the
+     * two-player trade window, and the vanish {@code VanishSilentContainerListener} mirrors a container silently for a
+     * vanished opener. Every spec-driven menu renders through the engine instead, so this allow-list must stay exactly
+     * these leaves.
      *
      * <p>A leaf's nested members carry the same signature (a holder built as a private inner class, a view's nested
      * record), so the match is on the top-level enclosing class, not the exact nested name — mirroring the uxmLib
@@ -258,7 +260,8 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView",
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeHolder",
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView",
-                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeHolder");
+                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeHolder",
+                "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener");
         return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
             String fullName = javaClass.getFullName();
             int nested = fullName.indexOf('$');

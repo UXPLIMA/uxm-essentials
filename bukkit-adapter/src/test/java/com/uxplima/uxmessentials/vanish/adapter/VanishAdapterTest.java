@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +54,7 @@ class VanishAdapterTest {
         levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         VanishNotifier notifier = new VanishNotifier(new KeyMessages(), new DiscardingSink());
-        toggleVanish = new ToggleVanish(store, view, levels, notifier);
+        toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs());
     }
 
     @AfterEach
@@ -106,7 +107,7 @@ class VanishAdapterTest {
         PlayerMock alice = server.addPlayer("Alice");
         toggleVanish.toggle(BukkitRefs.toRef(alice));
         assertThat(store.isVanished(alice.getUniqueId())).isTrue();
-        SetVanishLevel setVanishLevel = new SetVanishLevel(store, new NoopView(), levels);
+        SetVanishLevel setVanishLevel = new SetVanishLevel(store, new NoopView(), levels, new NoopBuffs());
         VanishLifecycleListener listener = new VanishLifecycleListener(store, new NoopView(), setVanishLevel, server);
         PlayerQuitEvent quit = new PlayerQuitEvent(
                 alice, net.kyori.adventure.text.Component.text("Alice left"), PlayerQuitEvent.QuitReason.DISCONNECTED);
@@ -124,6 +125,15 @@ class VanishAdapterTest {
 
         @Override
         public void reveal(PlayerRef who) {}
+    }
+
+    /** A buffs port that does nothing — the toggle/level behaviour under test does not assert on buffs here. */
+    private static final class NoopBuffs implements VanishBuffs {
+        @Override
+        public void apply(PlayerRef who) {}
+
+        @Override
+        public void clear(PlayerRef who) {}
     }
 
     /** A scheduler that runs every task inline so the entity-thread hop fires at once. */

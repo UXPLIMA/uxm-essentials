@@ -11,14 +11,21 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.command.VanishCommand;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLifecycleListener;
+import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishProtectionListener;
+import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishBuffs;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.PdcVanishPickup;
 import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
+import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
+import com.uxplima.uxmessentials.vanish.application.port.VanishPickupPreferences;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,19 +51,26 @@ public final class VanishWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         KernelPorts kernel = ctx.kernel();
+        VanishConfig config = VanishConfig.from(ctx.config());
 
         InMemoryVanishStore store = new InMemoryVanishStore();
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(plugin, kernel.scheduler(), levels);
         VanishNotifier notifier = new VanishNotifier(kernel.messages(), kernel.messageSink());
-        ToggleVanish toggleVanish = new ToggleVanish(store, view, levels, notifier);
-        SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels);
+        VanishBuffs buffs = new BukkitVanishBuffs(
+                plugin.getServer(), kernel.scheduler(), config.nightVision(), config.allowFlight());
+        VanishPickupPreferences pickup = new PdcVanishPickup(plugin.getServer(), config.pickupItems());
+        ToggleVanish toggleVanish = new ToggleVanish(store, view, levels, notifier, buffs);
+        SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs);
         ListVanished listVanished = new ListVanished(store, levels);
 
         List<CommandRegistration> commands =
-                List.of(new VanishCommand(toggleVanish, listVanished, plugin.getServer(), kernel.messages()));
-        List<Listener> listeners =
-                List.of(new VanishLifecycleListener(store, view, setVanishLevel, plugin.getServer()));
+                List.of(new VanishCommand(toggleVanish, listVanished, pickup, plugin.getServer(), kernel.messages()));
+        List<Listener> listeners = List.of(
+                new VanishLifecycleListener(store, view, setVanishLevel, plugin.getServer()),
+                new VanishProtectionListener(store, config, pickup),
+                new VanishSilentContainerListener(
+                        store, kernel.scheduler(), plugin.getServer(), config.silentChests()));
         return new Wired(commands, listeners, store, toggleVanish, levels);
     }
 

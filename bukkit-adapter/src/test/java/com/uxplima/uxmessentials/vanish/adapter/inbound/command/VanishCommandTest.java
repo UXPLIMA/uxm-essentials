@@ -20,9 +20,11 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.PdcVanishPickup;
 import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,10 +56,11 @@ class VanishCommandTest {
         store = new InMemoryVanishStore();
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
-        ToggleVanish toggleVanish =
-                new ToggleVanish(store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()));
+        ToggleVanish toggleVanish = new ToggleVanish(
+                store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()), new NoopBuffs());
         ListVanished listVanished = new ListVanished(store, levels);
-        command = new VanishCommand(toggleVanish, listVanished, server, new KeyMessages());
+        PdcVanishPickup pickup = new PdcVanishPickup(server, false);
+        command = new VanishCommand(toggleVanish, listVanished, pickup, server, new KeyMessages());
     }
 
     @AfterEach
@@ -116,6 +119,21 @@ class VanishCommandTest {
         execute(CommandSourceStackMock.from(caller), "vanish list");
 
         assertThat(lastMessage(caller)).contains("vanish.list").contains("Bob").contains("count=1");
+    }
+
+    @Test
+    void pickupToggleFlipsTheCallersPreferenceAndConfirms() {
+        PlayerMock caller = server.addPlayer("Caller");
+        caller.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.use", true);
+
+        execute(CommandSourceStackMock.from(caller), "vanish pickup"); // default off → toggle on
+        assertThat(lastMessage(caller)).contains("vanish.pickup-on");
+
+        execute(CommandSourceStackMock.from(caller), "vanish pickup"); // on → toggle off
+        assertThat(lastMessage(caller)).contains("vanish.pickup-off");
+
+        execute(CommandSourceStackMock.from(caller), "vanish pickup off"); // absolute off is idempotent
+        assertThat(lastMessage(caller)).contains("vanish.pickup-off");
     }
 
     @Test
@@ -192,5 +210,14 @@ class VanishCommandTest {
         public void deliver(PlayerRef viewer, String renderedText) {
             // discarded: the target's own confirmation is not under test here
         }
+    }
+
+    /** A buffs port that does nothing — the command routing under test does not assert on buffs. */
+    private static final class NoopBuffs implements VanishBuffs {
+        @Override
+        public void apply(PlayerRef who) {}
+
+        @Override
+        public void clear(PlayerRef who) {}
     }
 }

@@ -21,7 +21,11 @@ public enum VanishMessageKey implements MessageKey {
 
     // /vanish list — the roster of hidden players the caller may see, and the nobody-hidden line.
     VANISH_LIST("vanish.list"),
-    VANISH_LIST_EMPTY("vanish.list-empty");
+    VANISH_LIST_EMPTY("vanish.list-empty"),
+
+    // /vanish pickup — the confirmation shown when a player flips whether they pick up items while vanished.
+    VANISH_PICKUP_ON("vanish.pickup-on"),
+    VANISH_PICKUP_OFF("vanish.pickup-off");
 
     private final String key;
 

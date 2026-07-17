@@ -4,11 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
@@ -19,40 +23,41 @@ import com.uxplima.uxmessentials.vanish.domain.VanishState;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link SetVanishLevel} re-resolves a vanished player's use level from their permissions and re-applies their
- * visibility and buffs; a non-vanished player is left untouched. The re-apply writes the fresh level to the store
- * first, then reconciles the view at that level so every {@code canSee} reader agrees, and tops the buffs back up.
+ * {@link ToggleVanish} flips the store, reconciles the view, and — the Phase 3 addition — applies the configured buffs
+ * when a player vanishes and clears them when they reappear, so a hidden player is buffed and a revealed player is not.
+ * Every entry point (bare {@code /vanish}, the absolute {@link ToggleVanish#setVanished}) routes through the same
+ * apply/clear here, which is what keeps buffs uniform across the command, staff-mode vanish, and the settings panel.
  */
-class SetVanishLevelTest {
+class ToggleVanishTest {
 
     private final FakeStore store = new FakeStore();
     private final RecordingView view = new RecordingView();
     private final FakeLevels levels = new FakeLevels();
     private final RecordingBuffs buffs = new RecordingBuffs();
-    private final SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs);
+    private final ToggleVanish toggleVanish =
+            new ToggleVanish(store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()), buffs);
 
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Who");
 
     @Test
-    void aNonVanishedPlayerIsLeftUntouched() {
-        Optional<VanishLevel> applied = setVanishLevel.reapply(who);
+    void vanishingAppliesBuffsAndReappearingClearsThem() {
+        boolean vanished = toggleVanish.toggle(who);
+        assertThat(vanished).isTrue();
+        assertThat(buffs.applied).containsExactly(who);
+        assertThat(buffs.cleared).isEmpty();
 
-        assertThat(applied).isEmpty();
-        assertThat(view.hidden).isEmpty();
-        assertThat(buffs.applied).isEmpty();
+        boolean revealed = toggleVanish.toggle(who);
+        assertThat(revealed).isFalse();
+        assertThat(buffs.cleared).containsExactly(who); // buffs cleared on reappear
     }
 
     @Test
-    void aVanishedPlayerHasTheirLevelReResolvedAndReapplied() {
-        store.vanish(who.uuid(), VanishLevel.DEFAULT); // currently at level 1
-        levels.useLevel = VanishLevel.of(3); // permissions now say level 3
+    void setVanishedAppliesBuffsOnlyOnAStateChange() {
+        toggleVanish.setVanished(who, true);
+        assertThat(buffs.applied).containsExactly(who);
 
-        Optional<VanishLevel> applied = setVanishLevel.reapply(who);
-
-        assertThat(applied).contains(VanishLevel.of(3));
-        assertThat(store.levelOf(who.uuid())).contains(VanishLevel.of(3)); // store updated first
-        assertThat(view.hidden).containsExactly(VanishLevel.of(3)); // then reconciled at the new level
-        assertThat(buffs.applied).containsExactly(who); // and the buffs topped back up
+        toggleVanish.setVanished(who, true); // already vanished — no second apply
+        assertThat(buffs.applied).containsExactly(who);
     }
 
     private static final class RecordingBuffs implements VanishBuffs {
@@ -71,29 +76,35 @@ class SetVanishLevelTest {
     }
 
     private static final class RecordingView implements VanishView {
-        private final List<VanishLevel> hidden = new ArrayList<>();
-
         @Override
-        public void hide(PlayerRef target, VanishLevel level) {
-            hidden.add(level);
-        }
+        public void hide(PlayerRef target, VanishLevel level) {}
 
         @Override
         public void reveal(PlayerRef target) {}
     }
 
     private static final class FakeLevels implements VanishLevelResolver {
-        private VanishLevel useLevel = VanishLevel.DEFAULT;
-
         @Override
         public VanishLevel useLevel(PlayerRef p) {
-            return useLevel;
+            return VanishLevel.DEFAULT;
         }
 
         @Override
         public int seeLevel(PlayerRef p) {
             return 0;
         }
+    }
+
+    private static final class KeyMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return key.key();
+        }
+    }
+
+    private static final class DiscardingSink implements MessageSink {
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {}
     }
 
     private static final class FakeStore implements VanishStore {
