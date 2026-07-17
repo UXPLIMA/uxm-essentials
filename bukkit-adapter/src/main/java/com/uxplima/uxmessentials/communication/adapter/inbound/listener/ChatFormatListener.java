@@ -14,10 +14,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMeta;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderExpander;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
+import com.uxplima.uxmessentials.communication.domain.LegacyChatCodes;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmlib.text.Text;
 import org.jspecify.annotations.NullMarked;
@@ -30,6 +33,14 @@ import org.jspecify.annotations.NullMarked;
  * and parses the whole format as MiniMessage. The speaker's own message is inserted as plain text unless the
  * policy allows player formatting <em>and</em> the speaker holds {@code uxmessentials.communication.chat.format},
  * in which case the message is parsed as MiniMessage too.
+ *
+ * <p>Before the format is captured it is run through the {@link ChatPlaceholderExpander}, so an operator's
+ * PlaceholderAPI {@code %token%} placeholders in the format expand for the speaker when PlaceholderAPI is
+ * installed (a no-op leaving {@code %…%} untouched otherwise). The speaker's typed message is never PlaceholderAPI
+ * expanded — only the operator-authored format is — so a player cannot smuggle a placeholder through their message.
+ * The prefix and suffix are parsed as MiniMessage, except that a prefix/suffix written with legacy colour codes
+ * (a {@code &c} or section-sign sequence, detected by {@link LegacyChatCodes}) is deserialized through Adventure's
+ * legacy serializer instead, so a permission plugin that reports a legacy prefix still renders in colour.
  *
  * <p>Runs at {@link EventPriority#NORMAL}, before {@link ChatLockListener} at {@code HIGH}: a locked chat is
  * cancelled there and a cancelled event never reaches the renderer, so installing a renderer here can never
@@ -48,10 +59,13 @@ public final class ChatFormatListener implements Listener {
 
     private final Supplier<ChatFormatPolicy> policy;
     private final ChatMetaSource metaSource;
+    private final ChatPlaceholderExpander expander;
 
-    public ChatFormatListener(Supplier<ChatFormatPolicy> policy, ChatMetaSource metaSource) {
+    public ChatFormatListener(
+            Supplier<ChatFormatPolicy> policy, ChatMetaSource metaSource, ChatPlaceholderExpander expander) {
         this.policy = Objects.requireNonNull(policy, "policy");
         this.metaSource = Objects.requireNonNull(metaSource, "metaSource");
+        this.expander = Objects.requireNonNull(expander, "expander");
     }
 
     /** Install the format renderer for this line unless chat formatting is disabled. */
@@ -63,7 +77,9 @@ public final class ChatFormatListener implements Listener {
         }
         Player speaker = event.getPlayer();
         ChatMeta meta = metaSource.metaFor(speaker.getUniqueId());
-        String format = current.formatFor(meta.primaryGroup().orElse(null));
+        // Expand the operator format's PlaceholderAPI %tokens% for the speaker before capture; a no-op without PAPI.
+        String format = expander.expand(
+                speaker.getUniqueId(), current.formatFor(meta.primaryGroup().orElse(null)));
         boolean parseMessage = current.allowPlayerFormat() && speaker.hasPermission(FORMAT_PERMISSION);
         // Name and world are plain field reads on the async chat thread — no scheduling, no foreign-region state.
         Rendering rendering = new Rendering(
@@ -98,12 +114,33 @@ public final class ChatFormatListener implements Listener {
             TagResolver messageTag = parseMessage ? Text.parsed("message", raw) : Text.placeholder("message", raw);
             return StyledText.render(
                     format,
-                    Text.parsed("prefix", prefix),
-                    Text.parsed("suffix", suffix),
+                    affixTag("prefix", prefix),
+                    affixTag("suffix", suffix),
                     Text.component("display_name", decorate(displayName)),
                     Text.placeholder("name", name),
                     Text.placeholder("world", world),
                     messageTag);
+        }
+
+        /**
+         * The {@code <prefix>}/{@code <suffix>} resolver for {@code affix}: a legacy-coded affix (a {@code &c} or
+         * section-sign sequence) is deserialized through Adventure's legacy serializer and inserted as a component,
+         * every other affix is parsed as MiniMessage. Deciding once keeps a legacy prefix from rendering literally
+         * without ever double-parsing a MiniMessage one.
+         */
+        private static TagResolver affixTag(String key, String affix) {
+            if (LegacyChatCodes.containsLegacyCodes(affix)) {
+                return Text.component(key, legacy(affix));
+            }
+            return Text.parsed(key, affix);
+        }
+
+        /** Deserialize a legacy-coded affix, using the section-sign serializer when it carries section codes else ampersand. */
+        private static Component legacy(String affix) {
+            LegacyComponentSerializer serializer = affix.indexOf(LegacyComponentSerializer.SECTION_CHAR) >= 0
+                    ? LegacyComponentSerializer.legacySection()
+                    : LegacyComponentSerializer.legacyAmpersand();
+            return serializer.deserialize(affix);
         }
 
         private Component decorate(Component displayName) {

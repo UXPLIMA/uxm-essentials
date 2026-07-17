@@ -14,10 +14,12 @@ import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMeta;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderExpander;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,7 +106,8 @@ class ChatFormatListenerTest {
     @Test
     void aDisabledPolicyInstallsNoRenderer() {
         ChatFormatPolicy policy = ChatFormatPolicy.disabled();
-        ChatFormatListener listener = new ChatFormatListener(() -> policy, source(ChatMeta.empty()));
+        ChatFormatListener listener =
+                new ChatFormatListener(() -> policy, source(ChatMeta.empty()), ChatPlaceholderExpander.identity());
         AsyncChatEvent event = mock(AsyncChatEvent.class);
         when(event.getPlayer()).thenReturn(speaker);
 
@@ -113,9 +116,74 @@ class ChatFormatListenerTest {
         verify(event, never()).renderer(org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void aLegacyColourCodedPrefixRendersInColourNotLiterally() {
+        ChatFormatPolicy policy =
+                new ChatFormatPolicy(true, "<prefix><display_name><gray>:</gray> <message>", Map.of(), false, "", "");
+        ChatRenderer renderer = render(policy, new ChatMeta("&c[VIP] ", "", Optional.empty()));
+
+        Component line = renderer.render(speaker, Component.text("Alice"), Component.text("hello"), speaker);
+
+        // The &c code is consumed (no literal "&c") and re-emitted as a red span, not shown verbatim.
+        assertThat(PLAIN.serialize(line)).isEqualTo("[VIP] Alice: hello");
+        assertThat(MiniMessage.miniMessage().serialize(line)).contains("red");
+    }
+
+    @Test
+    void aSectionSignLegacyPrefixRendersInColourToo() {
+        ChatFormatPolicy policy =
+                new ChatFormatPolicy(true, "<prefix><display_name><gray>:</gray> <message>", Map.of(), false, "", "");
+        ChatRenderer renderer = render(policy, new ChatMeta("\u00A7c[VIP] ", "", Optional.empty()));
+
+        Component line = renderer.render(speaker, Component.text("Alice"), Component.text("hello"), speaker);
+
+        assertThat(PLAIN.serialize(line)).isEqualTo("[VIP] Alice: hello");
+        assertThat(MiniMessage.miniMessage().serialize(line)).contains("red");
+    }
+
+    @Test
+    void aMiniMessagePrefixIsStillParsedAsMiniMessage() {
+        ChatFormatPolicy policy =
+                new ChatFormatPolicy(true, "<prefix><display_name><gray>:</gray> <message>", Map.of(), false, "", "");
+        ChatRenderer renderer = render(policy, new ChatMeta("<red>[VIP] ", "", Optional.empty()));
+
+        Component line = renderer.render(speaker, Component.text("Alice"), Component.text("hello"), speaker);
+
+        assertThat(PLAIN.serialize(line)).isEqualTo("[VIP] Alice: hello");
+        assertThat(MiniMessage.miniMessage().serialize(line)).contains("red");
+    }
+
+    @Test
+    void aPapiPlaceholderInTheFormatIsExpandedWhenTheSeamIsPresent() {
+        ChatFormatPolicy policy =
+                new ChatFormatPolicy(true, "%papi_tag% <display_name>: <message>", Map.of(), false, "", "");
+        ChatPlaceholderExpander present = (who, text) -> text.replace("%papi_tag%", "[STAFF]");
+        ChatRenderer renderer = render(policy, ChatMeta.empty(), present);
+
+        Component line = renderer.render(speaker, Component.text("Alice"), Component.text("hi"), speaker);
+
+        assertThat(PLAIN.serialize(line)).isEqualTo("[STAFF] Alice: hi");
+    }
+
+    @Test
+    void aPapiPlaceholderIsLeftUntouchedWhenTheSeamIsAbsent() {
+        ChatFormatPolicy policy =
+                new ChatFormatPolicy(true, "%papi_tag% <display_name>: <message>", Map.of(), false, "", "");
+        ChatRenderer renderer = render(policy, ChatMeta.empty()); // identity expander — no PlaceholderAPI
+
+        Component line = renderer.render(speaker, Component.text("Alice"), Component.text("hi"), speaker);
+
+        assertThat(PLAIN.serialize(line)).isEqualTo("%papi_tag% Alice: hi");
+    }
+
     /** Run the listener with {@code policy} + {@code meta} and hand back the renderer it installed on the event. */
     private ChatRenderer render(ChatFormatPolicy policy, ChatMeta meta) {
-        ChatFormatListener listener = new ChatFormatListener(() -> policy, source(meta));
+        return render(policy, meta, ChatPlaceholderExpander.identity());
+    }
+
+    /** Run the listener with {@code policy} + {@code meta} + a specific PlaceholderAPI seam, returning the renderer. */
+    private ChatRenderer render(ChatFormatPolicy policy, ChatMeta meta, ChatPlaceholderExpander expander) {
+        ChatFormatListener listener = new ChatFormatListener(() -> policy, source(meta), expander);
         AsyncChatEvent event = mock(AsyncChatEvent.class);
         when(event.getPlayer()).thenReturn(speaker);
 

@@ -1,9 +1,12 @@
 package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
+import java.util.Locale;
+
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.communication.domain.DeathCause;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
 import org.jspecify.annotations.NullMarked;
 
@@ -36,15 +39,17 @@ final class ConnectionPlaceholders {
 
     /**
      * Tokens for a death: the connection tokens plus the rendered vanilla death line as {@code message}, the
-     * killer's name as {@code killer}, and the killer's weapon as {@code killer_weapon}. {@code killer} and
-     * {@code killer_weapon} are the empty string when no player dealt the blow / no weapon applies, so neither
-     * token ever renders raw in a template.
+     * killer's name as {@code killer}, the killer's weapon as {@code killer_weapon}, and the classified death
+     * {@code cause} as its lowercased key ({@code fall}, {@code pvp}, {@code lava}, …) so a template can read the
+     * cause even under the default policy. {@code killer} and {@code killer_weapon} are the empty string when no
+     * player dealt the blow / no weapon applies, so neither token ever renders raw in a template.
      */
     static PlaceholderBindings death(
-            Player player, int onlineCount, String deathMessage, String killer, String killerWeapon) {
+            Player player, int onlineCount, DeathCause cause, String deathMessage, String killer, String killerWeapon) {
         return connection(player, onlineCount)
                 .with("message", deathMessage)
                 .with("killer", killer)
-                .with("killer_weapon", killerWeapon);
+                .with("killer_weapon", killerWeapon)
+                .with("cause", cause.name().toLowerCase(Locale.ROOT));
     }
 }

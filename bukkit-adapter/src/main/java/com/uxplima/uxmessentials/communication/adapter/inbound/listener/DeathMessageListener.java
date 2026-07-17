@@ -32,7 +32,8 @@ import org.jspecify.annotations.Nullable;
  * differently; a cause with no override falls through to the default. A {@code DISABLE} policy clears the death
  * message, {@code DEFAULT} leaves the vanilla line, and {@code CUSTOM} swaps in the operator template the
  * {@code ResolveDeathMessage} use case selected, rendered through MiniMessage with {@code {player}},
- * {@code {count}}, {@code {world}}, the vanilla {@code {message}}, and — when a player dealt the blow —
+ * {@code {count}}, {@code {world}}, the vanilla {@code {message}}, the classified {@code {cause}}, and — when a
+ * player dealt the blow —
  * {@code {killer}} and {@code {killer_weapon}} substituted. The templates and the info-page bodies are operator
  * content, never {@code MessageKey}s.
  *
@@ -69,7 +70,7 @@ public final class DeathMessageListener implements Listener {
         Player killer = player.getKiller();
         DeathCause cause = DeathCauses.of(event);
         PlaceholderBindings bindings = ConnectionPlaceholders.death(
-                player, onlineCount(player), vanillaMessage(event), killerName(killer), killerWeapon(killer));
+                player, onlineCount(player), cause, vanillaMessage(event), killerName(killer), killerWeapon(killer));
         ResolvedMessage resolved = resolveDeath.resolve(cause, bindings);
         if (resolved.hasTemplate()) {
             event.deathMessage(MINI.deserialize(resolved.template().orElseThrow()));

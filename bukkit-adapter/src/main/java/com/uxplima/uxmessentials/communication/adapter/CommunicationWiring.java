@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerB
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSources;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderExpander;
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
@@ -179,6 +180,8 @@ public final class CommunicationWiring {
         commands.add(new CommunicationGuiCommand(adminMenu, kernel.messages()));
         // LuckPerms-backed prefix/suffix/group when installed, an empty fallback otherwise (probed once here).
         ChatMetaSource chatMeta = ChatMetaSources.create(plugin.getServer());
+        // PlaceholderAPI-backed %token% expansion for the chat format when installed, identity otherwise (probed once).
+        ChatPlaceholderExpander chatPlaceholders = ChatPlaceholderExpander.create();
         List<Listener> listeners = listeners(
                 services,
                 registry,
@@ -189,7 +192,8 @@ public final class CommunicationWiring {
                 channelBroadcaster,
                 optOutStore,
                 kernel.scheduler(),
-                chatMeta);
+                chatMeta,
+                chatPlaceholders);
         return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminMenu);
     }
 
@@ -237,7 +241,8 @@ public final class CommunicationWiring {
             ChannelBroadcaster channelBroadcaster,
             BroadcastOptOutStore optOutStore,
             Scheduler scheduler,
-            ChatMetaSource chatMeta) {
+            ChatMetaSource chatMeta,
+            ChatPlaceholderExpander chatPlaceholders) {
         return List.of(
                 new ConnectionMessageListener(
                         services.resolveJoin(), services.resolveQuit(), settings, infoSender, chatMeta),
@@ -254,7 +259,7 @@ public final class CommunicationWiring {
                 new ChatLockListener(chatLock, notifier),
                 // Registered at NORMAL, before the ChatLock at HIGH: a locked chat is cancelled there and a
                 // cancelled event never reaches the renderer, so the format can never override the lock.
-                new ChatFormatListener(settings::chatFormatPolicy, chatMeta));
+                new ChatFormatListener(settings::chatFormatPolicy, chatMeta, chatPlaceholders));
     }
 
     /**
