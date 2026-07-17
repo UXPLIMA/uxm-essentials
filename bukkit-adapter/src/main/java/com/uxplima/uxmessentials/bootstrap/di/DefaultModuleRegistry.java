@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import com.uxplima.uxmessentials.trade.application.TradeModule;
 import com.uxplima.uxmessentials.vanish.application.VanishModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
+import com.uxplima.uxmessentials.villagers.application.VillagersModule;
 import com.uxplima.uxmessentials.vote.application.VoteModule;
 import com.uxplima.uxmessentials.warps.application.WarpsModule;
 import com.uxplima.uxmessentials.worlds.application.WorldsModule;
@@ -199,6 +200,12 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // phases), a same-server trade is transient in-memory state (no DB), and like the steady-state features it
         // ships ENABLED, so it lands last after ranks.
         delegate.register(new TradeModule());
+        // villagers is a new bounded context — villager trade management (Phase 1: infinite trading, a restock timer,
+        // instant restock, and a global/per-villager trade toggle), each an independently toggleable sub-feature. It
+        // carries no hard dependency edge (its collaborators are the shared Scheduler, messages, and event ports),
+        // persists nothing (the last-restock stamp and disable flag are PDC state on the villager entity), and like the
+        // steady-state features ships ENABLED but inert until an operator turns a feature on, so it lands last.
+        delegate.register(new VillagersModule());
         // The shared kernel is not a module and never appears here.
     }
 

@@ -227,6 +227,10 @@ class FoliaThreadingDriftTest {
         allow.put(
                 pkg + "npc.adapter.outbound.NpcRenderer",
                 "GLOBAL: render/despawn/refresh/look all on onGlobal or repeatGlobal; despawnAll from stop()");
+        allow.put(
+                pkg + "villagers.adapter.outbound.VillagerRestockSweep",
+                "GLOBAL: restock sweep snapshots each world's villagers inside repeatGlobal, then hops each restock to "
+                        + "onRegion");
 
         // COMMAND — runs directly in a Brigadier handler, which Paper/Folia dispatch on the global region thread.
         allow.put(

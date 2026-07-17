@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
 import com.uxplima.uxmessentials.vanish.application.VanishMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
+import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
@@ -79,7 +80,8 @@ public final class MessageKeyCatalog {
             RanksMessageKey.values(),
             SecurityMessageKey.values(),
             CommandControlMessageKey.values(),
-            TradeMessageKey.values());
+            TradeMessageKey.values(),
+            VillagersMessageKey.values());
 
     private MessageKeyCatalog() {}
 

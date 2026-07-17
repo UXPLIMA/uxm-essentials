@@ -78,6 +78,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("security"))).isPresent();
         assertThat(registry.byId(ModuleId.of("commandcontrol"))).isPresent();
         assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("villagers"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -109,7 +110,8 @@ class FeatureModuleRegistryDriftTest {
                         "ranks",
                         "security",
                         "commandcontrol",
-                        "trade");
+                        "trade",
+                        "villagers");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -686,13 +688,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void tradeIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void tradeShipsEnabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule trade =
                 registry.byId(ModuleId.of("trade")).orElseThrow(() -> new AssertionError("trade is not registered"));
 
-        // trade is the 26th context — secure player-to-player trading (/trade) — registered last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("trade");
+        // trade is the 26th context — secure player-to-player trading (/trade). The later villagers context now lands
+        // last, so trade must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
 
         // It ships ENABLED (a steady-state feature — /trade is offered out of the box): with no modules.conf override
         // it is on, and disabling exactly trade removes only it while every sibling stays on.
@@ -711,6 +714,35 @@ class FeatureModuleRegistryDriftTest {
         // transient in-memory state (no DB) in Phase 1, so it declares no MigrationSet.
         assertThat(trade.commands()).isEmpty();
         assertThat(trade.migrations()).isEmpty();
+    }
+
+    @Test
+    void villagersIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule villagers = registry.byId(ModuleId.of("villagers"))
+                .orElseThrow(() -> new AssertionError("villagers is not registered"));
+
+        // villagers is a new bounded context — villager trade management (Phase 1: infinite trading, restock timer,
+        // instant restock, disable trades) — registered last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("villagers");
+
+        // It ships ENABLED but inert (every trade-availability feature defaults off): with no modules.conf override it
+        // is on, and disabling exactly villagers removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("villagers", "teleport", "economy", "holograms", "trade");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.villagers.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("villagers");
+        assertThat(off).contains("teleport", "holograms", "trade");
+
+        // The trade / interact listeners and the restock sweep are contributed through the adapter wiring (gated per
+        // feature), not the declarative lists, so the module publishes no command here, and it persists nothing (the
+        // last-restock stamp and disable flag are PDC state on the villager), so it declares no MigrationSet.
+        assertThat(villagers.commands()).isEmpty();
+        assertThat(villagers.migrations()).isEmpty();
     }
 
     @Test

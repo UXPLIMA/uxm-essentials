@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
+import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -129,7 +130,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(PosesMessageKey.values(), List.of("poses")),
                 Map.entry(SurvivalMessageKey.values(), List.of("survival")),
                 Map.entry(RanksMessageKey.values(), List.of("ranks")),
-                Map.entry(SecurityMessageKey.values(), List.of("security")));
+                Map.entry(SecurityMessageKey.values(), List.of("security")),
+                Map.entry(VillagersMessageKey.values(), List.of("villagers")));
     }
 
     @Test
