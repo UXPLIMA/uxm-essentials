@@ -1,13 +1,19 @@
 package com.uxplima.uxmessentials.persistence.trade;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.TradeEscrow.TRADE_ESCROW;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -17,6 +23,9 @@ import com.uxplima.uxmessentials.trade.application.TradeEscrow;
 import com.uxplima.uxmessentials.trade.application.TradeEscrowPhase;
 import com.uxplima.uxmessentials.trade.application.port.TradeEscrowStore;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
+import org.jooq.ConnectionProvider;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,6 +136,34 @@ class JooqTradeEscrowStoreTest {
     }
 
     @Test
+    void commitBothRefusesWhenACounterpartVanishesBetweenTheDecisionAndTheWrite() {
+        // Both sides staked and held — a trade one signal away from its atomic commit point.
+        hold(ALICE, BOB);
+        hold(BOB, ALICE);
+        // Model the exact cross-server race the two-phase commit must survive: the peer backend refunds Bob's
+        // still-held leg (deleting his row) in the window between commitBoth deciding to commit and its write
+        // landing. A connection proxy on the racing store runs that refund on the SAME transactional connection the
+        // instant the commit UPDATE is prepared, so the write now finds only Alice's row to flip — the affected-row
+        // divergence a non-locking count-then-update silently commits through (and MySQL/Postgres would too).
+        ConnectionProvider connections = persistence.dsl().configuration().connectionProvider();
+        TradeEscrowStore racing =
+                new JooqTradeEscrowStore(DSL.using(refundingBobAtTheCommitWrite(connections), SQLDialect.SQLITE));
+
+        boolean committed = racing.commitBoth(TRADE, ALICE.uuid(), BOB.uuid());
+
+        // The commit must report failure — it could not move both legs — and must have rolled its partial one-row
+        // flip back, so neither side is left COMMITTED while its counterpart is refundable (2PC all-or-nothing).
+        assertThat(committed)
+                .as("a commit that cannot move both legs atomically must not report success")
+                .isFalse();
+        assertThat(store.find(TRADE, ALICE.uuid()).orElseThrow().phase()).isEqualTo(TradeEscrowPhase.HELD);
+        assertThat(store.find(TRADE, BOB.uuid()).orElseThrow().phase()).isEqualTo(TradeEscrowPhase.HELD);
+        // Both legs are still fully refundable — no stake stranded, none double-committed.
+        assertThat(store.beginRefund(TRADE, ALICE.uuid())).isTrue();
+        assertThat(store.beginRefund(TRADE, BOB.uuid())).isTrue();
+    }
+
+    @Test
     void aCommittedRowCannotBeRefunded() {
         hold(ALICE, BOB);
         hold(BOB, ALICE);
@@ -146,6 +183,54 @@ class JooqTradeEscrowStoreTest {
     private void hold(PlayerRef owner, PlayerRef counterparty) {
         store.escrow(TradeEscrow.held(
                 TRADE, owner, "s1", counterparty, "s2", "x", 1, Map.of("coins", new BigDecimal("5")), Instant.EPOCH));
+    }
+
+    /** Whether {@code sql} is the guarded commit UPDATE over the escrow table — the write the race interleaves. */
+    private static boolean isCommitWrite(String sql) {
+        String normalized = sql.toLowerCase(Locale.ROOT).stripLeading();
+        return normalized.startsWith("update") && normalized.contains("trade_escrow");
+    }
+
+    /**
+     * A {@link ConnectionProvider} that hands out proxied connections which, the first time the guarded commit UPDATE
+     * is prepared, delete Bob's still-held escrow row on that same transactional connection before the UPDATE runs.
+     * This is the deterministic stand-in for the other backend committing a refund in the commit window — the exact
+     * interleaving a non-locking count-then-update misses and a single guarded UPDATE must catch.
+     */
+    private static ConnectionProvider refundingBobAtTheCommitWrite(ConnectionProvider original) {
+        AtomicBoolean refunded = new AtomicBoolean(false);
+        return new ConnectionProvider() {
+            @Override
+            public Connection acquire() {
+                Connection real = original.acquire();
+                return (Connection) Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[] {Connection.class}, (proxy, method, args) -> {
+                            if ("prepareStatement".equals(method.getName())
+                                    && args != null
+                                    && args.length > 0
+                                    && args[0] instanceof String sql
+                                    && isCommitWrite(sql)
+                                    && refunded.compareAndSet(false, true)) {
+                                DSL.using(real)
+                                        .deleteFrom(TRADE_ESCROW)
+                                        .where(TRADE_ESCROW.TRADE_ID.eq(TRADE.toString()))
+                                        .and(TRADE_ESCROW.OWNER_UUID.eq(
+                                                BOB.uuid().toString()))
+                                        .execute();
+                            }
+                            try {
+                                return method.invoke(real, args);
+                            } catch (InvocationTargetException reflected) {
+                                throw reflected.getCause();
+                            }
+                        });
+            }
+
+            @Override
+            public void release(Connection connection) {
+                original.release(connection);
+            }
+        };
     }
 
     /** A config that selects the embedded SQLite backend with every default. */

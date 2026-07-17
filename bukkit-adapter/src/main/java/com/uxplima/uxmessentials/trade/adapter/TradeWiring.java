@@ -111,7 +111,7 @@ public final class TradeWiring {
         }
         TradeCommand command =
                 new TradeCommand(requests, cooldown, config, sessions, view::open, kernel.messages(), crossView);
-        return new Wired(List.of(command), List.copyOf(listeners), config, sessions, view);
+        return new Wired(List.of(command), List.copyOf(listeners), config, sessions, view, crossView);
     }
 
     /**
@@ -199,13 +199,15 @@ public final class TradeWiring {
      * @param config the resolved trade config snapshot
      * @param sessions the in-memory registry of live trades
      * @param view the trade-window view that opens and drives sessions
+     * @param crossView the cross-server trade window to drain on stop, or {@code null} when cross-server trading is off
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             TradeConfig config,
             TradeSessions sessions,
-            TradeView view) {
+            TradeView view,
+            @Nullable CrossServerTradeView crossView) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -223,6 +225,9 @@ public final class TradeWiring {
         /** Return every in-flight trade's items and close its windows; run on module stop or reload. */
         public void closeAll() {
             view.closeAll();
+            if (crossView != null) {
+                crossView.flushAll();
+            }
         }
     }
 }

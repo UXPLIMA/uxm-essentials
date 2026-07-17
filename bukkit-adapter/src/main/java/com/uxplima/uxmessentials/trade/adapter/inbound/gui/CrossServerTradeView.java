@@ -174,14 +174,31 @@ public final class CrossServerTradeView {
                 holder.tradeId(), holder.local(), holder.remoteServer(), holder.remote(), itemData, count, Map.of()));
     }
 
-    /** A window closed before confirming — return the staked items and abort the other side. */
+    /**
+     * A window closed before confirming — return the staked items and abort the other side. The escrow gate wins here
+     * only when no confirm ran first (matching {@link #onAbort}): a plain close is the real abort and takes this path
+     * exactly once, while a confirm-driven close loses the gate (confirm already claimed it) and does nothing, so it
+     * never fires a spurious {@code ABORT} that would tear the counterpart down.
+     */
     void onClose(CrossTradeHolder holder) {
-        if (!holder.beginEscrow()) {
+        if (holder.beginEscrow()) {
             sessions.remove(holder.local().uuid());
             returnItems(holder);
             notify(holder.local(), TradeMessageKey.TRADE_CANCELLED, Map.of());
             bus.send(new TradeSignal(
                     holder.tradeId(), TradeSignalType.ABORT, holder.local(), holder.remote(), bus.localServer()));
+        }
+    }
+
+    /**
+     * Drain every open cross-server trade window on module stop or reload: return each side's still-staked items to the
+     * player and signal the peer to abort, exactly as a plain close does. Mirrors the same-server {@code TradeView.closeAll}
+     * so a disable or {@code /uxmess reload trade} never drops the transient window's items. Snapshots the open holders
+     * first because {@link #onClose} removes from {@link #sessions} as it drains each.
+     */
+    public void flushAll() {
+        for (CrossTradeHolder holder : List.copyOf(sessions.values())) {
+            onClose(holder);
         }
     }
 

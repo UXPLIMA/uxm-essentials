@@ -99,24 +99,36 @@ public final class JooqTradeEscrowStore extends JooqRepository implements TradeE
         Objects.requireNonNull(b, "b");
         String id = tradeId.toString();
         List<String> owners = List.of(a.toString(), b.toString());
-        return write(dsl -> {
-            Integer held = dsl.selectCount()
-                    .from(TRADE_ESCROW)
-                    .where(TRADE_ESCROW.TRADE_ID.eq(id))
-                    .and(TRADE_ESCROW.OWNER_UUID.in(owners))
-                    .and(TRADE_ESCROW.PHASE.eq(TradeEscrowPhase.HELD.name()))
-                    .fetchOne(0, Integer.class);
-            if (held == null || held != 2) {
-                return false;
-            }
-            dsl.update(TRADE_ESCROW)
-                    .set(TRADE_ESCROW.PHASE, TradeEscrowPhase.COMMITTED.name())
-                    .where(TRADE_ESCROW.TRADE_ID.eq(id))
-                    .and(TRADE_ESCROW.OWNER_UUID.in(owners))
-                    .and(TRADE_ESCROW.PHASE.eq(TradeEscrowPhase.HELD.name()))
-                    .execute();
-            return true;
-        });
+        try {
+            return write(dsl -> commitBothLegs(dsl, id, owners));
+        } catch (CommitConflict conflict) {
+            // A concurrent refund or claim on the peer backend flipped or removed one leg between our commit decision
+            // and our write, so the single guarded UPDATE moved fewer than both rows and the transaction rolled that
+            // partial flip back. Report no commit, leaving the still-held leg refundable — the two-phase point of no
+            // return is crossed for both sides or for neither, never for one alone.
+            return false;
+        }
+    }
+
+    /**
+     * Flip both still-{@code HELD} legs to {@code COMMITTED} in one atomic guarded write, deriving the commit decision
+     * from the UPDATE's own affected-row count rather than a prior non-locking count. A write that moves fewer than
+     * both rows — a leg already committed, claimed, or refunded away by the peer between our two backends — throws
+     * {@link CommitConflict} so the enclosing transaction rolls the partial flip back and {@link #commitBoth} reports
+     * failure. This closes the count-then-update TOCTOU: the decision and the transition are now the same statement,
+     * so no interleaving can leave one side committed while its counterpart is still refundable.
+     */
+    private static boolean commitBothLegs(DSLContext dsl, String id, List<String> owners) {
+        int flipped = dsl.update(TRADE_ESCROW)
+                .set(TRADE_ESCROW.PHASE, TradeEscrowPhase.COMMITTED.name())
+                .where(TRADE_ESCROW.TRADE_ID.eq(id))
+                .and(TRADE_ESCROW.OWNER_UUID.in(owners))
+                .and(TRADE_ESCROW.PHASE.eq(TradeEscrowPhase.HELD.name()))
+                .execute();
+        if (flipped != 2) {
+            throw new CommitConflict();
+        }
+        return true;
     }
 
     @Override
@@ -200,5 +212,16 @@ public final class JooqTradeEscrowStore extends JooqRepository implements TradeE
             }
         }
         return money;
+    }
+
+    /**
+     * The internal rollback signal for a commit that could not move both legs atomically. Thrown from
+     * {@link #commitBothLegs} inside the commit transaction so jOOQ rolls the partial one-row flip back, then caught in
+     * {@link #commitBoth}, which reports the commit as failed. It carries no stack trace and never escapes the store.
+     */
+    private static final class CommitConflict extends RuntimeException {
+        private CommitConflict() {
+            super(null, null, false, false);
+        }
     }
 }
