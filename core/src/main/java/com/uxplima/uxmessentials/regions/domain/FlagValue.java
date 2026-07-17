@@ -23,4 +23,25 @@ public record FlagValue(String name, String value) {
             throw new IllegalArgumentException("flag name must not be blank");
         }
     }
+
+    /**
+     * A flag value carrying {@code state} for {@code name}: the state's {@link FlagState#token() token} becomes the
+     * {@link #value()}, so cycling a flag in the editor round-trips through the {@code RegionService} port as a plain
+     * name/value pair. An {@link FlagState#UNSET} state carries the empty value (the "clear this flag" request).
+     */
+    public static FlagValue of(String name, FlagState state) {
+        Objects.requireNonNull(state, "state");
+        return new FlagValue(name, state.token());
+    }
+
+    /**
+     * This value read as a {@link FlagState}, strictly: {@code "ALLOW"} / {@code "DENY"} / blank map to the matching
+     * state and anything else is rejected. Call this only when the flag is known to be a state flag (the editor's
+     * config-declared list); a free-text flag's value is not a state and would raise.
+     *
+     * @throws IllegalArgumentException when the value names no known state
+     */
+    public FlagState state() {
+        return FlagState.parse(value);
+    }
 }

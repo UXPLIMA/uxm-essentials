@@ -13,9 +13,11 @@ import org.bukkit.Server;
 import org.bukkit.World;
 
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
+import com.uxplima.uxmessentials.regions.domain.FlagState;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
+import com.uxplima.uxmessentials.regions.domain.RegionServiceException;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -35,9 +37,12 @@ import org.jspecify.annotations.Nullable;
  * missing region, or any reflective failure (a version bump moving a method) reports an empty result and is logged
  * at most once, because a blank list is a better failure than a thrown command.
  *
- * <p>The mutations are declared by the port but not yet wired: {@code create}/{@code setFlag} land with the Phase 2
- * flag editor and {@code applyMemberChange}/{@code setPriority} with the Phase 3 roster editor, so they throw
- * {@link UnsupportedOperationException} for now (no Phase 1 caller reaches them).
+ * <p>{@code create} and {@code setFlag} are the Phase 2 mutations: unlike the fail-safe reads they must not fail
+ * silently, so a reflective failure or a rejected request is wrapped in a {@link RegionServiceException} the command
+ * surface turns into an operator-facing error rather than a swallowed no-op. Both mark the region manager dirty and
+ * lean on WorldGuard's own background/shutdown save to persist, so neither blocks the tick thread on a disk write.
+ * {@code applyMemberChange}/{@code setPriority} land with the Phase 3 roster editor and still throw
+ * {@link UnsupportedOperationException} until then.
  */
 @NullMarked
 public final class WorldGuardRegionService implements RegionService {
@@ -156,12 +161,52 @@ public final class WorldGuardRegionService implements RegionService {
 
     @Override
     public RegionRef create(WorldRef world, String id, Position min, Position max) {
-        throw new UnsupportedOperationException("region creation arrives in Phase 2");
+        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(min, "min");
+        Objects.requireNonNull(max, "max");
+        if (!available()) {
+            throw new UnsupportedOperationException("WorldGuard is not installed");
+        }
+        try {
+            Object manager = regionManager(world);
+            if (manager == null) {
+                throw new RegionServiceException("no WorldGuard region manager for world " + world.name());
+            }
+            Object region = newCuboidRegion(id, min, max);
+            addRegion(manager, region);
+            // The manager is now dirty; WorldGuard's periodic background saver and its shutdown save persist it, so
+            // create stays a fast in-memory call rather than a blocking disk write on the tick thread.
+            return new RegionRef(world, id);
+        } catch (ReflectiveOperationException failure) {
+            throw new RegionServiceException("could not create region " + id, failure);
+        }
     }
 
     @Override
     public void setFlag(RegionRef region, FlagValue flag) {
-        throw new UnsupportedOperationException("the flag editor arrives in Phase 2");
+        Objects.requireNonNull(region, "region");
+        Objects.requireNonNull(flag, "flag");
+        if (!available()) {
+            throw new UnsupportedOperationException("WorldGuard is not installed");
+        }
+        // Reject an out-of-range value before any reflection touches WorldGuard.
+        FlagState state = FlagState.parse(flag.value());
+        try {
+            Object protectedRegion = protectedRegion(region);
+            if (protectedRegion == null) {
+                throw new RegionServiceException("no region " + region.id() + " to flag");
+            }
+            Object stateFlag = stateFlag(flag.name());
+            if (stateFlag == null) {
+                throw new RegionServiceException("unknown or non-state flag: " + flag.name());
+            }
+            // A null value clears the flag (unset); a state value sets it explicitly.
+            Object value = state == FlagState.UNSET ? null : stateValue(state);
+            setRegionFlag(protectedRegion, stateFlag, value);
+        } catch (ReflectiveOperationException failure) {
+            throw new RegionServiceException("could not set flag " + flag.name(), failure);
+        }
     }
 
     @Override
@@ -220,9 +265,7 @@ public final class WorldGuardRegionService implements RegionService {
         if (bukkit == null) {
             return null;
         }
-        Object instance = Class.forName("com.sk89q.worldguard.WorldGuard")
-                .getMethod("getInstance")
-                .invoke(null);
+        Object instance = worldGuardInstance();
         Object platform = instance.getClass().getMethod("getPlatform").invoke(instance);
         Object container = platform.getClass().getMethod("getRegionContainer").invoke(platform);
         Object weWorld = Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter")
@@ -257,6 +300,70 @@ public final class WorldGuardRegionService implements RegionService {
             return null;
         }
         return regionsMap(manager).get(region.id());
+    }
+
+    /** {@code WorldGuard.getInstance()} — the singleton entry point every reflective walk starts from. */
+    private static Object worldGuardInstance() throws ReflectiveOperationException {
+        return Class.forName("com.sk89q.worldguard.WorldGuard")
+                .getMethod("getInstance")
+                .invoke(null);
+    }
+
+    /** A new {@code ProtectedCuboidRegion(id, min, max)} spanning the two positions' block cells. */
+    private static Object newCuboidRegion(String id, Position min, Position max) throws ReflectiveOperationException {
+        Object minVector = blockVector(min);
+        Object maxVector = blockVector(max);
+        Class<?> vectorClass = minVector.getClass();
+        return Class.forName("com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion")
+                .getConstructor(String.class, vectorClass, vectorClass)
+                .newInstance(id, minVector, maxVector);
+    }
+
+    /** {@code BlockVector3.at(blockX, blockY, blockZ)} for a domain {@link Position}. */
+    private static Object blockVector(Position position) throws ReflectiveOperationException {
+        return Class.forName("com.sk89q.worldedit.math.BlockVector3")
+                .getMethod("at", int.class, int.class, int.class)
+                .invoke(null, position.blockX(), position.blockY(), position.blockZ());
+    }
+
+    /** {@code RegionManager.addRegion(ProtectedRegion)} — matched by the single {@code ProtectedRegion} argument. */
+    private static void addRegion(Object manager, Object region) throws ReflectiveOperationException {
+        Class<?> protectedRegionClass = Class.forName("com.sk89q.worldguard.protection.regions.ProtectedRegion");
+        manager.getClass().getMethod("addRegion", protectedRegionClass).invoke(manager, region);
+    }
+
+    /**
+     * The WorldGuard {@code StateFlag} registered under {@code name}, or {@code null} when no flag carries that name
+     * or the flag is not a state flag (a free-text flag the cycle editor cannot drive). Read off the flag registry so
+     * a flag's canonical type — not a guessed one — decides whether the editor may cycle it.
+     */
+    private static @Nullable Object stateFlag(String name) throws ReflectiveOperationException {
+        Object registry =
+                worldGuardInstance().getClass().getMethod("getFlagRegistry").invoke(worldGuardInstance());
+        Object flag = registry.getClass().getMethod("get", String.class).invoke(registry, name);
+        if (flag == null) {
+            return null;
+        }
+        Class<?> stateFlagClass = Class.forName("com.sk89q.worldguard.protection.flags.StateFlag");
+        return stateFlagClass.isInstance(flag) ? flag : null;
+    }
+
+    /** The {@code StateFlag.State} enum constant for a domain {@link FlagState} ({@code ALLOW} / {@code DENY}). */
+    private static Object stateValue(FlagState state) throws ReflectiveOperationException {
+        Class<?> stateEnum = Class.forName("com.sk89q.worldguard.protection.flags.StateFlag$State");
+        return stateEnum.getMethod("valueOf", String.class).invoke(null, state.token());
+    }
+
+    /** {@code ProtectedRegion.setFlag(Flag, value)} — a null value clears the flag; matched by its two arguments. */
+    private static void setRegionFlag(Object region, Object flag, @Nullable Object value)
+            throws ReflectiveOperationException {
+        for (Method candidate : region.getClass().getMethods()) {
+            if (candidate.getName().equals("setFlag") && candidate.getParameterCount() == 2) {
+                candidate.invoke(region, flag, value);
+                return;
+            }
+        }
+        throw new NoSuchMethodException("ProtectedRegion.setFlag");
     }
 
     private void degrade(Exception failure) {

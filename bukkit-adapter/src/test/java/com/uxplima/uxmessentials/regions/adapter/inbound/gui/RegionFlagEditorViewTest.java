@@ -4,14 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.Material;
-import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryType;
@@ -20,6 +19,7 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
+import com.uxplima.uxmessentials.regions.domain.FlagState;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -43,23 +42,23 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@link RegionListView} over a real menu engine and a fake {@link RegionService} (WorldGuard
- * is not on the test classpath — the view is exercised through the port): the {@code /regions} list renders one
- * paper icon per region priority-first, clicking one hands that region to the injected selection callback, and a
- * world with no regions sends the "no regions" line without opening a window.
+ * MockBukkit coverage of {@link RegionFlagEditorView} over a real menu engine and a fake {@link RegionService}
+ * (WorldGuard is not on the test classpath — the editor is exercised through the port): it draws one icon per
+ * configured flag, reflects each flag's current value (a denied flag shows the deny icon), and a click cycles the
+ * flag to its next state and writes that value back through {@link RegionService#setFlag} — after which the reopened
+ * panel reflects the new value.
  */
-class RegionListViewTest {
+class RegionFlagEditorViewTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
+    private static final RegionRef REGION = new RegionRef(WORLD, "spawn");
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock staff;
     private PlayerRef staffRef;
     private FakeRegionService service;
-    private RecordingSink sink;
-    private List<String> selected;
-    private RegionListView listView;
+    private RegionFlagEditorView editor;
 
     @BeforeEach
     void setUp() {
@@ -67,25 +66,22 @@ class RegionListViewTest {
         plugin = MockBukkit.createMockPlugin();
         staff = server.addPlayer("Staff");
         staffRef = new PlayerRef(staff.getUniqueId(), staff.getName());
-        service = new FakeRegionService(true);
-        sink = new RecordingSink();
-        selected = new ArrayList<>();
+        service = new FakeRegionService();
 
         Scheduler scheduler = new SyncScheduler();
-        Messages messages = idAwareEcho();
+        Messages messages = keyEcho();
         GuiText guiText = new GuiText(messages);
         TestMenuEngine engine = TestMenuEngine.create(messages, scheduler);
         engine.installListener(plugin);
         Menus menus = engine.menus();
-        listView = new RegionListView(
+        editor = new RegionFlagEditorView(
                 menus,
                 guiText,
                 scheduler,
                 messages,
-                sink,
                 service,
-                EntityListLayout.paginatedDefault(Material.PAPER),
-                (Player clicker, RegionRef region) -> selected.add(region.id()));
+                List.of("pvp", "build", "mob-spawning"),
+                EntityListLayout.paginatedDefault(Material.GRAY_DYE));
     }
 
     @AfterEach
@@ -94,39 +90,32 @@ class RegionListViewTest {
     }
 
     @Test
-    void listsRegionsPriorityFirstAndAClickHandsTheRegionToTheCallback() {
-        // Added out of priority order; the list must show highest priority first (shop 10, spawn 5, wild 1).
-        service.add(new RegionRef(WORLD, "spawn"), 5, 2);
-        service.add(new RegionRef(WORLD, "shop"), 10, 0);
-        service.add(new RegionRef(WORLD, "wild"), 1, 1);
-
-        listView.open(staffRef, WORLD);
+    void drawsAnIconPerConfiguredFlag() {
+        editor.open(staffRef, REGION);
 
         Inventory inv = staff.getOpenInventory().getTopInventory();
         assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
-        assertThat(inv.getItem(0).getType()).isEqualTo(Material.PAPER);
-        assertThat(inv.getItem(1).getType()).isEqualTo(Material.PAPER);
-        assertThat(inv.getItem(2).getType()).isEqualTo(Material.PAPER);
-
-        // Clicking a slot routes to onSelect for the region drawn there, which hands that region to the callback.
-        fireClick(0);
-        assertThat(selected).containsExactly("shop");
-        fireClick(2);
-        assertThat(selected).containsExactly("shop", "wild");
+        assertThat(inv.getItem(0)).isNotNull();
+        assertThat(inv.getItem(1)).isNotNull();
+        assertThat(inv.getItem(2)).isNotNull();
     }
 
     @Test
-    void anEmptyWorldSendsTheNoRegionsLineAndOpensNoWindow() {
-        listView.open(staffRef, WORLD);
+    void reflectsAFlagsValueAndCyclesItThroughThePortOnClick() {
+        // pvp is denied in the region, so its icon must render as the deny icon (reflecting the live value).
+        service.setInitial("pvp", FlagState.DENY);
 
-        assertThat(sink.last()).isEqualTo("regions.no-regions");
-        assertThat(menuHolderOpen(staff)).isFalse();
-    }
+        editor.open(staffRef, REGION);
+        Inventory inv = staff.getOpenInventory().getTopInventory();
+        assertThat(inv.getItem(0).getType()).isEqualTo(Material.RED_DYE);
 
-    /** Whether {@code player} currently has an engine menu open — null-safe (no window means a null top inventory). */
-    private static boolean menuHolderOpen(PlayerMock player) {
-        Inventory top = player.getOpenInventory().getTopInventory();
-        return top != null && top.getHolder() instanceof MenuHolder;
+        // Clicking pvp cycles DENY -> UNSET and writes the empty (cleared) value back through the port.
+        fireClick(0);
+        assertThat(service.lastSetFlag()).isEqualTo(new FlagValue("pvp", ""));
+
+        // The reopened panel reflects the new value: pvp is now unset (the unset icon).
+        Inventory reopened = staff.getOpenInventory().getTopInventory();
+        assertThat(reopened.getItem(0).getType()).isEqualTo(Material.GRAY_DYE);
     }
 
     private void fireClick(int slot) {
@@ -136,72 +125,46 @@ class RegionListViewTest {
                         view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL));
     }
 
-    /** Renders the {@code {id}} placeholder verbatim (so an icon/notice carries the region id), else echoes the key. */
-    private static Messages idAwareEcho() {
-        return (viewer, key, placeholders) -> placeholders.containsKey("id") ? placeholders.get("id") : key.key();
+    private static Messages keyEcho() {
+        return (viewer, key, placeholders) -> key.key();
     }
 
-    /** Captures the last message delivered so a test can assert what the view sent. */
-    private static final class RecordingSink implements MessageSink {
-        private final AtomicReference<String> last = new AtomicReference<>();
-
-        @Override
-        public void deliver(PlayerRef viewer, String renderedText) {
-            last.set(renderedText);
-        }
-
-        @Nullable String last() {
-            return last.get();
-        }
-    }
-
-    /** An in-memory {@link RegionService} for one world; reads answer, mutations are out of Phase 1 scope. */
+    /** An in-memory {@link RegionService} that serves a region's state flags and records the last {@code setFlag}. */
     private static final class FakeRegionService implements RegionService {
-        private final boolean available;
-        private final List<RegionRef> regions = new ArrayList<>();
-        private final Map<String, Integer> priorities = new java.util.HashMap<>();
-        private final Map<String, Integer> memberCounts = new java.util.HashMap<>();
+        private final Map<String, FlagValue> flags = new LinkedHashMap<>();
+        private @Nullable FlagValue lastSetFlag;
 
-        FakeRegionService(boolean available) {
-            this.available = available;
+        void setInitial(String name, FlagState state) {
+            flags.put(name, FlagValue.of(name, state));
         }
 
-        void add(RegionRef region, int priority, int memberCount) {
-            regions.add(region);
-            priorities.put(region.id(), priority);
-            memberCounts.put(region.id(), memberCount);
+        @Nullable FlagValue lastSetFlag() {
+            return lastSetFlag;
         }
 
         @Override
         public boolean available() {
-            return available;
+            return true;
         }
 
         @Override
         public List<RegionRef> regionsIn(WorldRef world) {
-            return regions.stream().filter(r -> r.world().equals(world)).toList();
+            return List.of(REGION);
         }
 
         @Override
         public Optional<RegionRef> region(WorldRef world, String id) {
-            return regions.stream()
-                    .filter(r -> r.world().equals(world) && r.id().equals(id))
-                    .findFirst();
+            return Optional.of(REGION);
         }
 
         @Override
         public List<FlagValue> flags(RegionRef region) {
-            return List.of();
+            return new ArrayList<>(flags.values());
         }
 
         @Override
         public List<String> members(RegionRef region) {
-            int count = memberCounts.getOrDefault(region.id(), 0);
-            List<String> names = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                names.add("member" + i);
-            }
-            return names;
+            return List.of();
         }
 
         @Override
@@ -211,7 +174,7 @@ class RegionListViewTest {
 
         @Override
         public int priority(RegionRef region) {
-            return priorities.getOrDefault(region.id(), 0);
+            return 0;
         }
 
         @Override
@@ -221,7 +184,12 @@ class RegionListViewTest {
 
         @Override
         public void setFlag(RegionRef region, FlagValue flag) {
-            throw new UnsupportedOperationException();
+            this.lastSetFlag = flag;
+            if (flag.state() == FlagState.UNSET) {
+                flags.remove(flag.name());
+            } else {
+                flags.put(flag.name(), flag);
+            }
         }
 
         @Override

@@ -1,28 +1,37 @@
 package com.uxplima.uxmessentials.regions.adapter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.function.BiConsumer;
 import java.util.stream.IntStream;
 
 import org.bukkit.Material;
 import org.bukkit.Server;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.regions.adapter.inbound.command.RegionsCommand;
+import com.uxplima.uxmessentials.regions.adapter.inbound.command.WorldEditRegionSelection;
+import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionFlagEditorView;
 import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionListView;
 import com.uxplima.uxmessentials.regions.adapter.outbound.NoWorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.adapter.outbound.WorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.application.RegionsConfig;
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
+import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -48,6 +57,9 @@ public final class RegionsWiring {
     /** Each region is drawn as, and the paginated-list fallback icon is, a sheet of paper. */
     private static final Material REGION_ICON = Material.PAPER;
 
+    /** The clicked-a-region-without-the-flags-permission refusal is gated on this node. */
+    private static final String FLAGS_PERMISSION = "uxmessentials.regions.flags";
+
     private RegionsWiring() {}
 
     /** Build the regions adapters and the {@code /regions} command from {@code plugin}, {@code ctx} and {@code menus}. */
@@ -57,17 +69,52 @@ public final class RegionsWiring {
         Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         RegionsConfig config = RegionsConfig.from(ctx.config());
+        GuiText guiText = new GuiText(kernel.messages());
         RegionService service = regionService(plugin.getServer(), kernel.log());
+        RegionFlagEditorView flagEditor = new RegionFlagEditorView(
+                menus,
+                guiText,
+                kernel.scheduler(),
+                kernel.messages(),
+                service,
+                config.editableFlags(),
+                EntityListLayout.paginatedDefault(REGION_ICON));
         RegionListView listView = new RegionListView(
                 menus,
-                new GuiText(kernel.messages()),
+                guiText,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
                 service,
-                listLayout(config.listPageSize()));
-        RegionsCommand command = new RegionsCommand(service, listView, plugin.getServer(), kernel.messages());
+                listLayout(config.listPageSize()),
+                openEditorOnClick(kernel, flagEditor));
+        RegionsCommand command = new RegionsCommand(
+                service,
+                listView,
+                flagEditor,
+                new WorldEditRegionSelection(plugin.getServer()),
+                kernel.scheduler(),
+                plugin.getServer(),
+                kernel.messages());
         return new Wired(List.of(command));
+    }
+
+    /**
+     * The list-click handler: a click on a region opens its flag editor, but only for a viewer holding the flags
+     * permission — otherwise the same "no permission" line the {@code /regions flags} command would answer is sent, so
+     * the editor's mutation surface is gated identically from the list and from the command.
+     */
+    private static BiConsumer<Player, RegionRef> openEditorOnClick(
+            KernelPorts kernel, RegionFlagEditorView flagEditor) {
+        return (player, region) -> {
+            PlayerRef ref = BukkitRefs.toRef(player);
+            if (!player.hasPermission(FLAGS_PERMISSION)) {
+                kernel.messageSink()
+                        .deliver(ref, kernel.messages().resolve(ref, SharedMessageKey.COMMAND_NO_PERMISSION, Map.of()));
+                return;
+            }
+            flagEditor.open(ref, region);
+        };
     }
 
     /**

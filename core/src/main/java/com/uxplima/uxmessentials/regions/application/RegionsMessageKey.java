@@ -9,14 +9,16 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * context.
  *
  * <p>Phase 1 covers the {@code /regions} list surface: the refusals ({@code no-worldguard}, {@code unknown-world},
- * {@code no-regions}), the paginated list panel (title, per-region line, prev/next), and the placeholder detail
- * notice a region click raises until the Phase 2/3 editors fill it in.
+ * {@code no-regions}), and the paginated list panel (title, per-region line, prev/next). Phase 2 adds the
+ * {@code /regions create} feedback (the two-corner selection prompts and the create outcomes) and the flag-editor
+ * panel (title, per-flag icon, the three cycle-state words, and its own nav).
  */
 public enum RegionsMessageKey implements MessageKey {
 
     // Refusals shown at the /regions command boundary.
     REGIONS_NO_WORLDGUARD("regions.no-worldguard"),
     REGIONS_UNKNOWN_WORLD("regions.unknown-world"),
+    REGIONS_UNKNOWN_REGION("regions.unknown-region"),
     REGIONS_NO_REGIONS("regions.no-regions"),
 
     // The region list GUI: the panel title, a per-region icon name (its id) and lore (priority + member count),
@@ -28,8 +30,24 @@ public enum RegionsMessageKey implements MessageKey {
     REGIONS_GUI_PREV("regions.gui.prev"),
     REGIONS_GUI_NEXT("regions.gui.next"),
 
-    // The placeholder detail notice a region click raises until the flag/member editors land in later phases.
-    REGIONS_DETAIL_SOON("regions.detail-soon");
+    // /regions create: marking the two selection corners, and the create outcomes.
+    REGIONS_POS_SET("regions.pos.set"),
+    REGIONS_CREATE_DONE("regions.create.done"),
+    REGIONS_CREATE_DUPLICATE("regions.create.duplicate"),
+    REGIONS_CREATE_NO_SELECTION("regions.create.no-selection"),
+    REGIONS_CREATE_FAILED("regions.create.failed"),
+
+    // The flag editor GUI: the panel title, empty-state title, a per-flag icon name (its flag name) and lore
+    // (current state + a hint), the previous/next page buttons, and the three cycle-state words.
+    REGIONS_FLAGS_TITLE("regions.flags.title"),
+    REGIONS_FLAGS_EMPTY("regions.flags.empty"),
+    REGIONS_FLAGS_FLAG("regions.flags.flag"),
+    REGIONS_FLAGS_FLAG_INFO("regions.flags.flag-info"),
+    REGIONS_FLAGS_PREV("regions.flags.prev"),
+    REGIONS_FLAGS_NEXT("regions.flags.next"),
+    REGIONS_FLAGS_STATE_ALLOW("regions.flags.state-allow"),
+    REGIONS_FLAGS_STATE_DENY("regions.flags.state-deny"),
+    REGIONS_FLAGS_STATE_UNSET("regions.flags.state-unset");
 
     private final String key;
 

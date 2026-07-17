@@ -4,6 +4,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -17,7 +18,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -34,10 +34,10 @@ import org.jspecify.annotations.NullMarked;
  * thread, never a viewer's region thread), then the panel opens on the staff member's own entity thread; the icon
  * renderer reads only that snapshot.
  *
- * <p>Clicking a region raises the Phase 1 placeholder detail notice — the per-region flag and members/owners
- * editors it opens land with Phases 2 and 3. A world with no regions sends the "no regions" line instead of an
- * empty window. A fresh {@link EntityListView} is built per open, so two staff inspecting different worlds never
- * share list state.
+ * <p>Clicking a region hands it to the injected {@code onRegionSelected} callback — the wiring points it at the
+ * Phase 2 flag editor (gated on the flags permission); the members/owners editor joins it in Phase 3. A world with
+ * no regions sends the "no regions" line instead of an empty window. A fresh {@link EntityListView} is built per
+ * open, so two staff inspecting different worlds never share list state.
  */
 @NullMarked
 public final class RegionListView {
@@ -52,6 +52,7 @@ public final class RegionListView {
     private final MessageSink messageSink;
     private final RegionService service;
     private final EntityListLayout layout;
+    private final BiConsumer<Player, RegionRef> onRegionSelected;
 
     public RegionListView(
             Menus menus,
@@ -60,7 +61,8 @@ public final class RegionListView {
             Messages messages,
             MessageSink messageSink,
             RegionService service,
-            EntityListLayout layout) {
+            EntityListLayout layout,
+            BiConsumer<Player, RegionRef> onRegionSelected) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -68,6 +70,7 @@ public final class RegionListView {
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.service = Objects.requireNonNull(service, "service");
         this.layout = Objects.requireNonNull(layout, "layout");
+        this.onRegionSelected = Objects.requireNonNull(onRegionSelected, "onRegionSelected");
     }
 
     /**
@@ -139,14 +142,8 @@ public final class RegionListView {
                 .build();
     }
 
-    /** Phase 1: a click acknowledges the region and points at the editors the later phases fill in. */
+    /** A click hands the region to the injected selection callback (the wiring opens the flag editor for it). */
     private void onSelect(Player clicker, RegionRow row) {
-        PlayerRef ref = BukkitRefs.toRef(clicker);
-        messageSink.deliver(
-                ref,
-                messages.resolve(
-                        ref,
-                        RegionsMessageKey.REGIONS_DETAIL_SOON,
-                        Map.of("id", row.region().id())));
+        onRegionSelected.accept(clicker, row.region());
     }
 }
