@@ -62,6 +62,7 @@ final class DefaultResources {
             "modules/ranks/config.conf",
             "modules/ranks/ranks.conf",
             "modules/security/config.conf",
+            "modules/commandcontrol/config.conf",
             "modules/trade/config.conf",
             "modules/migration/config.conf",
             "modules/communication/gui/announcement-editor-list.conf",

@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.bootstrap.health.ModuleCountHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SchedulerHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SoftDependencyHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
+import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlWiring;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
@@ -968,6 +969,8 @@ public final class PluginModule {
             wireTrade(ctx, persistence, resources, textInput, links, bus);
         } else if (module.id().equals(ModuleId.of("security"))) {
             wireSecurity(plugin, ctx, persistence, resources, textInput);
+        } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
+            wireCommandControl(plugin, ctx, resources);
         }
     }
 
@@ -988,6 +991,15 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+    }
+
+    private static void wireCommandControl(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // commandcontrol persists nothing: the whitelist/blacklist rule set is derived once from the module's config
+        // into an immutable snapshot, so a hot-reload re-runs this wiring and registers a fresh gate. The single
+        // PlayerCommandPreprocessEvent listener consults that rule set with the player's group (LuckPerms when
+        // installed, empty otherwise) and permission facts, and on deny cancels the command and sends the configured
+        // deny line. There is no runtime state to drain on stop — unregistering the listener is enough.
+        resources.addListener(CommandControlWiring.wire(plugin.getServer(), ctx));
     }
 
     private static void wireTrade(

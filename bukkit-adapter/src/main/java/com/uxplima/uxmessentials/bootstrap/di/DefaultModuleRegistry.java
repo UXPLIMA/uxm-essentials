@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.di;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.commandcontrol.application.CommandControlModule;
 import com.uxplima.uxmessentials.communication.application.CommunicationModule;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusModule;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkModule;
@@ -184,6 +185,14 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // op-command protection and IP/alt guard land with the later phases), and like the steady-state features it
         // ships ENABLED but inert until a player enrols a factor. It is registered before trade so trade stays last.
         delegate.register(new SecurityModule());
+        // commandcontrol is a new bounded context — PlHidePro / CommandWhitelist-parity gating of which commands a
+        // player may run. Phase 1 is the per-group command whitelist/blacklist and the custom "unknown command" deny
+        // message (a single PlayerCommandPreprocessEvent gate); the tab-completion filter, plugin-hide, and
+        // namespace-bypass block land in the later phases. It carries no hard dependency edge (its collaborators are
+        // the shared messages/sink ports plus the LuckPerms group seam), persists nothing (the rule set is derived
+        // from config), and like the steady-state features ships ENABLED but inert until an operator names commands.
+        // It is registered before trade so trade stays last.
+        delegate.register(new CommandControlModule());
         // trade is the 26th context — secure player-to-player trading (/trade) with a live dual-inventory window and,
         // in the later phases, staked money and cross-server escrow. It carries no hard dependency edge in Phase 1
         // (its collaborators — the economy trade port and the bus transport — land with the money and cross-server

@@ -4,6 +4,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
@@ -77,6 +78,7 @@ public final class MessageKeyCatalog {
             SurvivalMessageKey.values(),
             RanksMessageKey.values(),
             SecurityMessageKey.values(),
+            CommandControlMessageKey.values(),
             TradeMessageKey.values());
 
     private MessageKeyCatalog() {}

@@ -76,6 +76,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
         assertThat(registry.byId(ModuleId.of("ranks"))).isPresent();
         assertThat(registry.byId(ModuleId.of("security"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("commandcontrol"))).isPresent();
         assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
@@ -107,6 +108,7 @@ class FeatureModuleRegistryDriftTest {
                         "survival",
                         "ranks",
                         "security",
+                        "commandcontrol",
                         "trade");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
@@ -650,6 +652,37 @@ class FeatureModuleRegistryDriftTest {
         // persistence V74 baseline (always applied), so it declares no MigrationSet of its own.
         assertThat(ranks.commands()).isEmpty();
         assertThat(ranks.migrations()).isEmpty();
+    }
+
+    @Test
+    void commandControlShipsEnabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule commandControl = registry.byId(ModuleId.of("commandcontrol"))
+                .orElseThrow(() -> new AssertionError("commandcontrol is not registered"));
+
+        // commandcontrol is a new context — command whitelist/blacklist gating. It is registered before trade so trade
+        // stays last, so it must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("commandcontrol"))).isPresent();
+
+        // It ships ENABLED but inert (the default config is a blacklist with empty lists, so nothing is gated until an
+        // operator names commands): with no modules.conf override it is on, and disabling exactly it removes only it
+        // while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("commandcontrol", "teleport", "economy", "holograms", "security");
+        Set<String> off =
+                registry.enabledModules(new FixedConfig(Map.of("modules.commandcontrol.enabled", false))).stream()
+                        .map(m -> m.id().value())
+                        .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("commandcontrol");
+        assertThat(off).contains("teleport", "holograms", "security");
+
+        // The PlayerCommandPreprocessEvent gate is contributed through the adapter wiring (it needs the live player and
+        // the group/permission lookups), not the declarative lists, so the module publishes no command here, and it
+        // persists nothing (the rule set is derived from config), so it declares no MigrationSet.
+        assertThat(commandControl.commands()).isEmpty();
+        assertThat(commandControl.migrations()).isEmpty();
     }
 
     @Test
