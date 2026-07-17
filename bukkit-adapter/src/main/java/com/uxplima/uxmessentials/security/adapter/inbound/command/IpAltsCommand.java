@@ -28,14 +28,17 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /alts <player>}: list the accounts that share an IP with a target — the staff read behind the same-IP alt
- * guard. Gated on {@code uxmessentials.security.alts} (staff). The target is resolved online-first and otherwise
- * from the profile cache, so an offline account is still checkable; the lookup, the DB read, and the grouping all
- * run off the tick thread through the {@link Scheduler}. Each alt's name is resolved from its stored UUID, falling
- * back to the raw UUID for an account the server has never seen.
+ * {@code /ipalts <player>}: list the accounts that share an IP with a target — the staff read behind the same-IP alt
+ * guard. It lives on {@code /ipalts} rather than {@code /alts} because the moderation context already owns the
+ * top-level {@code /alts} (last-IP history over its own raw store); this one reads the security context's hashed
+ * {@code security_ip} store instead, so the two never share a command literal. Gated on
+ * {@code uxmessentials.security.alts} (staff). The target is resolved online-first and otherwise from the profile
+ * cache, so an offline account is still checkable; the lookup, the DB read, and the grouping all run off the tick
+ * thread through the {@link Scheduler}. Each alt's name is resolved from its stored UUID, falling back to the raw
+ * UUID for an account the server has never seen.
  */
 @NullMarked
-public final class AltsCommand extends SecurityCommandSupport implements CommandRegistration {
+public final class IpAltsCommand extends SecurityCommandSupport implements CommandRegistration {
 
     /** The staff permission to inspect a player's same-IP alts. */
     public static final String PERMISSION = "uxmessentials.security.alts";
@@ -43,7 +46,7 @@ public final class AltsCommand extends SecurityCommandSupport implements Command
     private final FindAlts findAlts;
     private final PlayerLookup lookup;
 
-    public AltsCommand(
+    public IpAltsCommand(
             FindAlts findAlts, PlayerLookup lookup, Scheduler scheduler, Messages messages, MessageSink sink) {
         super(scheduler, messages, sink);
         this.findAlts = Objects.requireNonNull(findAlts, "findAlts");
@@ -52,7 +55,7 @@ public final class AltsCommand extends SecurityCommandSupport implements Command
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        return Commands.literal("alts")
+        return Commands.literal("ipalts")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player").executes(this::run))
                 .build();

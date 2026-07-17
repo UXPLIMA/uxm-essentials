@@ -1385,7 +1385,7 @@ permissions:
     default: op
   # IP/alt guard + ClientID (Phase 4). The two staff reads and the join-time notice are op-only.
   uxmessentials.security.alts:
-    description: '/alts — list the accounts that share an IP with a player.'
+    description: '/ipalts — list the accounts that share an IP with a player.'
     default: op
   uxmessentials.security.clientinfo:
     description: '/clientinfo — show the client brand a player reported.'

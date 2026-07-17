@@ -12,8 +12,8 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.security.IpGuardStores;
 import com.uxplima.uxmessentials.persistence.security.TrustStores;
 import com.uxplima.uxmessentials.persistence.security.TwoFactorRepositories;
-import com.uxplima.uxmessentials.security.adapter.inbound.command.AltsCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.ClientInfoCommand;
+import com.uxplima.uxmessentials.security.adapter.inbound.command.IpAltsCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.PinCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadListener;
@@ -74,7 +74,7 @@ public final class SecurityWiring {
         // Phase 4 — IP/alt guard + ClientID: the DB-backed IP association store (hashed tokens only, never a raw
         // address, so alts survive a restart), the session-only client-brand registry, the staff notifier that fans
         // an alt / flagged-client notice to the notify-perm holders and mirrors it to the log, and the two join
-        // guards. Each guard self-gates on its own config flag; the /alts and /clientinfo staff reads are published
+        // guards. Each guard self-gates on its own config flag; the /ipalts and /clientinfo staff reads are published
         // alongside the enrolment verbs.
         IpGuardStore ipGuardStore = IpGuardStores.jooq(persistence);
         ClientBrandRegistry brands = new ClientBrandRegistry();
@@ -104,7 +104,7 @@ public final class SecurityWiring {
                         kernel.messages(),
                         kernel.messageSink()),
                 new PinCommand(setPin, twoFactor, kernel.scheduler(), kernel.messages(), kernel.messageSink()),
-                new AltsCommand(
+                new IpAltsCommand(
                         findAlts, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()),
                 new ClientInfoCommand(
                         brands, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()));
