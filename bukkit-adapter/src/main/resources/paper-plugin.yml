@@ -689,6 +689,9 @@ permissions:
   uxmessentials.moderation.stats:
     description: '/modstats [staff] [days] — staff punishment analytics: a most-active-staff leaderboard or a single staff member''s breakdown, optionally over the last N days.'
     default: op
+  uxmessentials.moderation.templates:
+    description: '/punish <player> <template> — apply a configured punishment template (a preset reason + optional duration) as a ban or tempban.'
+    default: op
   uxmessentials.moderation.check:
     description: '/checkban <player> and /checkmute <player> — report whether a player is currently banned or muted.'
     default: op

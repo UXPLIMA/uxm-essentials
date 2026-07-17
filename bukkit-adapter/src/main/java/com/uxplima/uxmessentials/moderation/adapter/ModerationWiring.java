@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitTargetResolver;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.DiscordPunishmentAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
@@ -53,9 +54,11 @@ import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
+import com.uxplima.uxmessentials.moderation.application.Punish;
 import com.uxplima.uxmessentials.moderation.application.PunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
 import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
+import com.uxplima.uxmessentials.moderation.application.ResolveTemplate;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewPunishmentStats;
@@ -309,7 +312,10 @@ public final class ModerationWiring {
             SanctionSync sync,
             Clock clock) {
         ModerationNotifier notifier = new ModerationNotifier(kernel.messages(), kernel.messageSink());
-        ModerationAudit audit = new LoggingModerationAudit(auditLogger());
+        // The operator audit is wrapped so a successful punishment also emits a name-based Discord notice on the
+        // same channel when discord-notify is on; disabled or bridge-absent, it is a no-op.
+        ModerationAudit audit = new DiscordPunishmentAudit(
+                new LoggingModerationAudit(auditLogger()), auditLogger(), settings.discordNotify());
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         Sanctions sanctionPort = sanctions;
         Jail jail = new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock);
@@ -351,6 +357,9 @@ public final class ModerationWiring {
                 settings.addressStrictness(),
                 clock);
         Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast);
+        // /punish resolves a configured template to a preset reason + duration and dispatches to the same
+        // audited ban/tempban use cases above, so no punish logic is duplicated.
+        Punish punish = new Punish(new ResolveTemplate(settings.templates()), ban, tempBan, notifier);
         WarnEscalator escalator = new WarnEscalator(settings.warnEscalation(), mute, tempBan, ban, kick, notifier);
         // The revoke use cases are built as named locals so /staffrollback drives the same instances the
         // standalone /unmute, /unban and /unwarn commands do — one audited path, no parallel rollback logic.
@@ -367,6 +376,7 @@ public final class ModerationWiring {
                 .toggleJail(new ToggleJail(repository, jails, jail, unjail))
                 .tempBan(tempBan)
                 .ban(ban)
+                .punish(punish)
                 .unban(unban)
                 .kick(kick)
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))

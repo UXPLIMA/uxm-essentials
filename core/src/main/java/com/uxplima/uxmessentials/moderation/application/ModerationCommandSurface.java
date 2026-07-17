@@ -39,6 +39,7 @@ final class ModerationCommandSurface {
                 spec("setjail", "uxmessentials.moderation.jail", "Define a jail at your location"),
                 spec("tempban", "uxmessentials.moderation.tempban", "Ban a player for a duration"),
                 spec("ban", "uxmessentials.moderation.ban", "Permanently ban a player"),
+                spec("punish", "uxmessentials.moderation.templates", "Apply a configured punishment template"),
                 spec("unban", "uxmessentials.moderation.ban", "Lift a player's permanent ban"),
                 spec("banlist", "uxmessentials.moderation.banlist", "Review currently banned players"),
                 spec("mutelist", "uxmessentials.moderation.mutelist", "Review currently muted players"),

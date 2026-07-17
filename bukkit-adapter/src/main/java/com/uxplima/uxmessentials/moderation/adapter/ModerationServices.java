@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.Lockdown;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.Mute;
+import com.uxplima.uxmessentials.moderation.application.Punish;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewPunishmentStats;
@@ -61,6 +62,7 @@ public final class ModerationServices {
     private final ToggleJail toggleJail;
     private final TempBan tempBan;
     private final Ban ban;
+    private final Punish punish;
     private final Unban unban;
     private final Kick kick;
     private final KickAll kickAll;
@@ -105,6 +107,7 @@ public final class ModerationServices {
         this.toggleJail = Objects.requireNonNull(builder.toggleJail, "toggleJail");
         this.tempBan = Objects.requireNonNull(builder.tempBan, "tempBan");
         this.ban = Objects.requireNonNull(builder.ban, "ban");
+        this.punish = Objects.requireNonNull(builder.punish, "punish");
         this.unban = Objects.requireNonNull(builder.unban, "unban");
         this.kick = Objects.requireNonNull(builder.kick, "kick");
         this.kickAll = Objects.requireNonNull(builder.kickAll, "kickAll");
@@ -168,6 +171,10 @@ public final class ModerationServices {
 
     public Ban ban() {
         return ban;
+    }
+
+    public Punish punish() {
+        return punish;
     }
 
     public Unban unban() {
@@ -320,6 +327,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable ToggleJail toggleJail;
         private @org.jspecify.annotations.Nullable TempBan tempBan;
         private @org.jspecify.annotations.Nullable Ban ban;
+        private @org.jspecify.annotations.Nullable Punish punish;
         private @org.jspecify.annotations.Nullable Unban unban;
         private @org.jspecify.annotations.Nullable Kick kick;
         private @org.jspecify.annotations.Nullable KickAll kickAll;
@@ -388,6 +396,11 @@ public final class ModerationServices {
 
         Builder ban(Ban value) {
             this.ban = value;
+            return this;
+        }
+
+        Builder punish(Punish value) {
+            this.punish = value;
             return this;
         }
 

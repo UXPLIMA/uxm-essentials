@@ -2,14 +2,17 @@ package com.uxplima.uxmessentials.moderation.adapter;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
+import com.uxplima.uxmessentials.moderation.domain.PunishmentTemplate;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationAction;
@@ -46,6 +49,8 @@ public final class ModerationSettings {
     private final boolean silentByDefault;
     private final AddressStrictness addressStrictness;
     private final boolean censorIpAddresses;
+    private final Map<String, PunishmentTemplate> templates;
+    private final boolean discordNotify;
 
     public ModerationSettings(ConfigStore config, Logger log) {
         this.config = Objects.requireNonNull(config, "config");
@@ -61,6 +66,8 @@ public final class ModerationSettings {
         this.silentByDefault = config.getBoolean("broadcast.silent-by-default", false);
         this.addressStrictness = AddressStrictness.parse(config.getString("address-strictness", "NORMAL"));
         this.censorIpAddresses = config.getBoolean("censor-ip-addresses", false);
+        this.templates = parseTemplates(config, log);
+        this.discordNotify = config.getBoolean("discord-notify", false);
     }
 
     /** The command labels a muted player may not run (the mute-bypass guard list), case-folded. */
@@ -90,6 +97,49 @@ public final class ModerationSettings {
     /** Whether {@code /alts} and {@code /seenip} mask the addresses they render (privacy; off by default). */
     public boolean censorIpAddresses() {
         return censorIpAddresses;
+    }
+
+    /** The configured {@code /punish} templates (name → preset reason + optional duration), parsed at wire time. */
+    public Map<String, PunishmentTemplate> templates() {
+        return templates;
+    }
+
+    /**
+     * Whether each successful punishment additionally emits a formatted "who punished whom" line on the shared
+     * audit channel the optional Discord bridge forwards. Off by default; a no-op when no bridge is present.
+     */
+    public boolean discordNotify() {
+        return discordNotify;
+    }
+
+    /**
+     * Parse the {@code templates} block into name → {@link PunishmentTemplate}. A template needs a non-blank
+     * {@code reason}; its {@code duration} is optional (omit for a permanent ban) and, when present, must parse
+     * to a positive span. A template with a blank reason or a malformed duration is skipped with a log warning
+     * rather than failing the whole module, mirroring the warn-escalation ladder.
+     */
+    private static Map<String, PunishmentTemplate> parseTemplates(ConfigStore config, Logger log) {
+        Map<String, PunishmentTemplate> parsed = new LinkedHashMap<>();
+        for (String name : config.getKeys("templates")) {
+            parseTemplate(config, name, log).ifPresent(template -> parsed.put(name, template));
+        }
+        return Map.copyOf(parsed);
+    }
+
+    private static Optional<PunishmentTemplate> parseTemplate(ConfigStore config, String name, Logger log) {
+        String reason = config.getString("templates." + name + ".reason", "").trim();
+        if (reason.isBlank()) {
+            log.warn("Ignoring punishment template '{}' (missing a reason)", name);
+            return Optional.empty();
+        }
+        String rawDuration =
+                config.getString("templates." + name + ".duration", "").trim();
+        SanctionDuration.Parsed duration = SanctionDuration.parse(rawDuration);
+        if (duration.malformed()) {
+            log.warn("Ignoring punishment template '{}' (invalid duration '{}')", name, rawDuration);
+            return Optional.empty();
+        }
+        return Optional.of(new PunishmentTemplate(name, reason, duration.duration()));
     }
 
     /**

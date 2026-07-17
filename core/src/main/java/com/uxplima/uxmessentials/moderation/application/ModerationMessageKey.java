@@ -156,6 +156,9 @@ public enum ModerationMessageKey implements MessageKey {
     ALTS_NONE("moderation.alts.none"),
     ALTS_NO_IP("moderation.alts.no-ip"),
 
+    // /punish — apply a configured punishment template (preset reason + optional duration)
+    TEMPLATE_UNKNOWN("moderation.template.unknown"),
+
     // /sudo
     SUDO_DONE("moderation.sudo.done"),
 

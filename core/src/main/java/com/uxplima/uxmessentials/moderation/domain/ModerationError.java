@@ -39,7 +39,10 @@ public enum ModerationError {
     NOT_IP_BANNED(ModerationMessageKey.UNBANIP_NOT_BANNED),
 
     /** The {@code /unban} target was not banned. */
-    NOT_BANNED(ModerationMessageKey.BAN_NOT_BANNED);
+    NOT_BANNED(ModerationMessageKey.BAN_NOT_BANNED),
+
+    /** The {@code /punish} template name is not configured under {@code moderation.conf} {@code templates}. */
+    UNKNOWN_TEMPLATE(ModerationMessageKey.TEMPLATE_UNKNOWN);
 
     private final ModerationMessageKey messageKey;
 

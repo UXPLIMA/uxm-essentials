@@ -82,6 +82,7 @@ public final class ModerationCommands {
                 new SetJailCommand(services, messages, sink),
                 new TempbanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new BanCommand(services, messages, sink, silentByDefault, guiFlow),
+                new PunishCommand(services, messages, sink, silentByDefault),
                 new UnbanCommand(services, messages, sink),
                 new BanListCommand(services, messages, sink, scheduler, guiViews),
                 new MuteListCommand(services, messages, sink, scheduler),
