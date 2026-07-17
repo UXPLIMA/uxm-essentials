@@ -14,17 +14,22 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.command.VillagerCommand;
+import com.uxplima.uxmessentials.villagers.adapter.inbound.command.VillagerProtectToggle;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.ClickToTradeListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.DisableTradesListener;
+import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerBucketListener;
+import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerProtectionListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerRecipeReapplyListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerTradeListener;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.PdcVillagerFlags;
+import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerBucketItem;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerRecipeStore;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerRestockSweep;
 import com.uxplima.uxmessentials.villagers.application.VillagersConfig;
 import com.uxplima.uxmessentials.villagers.domain.RestockPolicy;
+import com.uxplima.uxmessentials.villagers.domain.VillagerProtectionPolicy;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -36,7 +41,11 @@ import org.jspecify.annotations.Nullable;
  * {@code /villager manager} command, its GUI listener, and the load-time recipe reapply) wires only when
  * {@code trade-manager} is on; and the {@link ClickToTradeListener} lands only when {@code click-to-trade} is on. The
  * {@link DisableTradesListener} always registers when the module is on, because it also honours the per-villager
- * disable flag the manager sets — with the global switch off and no flag it is an inert no-op.
+ * disable flag the manager sets — with the global switch off and no flag it is an inert no-op. The
+ * {@link VillagerProtectionListener} and the {@code /villager protect} toggle wire only under {@code protect}, while the
+ * {@link VillagerBucketListener} — like the disable listener — always registers and honours its own {@code bucket}
+ * switch. The one {@code /villager} command carries whichever of the {@code manager} / {@code protect} subcommands
+ * their features enabled, so it is registered when either is on.
  *
  * <p>The context persists nothing relational — the last-restock stamp, the disable flag, and the manager's custom
  * recipe set are all PDC state on the villager entity — so there is no repository or migration. The sweep's repeating
@@ -50,6 +59,10 @@ public final class VillagersWiring {
     private static final String MANAGER_PERMISSION = "uxmessentials.villagers.manager";
     /** The permission gating click-to-trade access. */
     private static final String TRADE_PERMISSION = "uxmessentials.villagers.trade";
+    /** The permission gating the {@code /villager protect} toggle. */
+    private static final String PROTECT_PERMISSION = "uxmessentials.villagers.protect";
+    /** The permission gating villager pickup with the villager-in-a-bucket item. */
+    private static final String BUCKET_PERMISSION = "uxmessentials.villagers.bucket";
 
     private VillagersWiring() {}
 
@@ -66,6 +79,7 @@ public final class VillagersWiring {
         VillagersConfig config = VillagersConfig.from(ctx.config());
         PdcVillagerFlags flags = new PdcVillagerFlags();
         VillagerRecipeStore recipeStore = new VillagerRecipeStore();
+        GuiText guiText = new GuiText(kernel.messages());
 
         List<Listener> listeners = new ArrayList<>();
         List<CommandRegistration> commands = new ArrayList<>();
@@ -81,16 +95,36 @@ public final class VillagersWiring {
 
         VillagerManagerView managerView = null;
         if (config.tradeManager().enabled()) {
-            managerView =
-                    new VillagerManagerView(new GuiText(kernel.messages()), kernel.scheduler(), flags, recipeStore);
+            managerView = new VillagerManagerView(guiText, kernel.scheduler(), flags, recipeStore);
             listeners.add(new VillagerManagerListener(managerView));
             listeners.add(new VillagerRecipeReapplyListener(recipeStore));
-            commands.add(new VillagerCommand(MANAGER_PERMISSION, managerView, kernel.messages()));
         }
         if (config.clickToTrade().enabled()) {
             listeners.add(new ClickToTradeListener(
                     config.disableTrades().enabled(), TRADE_PERMISSION, flags, VillagersWiring::openTrade));
         }
+        // Protection: the saver listener cancels the deaths a protected villager would suffer and keeps it loaded, and
+        // the /villager protect toggle sets the per-villager mark it reads. Both wire only under the protect switch.
+        VillagerProtectToggle protectToggle = null;
+        if (config.protect().enabled()) {
+            VillagerProtectionPolicy protectPolicy = config.protect().policy();
+            listeners.add(new VillagerProtectionListener(protectPolicy, flags));
+            protectToggle = new VillagerProtectToggle(kernel.scheduler(), flags, protectPolicy, kernel.messages());
+        }
+        // The one /villager command carries whichever subcommands their features enabled; register it when either is
+        // on.
+        if (managerView != null || protectToggle != null) {
+            commands.add(new VillagerCommand(
+                    managerView != null ? MANAGER_PERMISSION : null,
+                    managerView,
+                    protectToggle != null ? PROTECT_PERMISSION : null,
+                    protectToggle,
+                    kernel.messages()));
+        }
+        // Villager-in-a-bucket: sneak-pickup into a captured-villager item and place it back. The listener honours its
+        // own bucket switch, so it registers for the whole enabled module and is an inert early return when off.
+        listeners.add(new VillagerBucketListener(
+                config.bucket().enabled(), BUCKET_PERMISSION, new VillagerBucketItem(), guiText));
 
         RestockPolicy policy = new RestockPolicy(config.restock().interval());
         VillagerRestockSweep sweep = new VillagerRestockSweep(

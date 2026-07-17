@@ -26,6 +26,22 @@ class VillagersConfigTest {
         assertThat(config.disableTrades().enabled()).isFalse();
         assertThat(config.tradeManager().enabled()).isFalse();
         assertThat(config.clickToTrade().enabled()).isFalse();
+        assertThat(config.protect().enabled()).isFalse();
+        assertThat(config.bucket().enabled()).isFalse();
+    }
+
+    @Test
+    void protectionShipsOffButItsPerThreatGatesDefaultOn() {
+        VillagersConfig config = VillagersConfig.from(new FixedConfig(Map.of()));
+
+        assertThat(config.protect().enabled()).isFalse();
+        assertThat(config.protect().all()).isFalse();
+        assertThat(config.protect().fromZombies()).isTrue();
+        assertThat(config.protect().fromLightning()).isTrue();
+        assertThat(config.protect().fromDamage()).isTrue();
+        assertThat(config.protect().noDespawn()).isTrue();
+        // The derived pure policy cancels nothing while the feature is off, whatever the gates say.
+        assertThat(config.protect().policy().protectsDespawn(true)).isFalse();
     }
 
     @Test
@@ -46,15 +62,19 @@ class VillagersConfigTest {
 
     @Test
     void explicitOverridesAreReadBack() {
-        VillagersConfig config = VillagersConfig.from(new FixedConfig(Map.of(
-                "enabled", false,
-                "infinite-trading.enabled", true,
-                "restock.enabled", true,
-                "restock.interval-seconds", 120,
-                "instant-restock.enabled", true,
-                "disable-trades.enabled", true,
-                "trade-manager.enabled", true,
-                "click-to-trade.enabled", true)));
+        VillagersConfig config = VillagersConfig.from(new FixedConfig(Map.ofEntries(
+                Map.entry("enabled", false),
+                Map.entry("infinite-trading.enabled", true),
+                Map.entry("restock.enabled", true),
+                Map.entry("restock.interval-seconds", 120),
+                Map.entry("instant-restock.enabled", true),
+                Map.entry("disable-trades.enabled", true),
+                Map.entry("trade-manager.enabled", true),
+                Map.entry("click-to-trade.enabled", true),
+                Map.entry("protect.enabled", true),
+                Map.entry("protect.all", true),
+                Map.entry("protect.from-zombies", false),
+                Map.entry("bucket.enabled", true))));
 
         assertThat(config.enabled()).isFalse();
         assertThat(config.infiniteTrading().enabled()).isTrue();
@@ -64,6 +84,10 @@ class VillagersConfigTest {
         assertThat(config.disableTrades().enabled()).isTrue();
         assertThat(config.tradeManager().enabled()).isTrue();
         assertThat(config.clickToTrade().enabled()).isTrue();
+        assertThat(config.protect().enabled()).isTrue();
+        assertThat(config.protect().all()).isTrue();
+        assertThat(config.protect().fromZombies()).isFalse();
+        assertThat(config.bucket().enabled()).isTrue();
     }
 
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */

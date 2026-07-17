@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.villagers.domain.VillagerProtectionPolicy;
 
 /**
  * The typed, immutable view of {@code modules/villagers/config.conf}: the module enable gate plus one sub-record per
@@ -24,6 +25,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param disableTrades the disable-trades feature settings
  * @param tradeManager the trade-manager feature settings
  * @param clickToTrade the click-to-trade feature settings
+ * @param protect the protection / saver feature settings
+ * @param bucket the villager-in-a-bucket feature settings
  */
 public record VillagersConfig(
         boolean enabled,
@@ -32,7 +35,9 @@ public record VillagersConfig(
         InstantRestock instantRestock,
         DisableTrades disableTrades,
         TradeManager tradeManager,
-        ClickToTrade clickToTrade) {
+        ClickToTrade clickToTrade,
+        Protect protect,
+        Bucket bucket) {
 
     public VillagersConfig {
         Objects.requireNonNull(infiniteTrading, "infiniteTrading");
@@ -41,6 +46,8 @@ public record VillagersConfig(
         Objects.requireNonNull(disableTrades, "disableTrades");
         Objects.requireNonNull(tradeManager, "tradeManager");
         Objects.requireNonNull(clickToTrade, "clickToTrade");
+        Objects.requireNonNull(protect, "protect");
+        Objects.requireNonNull(bucket, "bucket");
     }
 
     /** Resolve the villagers config from the module's scoped {@link ConfigStore} ({@code modules.villagers}). */
@@ -53,7 +60,9 @@ public record VillagersConfig(
                 InstantRestock.from(config),
                 DisableTrades.from(config),
                 TradeManager.from(config),
-                ClickToTrade.from(config));
+                ClickToTrade.from(config),
+                Protect.from(config),
+                Bucket.from(config));
     }
 
     /**
@@ -162,6 +171,63 @@ public record VillagersConfig(
 
         static ClickToTrade from(ConfigStore config) {
             return new ClickToTrade(config.getBoolean("click-to-trade.enabled", false));
+        }
+    }
+
+    /**
+     * The protection / saver feature under {@code protect { … }}: with {@code enabled} on, a villager the operator has
+     * chosen to shield never dies to the deaths a settlement loses villagers to — a zombie infection, a lightning
+     * strike (and the witch transform it triggers), suffocation, or any other blow — and is kept loaded so it never
+     * despawns. {@code all} widens the shield from individually-marked villagers (the {@code /villager protect} toggle)
+     * to every villager. The four per-threat gates ship on, so turning the feature on shields everything unless the
+     * operator narrows it; the feature itself ships off with the rest of the module. The pure decision lives in
+     * {@link VillagerProtectionPolicy}.
+     *
+     * @param enabled whether protection runs ({@code protect.enabled}, default {@code false})
+     * @param all whether every villager is protected, not only flagged ones ({@code protect.all}, default {@code false})
+     * @param fromZombies whether zombie conversion is prevented ({@code protect.from-zombies}, default {@code true})
+     * @param fromLightning whether lightning death / transform is prevented ({@code protect.from-lightning}, default
+     *     {@code true})
+     * @param fromDamage whether other lethal damage is prevented ({@code protect.from-damage}, default {@code true})
+     * @param noDespawn whether the villager is kept loaded rather than despawn ({@code protect.no-despawn}, default
+     *     {@code true})
+     */
+    public record Protect(
+            boolean enabled,
+            boolean all,
+            boolean fromZombies,
+            boolean fromLightning,
+            boolean fromDamage,
+            boolean noDespawn) {
+
+        static Protect from(ConfigStore config) {
+            return new Protect(
+                    config.getBoolean("protect.enabled", false),
+                    config.getBoolean("protect.all", false),
+                    config.getBoolean("protect.from-zombies", true),
+                    config.getBoolean("protect.from-lightning", true),
+                    config.getBoolean("protect.from-damage", true),
+                    config.getBoolean("protect.no-despawn", true));
+        }
+
+        /** The pure protection rule this feature's switches decide. */
+        public VillagerProtectionPolicy policy() {
+            return new VillagerProtectionPolicy(enabled, all, fromZombies, fromLightning, fromDamage, noDespawn);
+        }
+    }
+
+    /**
+     * The villager-in-a-bucket feature under {@code bucket { … }}: with {@code enabled} on, a player holding
+     * {@code uxmessentials.villagers.bucket} sneak-right-clicks a villager to pick it up into a special item that
+     * PDC-encodes the villager's profession, type, level, and trades, and places it back later to restore the same
+     * villager. A gameplay change, so it ships off.
+     *
+     * @param enabled whether villager pickup / placement runs ({@code bucket.enabled}, default {@code false})
+     */
+    public record Bucket(boolean enabled) {
+
+        static Bucket from(ConfigStore config) {
+            return new Bucket(config.getBoolean("bucket.enabled", false));
         }
     }
 }

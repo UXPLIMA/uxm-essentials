@@ -19,8 +19,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The last-restock is stored as epoch milliseconds ({@link PersistentDataType#LONG}); an absent stamp reads as
  * {@link Instant#EPOCH}, which the {@link com.uxplima.uxmessentials.villagers.domain.RestockPolicy} treats as always
- * due, so a freshly-seen villager restocks on the first sweep. The disable flag rides the shared {@code (byte)}
- * boolean convention through {@link PdcFlag}.
+ * due, so a freshly-seen villager restocks on the first sweep. The disable flag and the Phase-3 protection ("saver")
+ * flag both ride the shared {@code (byte)} boolean convention through {@link PdcFlag}.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>per-holder PDC</b>. Reads and writes go through the live {@link Villager} on its own region thread
@@ -34,6 +34,8 @@ public final class PdcVillagerFlags {
             NamespacedKey.fromString("uxmessentials:villagers_restock"), "villagers_restock key");
     private static final NamespacedKey DISABLED = Objects.requireNonNull(
             NamespacedKey.fromString("uxmessentials:villagers_disabled"), "villagers_disabled key");
+    private static final NamespacedKey PROTECTED = Objects.requireNonNull(
+            NamespacedKey.fromString("uxmessentials:villagers_protected"), "villagers_protected key");
 
     /** The instant {@code villager} last restocked, or {@link Instant#EPOCH} when it never has. */
     public Instant lastRestock(Villager villager) {
@@ -59,5 +61,17 @@ public final class PdcVillagerFlags {
     public void setTradesDisabled(Villager villager, boolean disabled) {
         Objects.requireNonNull(villager, "villager");
         PdcFlag.set(villager.getPersistentDataContainer(), DISABLED, disabled);
+    }
+
+    /** Whether this individual {@code villager} carries the protection ("saver") mark (an absent flag reads false). */
+    public boolean isProtected(Villager villager) {
+        Objects.requireNonNull(villager, "villager");
+        return PdcFlag.getOrDefault(villager.getPersistentDataContainer(), PROTECTED, false);
+    }
+
+    /** Set whether this individual {@code villager} is protected from death and despawn. */
+    public void setProtected(Villager villager, boolean protectedMark) {
+        Objects.requireNonNull(villager, "villager");
+        PdcFlag.set(villager.getPersistentDataContainer(), PROTECTED, protectedMark);
     }
 }

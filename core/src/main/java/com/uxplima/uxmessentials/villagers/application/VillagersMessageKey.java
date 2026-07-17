@@ -11,7 +11,8 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * <p>Phase 1 seeded the one refusal a player sees when they right-click a villager whose trading is turned off
  * (globally or per-villager); Phase 2 adds the trade-manager surface — the "look at a villager" hint, the manager
  * GUI title, and the two button labels (the disable toggle, in its two states, and the per-row remove control) plus
- * the usage help. Later phases add their own keys here as their verbs land.
+ * the usage help. Phase 3 adds the protection toggle's two confirmations and its no-target hint, and the name the
+ * villager-in-a-bucket item carries. Later phases add their own keys here as their verbs land.
  */
 public enum VillagersMessageKey implements MessageKey {
 
@@ -35,7 +36,19 @@ public enum VillagersMessageKey implements MessageKey {
     VILLAGERS_MANAGER_REMOVE("villagers.manager.remove"),
 
     // Trade manager — the info/help item explaining how to edit, add and remove trades.
-    VILLAGERS_MANAGER_HELP("villagers.manager.help");
+    VILLAGERS_MANAGER_HELP("villagers.manager.help"),
+
+    // Protection — /villager protect could not find a villager the player is looking at (or within reach).
+    VILLAGERS_PROTECT_NO_TARGET("villagers.protect.no-target"),
+
+    // Protection — the villager the player looked at is now protected (the mark was turned on).
+    VILLAGERS_PROTECT_ENABLED("villagers.protect.enabled"),
+
+    // Protection — the villager the player looked at is no longer protected (the mark was turned off).
+    VILLAGERS_PROTECT_DISABLED("villagers.protect.disabled"),
+
+    // Villager-in-a-bucket — the display name of the item a picked-up villager becomes.
+    VILLAGERS_BUCKET_NAME("villagers.bucket.name");
 
     private final String key;
 
