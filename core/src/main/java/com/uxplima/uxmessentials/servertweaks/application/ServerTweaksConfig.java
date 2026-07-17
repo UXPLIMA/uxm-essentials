@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.servertweaks.application;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.servertweaks.domain.ChatReportPolicy;
 import com.uxplima.uxmessentials.servertweaks.domain.ConsoleFilterPolicy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
@@ -17,18 +18,27 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *
  * @param f3Brand the custom F3 server-brand tweak
  * @param consoleFilter the console-spam suppression tweak
+ * @param noChatReports the unsigned-public-chat tweak
+ * @param signedVelocity the SignedVelocity backend-handshake tweak
  */
-public record ServerTweaksConfig(F3Brand f3Brand, ConsoleFilter consoleFilter) {
+public record ServerTweaksConfig(
+        F3Brand f3Brand, ConsoleFilter consoleFilter, NoChatReports noChatReports, SignedVelocity signedVelocity) {
 
     public ServerTweaksConfig {
         Objects.requireNonNull(f3Brand, "f3Brand");
         Objects.requireNonNull(consoleFilter, "consoleFilter");
+        Objects.requireNonNull(noChatReports, "noChatReports");
+        Objects.requireNonNull(signedVelocity, "signedVelocity");
     }
 
     /** Resolve the server-tweaks config from the module's scoped {@link ConfigStore} ({@code modules.servertweaks}). */
     public static ServerTweaksConfig from(ConfigStore config) {
         Objects.requireNonNull(config, "config");
-        return new ServerTweaksConfig(F3Brand.from(config), ConsoleFilter.from(config));
+        return new ServerTweaksConfig(
+                F3Brand.from(config),
+                ConsoleFilter.from(config),
+                NoChatReports.from(config),
+                SignedVelocity.from(config));
     }
 
     /**
@@ -80,6 +90,45 @@ public record ServerTweaksConfig(F3Brand f3Brand, ConsoleFilter consoleFilter) {
         /** The pure suppression decision this block configures, ready for the adapter's Log4j2 filter to consult. */
         public ConsoleFilterPolicy toPolicy() {
             return new ConsoleFilterPolicy(enabled, patterns);
+        }
+    }
+
+    /**
+     * The {@code no-chat-reports { … }} block: when on, the server re-delivers public chat as unsigned messages so
+     * they carry no signature and cannot be reported to Mojang. This is the whole of what a server can do without a
+     * client mod — a vanilla client still signs its own messages; the server only chooses not to relay the signature.
+     *
+     * @param enabled whether public chat is re-delivered unsigned ({@code no-chat-reports.enabled}, default
+     *     {@code false})
+     */
+    public record NoChatReports(boolean enabled) {
+
+        /** Read the no-chat-reports switch from the module's scoped config. */
+        public static NoChatReports from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new NoChatReports(config.getBoolean("no-chat-reports.enabled", false));
+        }
+
+        /** The pure re-delivery decision this block configures, for the adapter's chat listener to consult. */
+        public ChatReportPolicy toPolicy() {
+            return new ChatReportPolicy(enabled);
+        }
+    }
+
+    /**
+     * The {@code signed-velocity { … }} block: when on, the backend listens on the {@code signedvelocity:main} channel
+     * for a Velocity proxy's chat/command rulings and applies them to its own events, keeping signed chat consistent
+     * across the proxy hop. It pairs with a proxy-side SignedVelocity component; with no such proxy sending rulings the
+     * tweak is inert (no ruling ever arrives, so no event is ever changed).
+     *
+     * @param enabled whether the backend handshake is wired ({@code signed-velocity.enabled}, default {@code false})
+     */
+    public record SignedVelocity(boolean enabled) {
+
+        /** Read the signed-velocity switch from the module's scoped config. */
+        public static SignedVelocity from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new SignedVelocity(config.getBoolean("signed-velocity.enabled", false));
         }
     }
 }

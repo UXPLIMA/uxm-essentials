@@ -13,15 +13,17 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The server-tweaks bounded context as a first-class {@link FeatureModule}: a grab-bag of small, independent
- * server/infrastructure toggles (Phase 1: a custom F3 server brand and a console-spam filter). The module ships
- * enabled so an operator can turn on any single tweak without touching the others, but <b>every individual tweak
- * defaults off</b> — being enabled changes nothing until a tweak is switched on in {@code modules.servertweaks}.
+ * server/infrastructure toggles — a custom F3 server brand, a console-spam filter, unsigned public chat
+ * (no-chat-reports), and a SignedVelocity backend handshake. The module ships enabled so an operator can turn on any
+ * single tweak without touching the others, but <b>every individual tweak defaults off</b> — being enabled changes
+ * nothing until a tweak is switched on in {@code modules.servertweaks}.
  *
  * <p>The tweaks are Bukkit-facing side effects (a join-time plugin message for the brand, a Log4j2 filter on the
- * server logger for the console filter), so they land with the adapter wiring; the module publishes no command,
- * registers no declarative listener, and runs no migration here. A disabled module wires zero of them, per the
- * {@code FeatureModule} contract, and the adapter's stop hook detaches the log filter and unregisters the brand
- * channel so a disable or reload leaves no residual state.
+ * server logger, an unsigned-chat re-delivery listener, and a plugin-message channel for the proxy handshake), so they
+ * land with the adapter wiring; the module publishes no command, registers no declarative listener, and runs no
+ * migration here. A disabled module wires zero of them, per the {@code FeatureModule} contract, and the adapter's stop
+ * hook detaches the log filter and unregisters the brand and SignedVelocity channels so a disable or reload leaves no
+ * residual state.
  */
 @NullMarked
 public final class ServerTweaksModule implements FeatureModule {

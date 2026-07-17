@@ -27,6 +27,11 @@ class ServerTweaksConfigTest {
         // The derived policy suppresses nothing while the tweak is off.
         assertThat(config.consoleFilter().toPolicy().shouldSuppress("Can't keep up!"))
                 .isFalse();
+        assertThat(config.noChatReports().enabled()).isFalse();
+        // With the tweak off, a signed message is never re-delivered unsigned.
+        assertThat(config.noChatReports().toPolicy().shouldDeliverUnsigned(false))
+                .isFalse();
+        assertThat(config.signedVelocity().enabled()).isFalse();
     }
 
     @Test
@@ -35,7 +40,9 @@ class ServerTweaksConfigTest {
                 Map.entry("f3-brand.enabled", true),
                 Map.entry("f3-brand.brand", "MyNetwork"),
                 Map.entry("console-filter.enabled", true),
-                Map.entry("console-filter.patterns", List.of("Can't keep up!", "moving too quickly")))));
+                Map.entry("console-filter.patterns", List.of("Can't keep up!", "moving too quickly")),
+                Map.entry("no-chat-reports.enabled", true),
+                Map.entry("signed-velocity.enabled", true))));
 
         assertThat(config.f3Brand().enabled()).isTrue();
         assertThat(config.f3Brand().brand()).isEqualTo("MyNetwork");
@@ -43,6 +50,13 @@ class ServerTweaksConfigTest {
         assertThat(config.consoleFilter().patterns()).containsExactly("Can't keep up!", "moving too quickly");
         assertThat(config.consoleFilter().toPolicy().shouldSuppress("[WARN]: Can't keep up! overloaded?"))
                 .isTrue();
+        assertThat(config.noChatReports().enabled()).isTrue();
+        // Enabled: a signed message is re-delivered unsigned, an already-unsigned one is left alone.
+        assertThat(config.noChatReports().toPolicy().shouldDeliverUnsigned(false))
+                .isTrue();
+        assertThat(config.noChatReports().toPolicy().shouldDeliverUnsigned(true))
+                .isFalse();
+        assertThat(config.signedVelocity().enabled()).isTrue();
     }
 
     /** A map-backed {@link ConfigStore} that honours the boolean/string/list getters the config reads. */

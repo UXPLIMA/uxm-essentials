@@ -7,11 +7,17 @@ import java.util.Objects;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.servertweaks.adapter.inbound.SignedVelocityChannelListener;
 import com.uxplima.uxmessentials.servertweaks.adapter.inbound.listener.ServerBrandJoinListener;
+import com.uxplima.uxmessentials.servertweaks.adapter.inbound.listener.SignedVelocityChatListener;
+import com.uxplima.uxmessentials.servertweaks.adapter.inbound.listener.SignedVelocityCommandListener;
+import com.uxplima.uxmessentials.servertweaks.adapter.inbound.listener.SignedVelocityQuitListener;
+import com.uxplima.uxmessentials.servertweaks.adapter.inbound.listener.UnsignedChatListener;
 import com.uxplima.uxmessentials.servertweaks.adapter.outbound.ConsoleFilterInstaller;
 import com.uxplima.uxmessentials.servertweaks.adapter.outbound.ConsoleSpamFilter;
 import com.uxplima.uxmessentials.servertweaks.adapter.outbound.PluginMessageBrandSender;
 import com.uxplima.uxmessentials.servertweaks.application.ServerTweaksConfig;
+import com.uxplima.uxmessentials.servertweaks.application.SignedDirectiveQueue;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
@@ -27,9 +33,14 @@ import org.jspecify.annotations.NullMarked;
  *       F3; the channel is unregistered on stop.
  *   <li><b>console-spam-fix</b> — when {@code console-filter.enabled}, a {@link ConsoleSpamFilter} is attached to the
  *       root Log4j2 logger through the {@link ConsoleFilterInstaller} and detached again on stop.
+ *   <li><b>nochatreports</b> — when {@code no-chat-reports.enabled}, an {@link UnsignedChatListener} re-delivers signed
+ *       public chat as unsigned messages so it cannot be reported to Mojang.
+ *   <li><b>signedvelocity</b> — when {@code signed-velocity.enabled}, the {@code signedvelocity:main} incoming channel
+ *       is registered and the chat/command/quit listeners apply a Velocity proxy's rulings from a shared
+ *       {@link SignedDirectiveQueue}; the channel is unregistered on stop. Inert without a SignedVelocity proxy.
  * </ul>
  *
- * <p>{@link Wired#stop()} unwinds every effect (unregister the channel, detach the filter) so a disable or reload
+ * <p>{@link Wired#stop()} unwinds every effect (unregister the channels, detach the filter) so a disable or reload
  * leaves the server exactly as it was found.
  */
 @NullMarked
@@ -42,10 +53,13 @@ public final class ServerTweaksWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         ServerTweaksConfig config = ServerTweaksConfig.from(ctx.config());
+        Logger log = ctx.kernel().log();
         List<Listener> listeners = new ArrayList<>();
         List<Runnable> stops = new ArrayList<>();
         wireF3Brand(plugin, config.f3Brand(), listeners, stops);
-        wireConsoleFilter(config.consoleFilter(), ctx.kernel().log(), stops);
+        wireConsoleFilter(config.consoleFilter(), log, stops);
+        wireNoChatReports(config.noChatReports(), listeners);
+        wireSignedVelocity(plugin, config.signedVelocity(), log, listeners, stops);
         return new Wired(List.copyOf(listeners), List.copyOf(stops));
     }
 
@@ -71,6 +85,38 @@ public final class ServerTweaksWiring {
                 new ConsoleFilterInstaller(new ConsoleSpamFilter(consoleFilter.toPolicy()), log);
         installer.install();
         stops.add(installer::uninstall);
+    }
+
+    private static void wireNoChatReports(ServerTweaksConfig.NoChatReports noChatReports, List<Listener> listeners) {
+        if (!noChatReports.enabled()) {
+            return;
+        }
+        listeners.add(new UnsignedChatListener(noChatReports.toPolicy()));
+    }
+
+    private static void wireSignedVelocity(
+            Plugin plugin,
+            ServerTweaksConfig.SignedVelocity signedVelocity,
+            Logger log,
+            List<Listener> listeners,
+            List<Runnable> stops) {
+        if (!signedVelocity.enabled()) {
+            return;
+        }
+        SignedDirectiveQueue queue = new SignedDirectiveQueue();
+        SignedVelocityChannelListener channel = new SignedVelocityChannelListener(queue, log);
+        plugin.getServer()
+                .getMessenger()
+                .registerIncomingPluginChannel(plugin, SignedVelocityChannelListener.CHANNEL, channel);
+        listeners.add(new SignedVelocityChatListener(queue));
+        listeners.add(new SignedVelocityCommandListener(queue));
+        listeners.add(new SignedVelocityQuitListener(queue));
+        stops.add(() -> {
+            plugin.getServer()
+                    .getMessenger()
+                    .unregisterIncomingPluginChannel(plugin, SignedVelocityChannelListener.CHANNEL, channel);
+            queue.clear();
+        });
     }
 
     /**
