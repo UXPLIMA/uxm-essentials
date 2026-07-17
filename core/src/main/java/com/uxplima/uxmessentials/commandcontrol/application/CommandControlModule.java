@@ -16,7 +16,9 @@ import org.jspecify.annotations.NullMarked;
  * gating of which commands a player may run and see, built in with no separate plugin. Phase 1 is the command
  * whitelist/blacklist and the custom "unknown command" deny message; Phase 2 adds the tab-completion filter and the
  * plugin-hide (scrubbing disallowed and plugin-listing commands from the client command list, tab completion, and the
- * scrub-help output). The namespace-bypass block lands in the last phase.
+ * scrub-help output); Phase 3 adds the namespace-bypass block, so a {@code /minecraft:gamemode} escape is denied when
+ * {@code /gamemode} is. The gate and filters are client-agnostic — a Bedrock / Geyser player is gated like a Java one —
+ * and run per backend, so a proxy-forwarded command is gated on arrival.
  *
  * <p><b>Ships enabled by default</b> but inert: the bundled config is a blacklist with empty lists and the plugin-hide
  * is off, so an enabled module gates and hides nothing until an operator names commands or turns the hide on. An

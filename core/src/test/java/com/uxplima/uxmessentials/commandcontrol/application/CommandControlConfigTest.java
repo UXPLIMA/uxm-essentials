@@ -39,6 +39,9 @@ class CommandControlConfigTest {
         assertThat(config.denyListCommands()).isFalse();
         assertThat(config.hiddenCommands()).contains("plugins", "pl", "help", "icanhasbukkit");
         assertThat(config.toHidePolicy(VIEW).isActive()).isFalse();
+
+        // The namespace-bypass block ships on so a namespaced escape is closed by default.
+        assertThat(config.blockNamespaceBypass()).isTrue();
     }
 
     @Test
@@ -48,13 +51,15 @@ class CommandControlConfigTest {
                 Map.of(
                         "tab-completion.enabled", false,
                         "plugin-hide.enabled", true,
-                        "plugin-hide.deny-list-commands", true),
+                        "plugin-hide.deny-list-commands", true,
+                        "block-namespace-bypass", false),
                 List.of(),
                 Map.of("plugin-hide.hidden-commands", List.of("plugins", "pl"))));
 
         assertThat(config.tabCompletionEnabled()).isFalse();
         assertThat(config.pluginHideEnabled()).isTrue();
         assertThat(config.denyListCommands()).isTrue();
+        assertThat(config.blockNamespaceBypass()).isFalse();
         assertThat(config.hiddenCommands()).containsExactly("plugins", "pl");
         assertThat(config.toHidePolicy(VIEW).isActive()).isTrue();
         assertThat(config.toHidePolicy(VIEW).isHiddenCommand("bukkit:plugins")).isTrue();

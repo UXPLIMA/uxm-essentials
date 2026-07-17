@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSour
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSources;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlConfig;
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
+import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -45,11 +46,12 @@ public final class CommandControlWiring {
         KernelPorts kernel = ctx.kernel();
         CommandControlConfig config = CommandControlConfig.from(ctx.config());
         RuleSet rules = config.toRuleSet(BYPASS_PERMISSION);
+        NamespaceBypassRule namespaceBypass = config.toNamespaceRule(rules);
         HidePolicy hidePolicy = config.toHidePolicy(VIEW_PERMISSION);
         PlayerGroupSource groups = PlayerGroupSources.create(server);
         CommandPermissionView permissions = CommandPermissionView.backedBy(server.getCommandMap());
-        Listener gate =
-                new CommandGateListener(rules, groups, kernel.messages(), kernel.messageSink(), config.denyMessage());
+        Listener gate = new CommandGateListener(
+                rules, namespaceBypass, groups, kernel.messages(), kernel.messageSink(), config.denyMessage());
         Listener visibility = new CommandVisibilityListener(
                 rules,
                 hidePolicy,

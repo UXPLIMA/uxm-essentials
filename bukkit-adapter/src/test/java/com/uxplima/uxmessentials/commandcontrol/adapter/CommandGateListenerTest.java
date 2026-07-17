@@ -20,6 +20,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandGateListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
+import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleMode;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -58,8 +59,17 @@ class CommandGateListenerTest {
     }
 
     private CommandGateListener listener(RuleSet rules, PlayerGroupSource groups) {
+        return listener(rules, groups, true);
+    }
+
+    private CommandGateListener listener(RuleSet rules, PlayerGroupSource groups, boolean blockNamespaceBypass) {
         return new CommandGateListener(
-                rules, groups, messages, sink, CommandControlMessageKey.COMMANDCONTROL_UNKNOWN_COMMAND);
+                rules,
+                NamespaceBypassRule.of(rules, blockNamespaceBypass),
+                groups,
+                messages,
+                sink,
+                CommandControlMessageKey.COMMANDCONTROL_UNKNOWN_COMMAND);
     }
 
     private static PlayerGroupSource inGroup(String group) {
@@ -158,5 +168,72 @@ class CommandGateListenerTest {
 
         assertThat(event.isCancelled()).isFalse();
         verify(sink, never()).deliver(any(), anyString());
+    }
+
+    @Test
+    void aNamespacedFormOfADeniedCommandIsBlocked() {
+        CommandGateListener listener =
+                listener(RuleSet.of(RuleMode.BLACKLIST, List.of("gamemode"), Map.of(), BYPASS), noGroup());
+
+        // The bare "gamemode" is blacklisted, so its namespace-prefixed escapes are blocked exactly the same way.
+        PlayerCommandPreprocessEvent vanilla = new PlayerCommandPreprocessEvent(player, "/minecraft:gamemode 1", null);
+        listener.onCommand(vanilla);
+        assertThat(vanilla.isCancelled()).isTrue();
+
+        PlayerCommandPreprocessEvent plugin = new PlayerCommandPreprocessEvent(player, "/bukkit:gamemode", null);
+        listener.onCommand(plugin);
+        assertThat(plugin.isCancelled()).isTrue();
+
+        // A namespaced form whose bare root is allowed still runs.
+        PlayerCommandPreprocessEvent allowed = new PlayerCommandPreprocessEvent(player, "/minecraft:home", null);
+        listener.onCommand(allowed);
+        assertThat(allowed.isCancelled()).isFalse();
+    }
+
+    @Test
+    void aBypassHolderMayUseANamespacedForm() {
+        when(player.hasPermission(BYPASS)).thenReturn(true);
+        CommandGateListener listener =
+                listener(RuleSet.of(RuleMode.BLACKLIST, List.of("gamemode"), Map.of(), BYPASS), noGroup());
+
+        PlayerCommandPreprocessEvent event = new PlayerCommandPreprocessEvent(player, "/minecraft:gamemode", null);
+        listener.onCommand(event);
+
+        assertThat(event.isCancelled()).isFalse();
+        verify(sink, never()).deliver(any(), anyString());
+    }
+
+    @Test
+    void theNamespaceBlockCanBeDisabled() {
+        CommandGateListener listener =
+                listener(RuleSet.of(RuleMode.BLACKLIST, List.of("gamemode"), Map.of(), BYPASS), noGroup(), false);
+
+        // With block-namespace-bypass off, the namespaced escape is allowed even though the bare form is denied.
+        PlayerCommandPreprocessEvent escape = new PlayerCommandPreprocessEvent(player, "/minecraft:gamemode", null);
+        listener.onCommand(escape);
+        assertThat(escape.isCancelled()).isFalse();
+
+        // The bare denied command is of course still blocked.
+        PlayerCommandPreprocessEvent bare = new PlayerCommandPreprocessEvent(player, "/gamemode", null);
+        listener.onCommand(bare);
+        assertThat(bare.isCancelled()).isTrue();
+    }
+
+    @Test
+    void aBedrockPlayerIsGatedLikeAnyOther() {
+        // A Floodgate/Geyser player arrives as an ordinary Player (a "." name prefix, a Floodgate UUID); the gate reads
+        // nothing client-specific, so a Bedrock client's namespaced escape is blocked exactly as a Java client's would
+        // be.
+        Player bedrock = mock(Player.class);
+        when(bedrock.getUniqueId()).thenReturn(new UUID(0L, 42L));
+        when(bedrock.getName()).thenReturn(".Steve");
+        when(bedrock.hasPermission(anyString())).thenReturn(false);
+        CommandGateListener listener =
+                listener(RuleSet.of(RuleMode.BLACKLIST, List.of("gamemode"), Map.of(), BYPASS), noGroup());
+
+        PlayerCommandPreprocessEvent event = new PlayerCommandPreprocessEvent(bedrock, "/minecraft:gamemode", null);
+        listener.onCommand(event);
+
+        assertThat(event.isCancelled()).isTrue();
     }
 }

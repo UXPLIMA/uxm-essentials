@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
+import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleMode;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -34,6 +35,9 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param hiddenCommands the plugin-listing / help commands the hide covers ({@code plugin-hide.hidden-commands})
  * @param denyListCommands also block the hidden commands from executing for those players, so a {@code /plugins} or
  *     {@code /help} cannot leak plugin names ({@code plugin-hide.deny-list-commands}, default {@code false})
+ * @param blockNamespaceBypass deny the {@code namespace:command} form (e.g. {@code /minecraft:gamemode}) of any command
+ *     the bare form is denied, so a player cannot dodge the filter with a namespace prefix
+ *     ({@code block-namespace-bypass}, default {@code true})
  */
 public record CommandControlConfig(
         boolean enabled,
@@ -44,7 +48,8 @@ public record CommandControlConfig(
         boolean tabCompletionEnabled,
         boolean pluginHideEnabled,
         List<String> hiddenCommands,
-        boolean denyListCommands) {
+        boolean denyListCommands,
+        boolean blockNamespaceBypass) {
 
     /** The config key under {@code commands} that holds the fallback list rather than a named group. */
     private static final String DEFAULT_LIST_KEY = "default";
@@ -84,7 +89,8 @@ public record CommandControlConfig(
                 config.getBoolean("tab-completion.enabled", true),
                 config.getBoolean("plugin-hide.enabled", false),
                 config.getStringList("plugin-hide.hidden-commands", DEFAULT_HIDDEN_COMMANDS),
-                config.getBoolean("plugin-hide.deny-list-commands", false));
+                config.getBoolean("plugin-hide.deny-list-commands", false),
+                config.getBoolean("block-namespace-bypass", true));
     }
 
     /** Build the pure {@link RuleSet} this config describes, gating {@code .bypass} on {@code bypassPermission}. */
@@ -95,6 +101,11 @@ public record CommandControlConfig(
     /** Build the pure {@link HidePolicy} this config describes, revealing the hidden commands to {@code viewPermission}. */
     public HidePolicy toHidePolicy(String viewPermission) {
         return HidePolicy.of(pluginHideEnabled, hiddenCommands, viewPermission);
+    }
+
+    /** Build the namespace-bypass block over {@code rules}, switched on per {@link #blockNamespaceBypass}. */
+    public NamespaceBypassRule toNamespaceRule(RuleSet rules) {
+        return NamespaceBypassRule.of(rules, blockNamespaceBypass);
     }
 
     /** The deny line to show on a blocked command, per {@link #useUnknownCommandMessage}. */
