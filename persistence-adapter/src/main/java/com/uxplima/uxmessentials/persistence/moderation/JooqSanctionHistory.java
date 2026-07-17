@@ -75,6 +75,17 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
         return recentBy(MODERATION_SANCTION_HISTORY.ACTOR, actor, limit);
     }
 
+    @Override
+    public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
+        Objects.requireNonNull(threshold, "threshold");
+        return read(dsl -> dsl.selectFrom(MODERATION_SANCTION_HISTORY)
+                .where(MODERATION_SANCTION_HISTORY.TS.ge(threshold.toEpochMilli()))
+                .orderBy(MODERATION_SANCTION_HISTORY.TS.desc(), MODERATION_SANCTION_HISTORY.ID.desc())
+                .limit(Math.max(0, limit))
+                .fetch()
+                .map(SanctionHistoryRows::toEntry));
+    }
+
     private List<SanctionHistoryEntry> scoped(UUID target, int limit, SanctionAction a, SanctionAction b) {
         return read(dsl -> dsl.selectFrom(MODERATION_SANCTION_HISTORY)
                 .where(MODERATION_SANCTION_HISTORY.TARGET.eq(target.toString()))

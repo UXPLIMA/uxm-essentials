@@ -226,6 +226,11 @@ class ModerationHistoryListGoldenTest {
         public List<SanctionHistoryEntry> recentByActor(UUID actor, int limit) {
             return List.copyOf(rows);
         }
+
+        @Override
+        public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
+            return List.copyOf(rows);
+        }
     }
 
     /**

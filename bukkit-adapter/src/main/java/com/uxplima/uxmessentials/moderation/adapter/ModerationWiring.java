@@ -53,10 +53,12 @@ import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
+import com.uxplima.uxmessentials.moderation.application.PunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
 import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewPunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.ReviewSanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewStaffHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
@@ -385,6 +387,8 @@ public final class ModerationWiring {
                 .reviewMuteHistory(new ReviewMuteHistory(sanctionHistory, notifier))
                 .reviewSanctionHistory(new ReviewSanctionHistory(sanctionHistory, notifier))
                 .reviewStaffHistory(new ReviewStaffHistory(sanctionHistory, kernel.playerLookup(), notifier))
+                .reviewPunishmentStats(
+                        new ReviewPunishmentStats(sanctionHistory, new PunishmentStats(), notifier, clock))
                 .checkBan(new CheckBan(repository, notifier, clock))
                 .checkMute(new CheckMute(repository, notifier, clock))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), history, clock))

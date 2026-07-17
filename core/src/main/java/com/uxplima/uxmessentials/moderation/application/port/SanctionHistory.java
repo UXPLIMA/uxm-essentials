@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.moderation.application.port;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,4 +34,13 @@ public interface SanctionHistory {
 
     /** Rows of every kind issued by {@code actor} ({@code /staffhistory}) newest-first, capped at {@code limit}. */
     List<SanctionHistoryEntry> recentByActor(UUID actor, int limit);
+
+    /**
+     * Every row (any kind, any target, any actor) applied at or after {@code threshold}, newest-first, capped at
+     * {@code limit}. The read side of the server-wide punishment analytics ({@code /modstats}): the bounded scan
+     * the pure {@code PunishmentStats} aggregation folds into a per-staff leaderboard. Pass {@link Instant#EPOCH}
+     * for the whole recorded history. Like every other read it is capped so the query stays within budget; the
+     * command hops it off the tick thread.
+     */
+    List<SanctionHistoryEntry> allSince(Instant threshold, int limit);
 }

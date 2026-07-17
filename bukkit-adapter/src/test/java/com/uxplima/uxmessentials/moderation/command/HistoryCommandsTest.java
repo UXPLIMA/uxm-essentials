@@ -304,6 +304,11 @@ class HistoryCommandsTest {
         public List<SanctionHistoryEntry> recentByActor(UUID actor, int limit) {
             return List.copyOf(byActor);
         }
+
+        @Override
+        public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
+            return List.of();
+        }
     }
 
     /** A repository fake the check commands read for the active ban/mute state. */

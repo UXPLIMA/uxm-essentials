@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.moderation.fakes;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -46,6 +47,12 @@ public final class FakeSanctionHistory implements SanctionHistory {
                         .filter(e -> e.actor().uuid().filter(actor::equals).isPresent())
                         .toList(),
                 limit);
+    }
+
+    @Override
+    public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
+        return newestFirst(
+                appended.stream().filter(e -> !e.at().isBefore(threshold)).toList(), limit);
     }
 
     private List<SanctionHistoryEntry> scoped(UUID target, int limit, SanctionAction a, SanctionAction b) {

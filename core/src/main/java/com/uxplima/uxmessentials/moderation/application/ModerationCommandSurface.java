@@ -53,6 +53,7 @@ final class ModerationCommandSurface {
                         "staffrollback",
                         "uxmessentials.moderation.staffrollback",
                         "Revoke a staff member's still-active sanctions"),
+                spec("modstats", "uxmessentials.moderation.stats", "Show staff punishment analytics"),
                 spec("checkban", "uxmessentials.moderation.check", "Check whether a player is banned"),
                 spec("checkmute", "uxmessentials.moderation.check", "Check whether a player is muted"),
                 spec("kick", "uxmessentials.moderation.kick", "Kick a player"),

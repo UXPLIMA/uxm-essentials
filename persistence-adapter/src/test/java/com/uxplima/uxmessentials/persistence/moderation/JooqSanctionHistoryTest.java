@@ -159,6 +159,26 @@ class JooqSanctionHistoryTest {
     }
 
     @Test
+    void allSinceReturnsEveryActorsRowsFromThresholdNewestFirstAndCapped() {
+        Issuer modOne = staff("Mod1");
+        Issuer modTwo = staff("Mod2");
+        UUID bob = UUID.randomUUID();
+        // Two in-window rows by different actors against different targets, and one before the threshold.
+        history.append(byActor(SanctionAction.WARN, modOne, alice, T0.minusSeconds(600), Optional.of("old")));
+        history.append(byActor(SanctionAction.BAN, modOne, alice, T0, Optional.of("ban")));
+        history.append(byActor(SanctionAction.MUTE, modTwo, bob, T0.plusSeconds(30), Optional.of("mute")));
+
+        List<SanctionHistoryEntry> since = history.allSince(T0, 20);
+        assertThat(since)
+                .extracting(SanctionHistoryEntry::action)
+                .containsExactly(SanctionAction.MUTE, SanctionAction.BAN);
+
+        assertThat(history.allSince(T0, 1))
+                .extracting(SanctionHistoryEntry::action)
+                .containsExactly(SanctionAction.MUTE);
+    }
+
+    @Test
     void warnAndKickRowsRoundTripThroughTheUnifiedRead() {
         Instant lapse = T0.plusSeconds(86400);
         history.append(new SanctionHistoryEntry(

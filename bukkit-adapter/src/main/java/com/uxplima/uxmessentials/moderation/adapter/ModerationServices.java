@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewPunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.ReviewSanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewStaffHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
@@ -78,6 +79,7 @@ public final class ModerationServices {
     private final ReviewMuteHistory reviewMuteHistory;
     private final ReviewSanctionHistory reviewSanctionHistory;
     private final ReviewStaffHistory reviewStaffHistory;
+    private final ReviewPunishmentStats reviewPunishmentStats;
     private final CheckBan checkBan;
     private final CheckMute checkMute;
     private final BanIp banIp;
@@ -121,6 +123,7 @@ public final class ModerationServices {
         this.reviewMuteHistory = Objects.requireNonNull(builder.reviewMuteHistory, "reviewMuteHistory");
         this.reviewSanctionHistory = Objects.requireNonNull(builder.reviewSanctionHistory, "reviewSanctionHistory");
         this.reviewStaffHistory = Objects.requireNonNull(builder.reviewStaffHistory, "reviewStaffHistory");
+        this.reviewPunishmentStats = Objects.requireNonNull(builder.reviewPunishmentStats, "reviewPunishmentStats");
         this.checkBan = Objects.requireNonNull(builder.checkBan, "checkBan");
         this.checkMute = Objects.requireNonNull(builder.checkMute, "checkMute");
         this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
@@ -239,6 +242,10 @@ public final class ModerationServices {
         return reviewStaffHistory;
     }
 
+    public ReviewPunishmentStats reviewPunishmentStats() {
+        return reviewPunishmentStats;
+    }
+
     public CheckBan checkBan() {
         return checkBan;
     }
@@ -331,6 +338,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable ReviewMuteHistory reviewMuteHistory;
         private @org.jspecify.annotations.Nullable ReviewSanctionHistory reviewSanctionHistory;
         private @org.jspecify.annotations.Nullable ReviewStaffHistory reviewStaffHistory;
+        private @org.jspecify.annotations.Nullable ReviewPunishmentStats reviewPunishmentStats;
         private @org.jspecify.annotations.Nullable CheckBan checkBan;
         private @org.jspecify.annotations.Nullable CheckMute checkMute;
         private @org.jspecify.annotations.Nullable BanIp banIp;
@@ -470,6 +478,11 @@ public final class ModerationServices {
 
         Builder reviewStaffHistory(ReviewStaffHistory value) {
             this.reviewStaffHistory = value;
+            return this;
+        }
+
+        Builder reviewPunishmentStats(ReviewPunishmentStats value) {
+            this.reviewPunishmentStats = value;
             return this;
         }
 

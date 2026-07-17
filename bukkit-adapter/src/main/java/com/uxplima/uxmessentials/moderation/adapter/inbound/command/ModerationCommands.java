@@ -90,6 +90,7 @@ public final class ModerationCommands {
                 new HistoryCommand(services, messages, sink, scheduler),
                 new StaffHistoryCommand(services, messages, sink, scheduler),
                 new StaffRollbackCommand(services, messages, sink, scheduler),
+                new ModStatsCommand(services, messages, sink, scheduler),
                 new CheckBanCommand(services, messages, sink, scheduler, guiText, textInput),
                 new CheckMuteCommand(services, messages, sink, scheduler, guiText, textInput),
                 new KickCommand(services, messages, sink, silentByDefault),

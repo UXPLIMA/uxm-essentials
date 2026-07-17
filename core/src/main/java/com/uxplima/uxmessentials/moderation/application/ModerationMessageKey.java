@@ -99,6 +99,16 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_STAFFROLLBACK_SUMMARY("moderation.staffrollback.summary"),
     MOD_STAFFROLLBACK_NONE("moderation.staffrollback.none"),
 
+    // /modstats — staff punishment analytics: the server-wide leaderboard and a single-staff breakdown, each
+    // with an all-time and a windowed variant so the time frame is stated in the line rather than an inline literal
+    MOD_STATS_HEADER("moderation.stats.header"),
+    MOD_STATS_HEADER_WINDOW("moderation.stats.header-window"),
+    MOD_STATS_ENTRY("moderation.stats.entry"),
+    MOD_STATS_EMPTY("moderation.stats.empty"),
+    MOD_STATS_STAFF("moderation.stats.staff"),
+    MOD_STATS_STAFF_WINDOW("moderation.stats.staff-window"),
+    MOD_STATS_STAFF_EMPTY("moderation.stats.staff-empty"),
+
     // /checkban, /checkmute — present-tense "is this player banned/muted?" checks
     MOD_CHECK_BANNED("moderation.check.banned"),
     MOD_CHECK_NOT_BANNED("moderation.check.not-banned"),
