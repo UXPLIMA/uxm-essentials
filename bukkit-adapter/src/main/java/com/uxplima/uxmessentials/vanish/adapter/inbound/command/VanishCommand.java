@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.bukkit.Server;
@@ -74,6 +75,7 @@ public final class VanishCommand implements CommandRegistration {
     private final VanishConnectionMessenger messenger;
     private final VanishActionBar actionBar;
     private final Server server;
+    private final Function<UUID, Optional<String>> networkName;
     private final CommandFeedback feedback;
 
     public VanishCommand(
@@ -83,13 +85,15 @@ public final class VanishCommand implements CommandRegistration {
             VanishConnectionMessenger messenger,
             VanishActionBar actionBar,
             Server server,
-            Messages messages) {
+            Messages messages,
+            Function<UUID, Optional<String>> networkName) {
         this.toggleVanish = Objects.requireNonNull(toggleVanish, "toggleVanish");
         this.listVanished = Objects.requireNonNull(listVanished, "listVanished");
         this.pickup = Objects.requireNonNull(pickup, "pickup");
         this.messenger = Objects.requireNonNull(messenger, "messenger");
         this.actionBar = Objects.requireNonNull(actionBar, "actionBar");
         this.server = Objects.requireNonNull(server, "server");
+        this.networkName = Objects.requireNonNull(networkName, "networkName");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -223,15 +227,20 @@ public final class VanishCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         String names = visible.stream()
-                .map(server::getPlayer)
-                .filter(Objects::nonNull)
-                .map(Player::getName)
+                .map(this::displayName)
+                .flatMap(Optional::stream)
                 .collect(Collectors.joining(", "));
         feedback.send(
                 ctx.getSource().getSender(),
                 VanishMessageKey.VANISH_LIST,
                 Map.of("count", Integer.toString(visible.size()), "players", names));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** The name to show for a listed uuid: the online player here, else the name carried in the network-vanish view. */
+    private Optional<String> displayName(UUID id) {
+        Player online = server.getPlayer(id);
+        return online != null ? Optional.of(online.getName()) : networkName.apply(id);
     }
 
     private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {

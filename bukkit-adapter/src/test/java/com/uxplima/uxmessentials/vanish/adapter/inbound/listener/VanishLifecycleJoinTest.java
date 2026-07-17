@@ -17,12 +17,16 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryNetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
+import com.uxplima.uxmessentials.vanish.application.JoinVanishReconciler;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
+import com.uxplima.uxmessentials.vanish.application.VanishSync;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,11 +45,12 @@ class VanishLifecycleJoinTest {
 
     private static VanishConfig config(boolean joinVanished) {
         return new VanishConfig(
-                true, true, false, true, true, true, true, true, true, true, joinVanished, "", "", "", "");
+                true, true, false, true, true, true, true, true, true, true, joinVanished, "", "", "", "", false);
     }
 
     private ServerMock server;
     private InMemoryVanishStore store;
+    private InMemoryNetworkVanishStore network;
     private ToggleVanish toggleVanish;
     private SetVanishLevel setVanishLevel;
     private BukkitVanishView view;
@@ -56,11 +61,12 @@ class VanishLifecycleJoinTest {
         server.addSimpleWorld("world");
         InlineScheduler scheduler = new InlineScheduler();
         store = new InMemoryVanishStore();
+        network = new InMemoryNetworkVanishStore();
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         VanishNotifier notifier = new VanishNotifier(new KeyMessages(), new DiscardingSink());
-        toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs());
-        setVanishLevel = new SetVanishLevel(store, view, levels, new NoopBuffs());
+        toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs(), VanishBus.disabled());
+        setVanishLevel = new SetVanishLevel(store, view, levels, new NoopBuffs(), VanishBus.disabled());
     }
 
     @AfterEach
@@ -104,8 +110,24 @@ class VanishLifecycleJoinTest {
         assertThat(event.joinMessage()).isNotNull(); // the real join line is left intact
     }
 
+    @Test
+    void aNetworkVanishedPlayerArrivesHiddenOnJoin() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob"); // a non-see viewer already online
+        // Alice vanished on another backend; every backend's network view recorded it.
+        network.apply(VanishSync.vanished(new PlayerRef(alice.getUniqueId(), "Alice"), VanishLevel.DEFAULT));
+        PlayerJoinEvent event = join(alice);
+
+        listener(config(false)).onJoin(event); // join-vanished off — the hide comes purely from the network view
+
+        assertThat(store.isVanished(alice.getUniqueId())).isTrue(); // seeded from the synced state
+        assertThat(event.joinMessage()).isNull(); // arrives silently
+        assertThat(bob.canSee(alice)).isFalse(); // hidden from a non-see viewer on arrival
+    }
+
     private VanishLifecycleListener listener(VanishConfig config) {
-        return new VanishLifecycleListener(store, view, setVanishLevel, toggleVanish, config, server);
+        return new VanishLifecycleListener(
+                store, view, setVanishLevel, toggleVanish, new JoinVanishReconciler(network, store), config, server);
     }
 
     private static PlayerJoinEvent join(PlayerMock player) {

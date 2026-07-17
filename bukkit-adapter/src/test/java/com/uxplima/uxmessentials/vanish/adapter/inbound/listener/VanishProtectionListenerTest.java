@@ -39,9 +39,9 @@ class VanishProtectionListenerTest {
     // fake-join-quit / action-bar / join-vanished toggles and the four fake-message templates (unused by this
     // listener).
     private static final VanishConfig ALL_ON =
-            new VanishConfig(true, true, false, true, true, true, true, true, true, true, true, "", "", "", "");
+            new VanishConfig(true, true, false, true, true, true, true, true, true, true, true, "", "", "", "", false);
     private static final VanishConfig ALL_OFF = new VanishConfig(
-            true, false, false, false, false, false, false, false, false, false, false, "", "", "", "");
+            true, false, false, false, false, false, false, false, false, false, false, "", "", "", "", false);
 
     private ServerMock server;
     private InMemoryVanishStore store;

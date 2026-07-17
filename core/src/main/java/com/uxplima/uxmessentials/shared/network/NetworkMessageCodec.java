@@ -99,6 +99,12 @@ public final class NetworkMessageCodec {
                 writeUuid(out, trade.toUuid());
                 out.writeUTF(trade.toName());
             }
+            case VanishStateChanged vanish -> {
+                writeUuid(out, vanish.player());
+                out.writeUTF(vanish.playerName());
+                out.writeBoolean(vanish.vanished());
+                out.writeInt(vanish.level());
+            }
         }
     }
 
@@ -121,6 +127,8 @@ public final class NetworkMessageCodec {
             case TRADE_SIGNAL ->
                 new TradeSignalFrame(
                         origin, readUuid(in), in.readUTF(), readUuid(in), in.readUTF(), readUuid(in), in.readUTF());
+            case VANISH_STATE_CHANGED ->
+                new VanishStateChanged(origin, readUuid(in), in.readUTF(), in.readBoolean(), in.readInt());
         };
     }
 

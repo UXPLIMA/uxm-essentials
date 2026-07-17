@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.network.NpcChanged;
 import com.uxplima.uxmessentials.shared.network.PlayerWarpChanged;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
 import com.uxplima.uxmessentials.shared.network.TradeSignalFrame;
+import com.uxplima.uxmessentials.shared.network.VanishStateChanged;
 import com.uxplima.uxmessentials.shared.network.VaultChanged;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
 import com.uxplima.uxmessentials.shared.network.VotePartyFired;
@@ -55,6 +56,7 @@ final class NetworkFrames {
                         OWNER,
                         "Alice",
                         TARGET,
-                        "Bob"));
+                        "Bob"),
+                new VanishStateChanged(origin, OWNER, "Alice", true, 3));
     }
 }

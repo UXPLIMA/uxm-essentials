@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
@@ -22,6 +23,11 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * state differs from the requested one, leaving an already-correctly-vanished player untouched. Because buffs are
  * applied here, every entry point — {@code /vanish}, {@code /vanish <player>}, the presence settings panel, and
  * staff-mode vanish — grants and clears them uniformly.
+ *
+ * <p>Every transition is announced to the peer backends through the {@link VanishBus} so a cluster keeps one coherent
+ * vanish view: vanishing publishes the new state and level, unvanishing publishes the reveal. A quit does <em>not</em>
+ * publish (a server hop must not read as an unvanish), so only a genuine {@code /vanish} flip crosses the bus. With the
+ * bus {@link VanishBus#disabled() disabled} the publish is a no-op and cross-server is inert.
  */
 public final class ToggleVanish {
 
@@ -30,18 +36,21 @@ public final class ToggleVanish {
     private final VanishLevelResolver levels;
     private final VanishNotifier notifier;
     private final VanishBuffs buffs;
+    private final VanishBus bus;
 
     public ToggleVanish(
             VanishStore store,
             VanishView view,
             VanishLevelResolver levels,
             VanishNotifier notifier,
-            VanishBuffs buffs) {
+            VanishBuffs buffs,
+            VanishBus bus) {
         this.store = Objects.requireNonNull(store, "store");
         this.view = Objects.requireNonNull(view, "view");
         this.levels = Objects.requireNonNull(levels, "levels");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.buffs = Objects.requireNonNull(buffs, "buffs");
+        this.bus = Objects.requireNonNull(bus, "bus");
     }
 
     /** Toggle {@code who}'s vanish state; returns the new vanished flag. */
@@ -52,6 +61,7 @@ public final class ToggleVanish {
             view.reveal(who);
             buffs.clear(who);
             notifier.send(who, VanishMessageKey.VANISH_OFF);
+            bus.publish(VanishSync.revealed(who));
             return false;
         }
         VanishLevel level = levels.useLevel(who);
@@ -59,6 +69,7 @@ public final class ToggleVanish {
         view.hide(who, level);
         buffs.apply(who);
         notifier.send(who, VanishMessageKey.VANISH_ON);
+        bus.publish(VanishSync.vanished(who, level));
         return true;
     }
 

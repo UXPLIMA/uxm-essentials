@@ -872,7 +872,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("vanish"))) {
-            wireVanish(plugin, ctx, resources, links);
+            wireVanish(plugin, ctx, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -1631,14 +1631,14 @@ public final class PluginModule {
     }
 
     private static void wireVanish(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links, Bus bus) {
         // vanish is the single vanish authority: an in-memory ConcurrentHashMap of who is vanished, the /vanish
         // command, the Bukkit hide-show view (which drops both the player entity and their tab entry for ineligible
         // viewers), and the join/quit listener. It persists nothing. It wires before the contexts it informs
         // (messaging, presence, nametags, staff), so its store and toggle are captured here and threaded into their
         // vanish gates during their own wiring; a disabled vanish module leaves those handles null and each consumer
         // degrades to "no one is hidden". On stop the store is cleared so a disable/reload leaves no residual state.
-        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx);
+        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx, bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

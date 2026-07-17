@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,7 +32,9 @@ import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
+import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +55,7 @@ class VanishCommandTest {
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     // enabled, silentChests, pickupItems, nightVision, allowFlight, noHunger, noDamage, mobTarget, fakeJoinQuit,
-    // actionBar, joinVanished, fake-quit, fake-join, fake-quit-staff, fake-join-staff.
+    // actionBar, joinVanished, fake-quit, fake-join, fake-quit-staff, fake-join-staff, cross-server.
     private static final VanishConfig CONFIG = new VanishConfig(
             true,
             true,
@@ -68,7 +71,8 @@ class VanishCommandTest {
             "{player} left",
             "{player} joined",
             "",
-            "");
+            "",
+            false);
 
     private ServerMock server;
     private InMemoryVanishStore store;
@@ -85,13 +89,25 @@ class VanishCommandTest {
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         ToggleVanish toggleVanish = new ToggleVanish(
-                store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()), new NoopBuffs());
-        ListVanished listVanished = new ListVanished(store, levels);
+                store,
+                view,
+                levels,
+                new VanishNotifier(new KeyMessages(), new DiscardingSink()),
+                new NoopBuffs(),
+                VanishBus.disabled());
+        ListVanished listVanished = new ListVanished(store, levels, NetworkVanishStore.empty());
         PdcVanishPickup pickup = new PdcVanishPickup(server, false);
         VanishConnectionMessenger messenger = new VanishConnectionMessenger(scheduler, sink, levels, CONFIG);
         VanishActionBar actionBar = new VanishActionBar(server, scheduler, new KeyMessages(), store, CONFIG);
-        command =
-                new VanishCommand(toggleVanish, listVanished, pickup, messenger, actionBar, server, new KeyMessages());
+        command = new VanishCommand(
+                toggleVanish,
+                listVanished,
+                pickup,
+                messenger,
+                actionBar,
+                server,
+                new KeyMessages(),
+                id -> Optional.empty());
     }
 
     @AfterEach

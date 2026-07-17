@@ -50,6 +50,9 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *     blank value sends them nothing ({@code fake-quit-message-staff})
  * @param fakeJoinMessageStaff the MiniMessage shown instead to viewers who can see the reappearing player; blank sends
  *     nothing ({@code fake-join-message-staff})
+ * @param crossServer sync vanish state across backends over the bus, so a player vanished on one server arrives still
+ *     vanished on another and {@code /vanish list} shows the whole network ({@code cross-server}, default {@code
+ *     false}); inert unless the network bus is also enabled
  */
 public record VanishConfig(
         boolean enabled,
@@ -66,7 +69,8 @@ public record VanishConfig(
         String fakeQuitMessage,
         String fakeJoinMessage,
         String fakeQuitMessageStaff,
-        String fakeJoinMessageStaff) {
+        String fakeJoinMessageStaff,
+        boolean crossServer) {
 
     private static final String DEFAULT_FAKE_QUIT = "<yellow>{player} left the game";
     private static final String DEFAULT_FAKE_JOIN = "<yellow>{player} joined the game";
@@ -96,6 +100,7 @@ public record VanishConfig(
                 config.getString("fake-quit-message", DEFAULT_FAKE_QUIT),
                 config.getString("fake-join-message", DEFAULT_FAKE_JOIN),
                 config.getString("fake-quit-message-staff", ""),
-                config.getString("fake-join-message-staff", ""));
+                config.getString("fake-join-message-staff", ""),
+                config.getBoolean("cross-server", false));
     }
 }

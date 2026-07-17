@@ -13,6 +13,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vanish.application.JoinVanishReconciler;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
@@ -26,12 +27,14 @@ import org.jspecify.annotations.Nullable;
  * Keeps the vanish view coherent across join and quit, and owns the join-vanished behaviour.
  *
  * <ul>
- *   <li><b>Join</b> — a joiner who holds {@code uxmessentials.vanish.persist} (and with {@code join-vanished} on) is
- *       re-vanished before anyone sees them, so a staff member rejoins already hidden; otherwise the joiner's own use
- *       level is re-derived through {@link SetVanishLevel} so a layered permission change takes effect on (re)join and a
- *       player still marked vanished (a reload, or a future cross-server hop) is re-hidden. Either way, once the joiner
- *       ends up vanished their real join line is suppressed. Every currently-vanished <em>other</em> player is then
- *       re-hidden from the joiner, so a hidden staff member does not flash into view the moment someone connects.
+ *   <li><b>Join</b> — the joiner's cross-server vanish is reconciled first through the {@link JoinVanishReconciler}: a
+ *       player vanished on another backend is seeded into this server's store so they arrive already hidden. Then a
+ *       joiner who holds {@code uxmessentials.vanish.persist} (and with {@code join-vanished} on) is re-vanished before
+ *       anyone sees them, so a staff member rejoins already hidden; otherwise the joiner's own use level is re-derived
+ *       through {@link SetVanishLevel} so a layered permission change takes effect on (re)join and a player still marked
+ *       vanished (a reload, or a cross-server hop) is re-hidden. Either way, once the joiner ends up vanished their real
+ *       join line is suppressed. Every currently-vanished <em>other</em> player is then re-hidden from the joiner, so a
+ *       hidden staff member does not flash into view the moment someone connects.
  *   <li><b>Quit</b> — suppress the quit line for a vanished player (they already appeared offline to those who could
  *       not see them), then drop them from the vanish store so a disconnected player holds no vanish state; a later
  *       reconnect re-derives it from the persist permission.
@@ -49,6 +52,7 @@ public final class VanishLifecycleListener implements Listener {
     private final VanishView view;
     private final SetVanishLevel setVanishLevel;
     private final ToggleVanish toggleVanish;
+    private final JoinVanishReconciler reconciler;
     private final VanishConfig config;
     private final Server server;
 
@@ -57,12 +61,14 @@ public final class VanishLifecycleListener implements Listener {
             VanishView view,
             SetVanishLevel setVanishLevel,
             ToggleVanish toggleVanish,
+            JoinVanishReconciler reconciler,
             VanishConfig config,
             Server server) {
         this.store = Objects.requireNonNull(store, "store");
         this.view = Objects.requireNonNull(view, "view");
         this.setVanishLevel = Objects.requireNonNull(setVanishLevel, "setVanishLevel");
         this.toggleVanish = Objects.requireNonNull(toggleVanish, "toggleVanish");
+        this.reconciler = Objects.requireNonNull(reconciler, "reconciler");
         this.config = Objects.requireNonNull(config, "config");
         this.server = Objects.requireNonNull(server, "server");
     }
@@ -71,6 +77,8 @@ public final class VanishLifecycleListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player joiner = event.getPlayer();
         PlayerRef ref = BukkitRefs.toRef(joiner);
+        // Cross-server: seed a player vanished on another backend into this server's store before the hide flow runs.
+        reconciler.reconcile(joiner.getUniqueId());
         if (shouldJoinVanished(joiner)) {
             toggleVanish.setVanished(ref, true);
         } else {

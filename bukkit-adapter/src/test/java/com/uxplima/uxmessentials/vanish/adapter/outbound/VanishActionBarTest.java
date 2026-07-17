@@ -33,7 +33,7 @@ class VanishActionBarTest {
 
     private static VanishConfig config(boolean actionBar) {
         return new VanishConfig(
-                true, true, false, true, true, true, true, true, true, actionBar, false, "", "", "", "");
+                true, true, false, true, true, true, true, true, true, actionBar, false, "", "", "", "", false);
     }
 
     private ServerMock server;

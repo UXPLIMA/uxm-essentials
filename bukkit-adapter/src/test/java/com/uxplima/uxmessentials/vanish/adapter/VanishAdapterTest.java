@@ -18,10 +18,13 @@ import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLifecycle
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
+import com.uxplima.uxmessentials.vanish.application.JoinVanishReconciler;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
+import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +57,7 @@ class VanishAdapterTest {
         levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         VanishNotifier notifier = new VanishNotifier(new KeyMessages(), new DiscardingSink());
-        toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs());
+        toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs(), VanishBus.disabled());
     }
 
     @AfterEach
@@ -107,14 +110,16 @@ class VanishAdapterTest {
         PlayerMock alice = server.addPlayer("Alice");
         toggleVanish.toggle(BukkitRefs.toRef(alice));
         assertThat(store.isVanished(alice.getUniqueId())).isTrue();
-        SetVanishLevel setVanishLevel = new SetVanishLevel(store, new NoopView(), levels, new NoopBuffs());
+        SetVanishLevel setVanishLevel =
+                new SetVanishLevel(store, new NoopView(), levels, new NoopBuffs(), VanishBus.disabled());
         VanishLifecycleListener listener = new VanishLifecycleListener(
                 store,
                 new NoopView(),
                 setVanishLevel,
                 toggleVanish,
+                new JoinVanishReconciler(NetworkVanishStore.empty(), store),
                 new com.uxplima.uxmessentials.vanish.application.VanishConfig(
-                        true, true, false, true, true, true, true, true, true, true, false, "", "", "", ""),
+                        true, true, false, true, true, true, true, true, true, true, false, "", "", "", "", false),
                 server);
         PlayerQuitEvent quit = new PlayerQuitEvent(
                 alice, net.kyori.adventure.text.Component.text("Alice left"), PlayerQuitEvent.QuitReason.DISCONNECTED);

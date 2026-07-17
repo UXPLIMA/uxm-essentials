@@ -9,12 +9,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.Test;
  * when a player vanishes and clears them when they reappear, so a hidden player is buffed and a revealed player is not.
  * Every entry point (bare {@code /vanish}, the absolute {@link ToggleVanish#setVanished}) routes through the same
  * apply/clear here, which is what keeps buffs uniform across the command, staff-mode vanish, and the settings panel.
+ * Phase 5 adds the cross-server announcement: every flip publishes a {@link VanishSync} to the peer backends.
  */
 class ToggleVanishTest {
 
@@ -34,8 +37,9 @@ class ToggleVanishTest {
     private final RecordingView view = new RecordingView();
     private final FakeLevels levels = new FakeLevels();
     private final RecordingBuffs buffs = new RecordingBuffs();
-    private final ToggleVanish toggleVanish =
-            new ToggleVanish(store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()), buffs);
+    private final RecordingBus bus = new RecordingBus();
+    private final ToggleVanish toggleVanish = new ToggleVanish(
+            store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()), buffs, bus);
 
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Who");
 
@@ -58,6 +62,34 @@ class ToggleVanishTest {
 
         toggleVanish.setVanished(who, true); // already vanished — no second apply
         assertThat(buffs.applied).containsExactly(who);
+    }
+
+    @Test
+    void everyFlipPublishesTheNewStateToTheBus() {
+        toggleVanish.toggle(who); // vanish
+        toggleVanish.toggle(who); // reveal
+
+        assertThat(bus.published).hasSize(2);
+        assertThat(bus.published.get(0).player()).isEqualTo(who.uuid());
+        assertThat(bus.published.get(0).vanished()).isTrue();
+        assertThat(bus.published.get(1).vanished()).isFalse();
+    }
+
+    private static final class RecordingBus implements VanishBus {
+        private final List<VanishSync> published = new ArrayList<>();
+
+        @Override
+        public void publish(VanishSync change) {
+            published.add(change);
+        }
+
+        @Override
+        public void subscribe(Consumer<VanishSync> handler) {}
+
+        @Override
+        public boolean healthy() {
+            return true;
+        }
     }
 
     private static final class RecordingBuffs implements VanishBuffs {

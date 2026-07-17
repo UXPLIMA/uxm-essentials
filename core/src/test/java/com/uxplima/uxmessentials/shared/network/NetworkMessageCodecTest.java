@@ -37,7 +37,9 @@ class NetworkMessageCodecTest {
                         OWNER,
                         "Alice",
                         UUID.fromString("00000000-0000-0000-0000-0000000000bb"),
-                        "Bob"));
+                        "Bob"),
+                new VanishStateChanged("survival-1", OWNER, "Alice", true, 3),
+                new VanishStateChanged("survival-2", OWNER, "Alice", false, 1));
     }
 
     @ParameterizedTest

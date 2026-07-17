@@ -44,7 +44,8 @@ class VanishConnectionMessengerTest {
                 publicLine,
                 publicLine,
                 staffLine,
-                staffLine);
+                staffLine,
+                false);
     }
 
     private ServerMock server;

@@ -8,9 +8,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
@@ -21,7 +23,8 @@ import org.junit.jupiter.api.Test;
 /**
  * {@link SetVanishLevel} re-resolves a vanished player's use level from their permissions and re-applies their
  * visibility and buffs; a non-vanished player is left untouched. The re-apply writes the fresh level to the store
- * first, then reconciles the view at that level so every {@code canSee} reader agrees, and tops the buffs back up.
+ * first, then reconciles the view at that level so every {@code canSee} reader agrees, and tops the buffs back up. It
+ * also re-announces the applied level to the peer backends so the network-vanish view converges after a hop.
  */
 class SetVanishLevelTest {
 
@@ -29,7 +32,8 @@ class SetVanishLevelTest {
     private final RecordingView view = new RecordingView();
     private final FakeLevels levels = new FakeLevels();
     private final RecordingBuffs buffs = new RecordingBuffs();
-    private final SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs);
+    private final RecordingBus bus = new RecordingBus();
+    private final SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs, bus);
 
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Who");
 
@@ -40,6 +44,7 @@ class SetVanishLevelTest {
         assertThat(applied).isEmpty();
         assertThat(view.hidden).isEmpty();
         assertThat(buffs.applied).isEmpty();
+        assertThat(bus.published).isEmpty(); // nothing to announce
     }
 
     @Test
@@ -53,6 +58,25 @@ class SetVanishLevelTest {
         assertThat(store.levelOf(who.uuid())).contains(VanishLevel.of(3)); // store updated first
         assertThat(view.hidden).containsExactly(VanishLevel.of(3)); // then reconciled at the new level
         assertThat(buffs.applied).containsExactly(who); // and the buffs topped back up
+        assertThat(bus.published).hasSize(1); // and re-announced to the cluster
+        assertThat(bus.published.get(0).level()).isEqualTo(VanishLevel.of(3));
+    }
+
+    private static final class RecordingBus implements VanishBus {
+        private final List<VanishSync> published = new ArrayList<>();
+
+        @Override
+        public void publish(VanishSync change) {
+            published.add(change);
+        }
+
+        @Override
+        public void subscribe(Consumer<VanishSync> handler) {}
+
+        @Override
+        public boolean healthy() {
+            return true;
+        }
     }
 
     private static final class RecordingBuffs implements VanishBuffs {

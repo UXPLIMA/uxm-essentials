@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
@@ -21,6 +22,11 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * blanket reveal flash. The stored level is updated first so every {@code canSee} reader agrees with the view. The
  * configured buffs are re-applied too, so a still-vanished player who rejoins is topped back up to night vision and
  * flight rather than reappearing plain (this becomes load-bearing once join-vanished / cross-server persistence lands).
+ *
+ * <p>Because the natural trigger is a (re)join, the re-applied level is also announced to the peer backends through the
+ * {@link VanishBus}: a player who hops in and is re-hidden here re-broadcasts their now-local level, so every backend's
+ * network-vanish view converges on where the player actually is. With the bus {@link VanishBus#disabled() disabled} the
+ * publish is a no-op and this stays the single-server re-apply.
  */
 public final class SetVanishLevel {
 
@@ -28,12 +34,15 @@ public final class SetVanishLevel {
     private final VanishView view;
     private final VanishLevelResolver levels;
     private final VanishBuffs buffs;
+    private final VanishBus bus;
 
-    public SetVanishLevel(VanishStore store, VanishView view, VanishLevelResolver levels, VanishBuffs buffs) {
+    public SetVanishLevel(
+            VanishStore store, VanishView view, VanishLevelResolver levels, VanishBuffs buffs, VanishBus bus) {
         this.store = Objects.requireNonNull(store, "store");
         this.view = Objects.requireNonNull(view, "view");
         this.levels = Objects.requireNonNull(levels, "levels");
         this.buffs = Objects.requireNonNull(buffs, "buffs");
+        this.bus = Objects.requireNonNull(bus, "bus");
     }
 
     /**
@@ -49,6 +58,7 @@ public final class SetVanishLevel {
         store.vanish(who.uuid(), level);
         view.hide(who, level);
         buffs.apply(who);
+        bus.publish(VanishSync.vanished(who, level));
         return Optional.of(level);
     }
 }
