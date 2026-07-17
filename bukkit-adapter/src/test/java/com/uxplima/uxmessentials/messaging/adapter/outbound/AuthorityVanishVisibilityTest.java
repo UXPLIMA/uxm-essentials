@@ -2,70 +2,73 @@ package com.uxplima.uxmessentials.messaging.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
-import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
+import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * The migrated messaging vanish gate reads the vanish {@code VanishStore} authority directly: a vanished target is
- * hidden from a viewer who lacks the vanish-see node, visible to one who holds it, and never hidden when not vanished.
+ * The migrated messaging vanish gate reads the vanish {@code VanishStore} authority directly, comparing the viewer's
+ * resolved see level against the target's use level: a vanished target is hidden from a viewer whose see level is below
+ * it, visible to one whose see level clears it, and never hidden when not vanished.
  */
 class AuthorityVanishVisibilityTest {
 
     private final InMemoryVanishStore store = new InMemoryVanishStore();
-    private final FakePermissions permissions = new FakePermissions();
+    private final FakeLevels levels = new FakeLevels();
     private final PlayerRef viewer = new PlayerRef(UUID.randomUUID(), "Viewer");
     private final PlayerRef target = new PlayerRef(UUID.randomUUID(), "Target");
 
     @Test
-    void aVanishedTargetIsHiddenFromAViewerWithoutTheSeeNode() {
+    void aVanishedTargetIsHiddenFromAViewerBelowItsUseLevel() {
         store.vanish(target.uuid(), VanishLevel.DEFAULT);
-        VanishVisibility vanish = new AuthorityVanishVisibility(store, permissions);
+        VanishVisibility vanish = new AuthorityVanishVisibility(store, levels);
 
         assertThat(vanish.isHiddenFrom(viewer, target)).isTrue();
     }
 
     @Test
-    void aVanishedTargetIsVisibleToAViewerHoldingTheSeeNode() {
+    void aVanishedTargetIsVisibleToAViewerWhoseSeeLevelClearsIt() {
         store.vanish(target.uuid(), VanishLevel.DEFAULT);
-        permissions.grant(viewer, "uxmessentials.vanish.see");
-        VanishVisibility vanish = new AuthorityVanishVisibility(store, permissions);
+        levels.seeLevels.put(viewer.uuid(), 1);
+        VanishVisibility vanish = new AuthorityVanishVisibility(store, levels);
 
         assertThat(vanish.isHiddenFrom(viewer, target)).isFalse();
     }
 
     @Test
+    void aHigherUseLevelStillHidesFromALowerSeeLevelViewer() {
+        store.vanish(target.uuid(), VanishLevel.of(2));
+        levels.seeLevels.put(viewer.uuid(), 1);
+        VanishVisibility vanish = new AuthorityVanishVisibility(store, levels);
+
+        assertThat(vanish.isHiddenFrom(viewer, target)).isTrue();
+    }
+
+    @Test
     void aNonVanishedTargetIsNeverHidden() {
-        VanishVisibility vanish = new AuthorityVanishVisibility(store, permissions);
+        VanishVisibility vanish = new AuthorityVanishVisibility(store, levels);
 
         assertThat(vanish.isHiddenFrom(viewer, target)).isFalse();
     }
 
-    private static final class FakePermissions implements Permissions {
-        private final Set<String> grants = new HashSet<>();
+    private static final class FakeLevels implements VanishLevelResolver {
+        private final Map<UUID, Integer> seeLevels = new HashMap<>();
 
-        void grant(PlayerRef who, String node) {
-            grants.add(who.uuid() + "|" + node);
+        @Override
+        public VanishLevel useLevel(PlayerRef who) {
+            return VanishLevel.DEFAULT;
         }
 
         @Override
-        public boolean has(PlayerRef who, String node) {
-            return grants.contains(who.uuid() + "|" + node);
-        }
-
-        @Override
-        public QuotaResult resolveQuota(
-                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
-            return QuotaResult.unlimited();
+        public int seeLevel(PlayerRef who) {
+            return seeLevels.getOrDefault(who.uuid(), 0);
         }
     }
 }

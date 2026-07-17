@@ -12,10 +12,12 @@ import java.util.UUID;
  * value a reader takes of it so the visibility rule can be evaluated without touching the mutable map or any Bukkit
  * type. The map holds only the currently-vanished players, so a snapshot is small (usually empty) and cheap to copy.
  *
- * <p>The visibility rule lives here as {@link #canSee}: Phase 1's rule is that a viewer sees a vanished target only
- * when the viewer holds the vanish-see node. The per-viewer permission itself is resolved by the adapter (it is not
- * a domain concern); this record answers the pure question given whether the viewer holds it. Phase 2 layers the
- * see/use level comparison on top of the same seam.
+ * <p>The visibility rule lives here as {@link #canSee}: a viewer sees a vanished target only when the viewer's
+ * <em>see level</em> is at least the target's <em>use level</em> ({@link VanishLevels}). Both levels are resolved from
+ * permissions by the adapter (it is not a domain concern) and passed in — the viewer's see level as the argument, the
+ * target's use level read from this state. The simple case still holds: with layered permissions off a viewer with the
+ * plain {@code .see} node resolves to see level 1 and every vanished player is use level 1, so {@code 1 >= 1} reveals;
+ * a viewer with no see node resolves to see level 0, so {@code 0 >= 1} hides.
  *
  * @param vanished the currently-vanished players keyed by uuid, each at their level
  */
@@ -72,18 +74,20 @@ public record VanishState(Map<UUID, VanishLevel> vanished) {
 
     /**
      * Whether {@code viewer} may see {@code target}. A player always sees themselves; a non-vanished target is seen
-     * by everyone; a vanished target is seen only by a viewer holding the vanish-see node ({@code viewerHasSee}).
-     * This is the Phase-1 rule — Phase 2 extends it with the see/use level comparison over {@link #levelOf}.
+     * by everyone; a vanished target is seen only when {@code viewerSeeLevel} is at least the target's use level
+     * (the {@link VanishLevels#sees} rule). {@code viewerSeeLevel} is the viewer's see level as resolved from their
+     * permissions by the adapter; {@link VanishLevels#NO_SEE_LEVEL} (0) means "no vanish-see permission at all".
      */
-    public boolean canSee(UUID viewer, UUID target, boolean viewerHasSee) {
+    public boolean canSee(UUID viewer, UUID target, int viewerSeeLevel) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(target, "target");
         if (viewer.equals(target)) {
             return true;
         }
-        if (!isVanished(target)) {
+        VanishLevel targetUseLevel = vanished.get(target);
+        if (targetUseLevel == null) {
             return true;
         }
-        return viewerHasSee;
+        return VanishLevels.sees(viewerSeeLevel, targetUseLevel);
     }
 }

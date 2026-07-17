@@ -621,6 +621,16 @@ permissions:
   uxmessentials.vanish.see:
     description: 'See other vanished players (staff-among-staff visibility) and target them with /tp.'
     default: op
+  # Layered PremiumVanish-style see/use levels (optional): uxmessentials.vanish.use.level<N> vanishes at level N,
+  # uxmessentials.vanish.see.level<N> sees vanished players up to level N. A viewer sees a vanished player iff their
+  # see level >= the target's use level; plain .use/.see are level 1, op/wildcard resolve to a high default. The
+  # numbered nodes are dynamic and never granted by default; declare them per rank in your permission plugin.
+  uxmessentials.vanish.others:
+    description: '/vanish <player> to toggle another player''s vanish.'
+    default: op
+  uxmessentials.vanish.list:
+    description: '/vanish list to see the hidden players you are permitted to see (scoped to your see level).'
+    default: op
   # Presence settings panel — /presencesettings opens a per-player panel toggling AFK (/afk) and vanish
   # (/vanish). Self-service for every player; the underlying vanish toggle still honours uxmessentials.vanish.use.
   uxmessentials.presencesettings.use:

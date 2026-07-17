@@ -9,47 +9,59 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
+import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
+import com.uxplima.uxmessentials.vanish.domain.VanishLevels;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link VanishView} implementation. It hides a vanished player from every viewer who lacks the vanish-see node,
- * and reveals them again on unvanish, by driving Bukkit's {@code hidePlayer} / {@code showPlayer} graph — which drops
- * both the player <em>entity</em> and their <em>tablist</em> entry for that viewer in one call, so a hidden player
- * disappears from the world and the tab list together. This is the acceptable Bukkit-level fallback for the packet
- * hide the design prefers; it has the bonus that the {@code canSee}-reading surfaces observe the same result, so no
- * consumer can disagree with the store about who is visible.
+ * The {@link VanishView} implementation. It reconciles a vanished player's visibility across every viewer — hiding
+ * them from a viewer whose see level is below the player's use level, and revealing them to one who clears it — by
+ * driving Bukkit's {@code hidePlayer} / {@code showPlayer} graph, which drops both the player <em>entity</em> and their
+ * <em>tablist</em> entry for that viewer in one call, so a hidden player disappears from the world and the tab list
+ * together. This is the acceptable Bukkit-level fallback for the packet hide the design prefers; it has the bonus that
+ * the {@code canSee}-reading surfaces observe the same result, so no consumer can disagree with the store about who is
+ * visible.
  *
  * <p>Every mutation hops to the affected viewer's owning region/entity thread through the injected {@link Scheduler}
  * port — {@code hidePlayer}/{@code showPlayer} are per-viewer entity operations valid only on the <em>viewer's</em>
  * owning thread on Folia. The online roster is enumerated on the global region thread (iterating
  * {@code Bukkit.getOnlinePlayers()} off it is illegal on Folia), and each {@code hidePlayer}/{@code showPlayer} then
- * runs on that viewer's own entity thread. An offline player on either side is a silent no-op. The vanish-see node is
- * checked per viewer so a permitted viewer keeps seeing the hidden player.
+ * runs on that viewer's own entity thread. An offline player on either side is a silent no-op. The viewer's see level
+ * is resolved per viewer through the {@link VanishLevelResolver}, so a permitted viewer keeps seeing the hidden player
+ * and a level raise or drop settles in one reconciliation pass.
  */
 @NullMarked
 public final class BukkitVanishView implements VanishView {
 
-    private static final String SEE_NODE = "uxmessentials.vanish.see";
-
     private final Plugin plugin;
     private final Scheduler scheduler;
+    private final VanishLevelResolver levels;
 
-    public BukkitVanishView(Plugin plugin, Scheduler scheduler) {
+    public BukkitVanishView(Plugin plugin, Scheduler scheduler, VanishLevelResolver levels) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.levels = Objects.requireNonNull(levels, "levels");
     }
 
     @Override
-    public void hide(PlayerRef who) {
+    public void hide(PlayerRef who, VanishLevel level) {
         Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(level, "level");
         forEachViewer((viewer, viewerRef) -> {
-            if (!viewerRef.equals(who) && !viewer.hasPermission(SEE_NODE)) {
-                @Nullable Player target = liveTarget(who);
-                if (target != null) {
-                    viewer.hidePlayer(plugin, target);
-                }
+            if (viewerRef.equals(who)) {
+                return;
+            }
+            @Nullable Player target = liveTarget(who);
+            if (target == null) {
+                return;
+            }
+            if (VanishLevels.sees(levels.seeLevel(viewerRef), level)) {
+                viewer.showPlayer(plugin, target); // this viewer clears the bar — make sure they see the player
+            } else {
+                viewer.hidePlayer(plugin, target); // below the bar — hide the player from them
             }
         });
     }

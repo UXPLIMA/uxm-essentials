@@ -1443,7 +1443,7 @@ public final class PluginModule {
         com.uxplima.uxmessentials.messaging.application.port.VanishVisibility vanish = vanishStore == null
                 ? com.uxplima.uxmessentials.messaging.application.port.VanishVisibility.ALWAYS_VISIBLE
                 : new com.uxplima.uxmessentials.messaging.adapter.outbound.AuthorityVanishVisibility(
-                        vanishStore, ctx.kernel().permissions());
+                        vanishStore, java.util.Objects.requireNonNull(links.vanishLevelResolver));
         MessagingWiring.Wired wired = MessagingWiring.wire(
                 plugin,
                 ctx,
@@ -1644,6 +1644,7 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.vanishStore = wired.vanishStore();
         links.vanishToggle = wired.toggleVanish();
+        links.vanishLevelResolver = wired.levels();
         // Captured for staff (wired last), which binds its VANISH gadget and vanish-on-enter to the one authority.
         links.staffVanishSeam =
                 new com.uxplima.uxmessentials.staff.adapter.StaffWiring.VanishSeam(wired.toggleVanish());
@@ -1897,7 +1898,7 @@ public final class PluginModule {
         com.uxplima.uxmessentials.nametags.application.port.NametagVanish vanish = vanishStore == null
                 ? com.uxplima.uxmessentials.nametags.application.port.NametagVanish.ALWAYS_VISIBLE
                 : new com.uxplima.uxmessentials.nametags.adapter.outbound.AuthorityNametagVanish(
-                        vanishStore, ctx.kernel().permissions());
+                        vanishStore, java.util.Objects.requireNonNull(links.vanishLevelResolver));
         NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx, vanish, links.nameVisibility);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -2099,6 +2100,10 @@ public final class PluginModule {
                 vanishStore;
         private com.uxplima.uxmessentials.vanish.application.@org.jspecify.annotations.Nullable ToggleVanish
                 vanishToggle;
+        // The see/use level resolver, captured with the store so the messaging/nametags gates read the same layered
+        // see level the world does. Null when the vanish module is disabled (the gates degrade to fully-visible).
+        private com.uxplima.uxmessentials.vanish.application.port.@org.jspecify.annotations.Nullable VanishLevelResolver
+                vanishLevelResolver;
         // The soft-couple seams staff binds when it wires (it lands last). Each is captured during the source
         // context's wiring and left null when that context is disabled, so staff degrades the matching gadget or
         // staff chat to a no-op rather than failing.

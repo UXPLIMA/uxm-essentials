@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vanish.adapter.outbound;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,6 +42,12 @@ public final class InMemoryVanishStore implements VanishStore {
     public void reveal(UUID who) {
         Objects.requireNonNull(who, "who");
         vanished.remove(who);
+    }
+
+    @Override
+    public Optional<VanishLevel> levelOf(UUID who) {
+        Objects.requireNonNull(who, "who");
+        return Optional.ofNullable(vanished.get(who));
     }
 
     @Override

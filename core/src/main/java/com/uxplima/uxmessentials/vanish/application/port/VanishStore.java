@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.vanish.application.port;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,6 +27,9 @@ public interface VanishStore {
 
     /** Reveal {@code who} — drop them from the vanished set. Used for {@code /vanish off} and on quit. */
     void reveal(UUID who);
+
+    /** The level {@code who} is vanished at, or empty when they are not vanished. */
+    Optional<VanishLevel> levelOf(UUID who);
 
     /** The currently-vanished players. A point-in-time copy safe to iterate off the map. */
     Set<UUID> vanished();

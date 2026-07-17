@@ -15,10 +15,13 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLifecycleListener;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
+import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
+import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,15 +31,17 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of the vanish adapters against a real (mock) Bukkit server: the {@link ToggleVanish} use case
- * over the in-memory {@link InMemoryVanishStore} authority and the {@link BukkitVanishView}, driving Bukkit's
- * {@code hidePlayer}/{@code showPlayer} graph so a vanished caller disappears from a viewer who cannot see them and
- * reappears on unvanish; a see-node holder is exempt. The {@link VanishLifecycleListener} drops a quitting player's
+ * over the in-memory {@link InMemoryVanishStore} authority and the level-aware {@link BukkitVanishView} backed by the
+ * {@link BukkitVanishLevelResolver}, driving Bukkit's {@code hidePlayer}/{@code showPlayer} graph. A vanished caller
+ * disappears from a viewer whose see level is below their use level and reappears on unvanish; a see-node holder is
+ * exempt; a higher use level hides from a lower see level. The {@link VanishLifecycleListener} drops a quitting player's
  * vanish state. The {@link Scheduler} is a synchronous inline fake so the entity-thread hop runs deterministically.
  */
 class VanishAdapterTest {
 
     private ServerMock server;
     private InMemoryVanishStore store;
+    private BukkitVanishLevelResolver levels;
     private ToggleVanish toggleVanish;
 
     @BeforeEach
@@ -45,9 +50,10 @@ class VanishAdapterTest {
         server.addSimpleWorld("world");
         InlineScheduler scheduler = new InlineScheduler();
         store = new InMemoryVanishStore();
-        BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler);
+        levels = new BukkitVanishLevelResolver();
+        BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         VanishNotifier notifier = new VanishNotifier(new KeyMessages(), new DiscardingSink());
-        toggleVanish = new ToggleVanish(store, view, notifier);
+        toggleVanish = new ToggleVanish(store, view, levels, notifier);
     }
 
     @AfterEach
@@ -77,7 +83,22 @@ class VanishAdapterTest {
 
         toggleVanish.toggle(BukkitRefs.toRef(alice));
 
-        assertThat(staff.canSee(alice)).isTrue(); // a see-node holder is exempt from the hide
+        assertThat(staff.canSee(alice)).isTrue(); // a see-node holder (see level 1) clears the default use level
+    }
+
+    @Test
+    void aHigherUseLevelHidesFromALowerSeeLevelButNotAnEqualOne() {
+        PlayerMock alice = server.addPlayer("Alice");
+        alice.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.use.level2", true);
+        PlayerMock lowStaff = server.addPlayer("LowStaff");
+        lowStaff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.see.level1", true);
+        PlayerMock highStaff = server.addPlayer("HighStaff");
+        highStaff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.see.level2", true);
+
+        toggleVanish.toggle(BukkitRefs.toRef(alice)); // alice vanishes at use level 2
+
+        assertThat(lowStaff.canSee(alice)).isFalse(); // see level 1 does not clear use level 2
+        assertThat(highStaff.canSee(alice)).isTrue(); // see level 2 clears use level 2
     }
 
     @Test
@@ -85,7 +106,8 @@ class VanishAdapterTest {
         PlayerMock alice = server.addPlayer("Alice");
         toggleVanish.toggle(BukkitRefs.toRef(alice));
         assertThat(store.isVanished(alice.getUniqueId())).isTrue();
-        VanishLifecycleListener listener = new VanishLifecycleListener(store, new NoopView(), server);
+        SetVanishLevel setVanishLevel = new SetVanishLevel(store, new NoopView(), levels);
+        VanishLifecycleListener listener = new VanishLifecycleListener(store, new NoopView(), setVanishLevel, server);
         PlayerQuitEvent quit = new PlayerQuitEvent(
                 alice, net.kyori.adventure.text.Component.text("Alice left"), PlayerQuitEvent.QuitReason.DISCONNECTED);
 
@@ -98,7 +120,7 @@ class VanishAdapterTest {
     /** A view that records nothing — the lifecycle test only asserts store state and the quit message. */
     private static final class NoopView implements com.uxplima.uxmessentials.vanish.application.port.VanishView {
         @Override
-        public void hide(PlayerRef who) {}
+        public void hide(PlayerRef who, VanishLevel level) {}
 
         @Override
         public void reveal(PlayerRef who) {}
