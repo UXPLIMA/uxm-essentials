@@ -54,14 +54,16 @@ public final class SecurityModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // No listener in Phase 1; the join-verification freeze listener lands with Phase 2.
+        // The join-verification listeners (join/quit edges, the freeze move-cancel, the keypad click handler) are
+        // Bukkit-facing registrations contributed by the inbound adapter wiring, like the /2fa and /pin commands;
+        // the module declares no declarative ListenerFactory.
         return List.of();
     }
 
     @Override
     public List<MigrationSet> migrations() {
-        // The security_2fa table is part of the persistence baseline (db/migration V76), always applied by the
-        // persistence layer, so the module owns no additional Flyway location.
+        // The security_2fa and security_trusted tables are part of the persistence baseline (db/migration V76, V77),
+        // always applied by the persistence layer, so the module owns no additional Flyway location.
         return List.of();
     }
 

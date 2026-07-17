@@ -170,8 +170,8 @@ class ArchitectureTest {
     // betray a hand-rolled GUI: implementing org.bukkit.inventory.InventoryHolder (every bespoke menu holder
     // carries it) and calling Bukkit.createInventory / HumanEntity.openInventory (building or showing the frame).
     //
-    // Outside the engine package, exactly sixteen production classes are allowed to do either, and all sixteen
-    // are genuine non-menu item containers, not spec menus:
+    // Outside the engine package, a fixed allow-list of production classes may do either, and all of them are
+    // genuine non-menu leaves — item containers or the security keypad — not spec menus:
     //   - itemworld Workstation opens the vanilla MenuType workstations (anvil, loom, furnace, ...) and the
     //     player's own ender chest — real game containers, no menu spec.
     //   - playerstate InvseeView / InvseeHolder, EnderseeView / EnderseeHolder and OfflineContainerView /
@@ -181,6 +181,9 @@ class ArchitectureTest {
     //     OpenContainer / InventoryViewer use cases.
     //   - trade TradeView / TradeHolder are the two-player trade window: a genuine dual item container each
     //     participant places real stacks into, driven over a shared TradeSession.
+    //   - security PinKeypadView / PinKeypadHolder are the join-verification numeric keypad: a locked window that
+    //     captures live per-keystroke clicks and force-reopens on an escape, which the declarative engine does not
+    //     model — every click is cancelled and no item ever moves.
     // Every spec-driven MENU instead renders through the engine (the Menus facade); the engine's own MenuHolder,
     // Menus and EditorRefresh live inside ..gui.menu.. and are exempt by package. A new bespoke createInventory /
     // InventoryHolder GUI appearing anywhere else fails this fence until it is migrated onto the engine, rather
@@ -261,7 +264,9 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeHolder",
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView",
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeHolder",
-                "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener");
+                "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener",
+                "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView",
+                "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadHolder");
         return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
             String fullName = javaClass.getFullName();
             int nested = fullName.indexOf('$');

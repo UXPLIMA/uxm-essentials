@@ -46,7 +46,23 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_PIN_TOO_SHORT("security.pin.too-short"),
     SECURITY_PIN_TOO_LONG("security.pin.too-long"),
     SECURITY_PIN_NOT_NUMERIC("security.pin.not-numeric"),
-    SECURITY_PIN_FEATURE_DISABLED("security.pin.feature-disabled");
+    SECURITY_PIN_FEATURE_DISABLED("security.pin.feature-disabled"),
+
+    // Phase 2 — join verification: the freeze prompt on join, the keypad GUI (title, digit/clear/submit/TOTP buttons
+    // and the masked entry display), the TOTP text prompt, the success and failed replies, the must-verify nudge when
+    // a frozen player tries to act, and the lockout kick after too many failures.
+    SECURITY_VERIFY_PROMPT("security.verify.prompt"),
+    SECURITY_VERIFY_KEYPAD_TITLE("security.verify.keypad-title"),
+    SECURITY_VERIFY_KEYPAD_DIGIT("security.verify.keypad-digit"),
+    SECURITY_VERIFY_KEYPAD_CLEAR("security.verify.keypad-clear"),
+    SECURITY_VERIFY_KEYPAD_SUBMIT("security.verify.keypad-submit"),
+    SECURITY_VERIFY_KEYPAD_ENTRY("security.verify.keypad-entry"),
+    SECURITY_VERIFY_KEYPAD_TOTP("security.verify.keypad-totp"),
+    SECURITY_VERIFY_TOTP_PROMPT("security.verify.totp-prompt"),
+    SECURITY_VERIFY_SUCCESS("security.verify.success"),
+    SECURITY_VERIFY_FAILED("security.verify.failed"),
+    SECURITY_VERIFY_MUST_VERIFY("security.verify.must-verify"),
+    SECURITY_VERIFY_LOCKED_OUT("security.verify.locked-out");
 
     private final String key;
 

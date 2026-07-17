@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.security.application;
 
+import java.time.Duration;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.PinPolicy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
@@ -17,17 +19,20 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param twoFactor the two-factor enrolment settings ({@code two-factor.*})
+ * @param joinVerification the join-verification (freeze + keypad) settings ({@code join-verification.*})
  */
-public record SecurityConfig(boolean enabled, TwoFactorSettings twoFactor) {
+public record SecurityConfig(boolean enabled, TwoFactorSettings twoFactor, JoinVerification joinVerification) {
 
     public SecurityConfig {
         Objects.requireNonNull(twoFactor, "twoFactor");
+        Objects.requireNonNull(joinVerification, "joinVerification");
     }
 
     /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */
     public static SecurityConfig from(ConfigStore config) {
         Objects.requireNonNull(config, "config");
-        return new SecurityConfig(config.getBoolean("enabled", true), TwoFactorSettings.from(config));
+        return new SecurityConfig(
+                config.getBoolean("enabled", true), TwoFactorSettings.from(config), JoinVerification.from(config));
     }
 
     /**
@@ -81,6 +86,60 @@ public record SecurityConfig(boolean enabled, TwoFactorSettings twoFactor) {
                     config.getString("two-factor.issuer", DEFAULT_ISSUER),
                     Math.min(MAX_WINDOW, Math.max(0, config.getInt("two-factor.code-window", DEFAULT_WINDOW))),
                     new PinPolicy(min, max));
+        }
+    }
+
+    /**
+     * The join-verification tunables ({@code join-verification.*}): whether an enrolled player is frozen and made to
+     * prove a factor on join at all, whether a successful verification trusts the device so the next join skips the
+     * prompt (and for how long), how many failures before the player is kicked, and how long that kick locks them out.
+     * The numbers are validated here so a nonsensical value never reaches the keypad.
+     *
+     * @param enabled whether the join freeze is active ({@code join-verification.enabled}, default true)
+     * @param trustDevices whether a verified device is remembered ({@code join-verification.trust-devices}, default true)
+     * @param trustDuration how long a trusted device skips the prompt ({@code join-verification.trust-duration-hours})
+     * @param maxAttempts failures allowed before a lockout ({@code join-verification.max-attempts}, default 3)
+     * @param lockout how long a locked-out player is kicked for ({@code join-verification.lockout-seconds}, default 300)
+     */
+    public record JoinVerification(
+            boolean enabled, boolean trustDevices, Duration trustDuration, int maxAttempts, Duration lockout) {
+
+        private static final int DEFAULT_TRUST_HOURS = 24;
+        private static final int DEFAULT_MAX_ATTEMPTS = 3;
+        private static final int DEFAULT_LOCKOUT_SECONDS = 300;
+
+        public JoinVerification {
+            Objects.requireNonNull(trustDuration, "trustDuration");
+            Objects.requireNonNull(lockout, "lockout");
+            if (maxAttempts < 1) {
+                throw new IllegalArgumentException("join-verification max-attempts must be at least 1: " + maxAttempts);
+            }
+            if (trustDuration.isNegative()) {
+                throw new IllegalArgumentException("join-verification trust-duration must not be negative");
+            }
+            if (lockout.isNegative()) {
+                throw new IllegalArgumentException("join-verification lockout must not be negative");
+            }
+        }
+
+        /** Resolve the join-verification settings from the module's scoped {@link ConfigStore}. */
+        public static JoinVerification from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            int trustHours = Math.max(0, config.getInt("join-verification.trust-duration-hours", DEFAULT_TRUST_HOURS));
+            int maxAttempts = Math.max(1, config.getInt("join-verification.max-attempts", DEFAULT_MAX_ATTEMPTS));
+            int lockoutSeconds =
+                    Math.max(0, config.getInt("join-verification.lockout-seconds", DEFAULT_LOCKOUT_SECONDS));
+            return new JoinVerification(
+                    config.getBoolean("join-verification.enabled", true),
+                    config.getBoolean("join-verification.trust-devices", true),
+                    Duration.ofHours(trustHours),
+                    maxAttempts,
+                    Duration.ofSeconds(lockoutSeconds));
+        }
+
+        /** The pure lockout decision this config drives — reused by the keypad to judge a failed attempt. */
+        public LockoutPolicy lockoutPolicy() {
+            return new LockoutPolicy(maxAttempts);
         }
     }
 }

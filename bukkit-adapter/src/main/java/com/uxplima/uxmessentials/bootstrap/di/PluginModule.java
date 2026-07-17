@@ -967,20 +967,26 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(ctx, persistence, resources, textInput, links, bus);
         } else if (module.id().equals(ModuleId.of("security"))) {
-            wireSecurity(plugin, ctx, persistence, resources);
+            wireSecurity(plugin, ctx, persistence, resources, textInput);
         }
     }
 
     private static void wireSecurity(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            TextInput textInput) {
         // security stands up the DB-backed two-factor store (the PIN hashed, the TOTP secret AES-encrypted under a
         // key-file kept beside the module's config) and publishes the /2fa and /pin enrolment verbs over the shared
-        // persistence DSL (through the security persistence factory, so no jOOQ type reaches this layer). It carries
-        // no cross-context bridge in Phase 1 — the join-verification freeze, op-command protection and IP/alt guard
-        // land with the later phases. The pending, un-confirmed TOTP secrets are transient in-memory state cleared on
-        // stop so a disable or reload leaves no residual secret.
-        SecurityWiring.Wired wired = SecurityWiring.wire(plugin, ctx, persistence);
+        // persistence DSL (through the security persistence factory, so no jOOQ type reaches this layer). Phase 2 adds
+        // the join-verification freeze: an enrolled player on an untrusted device is frozen and made to prove a factor
+        // through the keypad GUI (or the TOTP text prompt) before they can act, with a device-trust store and a
+        // failure lockout. The transient freeze/enrolment state is cleared and every keypad closed on stop, so a
+        // disable or reload leaves no residual secret and no locked player.
+        SecurityWiring.Wired wired = SecurityWiring.wire(plugin, ctx, persistence, textInput);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
     }
 

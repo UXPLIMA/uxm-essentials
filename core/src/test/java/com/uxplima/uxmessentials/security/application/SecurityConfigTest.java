@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.security.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,6 +25,31 @@ class SecurityConfigTest {
         assertThat(twoFactor.issuer()).isEqualTo("uxmEssentials");
         assertThat(twoFactor.codeWindow()).isEqualTo(1);
         assertThat(twoFactor.pinPolicy()).isEqualTo(new PinPolicy(4, 8));
+
+        SecurityConfig.JoinVerification join = config.joinVerification();
+        assertThat(join.enabled()).isTrue();
+        assertThat(join.trustDevices()).isTrue();
+        assertThat(join.trustDuration()).isEqualTo(Duration.ofHours(24));
+        assertThat(join.maxAttempts()).isEqualTo(3);
+        assertThat(join.lockout()).isEqualTo(Duration.ofMinutes(5));
+    }
+
+    @Test
+    void readsTheJoinVerificationBlock() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("join-verification.trust-devices", false);
+        values.put("join-verification.trust-duration-hours", 6);
+        values.put("join-verification.max-attempts", 5);
+        values.put("join-verification.lockout-seconds", 120);
+
+        SecurityConfig.JoinVerification join =
+                SecurityConfig.from(new MapConfig(values)).joinVerification();
+
+        assertThat(join.trustDevices()).isFalse();
+        assertThat(join.trustDuration()).isEqualTo(Duration.ofHours(6));
+        assertThat(join.maxAttempts()).isEqualTo(5);
+        assertThat(join.lockout()).isEqualTo(Duration.ofMinutes(2));
+        assertThat(join.lockoutPolicy().maxAttempts()).isEqualTo(5);
     }
 
     @Test
