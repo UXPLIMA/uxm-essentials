@@ -108,7 +108,14 @@ class VanishAdapterTest {
         toggleVanish.toggle(BukkitRefs.toRef(alice));
         assertThat(store.isVanished(alice.getUniqueId())).isTrue();
         SetVanishLevel setVanishLevel = new SetVanishLevel(store, new NoopView(), levels, new NoopBuffs());
-        VanishLifecycleListener listener = new VanishLifecycleListener(store, new NoopView(), setVanishLevel, server);
+        VanishLifecycleListener listener = new VanishLifecycleListener(
+                store,
+                new NoopView(),
+                setVanishLevel,
+                toggleVanish,
+                new com.uxplima.uxmessentials.vanish.application.VanishConfig(
+                        true, true, false, true, true, true, true, true, true, true, false, "", "", "", ""),
+                server);
         PlayerQuitEvent quit = new PlayerQuitEvent(
                 alice, net.kyori.adventure.text.Component.text("Alice left"), PlayerQuitEvent.QuitReason.DISCONNECTED);
 

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.vanish.adapter;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
@@ -18,6 +19,8 @@ import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolv
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.PdcVanishPickup;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishActionBar;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishConnectionMessenger;
 import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
@@ -28,6 +31,7 @@ import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishPickupPreferences;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the vanish context's adapters and use cases over the injected kernel ports, and produces the {@code
@@ -43,6 +47,9 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class VanishWiring {
+
+    /** How often the action-bar indicator is re-sent to a vanished player, chosen to outrun the vanilla bar fade. */
+    private static final Duration ACTION_BAR_REFRESH = Duration.ofSeconds(1);
 
     private VanishWiring() {}
 
@@ -63,15 +70,23 @@ public final class VanishWiring {
         ToggleVanish toggleVanish = new ToggleVanish(store, view, levels, notifier, buffs);
         SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs);
         ListVanished listVanished = new ListVanished(store, levels);
+        VanishConnectionMessenger messenger =
+                new VanishConnectionMessenger(kernel.scheduler(), kernel.messageSink(), levels, config);
+        VanishActionBar actionBar =
+                new VanishActionBar(plugin.getServer(), kernel.scheduler(), kernel.messages(), store, config);
 
-        List<CommandRegistration> commands =
-                List.of(new VanishCommand(toggleVanish, listVanished, pickup, plugin.getServer(), kernel.messages()));
+        List<CommandRegistration> commands = List.of(new VanishCommand(
+                toggleVanish, listVanished, pickup, messenger, actionBar, plugin.getServer(), kernel.messages()));
         List<Listener> listeners = List.of(
-                new VanishLifecycleListener(store, view, setVanishLevel, plugin.getServer()),
+                new VanishLifecycleListener(store, view, setVanishLevel, toggleVanish, config, plugin.getServer()),
                 new VanishProtectionListener(store, config, pickup),
                 new VanishSilentContainerListener(
                         store, kernel.scheduler(), plugin.getServer(), config.silentChests()));
-        return new Wired(commands, listeners, store, toggleVanish, levels);
+        // A single global timer re-arms the action-bar indicator; a disabled indicator arms no timer at all.
+        @Nullable AutoCloseable actionBarTask = config.actionBar()
+                ? kernel.scheduler().repeatGlobal(actionBar::refresh, ACTION_BAR_REFRESH, ACTION_BAR_REFRESH)
+                : null;
+        return new Wired(commands, listeners, store, toggleVanish, levels, actionBarTask);
     }
 
     /**
@@ -85,13 +100,16 @@ public final class VanishWiring {
      * @param store the in-memory vanish authority, exposed for the messaging/nametags gates and cleared on stop
      * @param toggleVanish the vanish use case, exposed for staff-mode vanish
      * @param levels the see/use level resolver, exposed for the messaging/nametags vanish gates
+     * @param actionBarTask the repeating action-bar refresh handle, cancelled on stop; {@code null} when the indicator
+     *     is disabled and no timer was armed
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             InMemoryVanishStore store,
             ToggleVanish toggleVanish,
-            VanishLevelResolver levels) {
+            VanishLevelResolver levels,
+            @Nullable AutoCloseable actionBarTask) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -106,9 +124,17 @@ public final class VanishWiring {
             return store;
         }
 
-        /** Drop the vanish state so a disable or reload leaves no residual runtime state. */
+        /** Drop the vanish state and cancel the action-bar timer so a disable or reload leaves no residual state. */
         public void stop() {
             store.clear();
+            if (actionBarTask != null) {
+                try {
+                    actionBarTask.close();
+                } catch (Exception cancelFailed) {
+                    // The repeating-task handle's cancel does not throw; close() only declares the checked type.
+                    throw new IllegalStateException("failed to cancel the vanish action-bar task", cancelFailed);
+                }
+            }
         }
     }
 }

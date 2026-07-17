@@ -27,6 +27,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishActionBar;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishConnectionMessenger;
 import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishMessageKey;
@@ -51,7 +53,10 @@ import org.jspecify.annotations.Nullable;
  *
  * The {@link ToggleVanish} use case owns the store flip, the level-aware packet hide/show, and the toggling player's
  * confirmation; {@link ListVanished} owns the see-level-scoped roster; {@link VanishPickupPreferences} owns the pickup
- * toggle. This handler only maps players and renders the actor-facing lines.
+ * toggle. Around each vanish/reappear transition this handler drives the two connection effects: the
+ * {@link VanishConnectionMessenger} fakes the join/quit broadcast (skipped by the {@code -s} flag, gated by
+ * {@code uxmessentials.vanish.silent}) and the {@link VanishActionBar} shows or clears the indicator. Otherwise it only
+ * maps players and renders the actor-facing lines.
  */
 @NullMarked
 public final class VanishCommand implements CommandRegistration {
@@ -59,11 +64,15 @@ public final class VanishCommand implements CommandRegistration {
     private static final String PERMISSION = "uxmessentials.vanish.use";
     private static final String OTHERS_PERMISSION = "uxmessentials.vanish.others";
     private static final String LIST_PERMISSION = "uxmessentials.vanish.list";
+    private static final String SILENT_PERMISSION = "uxmessentials.vanish.silent";
+    private static final String SILENT_FLAG = "-s";
     private static final String TARGET_ARG = "target";
 
     private final ToggleVanish toggleVanish;
     private final ListVanished listVanished;
     private final VanishPickupPreferences pickup;
+    private final VanishConnectionMessenger messenger;
+    private final VanishActionBar actionBar;
     private final Server server;
     private final CommandFeedback feedback;
 
@@ -71,11 +80,15 @@ public final class VanishCommand implements CommandRegistration {
             ToggleVanish toggleVanish,
             ListVanished listVanished,
             VanishPickupPreferences pickup,
+            VanishConnectionMessenger messenger,
+            VanishActionBar actionBar,
             Server server,
             Messages messages) {
         this.toggleVanish = Objects.requireNonNull(toggleVanish, "toggleVanish");
         this.listVanished = Objects.requireNonNull(listVanished, "listVanished");
         this.pickup = Objects.requireNonNull(pickup, "pickup");
+        this.messenger = Objects.requireNonNull(messenger, "messenger");
+        this.actionBar = Objects.requireNonNull(actionBar, "actionBar");
         this.server = Objects.requireNonNull(server, "server");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
@@ -84,9 +97,16 @@ public final class VanishCommand implements CommandRegistration {
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("vanish")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(this::toggle)
-                .then(Commands.literal("on").executes(ctx -> set(ctx, true)))
-                .then(Commands.literal("off").executes(ctx -> set(ctx, false)))
+                .executes(ctx -> toggle(ctx, false))
+                .then(Commands.literal(SILENT_FLAG)
+                        .requires(src -> src.getSender().hasPermission(SILENT_PERMISSION))
+                        .executes(ctx -> toggle(ctx, true)))
+                .then(Commands.literal("on")
+                        .executes(ctx -> set(ctx, true, false))
+                        .then(silentFlag(ctx -> set(ctx, true, true))))
+                .then(Commands.literal("off")
+                        .executes(ctx -> set(ctx, false, false))
+                        .then(silentFlag(ctx -> set(ctx, false, true))))
                 .then(Commands.literal("pickup")
                         .executes(this::togglePickup)
                         .then(Commands.literal("on").executes(ctx -> setPickup(ctx, true)))
@@ -106,21 +126,33 @@ public final class VanishCommand implements CommandRegistration {
         return "Become invisible to other players.";
     }
 
-    private int toggle(CommandContext<CommandSourceStack> ctx) {
+    /** The {@code -s} silent-flag leaf shared by {@code /vanish on} and {@code /vanish off}, gated by the silent node. */
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> silentFlag(
+            Command<CommandSourceStack> action) {
+        return Commands.literal(SILENT_FLAG)
+                .requires(src -> src.getSender().hasPermission(SILENT_PERMISSION))
+                .executes(action);
+    }
+
+    private int toggle(CommandContext<CommandSourceStack> ctx, boolean silent) {
         PlayerRef who = playerRef(ctx);
         if (who == null) {
             return 0;
         }
-        toggleVanish.toggle(who);
+        applyTransition(who, toggleVanish.toggle(who), silent);
         return Command.SINGLE_SUCCESS;
     }
 
-    private int set(CommandContext<CommandSourceStack> ctx, boolean vanished) {
+    private int set(CommandContext<CommandSourceStack> ctx, boolean vanished, boolean silent) {
         PlayerRef who = playerRef(ctx);
         if (who == null) {
             return 0;
         }
+        boolean wasVanished = toggleVanish.isVanished(who);
         toggleVanish.setVanished(who, vanished);
+        if (wasVanished != vanished) {
+            applyTransition(who, vanished, silent);
+        }
         return Command.SINGLE_SUCCESS;
     }
 
@@ -133,9 +165,25 @@ public final class VanishCommand implements CommandRegistration {
         }
         Player resolved = target.get();
         boolean nowVanished = toggleVanish.toggle(BukkitRefs.toRef(resolved));
+        applyTransition(BukkitRefs.toRef(resolved), nowVanished, false);
         VanishMessageKey key = nowVanished ? VanishMessageKey.VANISH_OTHER_ON : VanishMessageKey.VANISH_OTHER_OFF;
         feedback.send(sender, key, Map.of("player", resolved.getName()));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** Drive the connection effects around a vanish/reappear: the fake broadcast (unless {@code silent}) and the bar. */
+    private void applyTransition(PlayerRef who, boolean nowVanished, boolean silent) {
+        if (nowVanished) {
+            actionBar.show(who);
+            if (!silent) {
+                messenger.announceVanish(who);
+            }
+        } else {
+            actionBar.clear(who);
+            if (!silent) {
+                messenger.announceReappear(who);
+            }
+        }
     }
 
     private int togglePickup(CommandContext<CommandSourceStack> ctx) {

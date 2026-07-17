@@ -179,6 +179,9 @@ class FoliaThreadingDriftTest {
                 pkg + "vanish.adapter.outbound.BukkitVanishView",
                 "GLOBAL: vanish visibility fan-out enumerates inside scheduler.onGlobal");
         allow.put(
+                pkg + "vanish.adapter.outbound.VanishConnectionMessenger",
+                "GLOBAL: fake join/quit fan-out enumerates inside scheduler.onGlobal, delivering per-viewer via the sink");
+        allow.put(
                 pkg + "scoreboard.adapter.ScoreboardWiring",
                 "GLOBAL: module stop() tear-down enumerates inside scheduler.onGlobal");
         allow.put(

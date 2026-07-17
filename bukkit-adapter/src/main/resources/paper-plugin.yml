@@ -631,6 +631,9 @@ permissions:
   uxmessentials.vanish.list:
     description: '/vanish list to see the hidden players you are permitted to see (scoped to your see level).'
     default: op
+  uxmessentials.vanish.silent:
+    description: '/vanish -s to vanish or reappear without the fake join/quit broadcast.'
+    default: op
   # Presence settings panel — /presencesettings opens a per-player panel toggling AFK (/afk) and vanish
   # (/vanish). Self-service for every player; the underlying vanish toggle still honours uxmessentials.vanish.use.
   uxmessentials.presencesettings.use:

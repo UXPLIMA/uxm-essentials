@@ -7,7 +7,8 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * {@code messages_<lang>.conf} ({@code VANISH_ON} ↔ {@code vanish.on}); the constant is the compile-time handle, the
  * catalog holds the text. There are no inline player-facing literals in the context — every message resolves through
  * one of these. Phase 1 owns the {@code /vanish} on/off confirmations; Phase 2 adds the {@code /vanish <player>} actor
- * feedback and the {@code /vanish list} output; later phases add fake join/quit and the action-bar indicator here.
+ * feedback and the {@code /vanish list} output; Phase 4 adds the persistent action-bar indicator. The fake join/quit
+ * lines are operator MiniMessage config content (see {@code VanishConfig}), not catalog keys.
  */
 public enum VanishMessageKey implements MessageKey {
 
@@ -25,7 +26,10 @@ public enum VanishMessageKey implements MessageKey {
 
     // /vanish pickup — the confirmation shown when a player flips whether they pick up items while vanished.
     VANISH_PICKUP_ON("vanish.pickup-on"),
-    VANISH_PICKUP_OFF("vanish.pickup-off");
+    VANISH_PICKUP_OFF("vanish.pickup-off"),
+
+    // The persistent action-bar indicator refreshed to a vanished player while they are hidden.
+    VANISH_ACTIONBAR("vanish.actionbar");
 
     private final String key;
 

@@ -3,7 +3,11 @@ package com.uxplima.uxmessentials.vanish.adapter.inbound.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -21,8 +25,11 @@ import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolv
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.PdcVanishPickup;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishActionBar;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishConnectionMessenger;
 import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
+import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
@@ -44,8 +51,28 @@ class VanishCommandTest {
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
+    // enabled, silentChests, pickupItems, nightVision, allowFlight, noHunger, noDamage, mobTarget, fakeJoinQuit,
+    // actionBar, joinVanished, fake-quit, fake-join, fake-quit-staff, fake-join-staff.
+    private static final VanishConfig CONFIG = new VanishConfig(
+            true,
+            true,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            "{player} left",
+            "{player} joined",
+            "",
+            "");
+
     private ServerMock server;
     private InMemoryVanishStore store;
+    private RecordingSink sink;
     private VanishCommand command;
 
     @BeforeEach
@@ -54,13 +81,17 @@ class VanishCommandTest {
         server.addSimpleWorld("world");
         InlineScheduler scheduler = new InlineScheduler();
         store = new InMemoryVanishStore();
+        sink = new RecordingSink();
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         ToggleVanish toggleVanish = new ToggleVanish(
                 store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()), new NoopBuffs());
         ListVanished listVanished = new ListVanished(store, levels);
         PdcVanishPickup pickup = new PdcVanishPickup(server, false);
-        command = new VanishCommand(toggleVanish, listVanished, pickup, server, new KeyMessages());
+        VanishConnectionMessenger messenger = new VanishConnectionMessenger(scheduler, sink, levels, CONFIG);
+        VanishActionBar actionBar = new VanishActionBar(server, scheduler, new KeyMessages(), store, CONFIG);
+        command =
+                new VanishCommand(toggleVanish, listVanished, pickup, messenger, actionBar, server, new KeyMessages());
     }
 
     @AfterEach
@@ -137,6 +168,44 @@ class VanishCommandTest {
     }
 
     @Test
+    void aPlainVanishBroadcastsAFakeQuitToOtherPlayers() {
+        PlayerMock caller = server.addPlayer("Caller");
+        caller.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.use", true);
+        PlayerMock observer = server.addPlayer("Observer");
+
+        execute(CommandSourceStackMock.from(caller), "vanish");
+
+        assertThat(sink.received(observer.getUniqueId())).anyMatch(line -> line.contains("Caller left"));
+        assertThat(sink.received(caller.getUniqueId())).noneMatch(line -> line.contains("Caller left"));
+    }
+
+    @Test
+    void theSilentFlagSkipsTheFakeBroadcast() {
+        PlayerMock caller = server.addPlayer("Caller");
+        caller.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.use", true);
+        caller.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.silent", true);
+        PlayerMock observer = server.addPlayer("Observer");
+
+        execute(CommandSourceStackMock.from(caller), "vanish -s");
+
+        assertThat(store.isVanished(caller.getUniqueId())).isTrue(); // still vanished
+        assertThat(sink.received(observer.getUniqueId())).isEmpty(); // but nobody was told
+    }
+
+    @Test
+    void theSilentFlagNodeIsGatedBySilentPermission() {
+        PlayerMock permitted = server.addPlayer("Permitted");
+        permitted.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.silent", true);
+        PlayerMock denied = server.addPlayer("Denied");
+
+        var silentNode = command.build().getChild("-s");
+        assertThat(silentNode.getRequirement().test(CommandSourceStackMock.from(permitted)))
+                .isTrue();
+        assertThat(silentNode.getRequirement().test(CommandSourceStackMock.from(denied)))
+                .isFalse();
+    }
+
+    @Test
     void listReportsNobodyWhenTheCallerSeesNoVanishedPlayer() {
         PlayerMock caller = server.addPlayer("Caller");
         caller.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.use", true);
@@ -209,6 +278,20 @@ class VanishCommandTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
             // discarded: the target's own confirmation is not under test here
+        }
+    }
+
+    /** Records every delivery per viewer so the fake-broadcast fan-out is assertable. */
+    private static final class RecordingSink implements MessageSink {
+        private final ConcurrentHashMap<UUID, List<String>> delivered = new ConcurrentHashMap<>();
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            delivered.computeIfAbsent(viewer.uuid(), id -> new ArrayList<>()).add(renderedText);
+        }
+
+        List<String> received(UUID viewer) {
+            return delivered.getOrDefault(viewer, List.of());
         }
     }
 
