@@ -28,6 +28,26 @@ class VillagersConfigTest {
         assertThat(config.clickToTrade().enabled()).isFalse();
         assertThat(config.protect().enabled()).isFalse();
         assertThat(config.bucket().enabled()).isFalse();
+        assertThat(config.follow().enabled()).isFalse();
+        assertThat(config.leash().enabled()).isFalse();
+    }
+
+    @Test
+    void followDefaultsToNormalSpeedAndSixteenBlocks() {
+        VillagersConfig config = VillagersConfig.from(new FixedConfig(Map.of()));
+
+        assertThat(config.follow().speed()).isEqualTo(1.0);
+        assertThat(config.follow().range()).isEqualTo(16);
+        assertThat(config.follow().followRange().range()).isEqualTo(16.0);
+    }
+
+    @Test
+    void followSpeedAndRangeAreClampedToSaneValues() {
+        VillagersConfig config = VillagersConfig.from(
+                new FixedConfig(Map.ofEntries(Map.entry("follow.speed", "0"), Map.entry("follow.range", 0))));
+
+        assertThat(config.follow().speed()).isEqualTo(1.0); // a non-positive speed falls back to the default
+        assertThat(config.follow().range()).isEqualTo(1); // clamped to at least one block
     }
 
     @Test
@@ -74,7 +94,11 @@ class VillagersConfigTest {
                 Map.entry("protect.enabled", true),
                 Map.entry("protect.all", true),
                 Map.entry("protect.from-zombies", false),
-                Map.entry("bucket.enabled", true))));
+                Map.entry("bucket.enabled", true),
+                Map.entry("follow.enabled", true),
+                Map.entry("follow.speed", "1.5"),
+                Map.entry("follow.range", 24),
+                Map.entry("leash.enabled", true))));
 
         assertThat(config.enabled()).isFalse();
         assertThat(config.infiniteTrading().enabled()).isTrue();
@@ -88,6 +112,10 @@ class VillagersConfigTest {
         assertThat(config.protect().all()).isTrue();
         assertThat(config.protect().fromZombies()).isFalse();
         assertThat(config.bucket().enabled()).isTrue();
+        assertThat(config.follow().enabled()).isTrue();
+        assertThat(config.follow().speed()).isEqualTo(1.5);
+        assertThat(config.follow().range()).isEqualTo(24);
+        assertThat(config.leash().enabled()).isTrue();
     }
 
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */

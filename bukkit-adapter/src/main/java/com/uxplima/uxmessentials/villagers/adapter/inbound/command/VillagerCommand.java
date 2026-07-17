@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView;
+import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerFollowService;
 import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -27,11 +28,12 @@ import org.jspecify.annotations.Nullable;
 /**
  * {@code /villager}: the villagers context's root command. Its subcommands act on the villager the player is looking at
  * (or the nearest one within reach): {@code manager} opens the trade manager (Phase 2, gated on
- * {@code uxmessentials.villagers.manager}) and {@code protect} toggles the villager's protection mark (Phase 3, gated on
- * {@code uxmessentials.villagers.protect}). Each subcommand is present only when its feature is wired, so the command
- * carries exactly the verbs the operator enabled; a sender who is not a player, or who is not looking at a villager,
- * gets a feedback line instead. The target is resolved on the Brigadier (global) thread and the actual entity work is
- * hopped to the villager's region by the collaborator it is handed to.
+ * {@code uxmessentials.villagers.manager}), {@code protect} toggles the villager's protection mark (Phase 3, gated on
+ * {@code uxmessentials.villagers.protect}), and {@code follow} toggles whether the villager follows the player (Phase 4,
+ * gated on {@code uxmessentials.villagers.follow}). Each subcommand is present only when its feature is wired, so the
+ * command carries exactly the verbs the operator enabled; a sender who is not a player, or who is not looking at a
+ * villager, gets a feedback line instead. The target is resolved on the Brigadier (global) thread and the actual entity
+ * work is hopped to the villager's region by the collaborator it is handed to.
  */
 @NullMarked
 public final class VillagerCommand implements CommandRegistration {
@@ -43,6 +45,8 @@ public final class VillagerCommand implements CommandRegistration {
     private final @Nullable VillagerManagerView managerView;
     private final @Nullable String protectPermission;
     private final @Nullable VillagerProtectToggle protectToggle;
+    private final @Nullable String followPermission;
+    private final @Nullable VillagerFollowService followService;
     private final CommandFeedback feedback;
 
     public VillagerCommand(
@@ -50,11 +54,15 @@ public final class VillagerCommand implements CommandRegistration {
             @Nullable VillagerManagerView managerView,
             @Nullable String protectPermission,
             @Nullable VillagerProtectToggle protectToggle,
+            @Nullable String followPermission,
+            @Nullable VillagerFollowService followService,
             Messages messages) {
         this.managerPermission = managerPermission;
         this.managerView = managerView;
         this.protectPermission = protectPermission;
         this.protectToggle = protectToggle;
+        this.followPermission = followPermission;
+        this.followService = followService;
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
@@ -73,12 +81,18 @@ public final class VillagerCommand implements CommandRegistration {
                     .requires(src -> src.getSender().hasPermission(permission))
                     .executes(this::toggleProtect));
         }
+        if (followService != null && followPermission != null) {
+            String permission = followPermission;
+            root.then(Commands.literal("follow")
+                    .requires(src -> src.getSender().hasPermission(permission))
+                    .executes(this::toggleFollow));
+        }
         return root.build();
     }
 
     @Override
     public String description() {
-        return "Manage the villager you are looking at (/villager manager, /villager protect).";
+        return "Manage the villager you are looking at (/villager manager, /villager protect, /villager follow).";
     }
 
     private int openManager(CommandContext<CommandSourceStack> ctx) {
@@ -110,6 +124,22 @@ public final class VillagerCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         toggle.toggle(player, BukkitRefs.toRef(player), target);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int toggleFollow(CommandContext<CommandSourceStack> ctx) {
+        VillagerFollowService follow = Objects.requireNonNull(followService, "followService");
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player player)) {
+            feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
+            return 0;
+        }
+        Villager target = targetVillager(player);
+        if (target == null) {
+            feedback.send(player, VillagersMessageKey.VILLAGERS_FOLLOW_NO_TARGET);
+            return Command.SINGLE_SUCCESS;
+        }
+        follow.toggle(player, BukkitRefs.toRef(player), target);
         return Command.SINGLE_SUCCESS;
     }
 

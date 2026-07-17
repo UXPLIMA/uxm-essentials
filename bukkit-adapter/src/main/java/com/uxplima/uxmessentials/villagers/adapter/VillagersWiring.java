@@ -20,11 +20,14 @@ import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerVi
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.ClickToTradeListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.DisableTradesListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerBucketListener;
+import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerLeashListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerProtectionListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerRecipeReapplyListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerTradeListener;
+import com.uxplima.uxmessentials.villagers.adapter.outbound.PathfinderVillagerMover;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.PdcVillagerFlags;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerBucketItem;
+import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerFollowService;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerRecipeStore;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerRestockSweep;
 import com.uxplima.uxmessentials.villagers.application.VillagersConfig;
@@ -44,13 +47,15 @@ import org.jspecify.annotations.Nullable;
  * disable flag the manager sets — with the global switch off and no flag it is an inert no-op. The
  * {@link VillagerProtectionListener} and the {@code /villager protect} toggle wire only under {@code protect}, while the
  * {@link VillagerBucketListener} — like the disable listener — always registers and honours its own {@code bucket}
- * switch. The one {@code /villager} command carries whichever of the {@code manager} / {@code protect} subcommands
- * their features enabled, so it is registered when either is on.
+ * switch. The {@link VillagerFollowService} and the {@code /villager follow} toggle wire only under {@code follow}, and
+ * the {@link VillagerLeashListener} lands only under {@code leash}. The one {@code /villager} command carries whichever
+ * of the {@code manager} / {@code protect} / {@code follow} subcommands their features enabled, so it is registered when
+ * any is on.
  *
- * <p>The context persists nothing relational — the last-restock stamp, the disable flag, and the manager's custom
- * recipe set are all PDC state on the villager entity — so there is no repository or migration. The sweep's repeating
- * task is started here and any still-open manager window is drained on {@link Wired#stop()}, so a disable or reload
- * leaves no scheduled work and no unsaved edit behind.
+ * <p>The context persists nothing relational — the last-restock stamp, the disable flag, the follow-owner mark, and the
+ * manager's custom recipe set are all PDC state on the villager entity — so there is no repository or migration. The
+ * restock sweep's and the follow runtime's repeating tasks are started here and any still-open manager window is drained
+ * on {@link Wired#stop()}, so a disable or reload leaves no scheduled work and no unsaved edit behind.
  */
 @NullMarked
 public final class VillagersWiring {
@@ -63,6 +68,10 @@ public final class VillagersWiring {
     private static final String PROTECT_PERMISSION = "uxmessentials.villagers.protect";
     /** The permission gating villager pickup with the villager-in-a-bucket item. */
     private static final String BUCKET_PERMISSION = "uxmessentials.villagers.bucket";
+    /** The permission gating the {@code /villager follow} toggle. */
+    private static final String FOLLOW_PERMISSION = "uxmessentials.villagers.follow";
+    /** The permission gating villager leashing. */
+    private static final String LEASH_PERMISSION = "uxmessentials.villagers.leash";
 
     private VillagersWiring() {}
 
@@ -111,15 +120,34 @@ public final class VillagersWiring {
             listeners.add(new VillagerProtectionListener(protectPolicy, flags));
             protectToggle = new VillagerProtectToggle(kernel.scheduler(), flags, protectPolicy, kernel.messages());
         }
-        // The one /villager command carries whichever subcommands their features enabled; register it when either is
-        // on.
-        if (managerView != null || protectToggle != null) {
+        // Follow: /villager follow makes the looked-at villager pathfind after the player, and a repeating sweep walks
+        // each following villager toward its owner. Wires only under the follow switch.
+        VillagerFollowService followService = null;
+        if (config.follow().enabled()) {
+            followService = new VillagerFollowService(
+                    server,
+                    kernel.scheduler(),
+                    flags,
+                    new PathfinderVillagerMover(),
+                    config.follow().followRange(),
+                    config.follow().speed(),
+                    kernel.messages(),
+                    true);
+        }
+        // The one /villager command carries whichever subcommands their features enabled; register it when any is on.
+        if (managerView != null || protectToggle != null || followService != null) {
             commands.add(new VillagerCommand(
                     managerView != null ? MANAGER_PERMISSION : null,
                     managerView,
                     protectToggle != null ? PROTECT_PERMISSION : null,
                     protectToggle,
+                    followService != null ? FOLLOW_PERMISSION : null,
+                    followService,
                     kernel.messages()));
+        }
+        // Leashing: intercept a lead right-click on a villager and attach the lead. Wires only under the leash switch.
+        if (config.leash().enabled()) {
+            listeners.add(new VillagerLeashListener(true, LEASH_PERMISSION));
         }
         // Villager-in-a-bucket: sneak-pickup into a captured-villager item and place it back. The listener honours its
         // own bucket switch, so it registers for the whole enabled module and is an inert early return when off.
@@ -136,8 +164,9 @@ public final class VillagersWiring {
                 Clock.systemUTC(),
                 config.restock().enabled());
         AutoCloseable sweepTask = sweep.start();
+        AutoCloseable followTask = followService != null ? followService.start() : () -> {};
         VillagerManagerView viewToDrain = managerView;
-        Runnable stop = () -> stop(sweepTask, viewToDrain, kernel.log());
+        Runnable stop = () -> stop(sweepTask, followTask, viewToDrain, kernel.log());
         return new Wired(listeners, commands, stop);
     }
 
@@ -149,16 +178,22 @@ public final class VillagersWiring {
         player.openMerchant((org.bukkit.inventory.Merchant) villager, true);
     }
 
-    // Cancel the repeating sweep and drain any still-open manager window on module stop, logging any failure with
+    // Cancel the repeating tasks and drain any still-open manager window on module stop, logging any failure with
     // context rather than swallowing it, so a disable or reload strands no scheduled task and loses no edit.
-    private static void stop(AutoCloseable sweepTask, @Nullable VillagerManagerView managerView, Logger log) {
+    private static void stop(
+            AutoCloseable sweepTask, AutoCloseable followTask, @Nullable VillagerManagerView managerView, Logger log) {
         if (managerView != null) {
             managerView.flushAll();
         }
+        close(sweepTask, "failed to cancel the villager restock sweep", log);
+        close(followTask, "failed to cancel the villager follow sweep", log);
+    }
+
+    private static void close(AutoCloseable task, String failureMessage, Logger log) {
         try {
-            sweepTask.close();
+            task.close();
         } catch (Exception failure) {
-            log.error("failed to cancel the villager restock sweep", failure);
+            log.error(failureMessage, failure);
         }
     }
 

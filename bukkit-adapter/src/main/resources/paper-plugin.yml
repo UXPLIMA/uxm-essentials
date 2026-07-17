@@ -1402,8 +1402,9 @@ permissions:
   # (buy/sell items and amounts, add/remove a trade, toggle the villager's disable flag). Click-to-trade (.trade) opens
   # a villager's trade window directly on right-click even where the vanilla gate would refuse it. Protect (.protect) —
   # /villager protect toggles a villager's saver mark (no death, no despawn). Bucket (.bucket) — sneak-pick a villager
-  # up into a captured-villager item and place it back. All features ship off in config; the module reload/inspect tier
-  # is uxmessentials.module.villagers.
+  # up into a captured-villager item and place it back. Follow (.follow) — /villager follow makes the villager you look
+  # at pathfind after you. Leash (.leash) — right-click a villager with a lead to leash it. All features ship off in
+  # config; the module reload/inspect tier is uxmessentials.module.villagers.
   uxmessentials.villagers.manager:
     description: '/villager manager — open and edit the trades of the villager you are looking at.'
     default: op
@@ -1415,6 +1416,12 @@ permissions:
     default: op
   uxmessentials.villagers.bucket:
     description: 'Sneak-right-click a villager to pick it up into a captured-villager item, and place it back later.'
+    default: op
+  uxmessentials.villagers.follow:
+    description: '/villager follow — toggle whether the villager you are looking at pathfinds after you.'
+    default: op
+  uxmessentials.villagers.leash:
+    description: 'Right-click a villager with a lead to leash it, when leashing is enabled.'
     default: op
   uxmessentials.module.villagers:
     description: 'Hot-reload / inspect the villagers module (villager trade management).'

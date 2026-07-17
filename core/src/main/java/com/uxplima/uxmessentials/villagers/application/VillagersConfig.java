@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.villagers.domain.FollowRange;
 import com.uxplima.uxmessentials.villagers.domain.VillagerProtectionPolicy;
 
 /**
@@ -27,6 +28,8 @@ import com.uxplima.uxmessentials.villagers.domain.VillagerProtectionPolicy;
  * @param clickToTrade the click-to-trade feature settings
  * @param protect the protection / saver feature settings
  * @param bucket the villager-in-a-bucket feature settings
+ * @param follow the follow feature settings
+ * @param leash the leash feature settings
  */
 public record VillagersConfig(
         boolean enabled,
@@ -37,7 +40,9 @@ public record VillagersConfig(
         TradeManager tradeManager,
         ClickToTrade clickToTrade,
         Protect protect,
-        Bucket bucket) {
+        Bucket bucket,
+        Follow follow,
+        Leash leash) {
 
     public VillagersConfig {
         Objects.requireNonNull(infiniteTrading, "infiniteTrading");
@@ -48,6 +53,8 @@ public record VillagersConfig(
         Objects.requireNonNull(clickToTrade, "clickToTrade");
         Objects.requireNonNull(protect, "protect");
         Objects.requireNonNull(bucket, "bucket");
+        Objects.requireNonNull(follow, "follow");
+        Objects.requireNonNull(leash, "leash");
     }
 
     /** Resolve the villagers config from the module's scoped {@link ConfigStore} ({@code modules.villagers}). */
@@ -62,7 +69,9 @@ public record VillagersConfig(
                 TradeManager.from(config),
                 ClickToTrade.from(config),
                 Protect.from(config),
-                Bucket.from(config));
+                Bucket.from(config),
+                Follow.from(config),
+                Leash.from(config));
     }
 
     /**
@@ -228,6 +237,62 @@ public record VillagersConfig(
 
         static Bucket from(ConfigStore config) {
             return new Bucket(config.getBoolean("bucket.enabled", false));
+        }
+    }
+
+    /**
+     * The follow feature under {@code follow { … }}: with {@code enabled} on, a player holding
+     * {@code uxmessentials.villagers.follow} runs {@code /villager follow} to make the villager they are looking at
+     * (or the nearest within reach) pathfind after them. The villager keeps up while it stays within {@code range}
+     * blocks of its owner in the same world — beyond that it stops until the owner returns — and a second
+     * {@code /villager follow} un-follows it. The owner is stamped in the villager's PDC so the pairing is durable,
+     * and the pure range decision lives in {@link FollowRange}. A gameplay change, so it ships off.
+     *
+     * @param enabled whether the follow feature runs ({@code follow.enabled}, default {@code false})
+     * @param speed the villager's pathfinder speed multiplier while following ({@code follow.speed}, default
+     *     {@code 1.0}), clamped to a strictly positive value
+     * @param range how far, in blocks, the owner may stray before the villager stops following ({@code follow.range},
+     *     default {@code 16}), clamped to at least one
+     */
+    public record Follow(boolean enabled, double speed, int range) {
+
+        /** The default pathfinder speed multiplier while following (the mob's normal move speed). */
+        private static final double DEFAULT_SPEED = 1.0;
+        /** The default follow range in blocks. */
+        private static final int DEFAULT_RANGE = 16;
+
+        public Follow {
+            if (!(speed > 0) || !Double.isFinite(speed)) {
+                speed = DEFAULT_SPEED;
+            }
+            range = Math.max(1, range);
+        }
+
+        static Follow from(ConfigStore config) {
+            return new Follow(
+                    config.getBoolean("follow.enabled", false),
+                    config.getDouble("follow.speed", DEFAULT_SPEED),
+                    config.getInt("follow.range", DEFAULT_RANGE));
+        }
+
+        /** The pure follow-range rule this feature's {@code range} decides. */
+        public FollowRange followRange() {
+            return new FollowRange(range);
+        }
+    }
+
+    /**
+     * The leash feature under {@code leash { … }}: with {@code enabled} on, a player holding
+     * {@code uxmessentials.villagers.leash} right-clicks a villager with a lead in hand to leash it — a lead vanilla
+     * never lets you attach to a villager. The adapter intercepts that right-click, attaches the lead, and consumes
+     * it, suppressing the trade window that click would otherwise open. A gameplay change, so it ships off.
+     *
+     * @param enabled whether villager leashing runs ({@code leash.enabled}, default {@code false})
+     */
+    public record Leash(boolean enabled) {
+
+        static Leash from(ConfigStore config) {
+            return new Leash(config.getBoolean("leash.enabled", false));
         }
     }
 }

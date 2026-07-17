@@ -12,7 +12,8 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * (globally or per-villager); Phase 2 adds the trade-manager surface — the "look at a villager" hint, the manager
  * GUI title, and the two button labels (the disable toggle, in its two states, and the per-row remove control) plus
  * the usage help. Phase 3 adds the protection toggle's two confirmations and its no-target hint, and the name the
- * villager-in-a-bucket item carries. Later phases add their own keys here as their verbs land.
+ * villager-in-a-bucket item carries. Phase 4 adds the follow toggle's two confirmations and its no-target hint
+ * (leashing is silent, like vanilla leashing). Later phases add their own keys here as their verbs land.
  */
 public enum VillagersMessageKey implements MessageKey {
 
@@ -48,7 +49,16 @@ public enum VillagersMessageKey implements MessageKey {
     VILLAGERS_PROTECT_DISABLED("villagers.protect.disabled"),
 
     // Villager-in-a-bucket — the display name of the item a picked-up villager becomes.
-    VILLAGERS_BUCKET_NAME("villagers.bucket.name");
+    VILLAGERS_BUCKET_NAME("villagers.bucket.name"),
+
+    // Follow — /villager follow could not find a villager the player is looking at (or within reach).
+    VILLAGERS_FOLLOW_NO_TARGET("villagers.follow.no-target"),
+
+    // Follow — the villager the player looked at is now following them.
+    VILLAGERS_FOLLOW_STARTED("villagers.follow.started"),
+
+    // Follow — the villager the player looked at has stopped following them.
+    VILLAGERS_FOLLOW_STOPPED("villagers.follow.stopped");
 
     private final String key;
 
