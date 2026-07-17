@@ -4,11 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
@@ -19,7 +18,6 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
-import com.uxplima.uxmessentials.regions.domain.FlagState;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
@@ -27,7 +25,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -42,24 +42,26 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@link RegionFlagEditorView} over a real menu engine and a fake {@link RegionService}
- * (WorldGuard is not on the test classpath — the editor is exercised through the port): it draws one icon per
- * configured flag, reflects each flag's current value (a denied flag shows the deny icon), and a click cycles the
- * flag to its next state and writes that value back through {@link RegionService#setFlag} — after which the reopened
- * panel reflects the new value.
+ * MockBukkit coverage of {@link RegionRosterView} over a real menu engine, a fake {@link RegionService} and a fake
+ * {@link PlayerLookup} (WorldGuard is not on the test classpath — the editor is exercised through the ports): it draws
+ * one icon per roster entry (owners first, then members, then groups), clicking a uuid-backed member removes it
+ * through {@link RegionService#applyMemberChange} and the reopened panel reflects the shrunken roster, and clicking a
+ * read-only group entry sends the "can't remove here" line and touches the port not at all.
  */
-class RegionFlagEditorViewTest {
+class RegionRosterViewTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
     private static final RegionRef REGION = new RegionRef(WORLD, "spawn");
+    private static final UUID OWNER = UUID.randomUUID();
+    private static final UUID MEMBER = UUID.randomUUID();
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock staff;
     private PlayerRef staffRef;
     private FakeRegionService service;
-    private List<String> manageMembersFor;
-    private RegionFlagEditorView editor;
+    private RecordingSink sink;
+    private RegionRosterView view;
 
     @BeforeEach
     void setUp() {
@@ -68,7 +70,10 @@ class RegionFlagEditorViewTest {
         staff = server.addPlayer("Staff");
         staffRef = new PlayerRef(staff.getUniqueId(), staff.getName());
         service = new FakeRegionService();
-        manageMembersFor = new ArrayList<>();
+        service.addOwner(OWNER.toString());
+        service.addMember(MEMBER.toString());
+        service.addMember("g:staff");
+        sink = new RecordingSink();
 
         Scheduler scheduler = new SyncScheduler();
         Messages messages = keyEcho();
@@ -76,15 +81,16 @@ class RegionFlagEditorViewTest {
         TestMenuEngine engine = TestMenuEngine.create(messages, scheduler);
         engine.installListener(plugin);
         Menus menus = engine.menus();
-        editor = new RegionFlagEditorView(
+        PlayerLookup lookup = new FakePlayerLookup();
+        view = new RegionRosterView(
                 menus,
                 guiText,
                 scheduler,
                 messages,
+                sink,
                 service,
-                List.of("pvp", "build", "mob-spawning"),
-                EntityListLayout.paginatedDefault(Material.GRAY_DYE),
-                (clicker, region) -> manageMembersFor.add(region.id()));
+                lookup,
+                EntityListLayout.paginatedDefault(Material.PLAYER_HEAD));
     }
 
     @AfterEach
@@ -93,42 +99,43 @@ class RegionFlagEditorViewTest {
     }
 
     @Test
-    void drawsAnIconPerConfiguredFlag() {
-        editor.open(staffRef, REGION);
+    void drawsAnIconPerRosterEntryOwnersFirst() {
+        view.open(staffRef, REGION);
 
         Inventory inv = staff.getOpenInventory().getTopInventory();
         assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
-        assertThat(inv.getItem(0)).isNotNull();
-        assertThat(inv.getItem(1)).isNotNull();
-        assertThat(inv.getItem(2)).isNotNull();
+        assertThat(inv.getItem(0).getType()).isEqualTo(Material.GOLDEN_HELMET);
+        assertThat(inv.getItem(1).getType()).isEqualTo(Material.PLAYER_HEAD);
+        assertThat(inv.getItem(2).getType()).isEqualTo(Material.OAK_SIGN);
     }
 
     @Test
-    void reflectsAFlagsValueAndCyclesItThroughThePortOnClick() {
-        // pvp is denied in the region, so its icon must render as the deny icon (reflecting the live value).
-        service.setInitial("pvp", FlagState.DENY);
+    void clickingAMemberRemovesItThroughThePortAndTheReopenedPanelReflectsIt() {
+        view.open(staffRef, REGION);
 
-        editor.open(staffRef, REGION);
-        Inventory inv = staff.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(0).getType()).isEqualTo(Material.RED_DYE);
+        // Slot 1 is the member (owner sits at 0); clicking it removes that member through the port.
+        fireClick(1);
+        assertThat(service.lastChange())
+                .isEqualTo(new RegionMemberChange(
+                        REGION, MEMBER, RegionMemberChange.Role.MEMBER, RegionMemberChange.Action.REMOVE));
 
-        // Clicking pvp cycles DENY -> UNSET and writes the empty (cleared) value back through the port.
-        fireClick(0);
-        assertThat(service.lastSetFlag()).isEqualTo(new FlagValue("pvp", ""));
-
-        // The reopened panel reflects the new value: pvp is now unset (the unset icon).
+        // The reopened panel now shows only the owner and the group; the group slides up to slot 1 and the vacated
+        // slot 2 falls back to the glass filler — the member's head is gone.
         Inventory reopened = staff.getOpenInventory().getTopInventory();
-        assertThat(reopened.getItem(0).getType()).isEqualTo(Material.GRAY_DYE);
+        assertThat(reopened.getItem(0).getType()).isEqualTo(Material.GOLDEN_HELMET);
+        assertThat(reopened.getItem(1).getType()).isEqualTo(Material.OAK_SIGN);
+        assertThat(reopened.getItem(2).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
     }
 
     @Test
-    void theMembersButtonHandsTheRegionToTheManageMembersCallback() {
-        editor.open(staffRef, REGION);
+    void clickingAReadOnlyGroupSendsTheNotRemovableLineAndTouchesNoPort() {
+        view.open(staffRef, REGION);
 
-        // The members & owners button sits at slot 53, clear of the flag icons and the nav arrows.
-        fireClick(53);
+        // Slot 2 is the g: group entry — it has no uuid to key a removal.
+        fireClick(2);
 
-        assertThat(manageMembersFor).containsExactly("spawn");
+        assertThat(sink.last()).isEqualTo("regions.members.not-removable");
+        assertThat(service.lastChange()).isNull();
     }
 
     private void fireClick(int slot) {
@@ -142,17 +149,36 @@ class RegionFlagEditorViewTest {
         return (viewer, key, placeholders) -> key.key();
     }
 
-    /** An in-memory {@link RegionService} that serves a region's state flags and records the last {@code setFlag}. */
-    private static final class FakeRegionService implements RegionService {
-        private final Map<String, FlagValue> flags = new LinkedHashMap<>();
-        private @Nullable FlagValue lastSetFlag;
+    /** Captures the last message delivered so a test can assert what the view sent. */
+    private static final class RecordingSink implements MessageSink {
+        private final AtomicReference<String> last = new AtomicReference<>();
 
-        void setInitial(String name, FlagState state) {
-            flags.put(name, FlagValue.of(name, state));
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            last.set(renderedText);
         }
 
-        @Nullable FlagValue lastSetFlag() {
-            return lastSetFlag;
+        @Nullable String last() {
+            return last.get();
+        }
+    }
+
+    /** An in-memory {@link RegionService} serving a region's roster and applying a removal by uuid. */
+    private static final class FakeRegionService implements RegionService {
+        private final List<String> owners = new ArrayList<>();
+        private final List<String> members = new ArrayList<>();
+        private @Nullable RegionMemberChange lastChange;
+
+        void addOwner(String identifier) {
+            owners.add(identifier);
+        }
+
+        void addMember(String identifier) {
+            members.add(identifier);
+        }
+
+        @Nullable RegionMemberChange lastChange() {
+            return lastChange;
         }
 
         @Override
@@ -172,17 +198,17 @@ class RegionFlagEditorViewTest {
 
         @Override
         public List<FlagValue> flags(RegionRef region) {
-            return new ArrayList<>(flags.values());
+            return List.of();
         }
 
         @Override
         public List<String> members(RegionRef region) {
-            return List.of();
+            return List.copyOf(members);
         }
 
         @Override
         public List<String> owners(RegionRef region) {
-            return List.of();
+            return List.copyOf(owners);
         }
 
         @Override
@@ -197,22 +223,47 @@ class RegionFlagEditorViewTest {
 
         @Override
         public void setFlag(RegionRef region, FlagValue flag) {
-            this.lastSetFlag = flag;
-            if (flag.state() == FlagState.UNSET) {
-                flags.remove(flag.name());
-            } else {
-                flags.put(flag.name(), flag);
-            }
+            throw new UnsupportedOperationException();
         }
 
         @Override
         public void applyMemberChange(RegionMemberChange change) {
-            throw new UnsupportedOperationException();
+            this.lastChange = change;
+            List<String> roster = change.role() == RegionMemberChange.Role.OWNER ? owners : members;
+            if (change.action() == RegionMemberChange.Action.REMOVE) {
+                roster.remove(change.player().toString());
+            } else {
+                roster.add(change.player().toString());
+            }
         }
 
         @Override
         public void setPriority(RegionRef region, int priority) {
             throw new UnsupportedOperationException();
+        }
+    }
+
+    /** A {@link PlayerLookup} that resolves the two roster uuids to stable names, else empty. */
+    private static final class FakePlayerLookup implements PlayerLookup {
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            if (uuid.equals(OWNER)) {
+                return Optional.of(new PlayerRef(OWNER, "Owner"));
+            }
+            if (uuid.equals(MEMBER)) {
+                return Optional.of(new PlayerRef(MEMBER, "Member"));
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
         }
     }
 

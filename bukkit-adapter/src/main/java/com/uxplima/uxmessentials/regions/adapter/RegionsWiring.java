@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.regions.adapter.inbound.command.RegionsCommand;
 import com.uxplima.uxmessentials.regions.adapter.inbound.command.WorldEditRegionSelection;
 import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionFlagEditorView;
 import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionListView;
+import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionRosterView;
 import com.uxplima.uxmessentials.regions.adapter.outbound.NoWorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.adapter.outbound.WorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.application.RegionsConfig;
@@ -60,6 +61,9 @@ public final class RegionsWiring {
     /** The clicked-a-region-without-the-flags-permission refusal is gated on this node. */
     private static final String FLAGS_PERMISSION = "uxmessentials.regions.flags";
 
+    /** Opening the roster editor from the detail panel's members button is gated on this node. */
+    private static final String MEMBERS_PERMISSION = "uxmessentials.regions.members";
+
     private RegionsWiring() {}
 
     /** Build the regions adapters and the {@code /regions} command from {@code plugin}, {@code ctx} and {@code menus}. */
@@ -71,6 +75,15 @@ public final class RegionsWiring {
         RegionsConfig config = RegionsConfig.from(ctx.config());
         GuiText guiText = new GuiText(kernel.messages());
         RegionService service = regionService(plugin.getServer(), kernel.log());
+        RegionRosterView rosterView = new RegionRosterView(
+                menus,
+                guiText,
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink(),
+                service,
+                kernel.playerLookup(),
+                EntityListLayout.paginatedDefault(Material.PLAYER_HEAD));
         RegionFlagEditorView flagEditor = new RegionFlagEditorView(
                 menus,
                 guiText,
@@ -78,7 +91,8 @@ public final class RegionsWiring {
                 kernel.messages(),
                 service,
                 config.editableFlags(),
-                EntityListLayout.paginatedDefault(REGION_ICON));
+                EntityListLayout.paginatedDefault(REGION_ICON),
+                openRosterOnClick(kernel, rosterView));
         RegionListView listView = new RegionListView(
                 menus,
                 guiText,
@@ -92,7 +106,9 @@ public final class RegionsWiring {
                 service,
                 listView,
                 flagEditor,
+                rosterView,
                 new WorldEditRegionSelection(plugin.getServer()),
+                kernel.playerLookup(),
                 kernel.scheduler(),
                 plugin.getServer(),
                 kernel.messages());
@@ -114,6 +130,23 @@ public final class RegionsWiring {
                 return;
             }
             flagEditor.open(ref, region);
+        };
+    }
+
+    /**
+     * The detail-panel members-button handler: it opens the roster editor for a region, but only for a viewer holding
+     * the members permission — otherwise the same "no permission" line the {@code /regions members} command would
+     * answer is sent, so the roster's mutation surface is gated identically from the panel and from the command.
+     */
+    private static BiConsumer<Player, RegionRef> openRosterOnClick(KernelPorts kernel, RegionRosterView rosterView) {
+        return (player, region) -> {
+            PlayerRef ref = BukkitRefs.toRef(player);
+            if (!player.hasPermission(MEMBERS_PERMISSION)) {
+                kernel.messageSink()
+                        .deliver(ref, kernel.messages().resolve(ref, SharedMessageKey.COMMAND_NO_PERMISSION, Map.of()));
+                return;
+            }
+            rosterView.open(ref, region);
         };
     }
 

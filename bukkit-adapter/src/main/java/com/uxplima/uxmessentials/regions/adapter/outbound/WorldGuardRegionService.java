@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.Server;
@@ -37,12 +38,12 @@ import org.jspecify.annotations.Nullable;
  * missing region, or any reflective failure (a version bump moving a method) reports an empty result and is logged
  * at most once, because a blank list is a better failure than a thrown command.
  *
- * <p>{@code create} and {@code setFlag} are the Phase 2 mutations: unlike the fail-safe reads they must not fail
- * silently, so a reflective failure or a rejected request is wrapped in a {@link RegionServiceException} the command
- * surface turns into an operator-facing error rather than a swallowed no-op. Both mark the region manager dirty and
- * lean on WorldGuard's own background/shutdown save to persist, so neither blocks the tick thread on a disk write.
- * {@code applyMemberChange}/{@code setPriority} land with the Phase 3 roster editor and still throw
- * {@link UnsupportedOperationException} until then.
+ * <p>The mutations — {@code create}, {@code setFlag}, {@code applyMemberChange} and {@code setPriority} — must, unlike
+ * the fail-safe reads, not fail silently: a reflective failure or a rejected request is wrapped in a
+ * {@link RegionServiceException} the command surface turns into an operator-facing error rather than a swallowed
+ * no-op. Each mutates the live region in memory and leans on WorldGuard's own background/shutdown save to persist
+ * (a roster change dirties the region through its domain, {@code setPriority} dirties the region directly), so none
+ * blocks the tick thread on a disk write.
  */
 @NullMarked
 public final class WorldGuardRegionService implements RegionService {
@@ -211,12 +212,55 @@ public final class WorldGuardRegionService implements RegionService {
 
     @Override
     public void applyMemberChange(RegionMemberChange change) {
-        throw new UnsupportedOperationException("the members/owners editor arrives in Phase 3");
+        Objects.requireNonNull(change, "change");
+        if (!available()) {
+            throw new UnsupportedOperationException("WorldGuard is not installed");
+        }
+        try {
+            Object protectedRegion = protectedRegion(change.region());
+            if (protectedRegion == null) {
+                throw new RegionServiceException("no region " + change.region().id() + " to edit");
+            }
+            Object domain = domainOf(protectedRegion, change.role());
+            applyToDomain(domain, change.player(), change.action());
+            // Mutating the domain marks it — and so the region — dirty; WorldGuard's periodic and shutdown saves
+            // persist it, keeping this a fast in-memory call rather than a blocking disk write on the tick thread.
+        } catch (ReflectiveOperationException failure) {
+            throw new RegionServiceException(
+                    "could not change roster of " + change.region().id(), failure);
+        }
     }
 
     @Override
     public void setPriority(RegionRef region, int priority) {
-        throw new UnsupportedOperationException("priority editing arrives in Phase 3");
+        Objects.requireNonNull(region, "region");
+        if (!available()) {
+            throw new UnsupportedOperationException("WorldGuard is not installed");
+        }
+        try {
+            Object protectedRegion = protectedRegion(region);
+            if (protectedRegion == null) {
+                throw new RegionServiceException("no region " + region.id() + " to prioritise");
+            }
+            // ProtectedRegion.setPriority dirties the region itself, so the background save picks it up.
+            protectedRegion.getClass().getMethod("setPriority", int.class).invoke(protectedRegion, priority);
+        } catch (ReflectiveOperationException failure) {
+            throw new RegionServiceException("could not set priority of " + region.id(), failure);
+        }
+    }
+
+    /** The region's owner or member {@code DefaultDomain}, selected by the change's role. */
+    private static Object domainOf(Object protectedRegion, RegionMemberChange.Role role)
+            throws ReflectiveOperationException {
+        String getter = role == RegionMemberChange.Role.OWNER ? "getOwners" : "getMembers";
+        return protectedRegion.getClass().getMethod(getter).invoke(protectedRegion);
+    }
+
+    /** {@code DefaultDomain.addPlayer(UUID)} / {@code removePlayer(UUID)} — the uuid overload, chosen by parameter. */
+    private static void applyToDomain(Object domain, UUID player, RegionMemberChange.Action action)
+            throws ReflectiveOperationException {
+        String method = action == RegionMemberChange.Action.ADD ? "addPlayer" : "removePlayer";
+        domain.getClass().getMethod(method, UUID.class).invoke(domain, player);
     }
 
     /** The member/owner identifiers of {@code region}: player names, uuids, and {@code g:}-prefixed group names. */

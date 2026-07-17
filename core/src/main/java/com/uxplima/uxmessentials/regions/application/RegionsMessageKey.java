@@ -47,7 +47,34 @@ public enum RegionsMessageKey implements MessageKey {
     REGIONS_FLAGS_NEXT("regions.flags.next"),
     REGIONS_FLAGS_STATE_ALLOW("regions.flags.state-allow"),
     REGIONS_FLAGS_STATE_DENY("regions.flags.state-deny"),
-    REGIONS_FLAGS_STATE_UNSET("regions.flags.state-unset");
+    REGIONS_FLAGS_STATE_UNSET("regions.flags.state-unset"),
+
+    // The members/owners editor GUI: the panel title, empty-state title, per-entry icon name (its player/group name)
+    // and lore (its role + whether it can be removed), the previous/next page buttons, the flag-editor's button that
+    // opens it, and the "can't remove this entry here" click reply.
+    REGIONS_MEMBERS_TITLE("regions.members.title"),
+    REGIONS_MEMBERS_EMPTY("regions.members.empty"),
+    REGIONS_MEMBERS_PREV("regions.members.prev"),
+    REGIONS_MEMBERS_NEXT("regions.members.next"),
+    REGIONS_MEMBERS_MEMBER("regions.members.member"),
+    REGIONS_MEMBERS_OWNER("regions.members.owner"),
+    REGIONS_MEMBERS_GROUP("regions.members.group"),
+    REGIONS_MEMBERS_MEMBER_INFO("regions.members.member-info"),
+    REGIONS_MEMBERS_OWNER_INFO("regions.members.owner-info"),
+    REGIONS_MEMBERS_LOCKED_INFO("regions.members.locked-info"),
+    REGIONS_MEMBERS_ACTION("regions.members.action"),
+    REGIONS_MEMBERS_NOT_REMOVABLE("regions.members.not-removable"),
+
+    // /regions addmember|addowner and the removal failure: the two add outcomes, the unknown-player refusal, and the
+    // "could not change the roster" error.
+    REGIONS_MEMBERS_ADDED_MEMBER("regions.members.added-member"),
+    REGIONS_MEMBERS_ADDED_OWNER("regions.members.added-owner"),
+    REGIONS_MEMBERS_UNKNOWN_PLAYER("regions.members.unknown-player"),
+    REGIONS_MEMBERS_FAILED("regions.members.failed"),
+
+    // /regions priority: the set-priority confirmation and its failure.
+    REGIONS_PRIORITY_SET("regions.priority.set"),
+    REGIONS_PRIORITY_FAILED("regions.priority.failed");
 
     private final String key;
 

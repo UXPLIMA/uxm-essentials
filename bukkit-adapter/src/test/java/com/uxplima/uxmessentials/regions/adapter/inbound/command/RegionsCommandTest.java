@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -21,6 +22,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.CommandNode;
 import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionFlagEditorView;
 import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionListView;
+import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionRosterView;
 import com.uxplima.uxmessentials.regions.adapter.outbound.NoWorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
@@ -32,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -58,6 +61,8 @@ class RegionsCommandTest {
     private static final String LIST = "uxmessentials.regions.list";
     private static final String CREATE = "uxmessentials.regions.create";
     private static final String FLAGS = "uxmessentials.regions.flags";
+    private static final String MEMBERS = "uxmessentials.regions.members";
+    private static final String ADMIN = "uxmessentials.regions.admin";
 
     private ServerMock server;
     private Plugin plugin;
@@ -228,7 +233,118 @@ class RegionsCommandTest {
         assertThat(staff.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
+    @Test
+    void theMembersAndPrioritySubcommandsAreGatedByTheirOwnPermissions() {
+        RegionsCommand command = command(new FakeRegionService(true));
+        PlayerMock roster = server.addPlayer("Roster");
+        roster.addAttachment(plugin, MEMBERS, true);
+        PlayerMock admin = server.addPlayer("Admin");
+        admin.addAttachment(plugin, ADMIN, true);
+        PlayerMock bare = server.addPlayer("Bare");
+
+        CommandNode<CommandSourceStack> members = command.build().getChild("members");
+        CommandNode<CommandSourceStack> priority = command.build().getChild("priority");
+
+        assertThat(members.getRequirement().test(CommandSourceStackMock.from(roster)))
+                .isTrue();
+        assertThat(members.getRequirement().test(CommandSourceStackMock.from(bare)))
+                .isFalse();
+        assertThat(priority.getRequirement().test(CommandSourceStackMock.from(admin)))
+                .isTrue();
+        assertThat(priority.getRequirement().test(CommandSourceStackMock.from(bare)))
+                .isFalse();
+    }
+
+    @Test
+    void addmemberResolvesTheTargetOfflineAndAddsThemThroughThePort() {
+        FakeRegionService service = new FakeRegionService(true);
+        FakePlayerLookup lookup = new FakePlayerLookup();
+        UUID target = UUID.randomUUID();
+        lookup.register("Notch", target);
+        PlayerMock staff = permittedPlayer("Staff", LIST, MEMBERS);
+        service.add(new RegionRef(worldOf(staff), "spawn"));
+        RegionsCommand command = command(service, lookup);
+
+        dispatch(command, CommandSourceStackMock.from(staff), "regions addmember spawn Notch");
+
+        assertThat(service.rosterChanges())
+                .containsExactly(new RegionMemberChange(
+                        new RegionRef(worldOf(staff), "spawn"),
+                        target,
+                        RegionMemberChange.Role.MEMBER,
+                        RegionMemberChange.Action.ADD));
+    }
+
+    @Test
+    void addownerAddsTheResolvedPlayerAsAnOwner() {
+        FakeRegionService service = new FakeRegionService(true);
+        FakePlayerLookup lookup = new FakePlayerLookup();
+        UUID target = UUID.randomUUID();
+        lookup.register("Jeb", target);
+        PlayerMock staff = permittedPlayer("Staff", LIST, MEMBERS);
+        service.add(new RegionRef(worldOf(staff), "shop"));
+        RegionsCommand command = command(service, lookup);
+
+        dispatch(command, CommandSourceStackMock.from(staff), "regions addowner shop Jeb");
+
+        assertThat(service.rosterChanges())
+                .containsExactly(new RegionMemberChange(
+                        new RegionRef(worldOf(staff), "shop"),
+                        target,
+                        RegionMemberChange.Role.OWNER,
+                        RegionMemberChange.Action.ADD));
+    }
+
+    @Test
+    void addmemberWithAnUnknownPlayerIsRefused() {
+        FakeRegionService service = new FakeRegionService(true);
+        PlayerMock staff = permittedPlayer("Staff", LIST, MEMBERS);
+        service.add(new RegionRef(worldOf(staff), "spawn"));
+        RegionsCommand command = command(service, new FakePlayerLookup());
+
+        dispatch(command, CommandSourceStackMock.from(staff), "regions addmember spawn Ghost");
+
+        assertThat(staff.nextMessage()).contains("regions.members.unknown-player");
+        assertThat(service.rosterChanges()).isEmpty();
+    }
+
+    @Test
+    void prioritySetsTheRegionPriorityThroughThePort() {
+        FakeRegionService service = new FakeRegionService(true);
+        PlayerMock staff = permittedPlayer("Staff", LIST, ADMIN);
+        service.add(new RegionRef(worldOf(staff), "spawn"));
+        RegionsCommand command = command(service);
+
+        dispatch(command, CommandSourceStackMock.from(staff), "regions priority spawn 7");
+
+        assertThat(service.lastPriority()).isEqualTo(7);
+        assertThat(staff.nextMessage()).contains("regions.priority.set");
+    }
+
+    @Test
+    void membersOnAnUnknownRegionIsRefused() {
+        RegionsCommand command = command(new FakeRegionService(true));
+        PlayerMock staff = permittedPlayer("Staff", LIST, MEMBERS);
+
+        dispatch(command, CommandSourceStackMock.from(staff), "regions members ghost");
+
+        assertThat(staff.nextMessage()).contains("regions.unknown-region");
+    }
+
     private RegionsCommand command(RegionService service) {
+        return command(service, new FakePlayerLookup());
+    }
+
+    private RegionsCommand command(RegionService service, PlayerLookup playerLookup) {
+        RegionRosterView rosterView = new RegionRosterView(
+                menus,
+                guiText,
+                scheduler,
+                messages,
+                noopSink(),
+                service,
+                playerLookup,
+                EntityListLayout.paginatedDefault(Material.PLAYER_HEAD));
         RegionFlagEditorView flagEditor = new RegionFlagEditorView(
                 menus,
                 guiText,
@@ -236,7 +352,8 @@ class RegionsCommandTest {
                 messages,
                 service,
                 List.of("pvp", "build"),
-                EntityListLayout.paginatedDefault(Material.GRAY_DYE));
+                EntityListLayout.paginatedDefault(Material.GRAY_DYE),
+                (clicker, region) -> {});
         RegionListView listView = new RegionListView(
                 menus,
                 guiText,
@@ -248,7 +365,15 @@ class RegionsCommandTest {
                 (Player clicker, RegionRef region) ->
                         flagEditor.open(new PlayerRef(clicker.getUniqueId(), clicker.getName()), region));
         return new RegionsCommand(
-                service, listView, flagEditor, new WorldEditRegionSelection(server), scheduler, server, messages);
+                service,
+                listView,
+                flagEditor,
+                rosterView,
+                new WorldEditRegionSelection(server),
+                playerLookup,
+                scheduler,
+                server,
+                messages);
     }
 
     private static WorldRef worldOf(PlayerMock player) {
@@ -291,11 +416,13 @@ class RegionsCommandTest {
         return (viewer, renderedText) -> {};
     }
 
-    /** An in-memory {@link RegionService} whose reads answer for every world and that records create/setFlag calls. */
+    /** An in-memory {@link RegionService} whose reads answer for every world, recording create/roster/priority calls. */
     private static final class FakeRegionService implements RegionService {
         private final boolean available;
         private final List<RegionRef> regions = new ArrayList<>();
+        private final List<RegionMemberChange> rosterChanges = new ArrayList<>();
         private @Nullable Created lastCreate;
+        private @Nullable Integer lastPriority;
 
         FakeRegionService(boolean available) {
             this.available = available;
@@ -307,6 +434,14 @@ class RegionsCommandTest {
 
         @Nullable Created lastCreate() {
             return lastCreate;
+        }
+
+        List<RegionMemberChange> rosterChanges() {
+            return rosterChanges;
+        }
+
+        @Nullable Integer lastPriority() {
+            return lastPriority;
         }
 
         @Override
@@ -361,16 +496,49 @@ class RegionsCommandTest {
 
         @Override
         public void applyMemberChange(RegionMemberChange change) {
-            throw new UnsupportedOperationException();
+            rosterChanges.add(change);
         }
 
         @Override
         public void setPriority(RegionRef region, int priority) {
-            throw new UnsupportedOperationException();
+            this.lastPriority = priority;
         }
 
         /** A recorded {@code create} call. */
         record Created(WorldRef world, String id, Position min, Position max) {}
+    }
+
+    /** A {@link PlayerLookup} that resolves a fixed set of names to stable uuids, else empty (an unknown player). */
+    private static final class FakePlayerLookup implements PlayerLookup {
+        private final java.util.Map<String, UUID> byName = new java.util.HashMap<>();
+
+        void register(String name, UUID uuid) {
+            byName.put(name, uuid);
+        }
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return findByName(name);
+        }
+
+        @Override
+        public Optional<PlayerRef> findByName(String name) {
+            UUID uuid = byName.get(name);
+            return uuid == null ? Optional.empty() : Optional.of(new PlayerRef(uuid, name));
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return byName.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(uuid))
+                    .findFirst()
+                    .map(entry -> new PlayerRef(uuid, entry.getKey()));
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
+        }
     }
 
     /** Runs every scheduler hop inline. */

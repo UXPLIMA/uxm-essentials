@@ -1457,7 +1457,9 @@ permissions:
   # (.list) — /regions [world] opens a paginated list of the regions in the player's (or the named) world, showing
   # each region's id, priority and member count; clicking a region opens its flag editor (gated on .flags). Create
   # (.create) — /regions pos1|pos2 and /regions create <id> define a cuboid region. Flags (.flags) — /regions flags
-  # <id> opens the per-region flag editor. uxmessentials.module.regions is the reload/inspect tier.
+  # <id> opens the per-region flag editor. Members (.members) — /regions members <id> opens the roster editor and
+  # /regions addmember|addowner <id> <player> add a player to a region's members or owners. Admin (.admin) —
+  # /regions priority <id> <value> sets a region's priority. uxmessentials.module.regions is the reload/inspect tier.
   uxmessentials.regions.list:
     description: '/regions [world] — open the WorldGuard region-list GUI for a world.'
     default: op
@@ -1466,6 +1468,12 @@ permissions:
     default: op
   uxmessentials.regions.flags:
     description: '/regions flags <id> — open the per-region flag editor GUI.'
+    default: op
+  uxmessentials.regions.members:
+    description: '/regions members <id> and /regions addmember|addowner <id> <player> — manage a region roster.'
+    default: op
+  uxmessentials.regions.admin:
+    description: '/regions priority <id> <value> — set a WorldGuard region priority.'
     default: op
   uxmessentials.module.regions:
     description: 'Hot-reload / inspect the regions module (WorldGuard region management).'

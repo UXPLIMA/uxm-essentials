@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -42,9 +43,16 @@ import org.jspecify.annotations.NullMarked;
  * WorldGuard mutations belong — then re-reads the region and re-opens the panel on the viewer's entity thread, so a
  * fresh panel always reflects the value that just landed. A fresh {@link EntityListView} is built per open, so two
  * staff editing different regions never share panel state.
+ *
+ * <p>As the region's detail panel, it carries one extra button: a "members &amp; owners" control that hands the
+ * region to the injected {@code onManageMembers} callback — the wiring points it at the roster editor, gated on the
+ * members permission, so the roster panel is reachable by a click from the same detail the region list opens.
  */
 @NullMarked
 public final class RegionFlagEditorView {
+
+    /** The bottom-row slot the "members &amp; owners" button sits in, clear of the nav arrows at slots 48 and 50. */
+    private static final int MEMBERS_BUTTON_SLOT = 53;
 
     private final Menus menus;
     private final GuiText guiText;
@@ -53,6 +61,7 @@ public final class RegionFlagEditorView {
     private final RegionService service;
     private final List<String> editableFlags;
     private final EntityListLayout layout;
+    private final BiConsumer<Player, RegionRef> onManageMembers;
 
     public RegionFlagEditorView(
             Menus menus,
@@ -61,7 +70,8 @@ public final class RegionFlagEditorView {
             Messages messages,
             RegionService service,
             List<String> editableFlags,
-            EntityListLayout layout) {
+            EntityListLayout layout,
+            BiConsumer<Player, RegionRef> onManageMembers) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -69,6 +79,7 @@ public final class RegionFlagEditorView {
         this.service = Objects.requireNonNull(service, "service");
         this.editableFlags = List.copyOf(Objects.requireNonNull(editableFlags, "editableFlags"));
         this.layout = Objects.requireNonNull(layout, "layout");
+        this.onManageMembers = Objects.requireNonNull(onManageMembers, "onManageMembers");
     }
 
     /** Read {@code region}'s flag values off the tick thread, then open the editor for {@code staff}. */
@@ -111,6 +122,11 @@ public final class RegionFlagEditorView {
                 .entities(() -> rows)
                 .iconRenderer(this::icon)
                 .onSelect((clicker, row) -> cycle(region, clicker, row))
+                .onAction(
+                        MEMBERS_BUTTON_SLOT,
+                        Material.PLAYER_HEAD,
+                        RegionsMessageKey.REGIONS_MEMBERS_ACTION,
+                        clicker -> onManageMembers.accept(clicker, region))
                 .build()
                 .open(viewer, staff);
     }
