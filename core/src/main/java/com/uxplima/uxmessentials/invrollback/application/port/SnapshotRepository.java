@@ -23,6 +23,13 @@ public interface SnapshotRepository {
     /** Every snapshot the owner has, newest first — backs the restore listing and the retention sweep. */
     List<Snapshot> list(UUID owner);
 
+    /**
+     * The distinct owners that currently hold at least one snapshot — the seam the scheduled retention sweep
+     * iterates so it can apply the per-player count cap ({@link #deleteBeyondCount}) across every player without
+     * enumerating players it has no snapshots for. Order is unspecified.
+     */
+    List<UUID> owners();
+
     /** The snapshot with this id, or empty when none exists (already pruned or restored). */
     Optional<Snapshot> find(SnapshotId id);
 

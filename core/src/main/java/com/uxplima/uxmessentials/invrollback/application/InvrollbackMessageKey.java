@@ -26,7 +26,15 @@ public enum InvrollbackMessageKey implements MessageKey {
     // The restore GUI: the panel title, a per-snapshot list line (cause + timestamp), and the restore action.
     INVROLLBACK_GUI_TITLE("invrollback.gui.title"),
     INVROLLBACK_GUI_SNAPSHOT("invrollback.gui.snapshot"),
-    INVROLLBACK_GUI_RESTORE("invrollback.gui.restore");
+    INVROLLBACK_GUI_VIEW("invrollback.gui.view"),
+    INVROLLBACK_GUI_RESTORE("invrollback.gui.restore"),
+
+    // The snapshot preview window: its title (cause + timestamp of the previewed snapshot) and the restore button
+    // label, plus the list's previous/next page buttons.
+    INVROLLBACK_GUI_PREVIEW_TITLE("invrollback.gui.preview-title"),
+    INVROLLBACK_GUI_RESTORE_NAME("invrollback.gui.restore-name"),
+    INVROLLBACK_GUI_PREV("invrollback.gui.prev"),
+    INVROLLBACK_GUI_NEXT("invrollback.gui.next");
 
     private final String key;
 

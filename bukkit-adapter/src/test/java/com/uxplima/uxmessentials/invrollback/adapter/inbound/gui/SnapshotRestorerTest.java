@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.invrollback.adapter.inbound.listener;
+package com.uxplima.uxmessentials.invrollback.adapter.inbound.gui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,17 +13,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
-
-import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
 import com.uxplima.uxmessentials.invrollback.application.CaptureSnapshot;
+import com.uxplima.uxmessentials.invrollback.application.RestoreSnapshot;
 import com.uxplima.uxmessentials.invrollback.application.port.SnapshotRepository;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotId;
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -35,13 +35,12 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the invrollback capture path end-to-end. A death capture reads the player's live
- * inventory, serializes it, and (off the tick thread via the injected {@link Scheduler}) persists a snapshot whose
- * contents and cause round-trip through the repository and back into items via the {@link InventorySnapshotCodec}.
- * The logout capture is gated by config — with {@code capture.on-logout} off a quit stores nothing, with it on a
- * quit stores a LOGOUT snapshot. The ender chest rides along only when {@code include-enderchest} is set.
+ * MockBukkit coverage of {@link SnapshotRestorer}: restoring a stored snapshot overwrites the target's live
+ * inventory with the snapshot's contents AND first freezes the pre-restore inventory as a {@link
+ * SnapshotCause#RESTORE} safety snapshot, so an accidental restore is itself undoable. A stale snapshot id leaves
+ * the inventory untouched and writes no safety copy.
  */
-class SnapshotCaptureListenerTest {
+class SnapshotRestorerTest {
 
     private static final Instant WHEN = Instant.parse("2026-07-17T12:00:00Z");
     private static final Clock CLOCK = Clock.fixed(WHEN, ZoneOffset.UTC);
@@ -59,67 +58,72 @@ class SnapshotCaptureListenerTest {
     }
 
     @Test
-    void aDeathCapturesASnapshotWhoseContentsAndCauseRoundTripThroughTheRepository() {
-        PlayerMock player = server.addPlayer();
-        player.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 5));
-        RecordingRepository repository = new RecordingRepository();
-        SnapshotCaptureListener listener = listener(repository, true, true, false);
+    void restoreOverwritesTheInventoryAndSafetySnapshotsThePreRestoreState() {
+        PlayerMock target = server.addPlayer();
+        PlayerMock staff = server.addPlayer();
 
-        listener.capture(player, SnapshotCause.DEATH);
+        // A stored snapshot holding a stack of diamonds in slot 0.
+        ItemStack[] snapshotContents = new ItemStack[target.getInventory().getContents().length];
+        snapshotContents[0] = new ItemStack(Material.DIAMOND, 5);
+        SnapshotRepository repository = new RecordingRepository();
+        Snapshot stored = Snapshot.capture(
+                target.getUniqueId(),
+                SnapshotCause.DEATH,
+                WHEN.minusSeconds(60),
+                InventorySnapshotCodec.encode(snapshotContents, null));
+        repository.save(stored);
 
-        List<Snapshot> stored = repository.list(player.getUniqueId());
-        assertThat(stored).hasSize(1);
-        Snapshot snapshot = stored.get(0);
-        assertThat(snapshot.cause()).isEqualTo(SnapshotCause.DEATH);
-        assertThat(snapshot.createdAt()).isEqualTo(WHEN);
+        // The player is currently holding dirt in slot 0 — this is the state that must be safety-snapshotted.
+        target.getInventory().setItem(0, new ItemStack(Material.DIRT, 12));
 
-        InventorySnapshotCodec.Decoded decoded = InventorySnapshotCodec.decode(snapshot.contents());
-        assertThat(decoded.contents()[0]).isNotNull();
-        assertThat(decoded.contents()[0].getType()).isEqualTo(Material.DIAMOND);
-        assertThat(decoded.contents()[0].getAmount()).isEqualTo(5);
-        assertThat(decoded.enderChest()).isEmpty(); // include-enderchest off
+        restorer(repository).restore(ref(staff), ref(target), stored.id());
+
+        assertThat(target.getInventory().getItem(0)).isNotNull();
+        assertThat(target.getInventory().getItem(0).getType()).isEqualTo(Material.DIAMOND);
+        assertThat(target.getInventory().getItem(0).getAmount()).isEqualTo(5);
+
+        List<Snapshot> safety = repository.list(target.getUniqueId()).stream()
+                .filter(s -> s.cause() == SnapshotCause.RESTORE)
+                .toList();
+        assertThat(safety).hasSize(1);
+        InventorySnapshotCodec.Decoded preRestore =
+                InventorySnapshotCodec.decode(safety.get(0).contents());
+        assertThat(preRestore.contents()[0]).isNotNull();
+        assertThat(preRestore.contents()[0].getType()).isEqualTo(Material.DIRT);
+        assertThat(preRestore.contents()[0].getAmount()).isEqualTo(12);
     }
 
     @Test
-    void logoutCaptureIsGatedByConfig() {
-        PlayerMock player = server.addPlayer();
-        RecordingRepository repository = new RecordingRepository();
+    void aStaleIdChangesNothingAndWritesNoSafetySnapshot() {
+        PlayerMock target = server.addPlayer();
+        PlayerMock staff = server.addPlayer();
+        target.getInventory().setItem(0, new ItemStack(Material.DIRT, 12));
+        SnapshotRepository repository = new RecordingRepository();
 
-        listener(repository, true, false, true).onQuit(quit(player));
-        assertThat(repository.list(player.getUniqueId())).isEmpty();
+        restorer(repository).restore(ref(staff), ref(target), SnapshotId.random());
 
-        listener(repository, true, true, true).onQuit(quit(player));
-        List<Snapshot> stored = repository.list(player.getUniqueId());
-        assertThat(stored).hasSize(1);
-        assertThat(stored.get(0).cause()).isEqualTo(SnapshotCause.LOGOUT);
+        assertThat(target.getInventory().getItem(0).getType()).isEqualTo(Material.DIRT);
+        assertThat(repository.list(target.getUniqueId())).isEmpty();
     }
 
-    @Test
-    void theEnderChestIsCapturedOnlyWhenConfigured() {
-        PlayerMock player = server.addPlayer();
-        player.getEnderChest().setItem(0, new ItemStack(Material.EMERALD, 3));
-        RecordingRepository repository = new RecordingRepository();
-
-        listener(repository, true, true, true).capture(player, SnapshotCause.DEATH);
-
-        Snapshot snapshot = repository.list(player.getUniqueId()).get(0);
-        InventorySnapshotCodec.Decoded decoded = InventorySnapshotCodec.decode(snapshot.contents());
-        assertThat(decoded.enderChest()[0]).isNotNull();
-        assertThat(decoded.enderChest()[0].getType()).isEqualTo(Material.EMERALD);
-        assertThat(decoded.enderChest()[0].getAmount()).isEqualTo(3);
+    private static SnapshotRestorer restorer(SnapshotRepository repository) {
+        RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
+        return new SnapshotRestorer(restore, inlineScheduler(), keyEchoMessages(), noopSink(), CLOCK);
     }
 
-    private static SnapshotCaptureListener listener(
-            SnapshotRepository repository, boolean onDeath, boolean onLogout, boolean includeEnderchest) {
-        return new SnapshotCaptureListener(
-                new CaptureSnapshot(repository, 0), inlineScheduler(), CLOCK, onDeath, onLogout, includeEnderchest);
+    private static PlayerRef ref(PlayerMock player) {
+        return new PlayerRef(player.getUniqueId(), player.getName());
     }
 
-    private static PlayerQuitEvent quit(PlayerMock player) {
-        return new PlayerQuitEvent(player, Component.text("bye"), PlayerQuitEvent.QuitReason.DISCONNECTED);
+    private static Messages keyEchoMessages() {
+        return (viewer, key, placeholders) -> key.key();
     }
 
-    /** A scheduler whose {@code async} hop runs inline, so a capture completes within the test. */
+    private static MessageSink noopSink() {
+        return (viewer, renderedText) -> {};
+    }
+
+    /** A scheduler whose entity/async hops run inline, so the restore completes within the test. */
     private static Scheduler inlineScheduler() {
         return new Scheduler() {
             @Override

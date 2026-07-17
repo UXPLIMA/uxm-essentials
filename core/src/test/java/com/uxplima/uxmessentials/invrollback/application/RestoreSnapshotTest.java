@@ -16,57 +16,51 @@ import com.uxplima.uxmessentials.invrollback.domain.SnapshotId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit coverage of {@link CaptureSnapshot} over an in-memory {@link SnapshotRepository}: a capture persists the
- * built {@link Snapshot} with the right owner, cause, instant and contents, and enforces the per-player count cap
- * after the save (and skips the trim when the cap is disabled).
+ * Unit coverage of {@link RestoreSnapshot} over an in-memory {@link SnapshotRepository}: a restore of a stored
+ * snapshot first captures the target's current inventory as a {@link SnapshotCause#RESTORE} safety copy, then
+ * returns the chosen snapshot for the adapter to apply; a restore of an unknown id returns empty and captures no
+ * safety copy (so a stale click leaves no orphan snapshot).
  */
-class CaptureSnapshotTest {
+class RestoreSnapshotTest {
 
-    private static final UUID OWNER = UUID.randomUUID();
+    private static final UUID TARGET = UUID.randomUUID();
     private static final Instant WHEN = Instant.parse("2026-07-17T12:00:00Z");
 
     @Test
-    void savesTheSnapshotWithItsOwnerCauseInstantAndContents() {
+    void safetySnapshotsTheCurrentStateThenReturnsTheChosenSnapshot() {
         FakeRepository repository = new FakeRepository();
-        CaptureSnapshot capture = new CaptureSnapshot(repository, 0);
+        Snapshot stored = Snapshot.capture(TARGET, SnapshotCause.DEATH, WHEN.minusSeconds(60), new byte[] {7, 7});
+        repository.save(stored);
+        RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
 
-        byte[] contents = {4, 8, 15, 16, 23, 42};
-        Snapshot saved = capture.capture(OWNER, SnapshotCause.DEATH, contents, WHEN);
+        byte[] currentInventory = {1, 2, 3};
+        Optional<Snapshot> chosen = restore.restore(TARGET, stored.id(), currentInventory, WHEN);
 
-        assertThat(repository.rows).containsExactly(saved);
-        assertThat(saved.owner()).isEqualTo(OWNER);
-        assertThat(saved.cause()).isEqualTo(SnapshotCause.DEATH);
-        assertThat(saved.createdAt()).isEqualTo(WHEN);
-        assertThat(saved.contents()).containsExactly(contents);
+        assertThat(chosen).isPresent();
+        assertThat(chosen.get().id()).isEqualTo(stored.id());
+        assertThat(chosen.get().contents()).containsExactly(7, 7);
+
+        // The current inventory was frozen as a RESTORE safety snapshot before the caller overwrites it.
+        List<Snapshot> safety = repository.list(TARGET).stream()
+                .filter(s -> s.cause() == SnapshotCause.RESTORE)
+                .toList();
+        assertThat(safety).hasSize(1);
+        assertThat(safety.get(0).createdAt()).isEqualTo(WHEN);
+        assertThat(safety.get(0).contents()).containsExactly(currentInventory);
     }
 
     @Test
-    void trimsToTheCountCapAfterEachSave() {
+    void anUnknownIdReturnsEmptyAndCapturesNoSafetySnapshot() {
         FakeRepository repository = new FakeRepository();
-        CaptureSnapshot capture = new CaptureSnapshot(repository, 2);
+        RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
 
-        capture.capture(OWNER, SnapshotCause.LOGOUT, new byte[] {1}, WHEN.minusSeconds(30));
-        capture.capture(OWNER, SnapshotCause.LOGOUT, new byte[] {2}, WHEN.minusSeconds(20));
-        capture.capture(OWNER, SnapshotCause.LOGOUT, new byte[] {3}, WHEN.minusSeconds(10));
+        Optional<Snapshot> chosen = restore.restore(TARGET, SnapshotId.random(), new byte[] {9}, WHEN);
 
-        // Three saved, but the cap of 2 pruned the oldest after the third save.
-        assertThat(repository.list(OWNER)).hasSize(2);
-        assertThat(repository.list(OWNER)).allSatisfy(s -> assertThat(s.owner()).isEqualTo(OWNER));
+        assertThat(chosen).isEmpty();
+        assertThat(repository.list(TARGET)).isEmpty();
     }
 
-    @Test
-    void aDisabledCapNeverTrims() {
-        FakeRepository repository = new FakeRepository();
-        CaptureSnapshot capture = new CaptureSnapshot(repository, 0);
-
-        for (int i = 0; i < 5; i++) {
-            capture.capture(OWNER, SnapshotCause.DEATH, new byte[] {(byte) i}, WHEN.plusSeconds(i));
-        }
-
-        assertThat(repository.list(OWNER)).hasSize(5);
-    }
-
-    /** An in-memory {@link SnapshotRepository} that implements the count cap the same way the jOOQ adapter does. */
+    /** An in-memory {@link SnapshotRepository} sufficient for the restore orchestration under test. */
     private static final class FakeRepository implements SnapshotRepository {
         private final List<Snapshot> rows = new ArrayList<>();
 
@@ -103,9 +97,8 @@ class CaptureSnapshotTest {
             List<Snapshot> newestFirst = list(owner);
             List<Snapshot> stale =
                     newestFirst.size() > keep ? newestFirst.subList(keep, newestFirst.size()) : List.of();
-            int removed = stale.size();
             rows.removeAll(stale);
-            return removed;
+            return stale.size();
         }
 
         @Override

@@ -198,8 +198,8 @@ class ArchitectureTest {
             .because("spec-driven menus must render through the engine (the Menus facade); only the engine itself "
                     + "and the genuine inventory leaves — the itemworld Workstation, the playerstate "
                     + "invsee/endersee/offline inventory mirrors and the use cases that drive them, the local and "
-                    + "cross-server trade windows, and the vanish silent-container mirror — may create or open a raw "
-                    + "Bukkit inventory");
+                    + "cross-server trade windows, the vanish silent-container mirror, and the invrollback snapshot "
+                    + "preview — may create or open a raw Bukkit inventory");
 
     /**
      * Builds the condition matching either raw-Bukkit-GUI signature: implementing
@@ -236,9 +236,10 @@ class ArchitectureTest {
      * fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the itemworld
      * {@code Workstation} opens vanilla game containers, the playerstate invsee / endersee / offline classes are
      * inventory mirrors (and the use cases driving them), the trade {@code TradeView} / {@code TradeHolder} are the
-     * two-player trade window, and the vanish {@code VanishSilentContainerListener} mirrors a container silently for a
-     * vanished opener. Every spec-driven menu renders through the engine instead, so this allow-list must stay exactly
-     * these leaves.
+     * two-player trade window, the vanish {@code VanishSilentContainerListener} mirrors a container silently for a
+     * vanished opener, and the invrollback {@code SnapshotPreviewView} / {@code SnapshotPreviewHolder} are the
+     * read-only preview of a stored inventory snapshot. Every spec-driven menu renders through the engine instead, so
+     * this allow-list must stay exactly these leaves.
      *
      * <p>A leaf's nested members carry the same signature (a holder built as a private inner class, a view's nested
      * record), so the match is on the top-level enclosing class, not the exact nested name — mirroring the uxmLib
@@ -268,7 +269,9 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView",
                 "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadHolder",
                 "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView",
-                "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerHolder");
+                "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerHolder",
+                "com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView",
+                "com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewHolder");
         return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
             String fullName = javaClass.getFullName();
             int nested = fullName.indexOf('$');

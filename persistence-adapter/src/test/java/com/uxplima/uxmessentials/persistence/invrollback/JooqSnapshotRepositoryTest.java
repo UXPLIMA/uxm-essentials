@@ -120,6 +120,17 @@ class JooqSnapshotRepositoryTest {
     }
 
     @Test
+    void ownersReturnsEachDistinctOwnerThatHoldsSnapshots() {
+        UUID other = UUID.randomUUID();
+        repository.save(snapshot(SnapshotCause.DEATH, Instant.ofEpochMilli(1_000), new byte[] {1}));
+        repository.save(snapshot(SnapshotCause.LOGOUT, Instant.ofEpochMilli(2_000), new byte[] {2}));
+        repository.save(
+                Snapshot.of(SnapshotId.random(), other, SnapshotCause.DEATH, Instant.ofEpochMilli(3_000), new byte[0]));
+
+        assertThat(repository.owners()).containsExactlyInAnyOrder(owner, other);
+    }
+
+    @Test
     void deleteOlderThanRemovesRowsStrictlyBeforeTheCutoff() {
         repository.save(snapshot(SnapshotCause.LOGOUT, Instant.ofEpochMilli(1_000), new byte[] {1}));
         repository.save(snapshot(SnapshotCause.LOGOUT, Instant.ofEpochMilli(2_000), new byte[] {2}));

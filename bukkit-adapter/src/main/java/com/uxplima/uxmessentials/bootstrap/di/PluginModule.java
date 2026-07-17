@@ -976,19 +976,25 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("villagers"))) {
             wireVillagers(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
-            wireInvrollback(ctx, persistence, resources);
+            wireInvrollback(ctx, persistence, resources, menus);
         }
     }
 
-    private static void wireInvrollback(ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+    private static void wireInvrollback(
+            ModuleContext ctx, Persistence persistence, CloseableResources resources, Menus menus) {
         // invrollback builds its jOOQ SnapshotRepository over persistence.dsl() and registers the death/logout
-        // capture listener. A capture reads the player's inventory on the tick thread, serializes it there, and
-        // hops the DB write off the tick thread through the Scheduler.async port (Folia-safe). The table is bounded
-        // per player at write time (deleteBeyondCount) using the configured retention count; the age-based sweep and
-        // the /invrestore GUI land in Phase 2. It holds no runtime state of its own, so there is nothing to drain on
-        // stop — a disabled module simply registers no listener.
-        InvrollbackWiring.Wired wired = InvrollbackWiring.wire(ctx, persistence);
+        // capture listener, the read-only snapshot-preview listener, and the /invrestore staff command. A capture
+        // reads the player's inventory on the tick thread, serializes it there, and hops the DB write off the tick
+        // thread through the Scheduler.async port (Folia-safe); the table is bounded per player at write time
+        // (deleteBeyondCount) and by age on a scheduled off-tick sweep (deleteOlderThan). /invrestore opens the
+        // engine-backed snapshot list; selecting one previews it (a sanctioned raw-inventory leaf) and a restore
+        // safety-snapshots the pre-restore inventory before overwriting the target's live inventory. The only runtime
+        // state is the repeating retention sweep, cancelled through the Wired stop hook so a disable/reload strands no
+        // scheduled work; a disabled module wires none of this.
+        InvrollbackWiring.Wired wired = InvrollbackWiring.wire(ctx, persistence, menus);
         wired.listeners().forEach(resources::addListener);
+        wired.commands().forEach(resources::addCommand);
+        resources.onClose(wired.stop());
     }
 
     private static void wireVillagers(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {

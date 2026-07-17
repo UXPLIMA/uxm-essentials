@@ -6,56 +6,112 @@ import java.util.Objects;
 
 import org.bukkit.event.Listener;
 
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.command.InvrestoreCommand;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotListView;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewListener;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotRestorer;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.listener.SnapshotCaptureListener;
+import com.uxplima.uxmessentials.invrollback.adapter.outbound.SnapshotPruneSweep;
 import com.uxplima.uxmessentials.invrollback.application.CaptureSnapshot;
 import com.uxplima.uxmessentials.invrollback.application.InvrollbackConfig;
+import com.uxplima.uxmessentials.invrollback.application.PruneSnapshots;
+import com.uxplima.uxmessentials.invrollback.application.RestoreSnapshot;
 import com.uxplima.uxmessentials.invrollback.application.port.SnapshotRepository;
 import com.uxplima.uxmessentials.persistence.invrollback.SnapshotRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Constructs the invrollback context's adapter and use case over the injected kernel ports and the persistence
- * DSL, and produces the death/logout capture listener the plugin registers. The snapshot repository is the jOOQ
- * adapter built by {@link SnapshotRepositories} over the shared persistence DSL (so this module never names a jOOQ
- * type); the {@link CaptureSnapshot} use case saves through
- * it and bounds a player's snapshots to the configured count at write time; the listener reads the live inventory
- * on the tick thread and hops the DB write off it through the injected {@code Scheduler}. The context persists to
- * the shared pool but holds no runtime state of its own, so there is nothing to drain on stop — a disabled module
- * simply registers no listener.
+ * Constructs the invrollback context's adapters and use cases over the injected kernel ports, the persistence DSL
+ * and the shared menu engine, and produces everything the plugin registers: the death/logout capture listener, the
+ * read-only snapshot-preview listener, the {@code /invrestore} staff command, and — as the {@code stop} hook — the
+ * scheduled retention sweep's cancel handle.
+ *
+ * <p>The snapshot repository is the jOOQ adapter built by {@link SnapshotRepositories} (so this module never names a
+ * jOOQ type); {@link CaptureSnapshot} bounds a player's snapshots to the configured count at write time;
+ * {@link RestoreSnapshot} safety-snapshots the pre-restore state and resolves the chosen snapshot; and
+ * {@link PruneSnapshots} runs on the {@link SnapshotPruneSweep}'s repeating, off-tick sweep to keep the table
+ * bounded by age. Every DB touch is scheduled off the region thread through the injected {@code Scheduler}
+ * (Folia-safe). A disabled module wires none of this; on stop the sweep is cancelled through the returned handle.
  */
 @NullMarked
 public final class InvrollbackWiring {
 
     private InvrollbackWiring() {}
 
-    /** Build the invrollback adapter and use case from {@code ctx} and {@code persistence}, ready to register. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence) {
+    /** Build the invrollback adapters and use cases from {@code ctx}, {@code persistence} and {@code menus}. */
+    public static Wired wire(ModuleContext ctx, Persistence persistence, Menus menus) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(menus, "menus");
         InvrollbackConfig config = InvrollbackConfig.from(ctx.config());
+        KernelPorts kernel = ctx.kernel();
+        Clock clock = Clock.systemUTC();
+
         SnapshotRepository repository = SnapshotRepositories.jooq(persistence);
         CaptureSnapshot capture = new CaptureSnapshot(repository, config.maxPerPlayer());
-        SnapshotCaptureListener listener = new SnapshotCaptureListener(
+
+        SnapshotCaptureListener captureListener = new SnapshotCaptureListener(
                 capture,
-                ctx.kernel().scheduler(),
-                Clock.systemUTC(),
+                kernel.scheduler(),
+                clock,
                 config.captureOnDeath(),
                 config.captureOnLogout(),
                 config.includeEnderchest());
-        return new Wired(List.of(listener));
+
+        RestoreSnapshot restore = new RestoreSnapshot(repository, capture);
+        SnapshotRestorer restorer =
+                new SnapshotRestorer(restore, kernel.scheduler(), kernel.messages(), kernel.messageSink(), clock);
+        SnapshotPreviewView preview = new SnapshotPreviewView(kernel.messages(), kernel.scheduler(), restorer);
+        SnapshotListView listView = new SnapshotListView(
+                menus,
+                new GuiText(kernel.messages()),
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink(),
+                repository,
+                preview);
+        InvrestoreCommand command = new InvrestoreCommand(listView, kernel.messages());
+
+        PruneSnapshots prune = new PruneSnapshots(repository, config.retentionPolicy());
+        boolean retentionOn = config.maxPerPlayer() > 0 || config.maxAgeDays() > 0;
+        SnapshotPruneSweep sweep = new SnapshotPruneSweep(prune, kernel.scheduler(), clock, retentionOn);
+        AutoCloseable sweepHandle = sweep.start();
+
+        return new Wired(
+                List.of(captureListener, new SnapshotPreviewListener(preview)),
+                List.of(command),
+                () -> close(sweepHandle, kernel));
+    }
+
+    /** Cancel the repeating retention sweep on module stop; a failure to close is logged, never rethrown. */
+    private static void close(AutoCloseable sweepHandle, KernelPorts kernel) {
+        try {
+            sweepHandle.close();
+        } catch (Exception closing) {
+            kernel.log().error("failed to cancel the invrollback retention sweep", closing);
+        }
     }
 
     /**
-     * Everything the invrollback module contributes once wired: the death/logout capture listener the plugin
-     * registers.
+     * Everything the invrollback module contributes once wired: the capture and preview listeners the plugin
+     * registers, the {@code /invrestore} command, and the stop hook that cancels the retention sweep.
      *
      * @param listeners the Bukkit listeners to register
+     * @param commands the Brigadier commands to register
+     * @param stop the teardown run on module stop
      */
-    public record Wired(List<Listener> listeners) {
+    public record Wired(List<Listener> listeners, List<CommandRegistration> commands, Runnable stop) {
         public Wired {
             listeners = List.copyOf(listeners);
+            commands = List.copyOf(commands);
+            Objects.requireNonNull(stop, "stop");
         }
     }
 }

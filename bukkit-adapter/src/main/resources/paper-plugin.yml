@@ -1427,3 +1427,16 @@ permissions:
     description: 'Hot-reload / inspect the villagers module (villager trade management).'
     default: op
 
+  # invrollback context (docs/permissions.md "Inventory Rollback"). Inventory snapshots are captured at key moments
+  # (death, logout) and stored in the database (never PDC, so they survive a world rollback). Restore (.restore) —
+  # /invrestore <player> opens the staff GUI listing that player's snapshots newest-first; selecting one previews its
+  # contents and a restore overwrites the target's live inventory (the pre-restore inventory is itself snapshotted
+  # first as a safety copy). Restore acts on a live inventory, so the target must be online. uxmessentials.module.
+  # invrollback is the reload/inspect tier.
+  uxmessentials.invrollback.restore:
+    description: '/invrestore <player> — open the inventory-snapshot restore GUI for a player.'
+    default: op
+  uxmessentials.module.invrollback:
+    description: 'Hot-reload / inspect the invrollback module (inventory snapshots and restore).'
+    default: op
+
