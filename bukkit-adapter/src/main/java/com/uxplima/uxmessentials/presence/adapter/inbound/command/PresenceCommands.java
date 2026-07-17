@@ -13,11 +13,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * Builds the presence context's Brigadier command surface (docs/10-feature-modules.md §15.8) as
  * {@link CommandRegistration}s over the constructed {@link PresenceServices}: {@code /afk [reason]},
- * {@code /vanish}, {@code /list}, {@code /realname <player>}, {@code /whois <player>}, {@code /gc}, and
+ * {@code /list}, {@code /realname <player>}, {@code /whois <player>}, {@code /gc}, and
  * {@code /staff}. Collected in one
  * greppable table so the literal/permission pairing matches the permissions
  * reference and the kernel's {@code PresenceCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS}
- * handler registers each.
+ * handler registers each. {@code /vanish} moved to the dedicated {@code vanish} context.
  */
 @NullMarked
 public final class PresenceCommands {
@@ -32,7 +32,6 @@ public final class PresenceCommands {
             @Nullable OnlinePlayerListView listView) {
         return List.of(
                 new AfkCommand(services, messages, scheduler),
-                new VanishCommand(services, messages, scheduler),
                 new ListCommand(services, messages, scheduler, listView),
                 new RealnameCommand(services, messages, scheduler),
                 new NickCommand(services, messages, scheduler),

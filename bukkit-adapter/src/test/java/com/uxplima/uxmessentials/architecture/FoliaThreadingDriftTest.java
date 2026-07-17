@@ -176,7 +176,7 @@ class FoliaThreadingDriftTest {
                 pkg + "survival.adapter.inbound.listener.OnePlayerSleepListener",
                 "GLOBAL: one-player-sleep counts the world roster inside scheduler.onGlobal before advancing the world");
         allow.put(
-                pkg + "presence.adapter.outbound.BukkitVisibilityApplier",
+                pkg + "vanish.adapter.outbound.BukkitVanishView",
                 "GLOBAL: vanish visibility fan-out enumerates inside scheduler.onGlobal");
         allow.put(
                 pkg + "scoreboard.adapter.ScoreboardWiring",

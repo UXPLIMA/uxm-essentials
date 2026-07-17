@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
+import com.uxplima.uxmessentials.vanish.application.VanishMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
@@ -56,6 +57,7 @@ public final class MessageKeyCatalog {
             WarpsMessageKey.values(),
             KitsMessageKey.values(),
             PlayerstateMessageKey.values(),
+            VanishMessageKey.values(),
             MessagingMessageKey.values(),
             PresenceMessageKey.values(),
             ModerationMessageKey.values(),

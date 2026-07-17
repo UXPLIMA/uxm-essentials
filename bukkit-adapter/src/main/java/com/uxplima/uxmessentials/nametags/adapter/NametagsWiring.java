@@ -9,7 +9,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.nametags.adapter.inbound.listener.NametagLifecycleListener;
-import com.uxplima.uxmessentials.nametags.adapter.outbound.CanSeeNametagVanish;
 import com.uxplima.uxmessentials.nametags.adapter.outbound.NametagRenderTask;
 import com.uxplima.uxmessentials.nametags.adapter.outbound.PacketNametagPresenter;
 import com.uxplima.uxmessentials.nametags.application.port.NametagVanish;
@@ -54,9 +53,11 @@ public final class NametagsWiring {
      * {@code nameVisibility} coordinator (built once in the bootstrap and also handed to the scoreboard wiring) hides
      * the vanilla above-head name while a custom nametag is live.
      */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, NameVisibilityCoordinator nameVisibility) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, NametagVanish vanish, NameVisibilityCoordinator nameVisibility) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(vanish, "vanish");
         Objects.requireNonNull(nameVisibility, "nameVisibility");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
@@ -75,9 +76,9 @@ public final class NametagsWiring {
         NametagPackets packets = new NmsNametagPackets(new PacketSender(new ChannelResolver()));
         NametagRenderer libRenderer = new NametagRenderer(packets, new PaperScheduler(plugin));
 
-        // Vanish is soft-coupled through Bukkit's canSee graph; it degrades to "everyone can see everyone" when the
-        // presence module is off, so no nametag-side branch is needed for the presence-disabled case.
-        NametagVanish vanish = new CanSeeNametagVanish();
+        // Vanish is soft-coupled to the vanish module: bootstrap hands in the authority-reading gate (over the single
+        // vanish store) when vanish is enabled, or NametagVanish.ALWAYS_VISIBLE ("everyone can see everyone") when it
+        // is off — so no nametag-side branch is needed for the vanish-disabled case.
         // The presenter passes the same configured refresh interval into the lib's per-wearer refresh loop that drives
         // the reconcile/animation timer below, so a refresh-ticks change moves the lib's text/viewer/line-of-sight
         // cadence and the animation clock in lockstep — the lib loop reads the period once per show, and a

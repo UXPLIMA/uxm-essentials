@@ -8,6 +8,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
@@ -23,12 +27,9 @@ import com.uxplima.uxmessentials.presence.adapter.outbound.InMemoryPresenceStore
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
-import com.uxplima.uxmessentials.presence.application.ResolveVisibility;
 import com.uxplima.uxmessentials.presence.application.SetNick;
-import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
-import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -46,13 +47,10 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,11 +60,11 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the presence per-player settings panel. The panel draws one toggle per conf slot,
- * each reading the live {@link InMemoryPresenceStore} and writing through the real {@code MarkAfk} /
- * {@code ToggleVanish} use cases the {@code /afk} and {@code /vanish} commands use: opening reflects the stored
- * state, a click flips it through the use case, and a re-render shows the new value. The scheduler is
- * synchronous so the off-thread setter runs inline.
+ * MockBukkit coverage of the presence per-player settings panel. The panel draws one toggle per conf slot: the AFK
+ * toggle reads the live {@link InMemoryPresenceStore} and writes through the real {@code MarkAfk}, and the vanish
+ * toggle reads the store's overlaid vanished bit and writes through the injected vanish-toggle handle onto a fake
+ * vanish authority (a mutable uuid set). Opening reflects the stored state, a click flips it, and a re-render shows the
+ * new value. The scheduler is synchronous so the off-thread setter runs inline.
  */
 class PresenceSettingsViewTest {
 
@@ -78,6 +76,7 @@ class PresenceSettingsViewTest {
     private Scheduler scheduler;
     private InMemoryPresenceStore store;
     private PresenceServices services;
+    private Consumer<PlayerRef> vanishToggle;
 
     @BeforeEach
     void setUp() {
@@ -88,18 +87,22 @@ class PresenceSettingsViewTest {
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         Clock clock = Clock.systemUTC();
-        store = new InMemoryPresenceStore(clock);
+        // A fake vanish authority: the store overlays its vanished bit from this set, and the toggle handle flips it —
+        // the same contract the real vanish store and ToggleVanish satisfy in production.
+        Set<UUID> vanished = ConcurrentHashMap.newKeySet();
+        vanishToggle = who -> {
+            if (!vanished.add(who.uuid())) {
+                vanished.remove(who.uuid());
+            }
+        };
+        store = new InMemoryPresenceStore(clock, vanished::contains);
         PresenceNotifier notifier = new PresenceNotifier(new KeyMessages(), new NoopSink());
         PresenceAudience audience = List::<PlayerRef>of;
-        VisibilityApplier visibility = new NoopVisibility();
         DomainEventPublisher events = new NoopEvents();
         MarkAfk markAfk = new MarkAfk(store, audience, notifier, events, clock);
-        ToggleVanish toggleVanish = new ToggleVanish(store, visibility, notifier, events, clock);
         services = new PresenceServices(
                 markAfk,
                 new ClearAfkOnActivity(store, audience, notifier, events, clock),
-                toggleVanish,
-                new ResolveVisibility(store, alwaysPermitted()),
                 new SetNick(new NoopNicks(), notifier),
                 new com.uxplima.uxmessentials.presence.application.ClearNick(new NoopNicks(), notifier));
     }
@@ -154,7 +157,8 @@ class PresenceSettingsViewTest {
     private PresenceSettingsView view(Path dir) throws Exception {
         writeLayout(dir);
         GuiLayouts layouts = new GuiLayouts(dir, NOOP);
-        return new PresenceSettingsView(guiText, scheduler, layouts, new KeyMessages(), services, store, engine());
+        return new PresenceSettingsView(
+                guiText, scheduler, layouts, new KeyMessages(), services, store, vanishToggle, engine());
     }
 
     /** A minimal editor-capable engine + listener so the migrated panel can open through the runtime. */
@@ -211,21 +215,6 @@ class PresenceSettingsViewTest {
         server.getPluginManager().callEvent(event);
     }
 
-    private static Permissions alwaysPermitted() {
-        return new Permissions() {
-            @Override
-            public boolean has(PlayerRef who, String node) {
-                return true;
-            }
-
-            @Override
-            public QuotaResult resolveQuota(
-                    PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
-                return QuotaResult.limited(configDefault);
-            }
-        };
-    }
-
     /** Echoes the key and any placeholder values so a rendered value-lore reveals the substituted state. */
     private static final class KeyMessages implements Messages {
         @Override
@@ -240,17 +229,6 @@ class PresenceSettingsViewTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
-    }
-
-    private static final class NoopVisibility implements VisibilityApplier {
-        @Override
-        public void hide(PlayerRef who) {}
-
-        @Override
-        public void reveal(PlayerRef who) {}
-
-        @Override
-        public void reconcileOnJoin(PlayerRef who, boolean vanished) {}
     }
 
     private static final class NoopEvents implements DomainEventPublisher {

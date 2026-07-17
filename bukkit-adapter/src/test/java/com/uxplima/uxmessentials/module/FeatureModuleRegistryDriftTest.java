@@ -55,6 +55,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("warps"))).isPresent();
         assertThat(registry.byId(ModuleId.of("kits"))).isPresent();
         assertThat(registry.byId(ModuleId.of("playerstate"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("vanish"))).isPresent();
         assertThat(registry.byId(ModuleId.of("messaging"))).isPresent();
         assertThat(registry.byId(ModuleId.of("presence"))).isPresent();
         assertThat(registry.byId(ModuleId.of("moderation"))).isPresent();
@@ -84,6 +85,7 @@ class FeatureModuleRegistryDriftTest {
                         "warps",
                         "kits",
                         "playerstate",
+                        "vanish",
                         "messaging",
                         "presence",
                         "moderation",

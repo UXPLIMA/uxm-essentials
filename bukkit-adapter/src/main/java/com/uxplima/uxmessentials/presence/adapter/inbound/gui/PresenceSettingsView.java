@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -25,12 +26,13 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The per-player presence settings panel ({@code /presencesettings}, and the presence entry on the
- * {@code /uxmess gui} hub): two toggles a player flips for themselves, each reading the live
- * {@link PresenceStore} and writing through the same use cases the presence commands do. The first mirrors
- * {@code /afk} (the player's AFK state); the second mirrors {@code /vanish} (the player's vanish state). The
- * panel holds no logic of its own — it reads the current presence fresh on every open and routes a flip through
- * {@code MarkAfk} / {@code ToggleVanish}, so opening it always shows the live state and a click is the same
- * transition the command makes (including the away/back broadcast and the visibility graph update).
+ * {@code /uxmess gui} hub): two toggles a player flips for themselves. The first mirrors {@code /afk} (the player's
+ * AFK state), writing through presence's own {@code MarkAfk}; the second mirrors {@code /vanish} (the player's vanish
+ * state), reading the live {@link PresenceStore} (whose vanished bit is overlaid from the one vanish authority) and
+ * writing through the injected {@code vanishToggle} handle onto the {@code vanish} context. When the vanish module is
+ * disabled the handle is a no-op and the overlaid read stays {@code false}, so the toggle degrades cleanly. The panel
+ * holds no logic of its own — it reads the current presence fresh on every open and routes a flip through the matching
+ * handle, so opening it always shows the live state and a click is the same transition the command makes.
  */
 @NullMarked
 public final class PresenceSettingsView {
@@ -47,6 +49,7 @@ public final class PresenceSettingsView {
             Messages messages,
             PresenceServices services,
             PresenceStore store,
+            Consumer<PlayerRef> vanishToggle,
             Menus menus) {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
@@ -54,6 +57,7 @@ public final class PresenceSettingsView {
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(services, "services");
         Objects.requireNonNull(store, "store");
+        Objects.requireNonNull(vanishToggle, "vanishToggle");
         Objects.requireNonNull(menus, "menus");
         EntityEditorLayout layout =
                 guiLayouts.loadEntityEditor(MODULE, LAYOUT, EntityEditorLayout.codeDefault(List.of(11, 15), 22));
@@ -65,7 +69,7 @@ public final class PresenceSettingsView {
                 .title(PresenceMessageKey.GUI_SETTINGS_TITLE)
                 .valueLore(PresenceMessageKey.GUI_SETTINGS_VALUE_LORE)
                 .backName(PresenceMessageKey.GUI_SETTINGS_BACK)
-                .settings(viewer -> settings(messages, scheduler, services, store, viewer))
+                .settings(viewer -> settings(messages, scheduler, services, store, vanishToggle, viewer))
                 .onBack((player, viewer) -> player.closeInventory())
                 .build();
     }
@@ -76,7 +80,12 @@ public final class PresenceSettingsView {
     }
 
     private static List<EditableProperty> settings(
-            Messages messages, Scheduler scheduler, PresenceServices services, PresenceStore store, PlayerRef viewer) {
+            Messages messages,
+            Scheduler scheduler,
+            PresenceServices services,
+            PresenceStore store,
+            Consumer<PlayerRef> vanishToggle,
+            PlayerRef viewer) {
         return List.of(
                 ToggleProperty.ofBoolean(
                         PresenceMessageKey.GUI_SETTINGS_AFK,
@@ -96,7 +105,7 @@ public final class PresenceSettingsView {
                         (who, on) -> onOff(messages, who, on),
                         on -> {
                             if (store.current(viewer).vanished() != on) {
-                                services.toggleVanish().toggle(viewer);
+                                vanishToggle.accept(viewer);
                             }
                         },
                         scheduler));

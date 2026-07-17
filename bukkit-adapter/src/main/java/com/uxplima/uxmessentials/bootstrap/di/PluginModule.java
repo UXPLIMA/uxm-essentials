@@ -196,6 +196,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.trade.adapter.TradeWiring;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
+import com.uxplima.uxmessentials.vanish.adapter.VanishWiring;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
@@ -870,6 +871,8 @@ public final class PluginModule {
                     textInput,
                     menus,
                     menuBindings);
+        } else if (module.id().equals(ModuleId.of("vanish"))) {
+            wireVanish(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -1434,8 +1437,25 @@ public final class PluginModule {
         // loader, and the shared text-input seam (installed once in wireModules) for the ignore-list add prompt.
         // /msgsettings opens the settings panel; /ignore and /mail with no args open the ignore-list and mailbox.
         GuiText guiText = new GuiText(ctx.kernel().messages());
+        // The vanish gate reads the one vanish authority captured during vanish wiring (which lands before messaging),
+        // or degrades to ALWAYS_VISIBLE ("no one is hidden") when the vanish module is disabled.
+        com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
+        com.uxplima.uxmessentials.messaging.application.port.VanishVisibility vanish = vanishStore == null
+                ? com.uxplima.uxmessentials.messaging.application.port.VanishVisibility.ALWAYS_VISIBLE
+                : new com.uxplima.uxmessentials.messaging.adapter.outbound.AuthorityVanishVisibility(
+                        vanishStore, ctx.kernel().permissions());
         MessagingWiring.Wired wired = MessagingWiring.wire(
-                plugin, ctx, persistence, Optional.empty(), bus, guiText, guiLayouts, textInput, menus, menuBindings);
+                plugin,
+                ctx,
+                persistence,
+                Optional.empty(),
+                vanish,
+                bus,
+                guiText,
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
@@ -1610,6 +1630,25 @@ public final class PluginModule {
         }
     }
 
+    private static void wireVanish(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+        // vanish is the single vanish authority: an in-memory ConcurrentHashMap of who is vanished, the /vanish
+        // command, the Bukkit hide-show view (which drops both the player entity and their tab entry for ineligible
+        // viewers), and the join/quit listener. It persists nothing. It wires before the contexts it informs
+        // (messaging, presence, nametags, staff), so its store and toggle are captured here and threaded into their
+        // vanish gates during their own wiring; a disabled vanish module leaves those handles null and each consumer
+        // degrades to "no one is hidden". On stop the store is cleared so a disable/reload leaves no residual state.
+        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
+        links.vanishStore = wired.vanishStore();
+        links.vanishToggle = wired.toggleVanish();
+        // Captured for staff (wired last), which binds its VANISH gadget and vanish-on-enter to the one authority.
+        links.staffVanishSeam =
+                new com.uxplima.uxmessentials.staff.adapter.StaffWiring.VanishSeam(wired.toggleVanish());
+    }
+
     private static void wirePresence(
             JavaPlugin plugin,
             ModuleContext ctx,
@@ -1618,13 +1657,20 @@ public final class PluginModule {
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus) {
-        // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Its
-        // BukkitVisibilityApplier drives the canSee graph that messaging's /msg resolution and teleport's /tpa
-        // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here. The
-        // AFK soft-couple does need one: presence rebinds messaging's MutableAfkStatus (captured during the
-        // earlier messaging wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy
-        // notice. When messaging is disabled the holder is absent and the bind is a no-op.
-        PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx, guiLayouts, guiRegistry, menus);
+        // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Vanish now lives
+        // in its own context (wired earlier), so presence receives that authority's isVanished lookup — overlaid onto
+        // its store so the %..._vanished% placeholder and the sleep exclusion reflect the one vanish state — and a
+        // vanish-toggle handle for the settings panel; both degrade to no-ops when the vanish module is off. The
+        // AFK soft-couple: presence rebinds messaging's MutableAfkStatus (captured during the earlier messaging
+        // wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy notice.
+        com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
+        java.util.function.Predicate<java.util.UUID> vanishLookup =
+                vanishStore == null ? uuid -> false : vanishStore::isVanished;
+        com.uxplima.uxmessentials.vanish.application.ToggleVanish vanishToggle = links.vanishToggle;
+        java.util.function.Consumer<com.uxplima.uxmessentials.shared.domain.PlayerRef> vanishToggleHandle =
+                vanishToggle == null ? who -> {} : vanishToggle::toggle;
+        PresenceWiring.Wired wired =
+                PresenceWiring.wire(plugin, ctx, vanishLookup, vanishToggleHandle, guiLayouts, guiRegistry, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -1636,9 +1682,6 @@ public final class PluginModule {
         // disabled the holder is absent and this is a no-op.
         bindPlaytimeAfk(
                 links, new com.uxplima.uxmessentials.playerstate.adapter.outbound.PresenceAfkStatus(wired.store()));
-        // Captured for staff (wired last), which binds its VANISH gadget and vanish-on-enter to this toggle + store.
-        links.staffPresenceVanish = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.PresenceVanishSeam(
-                wired.services().toggleVanish(), wired.store());
     }
 
     private static void wireCommunication(
@@ -1848,7 +1891,14 @@ public final class PluginModule {
         // refresh loop the lib owns. On disable the reconcile timer on the Scheduler port is stopped and
         // presenter.removeAll() restores every online wearer's vanilla name, sends every wearer's remove packets, and
         // cancels each lib refresh task, so a disable/reload leaves no orphan.
-        NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx, links.nameVisibility);
+        // The vanish gate reads the one vanish authority captured during vanish wiring (which lands before nametags),
+        // or degrades to ALWAYS_VISIBLE ("everyone can see everyone") when the vanish module is disabled.
+        com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
+        com.uxplima.uxmessentials.nametags.application.port.NametagVanish vanish = vanishStore == null
+                ? com.uxplima.uxmessentials.nametags.application.port.NametagVanish.ALWAYS_VISIBLE
+                : new com.uxplima.uxmessentials.nametags.adapter.outbound.AuthorityNametagVanish(
+                        vanishStore, ctx.kernel().permissions());
+        NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx, vanish, links.nameVisibility);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -1911,7 +1961,7 @@ public final class PluginModule {
         // On stop it exits every staff member still in staff mode, restoring their real loadout so a disable/reload
         // never strands anyone in the gadget hotbar.
         StaffWiring.StaffSeams seams = new StaffWiring.StaffSeams(
-                Optional.ofNullable(links.staffPresenceVanish),
+                Optional.ofNullable(links.staffVanishSeam),
                 Optional.ofNullable(links.staffOpenContainer),
                 Optional.ofNullable(links.staffAudience),
                 Optional.ofNullable(links.staffModerationFreeze),
@@ -2042,11 +2092,18 @@ public final class PluginModule {
                 warpPlayerWarpGoTo;
         private com.uxplima.uxmessentials.warps.adapter.@org.jspecify.annotations.Nullable WarpTeleportRegistry
                 warpTeleportRegistry;
+        // The single vanish authority, captured during vanish wiring (which lands before the contexts it informs).
+        // The messaging/nametags vanish gates read the store; the presence overlay + settings panel and staff-mode
+        // vanish route through the toggle. Both are null when the vanish module is disabled, degrading each consumer.
+        private com.uxplima.uxmessentials.vanish.application.port.@org.jspecify.annotations.Nullable VanishStore
+                vanishStore;
+        private com.uxplima.uxmessentials.vanish.application.@org.jspecify.annotations.Nullable ToggleVanish
+                vanishToggle;
         // The soft-couple seams staff binds when it wires (it lands last). Each is captured during the source
         // context's wiring and left null when that context is disabled, so staff degrades the matching gadget or
         // staff chat to a no-op rather than failing.
-        private com.uxplima.uxmessentials.staff.adapter.StaffWiring.@org.jspecify.annotations.Nullable PresenceVanishSeam
-                staffPresenceVanish;
+        private com.uxplima.uxmessentials.staff.adapter.StaffWiring.@org.jspecify.annotations.Nullable VanishSeam
+                staffVanishSeam;
         private com.uxplima.uxmessentials.playerstate.application.@org.jspecify.annotations.Nullable OpenContainer
                 staffOpenContainer;
         private com.uxplima.uxmessentials.messaging.application.port.@org.jspecify.annotations.Nullable StaffAudience

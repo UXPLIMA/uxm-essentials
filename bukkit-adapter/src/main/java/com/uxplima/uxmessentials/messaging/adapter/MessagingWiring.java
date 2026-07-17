@@ -12,7 +12,6 @@ import com.uxplima.uxmessentials.messaging.adapter.inbound.command.MessagingComm
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitMessageDelivery;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience;
-import com.uxplima.uxmessentials.messaging.adapter.outbound.CanSeeVanishVisibility;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemoryConversationStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemorySocialSpyStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.MailExpirySweep;
@@ -62,7 +61,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Three cross-context gates are soft-coupled here: the mute gate is bound to {@link MutePolicy#NEVER} until
  * the moderation context lands (the caller may hand a real policy through {@code wire}); vanish-aware
- * visibility is the {@code canSee}-based adapter that degrades to "fully visible" when presence is disabled;
+ * visibility is the {@code vanish} gate handed in by bootstrap — the authority-reading adapter over the vanish
+ * store, or {@link VanishVisibility#ALWAYS_VISIBLE} when the vanish module is disabled ("no one is hidden");
  * and the AFK status is a {@link MutableAfkStatus} bound to {@code AfkStatus.NEVER} until the presence context
  * lands and rebinds it (presence wires after messaging, so the binding arrives through the rebindable holder).
  * The mail repository is the plain jOOQ adapter; the ignore store is the Caffeine-cached jOOQ adapter; the
@@ -79,6 +79,7 @@ public final class MessagingWiring {
             ModuleContext ctx,
             Persistence persistence,
             Optional<MutePolicy> mute,
+            VanishVisibility vanish,
             Bus bus,
             GuiText guiText,
             GuiLayouts guiLayouts,
@@ -89,6 +90,7 @@ public final class MessagingWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(mute, "mute");
+        Objects.requireNonNull(vanish, "vanish");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
@@ -106,7 +108,8 @@ public final class MessagingWiring {
         // The AFK status starts on AfkStatus.NEVER; presence rebinds it through this holder when it wires
         // (presence is wired after messaging), and stays NEVER when presence is disabled (soft couple).
         MutableAfkStatus afkStatus = new MutableAfkStatus();
-        MessagingServices services = assemble(kernel, settings, stores, mutePolicy, afkStatus, Clock.systemUTC());
+        MessagingServices services =
+                assemble(kernel, settings, stores, mutePolicy, afkStatus, vanish, Clock.systemUTC());
         MailExpirySweep sweep = new MailExpirySweep(
                 kernel.scheduler(),
                 stores.mail(),
@@ -146,10 +149,10 @@ public final class MessagingWiring {
             Stores stores,
             MutePolicy mute,
             AfkStatus afk,
+            VanishVisibility vanish,
             Clock clock) {
         MessagingNotifier notifier = new MessagingNotifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
-        VanishVisibility vanish = new CanSeeVanishVisibility();
         SendMessage sendMessage = new SendMessage(
                 delivery,
                 stores.ignores(),

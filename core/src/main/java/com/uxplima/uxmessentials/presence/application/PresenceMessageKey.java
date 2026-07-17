@@ -24,10 +24,6 @@ public enum PresenceMessageKey implements MessageKey {
     // anti-AFK: shown once per AFK session when item pickups are blocked while away
     AFK_PICKUP_BLOCKED("afk.pickup-blocked"),
 
-    // /vanish
-    VANISH_ON("vanish.on"),
-    VANISH_OFF("vanish.off"),
-
     // /list — the vanish-aware online roster
     LIST_PLAYERS("list.players"),
 

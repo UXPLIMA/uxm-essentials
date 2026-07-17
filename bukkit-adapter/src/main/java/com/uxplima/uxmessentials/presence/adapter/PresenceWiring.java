@@ -4,7 +4,10 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -19,20 +22,16 @@ import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceLifec
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.SleepExclusionListener;
 import com.uxplima.uxmessentials.presence.adapter.outbound.AfkSweep;
 import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitPresenceAudience;
-import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitVisibilityApplier;
 import com.uxplima.uxmessentials.presence.adapter.outbound.InMemoryPresenceStore;
 import com.uxplima.uxmessentials.presence.adapter.outbound.PdcNickStore;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
-import com.uxplima.uxmessentials.presence.application.ResolveVisibility;
 import com.uxplima.uxmessentials.presence.application.SetNick;
-import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
-import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
@@ -41,6 +40,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -50,22 +50,34 @@ import org.jspecify.annotations.NullMarked;
  * wired — nothing else news up its classes.
  *
  * <p>The context persists nothing: the presence map is an in-memory {@link InMemoryPresenceStore}. Its outbound
- * adapters are the store, the {@link BukkitVisibilityApplier} (driving the {@code canSee} graph that the
- * messaging and teleport vanish checks read), and the {@link BukkitPresenceAudience}, all sitting on the kernel
- * {@code Scheduler} port. {@link ResolveVisibility} is exposed on {@link Wired} so a cross-context lookup
- * (messaging / teleport) can query the vanish rule explicitly; both also honour vanish structurally through the
- * {@code canSee} graph this wiring drives, so the coupling degrades to "fully visible" when presence is off.
+ * adapters are the store and the {@link BukkitPresenceAudience}, both sitting on the kernel {@code Scheduler} port.
+ * Vanish moved to its own {@code vanish} context and single authority; presence receives that authority's
+ * {@code isVanished} lookup (to overlay its store's vanished bit) and a vanish-toggle handle (for the settings panel)
+ * from bootstrap, and both degrade to no-ops when the vanish module is off.
  */
 @NullMarked
 public final class PresenceWiring {
 
     private PresenceWiring() {}
 
-    /** Build the presence adapters and use cases from {@code plugin} and {@code ctx}, ready to register. */
+    /**
+     * Build the presence adapters and use cases from {@code plugin} and {@code ctx}, ready to register. The
+     * {@code vanishLookup} is the vanish authority's {@code isVanished} (or always-false when the vanish module is
+     * disabled), overlaid onto the presence store so presence's vanish-aware readers reflect the one vanish state; the
+     * {@code vanishToggle} routes the settings panel's vanish toggle onto that same authority (a no-op when off).
+     */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, ManagementGuiRegistry guiRegistry, Menus menus) {
+            Plugin plugin,
+            ModuleContext ctx,
+            Predicate<UUID> vanishLookup,
+            Consumer<PlayerRef> vanishToggle,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry,
+            Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(vanishLookup, "vanishLookup");
+        Objects.requireNonNull(vanishToggle, "vanishToggle");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
@@ -74,13 +86,12 @@ public final class PresenceWiring {
         Clock clock = Clock.systemUTC();
         AtomicBoolean running = new AtomicBoolean(true);
 
-        InMemoryPresenceStore store = new InMemoryPresenceStore(clock);
-        VisibilityApplier visibility = new BukkitVisibilityApplier(plugin, kernel.scheduler());
+        InMemoryPresenceStore store = new InMemoryPresenceStore(clock, vanishLookup);
         PresenceAudience audience = new BukkitPresenceAudience();
         PresenceNotifier notifier = new PresenceNotifier(kernel.messages(), kernel.messageSink());
         NickStore nicks = new PdcNickStore(plugin, kernel.scheduler());
 
-        PresenceServices services = assemble(kernel, store, visibility, audience, notifier, nicks, clock);
+        PresenceServices services = assemble(kernel, store, audience, notifier, nicks);
         AfkSweep sweep = new AfkSweep(
                 kernel.scheduler(),
                 store,
@@ -96,7 +107,7 @@ public final class PresenceWiring {
         // presence entry on the /uxmess gui hub opens the same panel for an admin (gated uxmessentials.presence.gui).
         GuiText guiText = new GuiText(kernel.messages());
         PresenceSettingsView settingsView = new PresenceSettingsView(
-                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services, store, menus);
+                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services, store, vanishToggle, menus);
         guiRegistry.register(new ManagementGuiEntry(
                 "presence",
                 com.uxplima.uxmessentials.presence.application.PresenceMessageKey.GUI_SETTINGS_TITLE,
@@ -114,7 +125,7 @@ public final class PresenceWiring {
         List<CommandRegistration> commands =
                 new ArrayList<>(PresenceCommands.all(services, kernel.messages(), kernel.scheduler(), listView));
         commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));
-        List<Listener> listeners = listeners(kernel, settings, services, store, visibility, notifier);
+        List<Listener> listeners = listeners(kernel, settings, services, store, notifier);
         return new Wired(commands, listeners, sweep, store, services, running, clock);
     }
 
@@ -123,12 +134,11 @@ public final class PresenceWiring {
             PresenceSettings settings,
             PresenceServices services,
             InMemoryPresenceStore store,
-            VisibilityApplier visibility,
             PresenceNotifier notifier) {
         List<Listener> listeners = new ArrayList<>();
         listeners.add(new PresenceActivityListener(
                 services.clearAfk(), kernel.scheduler(), settings.activityPolicy(), settings.moveThresholdBlocks()));
-        listeners.add(new PresenceLifecycleListener(store, visibility));
+        listeners.add(new PresenceLifecycleListener(store));
         if (settings.disablePickupWhileAfk()) {
             listeners.add(new AfkPickupListener(store, notifier));
         }
@@ -141,19 +151,16 @@ public final class PresenceWiring {
     private static PresenceServices assemble(
             KernelPorts kernel,
             PresenceStore store,
-            VisibilityApplier visibility,
             PresenceAudience audience,
             PresenceNotifier notifier,
-            NickStore nicks,
-            Clock clock) {
+            NickStore nicks) {
         var events = kernel.events();
+        Clock clock = Clock.systemUTC();
         MarkAfk markAfk = new MarkAfk(store, audience, notifier, events, clock);
         ClearAfkOnActivity clearAfk = new ClearAfkOnActivity(store, audience, notifier, events, clock);
-        ToggleVanish toggleVanish = new ToggleVanish(store, visibility, notifier, events, clock);
-        ResolveVisibility resolveVisibility = new ResolveVisibility(store, kernel.permissions());
         SetNick setNick = new SetNick(nicks, notifier);
         ClearNick clearNick = new ClearNick(nicks, notifier);
-        return new PresenceServices(markAfk, clearAfk, toggleVanish, resolveVisibility, setNick, clearNick);
+        return new PresenceServices(markAfk, clearAfk, setNick, clearNick);
     }
 
     /**

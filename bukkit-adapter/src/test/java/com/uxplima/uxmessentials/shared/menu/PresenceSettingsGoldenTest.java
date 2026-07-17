@@ -10,6 +10,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
@@ -32,11 +36,8 @@ import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
-import com.uxplima.uxmessentials.presence.application.ResolveVisibility;
 import com.uxplima.uxmessentials.presence.application.SetNick;
-import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
-import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
@@ -54,12 +55,9 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,6 +96,7 @@ class PresenceSettingsGoldenTest {
     private SyncScheduler scheduler;
     private InMemoryPresenceStore store;
     private PresenceServices services;
+    private Consumer<PlayerRef> vanishToggle;
 
     @BeforeEach
     void setUp() {
@@ -109,17 +108,20 @@ class PresenceSettingsGoldenTest {
         guiText = new GuiText(messages);
         scheduler = new SyncScheduler();
         Clock clock = Clock.systemUTC();
-        store = new InMemoryPresenceStore(clock);
+        // The fixture keeps vanish off, so the overlay set stays empty and the vanish toggle handle is inert here.
+        Set<UUID> vanished = ConcurrentHashMap.newKeySet();
+        vanishToggle = who -> {
+            if (!vanished.add(who.uuid())) {
+                vanished.remove(who.uuid());
+            }
+        };
+        store = new InMemoryPresenceStore(clock, vanished::contains);
         PresenceNotifier notifier = new PresenceNotifier(new KeyMessages(), new NoopSink());
-        VisibilityApplier visibility = new NoopVisibility();
         DomainEventPublisher events = new NoopEvents();
         MarkAfk markAfk = new MarkAfk(store, List::of, notifier, events, clock);
-        ToggleVanish toggleVanish = new ToggleVanish(store, visibility, notifier, events, clock);
         services = new PresenceServices(
                 markAfk,
                 new ClearAfkOnActivity(store, List::of, notifier, events, clock),
-                toggleVanish,
-                new ResolveVisibility(store, granting()),
                 new SetNick(new NoopNicks(), notifier),
                 new ClearNick(new NoopNicks(), notifier));
     }
@@ -204,7 +206,7 @@ class PresenceSettingsGoldenTest {
     private PresenceSettingsView view() throws Exception {
         writeLayout();
         GuiLayouts layouts = new GuiLayouts(dir, NOOP);
-        return new PresenceSettingsView(guiText, scheduler, layouts, messages, services, store, engine());
+        return new PresenceSettingsView(guiText, scheduler, layouts, messages, services, store, vanishToggle, engine());
     }
 
     /** A minimal editor-capable engine + listener so the migrated panel opens through the runtime. */
@@ -283,21 +285,6 @@ class PresenceSettingsGoldenTest {
 
     // --- fakes ---
 
-    private static Permissions granting() {
-        return new Permissions() {
-            @Override
-            public boolean has(PlayerRef who, String node) {
-                return true;
-            }
-
-            @Override
-            public QuotaResult resolveQuota(
-                    PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
-                return QuotaResult.limited(configDefault);
-            }
-        };
-    }
-
     /** Special-cases the value-lore key to wrap the substituted value; every other key echoes itself. */
     private static final class KeyMessages implements Messages {
         @Override
@@ -312,17 +299,6 @@ class PresenceSettingsGoldenTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
-    }
-
-    private static final class NoopVisibility implements VisibilityApplier {
-        @Override
-        public void hide(PlayerRef who) {}
-
-        @Override
-        public void reveal(PlayerRef who) {}
-
-        @Override
-        public void reconcileOnJoin(PlayerRef who, boolean vanished) {}
     }
 
     private static final class NoopEvents implements DomainEventPublisher {

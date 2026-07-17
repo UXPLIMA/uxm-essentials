@@ -25,7 +25,8 @@ import org.junit.jupiter.api.Test;
 class PresenceAfkStatusTest {
 
     private static final Instant T0 = Instant.parse("2026-06-14T12:00:00Z");
-    private final InMemoryPresenceStore store = new InMemoryPresenceStore(Clock.fixed(T0, ZoneOffset.UTC));
+    private final InMemoryPresenceStore store =
+            new InMemoryPresenceStore(Clock.fixed(T0, ZoneOffset.UTC), uuid -> false);
     private final PresenceAfkStatus status = new PresenceAfkStatus(store);
 
     private final PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");

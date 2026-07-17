@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.survival.application.SurvivalModule;
 import com.uxplima.uxmessentials.tablist.application.TablistModule;
 import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import com.uxplima.uxmessentials.trade.application.TradeModule;
+import com.uxplima.uxmessentials.vanish.application.VanishModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
 import com.uxplima.uxmessentials.vote.application.VoteModule;
 import com.uxplima.uxmessentials.warps.application.WarpsModule;
@@ -68,7 +69,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // playerstate is self-contained — transient in-memory snapshots, no DB and no cross-context bridge —
         // so its position is not dependency-constrained; it lands after kits.
         delegate.register(new PlayerstateModule());
-        // messaging soft-couples to moderation (mute-gated sending) and presence (vanish-aware /msg
+        // vanish owns the single vanish state every other context reads (messaging's /msg resolution, the nametag
+        // viewer cull, staff-mode vanish). It carries no hard dependency edge — those couplings are soft and degrade
+        // to "no one is hidden" when vanish is off — but it lands before the contexts it informs so its store handle
+        // is captured and threaded into their vanish gates during wiring (the same capture-early pattern teleport
+        // uses).
+        delegate.register(new VanishModule());
+        // messaging soft-couples to moderation (mute-gated sending) and vanish (vanish-aware /msg
         // resolution); both gates degrade gracefully when the other module is off, so messaging carries no
         // hard dependency edge and lands here independently of either.
         delegate.register(new MessagingModule());

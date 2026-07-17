@@ -19,8 +19,6 @@ import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.staff.StaffStores;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
-import com.uxplima.uxmessentials.presence.application.ToggleVanish;
-import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -42,10 +40,10 @@ import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCaptur
 import com.uxplima.uxmessentials.staff.adapter.outbound.MessagingStaffChannel;
 import com.uxplima.uxmessentials.staff.adapter.outbound.ModerationStaffFreeze;
 import com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector;
-import com.uxplima.uxmessentials.staff.adapter.outbound.PresenceStaffVanish;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffModeStoreImpl;
 import com.uxplima.uxmessentials.staff.adapter.outbound.TeleportStaffTeleport;
+import com.uxplima.uxmessentials.staff.adapter.outbound.VanishStaffVanish;
 import com.uxplima.uxmessentials.staff.application.EnterStaffMode;
 import com.uxplima.uxmessentials.staff.application.ExitStaffMode;
 import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
@@ -53,19 +51,21 @@ import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the staff context's adapters and use cases over the injected kernel ports, the persistence DSL, and
- * the soft-coupled seams handed in from the presence, playerstate, and messaging modules (captured during their
- * wiring, since staff wires last). This is the one place the staff context is wired.
+ * the soft-coupled seams handed in from the vanish, playerstate, moderation, messaging, and teleport modules
+ * (captured during their wiring, since staff wires last). This is the one place the staff context is wired.
  *
  * <p>The five soft couplings ride rebindable holders ({@link MutableStaffVanish}, {@link MutableStaffInspector},
  * {@link MutableStaffChannel}, {@link MutableStaffFreeze}, {@link MutableStaffTeleport}), each starting on its
- * port's {@code NONE} and bound to the real presence/playerstate/messaging/moderation/teleport impl only when
+ * port's {@code NONE} and bound to the real vanish/playerstate/messaging/moderation/teleport impl only when
  * that module is enabled — so a disabled source module degrades the matching gadget or staff chat to a no-op
- * rather than failing (mirroring messaging's {@code MutableMutePolicy}).
+ * rather than failing (mirroring messaging's {@code MutableMutePolicy}). Staff-mode vanish routes through the
+ * dedicated vanish context's {@code ToggleVanish}, the single vanish authority.
  *
  * <p>The loadout is DB-backed through the jOOQ {@code StaffLoadoutRepository} (built via {@link StaffStores})
  * so it survives a restart (the item-loss-safe net). On stop the wiring exits every staff member still in staff
@@ -198,7 +198,7 @@ public final class StaffWiring {
             MutableStaffChannel channel,
             MutableStaffFreeze freeze,
             MutableStaffTeleport teleport) {
-        seams.presenceVanish().ifPresent(p -> vanish.bind(new PresenceStaffVanish(p.toggleVanish(), p.store())));
+        seams.vanish().ifPresent(v -> vanish.bind(new VanishStaffVanish(v.toggleVanish())));
         seams.openContainer().ifPresent(open -> inspector.bind(new PlayerstateStaffInspector(open)));
         seams.staffAudience()
                 .ifPresent(audience -> channel.bind(new MessagingStaffChannel(
@@ -211,21 +211,21 @@ public final class StaffWiring {
      * The soft-coupled seams staff binds when their source modules are enabled. Each is optional: an absent seam
      * leaves the matching holder on {@code NONE}, so the gadget or staff chat degrades to a no-op.
      *
-     * @param presenceVanish the presence toggle + store backing the VANISH gadget and vanish-on-enter
+     * @param vanish the vanish toggle backing the VANISH gadget and vanish-on-enter
      * @param openContainer the playerstate inventory-open use case backing the EXAMINE gadget
      * @param staffAudience the messaging staff-audience resolver backing staff chat
      * @param moderationFreeze the moderation freeze use case + sanction read backing the FREEZE gadget
      * @param teleport the teleport engine backing the COMPASS gadget and {@code /stafflist}
      */
     public record StaffSeams(
-            Optional<PresenceVanishSeam> presenceVanish,
+            Optional<VanishSeam> vanish,
             Optional<OpenContainer> openContainer,
             Optional<StaffAudience> staffAudience,
             Optional<ModerationFreezeSeam> moderationFreeze,
             Optional<TeleportSeam> teleport) {
 
         public StaffSeams {
-            Objects.requireNonNull(presenceVanish, "presenceVanish");
+            Objects.requireNonNull(vanish, "vanish");
             Objects.requireNonNull(openContainer, "openContainer");
             Objects.requireNonNull(staffAudience, "staffAudience");
             Objects.requireNonNull(moderationFreeze, "moderationFreeze");
@@ -239,11 +239,10 @@ public final class StaffWiring {
         }
     }
 
-    /** The presence handles staff needs to set a vanish state absolutely (toggle + a read of the current flag). */
-    public record PresenceVanishSeam(ToggleVanish toggleVanish, PresenceStore store) {
-        public PresenceVanishSeam {
+    /** The vanish handle staff needs to set a vanish state absolutely through the one vanish authority. */
+    public record VanishSeam(ToggleVanish toggleVanish) {
+        public VanishSeam {
             Objects.requireNonNull(toggleVanish, "toggleVanish");
-            Objects.requireNonNull(store, "store");
         }
     }
 

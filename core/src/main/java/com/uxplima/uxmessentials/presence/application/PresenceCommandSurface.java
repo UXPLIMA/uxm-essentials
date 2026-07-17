@@ -15,14 +15,12 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * stays small and the command/permission pairing is one greppable table the permissions guard checks against
  * {@code paper-plugin.yml}.
  *
- * <p>Seven commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /vanish}
- * ({@code uxmessentials.vanish.use}), {@code /list} ({@code uxmessentials.list.use}), {@code /realname <player>}
- * ({@code uxmessentials.realname.use}), {@code /whois <player>} ({@code uxmessentials.whois.use}),
- * {@code /gc} ({@code uxmessentials.gc.use}), and {@code /staff} ({@code uxmessentials.staff.use}). The
- * vanish-see node ({@code uxmessentials.vanish.see}) gates visibility,
- * not a command, so it is enforced in the {@code VisibilityApplier} rather than declared as a literal here. The
- * staff-membership node ({@code uxmessentials.staff.member}) marks who appears in {@code /staff} and is likewise
- * not a command literal.
+ * <p>Seven commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /list}
+ * ({@code uxmessentials.list.use}), {@code /realname <player>} ({@code uxmessentials.realname.use}),
+ * {@code /nick} ({@code uxmessentials.nick.use}), {@code /whois <player>} ({@code uxmessentials.whois.use}),
+ * {@code /gc} ({@code uxmessentials.gc.use}), and {@code /staff} ({@code uxmessentials.staff.use}). Vanish moved
+ * to its own {@code vanish} context and is no longer a presence command. The staff-membership node
+ * ({@code uxmessentials.staff.member}) marks who appears in {@code /staff} and is not a command literal.
  */
 final class PresenceCommandSurface {
 
@@ -31,7 +29,6 @@ final class PresenceCommandSurface {
     static List<CommandSpec> all() {
         return List.of(
                 spec("afk", "uxmessentials.afk.use", cmd("afk", "Toggle your AFK state")),
-                spec("vanish", "uxmessentials.vanish.use", cmd("vanish", "Toggle staff vanish")),
                 spec("list", "uxmessentials.list.use", cmd("list", "List online players")),
                 spec("realname", "uxmessentials.realname.use", cmd("realname", "Look up a player's real name")),
                 spec("nick", "uxmessentials.nick.use", cmd("nick", "Set or clear a player's display name")),

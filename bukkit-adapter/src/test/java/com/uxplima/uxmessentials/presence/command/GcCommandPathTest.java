@@ -19,9 +19,7 @@ import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
-import com.uxplima.uxmessentials.presence.application.ResolveVisibility;
 import com.uxplima.uxmessentials.presence.application.SetNick;
-import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -109,12 +107,7 @@ class GcCommandPathTest {
 
     private PresenceServices presenceServices() {
         return new PresenceServices(
-                mock(MarkAfk.class),
-                mock(ClearAfkOnActivity.class),
-                mock(ToggleVanish.class),
-                mock(ResolveVisibility.class),
-                mock(SetNick.class),
-                mock(ClearNick.class));
+                mock(MarkAfk.class), mock(ClearAfkOnActivity.class), mock(SetNick.class), mock(ClearNick.class));
     }
 
     private void execute(CommandSourceStack source, String input) {

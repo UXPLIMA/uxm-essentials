@@ -15,14 +15,11 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceLifecycleListener;
 import com.uxplima.uxmessentials.presence.adapter.outbound.AfkSweep;
-import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitVisibilityApplier;
 import com.uxplima.uxmessentials.presence.adapter.outbound.InMemoryPresenceStore;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
-import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
-import com.uxplima.uxmessentials.presence.domain.PlayerPresence;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -42,19 +39,16 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of the presence outbound adapters and listeners against a real (mock) Bukkit server: the
- * in-memory presence store's {@code compute}-based mutation, the {@link BukkitVisibilityApplier} hiding a
- * vanished player from another player's {@code canSee} graph (the seam messaging {@code /msg} and teleport
- * {@code /tpa} read), the {@link AfkSweep} flipping an idle player to AFK on its scan, and the
- * {@link PresenceLifecycleListener} suppressing a vanished player's quit message and forgetting their presence.
- * The {@link Scheduler} is a synchronous inline fake so the entity-thread hop the adapters route through is
- * exercised deterministically.
+ * in-memory presence store's {@code compute}-based mutation, the {@link AfkSweep} flipping an idle player to AFK on
+ * its scan, and the {@link PresenceLifecycleListener} seeding and forgetting a player's presence. Vanish moved to its
+ * own {@code vanish} context, covered by {@code VanishAdapterTest}. The {@link Scheduler} is a synchronous inline fake
+ * so the entity-thread hop the adapters route through is exercised deterministically.
  */
 class PresenceAdapterTest {
 
     private ServerMock server;
     private InlineScheduler scheduler;
     private InMemoryPresenceStore store;
-    private VisibilityApplier visibility;
     private RecordingEvents events;
     private PresenceNotifier notifier;
     private FixedClock clock;
@@ -65,8 +59,7 @@ class PresenceAdapterTest {
         server.addSimpleWorld("world");
         scheduler = new InlineScheduler();
         clock = new FixedClock(Instant.parse("2026-05-30T12:00:00Z"));
-        store = new InMemoryPresenceStore(clock);
-        visibility = new BukkitVisibilityApplier(MockBukkit.createMockPlugin(), scheduler);
+        store = new InMemoryPresenceStore(clock, uuid -> false);
         events = new RecordingEvents();
         notifier = new PresenceNotifier(new KeyMessages(), new DiscardingSink());
     }
@@ -87,39 +80,6 @@ class PresenceAdapterTest {
 
         store.forget(ref);
         assertThat(store.current(ref).afk()).isFalse(); // back to the neutral active state
-    }
-
-    @Test
-    void vanishHidesThePlayerFromAnotherPlayersView() {
-        PlayerMock alice = server.addPlayer("Alice");
-        PlayerMock bob = server.addPlayer("Bob");
-
-        visibility.hide(BukkitRefs.toRef(alice));
-
-        assertThat(bob.canSee(alice)).isFalse(); // bob no longer sees the vanished alice
-        assertThat(alice.canSee(bob)).isTrue(); // alice still sees everyone
-    }
-
-    @Test
-    void unvanishRevealsThePlayerAgain() {
-        PlayerMock alice = server.addPlayer("Alice");
-        PlayerMock bob = server.addPlayer("Bob");
-        visibility.hide(BukkitRefs.toRef(alice));
-
-        visibility.reveal(BukkitRefs.toRef(alice));
-
-        assertThat(bob.canSee(alice)).isTrue();
-    }
-
-    @Test
-    void staffWithTheSeeNodeStillSeeAVanishedPlayer() {
-        PlayerMock alice = server.addPlayer("Alice");
-        PlayerMock staff = server.addPlayer("Staff");
-        staff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.vanish.see", true);
-
-        visibility.hide(BukkitRefs.toRef(alice));
-
-        assertThat(staff.canSee(alice)).isTrue(); // a see-node holder is exempt from the hide
     }
 
     @Test
@@ -182,18 +142,18 @@ class PresenceAdapterTest {
     }
 
     @Test
-    void theLifecycleListenerSuppressesAVanishedPlayersQuitAndForgetsThem() {
+    void theLifecycleListenerForgetsAQuitPlayersPresence() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerRef ref = BukkitRefs.toRef(alice);
-        store.update(ref, PlayerPresence::vanish);
-        PresenceLifecycleListener listener = new PresenceLifecycleListener(store, visibility);
+        store.update(ref, p -> p.markAfk(Optional.of("brb")));
+        assertThat(store.current(ref).afk()).isTrue();
+        PresenceLifecycleListener listener = new PresenceLifecycleListener(store);
         PlayerQuitEvent quit = new PlayerQuitEvent(
                 alice, net.kyori.adventure.text.Component.text("Alice left"), PlayerQuitEvent.QuitReason.DISCONNECTED);
 
         listener.onQuit(quit);
 
-        assertThat(quit.quitMessage()).isNull(); // fake-quit suppressed for a vanished player
-        assertThat(store.current(ref).vanished()).isFalse(); // presence dropped, re-reads as neutral
+        assertThat(store.current(ref).afk()).isFalse(); // presence dropped, re-reads as the neutral active state
     }
 
     /**

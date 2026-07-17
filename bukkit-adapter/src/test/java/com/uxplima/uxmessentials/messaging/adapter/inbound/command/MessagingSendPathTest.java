@@ -108,7 +108,7 @@ class MessagingSendPathTest {
         server.addSimpleWorld("world");
         sink = new RecordingSink();
         mail = new CapturingMail();
-        presence = new InMemoryPresenceStore(Clock.fixed(T0, ZoneOffset.UTC));
+        presence = new InMemoryPresenceStore(Clock.fixed(T0, ZoneOffset.UTC), uuid -> false);
         afk = new MutableAfkStatus();
         scheduler = new CountingScheduler();
         vanish = (viewer, target) -> false; // no one hidden unless a test opts in

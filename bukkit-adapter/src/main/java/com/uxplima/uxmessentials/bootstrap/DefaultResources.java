@@ -38,6 +38,7 @@ final class DefaultResources {
             "modules/playerstate/config.conf",
             "modules/messaging/config.conf",
             "modules/presence/config.conf",
+            "modules/vanish/config.conf",
             "modules/moderation/config.conf",
             "modules/itemworld/config.conf",
             "modules/vaults/config.conf",

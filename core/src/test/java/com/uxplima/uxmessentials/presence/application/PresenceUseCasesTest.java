@@ -5,31 +5,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
-import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
 import com.uxplima.uxmessentials.presence.domain.PlayerPresence;
 import com.uxplima.uxmessentials.presence.domain.event.ReturnedFromAfk;
-import com.uxplima.uxmessentials.presence.domain.event.VanishToggled;
 import com.uxplima.uxmessentials.presence.domain.event.WentAfk;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -37,17 +30,15 @@ import org.junit.jupiter.api.Test;
  * The presence use cases through their real implementations against in-memory fakes — the same wiring the
  * Brigadier handlers, the activity listeners, and the AFK sweep drive, minus Bukkit. It pins the headline rules:
  * {@code /afk} toggles AFK and publishes the matching event; the sweep's auto-mark flips an idle player exactly
- * once; activity clears AFK and only announces a return when the player was actually AFK; vanish flips the flag,
- * drives the visibility applier, and publishes; and the cross-context vanish query honours the see-node.
+ * once; and activity clears AFK, only announcing a return when the player was actually AFK. Vanish moved to its own
+ * {@code vanish} context and is exercised there.
  */
 class PresenceUseCasesTest {
 
     private FakeStore store;
     private FakeAudience audience;
-    private RecordingVisibility visibility;
     private RecordingEvents events;
     private PresenceNotifier notifier;
-    private FakePermissions permissions;
     private Clock clock;
     private PlayerRef alice;
     private PlayerRef bob;
@@ -56,10 +47,8 @@ class PresenceUseCasesTest {
     void setUp() {
         store = new FakeStore();
         audience = new FakeAudience();
-        visibility = new RecordingVisibility();
         events = new RecordingEvents();
         notifier = new PresenceNotifier(new KeyMessages(), new CapturingSink());
-        permissions = new FakePermissions();
         clock = Clock.system(ZoneOffset.UTC);
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         bob = new PlayerRef(UUID.randomUUID(), "Bob");
@@ -126,62 +115,10 @@ class PresenceUseCasesTest {
     void activityOnAnActivePlayerJustRestampsWithNoEvent() {
         ClearAfkOnActivity clearAfk = new ClearAfkOnActivity(store, audience, notifier, events, clock);
 
-        clearAfk.recordActivity(alice);
+        clearAfk.recordActivity(bob);
 
-        assertThat(store.current(alice).afk()).isFalse();
+        assertThat(store.current(bob).afk()).isFalse();
         assertThat(events.published).isEmpty(); // no return event when the player was never AFK
-    }
-
-    @Test
-    void vanishToggleHidesDrivesVisibilityAndPublishes() {
-        ToggleVanish toggleVanish = new ToggleVanish(store, visibility, notifier, events, clock);
-
-        boolean vanished = toggleVanish.toggle(alice);
-
-        assertThat(vanished).isTrue();
-        assertThat(store.current(alice).vanished()).isTrue();
-        assertThat(visibility.hidden).containsExactly(alice.uuid());
-        assertThat(visibility.revealed).isEmpty();
-        VanishToggled event = (VanishToggled) onlyEvent();
-        assertThat(event.vanished()).isTrue();
-    }
-
-    @Test
-    void vanishToggleTwiceRevealsAgain() {
-        ToggleVanish toggleVanish = new ToggleVanish(store, visibility, notifier, events, clock);
-
-        toggleVanish.toggle(alice);
-        boolean vanished = toggleVanish.toggle(alice);
-
-        assertThat(vanished).isFalse();
-        assertThat(store.current(alice).vanished()).isFalse();
-        assertThat(visibility.revealed).containsExactly(alice.uuid());
-    }
-
-    @Test
-    void resolveVisibilityHidesAVanishedTargetFromAViewerWithoutTheSeeNode() {
-        store.update(alice, PlayerPresence::vanish);
-        ResolveVisibility resolve = new ResolveVisibility(store, permissions);
-
-        assertThat(resolve.isHiddenFrom(bob, alice)).isTrue();
-    }
-
-    @Test
-    void resolveVisibilityShowsAVanishedTargetToAViewerHoldingTheSeeNode() {
-        store.update(alice, PlayerPresence::vanish);
-        permissions.grant(bob, "uxmessentials.vanish.see");
-        ResolveVisibility resolve = new ResolveVisibility(store, permissions);
-
-        assertThat(resolve.isHiddenFrom(bob, alice)).isFalse();
-    }
-
-    @Test
-    void resolveVisibilityNeverHidesANonVanishedTargetOrTheViewerThemselves() {
-        ResolveVisibility resolve = new ResolveVisibility(store, permissions);
-
-        assertThat(resolve.isHiddenFrom(bob, alice)).isFalse(); // alice not vanished
-        store.update(alice, PlayerPresence::vanish);
-        assertThat(resolve.isHiddenFrom(alice, alice)).isFalse(); // a player always sees themselves
     }
 
     private DomainEvent onlyEvent() {
@@ -235,53 +172,12 @@ class PresenceUseCasesTest {
         }
     }
 
-    /** A visibility applier that records each hide/reveal/reconcile it was asked to perform. */
-    private static final class RecordingVisibility implements VisibilityApplier {
-        private final List<UUID> hidden = new ArrayList<>();
-        private final List<UUID> revealed = new ArrayList<>();
-
-        @Override
-        public void hide(PlayerRef who) {
-            hidden.add(who.uuid());
-        }
-
-        @Override
-        public void reveal(PlayerRef who) {
-            revealed.add(who.uuid());
-        }
-
-        @Override
-        public void reconcileOnJoin(PlayerRef who, boolean vanished) {
-            // not exercised by these use-case tests
-        }
-    }
-
     private static final class RecordingEvents implements DomainEventPublisher {
         private final List<DomainEvent> published = new ArrayList<>();
 
         @Override
         public void publish(DomainEvent event) {
             published.add(event);
-        }
-    }
-
-    /** A permissions fake granting only the nodes explicitly handed to a player. */
-    private static final class FakePermissions implements Permissions {
-        private final Set<String> grants = new HashSet<>();
-
-        void grant(PlayerRef who, String node) {
-            grants.add(who.uuid() + "|" + node);
-        }
-
-        @Override
-        public boolean has(PlayerRef who, String node) {
-            return grants.contains(who.uuid() + "|" + node);
-        }
-
-        @Override
-        public QuotaResult resolveQuota(
-                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
-            return QuotaResult.unlimited();
         }
     }
 
