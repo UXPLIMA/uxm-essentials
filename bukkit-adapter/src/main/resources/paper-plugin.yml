@@ -1384,4 +1384,17 @@ permissions:
   uxmessentials.module.security:
     description: 'Hot-reload / inspect the security module (2FA, op-protection, IP/alt guard).'
     default: op
+  # Command Control — PlHidePro / CommandWhitelist-parity gating of which commands a player may run and see. .bypass
+  # exempts a holder from the whitelist/blacklist gate and the tab-completion / plugin-hide scrub (sees everything);
+  # .viewplugins reveals the plugin-listing / help commands the plugin-hide otherwise removes and blocks. The module
+  # reload/inspect tier is uxmessentials.module.commandcontrol.
+  uxmessentials.commandcontrol.bypass:
+    description: 'Exempt from the command whitelist/blacklist gate and the tab-completion / plugin-hide scrub.'
+    default: op
+  uxmessentials.commandcontrol.viewplugins:
+    description: 'See the plugin-listing / help commands (/plugins, /pl, /help, ...) hidden by the plugin-hide feature.'
+    default: op
+  uxmessentials.module.commandcontrol:
+    description: 'Hot-reload / inspect the commandcontrol module (command whitelist, tab-completion filter, plugin-hide).'
+    default: op
 

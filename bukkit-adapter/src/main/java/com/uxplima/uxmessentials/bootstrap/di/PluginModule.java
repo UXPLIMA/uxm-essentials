@@ -994,12 +994,14 @@ public final class PluginModule {
     }
 
     private static void wireCommandControl(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
-        // commandcontrol persists nothing: the whitelist/blacklist rule set is derived once from the module's config
-        // into an immutable snapshot, so a hot-reload re-runs this wiring and registers a fresh gate. The single
-        // PlayerCommandPreprocessEvent listener consults that rule set with the player's group (LuckPerms when
-        // installed, empty otherwise) and permission facts, and on deny cancels the command and sends the configured
-        // deny line. There is no runtime state to drain on stop — unregistering the listener is enough.
-        resources.addListener(CommandControlWiring.wire(plugin.getServer(), ctx));
+        // commandcontrol persists nothing: the whitelist/blacklist rule set and the plugin-hide policy are derived once
+        // from the module's config into immutable snapshots, so a hot-reload re-runs this wiring and registers fresh
+        // listeners. The gate listener consults the rule set on PlayerCommandPreprocessEvent and, on deny, cancels the
+        // command and sends the configured deny line; the visibility listener scrubs the sent command list, tab
+        // completion, and the scrub-help output so disallowed and hidden commands stay invisible. Both read the
+        // player's group (LuckPerms when installed, empty otherwise) and permission facts. There is no runtime state to
+        // drain on stop — unregistering the listeners is enough.
+        CommandControlWiring.wire(plugin.getServer(), ctx).forEach(resources::addListener);
     }
 
     private static void wireTrade(

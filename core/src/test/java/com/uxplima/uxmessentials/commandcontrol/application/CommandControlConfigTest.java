@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 class CommandControlConfigTest {
 
     private static final String BYPASS = "uxmessentials.commandcontrol.bypass";
+    private static final String VIEW = "uxmessentials.commandcontrol.viewplugins";
 
     @Test
     void defaultsAreSafeAndInert() {
@@ -30,6 +31,33 @@ class CommandControlConfigTest {
         assertThat(config.useUnknownCommandMessage()).isTrue();
         assertThat(config.denyMessage()).isEqualTo(CommandControlMessageKey.COMMANDCONTROL_UNKNOWN_COMMAND);
         assertThat(config.toRuleSet(BYPASS).isInert()).isTrue();
+
+        // Tab-completion ships on (a no-op while the lists are empty); the plugin-hide ships off with the standard
+        // plugin-listing list pre-filled, so it is one toggle away without leaving the module doing anything yet.
+        assertThat(config.tabCompletionEnabled()).isTrue();
+        assertThat(config.pluginHideEnabled()).isFalse();
+        assertThat(config.denyListCommands()).isFalse();
+        assertThat(config.hiddenCommands()).contains("plugins", "pl", "help", "icanhasbukkit");
+        assertThat(config.toHidePolicy(VIEW).isActive()).isFalse();
+    }
+
+    @Test
+    void pluginHideAndTabCompletionOverridesAreReadBack() {
+        CommandControlConfig config = CommandControlConfig.from(new FixedConfig(
+                Map.of(),
+                Map.of(
+                        "tab-completion.enabled", false,
+                        "plugin-hide.enabled", true,
+                        "plugin-hide.deny-list-commands", true),
+                List.of(),
+                Map.of("plugin-hide.hidden-commands", List.of("plugins", "pl"))));
+
+        assertThat(config.tabCompletionEnabled()).isFalse();
+        assertThat(config.pluginHideEnabled()).isTrue();
+        assertThat(config.denyListCommands()).isTrue();
+        assertThat(config.hiddenCommands()).containsExactly("plugins", "pl");
+        assertThat(config.toHidePolicy(VIEW).isActive()).isTrue();
+        assertThat(config.toHidePolicy(VIEW).isHiddenCommand("bukkit:plugins")).isTrue();
     }
 
     @Test

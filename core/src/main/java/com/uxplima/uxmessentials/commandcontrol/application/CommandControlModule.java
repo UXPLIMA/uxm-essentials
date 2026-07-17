@@ -13,18 +13,19 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The command-control bounded context as a first-class {@link FeatureModule}: PlHidePro / CommandWhitelist-parity
- * gating of which commands a player may run, built in with no separate plugin. Phase 1 is the command
- * whitelist/blacklist and the custom "unknown command" deny message; the tab-completion filter, the plugin-hide, and
- * the namespace-bypass block land in the later phases.
+ * gating of which commands a player may run and see, built in with no separate plugin. Phase 1 is the command
+ * whitelist/blacklist and the custom "unknown command" deny message; Phase 2 adds the tab-completion filter and the
+ * plugin-hide (scrubbing disallowed and plugin-listing commands from the client command list, tab completion, and the
+ * scrub-help output). The namespace-bypass block lands in the last phase.
  *
- * <p><b>Ships enabled by default</b> but inert: the bundled config is a blacklist with empty lists, so an enabled
- * module gates nothing until an operator names commands. An operator turns the whole feature off with
- * {@code modules.commandcontrol.enabled = false}. It persists nothing — the rule set is derived from config — so the
- * module owns no Flyway location.
+ * <p><b>Ships enabled by default</b> but inert: the bundled config is a blacklist with empty lists and the plugin-hide
+ * is off, so an enabled module gates and hides nothing until an operator names commands or turns the hide on. An
+ * operator turns the whole feature off with {@code modules.commandcontrol.enabled = false}. It persists nothing — the
+ * rule set and the hide policy are derived from config — so the module owns no Flyway location.
  *
- * <p>The gate is a single {@code PlayerCommandPreprocessEvent} listener contributed through the adapter wiring (it
- * needs the live player, the permission check, and the group lookup), so this module publishes no declarative command
- * or listener; a disabled module wires zero of them (the {@code FeatureModule} contract).
+ * <p>The gate and the visibility filter are Bukkit-facing listeners contributed through the adapter wiring (they need
+ * the live player, the permission check, and the group lookup), so this module publishes no declarative command or
+ * listener; a disabled module wires zero of them (the {@code FeatureModule} contract).
  */
 @NullMarked
 public final class CommandControlModule implements FeatureModule {

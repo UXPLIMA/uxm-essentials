@@ -5,7 +5,9 @@
  * {@link com.uxplima.uxmessentials.commandcontrol.adapter.outbound.LuckPermsPlayerGroupSource} binds only when
  * LuckPerms is installed, chosen by
  * {@link com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSources}, with an empty fallback
- * otherwise.
+ * otherwise. {@link com.uxplima.uxmessentials.commandcontrol.adapter.outbound.CommandPermissionView} resolves whether a
+ * player may see a command by its vanilla permission, so the tab-completion scrub honours the permission a command
+ * already carries alongside the rule set.
  */
 @org.jspecify.annotations.NullMarked
 package com.uxplima.uxmessentials.commandcontrol.adapter.outbound;

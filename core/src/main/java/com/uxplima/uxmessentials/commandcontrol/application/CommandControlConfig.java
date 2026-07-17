@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleMode;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -26,22 +27,39 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *     "no permission" line ({@code use-unknown-command-message}, default {@code true})
  * @param defaultCommands the fallback command list ({@code commands.default})
  * @param groupCommands the per-group command lists, keyed by permission group name
+ * @param tabCompletionEnabled scrub the disallowed commands from the client command list / tab-completion
+ *     ({@code tab-completion.enabled}, default {@code true} — a no-op while the rule set stays inert)
+ * @param pluginHideEnabled hide the plugin-listing / help commands from players without the view permission
+ *     ({@code plugin-hide.enabled}, default {@code false} — the feature ships opt-in)
+ * @param hiddenCommands the plugin-listing / help commands the hide covers ({@code plugin-hide.hidden-commands})
+ * @param denyListCommands also block the hidden commands from executing for those players, so a {@code /plugins} or
+ *     {@code /help} cannot leak plugin names ({@code plugin-hide.deny-list-commands}, default {@code false})
  */
 public record CommandControlConfig(
         boolean enabled,
         RuleMode mode,
         boolean useUnknownCommandMessage,
         List<String> defaultCommands,
-        Map<String, List<String>> groupCommands) {
+        Map<String, List<String>> groupCommands,
+        boolean tabCompletionEnabled,
+        boolean pluginHideEnabled,
+        List<String> hiddenCommands,
+        boolean denyListCommands) {
 
     /** The config key under {@code commands} that holds the fallback list rather than a named group. */
     private static final String DEFAULT_LIST_KEY = "default";
+
+    /** The plugin-listing / help commands the hide covers out of the box, before an operator edits the list. */
+    private static final List<String> DEFAULT_HIDDEN_COMMANDS =
+            List.of("plugins", "pl", "?", "help", "ver", "version", "about", "icanhasbukkit");
 
     public CommandControlConfig {
         Objects.requireNonNull(mode, "mode");
         Objects.requireNonNull(defaultCommands, "defaultCommands");
         Objects.requireNonNull(groupCommands, "groupCommands");
+        Objects.requireNonNull(hiddenCommands, "hiddenCommands");
         defaultCommands = List.copyOf(defaultCommands);
+        hiddenCommands = List.copyOf(hiddenCommands);
         Map<String, List<String>> copied = new LinkedHashMap<>();
         groupCommands.forEach((group, list) -> copied.put(group, List.copyOf(list)));
         groupCommands = Map.copyOf(copied);
@@ -62,12 +80,21 @@ public record CommandControlConfig(
                 RuleMode.fromConfig(config.getString("mode", "blacklist"), RuleMode.BLACKLIST),
                 config.getBoolean("use-unknown-command-message", true),
                 defaults,
-                groups);
+                groups,
+                config.getBoolean("tab-completion.enabled", true),
+                config.getBoolean("plugin-hide.enabled", false),
+                config.getStringList("plugin-hide.hidden-commands", DEFAULT_HIDDEN_COMMANDS),
+                config.getBoolean("plugin-hide.deny-list-commands", false));
     }
 
     /** Build the pure {@link RuleSet} this config describes, gating {@code .bypass} on {@code bypassPermission}. */
     public RuleSet toRuleSet(String bypassPermission) {
         return RuleSet.of(mode, defaultCommands, groupCommands, bypassPermission);
+    }
+
+    /** Build the pure {@link HidePolicy} this config describes, revealing the hidden commands to {@code viewPermission}. */
+    public HidePolicy toHidePolicy(String viewPermission) {
+        return HidePolicy.of(pluginHideEnabled, hiddenCommands, viewPermission);
     }
 
     /** The deny line to show on a blocked command, per {@link #useUnknownCommandMessage}. */
