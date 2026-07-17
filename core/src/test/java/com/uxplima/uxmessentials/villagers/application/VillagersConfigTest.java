@@ -24,6 +24,8 @@ class VillagersConfigTest {
         assertThat(config.restock().enabled()).isFalse();
         assertThat(config.instantRestock().enabled()).isFalse();
         assertThat(config.disableTrades().enabled()).isFalse();
+        assertThat(config.tradeManager().enabled()).isFalse();
+        assertThat(config.clickToTrade().enabled()).isFalse();
     }
 
     @Test
@@ -50,7 +52,9 @@ class VillagersConfigTest {
                 "restock.enabled", true,
                 "restock.interval-seconds", 120,
                 "instant-restock.enabled", true,
-                "disable-trades.enabled", true)));
+                "disable-trades.enabled", true,
+                "trade-manager.enabled", true,
+                "click-to-trade.enabled", true)));
 
         assertThat(config.enabled()).isFalse();
         assertThat(config.infiniteTrading().enabled()).isTrue();
@@ -58,6 +62,8 @@ class VillagersConfigTest {
         assertThat(config.restock().intervalSeconds()).isEqualTo(120);
         assertThat(config.instantRestock().enabled()).isTrue();
         assertThat(config.disableTrades().enabled()).isTrue();
+        assertThat(config.tradeManager().enabled()).isTrue();
+        assertThat(config.clickToTrade().enabled()).isTrue();
     }
 
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */

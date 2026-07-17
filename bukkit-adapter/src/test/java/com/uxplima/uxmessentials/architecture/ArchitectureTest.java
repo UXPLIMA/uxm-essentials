@@ -266,7 +266,9 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeHolder",
                 "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener",
                 "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView",
-                "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadHolder");
+                "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadHolder",
+                "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView",
+                "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerHolder");
         return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
             String fullName = javaClass.getFullName();
             int nested = fullName.indexOf('$');

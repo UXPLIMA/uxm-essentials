@@ -1397,4 +1397,18 @@ permissions:
   uxmessentials.module.commandcontrol:
     description: 'Hot-reload / inspect the commandcontrol module (command whitelist, tab-completion filter, plugin-hide).'
     default: op
+  # villagers context (docs/permissions.md "Villagers"). Villager trade management. The trade manager is a staff tool
+  # (.manager) — /villager manager opens the villager you look at and edits its trades (buy/sell items and amounts,
+  # add/remove a trade, toggle the villager's disable flag). Click-to-trade (.trade) opens a villager's trade window
+  # directly on right-click even where the vanilla gate would refuse it. Both features ship off in config; the module
+  # reload/inspect tier is uxmessentials.module.villagers.
+  uxmessentials.villagers.manager:
+    description: '/villager manager — open and edit the trades of the villager you are looking at.'
+    default: op
+  uxmessentials.villagers.trade:
+    description: 'Open a villager''s trade window directly on right-click, when click-to-trade is enabled.'
+    default: op
+  uxmessentials.module.villagers:
+    description: 'Hot-reload / inspect the villagers module (villager trade management).'
+    default: op
 

@@ -978,15 +978,17 @@ public final class PluginModule {
     }
 
     private static void wireVillagers(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
-        // villagers persists nothing: the per-villager last-restock stamp and disable flag are PDC state on the
-        // villager entity, and the config is read once into an immutable snapshot. Each trade-availability feature
-        // wires only when its config switch is on — the trade listener lands only when infinite trading or instant
-        // restock is enabled, and the restock sweep schedules a task only when the restock timer is enabled — while the
-        // disable-trades listener always registers so it can honour the per-villager flag the Phase-2 manager sets. The
-        // sweep's repeating task is cancelled on module stop through the Wired stop hook so a disable strands no
-        // scheduled work.
+        // villagers persists nothing relational: the last-restock stamp, the disable flag, and the manager's custom
+        // recipe set are all PDC state on the villager entity, and the config is read once into an immutable snapshot.
+        // Each feature wires only when its config switch is on — the trade listener under infinite/instant restock, the
+        // restock sweep under the restock timer, the /villager manager command + its GUI listener + the load-time
+        // recipe reapply under trade-manager, and the click-to-trade listener under click-to-trade — while the
+        // disable-trades listener always registers so it can honour the per-villager flag the manager sets. The sweep's
+        // repeating task is cancelled and any open manager window drained on module stop through the Wired stop hook so
+        // a disable strands no scheduled work and loses no edit.
         VillagersWiring.Wired wired = VillagersWiring.wire(ctx, plugin.getServer());
         wired.listeners().forEach(resources::addListener);
+        wired.commands().forEach(resources::addCommand);
         resources.onClose(wired.stop());
     }
 

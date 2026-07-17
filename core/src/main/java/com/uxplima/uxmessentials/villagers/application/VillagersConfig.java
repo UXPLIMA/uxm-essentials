@@ -22,19 +22,25 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param restock the restock-timer feature settings
  * @param instantRestock the instant-restock feature settings
  * @param disableTrades the disable-trades feature settings
+ * @param tradeManager the trade-manager feature settings
+ * @param clickToTrade the click-to-trade feature settings
  */
 public record VillagersConfig(
         boolean enabled,
         InfiniteTrading infiniteTrading,
         Restock restock,
         InstantRestock instantRestock,
-        DisableTrades disableTrades) {
+        DisableTrades disableTrades,
+        TradeManager tradeManager,
+        ClickToTrade clickToTrade) {
 
     public VillagersConfig {
         Objects.requireNonNull(infiniteTrading, "infiniteTrading");
         Objects.requireNonNull(restock, "restock");
         Objects.requireNonNull(instantRestock, "instantRestock");
         Objects.requireNonNull(disableTrades, "disableTrades");
+        Objects.requireNonNull(tradeManager, "tradeManager");
+        Objects.requireNonNull(clickToTrade, "clickToTrade");
     }
 
     /** Resolve the villagers config from the module's scoped {@link ConfigStore} ({@code modules.villagers}). */
@@ -45,7 +51,9 @@ public record VillagersConfig(
                 InfiniteTrading.from(config),
                 Restock.from(config),
                 InstantRestock.from(config),
-                DisableTrades.from(config));
+                DisableTrades.from(config),
+                TradeManager.from(config),
+                ClickToTrade.from(config));
     }
 
     /**
@@ -120,6 +128,40 @@ public record VillagersConfig(
 
         static DisableTrades from(ConfigStore config) {
             return new DisableTrades(config.getBoolean("disable-trades.enabled", false));
+        }
+    }
+
+    /**
+     * The trade-manager feature under {@code trade-manager { … }}: with {@code enabled} on, staff run
+     * {@code /villager manager} (gated on {@code uxmessentials.villagers.manager}) to open a GUI of the villager they
+     * are looking at and edit its trades — change a recipe's buy/sell items and amounts, add a recipe, remove one, or
+     * toggle the villager's per-villager disable flag. Edits apply to the live merchant and are PDC-serialised on the
+     * villager so they survive a chunk reload / restart (reapplied when the villager loads). When this feature is on
+     * the reapply listener registers so a managed villager keeps its custom trades. Ships off with the rest of the
+     * module — an operator opts the staff tool in.
+     *
+     * @param enabled whether the trade manager is available ({@code trade-manager.enabled}, default {@code false})
+     */
+    public record TradeManager(boolean enabled) {
+
+        static TradeManager from(ConfigStore config) {
+            return new TradeManager(config.getBoolean("trade-manager.enabled", false));
+        }
+    }
+
+    /**
+     * The click-to-trade feature under {@code click-to-trade { … }}: with {@code enabled} on, a permitted player
+     * (gated on {@code uxmessentials.villagers.trade}) who right-clicks a villager opens its trade window directly,
+     * even where the vanilla gate would refuse it (a professionless villager, one already claimed by another trader).
+     * The per-villager and global disable flags are still honoured — a disabled villager never opens. A gameplay
+     * change, so it ships off.
+     *
+     * @param enabled whether click-to-trade runs ({@code click-to-trade.enabled}, default {@code false})
+     */
+    public record ClickToTrade(boolean enabled) {
+
+        static ClickToTrade from(ConfigStore config) {
+            return new ClickToTrade(config.getBoolean("click-to-trade.enabled", false));
         }
     }
 }
