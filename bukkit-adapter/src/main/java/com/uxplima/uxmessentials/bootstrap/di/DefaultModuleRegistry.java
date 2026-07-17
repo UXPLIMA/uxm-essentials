@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.ranks.application.RanksModule;
 import com.uxplima.uxmessentials.regions.application.RegionsModule;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardModule;
 import com.uxplima.uxmessentials.security.application.SecurityModule;
+import com.uxplima.uxmessentials.servertweaks.application.ServerTweaksModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
@@ -221,6 +222,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // soft-dep, not a module), persists nothing (WorldGuard owns the region store), and like the steady-state
         // features ships ENABLED, so it lands last after invrollback.
         delegate.register(new RegionsModule());
+        // servertweaks is the last bounded context — a grab-bag of small, independently-toggleable server/infra
+        // tweaks (Phase 1: a custom F3 server brand and a console-spam log filter). It carries no hard dependency
+        // edge (its collaborators are the shared Scheduler-free config + logger ports and Bukkit's Messenger/Log4j2
+        // seams at the adapter edge), persists nothing (each tweak is a live side effect), and ships ENABLED so a
+        // single tweak can be turned on in isolation — but every individual tweak defaults OFF, so a fresh install
+        // wires nothing until an operator opts one in. It lands last after regions.
+        delegate.register(new ServerTweaksModule());
         // The shared kernel is not a module and never appears here.
     }
 

@@ -83,6 +83,7 @@ import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
+import com.uxplima.uxmessentials.servertweaks.adapter.ServerTweaksWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
@@ -980,7 +981,22 @@ public final class PluginModule {
             wireInvrollback(ctx, persistence, resources, menus);
         } else if (module.id().equals(ModuleId.of("regions"))) {
             wireRegions(plugin, ctx, resources, menus);
+        } else if (module.id().equals(ModuleId.of("servertweaks"))) {
+            wireServerTweaks(plugin, ctx, resources);
         }
+    }
+
+    private static void wireServerTweaks(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // servertweaks is a grab-bag of small server/infra tweaks, each gated by its own switch (both default off), so
+        // the wiring registers only the effects an operator has opted into. When f3-brand is on, a join listener
+        // re-sends the configured brand over the minecraft:brand channel so it shows on F3; when console-filter is on,
+        // a Log4j2 filter is attached to the root logger to drop exactly the configured console spam. The context
+        // persists nothing — each effect is a live side effect on the running server — and its stop hook unwinds every
+        // one (unregister the channel, detach the filter) so a disable or reload leaves the server as it was found. A
+        // disabled module wires none of this.
+        ServerTweaksWiring.Wired wired = ServerTweaksWiring.wire(plugin, ctx);
+        wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
     }
 
     private static void wireRegions(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, Menus menus) {

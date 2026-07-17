@@ -81,6 +81,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("villagers"))).isPresent();
         assertThat(registry.byId(ModuleId.of("invrollback"))).isPresent();
         assertThat(registry.byId(ModuleId.of("regions"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("servertweaks"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -115,7 +116,8 @@ class FeatureModuleRegistryDriftTest {
                         "trade",
                         "villagers",
                         "invrollback",
-                        "regions");
+                        "regions",
+                        "servertweaks");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -782,14 +784,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void regionsIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void regionsShipsEnabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule regions = registry.byId(ModuleId.of("regions"))
                 .orElseThrow(() -> new AssertionError("regions is not registered"));
 
-        // regions is a new bounded context — a GUI to manage WorldGuard regions behind a SOFT dependency — registered
-        // last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("regions");
+        // regions is a bounded context — a GUI to manage WorldGuard regions behind a SOFT dependency. The later
+        // servertweaks context now lands last, so regions must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("regions"))).isPresent();
 
         // It ships ENABLED (being on costs nothing without WorldGuard — the module degrades to a "not installed"
         // reply): with no modules.conf override it is on, and disabling exactly regions removes only it while every
@@ -809,6 +811,37 @@ class FeatureModuleRegistryDriftTest {
         // persists nothing (WorldGuard owns the region store), so it declares no MigrationSet.
         assertThat(regions.commands()).isEmpty();
         assertThat(regions.migrations()).isEmpty();
+    }
+
+    @Test
+    void serverTweaksIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule serverTweaks = registry.byId(ModuleId.of("servertweaks"))
+                .orElseThrow(() -> new AssertionError("servertweaks is not registered"));
+
+        // servertweaks is the last bounded context — a grab-bag of small server/infra tweaks (custom F3 brand,
+        // console-spam filter), registered last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("servertweaks");
+
+        // It ships ENABLED but inert (every individual tweak defaults off, so being on changes nothing until an
+        // operator opts a tweak in): with no modules.conf override it is on, and disabling exactly it removes only it
+        // while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("servertweaks", "teleport", "economy", "holograms", "regions");
+        Set<String> off =
+                registry.enabledModules(new FixedConfig(Map.of("modules.servertweaks.enabled", false))).stream()
+                        .map(m -> m.id().value())
+                        .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("servertweaks");
+        assertThat(off).contains("teleport", "holograms", "regions");
+
+        // The tweaks are Bukkit-facing side effects (a brand plugin-message on join, a Log4j2 console filter)
+        // contributed through the adapter wiring, gated per tweak, not the declarative lists — so the module publishes
+        // no command here, and it persists nothing (each tweak is a live side effect), so it declares no MigrationSet.
+        assertThat(serverTweaks.commands()).isEmpty();
+        assertThat(serverTweaks.migrations()).isEmpty();
     }
 
     @Test
