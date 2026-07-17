@@ -45,6 +45,7 @@ public final class ItemworldGroupACommands {
         commands.add(new ItemCommand(services));
         commands.add(new ItemNameCommand(services));
         commands.add(new ItemLoreCommand(services));
+        commands.add(new ItemEditCommand(services));
         commands.add(new ItemFlagCommand(services));
         commands.add(new SkullCommand(services));
         commands.add(new FireworkCommand(services));

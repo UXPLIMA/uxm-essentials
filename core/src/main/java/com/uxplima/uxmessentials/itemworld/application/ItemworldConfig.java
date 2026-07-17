@@ -38,6 +38,15 @@ public final class ItemworldConfig {
         return config.getBoolean("groups." + group.configKey() + ".enabled", true);
     }
 
+    /**
+     * Whether the {@code /itemedit} held-item editor is enabled ({@code item-edit.enabled}, default {@code true}).
+     * This is the item-edit sub-feature's own toggle, separate from the {@link SubFeatureGroup} gate — an operator
+     * switches the whole editor off here without touching the item-utils group.
+     */
+    public boolean itemEditEnabled() {
+        return config.getBoolean("item-edit.enabled", true);
+    }
+
     /** Whether a single command is disabled ({@code commands.<literal>.disabled}, default {@code false}). */
     public boolean commandDisabled(String literal) {
         Objects.requireNonNull(literal, "literal");

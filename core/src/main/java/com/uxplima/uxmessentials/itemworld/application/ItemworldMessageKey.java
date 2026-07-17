@@ -31,6 +31,15 @@ public enum ItemworldMessageKey implements MessageKey {
     ITEMLORE_SET("itemworld.itemlore.set"),
     ITEMLORE_ADDED("itemworld.itemlore.added"),
     ITEMLORE_CLEARED("itemworld.itemlore.cleared"),
+    // /itemedit — the held-item editor (name + lore)
+    ITEMEDIT_NAME_SET("itemworld.itemedit.name-set"),
+    ITEMEDIT_NAME_RESET("itemworld.itemedit.name-reset"),
+    ITEMEDIT_LORE_ADDED("itemworld.itemedit.lore-added"),
+    ITEMEDIT_LORE_SET("itemworld.itemedit.lore-set"),
+    ITEMEDIT_LORE_INSERTED("itemworld.itemedit.lore-inserted"),
+    ITEMEDIT_LORE_REMOVED("itemworld.itemedit.lore-removed"),
+    ITEMEDIT_LORE_CLEARED("itemworld.itemedit.lore-cleared"),
+    ITEMEDIT_LORE_OUT_OF_RANGE("itemworld.itemedit.lore-out-of-range"),
     // /itemflag
     ITEMFLAG_TOGGLED("itemworld.itemflag.toggled"),
     ITEMFLAG_UNKNOWN("itemworld.itemflag.unknown"),
