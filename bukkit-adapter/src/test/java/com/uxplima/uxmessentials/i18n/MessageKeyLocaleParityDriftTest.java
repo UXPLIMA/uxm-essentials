@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
+import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
@@ -131,7 +132,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(SurvivalMessageKey.values(), List.of("survival")),
                 Map.entry(RanksMessageKey.values(), List.of("ranks")),
                 Map.entry(SecurityMessageKey.values(), List.of("security")),
-                Map.entry(VillagersMessageKey.values(), List.of("villagers")));
+                Map.entry(VillagersMessageKey.values(), List.of("villagers")),
+                Map.entry(InvrollbackMessageKey.values(), List.of("invrollback")));
     }
 
     @Test

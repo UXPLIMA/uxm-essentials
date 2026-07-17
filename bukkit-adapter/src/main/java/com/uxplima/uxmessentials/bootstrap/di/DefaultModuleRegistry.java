@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.discordlink.application.DiscordlinkModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.holograms.application.HologramsModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
+import com.uxplima.uxmessentials.invrollback.application.InvrollbackModule;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldModule;
 import com.uxplima.uxmessentials.kits.application.KitsModule;
 import com.uxplima.uxmessentials.messaging.application.MessagingModule;
@@ -206,6 +207,12 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // persists nothing (the last-restock stamp and disable flag are PDC state on the villager entity), and like the
         // steady-state features ships ENABLED but inert until an operator turns a feature on, so it lands last.
         delegate.register(new VillagersModule());
+        // invrollback is a new bounded context — AxInventoryRestore-parity inventory snapshots captured on death
+        // and logout, DB-backed so a lost inventory survives a world rollback and staff can restore it from a GUI
+        // (Phase 2). It carries no hard dependency edge (its collaborators are the shared persistence DSL, the
+        // Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but inert
+        // until a capture happens, so it lands last after villagers.
+        delegate.register(new InvrollbackModule());
         // The shared kernel is not a module and never appears here.
     }
 

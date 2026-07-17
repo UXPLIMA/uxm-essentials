@@ -79,6 +79,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("commandcontrol"))).isPresent();
         assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
         assertThat(registry.byId(ModuleId.of("villagers"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("invrollback"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -111,7 +112,8 @@ class FeatureModuleRegistryDriftTest {
                         "security",
                         "commandcontrol",
                         "trade",
-                        "villagers");
+                        "villagers",
+                        "invrollback");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -717,14 +719,15 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void villagersIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void villagersShipsEnabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule villagers = registry.byId(ModuleId.of("villagers"))
                 .orElseThrow(() -> new AssertionError("villagers is not registered"));
 
-        // villagers is a new bounded context — villager trade management (Phase 1: infinite trading, restock timer,
-        // instant restock, disable trades) — registered last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("villagers");
+        // villagers is a bounded context — villager trade management (Phase 1: infinite trading, restock timer,
+        // instant restock, disable trades). The later invrollback context now lands last, so villagers must merely
+        // be registered, not last.
+        assertThat(registry.byId(ModuleId.of("villagers"))).isPresent();
 
         // It ships ENABLED but inert (every trade-availability feature defaults off): with no modules.conf override it
         // is on, and disabling exactly villagers removes only it while every sibling stays on.
@@ -743,6 +746,37 @@ class FeatureModuleRegistryDriftTest {
         // last-restock stamp and disable flag are PDC state on the villager), so it declares no MigrationSet.
         assertThat(villagers.commands()).isEmpty();
         assertThat(villagers.migrations()).isEmpty();
+    }
+
+    @Test
+    void invrollbackIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule invrollback = registry.byId(ModuleId.of("invrollback"))
+                .orElseThrow(() -> new AssertionError("invrollback is not registered"));
+
+        // invrollback is a new bounded context — AxInventoryRestore-parity inventory snapshots on death and logout —
+        // registered last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("invrollback");
+
+        // It ships ENABLED but inert (a steady-state feature — nothing is stored until a player dies or logs out):
+        // with no modules.conf override it is on, and disabling exactly invrollback removes only it while every
+        // sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("invrollback", "teleport", "economy", "holograms", "villagers");
+        Set<String> off =
+                registry.enabledModules(new FixedConfig(Map.of("modules.invrollback.enabled", false))).stream()
+                        .map(m -> m.id().value())
+                        .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("invrollback");
+        assertThat(off).contains("teleport", "holograms", "villagers");
+
+        // The death/logout capture listeners are contributed through the adapter wiring, not the declarative lists,
+        // so the module publishes no command here, and its inv_snapshots table is in the persistence V79 baseline
+        // (always applied), so it declares no MigrationSet of its own.
+        assertThat(invrollback.commands()).isEmpty();
+        assertThat(invrollback.migrations()).isEmpty();
     }
 
     @Test

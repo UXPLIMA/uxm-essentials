@@ -54,6 +54,7 @@ import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.homes.adapter.outbound.RepositoryHomeRespawnLocator;
 import com.uxplima.uxmessentials.homes.application.HomeRespawnLocator;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
+import com.uxplima.uxmessentials.invrollback.adapter.InvrollbackWiring;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
@@ -974,7 +975,20 @@ public final class PluginModule {
             wireCommandControl(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
             wireVillagers(plugin, ctx, resources);
+        } else if (module.id().equals(ModuleId.of("invrollback"))) {
+            wireInvrollback(ctx, persistence, resources);
         }
+    }
+
+    private static void wireInvrollback(ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // invrollback builds its jOOQ SnapshotRepository over persistence.dsl() and registers the death/logout
+        // capture listener. A capture reads the player's inventory on the tick thread, serializes it there, and
+        // hops the DB write off the tick thread through the Scheduler.async port (Folia-safe). The table is bounded
+        // per player at write time (deleteBeyondCount) using the configured retention count; the age-based sweep and
+        // the /invrestore GUI land in Phase 2. It holds no runtime state of its own, so there is nothing to drain on
+        // stop — a disabled module simply registers no listener.
+        InvrollbackWiring.Wired wired = InvrollbackWiring.wire(ctx, persistence);
+        wired.listeners().forEach(resources::addListener);
     }
 
     private static void wireVillagers(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {

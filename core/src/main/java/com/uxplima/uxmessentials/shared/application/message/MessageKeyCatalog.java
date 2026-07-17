@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
+import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
@@ -81,7 +82,8 @@ public final class MessageKeyCatalog {
             SecurityMessageKey.values(),
             CommandControlMessageKey.values(),
             TradeMessageKey.values(),
-            VillagersMessageKey.values());
+            VillagersMessageKey.values(),
+            InvrollbackMessageKey.values());
 
     private MessageKeyCatalog() {}
 
