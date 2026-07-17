@@ -1358,9 +1358,9 @@ permissions:
   uxmessentials.module.trade:
     description: 'Hot-reload / inspect the trade module.'
     default: op
-  # Security — account-security features (NOT a login system). Phase 1 is the two-factor enrolment surface: every
+  # Security — account-security features (NOT a login system). Two-factor enrolment is the self-service surface: every
   # player may protect their own account, so uxmessentials.security.2fa and .pin ship true; .bypass exempts a holder
-  # from the (later-phase) verification and op-command re-auth checks; uxmessentials.module.security is the
+  # from the two-factor join verification and op-command re-auth checks; uxmessentials.module.security is the
   # reload/inspect tier.
   uxmessentials.security.2fa:
     description: '/2fa — set up, confirm or disable an authenticator second factor on your account.'
@@ -1369,7 +1369,7 @@ permissions:
     description: '/pin set — set a numeric PIN second factor on your account.'
     default: true
   uxmessentials.security.bypass:
-    description: 'Exempt from the two-factor join verification and op-command re-auth checks (later phases).'
+    description: 'Exempt from the two-factor join verification and op-command re-auth checks.'
     default: op
   uxmessentials.module.security:
     description: 'Hot-reload / inspect the security module (2FA, op-protection, IP/alt guard).'

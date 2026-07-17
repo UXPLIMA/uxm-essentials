@@ -49,6 +49,7 @@ public final class VerificationController implements KeypadActions {
     private final VerifyTwoFactor verify;
     private final TrustStore trustStore;
     private final VerificationSessions sessions;
+    private final ReauthState reauthState;
     private final SecurityConfig.JoinVerification config;
     private final PinKeypadView keypad;
     private final TotpPrompt totpPrompt;
@@ -62,6 +63,7 @@ public final class VerificationController implements KeypadActions {
             VerifyTwoFactor verify,
             TrustStore trustStore,
             VerificationSessions sessions,
+            ReauthState reauthState,
             SecurityConfig.JoinVerification config,
             PinKeypadView keypad,
             TotpPrompt totpPrompt,
@@ -73,6 +75,7 @@ public final class VerificationController implements KeypadActions {
         this.verify = Objects.requireNonNull(verify, "verify");
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.reauthState = Objects.requireNonNull(reauthState, "reauthState");
         this.config = Objects.requireNonNull(config, "config");
         this.keypad = Objects.requireNonNull(keypad, "keypad");
         this.totpPrompt = Objects.requireNonNull(totpPrompt, "totpPrompt");
@@ -166,6 +169,9 @@ public final class VerificationController implements KeypadActions {
 
     private void succeed(Player player, PlayerRef viewer) {
         sessions.clear(viewer.uuid());
+        // A fresh join proof also opens the op-command re-auth window, so the player is not re-asked to verify to run
+        // a protected command they were just about to run.
+        reauthState.stamp(viewer.uuid(), clock.instant());
         keypad.closeFor(viewer);
         notify(viewer, SecurityMessageKey.SECURITY_VERIFY_SUCCESS);
         rememberDevice(player, viewer);

@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.security.adapter.inbound.command.PinCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
+import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityJoinListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
 import com.uxplima.uxmessentials.security.application.BeginTotpEnrollment;
@@ -81,24 +82,49 @@ public final class SecurityWiring {
         // re-prompt, or lockout kick. A submitted code is verified through VerifyTwoFactor (TOTP or PIN), off-thread.
         TrustStore trustStore = TrustStores.jooq(persistence);
         VerificationSessions sessions = new VerificationSessions();
+        ReauthState reauthState = new ReauthState();
+        ReauthSessions reauthSessions = new ReauthSessions();
         PinKeypadView keypad = new PinKeypadView(kernel.messages(), kernel.scheduler());
+        VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
+        TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(textInput);
         VerificationController controller = new VerificationController(
                 repository,
-                new VerifyTwoFactor(repository, twoFactor.codeWindow()),
+                verify,
                 trustStore,
                 sessions,
+                reauthState,
                 config.joinVerification(),
                 keypad,
-                new TextInputTotpPrompt(textInput),
+                totpPrompt,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
                 clock);
+
+        // Phase 3 — op-command protection: a re-auth controller sharing the same keypad, a router that sends each
+        // keypad submission to whichever flow the player is in, and the command listener that blocks a protected
+        // command until the player's re-auth window is fresh. The recent-verify check is in-memory; the verify is
+        // off-thread. The op-protection sub-feature is gated by its own enabled flag, so a no-op costs nothing.
+        SecurityConfig.OpProtection opProtection = config.opProtection();
+        ReauthController reauthController = new ReauthController(
+                repository,
+                verify,
+                reauthState,
+                reauthSessions,
+                keypad,
+                totpPrompt,
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink(),
+                clock);
+        KeypadRouter router = new KeypadRouter(reauthSessions, controller, reauthController);
         List<Listener> listeners = List.of(
                 new SecurityJoinListener(controller),
                 new VerificationFreezeListener(sessions, kernel.messages(), kernel.messageSink()),
-                new PinKeypadListener(keypad, controller, sessions));
-        return new Wired(commands, listeners, pending, sessions, keypad);
+                new PinKeypadListener(keypad, router, sessions),
+                new ReauthCommandListener(
+                        opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock));
+        return new Wired(commands, listeners, pending, sessions, keypad, reauthSessions, reauthState);
     }
 
     /**
@@ -108,17 +134,21 @@ public final class SecurityWiring {
      * a disable or reload leaves no residual secret and no locked player.
      *
      * @param commands the Brigadier command registrations to publish
-     * @param listeners the join/freeze/keypad Bukkit listeners to register
+     * @param listeners the join/freeze/keypad/op-protection Bukkit listeners to register
      * @param pending the pending un-confirmed TOTP enrolments, cleared on module stop
      * @param sessions the freeze/lockout registry, cleared on module stop
      * @param keypad the keypad view whose open windows close on module stop
+     * @param reauthSessions the in-flight op-command re-auth prompts, cleared on module stop
+     * @param reauthState the per-player last-verified stamps, cleared on module stop
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             PendingTotpEnrollments pending,
             VerificationSessions sessions,
-            PinKeypadView keypad) {
+            PinKeypadView keypad,
+            ReauthSessions reauthSessions,
+            ReauthState reauthState) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -126,13 +156,17 @@ public final class SecurityWiring {
             Objects.requireNonNull(pending, "pending");
             Objects.requireNonNull(sessions, "sessions");
             Objects.requireNonNull(keypad, "keypad");
+            Objects.requireNonNull(reauthSessions, "reauthSessions");
+            Objects.requireNonNull(reauthState, "reauthState");
         }
 
-        /** Drop every pending secret and freeze, and close every keypad, so a disable leaves no residual state. */
+        /** Drop every pending secret, freeze and re-auth window, and close every keypad, so a disable leaves nothing. */
         public void stop() {
             pending.clearAll();
             keypad.closeAll();
             sessions.clearAll();
+            reauthSessions.clearAll();
+            reauthState.clearAll();
         }
     }
 }

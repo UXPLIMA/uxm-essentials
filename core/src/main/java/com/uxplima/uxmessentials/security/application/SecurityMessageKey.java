@@ -62,7 +62,13 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_VERIFY_SUCCESS("security.verify.success"),
     SECURITY_VERIFY_FAILED("security.verify.failed"),
     SECURITY_VERIFY_MUST_VERIFY("security.verify.must-verify"),
-    SECURITY_VERIFY_LOCKED_OUT("security.verify.locked-out");
+    SECURITY_VERIFY_LOCKED_OUT("security.verify.locked-out"),
+
+    // Phase 3 — op-command protection: the prompt when a protected command is blocked pending a fresh proof, the
+    // reply when the re-auth succeeds and the command is retried, and the reply when the submitted code is wrong.
+    SECURITY_REAUTH_REQUIRED("security.reauth.required"),
+    SECURITY_REAUTH_SUCCESS("security.reauth.success"),
+    SECURITY_REAUTH_FAILED("security.reauth.failed");
 
     private final String key;
 

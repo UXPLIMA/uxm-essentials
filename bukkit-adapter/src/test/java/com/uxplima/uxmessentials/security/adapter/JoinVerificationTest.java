@@ -67,6 +67,7 @@ class JoinVerificationTest {
     private FakeRepository repository;
     private FakeTrustStore trustStore;
     private VerificationSessions sessions;
+    private ReauthState reauthState;
     private RecordingSink sink;
     private PinKeypadView keypad;
     private VerificationController controller;
@@ -80,6 +81,7 @@ class JoinVerificationTest {
         repository = new FakeRepository();
         trustStore = new FakeTrustStore();
         sessions = new VerificationSessions();
+        reauthState = new ReauthState();
         sink = new RecordingSink();
         Scheduler scheduler = new InlineScheduler();
         Messages messages = new KeyMessages();
@@ -90,6 +92,7 @@ class JoinVerificationTest {
                 new VerifyTwoFactor(repository, 1),
                 trustStore,
                 sessions,
+                reauthState,
                 config(),
                 keypad,
                 new AutoSubmitTotpPrompt(),

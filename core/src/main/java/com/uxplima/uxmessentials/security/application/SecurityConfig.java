@@ -1,10 +1,13 @@
 package com.uxplima.uxmessentials.security.application;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.PinPolicy;
+import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
 /**
@@ -20,19 +23,25 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param twoFactor the two-factor enrolment settings ({@code two-factor.*})
  * @param joinVerification the join-verification (freeze + keypad) settings ({@code join-verification.*})
+ * @param opProtection the op-command re-authentication settings ({@code op-protection.*})
  */
-public record SecurityConfig(boolean enabled, TwoFactorSettings twoFactor, JoinVerification joinVerification) {
+public record SecurityConfig(
+        boolean enabled, TwoFactorSettings twoFactor, JoinVerification joinVerification, OpProtection opProtection) {
 
     public SecurityConfig {
         Objects.requireNonNull(twoFactor, "twoFactor");
         Objects.requireNonNull(joinVerification, "joinVerification");
+        Objects.requireNonNull(opProtection, "opProtection");
     }
 
     /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */
     public static SecurityConfig from(ConfigStore config) {
         Objects.requireNonNull(config, "config");
         return new SecurityConfig(
-                config.getBoolean("enabled", true), TwoFactorSettings.from(config), JoinVerification.from(config));
+                config.getBoolean("enabled", true),
+                TwoFactorSettings.from(config),
+                JoinVerification.from(config),
+                OpProtection.from(config));
     }
 
     /**
@@ -140,6 +149,53 @@ public record SecurityConfig(boolean enabled, TwoFactorSettings twoFactor, JoinV
         /** The pure lockout decision this config drives — reused by the keypad to judge a failed attempt. */
         public LockoutPolicy lockoutPolicy() {
             return new LockoutPolicy(maxAttempts);
+        }
+    }
+
+    /**
+     * The op-command protection tunables ({@code op-protection.*}): whether dangerous commands are gated at all, the
+     * list of command roots that demand a recent second-factor proof, and how long a verification counts as recent.
+     * Only players who have enrolled a factor are gated — a re-auth needs something to prove against — and a holder of
+     * {@code uxmessentials.security.bypass} is exempt. The command list is matched leniently (leading slash, namespace
+     * prefix and arguments are ignored) so an operator listing {@code op} catches {@code /op Steve} and
+     * {@code minecraft:op} alike.
+     *
+     * @param enabled whether op-command protection is active ({@code op-protection.enabled}, default true)
+     * @param protectedCommands the command roots that demand a recent verification ({@code op-protection.protected-commands})
+     * @param reauthWindow how long a verification counts as recent ({@code op-protection.reauth-window-seconds}, default 60)
+     */
+    public record OpProtection(boolean enabled, List<String> protectedCommands, Duration reauthWindow) {
+
+        /** The default re-auth window: a verification in the last minute counts as recent. */
+        private static final int DEFAULT_WINDOW_SECONDS = 60;
+
+        /** The default protected set: the op/dangerous vanilla commands an operator most wants behind a re-auth. */
+        private static final List<String> DEFAULT_COMMANDS = List.of(
+                "op", "deop", "stop", "restart", "reload", "gamemode", "ban", "ban-ip", "pardon", "kick", "whitelist");
+
+        public OpProtection {
+            Objects.requireNonNull(protectedCommands, "protectedCommands");
+            Objects.requireNonNull(reauthWindow, "reauthWindow");
+            if (reauthWindow.isNegative()) {
+                throw new IllegalArgumentException("op-protection reauth-window must not be negative: " + reauthWindow);
+            }
+            protectedCommands = List.copyOf(protectedCommands);
+        }
+
+        /** Resolve the op-protection settings from the module's scoped {@link ConfigStore}. */
+        public static OpProtection from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            int windowSeconds =
+                    Math.max(0, config.getInt("op-protection.reauth-window-seconds", DEFAULT_WINDOW_SECONDS));
+            return new OpProtection(
+                    config.getBoolean("op-protection.enabled", true),
+                    config.getStringList("op-protection.protected-commands", DEFAULT_COMMANDS),
+                    Duration.ofSeconds(windowSeconds));
+        }
+
+        /** The pure re-auth decision this config drives — the guard feeds it each protected command and the last verify. */
+        public ReauthPolicy policy() {
+            return new ReauthPolicy(Set.copyOf(protectedCommands), reauthWindow);
         }
     }
 }
