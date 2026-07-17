@@ -174,6 +174,9 @@ class ArchitectureTest {
     // genuine non-menu leaves — item containers or the security keypad — not spec menus:
     //   - itemworld Workstation opens the vanilla MenuType workstations (anvil, loom, furnace, ...) and the
     //     player's own ender chest — real game containers, no menu spec.
+    //   - itemworld ShulkerBoxView / ShulkerBoxHolder open a shulker box the player right-clicks in hand as an
+    //     editable 27-slot container and write the edits back into the box item on close — an item container, not a
+    // menu.
     //   - playerstate InvseeView / InvseeHolder, EnderseeView / EnderseeHolder and OfflineContainerView /
     //     OfflineHolder are inventory MIRRORS: a managed copy of another player's (or an offline player's stored)
     //     inventory or ender chest that the viewer edits and that reconciles back on close. InvseeCommand,
@@ -234,7 +237,8 @@ class ArchitectureTest {
     /**
      * The non-menu inventory leaves allowed to create or open a raw Bukkit inventory outside the engine, named by
      * fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the itemworld
-     * {@code Workstation} opens vanilla game containers, the playerstate invsee / endersee / offline classes are
+     * {@code Workstation} opens vanilla game containers, the itemworld {@code ShulkerBoxView} / {@code ShulkerBoxHolder}
+     * open a held shulker box as an editable item container, the playerstate invsee / endersee / offline classes are
      * inventory mirrors (and the use cases driving them), the trade {@code TradeView} / {@code TradeHolder} are the
      * two-player trade window, the vanish {@code VanishSilentContainerListener} mirrors a container silently for a
      * vanished opener, and the invrollback {@code SnapshotPreviewView} / {@code SnapshotPreviewHolder} are the
@@ -248,6 +252,8 @@ class ArchitectureTest {
     private static DescribedPredicate<JavaClass> areNotAllowedRawBukkitInventoryLeaves() {
         java.util.Set<String> allowed = java.util.Set.of(
                 "com.uxplima.uxmessentials.itemworld.adapter.inbound.command.Workstation",
+                "com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ShulkerBoxView",
+                "com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ShulkerBoxHolder",
                 "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView",
                 "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorHolder",
                 "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView",

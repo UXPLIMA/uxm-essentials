@@ -135,6 +135,9 @@ public enum ItemworldMessageKey implements MessageKey {
     WORKSTATION_OPENED("itemworld.workstation.opened"),
     WORKSTATION_OPENED_FOR("itemworld.workstation.opened-for"),
 
+    // Shulkers — open a shulker box from the inventory. The view's title (no chat line: the GUI is the feedback).
+    SHULKER_TITLE("itemworld.shulker.title"),
+
     // Cleanup — /disposal
     DISPOSAL_OPENED("itemworld.disposal.opened"),
     DISPOSAL_TITLE("itemworld.disposal.title"),

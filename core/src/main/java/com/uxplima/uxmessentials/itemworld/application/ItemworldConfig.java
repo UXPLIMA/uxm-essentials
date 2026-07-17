@@ -56,6 +56,24 @@ public final class ItemworldConfig {
         return config.getBoolean("item-edit.allow-over-max-enchants", false);
     }
 
+    /**
+     * Whether opening a shulker box from the inventory is enabled ({@code shulkers.enabled}, default {@code true}).
+     * This is the shulker sub-feature's own toggle, separate from the {@link SubFeatureGroup} groups — an operator
+     * turns the in-inventory shulker opener off here without touching any command group.
+     */
+    public boolean shulkersEnabled() {
+        return config.getBoolean("shulkers.enabled", true);
+    }
+
+    /**
+     * Whether opening a shulker box from the inventory requires the player to be sneaking
+     * ({@code shulkers.require-sneak}, default {@code true}). On (the default) a plain right-click still places the
+     * box as a block and only a sneak-right-click opens it; off, any right-click with the box in hand opens it.
+     */
+    public boolean shulkersRequireSneak() {
+        return config.getBoolean("shulkers.require-sneak", true);
+    }
+
     /** Whether a single command is disabled ({@code commands.<literal>.disabled}, default {@code false}). */
     public boolean commandDisabled(String literal) {
         Objects.requireNonNull(literal, "literal");

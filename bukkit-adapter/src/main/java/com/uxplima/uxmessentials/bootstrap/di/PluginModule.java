@@ -1628,6 +1628,8 @@ public final class PluginModule {
         ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // Write back any still-open in-inventory shulker view before the module stops, so no edit is lost on disable.
+        resources.onClose(wired.shulkerView()::flushAll);
         // Register the itemworld utilities hub on the /uxmess gui hub, gated by the itemworld GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "itemworld",

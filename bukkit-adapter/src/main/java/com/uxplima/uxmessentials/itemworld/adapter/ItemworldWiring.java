@@ -13,6 +13,8 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGuiC
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ShulkerBoxListener;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ShulkerBoxView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.PowertoolInteractListener;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.UnlimitedPlacementListener;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.LoggingItemworldAudit;
@@ -96,10 +98,15 @@ public final class ItemworldWiring {
         commands.addAll(ItemworldGroupBCommands.all(
                 services, powertoolPolicy, purgePolicy, powertoolStore, powertoolToggles, unlimited, entityCountView));
         commands.add(new ItemworldGuiCommand(hubView, kernel.messages(), kernel.messageSink()));
+
+        // The in-inventory shulker opener: a sanctioned raw-inventory leaf (view + holder + listener) that opens a
+        // shulker box the player right-clicks in hand and writes the edits back into the box item on close.
+        ShulkerBoxView shulkerView = new ShulkerBoxView(kernel.messages(), kernel.scheduler());
         List<Listener> listeners = List.of(
                 new PowertoolInteractListener(powertoolStore, powertoolToggles, config),
-                new UnlimitedPlacementListener(unlimited, config));
-        return new Wired(List.copyOf(commands), listeners, hubView);
+                new UnlimitedPlacementListener(unlimited, config),
+                new ShulkerBoxListener(shulkerView, config));
+        return new Wired(List.copyOf(commands), listeners, hubView, shulkerView);
     }
 
     private static Logger auditLogger() {
@@ -113,15 +120,21 @@ public final class ItemworldWiring {
      * garbage-collected with the wiring on module stop — there is nothing to drain or flush.
      *
      * @param commands the Brigadier command registrations to publish
-     * @param listeners the powertool interact + unlimited-placement listeners to register
+     * @param listeners the powertool interact, unlimited-placement, and shulker-open listeners to register
      * @param hubView the utilities hub the {@code /uxmess gui} hub entry opens
+     * @param shulkerView the in-inventory shulker view, exposed so its still-open windows are flushed on module stop
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, ItemworldHubMenu hubView) {
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            ItemworldHubMenu hubView,
+            ShulkerBoxView shulkerView) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(hubView, "hubView");
+            Objects.requireNonNull(shulkerView, "shulkerView");
         }
     }
 }
