@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -29,6 +30,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -195,6 +197,26 @@ abstract class ItemworldCommandSupport {
     static RequiredArgumentBuilder<CommandSourceStack, String> treeTypeArgument() {
         return Commands.argument("type", StringArgumentType.word()).suggests(enumNames(TreeType.values()));
     }
+
+    /**
+     * An {@code attribute} string argument that completes against the attributes in the live registry. The value
+     * still parses through {@link com.uxplima.uxmessentials.itemworld.domain.AttributeSpec} at execution, so a
+     * typed-but-unsuggested id keeps working — the registry only drives the type-ahead.
+     */
+    static RequiredArgumentBuilder<CommandSourceStack, String> attributeArgument() {
+        return Commands.argument("attribute", StringArgumentType.word())
+                .suggests(keyedSuggestions(
+                        () -> RegistryAccess.registryAccess().getRegistry(RegistryKey.ATTRIBUTE), attribute -> true));
+    }
+
+    /** A {@code slot} string argument that completes against the equipment-slot-group tokens the resolver accepts. */
+    static RequiredArgumentBuilder<CommandSourceStack, String> slotGroupArgument() {
+        return Commands.argument("slot", StringArgumentType.word())
+                .suggests(CommandSuggestions.fromStrings(() -> SLOT_GROUP_TOKENS));
+    }
+
+    private static final List<String> SLOT_GROUP_TOKENS =
+            List.of("any", "mainhand", "offhand", "hand", "feet", "legs", "chest", "head", "armor", "body");
 
     /**
      * Build a suggestion provider over an enum's values: each value is offered by its lower-cased name,

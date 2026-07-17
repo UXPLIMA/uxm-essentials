@@ -778,7 +778,7 @@ permissions:
     description: '/itemlore <set|add|clear> [text] — edit the held item''s lore.'
     default: op
   uxmessentials.itemworld.itemedit:
-    description: '/itemedit <rename|resetname|lore> — edit the held item''s name and lore (item-edit.enabled).'
+    description: '/itemedit <rename|resetname|lore|enchant|unenchant|flag|attribute|durability|repair|unbreakable|custommodeldata> — edit the held item''s name, lore and meta (item-edit.enabled).'
     default: op
   uxmessentials.itemflag.use:
     description: '/itemflag <flag> <on|off> — toggle an item meta flag.'

@@ -5,8 +5,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlotGroup;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -16,13 +23,17 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.outbound.BukkitItemResolver;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
+import com.uxplima.uxmessentials.itemworld.domain.AttributeSpec;
+import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.LorePolicy;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -33,11 +44,18 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /itemedit}: the held-item editor. Renames the item ({@code rename <name>} / {@code resetname}) and edits
- * its lore ({@code lore add|set|insert|remove|clear}) — MiniMessage source for both, with the default italic
- * stripped by {@link ItemBuilder} so names and lines render upright. The lore line rules and their 1-based
- * index-bounds live in the pure {@link LorePolicy}; this adapter only reads the current lore off the item into a
- * string list, hands one operation to the policy, and writes the result back onto the {@link ItemMeta}.
+ * {@code /itemedit}: the held-item editor. Renames the item ({@code rename <name>} / {@code resetname}), edits
+ * its lore ({@code lore add|set|insert|remove|clear}), and carries the advanced meta editors: {@code enchant
+ * <enchant> <level>} (level {@code 0} or {@code unenchant} removes; over-vanilla-max is gated by
+ * {@code item-edit.allow-over-max-enchants}), {@code flag <ItemFlag> [on|off]}, {@code attribute add|remove},
+ * {@code durability <value>} / {@code repair}, {@code unbreakable [on|off]}, and {@code custommodeldata <int>} /
+ * {@code custommodeldata clear}. Names and lore lines are MiniMessage source with the default italic stripped by
+ * {@link ItemBuilder} so they render upright.
+ *
+ * <p>The lore line rules live in the pure {@link LorePolicy}; the enchant level-clamp in {@link EnchantSpec} and
+ * the attribute id/amount/slot validation in {@link AttributeSpec}. This adapter resolves the Bukkit
+ * {@link Enchantment} / {@link Attribute} / {@link ItemFlag} / {@link EquipmentSlotGroup} at the boundary through
+ * {@link BukkitItemResolver} and writes the result back onto the {@link ItemMeta} via {@link ItemBuilder}.
  *
  * <p>Unlike the {@link SubFeatureGroup} verbs, {@code /itemedit} is gated by its own {@code item-edit.enabled}
  * flag ({@link com.uxplima.uxmessentials.itemworld.application.ItemworldConfig#itemEditEnabled()}); when off it
@@ -53,7 +71,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     private static final MiniMessage MINI = MiniMessage.miniMessage();
 
     public ItemEditCommand(ItemworldServices services) {
-        super(services, "itemedit", SubFeatureGroup.ITEM_UTILS, "Edit the held item's name and lore.");
+        super(services, "itemedit", SubFeatureGroup.ITEM_UTILS, "Edit the held item's name, lore and meta.");
     }
 
     @Override
@@ -64,6 +82,14 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
                                 .executes(ctx -> rename(ctx, StringArgumentType.getString(ctx, "name")))))
                 .then(Commands.literal("resetname").executes(this::resetName))
                 .then(loreNode())
+                .then(enchantNode())
+                .then(unenchantNode())
+                .then(flagNode())
+                .then(attributeNode())
+                .then(durabilityNode())
+                .then(Commands.literal("repair").executes(this::repair))
+                .then(unbreakableNode())
+                .then(modelNode())
                 .build();
     }
 
@@ -188,6 +214,287 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
                 Map.of("index", str(index)));
     }
 
+    // ---- Advanced meta editors: enchant / flag / attribute / durability / unbreakable / custom model data ----
+
+    private LiteralArgumentBuilder<CommandSourceStack> enchantNode() {
+        return Commands.literal("enchant")
+                .then(enchantArgument()
+                        .executes(ctx -> enchant(ctx, 1))
+                        .then(Commands.argument("level", IntegerArgumentType.integer(0))
+                                .executes(ctx -> enchant(ctx, IntegerArgumentType.getInteger(ctx, "level")))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> unenchantNode() {
+        return Commands.literal("unenchant").then(enchantArgument().executes(ctx -> enchant(ctx, 0)));
+    }
+
+    /** Apply (or, at level 0, remove) an enchant on the held item, clamping the level through {@link EnchantSpec}. */
+    private int enchant(CommandContext<CommandSourceStack> ctx, int level) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String rawId = ctx.getArgument("enchant", String.class);
+        Optional<Enchantment> enchant = BukkitItemResolver.enchantmentByToken(rawId);
+        if (enchant.isEmpty()) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_ENCHANT_UNKNOWN, Map.of("enchant", rawId));
+            return Command.SINGLE_SUCCESS;
+        }
+        if (level == 0) {
+            return removeEnchant(ctx, held, enchant.get(), rawId);
+        }
+        applyEnchant(ctx, held, enchant.get(), rawId, level);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int removeEnchant(CommandContext<CommandSourceStack> ctx, Held held, Enchantment enchant, String rawId) {
+        ItemMeta meta = held.hand().getItemMeta();
+        if (meta == null || !meta.hasEnchant(enchant)) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_ENCHANT_NOT_PRESENT, Map.of("enchant", rawId));
+            return Command.SINGLE_SUCCESS;
+        }
+        apply(
+                ctx,
+                held,
+                ItemBuilder.from(held.hand()).removeEnchant(enchant).build(),
+                ItemworldMessageKey.ITEMEDIT_ENCHANT_REMOVED,
+                Map.of("enchant", rawId));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void applyEnchant(
+            CommandContext<CommandSourceStack> ctx, Held held, Enchantment enchant, String rawId, int level) {
+        EnchantSpec spec = EnchantSpec.forEdit(
+                        rawId,
+                        level,
+                        enchant.getMaxLevel(),
+                        services.config().itemEditAllowOverMaxEnchants(),
+                        services.config().maxEnchantLevel())
+                .orElseThrow();
+        if (spec.clamped()) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_ENCHANT_CLAMPED, Map.of("level", str(spec.level())));
+        }
+        apply(
+                ctx,
+                held,
+                ItemBuilder.from(held.hand()).enchant(enchant, spec.level()).build(),
+                ItemworldMessageKey.ITEMEDIT_ENCHANTED,
+                Map.of("enchant", rawId, "level", str(spec.level())));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> flagNode() {
+        return Commands.literal("flag")
+                .then(itemFlagArgument()
+                        .executes(ctx -> flag(ctx, Optional.empty()))
+                        .then(Commands.literal("on").executes(ctx -> flag(ctx, Optional.of(true))))
+                        .then(Commands.literal("off").executes(ctx -> flag(ctx, Optional.of(false)))));
+    }
+
+    /** Toggle an {@link ItemFlag}; a bare {@code flag <name>} flips the current state, {@code on}/{@code off} set it. */
+    private int flag(CommandContext<CommandSourceStack> ctx, Optional<Boolean> requested) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String token = ctx.getArgument("flag", String.class);
+        Optional<ItemFlag> flag = BukkitItemResolver.itemFlag(token);
+        if (flag.isEmpty()) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_FLAG_UNKNOWN, Map.of("flag", token));
+            return Command.SINGLE_SUCCESS;
+        }
+        ItemMeta meta = held.hand().getItemMeta();
+        boolean state = requested.orElse(meta == null || !meta.hasItemFlag(flag.get()));
+        ItemBuilder builder = ItemBuilder.from(held.hand());
+        apply(
+                ctx,
+                held,
+                (state ? builder.flags(flag.get()) : builder.removeFlags(flag.get())).build(),
+                ItemworldMessageKey.ITEMEDIT_FLAG_TOGGLED,
+                Map.of("flag", token, "state", state ? "on" : "off"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> attributeNode() {
+        return Commands.literal("attribute")
+                .then(Commands.literal("add")
+                        .then(attributeArgument()
+                                .then(Commands.argument("amount", DoubleArgumentType.doubleArg())
+                                        .executes(ctx -> attributeAdd(ctx, null))
+                                        .then(slotGroupArgument()
+                                                .executes(ctx -> attributeAdd(
+                                                        ctx, StringArgumentType.getString(ctx, "slot")))))))
+                .then(Commands.literal("remove").then(attributeArgument().executes(this::attributeRemove)));
+    }
+
+    /** Add an {@code add_number} attribute modifier, keyed uniquely under {@code uxmessentials:} per attribute. */
+    private int attributeAdd(CommandContext<CommandSourceStack> ctx, @Nullable String rawSlot) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String rawAttr = ctx.getArgument("attribute", String.class);
+        double amount = DoubleArgumentType.getDouble(ctx, "amount");
+        Optional<AttributeSpec> spec = AttributeSpec.of(rawAttr, amount, rawSlot);
+        Optional<Attribute> attribute = spec.flatMap(BukkitItemResolver::attribute);
+        if (spec.isEmpty() || attribute.isEmpty()) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_UNKNOWN, Map.of("attribute", rawAttr));
+            return Command.SINGLE_SUCCESS;
+        }
+        Optional<EquipmentSlotGroup> slot =
+                BukkitItemResolver.slotGroup(spec.get().slotGroup());
+        if (slot.isEmpty()) {
+            reply(
+                    ctx,
+                    ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_BAD_SLOT,
+                    Map.of("slot", spec.get().slotGroup()));
+            return Command.SINGLE_SUCCESS;
+        }
+        applyAttribute(ctx, held, attribute.get(), rawAttr, amount, slot.get());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void applyAttribute(
+            CommandContext<CommandSourceStack> ctx,
+            Held held,
+            Attribute attribute,
+            String rawAttr,
+            double amount,
+            EquipmentSlotGroup slot) {
+        NamespacedKey key =
+                NamespacedKey.fromString("uxmessentials:" + attribute.getKey().value());
+        if (key == null) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_UNKNOWN, Map.of("attribute", rawAttr));
+            return;
+        }
+        AttributeModifier modifier = new AttributeModifier(key, amount, AttributeModifier.Operation.ADD_NUMBER, slot);
+        apply(
+                ctx,
+                held,
+                ItemBuilder.from(held.hand()).attribute(attribute, modifier).build(),
+                ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_ADDED,
+                Map.of("attribute", rawAttr, "amount", str(amount)));
+    }
+
+    /** Remove every modifier the held item carries for the named attribute. */
+    private int attributeRemove(CommandContext<CommandSourceStack> ctx) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String rawAttr = ctx.getArgument("attribute", String.class);
+        Optional<Attribute> attribute = AttributeSpec.of(rawAttr, 0.0, null).flatMap(BukkitItemResolver::attribute);
+        if (attribute.isEmpty()) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_UNKNOWN, Map.of("attribute", rawAttr));
+            return Command.SINGLE_SUCCESS;
+        }
+        apply(
+                ctx,
+                held,
+                ItemBuilder.from(held.hand())
+                        .editMeta(meta -> meta.removeAttributeModifier(attribute.get()))
+                        .build(),
+                ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_REMOVED,
+                Map.of("attribute", rawAttr));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> durabilityNode() {
+        return Commands.literal("durability")
+                .then(Commands.argument("value", IntegerArgumentType.integer(0))
+                        .executes(ctx -> durability(ctx, IntegerArgumentType.getInteger(ctx, "value"))));
+    }
+
+    /** Set the held item's durability damage, bounded by its max durability; non-damageable items are rejected. */
+    private int durability(CommandContext<CommandSourceStack> ctx, int value) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        short max = held.hand().getType().getMaxDurability();
+        if (max <= 0 || !(held.hand().getItemMeta() instanceof Damageable)) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_DURABILITY_NOT_DAMAGEABLE);
+            return Command.SINGLE_SUCCESS;
+        }
+        if (value > max) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_DURABILITY_OUT_OF_RANGE, Map.of("max", str(max)));
+            return Command.SINGLE_SUCCESS;
+        }
+        apply(
+                ctx,
+                held,
+                ItemBuilder.from(held.hand()).damage(value).build(),
+                ItemworldMessageKey.ITEMEDIT_DURABILITY_SET,
+                Map.of("value", str(value)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Reset the held item's durability damage to zero; an undamaged item is a no-op with a note. */
+    private int repair(CommandContext<CommandSourceStack> ctx) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        if (!(held.hand().getItemMeta() instanceof Damageable damageable) || !damageable.hasDamage()) {
+            reply(ctx, ItemworldMessageKey.ITEMEDIT_REPAIR_NOTHING);
+            return Command.SINGLE_SUCCESS;
+        }
+        apply(
+                ctx,
+                held,
+                ItemBuilder.from(held.hand()).damage(0).build(),
+                ItemworldMessageKey.ITEMEDIT_REPAIRED,
+                Map.of());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> unbreakableNode() {
+        return Commands.literal("unbreakable")
+                .executes(ctx -> unbreakable(ctx, Optional.empty()))
+                .then(Commands.literal("on").executes(ctx -> unbreakable(ctx, Optional.of(true))))
+                .then(Commands.literal("off").executes(ctx -> unbreakable(ctx, Optional.of(false))));
+    }
+
+    /** Set the held item's unbreakable flag; a bare {@code unbreakable} flips the current state. */
+    private int unbreakable(CommandContext<CommandSourceStack> ctx, Optional<Boolean> requested) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        ItemMeta meta = held.hand().getItemMeta();
+        boolean state = requested.orElse(meta == null || !meta.isUnbreakable());
+        apply(
+                ctx,
+                held,
+                ItemBuilder.from(held.hand()).unbreakable(state).build(),
+                ItemworldMessageKey.ITEMEDIT_UNBREAKABLE_SET,
+                Map.of("state", state ? "on" : "off"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> modelNode() {
+        return Commands.literal("custommodeldata")
+                .then(Commands.literal("clear").executes(ctx -> model(ctx, Optional.empty())))
+                .then(Commands.argument("id", IntegerArgumentType.integer(0))
+                        .executes(ctx -> model(ctx, Optional.of(IntegerArgumentType.getInteger(ctx, "id")))));
+    }
+
+    /** Set or clear the held item's custom model data, written as the 1.21 float-list selector. */
+    private int model(CommandContext<CommandSourceStack> ctx, Optional<Integer> id) {
+        Held held = resolve(ctx);
+        if (held == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        List<Float> floats = id.map(value -> List.of((float) (int) value)).orElseGet(List::of);
+        ItemStack updated =
+                ItemBuilder.from(held.hand()).customModelDataFloats(floats).build();
+        if (id.isPresent()) {
+            apply(ctx, held, updated, ItemworldMessageKey.ITEMEDIT_MODEL_SET, Map.of("id", str(id.get())));
+        } else {
+            apply(ctx, held, updated, ItemworldMessageKey.ITEMEDIT_MODEL_CLEARED, Map.of());
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
     /** Apply a bounded lore op: an empty result is an out-of-range line number, otherwise write the new lore. */
     private int bounded(
             CommandContext<CommandSourceStack> ctx,
@@ -275,6 +582,13 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     private static String str(int value) {
         return Integer.toString(value);
+    }
+
+    /** Render an attribute amount without a trailing {@code .0} when it is a whole number. */
+    private static String str(double value) {
+        return value == Math.rint(value) && !Double.isInfinite(value)
+                ? Long.toString((long) value)
+                : Double.toString(value);
     }
 
     /** The resolved actor and their main-hand item, captured once so each op reads a single consistent target. */

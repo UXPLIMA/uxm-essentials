@@ -14,10 +14,17 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -224,8 +231,248 @@ class ItemEditCommandTest {
         assertThat(heldMeta().hasLore()).isFalse();
     }
 
+    @Test
+    void enchantAppliesToTheHeldItem() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit enchant sharpness 3");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_ENCHANTED);
+        assertThat(held().getEnchantmentLevel(Enchantment.SHARPNESS)).isEqualTo(3);
+    }
+
+    @Test
+    void enchantAtLevelZeroRemovesTheEnchant() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+        execute(dispatcher, "itemedit enchant sharpness 3");
+
+        sink.keys.clear();
+        execute(dispatcher, "itemedit enchant sharpness 0");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_ENCHANT_REMOVED);
+        assertThat(held().getEnchantmentLevel(Enchantment.SHARPNESS)).isZero();
+    }
+
+    @Test
+    void unenchantRemovesTheEnchant() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+        execute(dispatcher, "itemedit enchant sharpness 2");
+
+        sink.keys.clear();
+        execute(dispatcher, "itemedit unenchant sharpness");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_ENCHANT_REMOVED);
+        assertThat(held().getEnchantmentLevel(Enchantment.SHARPNESS)).isZero();
+    }
+
+    @Test
+    void unenchantOnAnUnenchantedItemReportsNotPresent() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit unenchant sharpness");
+
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.ITEMEDIT_ENCHANT_NOT_PRESENT);
+    }
+
+    @Test
+    void enchantOverVanillaMaxIsClampedUnlessAllowed() {
+        holdSword();
+        int max = Math.max(1, Enchantment.SHARPNESS.getMaxLevel());
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit enchant sharpness " + (max + 5));
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_ENCHANT_CLAMPED);
+        assertThat(held().getEnchantmentLevel(Enchantment.SHARPNESS)).isEqualTo(max);
+    }
+
+    @Test
+    void enchantOverVanillaMaxIsAllowedWhenFlagged() {
+        holdSword();
+        config.put("item-edit.allow-over-max-enchants", true);
+        int over = Math.max(1, Enchantment.SHARPNESS.getMaxLevel()) + 5;
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit enchant sharpness " + over);
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_ENCHANTED);
+        assertThat(sink.keys).doesNotContain(ItemworldMessageKey.ITEMEDIT_ENCHANT_CLAMPED);
+        assertThat(held().getEnchantmentLevel(Enchantment.SHARPNESS)).isEqualTo(over);
+    }
+
+    @Test
+    void anUnknownEnchantIsRejected() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit enchant not_a_real_enchant 1");
+
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.ITEMEDIT_ENCHANT_UNKNOWN);
+        assertThat(held().getEnchantments()).isEmpty();
+    }
+
+    @Test
+    void flagTogglesOnAndOff() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit flag hide_enchants on");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_FLAG_TOGGLED);
+        assertThat(heldMeta().hasItemFlag(ItemFlag.HIDE_ENCHANTS)).isTrue();
+
+        execute(dispatcher, "itemedit flag hide_enchants off");
+        assertThat(heldMeta().hasItemFlag(ItemFlag.HIDE_ENCHANTS)).isFalse();
+    }
+
+    @Test
+    void aBareFlagFlipsTheCurrentState() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit flag hide_attributes");
+
+        assertThat(heldMeta().hasItemFlag(ItemFlag.HIDE_ATTRIBUTES)).isTrue();
+    }
+
+    @Test
+    void anUnknownFlagIsRejected() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit flag not_a_flag on");
+
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.ITEMEDIT_FLAG_UNKNOWN);
+    }
+
+    @Test
+    void attributeAddLandsOnTheItemAndRemoveClearsIt() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit attribute add attack_damage 5 hand");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_ADDED);
+        assertThat(heldMeta().getAttributeModifiers(attribute("attack_damage")))
+                .isNotNull()
+                .anyMatch(modifier -> modifier.getAmount() == 5.0);
+
+        sink.keys.clear();
+        execute(dispatcher, "itemedit attribute remove attack_damage");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_REMOVED);
+        var remaining = heldMeta().getAttributeModifiers(attribute("attack_damage"));
+        assertThat(remaining == null || remaining.isEmpty()).isTrue();
+    }
+
+    @Test
+    void anUnknownAttributeIsRejected() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit attribute add not_an_attribute 5");
+
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.ITEMEDIT_ATTRIBUTE_UNKNOWN);
+    }
+
+    @Test
+    void durabilitySetsDamageAndRejectsOutOfRange() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit durability 100");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_DURABILITY_SET);
+        assertThat(((Damageable) heldMeta()).getDamage()).isEqualTo(100);
+
+        sink.keys.clear();
+        execute(dispatcher, "itemedit durability 999999");
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.ITEMEDIT_DURABILITY_OUT_OF_RANGE);
+    }
+
+    @Test
+    void durabilityOnANonDamageableItemIsRejected() {
+        hold(Material.DIAMOND);
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit durability 1");
+
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.ITEMEDIT_DURABILITY_NOT_DAMAGEABLE);
+    }
+
+    @Test
+    void repairResetsDamageAndNoopsOnAnUndamagedItem() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+        execute(dispatcher, "itemedit durability 100");
+
+        sink.keys.clear();
+        execute(dispatcher, "itemedit repair");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_REPAIRED);
+        assertThat(((Damageable) heldMeta()).getDamage()).isZero();
+
+        sink.keys.clear();
+        execute(dispatcher, "itemedit repair");
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.ITEMEDIT_REPAIR_NOTHING);
+    }
+
+    @Test
+    void unbreakableTogglesAndABareCallFlips() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit unbreakable on");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_UNBREAKABLE_SET);
+        assertThat(heldMeta().isUnbreakable()).isTrue();
+
+        execute(dispatcher, "itemedit unbreakable off");
+        assertThat(heldMeta().isUnbreakable()).isFalse();
+
+        execute(dispatcher, "itemedit unbreakable");
+        assertThat(heldMeta().isUnbreakable()).isTrue();
+    }
+
+    @Test
+    void customModelDataSetsAndClears() {
+        holdSword();
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit custommodeldata 5");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_MODEL_SET);
+
+        sink.keys.clear();
+        execute(dispatcher, "itemedit custommodeldata clear");
+        assertThat(sink.keys).contains(ItemworldMessageKey.ITEMEDIT_MODEL_CLEARED);
+    }
+
+    @Test
+    void disablingItemEditMakesTheAdvancedSubcommandsInert() {
+        holdSword();
+        config.put("item-edit.enabled", false);
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "itemedit enchant sharpness 3");
+
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.COMMAND_DISABLED);
+        assertThat(held().getEnchantments()).isEmpty();
+    }
+
     private void holdSword() {
         player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
+    }
+
+    private void hold(Material material) {
+        player.getInventory().setItemInMainHand(new ItemStack(material));
+    }
+
+    private ItemStack held() {
+        return player.getInventory().getItemInMainHand();
+    }
+
+    private static Attribute attribute(String path) {
+        return RegistryAccess.registryAccess()
+                .getRegistry(RegistryKey.ATTRIBUTE)
+                .get(NamespacedKey.minecraft(path));
     }
 
     private ItemMeta heldMeta() {

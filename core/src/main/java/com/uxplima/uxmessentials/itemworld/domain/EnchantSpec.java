@@ -49,6 +49,27 @@ public record EnchantSpec(String enchantId, int level, boolean clamped) {
         return Optional.of(new EnchantSpec(normalised, level, level < floored));
     }
 
+    /**
+     * Resolve a requested level for the {@code /itemedit enchant} editor, honouring an over-vanilla-max allowance.
+     * When {@code allowOverMax} is {@code false} the level is clamped to the enchantment's {@code vanillaMax} (the
+     * value the registry reports for the resolved enchant); when {@code true} it is clamped only to the absolute
+     * {@code hardCeiling} the operator sets in {@code max-enchant-level}. A blank id is empty and a level below one
+     * floors to one, matching {@link #of}. {@link #clamped()} reports whether the requested level was reduced by
+     * whichever ceiling applied.
+     */
+    public static Optional<EnchantSpec> forEdit(
+            String rawId, int requestedLevel, int vanillaMax, boolean allowOverMax, int hardCeiling) {
+        if (rawId == null || rawId.isBlank()) {
+            return Optional.empty();
+        }
+        String normalised = normaliseId(rawId);
+        int hard = hardCeiling < 1 ? DEFAULT_MAX_LEVEL : hardCeiling;
+        int ceiling = allowOverMax ? hard : Math.min(Math.max(1, vanillaMax), hard);
+        int floored = Math.max(1, requestedLevel);
+        int level = Math.min(floored, ceiling);
+        return Optional.of(new EnchantSpec(normalised, level, level < floored));
+    }
+
     private static String normaliseId(String rawId) {
         String trimmed = rawId.trim().toLowerCase(Locale.ROOT);
         return trimmed.indexOf(':') < 0 ? DEFAULT_NAMESPACE + ":" + trimmed : trimmed;

@@ -47,6 +47,15 @@ public final class ItemworldConfig {
         return config.getBoolean("item-edit.enabled", true);
     }
 
+    /**
+     * Whether {@code /itemedit enchant} may set a level above the enchantment's vanilla maximum
+     * ({@code item-edit.allow-over-max-enchants}, default {@code false}). When off the level is clamped to the
+     * enchant's vanilla max; when on it is bounded only by {@link #maxEnchantLevel()}.
+     */
+    public boolean itemEditAllowOverMaxEnchants() {
+        return config.getBoolean("item-edit.allow-over-max-enchants", false);
+    }
+
     /** Whether a single command is disabled ({@code commands.<literal>.disabled}, default {@code false}). */
     public boolean commandDisabled(String literal) {
         Objects.requireNonNull(literal, "literal");
