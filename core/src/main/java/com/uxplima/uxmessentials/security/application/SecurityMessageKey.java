@@ -68,7 +68,22 @@ public enum SecurityMessageKey implements MessageKey {
     // reply when the re-auth succeeds and the command is retried, and the reply when the submitted code is wrong.
     SECURITY_REAUTH_REQUIRED("security.reauth.required"),
     SECURITY_REAUTH_SUCCESS("security.reauth.success"),
-    SECURITY_REAUTH_FAILED("security.reauth.failed");
+    SECURITY_REAUTH_FAILED("security.reauth.failed"),
+
+    // Phase 4 — IP/alt guard: the /alts header/entry/empty lines shown to staff, the staff notice raised when a
+    // joining player shares an IP with other accounts, and the kick shown when an IP is over the account cap.
+    SECURITY_ALTS_HEADER("security.alts.header"),
+    SECURITY_ALTS_ENTRY("security.alts.entry"),
+    SECURITY_ALTS_NONE("security.alts.none"),
+    SECURITY_ALTS_NOTIFY("security.alts.notify"),
+    SECURITY_ALTS_KICKED("security.alts.kicked"),
+
+    // Phase 4 — ClientID: the /clientinfo line reporting a player's recorded brand (or that none was seen), the
+    // staff notice when a flagged/blocked brand joins, and the kick shown when a client is not allowed.
+    SECURITY_CLIENT_INFO("security.client.info"),
+    SECURITY_CLIENT_UNKNOWN("security.client.unknown"),
+    SECURITY_CLIENT_FLAGGED("security.client.flagged"),
+    SECURITY_CLIENT_BLOCKED("security.client.blocked");
 
     private final String key;
 

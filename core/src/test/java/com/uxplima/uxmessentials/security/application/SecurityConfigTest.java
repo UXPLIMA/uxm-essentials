@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.uxplima.uxmessentials.security.domain.ClientIdMode;
 import com.uxplima.uxmessentials.security.domain.PinPolicy;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -39,6 +40,56 @@ class SecurityConfigTest {
         assertThat(op.enabled()).isTrue();
         assertThat(op.reauthWindow()).isEqualTo(Duration.ofSeconds(60));
         assertThat(op.protectedCommands()).contains("op", "deop", "stop", "gamemode", "ban");
+
+        SecurityConfig.IpGuard ipGuard = config.ipGuard();
+        assertThat(ipGuard.enabled()).isTrue();
+        assertThat(ipGuard.maxAccountsPerIp()).isZero();
+        assertThat(ipGuard.notifyStaff()).isTrue();
+        assertThat(ipGuard.limitPolicy().unlimited()).isTrue();
+
+        SecurityConfig.ClientId clientId = config.clientId();
+        assertThat(clientId.enabled()).isTrue();
+        assertThat(clientId.mode()).isEqualTo(ClientIdMode.FLAG);
+        assertThat(clientId.brands()).isEmpty();
+    }
+
+    @Test
+    void readsTheIpGuardBlock() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("ip-guard.enabled", false);
+        values.put("ip-guard.max-accounts-per-ip", 3);
+        values.put("ip-guard.notify-staff", false);
+
+        SecurityConfig.IpGuard ipGuard =
+                SecurityConfig.from(new MapConfig(values)).ipGuard();
+
+        assertThat(ipGuard.enabled()).isFalse();
+        assertThat(ipGuard.maxAccountsPerIp()).isEqualTo(3);
+        assertThat(ipGuard.notifyStaff()).isFalse();
+        assertThat(ipGuard.limitPolicy().evaluate(4))
+                .isEqualTo(com.uxplima.uxmessentials.security.domain.AltLimitPolicy.Decision.DENY);
+    }
+
+    @Test
+    void readsTheClientIdBlockAndParsesTheMode() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("client-id.mode", "block-list");
+        values.put("client-id.brands", List.of("wurst", "impact"));
+
+        SecurityConfig.ClientId clientId =
+                SecurityConfig.from(new MapConfig(values)).clientId();
+
+        assertThat(clientId.mode()).isEqualTo(ClientIdMode.BLOCK_LIST);
+        assertThat(clientId.brands()).containsExactly("wurst", "impact");
+        assertThat(clientId.policy().judge("wurst").allowed()).isFalse();
+    }
+
+    @Test
+    void fallsBackToFlagModeForAnUnknownModeString() {
+        SecurityConfig.ClientId clientId = SecurityConfig.from(new MapConfig(Map.of("client-id.mode", "nonsense")))
+                .clientId();
+
+        assertThat(clientId.mode()).isEqualTo(ClientIdMode.FLAG);
     }
 
     @Test

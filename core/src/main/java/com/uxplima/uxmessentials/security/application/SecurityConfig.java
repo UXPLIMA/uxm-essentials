@@ -2,9 +2,13 @@ package com.uxplima.uxmessentials.security.application;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.security.domain.AltLimitPolicy;
+import com.uxplima.uxmessentials.security.domain.ClientIdMode;
+import com.uxplima.uxmessentials.security.domain.ClientPolicy;
 import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.PinPolicy;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
@@ -24,14 +28,23 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param twoFactor the two-factor enrolment settings ({@code two-factor.*})
  * @param joinVerification the join-verification (freeze + keypad) settings ({@code join-verification.*})
  * @param opProtection the op-command re-authentication settings ({@code op-protection.*})
+ * @param ipGuard the same-IP alt-detection settings ({@code ip-guard.*})
+ * @param clientId the client-brand guard settings ({@code client-id.*})
  */
 public record SecurityConfig(
-        boolean enabled, TwoFactorSettings twoFactor, JoinVerification joinVerification, OpProtection opProtection) {
+        boolean enabled,
+        TwoFactorSettings twoFactor,
+        JoinVerification joinVerification,
+        OpProtection opProtection,
+        IpGuard ipGuard,
+        ClientId clientId) {
 
     public SecurityConfig {
         Objects.requireNonNull(twoFactor, "twoFactor");
         Objects.requireNonNull(joinVerification, "joinVerification");
         Objects.requireNonNull(opProtection, "opProtection");
+        Objects.requireNonNull(ipGuard, "ipGuard");
+        Objects.requireNonNull(clientId, "clientId");
     }
 
     /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */
@@ -41,7 +54,9 @@ public record SecurityConfig(
                 config.getBoolean("enabled", true),
                 TwoFactorSettings.from(config),
                 JoinVerification.from(config),
-                OpProtection.from(config));
+                OpProtection.from(config),
+                IpGuard.from(config),
+                ClientId.from(config));
     }
 
     /**
@@ -196,6 +211,76 @@ public record SecurityConfig(
         /** The pure re-auth decision this config drives — the guard feeds it each protected command and the last verify. */
         public ReauthPolicy policy() {
             return new ReauthPolicy(Set.copyOf(protectedCommands), reauthWindow);
+        }
+    }
+
+    /**
+     * The IP/alt-guard tunables ({@code ip-guard.*}): whether the guard records a joining player's (hashed) IP and
+     * checks for alts at all, the greatest number of distinct accounts allowed on one IP (0 = no cap, only observe),
+     * and whether staff are notified when a joining player shares an IP with other accounts. No GeoIP — the guard
+     * only ever holds one-way IP tokens.
+     *
+     * @param enabled whether the IP/alt guard is active ({@code ip-guard.enabled}, default true)
+     * @param maxAccountsPerIp the same-IP account cap, 0 for no cap ({@code ip-guard.max-accounts-per-ip}, default 0)
+     * @param notifyStaff whether staff are told when a join shares an IP ({@code ip-guard.notify-staff}, default true)
+     */
+    public record IpGuard(boolean enabled, int maxAccountsPerIp, boolean notifyStaff) {
+
+        private static final int DEFAULT_MAX_ACCOUNTS = 0;
+
+        /** Resolve the IP/alt-guard settings from the module's scoped {@link ConfigStore}. */
+        public static IpGuard from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new IpGuard(
+                    config.getBoolean("ip-guard.enabled", true),
+                    Math.max(0, config.getInt("ip-guard.max-accounts-per-ip", DEFAULT_MAX_ACCOUNTS)),
+                    config.getBoolean("ip-guard.notify-staff", true));
+        }
+
+        /** The pure same-IP account-cap decision this config drives. */
+        public AltLimitPolicy limitPolicy() {
+            return new AltLimitPolicy(maxAccountsPerIp);
+        }
+    }
+
+    /**
+     * The client-brand-guard tunables ({@code client-id.*}): whether the guard reads a joining player's client brand
+     * at all, which side of the brand list is the allowed side (or the flag-only observe mode), and the brand list
+     * itself. The mode string is parsed leniently and falls back to {@link ClientIdMode#FLAG} — the safe observe
+     * mode that never kicks — so a typo never starts denying joins.
+     *
+     * @param enabled whether the client-brand guard is active ({@code client-id.enabled}, default true)
+     * @param mode which side of {@code brands} is allowed ({@code client-id.mode}: block-list|allow-list|flag)
+     * @param brands the configured brand list ({@code client-id.brands}, default empty)
+     */
+    public record ClientId(boolean enabled, ClientIdMode mode, List<String> brands) {
+
+        public ClientId {
+            Objects.requireNonNull(mode, "mode");
+            Objects.requireNonNull(brands, "brands");
+            brands = List.copyOf(brands);
+        }
+
+        /** Resolve the client-brand-guard settings from the module's scoped {@link ConfigStore}. */
+        public static ClientId from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new ClientId(
+                    config.getBoolean("client-id.enabled", true),
+                    parseMode(config.getString("client-id.mode", "flag")),
+                    config.getStringList("client-id.brands", List.of()));
+        }
+
+        /** The pure allow/deny decision this config drives, feeding it each joiner's reported brand. */
+        public ClientPolicy policy() {
+            return new ClientPolicy(mode, Set.copyOf(brands));
+        }
+
+        private static ClientIdMode parseMode(String raw) {
+            return switch (raw.strip().toLowerCase(Locale.ROOT)) {
+                case "block-list", "blocklist", "block" -> ClientIdMode.BLOCK_LIST;
+                case "allow-list", "allowlist", "allow", "whitelist" -> ClientIdMode.ALLOW_LIST;
+                default -> ClientIdMode.FLAG;
+            };
         }
     }
 }

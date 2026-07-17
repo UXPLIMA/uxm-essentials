@@ -1371,6 +1371,16 @@ permissions:
   uxmessentials.security.bypass:
     description: 'Exempt from the two-factor join verification and op-command re-auth checks.'
     default: op
+  # IP/alt guard + ClientID (Phase 4). The two staff reads and the join-time notice are op-only.
+  uxmessentials.security.alts:
+    description: '/alts — list the accounts that share an IP with a player.'
+    default: op
+  uxmessentials.security.clientinfo:
+    description: '/clientinfo — show the client brand a player reported.'
+    default: op
+  uxmessentials.security.alts.notify:
+    description: 'Receive the staff notice when a join shares an IP with other accounts or reports a flagged client.'
+    default: op
   uxmessentials.module.security:
     description: 'Hot-reload / inspect the security module (2FA, op-protection, IP/alt guard).'
     default: op

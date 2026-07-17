@@ -62,8 +62,9 @@ public final class SecurityModule implements FeatureModule {
 
     @Override
     public List<MigrationSet> migrations() {
-        // The security_2fa and security_trusted tables are part of the persistence baseline (db/migration V76, V77),
-        // always applied by the persistence layer, so the module owns no additional Flyway location.
+        // The security_2fa, security_trusted and security_ip tables are part of the persistence baseline
+        // (db/migration V76, V77, V78), always applied by the persistence layer, so the module owns no additional
+        // Flyway location.
         return List.of();
     }
 

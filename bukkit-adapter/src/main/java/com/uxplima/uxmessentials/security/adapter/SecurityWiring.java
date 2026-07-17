@@ -9,22 +9,28 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.security.IpGuardStores;
 import com.uxplima.uxmessentials.persistence.security.TrustStores;
 import com.uxplima.uxmessentials.persistence.security.TwoFactorRepositories;
+import com.uxplima.uxmessentials.security.adapter.inbound.command.AltsCommand;
+import com.uxplima.uxmessentials.security.adapter.inbound.command.ClientInfoCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.PinCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
+import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityGuardListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityJoinListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
 import com.uxplima.uxmessentials.security.application.BeginTotpEnrollment;
 import com.uxplima.uxmessentials.security.application.ConfirmTotpEnrollment;
 import com.uxplima.uxmessentials.security.application.DisableTwoFactor;
+import com.uxplima.uxmessentials.security.application.FindAlts;
 import com.uxplima.uxmessentials.security.application.PendingTotpEnrollments;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SetPin;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
+import com.uxplima.uxmessentials.security.application.port.IpGuardStore;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.SecretGenerator;
@@ -64,6 +70,28 @@ public final class SecurityWiring {
         DisableTwoFactor disable = new DisableTwoFactor(repository, twoFactor.codeWindow());
         SetPin setPin = new SetPin(repository, twoFactor.pinPolicy());
         Clock clock = Clock.systemUTC();
+
+        // Phase 4 — IP/alt guard + ClientID: the DB-backed IP association store (hashed tokens only, never a raw
+        // address, so alts survive a restart), the session-only client-brand registry, the staff notifier that fans
+        // an alt / flagged-client notice to the notify-perm holders and mirrors it to the log, and the two join
+        // guards. Each guard self-gates on its own config flag; the /alts and /clientinfo staff reads are published
+        // alongside the enrolment verbs.
+        IpGuardStore ipGuardStore = IpGuardStores.jooq(persistence);
+        ClientBrandRegistry brands = new ClientBrandRegistry();
+        SecurityStaffNotifier staffNotifier = new SecurityStaffNotifier(
+                plugin.getServer(), kernel.scheduler(), kernel.messages(), kernel.messageSink(), kernel.log());
+        IpGuardController ipGuardController = new IpGuardController(
+                ipGuardStore,
+                config.ipGuard(),
+                kernel.playerLookup(),
+                staffNotifier,
+                kernel.scheduler(),
+                kernel.messages(),
+                clock);
+        ClientGuard clientGuard =
+                new ClientGuard(brands, config.clientId(), staffNotifier, kernel.scheduler(), kernel.messages());
+        FindAlts findAlts = new FindAlts(ipGuardStore);
+
         List<CommandRegistration> commands = List.of(
                 new TwoFactorCommand(
                         begin,
@@ -75,7 +103,11 @@ public final class SecurityWiring {
                         kernel.scheduler(),
                         kernel.messages(),
                         kernel.messageSink()),
-                new PinCommand(setPin, twoFactor, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
+                new PinCommand(setPin, twoFactor, kernel.scheduler(), kernel.messages(), kernel.messageSink()),
+                new AltsCommand(
+                        findAlts, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()),
+                new ClientInfoCommand(
+                        brands, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()));
 
         // Phase 2 — join verification: the DB-backed device-trust store, the transient freeze/lockout registry, the
         // keypad GUI, and the controller that decides on join and drives every submitted PIN/code to an unfreeze,
@@ -123,8 +155,9 @@ public final class SecurityWiring {
                 new VerificationFreezeListener(sessions, kernel.messages(), kernel.messageSink()),
                 new PinKeypadListener(keypad, router, sessions),
                 new ReauthCommandListener(
-                        opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock));
-        return new Wired(commands, listeners, pending, sessions, keypad, reauthSessions, reauthState);
+                        opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
+                new SecurityGuardListener(ipGuardController, clientGuard, brands));
+        return new Wired(commands, listeners, pending, sessions, keypad, reauthSessions, reauthState, brands);
     }
 
     /**
@@ -140,6 +173,7 @@ public final class SecurityWiring {
      * @param keypad the keypad view whose open windows close on module stop
      * @param reauthSessions the in-flight op-command re-auth prompts, cleared on module stop
      * @param reauthState the per-player last-verified stamps, cleared on module stop
+     * @param brands the session-only client-brand registry, cleared on module stop
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -148,7 +182,8 @@ public final class SecurityWiring {
             VerificationSessions sessions,
             PinKeypadView keypad,
             ReauthSessions reauthSessions,
-            ReauthState reauthState) {
+            ReauthState reauthState,
+            ClientBrandRegistry brands) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -158,15 +193,17 @@ public final class SecurityWiring {
             Objects.requireNonNull(keypad, "keypad");
             Objects.requireNonNull(reauthSessions, "reauthSessions");
             Objects.requireNonNull(reauthState, "reauthState");
+            Objects.requireNonNull(brands, "brands");
         }
 
-        /** Drop every pending secret, freeze and re-auth window, and close every keypad, so a disable leaves nothing. */
+        /** Drop every pending secret, freeze and re-auth window, close every keypad, and forget every recorded brand. */
         public void stop() {
             pending.clearAll();
             keypad.closeAll();
             sessions.clearAll();
             reauthSessions.clearAll();
             reauthState.clearAll();
+            brands.clearAll();
         }
     }
 }
