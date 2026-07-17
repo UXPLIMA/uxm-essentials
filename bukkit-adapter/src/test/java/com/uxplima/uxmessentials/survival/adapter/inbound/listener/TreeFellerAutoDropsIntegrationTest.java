@@ -49,7 +49,9 @@ class TreeFellerAutoDropsIntegrationTest {
         world = server.addSimpleWorld("world");
         player = server.addPlayer("Steve");
         player.teleport(new Location(world, 0.5, 65, 0.5));
-        player.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.survival.autopickup", true);
+        var plugin = MockBukkit.createMockPlugin();
+        player.addAttachment(plugin, "uxmessentials.survival.autopickup", true);
+        player.addAttachment(plugin, "uxmessentials.survival.treefeller", true); // the fell now requires its use node
         toggles = new PdcSurvivalToggles();
     }
 

@@ -36,10 +36,13 @@ class FarmProtectListenerTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        MockBukkit.createMockPlugin();
+        var plugin = MockBukkit.createMockPlugin();
         world = server.addSimpleWorld("world");
         player = server.addPlayer("Steve");
         player.teleport(new Location(world, 0.5, 65, 0.5));
+        // Protection now requires the use permission on top of the toggle; grant it so the toggle behaviour under
+        // test still fires. The permission-denied path has its own case below.
+        player.addAttachment(plugin, "uxmessentials.survival.farmprotect", true);
         toggles = new PdcSurvivalToggles();
         listener = new FarmProtectListener(toggles);
     }
@@ -66,6 +69,19 @@ class FarmProtectListenerTest {
 
         listener.onTrample(event);
 
+        assertThat(event.useInteractedBlock()).isNotEqualTo(Event.Result.DENY);
+    }
+
+    @Test
+    void leavesTheTrampleAloneWithoutTheUsePermission() {
+        PlayerMock denied = server.addPlayer("NoPerm"); // never granted uxmessentials.survival.farmprotect
+        denied.teleport(new Location(world, 0.5, 65, 0.5));
+        PlayerInteractEvent event = new PlayerInteractEvent(
+                denied, Action.PHYSICAL, null, farmlandAt(0, 64, 0), BlockFace.UP, EquipmentSlot.HAND);
+
+        listener.onTrample(event);
+
+        // Toggle defaults on, so only the missing permission leaves the farmland unprotected.
         assertThat(event.useInteractedBlock()).isNotEqualTo(Event.Result.DENY);
     }
 

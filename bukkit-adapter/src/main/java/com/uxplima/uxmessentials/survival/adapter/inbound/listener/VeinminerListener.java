@@ -20,7 +20,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Veinminer: breaking one of the configured blocks breaks the whole connected vein of the same material, up to
  * {@code max-blocks}, applying tool durability and hunger. It listens on {@code BlockBreakEvent} (ignoring an
- * already-cancelled break) and fires only for a block in the configured trigger set.
+ * already-cancelled break) and fires only for a block in the configured trigger set, and only for a player holding the
+ * {@code uxmessentials.survival.veinminer} permission with their personal toggle on.
  *
  * <h2>Sneak semantics</h2>
  * The mechanic acts on the breaking player. {@code sneak-required} (default {@code true}) is the "shift to vein"
@@ -40,6 +41,8 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 public final class VeinminerListener implements Listener {
+
+    private static final String PERMISSION = "uxmessentials.survival.veinminer";
 
     private final Veinminer config;
     private final Set<Material> triggers;
@@ -75,9 +78,11 @@ public final class VeinminerListener implements Listener {
         }
     }
 
-    /** Whether veinminer should fire for this break: the player's toggle is on and the sneak gate passes. */
+    /** Whether veinminer should fire: the player is permitted, their toggle is on, and the sneak gate passes. */
     private boolean applies(Player player) {
-        return toggles.veinminerActive(player, true) && (!config.sneakRequired() || player.isSneaking());
+        return player.hasPermission(PERMISSION)
+                && toggles.veinminerActive(player, true)
+                && (!config.sneakRequired() || player.isSneaking());
     }
 
     private void vein(Block origin, Player player) {

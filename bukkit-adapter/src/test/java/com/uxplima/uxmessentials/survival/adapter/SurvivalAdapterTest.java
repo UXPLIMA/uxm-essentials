@@ -47,10 +47,14 @@ class SurvivalAdapterTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        MockBukkit.createMockPlugin();
+        var plugin = MockBukkit.createMockPlugin();
         world = server.addSimpleWorld("world");
         player = server.addPlayer("Steve");
         player.teleport(new Location(world, 0.5, 65, 0.5));
+        // Both mechanics now require their use permission on top of the per-player toggle; grant them so the
+        // toggle/sneak/axe behaviour under test still fires. The permission-denied path has its own cases below.
+        player.addAttachment(plugin, "uxmessentials.survival.treefeller", true);
+        player.addAttachment(plugin, "uxmessentials.survival.veinminer", true);
         toggles = new PdcSurvivalToggles();
         scheduler = new CapturingScheduler();
     }
@@ -122,6 +126,19 @@ class SurvivalAdapterTest {
     }
 
     @Test
+    void treeFellerDoesNothingWithoutTheUsePermissionEvenWithTheToggleOn() {
+        PlayerMock denied = server.addPlayer("NoPerm"); // never granted uxmessentials.survival.treefeller
+        denied.teleport(new Location(world, 0.5, 65, 0.5));
+        denied.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_AXE));
+        logColumn(0, 64, 6); // toggle defaults on, so only the missing permission can stop the fell
+        TreeFellerListener listener = new TreeFellerListener(treeFeller(cfg -> cfg), toggles, scheduler);
+
+        listener.onBreak(new BlockBreakEvent(blockAt(0, 64, 0), denied));
+
+        assertThat(typeAt(0, 65, 0)).isEqualTo(Material.OAK_LOG);
+    }
+
+    @Test
     void treeFellerReplantsASaplingAtTheBaseOnceTheOriginIsCleared() {
         giveAxe();
         logColumn(0, 64, 3);
@@ -177,6 +194,19 @@ class SurvivalAdapterTest {
         player.setSneaking(true);
         listener.onBreak(breakOf(blockAt(0, 64, 0)));
         assertThat(typeAt(0, 65, 0)).isEqualTo(Material.AIR);
+    }
+
+    @Test
+    void veinminerDoesNothingWithoutTheUsePermissionEvenWithTheToggleOn() {
+        PlayerMock denied = server.addPlayer("NoPerm"); // never granted uxmessentials.survival.veinminer
+        denied.teleport(new Location(world, 0.5, 65, 0.5));
+        oreColumn(Material.COAL_ORE, 0, 64, 6);
+        denied.setSneaking(true); // toggle defaults on and no sneak gate here, so only the permission can stop the vein
+        VeinminerListener listener = new VeinminerListener(veinminer(cfg -> cfg), Set.of(Material.COAL_ORE), toggles);
+
+        listener.onBreak(new BlockBreakEvent(blockAt(0, 64, 0), denied));
+
+        assertThat(typeAt(0, 65, 0)).isEqualTo(Material.COAL_ORE);
     }
 
     // --- helpers -------------------------------------------------------------------------------------------------

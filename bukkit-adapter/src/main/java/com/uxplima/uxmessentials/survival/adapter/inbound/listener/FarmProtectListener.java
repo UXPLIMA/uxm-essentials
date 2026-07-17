@@ -20,9 +20,10 @@ import org.jspecify.annotations.NullMarked;
  * trample. The player's own {@link EntityChangeBlockEvent} (jumping onto farmland from a height) is cancelled too, so
  * neither a step nor a fall breaks the crop bed.
  *
- * <p>Both handlers are per-player: the toggle is read from {@link PdcSurvivalToggles} for the acting player and
- * defaults to on, so a protected player who never touched the command keeps their crops. A mob trampling farmland is
- * not this mechanic's concern — only the player's own {@code EntityChangeBlockEvent} is inspected.
+ * <p>Both handlers are per-player and gated by the {@code uxmessentials.survival.farmprotect} permission: the toggle is
+ * read from {@link PdcSurvivalToggles} for the acting player and defaults to on, so a permitted player who never touched
+ * the command keeps their crops. A mob trampling farmland is not this mechanic's concern — only the player's own
+ * {@code EntityChangeBlockEvent} is inspected.
  *
  * <h2>Folia</h2>
  * Both events are dispatched on the region owning the trampled block, and the handler only reads the block type and
@@ -30,6 +31,8 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class FarmProtectListener implements Listener {
+
+    private static final String PERMISSION = "uxmessentials.survival.farmprotect";
 
     private final PdcSurvivalToggles toggles;
 
@@ -43,9 +46,7 @@ public final class FarmProtectListener implements Listener {
             return;
         }
         Block block = event.getClickedBlock();
-        if (block != null
-                && block.getType() == Material.FARMLAND
-                && toggles.farmProtectActive(event.getPlayer(), true)) {
+        if (block != null && block.getType() == Material.FARMLAND && protects(event.getPlayer())) {
             event.setCancelled(true);
         }
     }
@@ -55,8 +56,13 @@ public final class FarmProtectListener implements Listener {
         if (event.getBlock().getType() != Material.FARMLAND) {
             return;
         }
-        if (event.getEntity() instanceof Player player && toggles.farmProtectActive(player, true)) {
+        if (event.getEntity() instanceof Player player && protects(player)) {
             event.setCancelled(true);
         }
+    }
+
+    /** Whether farmland protection guards {@code player}: they are permitted and their toggle is on. */
+    private boolean protects(Player player) {
+        return player.hasPermission(PERMISSION) && toggles.farmProtectActive(player, true);
     }
 }

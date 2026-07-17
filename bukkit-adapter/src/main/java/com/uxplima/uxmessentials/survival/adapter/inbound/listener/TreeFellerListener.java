@@ -26,7 +26,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Tree-feller: breaking one log of a tree fells every connected log of the same kind, up to {@code max-blocks}, then
  * optionally replants a sapling at the base. It listens on {@code BlockBreakEvent} (ignoring an already-cancelled
- * break) and, when the break is a log and the mechanic applies, breaks the rest of the connected trunk.
+ * break) and, when the break is a log and the mechanic applies, breaks the rest of the connected trunk. It fires only
+ * for a player holding the {@code uxmessentials.survival.treefeller} permission with their personal toggle on.
  *
  * <h2>Sneak semantics (the owner-shift nuance)</h2>
  * The mechanic acts on the player who broke the log — there is no block ownership involved. The config
@@ -48,6 +49,8 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 public final class TreeFellerListener implements Listener {
+
+    private static final String PERMISSION = "uxmessentials.survival.treefeller";
 
     private final TreeFeller config;
     private final PdcSurvivalToggles toggles;
@@ -80,9 +83,9 @@ public final class TreeFellerListener implements Listener {
         }
     }
 
-    /** Whether tree-feller should fire for this break: the player's toggle is on and the sneak/axe gates pass. */
+    /** Whether tree-feller should fire: the player is permitted, their toggle is on, and the sneak/axe gates pass. */
     private boolean applies(Player player) {
-        if (!toggles.treeFellerActive(player, true)) {
+        if (!player.hasPermission(PERMISSION) || !toggles.treeFellerActive(player, true)) {
             return false;
         }
         if (config.sneakRequired() && !player.isSneaking()) {
