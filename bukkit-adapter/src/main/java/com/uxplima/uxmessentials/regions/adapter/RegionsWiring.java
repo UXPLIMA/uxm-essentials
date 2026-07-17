@@ -1,0 +1,106 @@
+package com.uxplima.uxmessentials.regions.adapter;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.OptionalInt;
+import java.util.stream.IntStream;
+
+import org.bukkit.Material;
+import org.bukkit.Server;
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.regions.adapter.inbound.command.RegionsCommand;
+import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionListView;
+import com.uxplima.uxmessentials.regions.adapter.outbound.NoWorldGuardRegionService;
+import com.uxplima.uxmessentials.regions.adapter.outbound.WorldGuardRegionService;
+import com.uxplima.uxmessentials.regions.application.RegionsConfig;
+import com.uxplima.uxmessentials.regions.application.port.RegionService;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
+import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * Constructs the regions context's adapters over the injected kernel ports and the shared menu engine, and produces
+ * the {@code /regions} command. WorldGuard is a soft dependency, so the {@link RegionService} is chosen here by
+ * {@link #regionService a plugin-present probe}: the reflective {@link WorldGuardRegionService} when WorldGuard is
+ * installed, otherwise the {@link NoWorldGuardRegionService} no-op that reports "not available" and degrades the
+ * command to a "WorldGuard not installed" reply. Either way the module registers exactly one permission-gated
+ * command and no listener, and holds no runtime state — so there is nothing to tear down on stop.
+ *
+ * <p>The region-list panel is opened through the menu engine's paginated list, so the context creates no raw
+ * inventory. The list page size comes from the module config, applied here as the layout's content-slot count.
+ */
+@NullMarked
+public final class RegionsWiring {
+
+    /** The full five content rows of a six-row chest; the nav row (slots 45..53) carries the prev/next buttons. */
+    private static final int LIST_ROWS = 6;
+
+    private static final int PREV_SLOT = 48;
+    private static final int NEXT_SLOT = 50;
+
+    /** Each region is drawn as, and the paginated-list fallback icon is, a sheet of paper. */
+    private static final Material REGION_ICON = Material.PAPER;
+
+    private RegionsWiring() {}
+
+    /** Build the regions adapters and the {@code /regions} command from {@code plugin}, {@code ctx} and {@code menus}. */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Menus menus) {
+        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(menus, "menus");
+        KernelPorts kernel = ctx.kernel();
+        RegionsConfig config = RegionsConfig.from(ctx.config());
+        RegionService service = regionService(plugin.getServer(), kernel.log());
+        RegionListView listView = new RegionListView(
+                menus,
+                new GuiText(kernel.messages()),
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink(),
+                service,
+                listLayout(config.listPageSize()));
+        RegionsCommand command = new RegionsCommand(service, listView, plugin.getServer(), kernel.messages());
+        return new Wired(List.of(command));
+    }
+
+    /**
+     * The region-service seam bound for this run: the reflective WorldGuard implementation when the WorldGuard
+     * plugin is installed, else the no-op fallback. The probe is a plain plugin-present check
+     * ({@code getPlugin("WorldGuard") != null}) — the same soft-dep pattern the economy Vault/Treasury bridge uses —
+     * so no {@code com.sk89q} class loads on a server without WorldGuard. Package-visible for the wiring probe test.
+     */
+    public static RegionService regionService(Server server, Logger log) {
+        Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(log, "log");
+        if (server.getPluginManager().getPlugin("WorldGuard") != null) {
+            return new WorldGuardRegionService(server, log);
+        }
+        return new NoWorldGuardRegionService();
+    }
+
+    /** A six-row paginated layout whose content region is the first {@code pageSize} slots (nav in the bottom row). */
+    private static EntityListLayout listLayout(int pageSize) {
+        List<Integer> content = IntStream.range(0, pageSize).boxed().toList();
+        GuiLayout base = new GuiLayout(LIST_ROWS, REGION_ICON, Material.ARROW, PREV_SLOT, NEXT_SLOT, content);
+        return new EntityListLayout(base, Material.BLACK_STAINED_GLASS_PANE, OptionalInt.empty(), REGION_ICON);
+    }
+
+    /**
+     * Everything the regions module contributes once wired: the {@code /regions} command. The context registers no
+     * listener and holds no runtime state (WorldGuard owns the region store), so there is no stop hook.
+     *
+     * @param commands the Brigadier command registrations to publish
+     */
+    public record Wired(List<CommandRegistration> commands) {
+        public Wired {
+            commands = List.copyOf(commands);
+        }
+    }
+}

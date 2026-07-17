@@ -80,6 +80,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
         assertThat(registry.byId(ModuleId.of("villagers"))).isPresent();
         assertThat(registry.byId(ModuleId.of("invrollback"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("regions"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -113,7 +114,8 @@ class FeatureModuleRegistryDriftTest {
                         "commandcontrol",
                         "trade",
                         "villagers",
-                        "invrollback");
+                        "invrollback",
+                        "regions");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -749,14 +751,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void invrollbackIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void invrollbackShipsEnabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule invrollback = registry.byId(ModuleId.of("invrollback"))
                 .orElseThrow(() -> new AssertionError("invrollback is not registered"));
 
-        // invrollback is a new bounded context — AxInventoryRestore-parity inventory snapshots on death and logout —
-        // registered last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("invrollback");
+        // invrollback is a bounded context — AxInventoryRestore-parity inventory snapshots on death and logout. The
+        // later regions context now lands last, so invrollback must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("invrollback"))).isPresent();
 
         // It ships ENABLED but inert (a steady-state feature — nothing is stored until a player dies or logs out):
         // with no modules.conf override it is on, and disabling exactly invrollback removes only it while every
@@ -777,6 +779,36 @@ class FeatureModuleRegistryDriftTest {
         // (always applied), so it declares no MigrationSet of its own.
         assertThat(invrollback.commands()).isEmpty();
         assertThat(invrollback.migrations()).isEmpty();
+    }
+
+    @Test
+    void regionsIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule regions = registry.byId(ModuleId.of("regions"))
+                .orElseThrow(() -> new AssertionError("regions is not registered"));
+
+        // regions is a new bounded context — a GUI to manage WorldGuard regions behind a SOFT dependency — registered
+        // last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("regions");
+
+        // It ships ENABLED (being on costs nothing without WorldGuard — the module degrades to a "not installed"
+        // reply): with no modules.conf override it is on, and disabling exactly regions removes only it while every
+        // sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("regions", "teleport", "economy", "holograms", "invrollback");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.regions.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("regions");
+        assertThat(off).contains("teleport", "holograms", "invrollback");
+
+        // The /regions command is Bukkit-facing and bound only when WorldGuard is present, so it is contributed
+        // through the adapter wiring rather than the declarative list; the module publishes no command here, and it
+        // persists nothing (WorldGuard owns the region store), so it declares no MigrationSet.
+        assertThat(regions.commands()).isEmpty();
+        assertThat(regions.migrations()).isEmpty();
     }
 
     @Test

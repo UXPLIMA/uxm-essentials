@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
 import com.uxplima.uxmessentials.poses.application.PoseModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
 import com.uxplima.uxmessentials.ranks.application.RanksModule;
+import com.uxplima.uxmessentials.regions.application.RegionsModule;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardModule;
 import com.uxplima.uxmessentials.security.application.SecurityModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
@@ -213,6 +214,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but inert
         // until a capture happens, so it lands last after villagers.
         delegate.register(new InvrollbackModule());
+        // regions is a new bounded context — a GUI to manage WorldGuard regions (Phase 1 lists them). WorldGuard is a
+        // SOFT dependency: the adapter wiring probes for it and, when it is absent, binds a no-op RegionService so the
+        // module is inert (the /regions command reports "WorldGuard not installed"). It carries no hard dependency edge
+        // (its only collaborators are the shared Scheduler, messages and the menu engine; WorldGuard is an external
+        // soft-dep, not a module), persists nothing (WorldGuard owns the region store), and like the steady-state
+        // features ships ENABLED, so it lands last after invrollback.
+        delegate.register(new RegionsModule());
         // The shared kernel is not a module and never appears here.
     }
 

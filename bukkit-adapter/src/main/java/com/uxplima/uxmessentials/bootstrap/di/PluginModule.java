@@ -80,6 +80,7 @@ import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
+import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
@@ -977,7 +978,21 @@ public final class PluginModule {
             wireVillagers(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
             wireInvrollback(ctx, persistence, resources, menus);
+        } else if (module.id().equals(ModuleId.of("regions"))) {
+            wireRegions(plugin, ctx, resources, menus);
         }
+    }
+
+    private static void wireRegions(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, Menus menus) {
+        // regions manages WorldGuard regions behind a SOFT dependency. The wiring probes for the WorldGuard plugin and
+        // binds either the reflective WorldGuardRegionService (WG present) or the NoWorldGuardRegionService no-op (WG
+        // absent); the /regions command consults RegionService.available() and, on the no-op, replies "WorldGuard not
+        // installed" and opens nothing, so the surface is inert without WorldGuard. The region-list panel rides the
+        // shared menu engine's paginated list (no raw inventory), reading the region set + each region's priority and
+        // roster counts off the tick thread on the global region thread. The context persists nothing and holds no
+        // runtime state, so there is no stop hook. A disabled module wires none of this.
+        RegionsWiring.Wired wired = RegionsWiring.wire(plugin, ctx, menus);
+        wired.commands().forEach(resources::addCommand);
     }
 
     private static void wireInvrollback(

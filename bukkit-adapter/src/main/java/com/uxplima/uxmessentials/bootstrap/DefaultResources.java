@@ -66,6 +66,7 @@ final class DefaultResources {
             "modules/trade/config.conf",
             "modules/villagers/config.conf",
             "modules/invrollback/config.conf",
+            "modules/regions/config.conf",
             "modules/migration/config.conf",
             "modules/communication/gui/announcement-editor-list.conf",
             "modules/communication/gui/announcement-editor.conf",

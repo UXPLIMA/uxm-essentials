@@ -1452,3 +1452,15 @@ permissions:
     description: 'Hot-reload / inspect the invrollback module (inventory snapshots and restore).'
     default: op
 
+  # regions context (docs/permissions.md "Regions"). A GUI to manage WorldGuard regions; WorldGuard is a soft
+  # dependency, so on a server without it the command replies "WorldGuard not installed" and opens nothing. List
+  # (.list) — /regions [world] opens a paginated list of the regions in the player's (or the named) world, showing
+  # each region's id, priority and member count; clicking a region opens its detail panel (the flag and
+  # members/owners editors land with the later phases). uxmessentials.module.regions is the reload/inspect tier.
+  uxmessentials.regions.list:
+    description: '/regions [world] — open the WorldGuard region-list GUI for a world.'
+    default: op
+  uxmessentials.module.regions:
+    description: 'Hot-reload / inspect the regions module (WorldGuard region management).'
+    default: op
+
