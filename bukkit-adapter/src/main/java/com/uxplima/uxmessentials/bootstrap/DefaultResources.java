@@ -49,6 +49,7 @@ final class DefaultResources {
             "modules/communication/info-pages.conf",
             "modules/communication/chat.conf",
             "modules/vote/config.conf",
+            "modules/discordlink/config.conf",
             "modules/holograms/config.conf",
             "modules/playerwarps/config.conf",
             "modules/scoreboard/config.conf",

@@ -39,4 +39,12 @@ class ConfigLayoutFirstRunDriftTest {
         assertThat(store.getInt("modules.homes.default-limit", -1)).isEqualTo(3);
         assertThat(store.getString("storage.backend", "x")).isEqualTo("sqlite");
     }
+
+    @Test
+    void firstRunTreeSurfacesTheDiscordlinkHostConfig(@TempDir Path dir) {
+        DefaultResources.writeInto(dir, java.util.logging.Logger.getLogger("t"));
+        ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
+        assertThat(store.getBoolean("modules.discordlink.enabled", false)).isTrue();
+        assertThat(store.getInt("modules.discordlink.code-ttl-seconds", -1)).isEqualTo(600);
+    }
 }
