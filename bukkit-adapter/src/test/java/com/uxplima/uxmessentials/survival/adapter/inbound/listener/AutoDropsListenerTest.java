@@ -3,11 +3,13 @@ package com.uxplima.uxmessentials.survival.adapter.inbound.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -16,7 +18,9 @@ import org.bukkit.entity.Item;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.survival.domain.SellPrices;
@@ -41,6 +45,7 @@ class AutoDropsListenerTest {
     private WorldMock world;
     private PlayerMock player;
     private PdcSurvivalToggles toggles;
+    private InlineScheduler scheduler;
 
     @BeforeEach
     void setUp() {
@@ -52,6 +57,7 @@ class AutoDropsListenerTest {
         player.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.survival.autosmelt", true);
         player.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.survival.autosell", true);
         toggles = new PdcSurvivalToggles();
+        scheduler = new InlineScheduler();
     }
 
     @AfterEach
@@ -96,6 +102,7 @@ class AutoDropsListenerTest {
                         new SellPrices(Map.of()),
                         Optional.empty(),
                         toggles),
+                scheduler,
                 false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
@@ -117,6 +124,7 @@ class AutoDropsListenerTest {
                         new SellPrices(Map.of()),
                         Optional.empty(),
                         toggles),
+                scheduler,
                 false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
@@ -127,6 +135,7 @@ class AutoDropsListenerTest {
 
     @Test
     void autoSellCreditsTheWalletAtTheConfiguredPrice() {
+        toggles.toggleAutoSell(player, false); // autosell now defaults off per player: opt in for this case
         Block ore = blockWithDrops(Material.DIAMOND_ORE, new ItemStack(Material.DIAMOND, 2));
         RecordingSales sales = new RecordingSales(true);
         AutoDropsListener listener = new AutoDropsListener(
@@ -138,6 +147,7 @@ class AutoDropsListenerTest {
                         new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
                         Optional.of(sales),
                         toggles),
+                scheduler,
                 false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
@@ -150,6 +160,8 @@ class AutoDropsListenerTest {
 
     @Test
     void autoSellIsInertWithoutAnEconomyProvider() {
+        toggles.toggleAutoSell(
+                player, false); // opt in, so the only thing that can stop the sell is the missing provider
         Block ore = blockWithDrops(Material.DIAMOND_ORE, new ItemStack(Material.DIAMOND, 2));
         AutoDropsListener listener = new AutoDropsListener(
                 new AutoDropsPipeline(
@@ -160,12 +172,55 @@ class AutoDropsListenerTest {
                         new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
                         Optional.empty(),
                         toggles),
+                scheduler,
                 false);
 
         listener.onBreak(new BlockBreakEvent(ore, player));
 
         // No provider: the sell stage never fires, so auto-pickup simply keeps the diamonds.
         assertThat(player.getInventory().contains(Material.DIAMOND, 2)).isTrue();
+    }
+
+    @Test
+    void theOriginDropIsDeferredToItsRegionSoItSpawnsAfterTheVanillaBreakClearsTheBlock() {
+        Block ore = blockWithDrops(Material.IRON_ORE, new ItemStack(Material.RAW_IRON, 1));
+        CapturingScheduler capturing = new CapturingScheduler();
+        AutoDropsListener listener = new AutoDropsListener(
+                new AutoDropsPipeline(
+                        false, // smelt only, no pickup: the smelted item must reach the ground, not the inventory
+                        true,
+                        new SmeltMap(Map.of("RAW_IRON", "IRON_INGOT")),
+                        false,
+                        new SellPrices(Map.of()),
+                        Optional.empty(),
+                        toggles),
+                capturing,
+                false);
+
+        listener.onBreak(new BlockBreakEvent(ore, player));
+
+        // Nothing spawns during the event: the route is deferred to the block's region, so on the real server it
+        // lands a tick later, after vanilla has cleared the origin to air (no fling out of the still-solid block).
+        assertThat(capturing.captured).hasSize(1);
+        assertThat(groundItems()).isEmpty();
+        capturing.captured.forEach(Runnable::run);
+        assertThat(groundItems()).hasSize(1);
+        assertThat(groundItems().get(0).getType()).isEqualTo(Material.IRON_INGOT);
+    }
+
+    @Test
+    void aCreativeBreakPocketsAndDropsNothingAndLeavesTheBlockToVanilla() {
+        player.setGameMode(GameMode.CREATIVE);
+        Block ore = blockWithDrops(Material.COAL_ORE, new ItemStack(Material.COAL, 3));
+        AutoDropsListener listener = pickupOnly();
+
+        listener.onBreak(new BlockBreakEvent(ore, player));
+
+        // Creative: the auto-* mechanics never fire, so nothing is pocketed, nothing drops, and the block is left
+        // untouched for the vanilla break to handle.
+        assertThat(player.getInventory().contains(Material.COAL)).isFalse();
+        assertThat(groundItems()).isEmpty();
+        assertThat(ore.getType()).isEqualTo(Material.COAL_ORE);
     }
 
     // --- helpers -----------------------------------------------------------------------------------------------------
@@ -180,6 +235,7 @@ class AutoDropsListenerTest {
                         new SellPrices(Map.of()),
                         Optional.empty(),
                         toggles),
+                scheduler,
                 false);
     }
 
@@ -221,6 +277,64 @@ class AutoDropsListenerTest {
                 credited = credited.add(amount);
             }
             return success;
+        }
+    }
+
+    /** Runs the deferred region hop inline so the auto-drops route is observable in the dispatch call. */
+    private static final class InlineScheduler implements Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Captures region-scheduled tasks so a test can assert the route is deferred and run it explicitly. */
+    private static final class CapturingScheduler implements Scheduler {
+        private final List<Runnable> captured = new ArrayList<>();
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            captured.add(task);
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
         }
     }
 }

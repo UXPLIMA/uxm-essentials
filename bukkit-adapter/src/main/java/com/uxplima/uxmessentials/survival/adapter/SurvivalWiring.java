@@ -198,7 +198,8 @@ public final class SurvivalWiring {
             commands.add(new AutoSellCommand(toggles, kernel.messages()));
         }
         if (autoDrops != null) {
-            listeners.add(new AutoDropsListener(autoDrops, config.autoPickup().transferXp()));
+            listeners.add(new AutoDropsListener(
+                    autoDrops, kernel.scheduler(), config.autoPickup().transferXp()));
         }
         if (config.autoTool().enabled()) {
             commands.add(new AutoToolCommand(toggles, kernel.messages()));

@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.data.type.Leaves;
 import org.bukkit.entity.Item;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
@@ -65,14 +66,17 @@ class TreeFellerAutoDropsIntegrationTest {
         logColumn(5); // five stacked logs, each dropping one OAK_LOG
         AutoDropsPipeline pipeline = new AutoDropsPipeline(
                 true, false, new SmeltMap(Map.of()), false, new SellPrices(Map.of()), Optional.empty(), toggles);
-        AutoDropsListener autoDrops = new AutoDropsListener(pipeline, false);
+        AutoDropsListener autoDrops = new AutoDropsListener(pipeline, new SyncScheduler(), false);
         TreeFellerListener treeFeller = new TreeFellerListener(config(), toggles, new SyncScheduler(), pipeline);
 
         BlockBreakEvent event = new BlockBreakEvent(world.getBlockAt(0, 64, 0), player);
-        autoDrops.onBreak(event); // the origin log's drop is taken over and routed
+        // Fire in the order the wiring registers them: the harvesting listener before the auto-drops listener. The
+        // tree-feller fells the trunk while the break's drops are still live, then the auto-drops listener takes over
+        // the origin's drop (setDropItems(false)); reversing them would let the suppressed-drops guard skip the fell.
         treeFeller.onBreak(event); // the four logs above cascade through the same pipeline
+        autoDrops.onBreak(event); // the origin log's drop is taken over and routed
 
-        // All five logs — origin plus the four-log cascade — are in the inventory, and none reached the ground.
+        // All five logs, origin plus the four-log cascade, are in the inventory, and none reached the ground.
         assertThat(player.getInventory().contains(Material.OAK_LOG, 5)).isTrue();
         assertThat(groundItems()).isEmpty();
         // The cascade cleared the trunk above the origin (the origin itself is left to the vanilla break).
@@ -92,6 +96,12 @@ class TreeFellerAutoDropsIntegrationTest {
             log.setType(Material.OAK_LOG);
             log.setDrops(List.of(new ItemStack(Material.OAK_LOG)));
         }
+        // Tree-feller now fells only a natural tree, so place a grown (non-persistent) leaf beside the trunk.
+        BlockMock leaf = world.getBlockAt(1, 64, 0);
+        leaf.setType(Material.OAK_LEAVES);
+        Leaves data = (Leaves) leaf.getBlockData();
+        data.setPersistent(false);
+        leaf.setBlockData(data);
     }
 
     private List<ItemStack> groundItems() {

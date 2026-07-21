@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.survival.adapter.inbound.listener;
 import java.util.Objects;
 import java.util.Set;
 
+import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -68,11 +69,14 @@ public final class VeinminerListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE || !event.isDropItems()) {
+            return; // a creative or drop-suppressed break does the vanilla nothing: no vein
+        }
         Block origin = event.getBlock();
         if (!triggers.contains(origin.getType())) {
             return;
         }
-        Player player = event.getPlayer();
         if (applies(player)) {
             vein(origin, player);
         }
