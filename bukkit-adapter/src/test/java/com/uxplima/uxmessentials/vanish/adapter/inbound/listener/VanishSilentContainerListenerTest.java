@@ -1,10 +1,16 @@
 package com.uxplima.uxmessentials.vanish.adapter.inbound.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.Container;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
@@ -80,6 +86,41 @@ class VanishSilentContainerListenerTest {
         listener(false).onOpen(event);
 
         assertThat(event.isCancelled()).isFalse();
+    }
+
+    @Test
+    void aVanishedPlayersRealBlockChestIsStillSilenced() {
+        PlayerMock alice = server.addPlayer("Alice");
+        store.vanish(alice.getUniqueId(), VanishLevel.DEFAULT);
+        World world = server.getWorld("world");
+        Block block = world.getBlockAt(1, 64, 1);
+        block.setType(Material.CHEST);
+        Inventory chest = ((Container) block.getState()).getInventory();
+        InventoryOpenEvent event = openEvent(alice, chest);
+
+        listener(true).onOpen(event);
+
+        assertThat(event.isCancelled()).isTrue(); // a real block chest carries a world location, so it is silenced
+    }
+
+    @Test
+    void aVanishedPlayersVirtualGuiOpenIsNotMirrored() {
+        // A plugin GUI (the menu engine, the PIN keypad) is a virtual CHEST inventory with no block, so getLocation()
+        // is null. Mirroring it would swap it for a null-holder copy and strip its MenuHolder / PinKeypadHolder, which
+        // silently breaks click-cancelling; the listener must leave a virtual GUI alone even though its type is CHEST.
+        PlayerMock alice = server.addPlayer("Alice");
+        store.vanish(alice.getUniqueId(), VanishLevel.DEFAULT);
+        Inventory virtualChestGui = mock(Inventory.class);
+        when(virtualChestGui.getType()).thenReturn(InventoryType.CHEST);
+        when(virtualChestGui.getLocation()).thenReturn(null);
+        InventoryView view = mock(InventoryView.class);
+        when(view.getPlayer()).thenReturn(alice);
+        when(view.getTopInventory()).thenReturn(virtualChestGui);
+        InventoryOpenEvent event = new InventoryOpenEvent(view);
+
+        listener(true).onOpen(event);
+
+        assertThat(event.isCancelled()).isFalse(); // a virtual GUI carries no block location, so it is never mirrored
     }
 
     @Test
