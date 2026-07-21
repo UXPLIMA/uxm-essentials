@@ -20,29 +20,20 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The self-rescheduling rent sweep (the {@code SalaryTask}/{@code BankInterestTask} pattern): on a fixed interval,
  * off the tick thread, it charges the warps whose paid term has lapsed, retries or archives the suspended ones, and
- * mails any owners a heads-up whose term is approaching. Every pass is bounded — each query is capped at
- * {@link #BATCH_LIMIT} rows and indexed on {@code rent_paid_until}, never a full-table scan — and each warp is
- * settled in isolation, so one warp's fault (a transient DB error, say) is logged and the sweep carries on.
+ * mails any owners a heads-up whose term is approaching. Every pass is bounded: each query is capped at
+ * {@link #BATCH_LIMIT} rows and indexed on {@code rent_paid_until}, never a full-table scan, and each warp is settled
+ * in isolation, so one warp's fault (a transient DB error, say) is logged and the sweep carries on.
  *
- * <p>A disabled rent sub-group schedules nothing and charges nothing: {@link #start()} returns immediately when the
- * config is off. Processing one batch per tick keeps a single pass's work bounded; a backlog larger than the batch
- * drains over successive ticks rather than in one long off-tick burst.
+ * <p>The scheduling, stop flag and enable gate live in {@link AbstractPeriodicSweep}; this sweep supplies only the
+ * per-pass work.
  */
 @NullMarked
-public final class RentSweep {
-
-    /** Hard cap on the rows any one pass touches — keeps each sweep a bounded index scan, never a full-table read. */
-    private static final int BATCH_LIMIT = 500;
+public final class RentSweep extends AbstractPeriodicSweep {
 
     private final PlayerWarpRepository repository;
     private final SettleRent settle;
     private final RentReminders reminders;
     private final RentConfig config;
-    private final Scheduler scheduler;
-    private final Duration interval;
-    private final Clock clock;
-    private final Logger log;
-    private volatile boolean running;
 
     public RentSweep(
             PlayerWarpRepository repository,
@@ -53,45 +44,20 @@ public final class RentSweep {
             Duration interval,
             Clock clock,
             Logger log) {
+        super(scheduler, interval, clock, log);
         this.repository = Objects.requireNonNull(repository, "repository");
         this.settle = Objects.requireNonNull(settle, "settle");
         this.reminders = Objects.requireNonNull(reminders, "reminders");
         this.config = Objects.requireNonNull(config, "config");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.interval = Objects.requireNonNull(interval, "interval");
-        this.clock = Objects.requireNonNull(clock, "clock");
-        this.log = Objects.requireNonNull(log, "log");
     }
 
-    public void start() {
-        if (!config.enabled()) {
-            return;
-        }
-        running = true;
-        scheduleNext();
-    }
-
-    public void stop() {
-        running = false;
-    }
-
-    private void scheduleNext() {
-        if (running) {
-            scheduler.asyncAfter(interval, this::tick);
-        }
-    }
-
-    private void tick() {
-        if (!running) {
-            return;
-        }
-        scheduler.async(() -> {
-            sweepOnce();
-            scheduleNext();
-        });
+    @Override
+    protected boolean enabled() {
+        return config.enabled();
     }
 
     /** One bounded pass: charge the due warps, retry/archive the suspended ones, then send any due reminders. */
+    @Override
     public void sweepOnce() {
         Instant now = clock.instant();
         int charged = settleBatch(repository.dueForRent(now, BATCH_LIMIT));
@@ -137,9 +103,5 @@ public final class RentSweep {
             }
         }
         return sent;
-    }
-
-    private static String warpId(PlayerWarp warp) {
-        return warp.id().map(id -> Long.toString(id.value())).orElse("?");
     }
 }

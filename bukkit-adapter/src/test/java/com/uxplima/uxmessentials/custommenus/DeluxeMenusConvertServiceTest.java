@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import com.uxplima.uxmessentials.custommenus.adapter.convert.AbstractMenuConvertService.ConvertReport;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService;
-import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertService.ConvertReport;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.junit.jupiter.api.Test;

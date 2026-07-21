@@ -1,8 +1,6 @@
 package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -165,7 +163,7 @@ public final class KitCategorySettingsView {
 
     /** Save {@code category} with the pipe-split lore and re-open the panel. Package-private for the golden test. */
     void applyLore(Player player, PlayerRef viewer, KitCategory category, String input) {
-        save(player, viewer, category.withDisplayLore(splitLines(input)));
+        save(player, viewer, category.withDisplayLore(KitViewText.splitLines(input)));
     }
 
     /** Capture a sorting-slot index through the input seam, then save it and re-open; a non-number is rejected. */
@@ -231,9 +229,5 @@ public final class KitCategorySettingsView {
 
     private KitCategory subject(MenuActionContext ctx) {
         return ctx.subject(KitCategory.class);
-    }
-
-    private static List<String> splitLines(String input) {
-        return input.equalsIgnoreCase("none") ? List.of() : Arrays.asList(input.split("\\|"));
     }
 }

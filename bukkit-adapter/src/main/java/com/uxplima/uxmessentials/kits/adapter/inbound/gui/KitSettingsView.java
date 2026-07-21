@@ -3,8 +3,6 @@ package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -283,7 +281,7 @@ public final class KitSettingsView {
 
     /** Save {@code kit} with the pipe-split display lore and re-open. Package-private for the golden test. */
     void applyDisplayLore(Player player, PlayerRef viewer, KitDefinition kit, String input) {
-        save(player, viewer, kit.withDisplayLore(splitLines(input)));
+        save(player, viewer, kit.withDisplayLore(KitViewText.splitLines(input)));
     }
 
     /** Capture pipe-separated commands through the input seam; {@code none} clears them. */
@@ -299,7 +297,7 @@ public final class KitSettingsView {
 
     /** Save {@code kit} with the pipe-split commands and re-open. Package-private for the golden test. */
     void applyCommands(Player player, PlayerRef viewer, KitDefinition kit, String input) {
-        save(player, viewer, kit.withCommands(splitLines(input)));
+        save(player, viewer, kit.withCommands(KitViewText.splitLines(input)));
     }
 
     /** Delete the kit through the {@link DelKit} use case, then return to the manager — the old delete button's effect. */
@@ -402,9 +400,5 @@ public final class KitSettingsView {
 
     private KitDefinition subject(MenuActionContext ctx) {
         return ctx.subject(KitDefinition.class);
-    }
-
-    private static List<String> splitLines(String input) {
-        return input.equalsIgnoreCase("none") ? List.of() : Arrays.asList(input.split("\\|"));
     }
 }

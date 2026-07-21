@@ -17,29 +17,20 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The self-rescheduling sponsor-expiry sweep (the {@code RentSweep} pattern): on a fixed interval, off the tick
- * thread, it retires the sponsorships whose term has lapsed — freeing each warp's slot so another owner can buy it
- * and stamping the post-expiry cooldown ({@code sponsored_until + cooldown-days}) that bars an immediate re-sponsor.
- * Every pass is bounded — the query is capped at {@link #BATCH_LIMIT} rows and indexed on {@code sponsored_until},
- * never a full-table scan — and each warp is retired in isolation, so one warp's fault is logged and the sweep
- * carries on.
+ * thread, it retires the sponsorships whose term has lapsed, freeing each warp's slot so another owner can buy it and
+ * stamping the post-expiry cooldown ({@code sponsored_until + cooldown-days}) that bars an immediate re-sponsor.
+ * Every pass is bounded: the query is capped at {@link #BATCH_LIMIT} rows and indexed on {@code sponsored_until},
+ * never a full-table scan, and each warp is retired in isolation, so one warp's fault is logged and the sweep carries
+ * on.
  *
- * <p>A disabled sponsor sub-group schedules nothing: {@link #start()} returns immediately when the config is off.
- * Processing one batch per tick keeps a single pass's work bounded; a backlog larger than the batch drains over
- * successive passes rather than in one long off-tick burst.
+ * <p>The scheduling, stop flag and enable gate live in {@link AbstractPeriodicSweep}; this sweep supplies only the
+ * per-pass work.
  */
 @NullMarked
-public final class SponsorExpirySweep {
-
-    /** Hard cap on the rows any one pass touches — keeps each sweep a bounded index scan, never a full-table read. */
-    private static final int BATCH_LIMIT = 500;
+public final class SponsorExpirySweep extends AbstractPeriodicSweep {
 
     private final PlayerWarpRepository repository;
     private final SponsorConfig config;
-    private final Scheduler scheduler;
-    private final Duration interval;
-    private final Clock clock;
-    private final Logger log;
-    private volatile boolean running;
 
     public SponsorExpirySweep(
             PlayerWarpRepository repository,
@@ -48,43 +39,18 @@ public final class SponsorExpirySweep {
             Duration interval,
             Clock clock,
             Logger log) {
+        super(scheduler, interval, clock, log);
         this.repository = Objects.requireNonNull(repository, "repository");
         this.config = Objects.requireNonNull(config, "config");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.interval = Objects.requireNonNull(interval, "interval");
-        this.clock = Objects.requireNonNull(clock, "clock");
-        this.log = Objects.requireNonNull(log, "log");
     }
 
-    public void start() {
-        if (!config.enabled()) {
-            return;
-        }
-        running = true;
-        scheduleNext();
-    }
-
-    public void stop() {
-        running = false;
-    }
-
-    private void scheduleNext() {
-        if (running) {
-            scheduler.asyncAfter(interval, this::tick);
-        }
-    }
-
-    private void tick() {
-        if (!running) {
-            return;
-        }
-        scheduler.async(() -> {
-            sweepOnce();
-            scheduleNext();
-        });
+    @Override
+    protected boolean enabled() {
+        return config.enabled();
     }
 
     /** One bounded pass: free the slot and stamp the cooldown for every warp whose sponsorship term has lapsed. */
+    @Override
     public void sweepOnce() {
         Instant now = clock.instant();
         List<PlayerWarp> expired = repository.expiredSponsorships(now, BATCH_LIMIT);
@@ -112,9 +78,5 @@ public final class SponsorExpirySweep {
         }
         repository.expireSponsorship(id, sponsorship.activeUntil().plus(config.cooldown()));
         return true;
-    }
-
-    private static String warpId(PlayerWarp warp) {
-        return warp.id().map(id -> Long.toString(id.value())).orElse("?");
     }
 }

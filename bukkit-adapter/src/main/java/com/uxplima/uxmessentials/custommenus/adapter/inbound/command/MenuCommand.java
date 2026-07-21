@@ -559,7 +559,7 @@ public final class MenuCommand implements CommandRegistration {
     private int convertDeluxeMenus(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String path = StringArgumentType.getString(ctx, "path");
-        DeluxeMenusConvertService.ConvertReport report = deluxeMenusConvert.convert(path);
+        var report = deluxeMenusConvert.convert(path);
         if (!report.found()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
             return 0;
@@ -576,7 +576,7 @@ public final class MenuCommand implements CommandRegistration {
     private int convertZMenu(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String path = StringArgumentType.getString(ctx, "path");
-        ZMenuConvertService.ConvertReport report = zMenuConvert.convert(path);
+        var report = zMenuConvert.convert(path);
         if (!report.found()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
             return 0;
@@ -593,7 +593,7 @@ public final class MenuCommand implements CommandRegistration {
     private int convertOgui(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String path = StringArgumentType.getString(ctx, "path");
-        OguiConvertService.ConvertReport report = oguiConvert.convert(path);
+        var report = oguiConvert.convert(path);
         if (!report.found()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
             return 0;
@@ -610,7 +610,7 @@ public final class MenuCommand implements CommandRegistration {
     private int convertGuiPlus(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String path = StringArgumentType.getString(ctx, "path");
-        GuiPlusConvertService.ConvertReport report = guiPlusConvert.convert(path);
+        var report = guiPlusConvert.convert(path);
         if (!report.found()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_CONVERT_FAILED, Map.of("path", path));
             return 0;
