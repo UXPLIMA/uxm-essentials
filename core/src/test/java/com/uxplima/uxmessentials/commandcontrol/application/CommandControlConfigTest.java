@@ -32,13 +32,14 @@ class CommandControlConfigTest {
         assertThat(config.denyMessage()).isEqualTo(CommandControlMessageKey.COMMANDCONTROL_UNKNOWN_COMMAND);
         assertThat(config.toRuleSet(BYPASS).isInert()).isTrue();
 
-        // Tab-completion ships on (a no-op while the lists are empty); the plugin-hide ships off with the standard
-        // plugin-listing list pre-filled, so it is one toggle away without leaving the module doing anything yet.
+        // Tab-completion ships on (a no-op while the lists are empty); the plugin-hide ships on with the standard
+        // plugin-listing list pre-filled, and deny-list-commands ships on too, so the listed commands are both hidden
+        // from and unrunnable by a non-op out of the box (holders of the view permission, op by default, are exempt).
         assertThat(config.tabCompletionEnabled()).isTrue();
-        assertThat(config.pluginHideEnabled()).isFalse();
-        assertThat(config.denyListCommands()).isFalse();
+        assertThat(config.pluginHideEnabled()).isTrue();
+        assertThat(config.denyListCommands()).isTrue();
         assertThat(config.hiddenCommands()).contains("plugins", "pl", "help", "icanhasbukkit");
-        assertThat(config.toHidePolicy(VIEW).isActive()).isFalse();
+        assertThat(config.toHidePolicy(VIEW).isActive()).isTrue();
 
         // The namespace-bypass block ships on so a namespaced escape is closed by default.
         assertThat(config.blockNamespaceBypass()).isTrue();

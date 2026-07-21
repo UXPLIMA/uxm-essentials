@@ -31,10 +31,10 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param tabCompletionEnabled scrub the disallowed commands from the client command list / tab-completion
  *     ({@code tab-completion.enabled}, default {@code true} — a no-op while the rule set stays inert)
  * @param pluginHideEnabled hide the plugin-listing / help commands from players without the view permission
- *     ({@code plugin-hide.enabled}, default {@code false} — the feature ships opt-in)
+ *     ({@code plugin-hide.enabled}, default {@code true}; the view permission defaults to op, so only non-ops are hit)
  * @param hiddenCommands the plugin-listing / help commands the hide covers ({@code plugin-hide.hidden-commands})
  * @param denyListCommands also block the hidden commands from executing for those players, so a {@code /plugins} or
- *     {@code /help} cannot leak plugin names ({@code plugin-hide.deny-list-commands}, default {@code false})
+ *     {@code /help} cannot leak plugin names ({@code plugin-hide.deny-list-commands}, default {@code true})
  * @param blockNamespaceBypass deny the {@code namespace:command} form (e.g. {@code /minecraft:gamemode}) of any command
  *     the bare form is denied, so a player cannot dodge the filter with a namespace prefix
  *     ({@code block-namespace-bypass}, default {@code true})
@@ -87,9 +87,9 @@ public record CommandControlConfig(
                 defaults,
                 groups,
                 config.getBoolean("tab-completion.enabled", true),
-                config.getBoolean("plugin-hide.enabled", false),
+                config.getBoolean("plugin-hide.enabled", true),
                 config.getStringList("plugin-hide.hidden-commands", DEFAULT_HIDDEN_COMMANDS),
-                config.getBoolean("plugin-hide.deny-list-commands", false),
+                config.getBoolean("plugin-hide.deny-list-commands", true),
                 config.getBoolean("block-namespace-bypass", true));
     }
 
