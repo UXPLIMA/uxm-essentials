@@ -9,16 +9,16 @@
 
 The all-in-one essentials suite for **Paper 26.1.2** servers, on **Java 25**. Homes, warps, teleports, a
 real economy, kits, vaults, ranks, cross-server trade, moderation, a staff mode, vanish, holograms, NPCs,
-scoreboards, a vote engine, multi-world management — the entire day-to-day toolkit a survival or network server
-needs — built as **34 independent feature modules** behind one clean, fully configurable plugin.
+scoreboards, a vote engine, multi-world management (the entire day-to-day toolkit a survival or network server
+needs), built as **34 independent feature modules** behind one clean, fully configurable plugin.
 
-Every module is its own bounded context: turn one off and it wires *nothing* — no commands, no listeners, no
+Every module is its own bounded context: turn one off and it wires *nothing*: no commands, no listeners, no
 database tables, no runtime cost. Everything a player ever sees resolves through a per-locale message catalog,
 so it can be re-worded or recoloured without touching code, and **every module ships with an in-game
 management GUI** so you configure holograms, NPCs, warps, vaults, and moderation by clicking, not by editing
 files.
 
-It is built **Paper 26.1.2 only, on purpose** — current API used the way it is meant to be used,
+It is built **Paper 26.1.2 only, on purpose**: the current API used the way it is meant to be used,
 **Folia-ready from line one**, balances and vaults **database-backed** so they survive world rollbacks, and
 verified by Error Prone, NullAway null-safety, Spotless formatting, ArchUnit architecture rules, and an
 extensive MockBukkit/JUnit test suite.
@@ -54,22 +54,22 @@ extensive MockBukkit/JUnit test suite.
 
 ## Why uxmEssentials
 
-- **One platform, done well.** Paper 26.1.2 and Java 25 only — no legacy cross-version reflection to drag
+- **One platform, done well.** Paper 26.1.2 and Java 25 only: no legacy cross-version reflection to drag
   around, just the current server API used natively.
 - **Genuinely modular.** Thirty-four feature modules, each toggled on its own. A disabled module instantiates
   zero adapters, registers zero commands and listeners, runs zero migrations, and holds zero state.
-- **Configure in-game.** Every module has a management GUI reachable from `/uxmess gui` — edit a hologram, an
+- **Configure in-game.** Every module has a management GUI reachable from `/uxmess gui`: edit a hologram, an
   NPC, a warp, a vault, or a punishment by clicking. Every screen in the plugin renders through one data-driven
   menu engine, so the grids, slots, and icons are themselves config values.
 - **Build your own menus.** `/menu` loads operator-authored menu files from `menus/*.conf` and opens them with
-  `/menu open <name>` — the same engine, a generic action vocabulary, custom GUIs without a line of code.
+  `/menu open <name>`: the same engine, a generic action vocabulary, custom GUIs without a line of code.
 - **Nothing hardcoded.** Every player-facing string lives in a per-locale catalog; every command can be
   renamed, aliased, or disabled; every GUI layout, cost, cooldown, and limit is a config value.
-- **Rollback-proof data.** Economy balances and player vaults are stored in the database — never in item
-  persistent-data — so a world rollback never duplicates money or items.
+- **Rollback-proof data.** Economy balances and player vaults are stored in the database (never in item
+  persistent-data), so a world rollback never duplicates money or items.
 - **Folia-ready.** Nothing schedules through `BukkitScheduler`. A `Scheduler` port maps onto Paper's global /
   region / entity / async schedulers, so the same code runs unchanged on Folia.
-- **Adventure-native.** All text is MiniMessage resolved through a shared style theme — no `§`/`&` colour
+- **Adventure-native.** All text is MiniMessage resolved through a shared style theme: no `§`/`&` colour
   codes anywhere.
 - **Built on solid foundations.** Hexagonal (ports & adapters) with DDD bounded contexts; static analysis and
   architecture tests run as part of every build.
@@ -81,9 +81,9 @@ extensive MockBukkit/JUnit test suite.
 | Server | Paper **26.1.2** (build 71), or a Paper fork (Folia / Purpur / Pufferfish) |
 | Java | **25** |
 | Optional | PlaceholderAPI · Vault / VaultUnlocked / Treasury · a Votifier-compatible vote listener · LuckPerms · WorldGuard |
-| Clients | any version a server-side ViaVersion supports can connect — the **server** must be 26.1.2 |
+| Clients | any version a server-side ViaVersion supports can connect; the **server** must be 26.1.2 |
 
-> Spigot and CraftBukkit are **not** supported — uxmEssentials uses `paper-plugin.yml`, Brigadier, and
+> Spigot and CraftBukkit are **not** supported: uxmEssentials uses `paper-plugin.yml`, Brigadier, and
 > bundled Adventure, which only Paper and its forks provide.
 
 ## Installation
@@ -93,14 +93,14 @@ extensive MockBukkit/JUnit test suite.
    `commands.conf`, a `config.conf` per module under `modules/`, the message catalogs, and the GUI layouts.
 3. Edit what you want, then `/uxmess reload <module>` (or restart). That's it.
 
-Three optional companion jars extend the suite onto other platforms — see
+Three optional companion jars extend the suite onto other platforms; see
 [Cross-server & Discord add-ons](#cross-server--discord-add-ons):
 
 | Jar | Where it goes | What it adds |
 | --- | --- | --- |
 | `uxmEssentials-0.5.0.jar` | Paper `plugins/` | The plugin itself (required). |
-| `uxmEssentials-velocity-0.5.0.jar` | Velocity `plugins/` | Proxy-side bus broker — relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
-| `uxmEssentials-redis-0.5.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus — the same sync over Redis pub/sub, with no proxy required. |
+| `uxmEssentials-velocity-0.5.0.jar` | Velocity `plugins/` | Proxy-side bus broker: relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
+| `uxmEssentials-redis-0.5.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus: the same sync over Redis pub/sub, with no proxy required. |
 | `uxmEssentials-discord-0.5.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
 
 ## Modules
@@ -111,40 +111,40 @@ database-backed so they survive rollbacks.
 
 | Module | What it gives your server |
 | --- | --- |
-| **homes** | Slot-based home GUI — click an empty cell to set a home, click a home to teleport / rename / relocate / re-icon. Home visibility + invites (`/visit`, `/invite`), optional economy charge, a death-respawn chain (home → bed → spawn), unsafe / blacklisted-world guards, and land-claim gating across nine providers (Lands, GriefPrevention, uxmClaims, …). |
+| **homes** | Slot-based home GUI: click an empty cell to set a home, click a home to teleport / rename / relocate / re-icon. Home visibility + invites (`/visit`, `/invite`), optional economy charge, a death-respawn chain (home → bed → spawn), unsafe / blacklisted-world guards, and land-claim gating across nine providers (Lands, GriefPrevention, uxmClaims, …). |
 | **warps** | Server warps with per-warp cost, required permission, password lock, welcome message, warmup / cooldown overrides, departure / arrival sounds and particles, and a rating system. |
-| **playerwarps** | Player-owned warps (`/pwarp`) with per-rank quotas, public / private visibility, password locks, visitor counts, and custom icons — all editable from a GUI. |
+| **playerwarps** | Player-owned warps (`/pwarp`) with per-rank quotas, public / private visibility, password locks, visitor counts, and custom icons, all editable from a GUI. |
 | **teleport** | `/tpa` · `/tpahere` · `/back` · `/rtp` (a pre-warmed, safe-search queue) · `/spawn`, with move-cancels-warmup, per-rank cooldowns, and configurable arrival sound / particle effects. |
 | **economy** | Multi-currency, **database-backed** balances with `/pay` · `/balance` · `/baltop`, shared banks, loans, a currency exchange, physical banknotes, a Vault / Treasury provider, and per-rank limits via numbered permission nodes. |
-| **kits** | An in-game kit editor with categories, cooldowns, one-time and first-join grants, costs, permission gating, and auto-equip — `/kit` opens a claim menu, operators edit it in place. |
+| **kits** | An in-game kit editor with categories, cooldowns, one-time and first-join grants, costs, permission gating, and auto-equip; `/kit` opens a claim menu, operators edit it in place. |
 | **vaults** | **Database-backed** player item storage (survives rollbacks) with per-player vault counts and per-vault sizes via quota nodes, an item blacklist, per-vault name & icon, overflow rescue, and inactive-vault purge. |
-| **ranks** | Rankup, prestige, and autorank driven by configurable command-actions (or LuckPerms groups + permission nodes), with economy costs, placeholder requirements, a prestige loop, and a `/ranks` GUI — `/rankup`, `/prestige`, `/setrank`. |
+| **ranks** | Rankup, prestige, and autorank driven by configurable command-actions (or LuckPerms groups + permission nodes), with economy costs, placeholder requirements, a prestige loop, and a `/ranks` GUI (`/rankup`, `/prestige`, `/setrank`). |
 | **trade** | A secure player-to-player trade window (`/trade`): both sides stake items and money, both confirm, and any change resets the confirmation (anti-scam). Multi-currency, an item blacklist, request / accept flow, distance and cooldown limits, an audit log, and **cross-server trading** between backends that share a database. |
 | **survival** | A grab-bag of survival mechanics, each independently toggled and permissioned (several player-toggleable by command): tree-feller (`/treefeller`), veinminer (`/veinminer`), fast-leaf-decay, farm protection (`/farmprotect`), farm assist, one-player-sleep, head drops, and auto-pickup / auto-smelt / auto-sell / auto-tool. |
 | **poses** | Sit, sit-on-players, lay, belly-flop, spin, and crawl, with region / WorldGuard gating, a settings GUI, and cooldowns. |
 | **villagers** | Infinite trading, restock timers, a trade manager, trade disabling, villager protection, villager-in-a-bucket, follow and leash (`/villager`), instant restock, and click-to-trade. |
 | **moderation** | Bans / mutes / kicks / warns / jails with silent sanctions, duration tiers, warn escalation, IP history and address-strictness, punishment templates, staff analytics + Discord notifications, a unified `/history` · `/staffhistory` · `/checkban` · `/checkmute`, a management GUI, and a LiteBans importer. |
 | **security** | Server-side account security (no login/auth): two-factor with a PIN GUI or TOTP (`/2fa`, `/pin`), op-command protection, same-IP alt detection (`/ipalts`), and client-brand detection / blocking. Secrets are database-hashed. |
-| **commandcontrol** | Command whitelisting, tab-completion filtering, plugin-list hiding (`/plugins`, `/pl`, `/?`, `/help`), a custom unknown-command message, and `namespace:command` bypass blocking — permission-driven, with Geyser / Folia / cross-server support. Works transparently, with no command of its own. |
+| **commandcontrol** | Command whitelisting, tab-completion filtering, plugin-list hiding (`/plugins`, `/pl`, `/?`, `/help`), a custom unknown-command message, and `namespace:command` bypass blocking, permission-driven, with Geyser / Folia / cross-server support. Works transparently, with no command of its own. |
 | **staff** | A dedicated staff mode: toggle with loadout swap, examine, freeze, follow, navigator, staff chat, an online-staff list, alerts, flight, sanction rollback, server lockdown, and targeted socialspy. |
 | **vanish** | Packet-level invisibility over the in-house packet layer: fake join / quit, silent chest / shulker / ender-chest access, an item-pickup toggle, night-vision and flight, layered see / interact levels, an action-bar indicator, `/vanish list`, mob-targeting suppression, cross-server + Folia. |
 | **invrollback** | Snapshots every death and logout (main, armor, offhand, ender-chest) with a configurable retention window; `/invrestore` opens a GUI of a player's past snapshots to restore from. |
 | **messaging** | Private messages (`/msg`, `/r`), a mailbox (`/mail`) with offline-message fallback and `/mail sendall`, AFK notices, and a per-player ignore list. |
 | **communication** | Public chat formatting (LuckPerms prefix / suffix + MiniMessage + PAPI), per-cause death and per-rank join messages, a first-join welcome and MOTD, a killer-weapon placeholder, plus multi-channel scheduled announcements (conditional, with placeholders), broadcasts, clear-chat, custom advancement notifications, and `/info` pages. |
 | **presence** | Nicknames, presence status, and display-name management. |
-| **playerstate** | Gamemode / heal / feed / fly / god / speed, and inventory inspection — `/invsee` and `/endersee`, offline-capable through a quarantined NMS seam. |
+| **playerstate** | Gamemode / heal / feed / fly / god / speed, and inventory inspection: `/invsee` and `/endersee`, offline-capable through a quarantined NMS seam. |
 | **holograms** | `Display`-entity holograms: multi-line, multi-page (per-viewer click-to-cycle), provider-driven leaderboards, click-action chains, inline animations, per-player visibility and per-hologram blacklists, glow colour and opacity, link-to-NPC follow, plus FancyHolograms and DecentHolograms importers. |
-| **npc** | Packet-based NPCs over an in-house, GPL-free packet layer — players, mobs, and display entities; skins by name / MineSkin / URL; click-action chains; equipment, glow, poses, and deep per-type variants; per-owner creation quotas and a command blocklist. |
+| **npc** | Packet-based NPCs over an in-house, GPL-free packet layer: players, mobs, and display entities; skins by name / MineSkin / URL; click-action chains; equipment, glow, poses, and deep per-type variants; per-owner creation quotas and a command blocklist. |
 | **scoreboard** | Per-player, condition-selected sidebars chosen by priority, with animated and conditional lines and hidden score numbers. |
 | **tablist** | Per-player tab name formatting and sorting, animated header / footer, and fixed-slot layouts with filler entries. |
-| **nametags** | Above-head nametags rendered through display entities — per-viewer, vanish-aware, with a separate view-range and cull distance. |
+| **nametags** | Above-head nametags rendered through display entities: per-viewer, vanish-aware, with a separate view-range and cull distance. |
 | **vote** | A full vote-rewards engine: Votifier intake, totals and a leaderboard, a config-driven reward engine, a cross-server vote party with escalation, voting streaks, per-site cooldowns and reminders, multi-channel broadcasts, and Discord webhook notifications. |
 | **discordlink** | Link a Minecraft account to Discord, sync roles, and push audit / economy notifications (with the Discord add-on). |
-| **itemworld** | The everyday item & world utility surface — an `/itemedit` editor (rename, lore, enchants, flags, attributes, durability, custom-model-data, unbreakable), open-shulker-from-inventory, item tools, virtual workstations, world cleanup, powertool, mob / entity controls, time / weather aliases, and admin-fun — split into independently disableable sub-feature groups. |
+| **itemworld** | The everyday item & world utility surface: an `/itemedit` editor (rename, lore, enchants, flags, attributes, durability, custom-model-data, unbreakable), open-shulker-from-inventory, item tools, virtual workstations, world cleanup, powertool, mob / entity controls, time / weather aliases, and admin-fun, split into independently disableable sub-feature groups. |
 | **worlds** | A full multi-world manager: create / import / load / unload / delete (confirm-staged), per-world properties and gamerules, built-in void and flat generators, access gating with economy entry fees, cross-world portals, a world-editor GUI, pre-generation, backup / restore, and idle auto-unload. |
 | **regions** | A WorldGuard region-management GUI (`/regions`): list, create (two-position selection), edit flags, manage members / owners, and set priority. WorldGuard is a soft-dependency; without it the module stays inert. |
-| **servertweaks** | Small opt-in infrastructure toggles: a custom F3 server brand, console-spam filtering, no-chat-reports, and SignedVelocity coordination — each ships off. |
-| **custommenus** | Operator-authored menus over the built-in menu engine — drop a `menus/<name>.conf` and open it with `/menu open <name>`, built from a generic action / condition / placeholder vocabulary (close, open another menu, run a command, send a message, …). Custom GUIs with no code, hot-reloadable with `/menu reload`; the privileged console action is config-gated and off by default. |
+| **servertweaks** | Small opt-in infrastructure toggles: a custom F3 server brand, console-spam filtering, no-chat-reports, and SignedVelocity coordination; each ships off. |
+| **custommenus** | Operator-authored menus over the built-in menu engine: drop a `menus/<name>.conf` and open it with `/menu open <name>`, built from a generic action / condition / placeholder vocabulary (close, open another menu, run a command, send a message, …). Custom GUIs with no code, hot-reloadable with `/menu reload`; the privileged console action is config-gated and off by default. |
 
 ## Command cheat-sheet
 
@@ -192,7 +192,7 @@ plugins/uxmEssentials/
 ### Enabling & disabling modules
 
 Each module owns its own `enabled` flag at the top of its `config.conf`. Switch it off and the module wires
-nothing at all — no commands, no listeners, no tables:
+nothing at all, no commands, no listeners, no tables:
 
 ```hocon
 # modules/discordlink/config.conf
@@ -201,7 +201,7 @@ enabled = false
 
 ### Renaming, aliasing & disabling commands
 
-Every command's label, aliases, and enabled state live in `commands.conf` — rename `/balance` to `/money`,
+Every command's label, aliases, and enabled state live in `commands.conf`: rename `/balance` to `/money`,
 add the aliases you like, or switch a command off entirely:
 
 ```hocon
@@ -228,32 +228,32 @@ through a shared style theme (one palette, consistent titles and prefixes). Ship
 ### In-game management GUIs
 
 `/uxmess gui` opens a hub that links to every module's editor. Entity modules (holograms, NPCs, warps, player
-warps, vaults, moderation) get a list → editor flow — pick an entity, then flip its properties with toggles,
+warps, vaults, moderation) get a list → editor flow: pick an entity, then flip its properties with toggles,
 steppers, text / number / enum editors, a colour picker, and list editors. Settings-style modules (teleport,
 messaging, presence, scoreboard, …) get a panel of switches. The rows, slots, icons, and filler all come from
 `modules/<module>/gui/*.conf`, so you can re-skin every menu without code.
 
-Under the hood it is all one **data-driven menu engine**: every screen — including the GUI that opens when you
-run a bare command like `/eco`, `/jail`, or `/list` — is a HOCON spec plus type-safe bindings, behind a single
+Under the hood it is all one **data-driven menu engine**: every screen, including the GUI that opens when you
+run a bare command like `/eco`, `/jail`, or `/list`, is a HOCON spec plus type-safe bindings, behind a single
 window holder and listener with no per-menu code. Operators reach that engine directly through **`/menu`**:
 drop a `menus/<name>.conf` in the data folder, open it with `/menu open <name>`, and `/menu reload` re-reads
 the folder. Custom menus use a generic vocabulary (close, open another menu, run a command, send a message); a
 file that fails to parse or names an unknown binding is skipped with a warning rather than hiding the rest, and
-the console action — which runs a command with full server permissions — is gated off by default.
+the console action, which runs a command with full server permissions, is gated off by default.
 
 ## Economy
 
 `economy` is the canonical worked example: a `Wallet` aggregate holds a balance per `Currency`, so the plugin
 is multi-currency-capable while shipping one default currency out of the box. Balances are **DB-backed**
 (never item persistent-data), so they survive world rollbacks. It registers a Vault / Treasury provider when
-one is present — or runs on its own native provider — and gates limits through numbered permission nodes
+one is present (or runs on its own native provider) and gates limits through numbered permission nodes
 (`uxmessentials.economy.balance.limit.<n>`). On top of the wallet sit shared banks, loans, a currency
 exchange, and physical banknotes.
 
 ## Storage
 
-SQLite is the default — zero setup, a single file under the data folder, WAL-mode and single-writer-safe.
-Point it at a network backend to share state across a fleet — homes, warps, player-warps, economy, vaults,
+SQLite is the default: zero setup, a single file under the data folder, WAL-mode and single-writer-safe.
+Point it at a network backend to share state across a fleet: homes, warps, player-warps, economy, vaults,
 trade, vanish, moderation, holograms, NPCs, the vote party, and the messaging ignore list all replicate between
 nodes that share one database:
 
@@ -271,7 +271,7 @@ a cosmetic migration edit never blocks an existing database.
 
 ## PlaceholderAPI
 
-With PlaceholderAPI installed, uxmEssentials exposes placeholders across every module — economy (per-currency
+With PlaceholderAPI installed, uxmEssentials exposes placeholders across every module: economy (per-currency
 balances and indexed `baltop`), homes, presence and nicknames, teleport (cooldowns, back, requests),
 moderation (ban / mute / freeze / warn state), vaults, kits, warps and player-warps, messaging, staff,
 holograms, Discord links, and live server-metric tokens.
@@ -279,7 +279,7 @@ holograms, Discord links, and live server-metric tokens.
 ## Migrating from another plugin
 
 `/uxmess import <source>` runs a one-shot, **idempotent** migration with a dry-run preview and a documented
-conflict policy — so you can move an existing server over without starting from scratch:
+conflict policy, so you can move an existing server over without starting from scratch:
 
 | Source | Imports |
 | --- | --- |
@@ -291,7 +291,7 @@ conflict policy — so you can move an existing server over without starting fro
 ## Cross-server & Discord add-ons
 
 Nodes that share one database stay in sync over a pluggable bus. A write on one server publishes a small
-"this changed" notice that tells every peer to drop its cached copy and re-read the authoritative row — so the
+"this changed" notice that tells every peer to drop its cached copy and re-read the authoritative row, so the
 database stays the single source of truth and a change never round-trips as a full payload. Pick the transport
 in `config.conf`:
 
@@ -311,30 +311,30 @@ network {
 }
 ```
 
-- **Velocity** — drop `uxmEssentials-velocity-0.5.0.jar` on the proxy and the bus rides a proxy-side broker
+- **Velocity**: drop `uxmEssentials-velocity-0.5.0.jar` on the proxy and the bus rides a proxy-side broker
   over plugin messaging.
-- **Redis** — drop `uxmEssentials-redis-0.5.0.jar` on each backend and point `network.redis` at a Redis
-  server; the same bus then runs over Redis pub/sub with **no Velocity proxy required** — a plain set of
+- **Redis**: drop `uxmEssentials-redis-0.5.0.jar` on each backend and point `network.redis` at a Redis
+  server; the same bus then runs over Redis pub/sub with **no Velocity proxy required**: a plain set of
   backends sharing a database and a Redis instance sync directly.
-- **both** — run both transports at once (handy mid-migration); a frame goes out on each.
+- **both**: run both transports at once (handy mid-migration); a frame goes out on each.
 
 Either way the sync covers homes, warps, player-warps, economy, vaults, trade, vanish, moderation, holograms,
 NPCs, the vote party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
-local-only — the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
+local-only; the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
 
-- **Discord** — drop `uxmEssentials-discord-0.5.0.jar` on a Paper node to bridge account linking and push
+- **Discord**: drop `uxmEssentials-discord-0.5.0.jar` on a Paper node to bridge account linking and push
   audit and economy notifications through JDA.
 
 ## Permissions
 
 Permissions are tiered and quota-based: a feature root (`uxmessentials.home.*`), a module toggle, and numbered
-quota nodes that resolve the highest a player holds — `uxmessentials.home.limit.<n>`,
+quota nodes that resolve the highest a player holds: `uxmessentials.home.limit.<n>`,
 `uxmessentials.warp.cooldown.<seconds>`, `uxmessentials.vault.amount.<n>`. The full node reference ships with
 the plugin and is validated against the code by the build.
 
 ## Architecture & quality
 
-uxmEssentials is **hexagonal (ports & adapters) with DDD bounded contexts**. The domain is pure Java — no
+uxmEssentials is **hexagonal (ports & adapters) with DDD bounded contexts**. The domain is pure Java: no
 `org.bukkit`, no `net.kyori`, no SLF4J. Use cases orchestrate the domain through ports; adapters translate to
 and from Bukkit at the edges; bootstrap wires everything, consulting a module registry so a disabled module
 wires nothing.
@@ -348,12 +348,12 @@ graph LR
 ```
 
 - **Folia-ready** schedulers from line one; all I/O off the main thread.
-- **Static analysis as errors** — Error Prone + NullAway (JSpecify `@NullMarked`), Spotless with Palantir
+- **Static analysis as errors**: Error Prone + NullAway (JSpecify `@NullMarked`), Spotless with Palantir
   Java Format.
-- **Architecture tests** — ArchUnit fences the domain off from Bukkit, forbids `BukkitScheduler` and legacy
+- **Architecture tests**: ArchUnit fences the domain off from Bukkit, forbids `BukkitScheduler` and legacy
   command handlers, and keeps module boundaries clean. Drift guards keep the docs, permissions, and message
   catalogs in lockstep with the code.
-- **Tests** — JUnit 5, AssertJ, Mockito, MockBukkit (Paper 26.1.2), Testcontainers, and jqwik property
+- **Tests**: JUnit 5, AssertJ, Mockito, MockBukkit (Paper 26.1.2), Testcontainers, and jqwik property
   tests.
 - Built on **[uxmLib](https://github.com/siracozmen01/uxmLib)**, the sibling toolkit that provides the GUI
   framework, item builder, config, storage, and the in-house packet layer.
@@ -379,16 +379,16 @@ behaviour between minor versions as the surface settles; the current release is 
 
 Issues and pull requests are welcome. The workflow is test-first: add a failing test, write the minimum
 implementation, run `./gradlew spotlessApply` then `./gradlew check` green before committing. Keep to the
-existing conventions — pure domain, constructor injection, MiniMessage for all text, and every player-facing
+existing conventions: pure domain, constructor injection, MiniMessage for all text, and every player-facing
 string behind a message key.
 
 ## License
 
-[GPL-3.0](LICENSE) — © UXPLIMA.
+[GPL-3.0](LICENSE). © UXPLIMA.
 
 ## Acknowledgements
 
 uxmEssentials is an independent implementation built on Paper, Adventure, and the open infrastructure stack
 (HikariCP, Flyway, jOOQ, Caffeine, Configurate), on top of the [uxmLib](https://github.com/siracozmen01/uxmLib)
-toolkit. The importers exist to make moving from an existing setup painless — the data formats they read are
+toolkit. The importers exist to make moving from an existing setup painless: the data formats they read are
 acknowledged there, not borrowed from.
