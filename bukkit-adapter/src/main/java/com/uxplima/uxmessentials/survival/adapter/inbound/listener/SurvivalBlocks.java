@@ -54,11 +54,34 @@ final class SurvivalBlocks {
      * @return how many blocks were broken, the origin excluded
      */
     static int breakConnected(ConnectedBlockSearch search, Block origin, ItemStack tool, @Nullable CascadeSink sink) {
+        return breakGroup(origin, connectedGroup(search, origin), tool, sink);
+    }
+
+    /**
+     * The connected group of blocks sharing {@code origin}'s material, resolved over the live world with the search,
+     * origin first. Split out from the break so a caller can inspect the group before committing to break it - the
+     * tree-feller runs its natural-tree check on the group and only fells a group that is a grown tree.
+     *
+     * @return the connected coordinates, at most the search's cap, the origin first
+     */
+    static List<BlockPos> connectedGroup(ConnectedBlockSearch search, Block origin) {
         Material type = origin.getType();
         World world = origin.getWorld();
         BlockPos start = new BlockPos(origin.getX(), origin.getY(), origin.getZ());
-        List<BlockPos> group = search.from(
+        return search.from(
                 start, pos -> world.getBlockAt(pos.x(), pos.y(), pos.z()).getType() == type);
+    }
+
+    /**
+     * Break every coordinate in {@code group} except the origin (the vanilla event breaks that one). With a
+     * {@code sink} each broken block is computed for its drops, cleared to air (no vanilla ground drop), and the sink
+     * is handed the captured drops at that block's location; with none the block breaks naturally onto the ground.
+     *
+     * @return how many blocks were broken, the origin excluded
+     */
+    static int breakGroup(Block origin, List<BlockPos> group, ItemStack tool, @Nullable CascadeSink sink) {
+        World world = origin.getWorld();
+        BlockPos start = new BlockPos(origin.getX(), origin.getY(), origin.getZ());
         int broken = 0;
         for (BlockPos pos : group) {
             if (pos.equals(start)) {

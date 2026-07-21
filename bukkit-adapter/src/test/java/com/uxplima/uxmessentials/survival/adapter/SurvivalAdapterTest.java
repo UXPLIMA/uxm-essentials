@@ -7,9 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.type.Leaves;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -153,6 +155,56 @@ class SurvivalAdapterTest {
         assertThat(typeAt(0, 64, 0)).isEqualTo(Material.OAK_SAPLING);
     }
 
+    @Test
+    void treeFellerDoesNotFellAPlacedLogStructureWithNoNaturalLeaf() {
+        giveAxe();
+        bareLogColumn(0, 64, 6); // a player-built log pillar: no leaves anywhere, so not a natural tree
+        TreeFellerListener listener = new TreeFellerListener(treeFeller(cfg -> cfg), toggles, scheduler);
+
+        listener.onBreak(breakOf(blockAt(0, 64, 0)));
+
+        // No natural leaf beside the trunk: the fell is refused and the logs above the origin still stand.
+        assertThat(typeAt(0, 65, 0)).isEqualTo(Material.OAK_LOG);
+        assertThat(typeAt(0, 68, 0)).isEqualTo(Material.OAK_LOG);
+    }
+
+    @Test
+    void treeFellerFellsATrunkWithANaturalLeafBesideIt() {
+        giveAxe();
+        bareLogColumn(0, 64, 6);
+        naturalLeaf(1, 69, false); // a grown, non-persistent leaf beside the crown makes it a natural tree
+
+        TreeFellerListener listener = new TreeFellerListener(treeFeller(cfg -> cfg), toggles, scheduler);
+        listener.onBreak(breakOf(blockAt(0, 64, 0)));
+
+        assertThat(typeAt(0, 65, 0)).isEqualTo(Material.AIR);
+        assertThat(typeAt(0, 68, 0)).isEqualTo(Material.AIR);
+    }
+
+    @Test
+    void treeFellerDoesNotFellATrunkWrappedOnlyInPlayerPlacedPersistentLeaves() {
+        giveAxe();
+        bareLogColumn(0, 64, 6);
+        naturalLeaf(1, 69, true); // persistent (player-placed) leaves are not a natural tree
+
+        TreeFellerListener listener = new TreeFellerListener(treeFeller(cfg -> cfg), toggles, scheduler);
+        listener.onBreak(breakOf(blockAt(0, 64, 0)));
+
+        assertThat(typeAt(0, 65, 0)).isEqualTo(Material.OAK_LOG);
+    }
+
+    @Test
+    void treeFellerDoesNothingInCreativeMode() {
+        giveAxe();
+        logColumn(0, 64, 6); // a natural tree (logColumn adds a leaf), so only the creative gate can stop the fell
+        player.setGameMode(GameMode.CREATIVE);
+        TreeFellerListener listener = new TreeFellerListener(treeFeller(cfg -> cfg), toggles, scheduler);
+
+        listener.onBreak(breakOf(blockAt(0, 64, 0)));
+
+        assertThat(typeAt(0, 65, 0)).isEqualTo(Material.OAK_LOG);
+    }
+
     // --- veinminer -----------------------------------------------------------------------------------------------
 
     @Test
@@ -209,6 +261,18 @@ class SurvivalAdapterTest {
         assertThat(typeAt(0, 65, 0)).isEqualTo(Material.COAL_ORE);
     }
 
+    @Test
+    void veinminerDoesNothingInCreativeMode() {
+        oreColumn(Material.COAL_ORE, 0, 64, 6);
+        player.setSneaking(true);
+        player.setGameMode(GameMode.CREATIVE);
+        VeinminerListener listener = new VeinminerListener(veinminer(cfg -> cfg), Set.of(Material.COAL_ORE), toggles);
+
+        listener.onBreak(breakOf(blockAt(0, 64, 0)));
+
+        assertThat(typeAt(0, 65, 0)).isEqualTo(Material.COAL_ORE);
+    }
+
     // --- helpers -------------------------------------------------------------------------------------------------
 
     /** Build a tree-feller config with sensible test defaults, letting a case override individual knobs. */
@@ -240,10 +304,28 @@ class SurvivalAdapterTest {
     }
 
     private void logColumn(int x, int baseY, int height) {
+        bareLogColumn(x, baseY, height);
+        // A grown tree carries leaves; tree-feller now fells only a trunk with a natural leaf beside it, so a plain
+        // "log column" fixture must include one to still read as a fellable tree.
+        naturalLeaf(x + 1, baseY, false);
+    }
+
+    /** A bare trunk of {@code height} logs on dirt, with no leaves: a player-built pillar rather than a grown tree. */
+    private void bareLogColumn(int x, int baseY, int height) {
         blockAt(x, baseY - 1, 0).setType(Material.DIRT); // soil under the trunk for the replant test
         for (int i = 0; i < height; i++) {
             blockAt(x, baseY + i, 0).setType(Material.OAK_LOG);
         }
+    }
+
+    /** Place an oak-leaves block at {@code (x, y, 0)} with the given player-placed (persistent) flag. */
+    private Block naturalLeaf(int x, int y, boolean persistent) {
+        Block leaf = blockAt(x, y, 0);
+        leaf.setType(Material.OAK_LEAVES);
+        Leaves data = (Leaves) leaf.getBlockData();
+        data.setPersistent(persistent);
+        leaf.setBlockData(data);
+        return leaf;
     }
 
     private void oreColumn(Material ore, int x, int baseY, int height) {

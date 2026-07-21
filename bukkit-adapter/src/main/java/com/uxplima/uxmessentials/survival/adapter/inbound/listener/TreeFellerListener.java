@@ -1,13 +1,16 @@
 package com.uxplima.uxmessentials.survival.adapter.inbound.listener;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.type.Leaves;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -19,7 +22,9 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig.TreeFeller;
+import com.uxplima.uxmessentials.survival.domain.BlockPos;
 import com.uxplima.uxmessentials.survival.domain.ConnectedBlockSearch;
+import com.uxplima.uxmessentials.survival.domain.NaturalTree;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -28,6 +33,12 @@ import org.jspecify.annotations.Nullable;
  * optionally replants a sapling at the base. It listens on {@code BlockBreakEvent} (ignoring an already-cancelled
  * break) and, when the break is a log and the mechanic applies, breaks the rest of the connected trunk. It fires only
  * for a player holding the {@code uxmessentials.survival.treefeller} permission with their personal toggle on.
+ *
+ * <h2>Natural trees only</h2>
+ * A fell only happens for a naturally grown tree, not a player-built log wall, pillar, or house. Before breaking the
+ * connected logs the listener checks (see {@link NaturalTree}) that at least one naturally grown leaf, a
+ * {@code Tag.LEAVES} block whose {@code Leaves} data is not persistent (persistent leaves are player-placed), sits
+ * beside the trunk. With no natural leaf adjacent the group is left to break as a single vanilla block.
  *
  * <h2>Sneak semantics (the owner-shift nuance)</h2>
  * The mechanic acts on the player who broke the log — there is no block ownership involved. The config
@@ -73,11 +84,14 @@ public final class TreeFellerListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE || !event.isDropItems()) {
+            return; // a creative or drop-suppressed break does the vanilla nothing: no fell
+        }
         Block origin = event.getBlock();
         if (!Tag.LOGS.isTagged(origin.getType())) {
             return;
         }
-        Player player = event.getPlayer();
         if (applies(player)) {
             fell(origin, player);
         }
@@ -97,8 +111,12 @@ public final class TreeFellerListener implements Listener {
     }
 
     private void fell(Block origin, Player player) {
+        List<BlockPos> logs = SurvivalBlocks.connectedGroup(search, origin);
+        if (!isNaturalTree(origin, logs)) {
+            return; // placed logs (a wall/pillar/house) have no natural leaves: break as a single vanilla block
+        }
         ItemStack tool = player.getInventory().getItemInMainHand();
-        int broken = SurvivalBlocks.breakConnected(search, origin, tool, cascadeSink(player));
+        int broken = SurvivalBlocks.breakGroup(origin, logs, tool, cascadeSink(player));
         if (broken == 0) {
             return;
         }
@@ -109,6 +127,19 @@ public final class TreeFellerListener implements Listener {
         if (config.replantSaplings()) {
             scheduleReplant(origin);
         }
+    }
+
+    /** Whether the connected {@code logs} are a naturally grown tree: a non-persistent leaf sits beside the trunk. */
+    private boolean isNaturalTree(Block origin, List<BlockPos> logs) {
+        World world = origin.getWorld();
+        return NaturalTree.hasNaturalLeaf(logs, pos -> isNaturalLeaf(world.getBlockAt(pos.x(), pos.y(), pos.z())));
+    }
+
+    /** Whether {@code block} is a naturally grown leaf: a leaves block that is not player-placed (persistent). */
+    private static boolean isNaturalLeaf(Block block) {
+        return Tag.LEAVES.isTagged(block.getType())
+                && block.getBlockData() instanceof Leaves leaf
+                && !leaf.isPersistent();
     }
 
     /**
