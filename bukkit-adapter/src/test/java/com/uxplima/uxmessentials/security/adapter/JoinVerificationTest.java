@@ -16,9 +16,12 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
@@ -169,6 +172,18 @@ class JoinVerificationTest {
         // The verified device is remembered for the next join.
         assertThat(trustStore.isTrusted(player.getUniqueId(), IpHashing.hash("10.0.0.5"), NOW))
                 .isTrue();
+    }
+
+    @Test
+    void aDragAcrossTheKeypadIsCancelled() {
+        PlayerMock player = joinedPlayerWithPin();
+        InventoryView view = player.getOpenInventory();
+        InventoryDragEvent drag = new InventoryDragEvent(
+                view, null, new ItemStack(Material.STONE), false, Map.of(SLOT_1, new ItemStack(Material.STONE)));
+
+        new PinKeypadListener(keypad, controller, sessions).onDrag(drag);
+
+        assertThat(drag.isCancelled()).isTrue(); // no item may be dragged into or out of the frozen keypad window
     }
 
     @Test

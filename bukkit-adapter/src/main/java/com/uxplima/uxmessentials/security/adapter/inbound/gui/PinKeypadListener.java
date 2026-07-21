@@ -7,6 +7,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 
 import com.uxplima.uxmessentials.security.adapter.VerificationSessions;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadLayout.Button;
@@ -47,6 +48,15 @@ public final class PinKeypadListener implements Listener {
             return;
         }
         route(view.buttonAt(event.getRawSlot()), holder, player);
+    }
+
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (event.getInventory().getHolder() instanceof PinKeypadHolder) {
+            // A drag can span the keypad even when no single click lands on a button; cancel it so no item enters or
+            // leaves the frozen window.
+            event.setCancelled(true);
+        }
     }
 
     private void route(Button button, PinKeypadHolder holder, Player player) {
