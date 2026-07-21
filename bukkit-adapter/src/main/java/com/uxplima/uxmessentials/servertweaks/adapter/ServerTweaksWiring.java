@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.servertweaks.application.ServerTweaksConfig;
 import com.uxplima.uxmessentials.servertweaks.application.SignedDirectiveQueue;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -56,7 +57,7 @@ public final class ServerTweaksWiring {
         Logger log = ctx.kernel().log();
         List<Listener> listeners = new ArrayList<>();
         List<Runnable> stops = new ArrayList<>();
-        wireF3Brand(plugin, config.f3Brand(), listeners, stops);
+        wireF3Brand(plugin, config.f3Brand(), ctx.kernel().scheduler(), listeners, stops);
         wireConsoleFilter(config.consoleFilter(), log, stops);
         wireNoChatReports(config.noChatReports(), listeners);
         wireSignedVelocity(plugin, config.signedVelocity(), log, listeners, stops);
@@ -64,13 +65,17 @@ public final class ServerTweaksWiring {
     }
 
     private static void wireF3Brand(
-            Plugin plugin, ServerTweaksConfig.F3Brand f3Brand, List<Listener> listeners, List<Runnable> stops) {
+            Plugin plugin,
+            ServerTweaksConfig.F3Brand f3Brand,
+            Scheduler scheduler,
+            List<Listener> listeners,
+            List<Runnable> stops) {
         if (!f3Brand.enabled()) {
             return;
         }
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, PluginMessageBrandSender.BRAND_CHANNEL);
         PluginMessageBrandSender sender = new PluginMessageBrandSender(plugin, f3Brand.brand());
-        listeners.add(new ServerBrandJoinListener(true, sender));
+        listeners.add(new ServerBrandJoinListener(true, sender, scheduler));
         stops.add(() -> plugin.getServer()
                 .getMessenger()
                 .unregisterOutgoingPluginChannel(plugin, PluginMessageBrandSender.BRAND_CHANNEL));

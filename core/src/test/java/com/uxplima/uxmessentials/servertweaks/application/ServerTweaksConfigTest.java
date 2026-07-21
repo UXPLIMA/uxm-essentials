@@ -9,18 +9,18 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@link ServerTweaksConfig}'s resolution from the module's scoped config: an empty store leaves both tweaks off
- * (the whole module is inert until an operator opts in), the F3 brand falls back to the shipped default string, and
- * explicit keys switch each tweak on with its own values. The console-filter block also hands out a ready
- * {@code ConsoleFilterPolicy} that reflects the same switch and patterns.
+ * Pins {@link ServerTweaksConfig}'s resolution from the module's scoped config: an empty store leaves every tweak off
+ * except the F3 brand, which ships on and falls back to the shipped default string, and explicit keys switch each
+ * tweak on with its own values. The console-filter block also hands out a ready {@code ConsoleFilterPolicy} that
+ * reflects the same switch and patterns.
  */
 class ServerTweaksConfigTest {
 
     @Test
-    void anEmptyStoreLeavesEveryTweakOff() {
+    void anEmptyStoreLeavesEveryTweakOffExceptTheF3Brand() {
         ServerTweaksConfig config = ServerTweaksConfig.from(new FixedConfig(Map.of()));
 
-        assertThat(config.f3Brand().enabled()).isFalse();
+        assertThat(config.f3Brand().enabled()).isTrue();
         assertThat(config.f3Brand().brand()).isEqualTo("uxmEssentials");
         assertThat(config.consoleFilter().enabled()).isFalse();
         assertThat(config.consoleFilter().patterns()).isEmpty();

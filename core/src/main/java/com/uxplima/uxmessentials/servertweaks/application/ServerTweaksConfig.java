@@ -12,9 +12,10 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * resolved once from the module's scoped {@link ConfigStore} when the module starts and, per the atomic-reload rule,
  * swapped whole on reload, so an effect applied mid-reload sees one coherent snapshot.
  *
- * <p>The module itself ships enabled, but every individual tweak defaults {@code false}: an operator turns on exactly
- * the tweaks they want without touching the others. The HOCON keys are kebab-case ({@code f3-brand},
- * {@code console-filter}); the record components are the camelCase views the wiring reads.
+ * <p>The module itself ships enabled; every individual tweak defaults {@code false} except the F3 brand, which
+ * defaults {@code true} so the debug screen shows this server's brand out of the box. An operator turns each tweak on
+ * or off independently. The HOCON keys are kebab-case ({@code f3-brand}, {@code console-filter}); the record
+ * components are the camelCase views the wiring reads.
  *
  * @param f3Brand the custom F3 server-brand tweak
  * @param consoleFilter the console-spam suppression tweak
@@ -46,7 +47,7 @@ public record ServerTweaksConfig(
      * {@code minecraft:brand} the server reports). The client shows it as plain text, so the value is a short plain
      * string — MiniMessage or rich formatting is not interpreted.
      *
-     * @param enabled whether the custom brand is sent on join ({@code f3-brand.enabled}, default {@code false})
+     * @param enabled whether the custom brand is sent on join ({@code f3-brand.enabled}, default {@code true})
      * @param brand the brand string sent verbatim to the client ({@code f3-brand.brand}, default {@code uxmEssentials})
      */
     public record F3Brand(boolean enabled, String brand) {
@@ -62,7 +63,7 @@ public record ServerTweaksConfig(
         public static F3Brand from(ConfigStore config) {
             Objects.requireNonNull(config, "config");
             return new F3Brand(
-                    config.getBoolean("f3-brand.enabled", false), config.getString("f3-brand.brand", DEFAULT_BRAND));
+                    config.getBoolean("f3-brand.enabled", true), config.getString("f3-brand.brand", DEFAULT_BRAND));
         }
     }
 
