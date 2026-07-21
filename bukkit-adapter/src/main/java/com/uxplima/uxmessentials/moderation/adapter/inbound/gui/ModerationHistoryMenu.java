@@ -1,29 +1,18 @@
 package com.uxplima.uxmessentials.moderation.adapter.inbound.gui;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -81,7 +70,7 @@ public final class ModerationHistoryMenu {
                 "mod_history_reason",
                 ctx -> entry(ctx).reason().filter(r -> !r.isBlank()).orElse(""));
         bindings.placeholder("mod_history_at", ctx -> STAMP.format(entry(ctx).at()));
-        menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
     }
 
     /** Resolve {@code target}'s history off-thread, then open the read-only list for {@code viewer}. */
@@ -112,44 +101,6 @@ public final class ModerationHistoryMenu {
             case WARN -> "PAPER";
             case KICK -> "LEATHER_BOOTS";
         };
-    }
-
-    /**
-     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
-     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting moderation
-     * wiring. Resolution mirrors {@code GuiLayouts}: disk first, then the classpath default.
-     */
-    private MenuSpec loadSpec(Path dataFolder, Logger log) {
-        MenuSpecLoader specLoader = new MenuSpecLoader();
-        Path onDisk = dataFolder.resolve(SPEC_RESOURCE);
-        if (Files.isRegularFile(onDisk)) {
-            try {
-                return specLoader.load(onDisk);
-            } catch (MenuSpecException malformed) {
-                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
-            }
-        }
-        return loadBundledSpec(specLoader, log);
-    }
-
-    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(SPEC_RESOURCE)) {
-            if (in == null) {
-                log.warn("bundled menu spec {} is missing from the jar", SPEC_RESOURCE);
-                return emptySpec();
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
-            }
-        } catch (IOException | MenuSpecException failure) {
-            log.error("could not read bundled menu spec " + SPEC_RESOURCE, failure);
-            return emptySpec();
-        }
-    }
-
-    /** A minimal valid spec used only when the real one cannot be read, so moderation still wires cleanly. */
-    private static MenuSpec emptySpec() {
-        return new MenuSpec("", 6, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     /**

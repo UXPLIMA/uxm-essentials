@@ -1,17 +1,10 @@
 package com.uxplima.uxmessentials.moderation.adapter.inbound.gui;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -30,10 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -128,7 +118,7 @@ public final class JailListView {
         bindings.action("moderation:jail-goto", this::goTo);
         bindings.action("moderation:jail-delete", this::delete);
         bindings.action("moderation:jail-back", ctx -> open(ctx.player(), ctx.viewer()));
-        menus.registerSpec(EDIT_SPEC_ID, loadSpec(dataFolder, log));
+        menus.registerSpec(EDIT_SPEC_ID, MenuSpecs.loadOrBundled(EDIT_SPEC_RESOURCE, dataFolder, EDIT_ROWS, log));
     }
 
     /** Resolve the jail-name union off-thread, then open the list on the viewer's entity thread. */
@@ -235,44 +225,6 @@ public final class JailListView {
 
     private JailEdit subject(MenuContext ctx) {
         return ctx.subject(JailEdit.class);
-    }
-
-    /**
-     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
-     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting moderation
-     * wiring. Resolution mirrors {@code GuiLayouts}: disk first, then the classpath default.
-     */
-    private MenuSpec loadSpec(Path dataFolder, Logger log) {
-        MenuSpecLoader specLoader = new MenuSpecLoader();
-        Path onDisk = dataFolder.resolve(EDIT_SPEC_RESOURCE);
-        if (Files.isRegularFile(onDisk)) {
-            try {
-                return specLoader.load(onDisk);
-            } catch (MenuSpecException malformed) {
-                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
-            }
-        }
-        return loadBundledSpec(specLoader, log);
-    }
-
-    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(EDIT_SPEC_RESOURCE)) {
-            if (in == null) {
-                log.warn("bundled menu spec {} is missing from the jar", EDIT_SPEC_RESOURCE);
-                return emptySpec();
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
-            }
-        } catch (IOException | MenuSpecException failure) {
-            log.error("could not read bundled menu spec " + EDIT_SPEC_RESOURCE, failure);
-            return emptySpec();
-        }
-    }
-
-    /** A minimal valid spec used only when the real one cannot be read, so moderation still wires cleanly. */
-    private static MenuSpec emptySpec() {
-        return new MenuSpec("", EDIT_ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     private static Position position(Player player) {

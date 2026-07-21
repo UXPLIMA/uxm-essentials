@@ -1,11 +1,5 @@
 package com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +8,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 
 import org.bukkit.entity.Player;
 
@@ -36,10 +29,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -150,8 +140,8 @@ public final class PlayerWarpViewMenu {
         bindings.action("playerwarps:view-back", ctx -> openBrowse.accept(ctx.player(), ctx.viewer()));
         bindings.action(
                 "playerwarps:rate-back", ctx -> open(ctx.viewer(), subject(ctx).name()));
-        menus.registerSpec(VIEW_SPEC_ID, loadSpec(dataFolder, VIEW_RESOURCE, log));
-        menus.registerSpec(RATE_SPEC_ID, loadSpec(dataFolder, RATE_RESOURCE, log));
+        menus.registerSpec(VIEW_SPEC_ID, MenuSpecs.loadOrBundled(VIEW_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(RATE_SPEC_ID, MenuSpecs.loadOrBundled(RATE_RESOURCE, dataFolder, 3, log));
     }
 
     /**
@@ -326,44 +316,6 @@ public final class PlayerWarpViewMenu {
 
     private String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         return messages.resolve(viewer, key, placeholders);
-    }
-
-    /**
-     * Load a spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
-     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting player-warps
-     * wiring. Resolution mirrors the browse menu: disk first, then the classpath default.
-     */
-    private MenuSpec loadSpec(Path dataFolder, String resource, Logger log) {
-        MenuSpecLoader specLoader = new MenuSpecLoader();
-        Path onDisk = dataFolder.resolve(resource);
-        if (Files.isRegularFile(onDisk)) {
-            try {
-                return specLoader.load(onDisk);
-            } catch (MenuSpecException malformed) {
-                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
-            }
-        }
-        return loadBundledSpec(specLoader, resource, log);
-    }
-
-    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, String resource, Logger log) {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(resource)) {
-            if (in == null) {
-                log.warn("bundled menu spec {} is missing from the jar", resource);
-                return emptySpec();
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
-            }
-        } catch (IOException | MenuSpecException failure) {
-            log.error("could not read bundled menu spec " + resource, failure);
-            return emptySpec();
-        }
-    }
-
-    /** A minimal valid spec used only when the real one cannot be read, so player-warps still wires cleanly. */
-    private static MenuSpec emptySpec() {
-        return new MenuSpec("", 3, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     /**

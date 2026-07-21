@@ -1,19 +1,12 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -32,10 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -124,7 +114,7 @@ public final class EconomyExchangeMenu {
         bindings.action("economy:exchange-source", ctx -> openPicker(ctx, true));
         bindings.action("economy:exchange-target", ctx -> openPicker(ctx, false));
         bindings.action("economy:exchange-convert", this::promptConvert);
-        menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
     }
 
     /** Open the dashboard with the first two configured currencies as source and target; a no-op with none configured. */
@@ -279,44 +269,6 @@ public final class EconomyExchangeMenu {
     /** The per-currency icon material name, paper by default, resolved through the operator-configured icon-material. */
     private static String material(Currency currency) {
         return CurrencyIcons.materialFor(currency, Material.PAPER).name();
-    }
-
-    /**
-     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
-     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting economy
-     * wiring. Resolution mirrors {@code GuiLayouts}: disk first, then the classpath default.
-     */
-    private MenuSpec loadSpec(Path dataFolder, Logger log) {
-        MenuSpecLoader specLoader = new MenuSpecLoader();
-        Path onDisk = dataFolder.resolve(SPEC_RESOURCE);
-        if (Files.isRegularFile(onDisk)) {
-            try {
-                return specLoader.load(onDisk);
-            } catch (MenuSpecException malformed) {
-                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
-            }
-        }
-        return loadBundledSpec(specLoader, log);
-    }
-
-    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(SPEC_RESOURCE)) {
-            if (in == null) {
-                log.warn("bundled menu spec {} is missing from the jar", SPEC_RESOURCE);
-                return emptySpec();
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
-            }
-        } catch (IOException | MenuSpecException failure) {
-            log.error("could not read bundled menu spec " + SPEC_RESOURCE, failure);
-            return emptySpec();
-        }
-    }
-
-    /** A minimal valid spec used only when the real one cannot be read, so economy still wires cleanly. */
-    private static MenuSpec emptySpec() {
-        return new MenuSpec("", ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     /**

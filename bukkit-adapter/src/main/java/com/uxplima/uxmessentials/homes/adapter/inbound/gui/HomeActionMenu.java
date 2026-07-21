@@ -1,21 +1,13 @@
 package com.uxplima.uxmessentials.homes.adapter.inbound.gui;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import org.bukkit.entity.Player;
 
@@ -37,10 +29,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
@@ -148,7 +137,7 @@ public final class HomeActionMenu {
         bindings.action("homes:toggle-visibility", this::toggleVisibility);
         bindings.action("homes:open-invites", ctx -> openInvitesMenu.accept(ctx.viewer(), home(ctx)));
         bindings.action("homes:action-back", ctx -> openList.accept(ctx.player()));
-        menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
     }
 
     /** Open the action menu for {@code home}; the live player is resolved by the engine. */
@@ -356,43 +345,6 @@ public final class HomeActionMenu {
             case DENIED_ACCESS -> HomesMessageKey.HOME_CLAIM_ACCESS_DENIED;
             case ALLOWED -> throw new IllegalArgumentException("ALLOWED is not a denial");
         };
-    }
-
-    /**
-     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
-     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting homes wiring.
-     */
-    private MenuSpec loadSpec(Path dataFolder, com.uxplima.uxmessentials.shared.application.port.Logger log) {
-        MenuSpecLoader specLoader = new MenuSpecLoader();
-        Path onDisk = dataFolder.resolve(SPEC_RESOURCE);
-        if (Files.isRegularFile(onDisk)) {
-            try {
-                return specLoader.load(onDisk);
-            } catch (MenuSpecException malformed) {
-                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
-            }
-        }
-        return loadBundledSpec(specLoader, log);
-    }
-
-    private MenuSpec loadBundledSpec(
-            MenuSpecLoader specLoader, com.uxplima.uxmessentials.shared.application.port.Logger log) {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(SPEC_RESOURCE)) {
-            if (in == null) {
-                log.warn("bundled menu spec {} is missing from the jar", SPEC_RESOURCE);
-                return emptySpec();
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
-            }
-        } catch (IOException | MenuSpecException failure) {
-            log.error("could not read bundled menu spec " + SPEC_RESOURCE, failure);
-            return emptySpec();
-        }
-    }
-
-    private static MenuSpec emptySpec() {
-        return new MenuSpec("", 3, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     /**

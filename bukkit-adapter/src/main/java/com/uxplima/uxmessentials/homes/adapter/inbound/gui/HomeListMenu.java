@@ -1,11 +1,5 @@
 package com.uxplima.uxmessentials.homes.adapter.inbound.gui;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -29,10 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
@@ -130,7 +121,7 @@ public final class HomeListMenu {
         bindings.placeholder("home_cell_name", this::cellName);
         bindings.placeholder("home_cell_lore", this::cellLore);
         bindings.action("homes:open-slot", this::openSlot);
-        menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
     }
 
     /** Open the slot grid for {@code viewer}; the live player is resolved by the engine. */
@@ -285,42 +276,6 @@ public final class HomeListMenu {
                 "y", Integer.toString(home.location().blockY()),
                 "z", Integer.toString(home.location().blockZ()),
                 "created", dateFormat.format(home.createdAt()));
-    }
-
-    /**
-     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
-     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting homes wiring.
-     */
-    private MenuSpec loadSpec(Path dataFolder, Logger log) {
-        MenuSpecLoader specLoader = new MenuSpecLoader();
-        Path onDisk = dataFolder.resolve(SPEC_RESOURCE);
-        if (Files.isRegularFile(onDisk)) {
-            try {
-                return specLoader.load(onDisk);
-            } catch (MenuSpecException malformed) {
-                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
-            }
-        }
-        return loadBundledSpec(specLoader, log);
-    }
-
-    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(SPEC_RESOURCE)) {
-            if (in == null) {
-                log.warn("bundled menu spec {} is missing from the jar", SPEC_RESOURCE);
-                return emptySpec();
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                return specLoader.parse(reader.lines().collect(java.util.stream.Collectors.joining("\n")));
-            }
-        } catch (IOException | MenuSpecException failure) {
-            log.error("could not read bundled menu spec " + SPEC_RESOURCE, failure);
-            return emptySpec();
-        }
-    }
-
-    private static MenuSpec emptySpec() {
-        return new MenuSpec("", 3, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     /** The seam that opens the per-home action menu for a clicked filled cell, injected so the grid does not name it. */
