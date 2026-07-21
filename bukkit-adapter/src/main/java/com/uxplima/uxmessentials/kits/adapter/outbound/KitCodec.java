@@ -168,41 +168,42 @@ final class KitCodec {
             List<KitAction> claimActions = readClaimActions(id, node, commands, sound, particles, log);
             List<KitAction> denyActions = readActions(node.node("deny-actions"));
 
-            return Optional.of(new KitDefinition(
-                    kitId,
-                    items,
-                    cooldown,
-                    oneTime,
-                    permission,
-                    cost,
-                    new ItemDisplay(displayMaterial, displayName, displayLore),
-                    commands,
-                    sound,
-                    particles,
-                    firstJoin,
-                    autoEquip,
-                    categoryId,
-                    claimMoney,
-                    claimMoneyCurrency,
-                    permissionCooldowns,
-                    priority,
-                    new ItemDisplay(noPermissionMaterial, noPermissionName, noPermissionLore),
-                    new ItemDisplay(cooldownMaterial, cooldownName, cooldownLore),
-                    new ItemDisplay(claimedMaterial, claimedName, claimedLore),
-                    new ItemDisplay(unaffordableMaterial, unaffordableName, unaffordableLore),
-                    customPermission,
-                    variants,
-                    preview,
-                    closeOnClaim,
-                    requirements,
-                    new ItemDisplay(requirementsMaterial, requirementsName, requirementsLore),
-                    claimActions,
-                    denyActions,
-                    schedule,
-                    stockLimit,
-                    parsePlaceholders,
-                    onFull,
-                    unlockOnce));
+            return Optional.of(KitDefinition.builder()
+                    .id(kitId)
+                    .items(items)
+                    .cooldown(cooldown)
+                    .oneTime(oneTime)
+                    .permission(permission)
+                    .cost(cost)
+                    .display(new ItemDisplay(displayMaterial, displayName, displayLore))
+                    .commands(commands)
+                    .sound(sound)
+                    .particles(particles)
+                    .firstJoin(firstJoin)
+                    .autoEquip(autoEquip)
+                    .categoryId(categoryId)
+                    .claimMoney(claimMoney)
+                    .claimMoneyCurrency(claimMoneyCurrency)
+                    .permissionCooldowns(permissionCooldowns)
+                    .priority(priority)
+                    .noPermission(new ItemDisplay(noPermissionMaterial, noPermissionName, noPermissionLore))
+                    .cooldownDisplay(new ItemDisplay(cooldownMaterial, cooldownName, cooldownLore))
+                    .claimed(new ItemDisplay(claimedMaterial, claimedName, claimedLore))
+                    .unaffordable(new ItemDisplay(unaffordableMaterial, unaffordableName, unaffordableLore))
+                    .customPermission(customPermission)
+                    .variants(variants)
+                    .preview(preview)
+                    .closeOnClaim(closeOnClaim)
+                    .requirements(requirements)
+                    .requirementsDisplay(new ItemDisplay(requirementsMaterial, requirementsName, requirementsLore))
+                    .claimActions(claimActions)
+                    .denyActions(denyActions)
+                    .schedule(schedule)
+                    .stockLimit(stockLimit)
+                    .parsePlaceholders(parsePlaceholders)
+                    .onFull(onFull)
+                    .unlockOnce(unlockOnce)
+                    .build());
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }

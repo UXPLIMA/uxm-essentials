@@ -20,7 +20,6 @@ import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitAction;
 import com.uxplima.uxmessentials.kits.domain.KitActionType;
-import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
@@ -95,7 +94,11 @@ class ClaimKitActionDispatchTest {
 
     @Test
     void aRefusedClaimRunsDenyActionsAndGrantsNothing() {
-        KitDefinition gated = new KitDefinition(KitId.of("vip"), items(), Duration.ZERO, false, true, KitCost.free())
+        KitDefinition gated = KitDefinition.builder()
+                .id(KitId.of("vip"))
+                .items(items())
+                .permission(true)
+                .build()
                 .withDenyActions(List.of(new KitAction(KitActionType.SOUND, "ENTITY_VILLAGER_NO;1;1", false, false)));
         repository.save(gated);
 

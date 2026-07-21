@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 
-import java.time.Duration;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 
@@ -10,7 +8,6 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
-import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
@@ -77,7 +74,7 @@ public final class KitCreatePrompt {
             return;
         }
         KitId id = KitId.of(clean);
-        createKit.create(viewer, new KitDefinition(id, List.of(), Duration.ZERO, false, false, KitCost.free()));
+        createKit.create(viewer, KitDefinition.builder().id(id).build());
         repository.find(id).ifPresent(kit -> settingsView.open(player, viewer, kit));
     }
 

@@ -110,13 +110,10 @@ class KitClaimStoreTest {
         KitGranter granter = new BukkitKitGranter(new NoopLogger());
         List<KitItem> items = List.of(KitItemCodec.encode(new ItemStack(Material.IRON_INGOT, 5)));
         com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("test"),
-                        items,
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("test"))
+                        .items(items)
+                        .build();
 
         KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
@@ -135,22 +132,11 @@ class KitClaimStoreTest {
                 KitItemCodec.encode(new ItemStack(Material.DIAMOND_CHESTPLATE, 1)),
                 KitItemCodec.encode(new ItemStack(Material.SHIELD, 1)));
         com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("auto-equip-on"),
-                        items,
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free(),
-                        java.util.Optional.empty(),
-                        java.util.Optional.empty(),
-                        List.of(),
-                        List.of(),
-                        java.util.Optional.empty(),
-                        java.util.Optional.empty(),
-                        false,
-                        true // autoEquip = true
-                        );
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("auto-equip-on"))
+                        .items(items)
+                        .autoEquip(true)
+                        .build();
 
         KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
@@ -175,22 +161,11 @@ class KitClaimStoreTest {
                 KitItemCodec.encode(new ItemStack(Material.DIAMOND_CHESTPLATE, 1)),
                 KitItemCodec.encode(new ItemStack(Material.SHIELD, 1)));
         com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("auto-equip-off"),
-                        items,
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free(),
-                        java.util.Optional.empty(),
-                        java.util.Optional.empty(),
-                        List.of(),
-                        List.of(),
-                        java.util.Optional.empty(),
-                        java.util.Optional.empty(),
-                        false,
-                        false // autoEquip = false
-                        );
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("auto-equip-off"))
+                        .items(items)
+                        .autoEquip(false)
+                        .build();
 
         KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
@@ -222,13 +197,10 @@ class KitClaimStoreTest {
         // Create a kit item with a specific slot (slot 4)
         KitItem item = KitItemCodec.encode(new ItemStack(Material.GOLD_INGOT, 3), 4);
         com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("slot-test"),
-                        List.of(item),
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("slot-test"))
+                        .items(List.of(item))
+                        .build();
 
         KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
@@ -246,13 +218,10 @@ class KitClaimStoreTest {
 
         KitItem item = KitItemCodec.encode(new ItemStack(Material.GOLD_INGOT, 3), 4);
         com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("slot-test-fallback"),
-                        List.of(item),
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("slot-test-fallback"))
+                        .items(List.of(item))
+                        .build();
 
         KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
@@ -311,13 +280,10 @@ class KitClaimStoreTest {
         ItemStack oversized = new ItemStack(Material.COOKIE, 100);
         KitItem item = KitItemCodec.encode(oversized);
         com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("oversized-test"),
-                        List.of(item),
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("oversized-test"))
+                        .items(List.of(item))
+                        .build();
 
         KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
@@ -342,13 +308,10 @@ class KitClaimStoreTest {
         ItemStack oversized = new ItemStack(Material.COOKIE, 100);
         KitItem item = KitItemCodec.encode(oversized);
         com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("oversized-test-no-perm"),
-                        List.of(item),
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("oversized-test-no-perm"))
+                        .items(List.of(item))
+                        .build();
 
         KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
@@ -379,22 +342,14 @@ class KitClaimStoreTest {
         KitGranter granter = new BukkitKitGranter(new NoopLogger());
 
         com.uxplima.uxmessentials.kits.domain.KitDefinition kitCancel =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("cancel-me"),
-                        List.of(),
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("cancel-me"))
+                        .build();
 
         com.uxplima.uxmessentials.kits.domain.KitDefinition kitAllow =
-                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
-                        com.uxplima.uxmessentials.kits.domain.KitId.of("allow-me"),
-                        List.of(),
-                        java.time.Duration.ZERO,
-                        false,
-                        false,
-                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+                com.uxplima.uxmessentials.kits.domain.KitDefinition.builder()
+                        .id(com.uxplima.uxmessentials.kits.domain.KitId.of("allow-me"))
+                        .build();
 
         // Register event cancellation listener
         server.getPluginManager()

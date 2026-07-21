@@ -304,15 +304,27 @@ class ClaimKitTest {
     }
 
     private static KitDefinition oneTime(String id) {
-        return new KitDefinition(KitId.of(id), items(), Duration.ZERO, true, false, KitCost.free());
+        return KitDefinition.builder()
+                .id(KitId.of(id))
+                .items(items())
+                .oneTime(true)
+                .build();
     }
 
     private static KitDefinition gated(String id) {
-        return new KitDefinition(KitId.of(id), items(), Duration.ZERO, false, true, KitCost.free());
+        return KitDefinition.builder()
+                .id(KitId.of(id))
+                .items(items())
+                .permission(true)
+                .build();
     }
 
     private static KitDefinition priced(String id, BigDecimal amount) {
-        return new KitDefinition(KitId.of(id), items(), Duration.ZERO, false, false, KitCost.of(amount));
+        return KitDefinition.builder()
+                .id(KitId.of(id))
+                .items(items())
+                .cost(KitCost.of(amount))
+                .build();
     }
 
     private static List<KitItem> items() {

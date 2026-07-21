@@ -296,13 +296,14 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         existing.ifPresent(kit -> services.kitEditor()
                 .redefine(
                         ref(sender),
-                        new KitDefinition(
-                                kit.id(),
-                                inventoryItems(sender),
-                                kit.cooldown(),
-                                kit.oneTime(),
-                                kit.permission(),
-                                kit.cost())));
+                        KitDefinition.builder()
+                                .id(kit.id())
+                                .items(inventoryItems(sender))
+                                .cooldown(kit.cooldown())
+                                .oneTime(kit.oneTime())
+                                .permission(kit.permission())
+                                .cost(kit.cost())
+                                .build()));
         return Command.SINGLE_SUCCESS;
     }
 

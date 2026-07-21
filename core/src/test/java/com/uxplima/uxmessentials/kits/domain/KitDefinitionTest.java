@@ -62,8 +62,13 @@ class KitDefinitionTest {
 
     @Test
     void aOneTimePricedGatedKitReportsItsFlags() {
-        KitDefinition kit = new KitDefinition(
-                KitId.of("vip"), items(), Duration.ZERO, true, true, KitCost.of(new BigDecimal("500")));
+        KitDefinition kit = KitDefinition.builder()
+                .id(KitId.of("vip"))
+                .items(items())
+                .oneTime(true)
+                .permission(true)
+                .cost(KitCost.of(new BigDecimal("500")))
+                .build();
 
         assertThat(kit.isOneTime()).isTrue();
         assertThat(kit.requiresPermission()).isTrue();
@@ -72,45 +77,52 @@ class KitDefinitionTest {
 
     @Test
     void aNegativeCooldownIsRejected() {
-        assertThatThrownBy(() ->
-                        new KitDefinition(KitId.of("x"), items(), Duration.ofSeconds(-1), false, false, KitCost.free()))
+        assertThatThrownBy(() -> KitDefinition.builder()
+                        .id(KitId.of("x"))
+                        .items(items())
+                        .cooldown(Duration.ofSeconds(-1))
+                        .build())
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void withItemsSwapsTheStacksAndPreservesEveryOtherSetting() {
-        KitDefinition original = new KitDefinition(
-                KitId.of("vip"),
-                List.of(KitItem.of("old", 1)),
-                Duration.ofSeconds(120),
-                true,
-                true,
-                KitCost.of(new BigDecimal("250")),
-                java.util.Optional.of("<gold>VIP Kit"),
-                java.util.Optional.of("DIAMOND"),
-                List.of("line-one", "line-two"),
-                List.of("say claimed", "give @s bread"),
-                java.util.Optional.of("entity.player.levelup"),
-                java.util.Optional.of("FLAME"),
-                true,
-                true,
-                java.util.Optional.of("premium"),
-                new BigDecimal("99"),
-                "coins",
-                java.util.Map.of("uxmessentials.kit.cooldown.30", Duration.ofSeconds(30)),
-                7,
-                java.util.Optional.of("BARRIER"),
-                java.util.Optional.of("<red>No permission"),
-                List.of("locked"),
-                java.util.Optional.of("CLOCK"),
-                java.util.Optional.of("<yellow>On cooldown"),
-                List.of("wait"),
-                java.util.Optional.of("STRUCTURE_VOID"),
-                java.util.Optional.of("<gray>Claimed"),
-                List.of("done"),
-                java.util.Optional.of("RED_WOOL"),
-                java.util.Optional.of("<red>Too poor"),
-                List.of("need money"));
+        KitDefinition original = KitDefinition.builder()
+                .id(KitId.of("vip"))
+                .items(List.of(KitItem.of("old", 1)))
+                .cooldown(Duration.ofSeconds(120))
+                .oneTime(true)
+                .permission(true)
+                .cost(KitCost.of(new BigDecimal("250")))
+                .display(new ItemDisplay(
+                        java.util.Optional.of("DIAMOND"),
+                        java.util.Optional.of("<gold>VIP Kit"),
+                        List.of("line-one", "line-two")))
+                .commands(List.of("say claimed", "give @s bread"))
+                .sound(java.util.Optional.of("entity.player.levelup"))
+                .particles(java.util.Optional.of("FLAME"))
+                .firstJoin(true)
+                .autoEquip(true)
+                .categoryId(java.util.Optional.of("premium"))
+                .claimMoney(new BigDecimal("99"))
+                .claimMoneyCurrency("coins")
+                .permissionCooldowns(java.util.Map.of("uxmessentials.kit.cooldown.30", Duration.ofSeconds(30)))
+                .priority(7)
+                .noPermission(new ItemDisplay(
+                        java.util.Optional.of("BARRIER"),
+                        java.util.Optional.of("<red>No permission"),
+                        List.of("locked")))
+                .cooldownDisplay(new ItemDisplay(
+                        java.util.Optional.of("CLOCK"), java.util.Optional.of("<yellow>On cooldown"), List.of("wait")))
+                .claimed(new ItemDisplay(
+                        java.util.Optional.of("STRUCTURE_VOID"),
+                        java.util.Optional.of("<gray>Claimed"),
+                        List.of("done")))
+                .unaffordable(new ItemDisplay(
+                        java.util.Optional.of("RED_WOOL"),
+                        java.util.Optional.of("<red>Too poor"),
+                        List.of("need money")))
+                .build();
 
         List<KitItem> newItems = List.of(KitItem.of("new", 5), KitItem.of("second", 2));
         KitDefinition edited = original.withItems(newItems);

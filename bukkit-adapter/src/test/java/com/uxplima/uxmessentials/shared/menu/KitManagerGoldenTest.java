@@ -35,7 +35,6 @@ import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
-import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
@@ -242,7 +241,7 @@ class KitManagerGoldenTest {
     }
 
     private void seed(String id) {
-        repository.save(new KitDefinition(KitId.of(id), List.of(), Duration.ZERO, false, false, KitCost.free()));
+        repository.save(KitDefinition.builder().id(KitId.of(id)).build());
     }
 
     /** What one rendered slot looks like for comparison: its material and the plain-text of its display name. */

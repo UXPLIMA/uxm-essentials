@@ -126,259 +126,19 @@ public record KitDefinition(
         denyActions = List.copyOf(denyActions);
     }
 
-    public KitDefinition(
-            KitId id,
-            List<KitItem> items,
-            Duration cooldown,
-            boolean oneTime,
-            boolean permission,
-            KitCost cost,
-            Optional<String> displayName,
-            Optional<String> displayMaterial,
-            List<String> displayLore,
-            List<String> commands,
-            Optional<String> sound,
-            Optional<String> particles,
-            boolean firstJoin,
-            boolean autoEquip,
-            Optional<String> categoryId,
-            java.math.BigDecimal claimMoney,
-            String claimMoneyCurrency,
-            java.util.Map<String, Duration> permissionCooldowns,
-            int priority,
-            Optional<String> noPermissionMaterial,
-            Optional<String> noPermissionName,
-            List<String> noPermissionLore,
-            Optional<String> cooldownMaterial,
-            Optional<String> cooldownName,
-            List<String> cooldownLore,
-            Optional<String> claimedMaterial,
-            Optional<String> claimedName,
-            List<String> claimedLore,
-            Optional<String> unaffordableMaterial,
-            Optional<String> unaffordableName,
-            List<String> unaffordableLore) {
-        this(
-                id,
-                items,
-                cooldown,
-                oneTime,
-                permission,
-                cost,
-                new ItemDisplay(displayMaterial, displayName, displayLore),
-                commands,
-                sound,
-                particles,
-                firstJoin,
-                autoEquip,
-                categoryId,
-                claimMoney,
-                claimMoneyCurrency,
-                permissionCooldowns,
-                priority,
-                new ItemDisplay(noPermissionMaterial, noPermissionName, noPermissionLore),
-                new ItemDisplay(cooldownMaterial, cooldownName, cooldownLore),
-                new ItemDisplay(claimedMaterial, claimedName, claimedLore),
-                new ItemDisplay(unaffordableMaterial, unaffordableName, unaffordableLore),
-                Optional.empty(),
-                List.of(),
-                true,
-                false,
-                List.of(),
-                ItemDisplay.empty(),
-                List.of(),
-                List.of(),
-                KitSchedule.always(),
-                0,
-                false,
-                KitFullPolicy.DROP,
-                false);
+    /** A new builder with every component at its default; set only what the kit needs and call {@code build()}. */
+    public static KitDefinitionBuilder builder() {
+        return new KitDefinitionBuilder();
     }
 
-    public KitDefinition(
-            KitId id,
-            List<KitItem> items,
-            Duration cooldown,
-            boolean oneTime,
-            boolean permission,
-            KitCost cost,
-            Optional<String> displayName,
-            Optional<String> displayMaterial,
-            List<String> displayLore,
-            List<String> commands,
-            Optional<String> sound,
-            Optional<String> particles,
-            boolean firstJoin,
-            boolean autoEquip,
-            Optional<String> categoryId,
-            java.math.BigDecimal claimMoney,
-            String claimMoneyCurrency,
-            java.util.Map<String, Duration> permissionCooldowns,
-            int priority) {
-        this(
-                id,
-                items,
-                cooldown,
-                oneTime,
-                permission,
-                cost,
-                displayName,
-                displayMaterial,
-                displayLore,
-                commands,
-                sound,
-                particles,
-                firstJoin,
-                autoEquip,
-                categoryId,
-                claimMoney,
-                claimMoneyCurrency,
-                permissionCooldowns,
-                priority,
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of());
-    }
-
-    public KitDefinition(
-            KitId id,
-            List<KitItem> items,
-            Duration cooldown,
-            boolean oneTime,
-            boolean permission,
-            KitCost cost,
-            Optional<String> displayName,
-            Optional<String> displayMaterial,
-            List<String> displayLore,
-            List<String> commands,
-            Optional<String> sound,
-            Optional<String> particles,
-            boolean firstJoin,
-            boolean autoEquip,
-            Optional<String> categoryId,
-            java.math.BigDecimal claimMoney,
-            java.util.Map<String, Duration> permissionCooldowns,
-            int priority) {
-        this(
-                id,
-                items,
-                cooldown,
-                oneTime,
-                permission,
-                cost,
-                displayName,
-                displayMaterial,
-                displayLore,
-                commands,
-                sound,
-                particles,
-                firstJoin,
-                autoEquip,
-                categoryId,
-                claimMoney,
-                "default",
-                permissionCooldowns,
-                priority);
-    }
-
-    public KitDefinition(
-            KitId id,
-            List<KitItem> items,
-            Duration cooldown,
-            boolean oneTime,
-            boolean permission,
-            KitCost cost,
-            Optional<String> displayName,
-            Optional<String> displayMaterial,
-            List<String> displayLore,
-            List<String> commands,
-            Optional<String> sound,
-            Optional<String> particles,
-            boolean firstJoin,
-            boolean autoEquip) {
-        this(
-                id,
-                items,
-                cooldown,
-                oneTime,
-                permission,
-                cost,
-                displayName,
-                displayMaterial,
-                displayLore,
-                commands,
-                sound,
-                particles,
-                firstJoin,
-                autoEquip,
-                Optional.empty(),
-                java.math.BigDecimal.ZERO,
-                "default",
-                java.util.Map.of(),
-                0);
-    }
-
-    public KitDefinition(
-            KitId id,
-            List<KitItem> items,
-            Duration cooldown,
-            boolean oneTime,
-            boolean permission,
-            KitCost cost,
-            Optional<String> displayName,
-            Optional<String> displayMaterial,
-            List<String> displayLore,
-            List<String> commands,
-            Optional<String> sound,
-            Optional<String> particles) {
-        this(
-                id,
-                items,
-                cooldown,
-                oneTime,
-                permission,
-                cost,
-                displayName,
-                displayMaterial,
-                displayLore,
-                commands,
-                sound,
-                particles,
-                false,
-                false);
-    }
-
-    public KitDefinition(
-            KitId id, List<KitItem> items, Duration cooldown, boolean oneTime, boolean permission, KitCost cost) {
-        this(
-                id,
-                items,
-                cooldown,
-                oneTime,
-                permission,
-                cost,
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                false,
-                false);
+    /** A builder seeded from this kit, so a caller can change one component and rebuild the rest unchanged. */
+    public KitDefinitionBuilder toBuilder() {
+        return new KitDefinitionBuilder(this);
     }
 
     /** A free, repeatable, ungated kit with the given items and cooldown. */
     public static KitDefinition repeatable(KitId id, List<KitItem> items, Duration cooldown) {
-        return new KitDefinition(id, items, cooldown, false, false, KitCost.free());
+        return builder().id(id).items(items).cooldown(cooldown).build();
     }
 
     /**
@@ -390,142 +150,142 @@ public record KitDefinition(
      */
     public KitDefinition withItems(List<KitItem> newItems) {
         Objects.requireNonNull(newItems, "newItems");
-        return copy(b -> b.items = newItems);
+        return toBuilder().items(newItems).build();
     }
 
     /** A copy of this kit with its one-time flag set to {@code value}, every other setting preserved. */
     public KitDefinition withOneTime(boolean value) {
-        return copy(b -> b.oneTime = value);
+        return toBuilder().oneTime(value).build();
     }
 
     /** A copy of this kit with its permission flag set to {@code value}, every other setting preserved. */
     public KitDefinition withPermission(boolean value) {
-        return copy(b -> b.permission = value);
+        return toBuilder().permission(value).build();
     }
 
     /** A copy of this kit with its cooldown set to {@code value}, every other setting preserved. */
     public KitDefinition withCooldown(Duration value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.cooldown = value);
+        return toBuilder().cooldown(value).build();
     }
 
     /** A copy of this kit with its cost set to {@code value}, every other setting preserved. */
     public KitDefinition withCost(KitCost value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.cost = value);
+        return toBuilder().cost(value).build();
     }
 
     /** A copy of this kit with its display name set to {@code value}, every other setting preserved. */
     public KitDefinition withDisplayName(Optional<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.display = new ItemDisplay(b.display.material(), value, b.display.lore()));
+        return toBuilder()
+                .display(new ItemDisplay(display.material(), value, display.lore()))
+                .build();
     }
 
     /** A copy of this kit with its display material set to {@code value}, every other setting preserved. */
     public KitDefinition withDisplayMaterial(Optional<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.display = new ItemDisplay(value, b.display.name(), b.display.lore()));
+        return toBuilder()
+                .display(new ItemDisplay(value, display.name(), display.lore()))
+                .build();
     }
 
     /** A copy of this kit with its display lore set to {@code value}, every other setting preserved. */
     public KitDefinition withDisplayLore(List<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.display = new ItemDisplay(b.display.material(), b.display.name(), value));
+        return toBuilder()
+                .display(new ItemDisplay(display.material(), display.name(), value))
+                .build();
     }
 
     /** A copy of this kit with its claim commands set to {@code value}, every other setting preserved. */
     public KitDefinition withCommands(List<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.commands = value);
+        return toBuilder().commands(value).build();
     }
 
     /** A copy of this kit with its first-join flag set to {@code value}, every other setting preserved. */
     public KitDefinition withFirstJoin(boolean value) {
-        return copy(b -> b.firstJoin = value);
+        return toBuilder().firstJoin(value).build();
     }
 
     /** A copy of this kit with its auto-equip flag set to {@code value}, every other setting preserved. */
     public KitDefinition withAutoEquip(boolean value) {
-        return copy(b -> b.autoEquip = value);
+        return toBuilder().autoEquip(value).build();
     }
 
     /** A copy of this kit with its category set to {@code value}, every other setting preserved. */
     public KitDefinition withCategoryId(Optional<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.categoryId = value);
+        return toBuilder().categoryId(value).build();
     }
 
     /** A copy of this kit with its preview flag set to {@code value}, every other setting preserved. */
     public KitDefinition withPreview(boolean value) {
-        return copy(b -> b.preview = value);
+        return toBuilder().preview(value).build();
     }
 
     /** A copy of this kit with its close-on-claim flag set to {@code value}, every other setting preserved. */
     public KitDefinition withCloseOnClaim(boolean value) {
-        return copy(b -> b.closeOnClaim = value);
+        return toBuilder().closeOnClaim(value).build();
     }
 
     /** A copy of this kit with its custom permission set to {@code value}, every other setting preserved. */
     public KitDefinition withCustomPermission(Optional<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.customPermission = value);
+        return toBuilder().customPermission(value).build();
     }
 
     /** A copy of this kit with its variants set to {@code value}, every other setting preserved. */
     public KitDefinition withVariants(List<KitVariant> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.variants = value);
+        return toBuilder().variants(value).build();
     }
 
     /** A copy of this kit with its claim requirements set to {@code value}, every other setting preserved. */
     public KitDefinition withRequirements(List<KitRequirement> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.requirements = value);
+        return toBuilder().requirements(value).build();
     }
 
     /** A copy of this kit with its claim actions set to {@code value}, every other setting preserved. */
     public KitDefinition withClaimActions(List<KitAction> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.claimActions = value);
+        return toBuilder().claimActions(value).build();
     }
 
     /** A copy of this kit with its deny actions set to {@code value}, every other setting preserved. */
     public KitDefinition withDenyActions(List<KitAction> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.denyActions = value);
+        return toBuilder().denyActions(value).build();
     }
 
     /** A copy of this kit with its availability schedule set to {@code value}, every other setting preserved. */
     public KitDefinition withSchedule(KitSchedule value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.schedule = value);
+        return toBuilder().schedule(value).build();
     }
 
     /** A copy of this kit with its global stock limit set to {@code value} ({@code 0} = unlimited), else preserved. */
     public KitDefinition withStockLimit(int value) {
-        return copy(b -> b.stockLimit = Math.max(0, value));
+        return toBuilder().stockLimit(Math.max(0, value)).build();
     }
 
     /** A copy of this kit with its parse-placeholders flag set to {@code value}, every other setting preserved. */
     public KitDefinition withParsePlaceholders(boolean value) {
-        return copy(b -> b.parsePlaceholders = value);
+        return toBuilder().parsePlaceholders(value).build();
     }
 
     /** A copy of this kit with its inventory-full policy set to {@code value}, every other setting preserved. */
     public KitDefinition withOnFull(KitFullPolicy value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.onFull = value);
+        return toBuilder().onFull(value).build();
     }
 
     /** A copy of this kit with its buy-to-unlock flag set to {@code value}, every other setting preserved. */
     public KitDefinition withUnlockOnce(boolean value) {
-        return copy(b -> b.unlockOnce = value);
-    }
-
-    private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {
-        KitDefinitionFields fields = new KitDefinitionFields(this);
-        mutator.accept(fields);
-        return fields.build();
+        return toBuilder().unlockOnce(value).build();
     }
 
     /** True when claiming this kit consumes it forever (a one-time kit). */

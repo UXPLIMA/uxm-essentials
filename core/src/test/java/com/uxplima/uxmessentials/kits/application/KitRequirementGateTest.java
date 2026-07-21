@@ -12,7 +12,6 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.RequirementEvaluator;
-import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
@@ -96,7 +95,11 @@ class KitRequirementGateTest {
     @Test
     void thePermissionGateStillRunsBeforeTheRequirementGate() {
         KitAccess access = access(Optional.of(new FakeEvaluator(false)));
-        KitDefinition gated = new KitDefinition(KitId.of("vip"), items(), Duration.ZERO, false, true, KitCost.free())
+        KitDefinition gated = KitDefinition.builder()
+                .id(KitId.of("vip"))
+                .items(items())
+                .permission(true)
+                .build()
                 .withRequirements(List.of(req("%a%", RequirementOperator.EQ, "b")));
 
         // Without the permission, the more informative permission refusal wins over the requirement refusal.

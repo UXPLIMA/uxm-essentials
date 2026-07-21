@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.List;
 
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.kits.domain.ItemDisplay;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
@@ -511,38 +512,27 @@ class ConfigurateKitRepositoryTest {
         Path dir = kitsDir(root);
         KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
 
-        KitDefinition custom = new KitDefinition(
-                KitId.of("custom"),
-                List.of(KitItem.of("AAAA", 1)),
-                Duration.ofSeconds(10),
-                false,
-                false,
-                com.uxplima.uxmessentials.kits.domain.KitCost.free(),
-                java.util.Optional.empty(),
-                java.util.Optional.empty(),
-                List.of(),
-                List.of(),
-                java.util.Optional.empty(),
-                java.util.Optional.empty(),
-                false,
-                false,
-                java.util.Optional.empty(),
-                java.math.BigDecimal.ZERO,
-                "default",
-                java.util.Map.of(),
-                0,
-                java.util.Optional.of("BARRIER"),
-                java.util.Optional.of("<red>No Perm"),
-                List.of("Lore line 1"),
-                java.util.Optional.of("CLOCK"),
-                java.util.Optional.of("<yellow>Cooldown"),
-                List.of("Cooldown lore"),
-                java.util.Optional.of("MINECART"),
-                java.util.Optional.of("<red>Claimed"),
-                List.of("Claimed lore"),
-                java.util.Optional.of("GOLD_NUGGET"),
-                java.util.Optional.of("<red>Cannot Afford"),
-                List.of("Price is %cost%"));
+        KitDefinition custom = KitDefinition.builder()
+                .id(KitId.of("custom"))
+                .items(List.of(KitItem.of("AAAA", 1)))
+                .cooldown(Duration.ofSeconds(10))
+                .noPermission(new ItemDisplay(
+                        java.util.Optional.of("BARRIER"),
+                        java.util.Optional.of("<red>No Perm"),
+                        List.of("Lore line 1")))
+                .cooldownDisplay(new ItemDisplay(
+                        java.util.Optional.of("CLOCK"),
+                        java.util.Optional.of("<yellow>Cooldown"),
+                        List.of("Cooldown lore")))
+                .claimed(new ItemDisplay(
+                        java.util.Optional.of("MINECART"),
+                        java.util.Optional.of("<red>Claimed"),
+                        List.of("Claimed lore")))
+                .unaffordable(new ItemDisplay(
+                        java.util.Optional.of("GOLD_NUGGET"),
+                        java.util.Optional.of("<red>Cannot Afford"),
+                        List.of("Price is %cost%")))
+                .build();
 
         repository.save(custom);
 

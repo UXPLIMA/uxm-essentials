@@ -5,9 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.entity.Player;
@@ -16,7 +14,6 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
-import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -62,36 +59,12 @@ class KitsJoinListenerTest {
         PlayerJoinEvent event = mock(PlayerJoinEvent.class);
         when(event.getPlayer()).thenReturn(player);
 
-        KitDefinition firstJoinKit = new KitDefinition(
-                KitId.of("first-join-kit"),
-                List.of(),
-                Duration.ZERO,
-                false,
-                false,
-                KitCost.free(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                true, // firstJoin = true
-                false);
-        KitDefinition regularKit = new KitDefinition(
-                KitId.of("regular-kit"),
-                List.of(),
-                Duration.ZERO,
-                false,
-                false,
-                KitCost.free(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                false, // firstJoin = false
-                false);
+        KitDefinition firstJoinKit = KitDefinition.builder()
+                .id(KitId.of("first-join-kit"))
+                .firstJoin(true)
+                .build();
+        KitDefinition regularKit =
+                KitDefinition.builder().id(KitId.of("regular-kit")).build();
 
         KitRepository repository = mock(KitRepository.class);
         when(repository.all()).thenReturn(List.of(firstJoinKit, regularKit));
@@ -125,21 +98,11 @@ class KitsJoinListenerTest {
         PlayerJoinEvent event = mock(PlayerJoinEvent.class);
         when(event.getPlayer()).thenReturn(player);
 
-        KitDefinition oneTimeFirstJoinKit = new KitDefinition(
-                KitId.of("one-time-first-join"),
-                List.of(),
-                Duration.ZERO,
-                true,
-                false,
-                KitCost.free(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                true, // firstJoin = true
-                false);
+        KitDefinition oneTimeFirstJoinKit = KitDefinition.builder()
+                .id(KitId.of("one-time-first-join"))
+                .oneTime(true)
+                .firstJoin(true)
+                .build();
 
         KitRepository repository = mock(KitRepository.class);
         when(repository.all()).thenReturn(List.of(oneTimeFirstJoinKit));
