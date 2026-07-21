@@ -80,7 +80,7 @@ public final class AutoDropsPipeline {
         boolean sell = sellEnabled
                 && sales.isPresent()
                 && player.hasPermission(SELL_PERMISSION)
-                && toggles.autoSellActive(player, true);
+                && toggles.autoSellActive(player, false); // opt-in: unlike pickup/smelt, autosell defaults off
         return new Stages(pickup, smelt, sell);
     }
 

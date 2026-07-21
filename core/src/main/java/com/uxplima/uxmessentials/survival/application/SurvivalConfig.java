@@ -397,14 +397,28 @@ public record SurvivalConfig(
 
     /**
      * The auto-sell mechanic under {@code autosell { … }}: a broken block's priced drops are sold into the economy and
-     * the proceeds credited to the breaker's wallet. It ships <em>disabled</em> — selling for money is a server-economy
-     * decision — and requires the economy module; with no provider present it is inert. Players toggle it with
-     * {@code /autosell}.
+     * the proceeds credited to the breaker's wallet. It ships enabled with a small default price table, but still
+     * requires the economy module (with no provider present it is inert) and each player opts in with {@code /autosell}
+     * (the per-player toggle defaults off), so nobody's drops turn to coin until they switch it on.
      *
-     * @param enabled whether auto-sell runs ({@code autosell.enabled}, default {@code false})
-     * @param prices the material → per-item price pairs read from {@code autosell.prices}; empty by default
+     * @param enabled whether auto-sell runs ({@code autosell.enabled}, default {@code true})
+     * @param prices the material to per-item price pairs read from {@code autosell.prices}; a small default set of
+     *     common sellables when the block is absent
      */
     public record AutoSell(boolean enabled, Map<String, BigDecimal> prices) {
+
+        /** A small, sensible default price table so autosell is not a silent no-op the moment it is enabled. */
+        private static final Map<String, BigDecimal> DEFAULT_PRICES = Map.ofEntries(
+                Map.entry("COAL", BigDecimal.valueOf(2)),
+                Map.entry("IRON_INGOT", BigDecimal.valueOf(8)),
+                Map.entry("COPPER_INGOT", BigDecimal.valueOf(4)),
+                Map.entry("GOLD_INGOT", BigDecimal.valueOf(12)),
+                Map.entry("REDSTONE", BigDecimal.valueOf(1)),
+                Map.entry("LAPIS_LAZULI", BigDecimal.valueOf(2)),
+                Map.entry("DIAMOND", BigDecimal.valueOf(80)),
+                Map.entry("EMERALD", BigDecimal.valueOf(60)),
+                Map.entry("QUARTZ", BigDecimal.valueOf(3)),
+                Map.entry("NETHERITE_SCRAP", BigDecimal.valueOf(120)));
 
         public AutoSell {
             Objects.requireNonNull(prices, "prices");
@@ -413,10 +427,15 @@ public record SurvivalConfig(
 
         static AutoSell from(ConfigStore config) {
             Map<String, BigDecimal> prices = new LinkedHashMap<>();
-            for (String material : config.getKeys("autosell.prices")) {
-                prices.put(material, BigDecimal.valueOf(config.getDouble("autosell.prices." + material, 0.0)));
+            List<String> keys = config.getKeys("autosell.prices");
+            if (keys.isEmpty()) {
+                prices.putAll(DEFAULT_PRICES);
+            } else {
+                for (String material : keys) {
+                    prices.put(material, BigDecimal.valueOf(config.getDouble("autosell.prices." + material, 0.0)));
+                }
             }
-            return new AutoSell(config.getBoolean("autosell.enabled", false), prices);
+            return new AutoSell(config.getBoolean("autosell.enabled", true), prices);
         }
     }
 

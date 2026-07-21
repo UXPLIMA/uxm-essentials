@@ -21,9 +21,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /autosell}: flip the caller's personal auto-sell toggle, gated by
- * {@code uxmessentials.survival.autosell.toggle}. The toggle is PDC-backed; because auto-sell ships disabled at the
- * config level, the toggle defaults to on <em>within</em> that gate — it only ever does anything on a server that has
- * enabled auto-sell and wired an economy. Running it once turns it off, again on.
+ * {@code uxmessentials.survival.autosell.toggle}. The toggle is PDC-backed and defaults to off (unlike auto-pickup and
+ * auto-smelt, which default on), so a player opts in by running this once, turning it on; running it again turns it
+ * back off. It only ever sells anything on a server that has the {@code autosell} mechanic enabled and an economy
+ * wired.
  */
 @NullMarked
 public final class AutoSellCommand implements CommandRegistration {
@@ -57,7 +58,7 @@ public final class AutoSellCommand implements CommandRegistration {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
         }
-        boolean nowActive = toggles.toggleAutoSell(player, true);
+        boolean nowActive = toggles.toggleAutoSell(player, false);
         feedback.send(
                 player,
                 nowActive

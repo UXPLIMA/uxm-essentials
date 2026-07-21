@@ -172,8 +172,8 @@ public final class SurvivalSettingsView {
                         Material.GOLD_INGOT,
                         "uxmessentials.survival.autosell.toggle",
                         config.autoSell().enabled(),
-                        p -> toggles.autoSellActive(p, true),
-                        p -> toggles.toggleAutoSell(p, true)),
+                        p -> toggles.autoSellActive(p, false),
+                        p -> toggles.toggleAutoSell(p, false)),
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_AUTOTOOL,
                         Material.DIAMOND_PICKAXE,

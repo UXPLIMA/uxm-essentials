@@ -76,8 +76,11 @@ class SurvivalConfigTest {
                 .containsEntry("ANCIENT_DEBRIS", "NETHERITE_SCRAP");
 
         SurvivalConfig.AutoSell sell = config.autoSell();
-        assertThat(sell.enabled()).isFalse();
-        assertThat(sell.prices()).isEmpty();
+        assertThat(sell.enabled()).isTrue();
+        assertThat(sell.prices())
+                .isNotEmpty()
+                .containsEntry("DIAMOND", java.math.BigDecimal.valueOf(80))
+                .containsEntry("IRON_INGOT", java.math.BigDecimal.valueOf(8));
 
         assertThat(config.autoTool().enabled()).isTrue();
     }
