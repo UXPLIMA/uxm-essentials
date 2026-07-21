@@ -286,11 +286,9 @@ class FoliaThreadingDriftTest {
         // §6.10): the loop enumerates on its own (async-loop or region) thread, then hops per-entity before touching
         // a player, or operates on a region-anchored shared display entity. No foreign Player is mutated inline.
         allow.put(
-                pkg + "scoreboard.adapter.outbound.ScoreboardRenderTask",
-                "RENDER_SCAN: asyncAfter loop enumerates, then hops per-entity to render");
-        allow.put(
-                pkg + "tablist.adapter.outbound.TablistRenderTask",
-                "RENDER_SCAN: asyncAfter loop enumerates, then hops per-entity to render");
+                pkg + "shared.adapter.outbound.AbstractHudRenderTask",
+                "RENDER_SCAN: shared HUD render loop asyncAfter enumerates, then hops per-entity to render "
+                        + "(base of ScoreboardRenderTask / TablistRenderTask)");
         // Supplies Bukkit::getOnlinePlayers (a method reference, caught via METHOD_REF) to the tablist renderer and
         // suppression as the injected roster supplier; consumed on the global/region thread, reads uuid/name only.
         allow.put(

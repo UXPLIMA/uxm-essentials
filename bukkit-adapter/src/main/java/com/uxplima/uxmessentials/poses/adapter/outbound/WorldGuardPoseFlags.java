@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.poses.adapter.outbound;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -12,10 +10,10 @@ import org.bukkit.World;
 
 import com.uxplima.uxmessentials.poses.application.port.PoseRegionFlags;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The WorldGuard side of the poses region gate, reached purely by reflection behind a plugin-present guard — the same
@@ -67,72 +65,11 @@ public final class WorldGuardPoseFlags implements PoseRegionFlags {
             return false;
         }
         try {
-            return queryDeny(new Location(world, where.x(), where.y(), where.z()), flagName(type));
+            return WorldGuardReflection.queryDeny(new Location(world, where.x(), where.y(), where.z()), flagName(type));
         } catch (ReflectiveOperationException | RuntimeException failure) {
             degrade(failure);
             return false;
         }
-    }
-
-    /** True only when a covering region explicitly sets the named custom flag to DENY at {@code location}. */
-    private boolean queryDeny(Location location, String flagName) throws ReflectiveOperationException {
-        Object instance = Class.forName("com.sk89q.worldguard.WorldGuard")
-                .getMethod("getInstance")
-                .invoke(null);
-        Object registry = instance.getClass().getMethod("getFlagRegistry").invoke(instance);
-        Object flag = registry.getClass().getMethod("get", String.class).invoke(registry, flagName);
-        if (flag == null) {
-            return false; // our flag never registered (WorldGuard loaded after us) — nothing to enforce
-        }
-        Object container =
-                platform(instance).getClass().getMethod("getRegionContainer").invoke(platform(instance));
-        Object query = container.getClass().getMethod("createQuery").invoke(container);
-        Object regions = getApplicableRegions(query, adapt(location));
-        return regions != null && isDeny(queryState(regions, flag));
-    }
-
-    private static Object platform(Object worldGuardInstance) throws ReflectiveOperationException {
-        return worldGuardInstance.getClass().getMethod("getPlatform").invoke(worldGuardInstance);
-    }
-
-    /** Adapt a Bukkit {@link Location} to the WorldEdit location the region container's query expects. */
-    private static Object adapt(Location location) throws ReflectiveOperationException {
-        return Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter")
-                .getMethod("adapt", Location.class)
-                .invoke(null, location);
-    }
-
-    /** {@code RegionQuery#getApplicableRegions(Location)} — matched by the single WorldEdit-location argument. */
-    private static @Nullable Object getApplicableRegions(Object query, Object weLocation)
-            throws ReflectiveOperationException {
-        for (Method candidate : query.getClass().getMethods()) {
-            if (candidate.getName().equals("getApplicableRegions")
-                    && candidate.getParameterCount() == 1
-                    && candidate.getParameterTypes()[0].isInstance(weLocation)) {
-                return candidate.invoke(query, weLocation);
-            }
-        }
-        throw new NoSuchMethodException("getApplicableRegions");
-    }
-
-    /** {@code ApplicableRegionSet#queryState(RegionAssociable, StateFlag...)} with a null subject and our one flag. */
-    private static @Nullable Object queryState(Object regions, Object flag) throws ReflectiveOperationException {
-        Class<?> stateFlag = Class.forName("com.sk89q.worldguard.protection.flags.StateFlag");
-        Object flags = Array.newInstance(stateFlag, 1);
-        Array.set(flags, 0, flag);
-        for (Method candidate : regions.getClass().getMethods()) {
-            if (candidate.getName().equals("queryState")
-                    && candidate.getParameterCount() == 2
-                    && candidate.getParameterTypes()[1].isArray()) {
-                return candidate.invoke(regions, null, flags);
-            }
-        }
-        throw new NoSuchMethodException("queryState");
-    }
-
-    /** The resolved {@code StateFlag.State} is a DENY only when its enum constant is named {@code DENY}. */
-    private static boolean isDeny(@Nullable Object state) {
-        return state instanceof Enum<?> value && "DENY".equals(value.name());
     }
 
     private void degrade(Exception failure) {
