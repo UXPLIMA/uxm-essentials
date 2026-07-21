@@ -26,7 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param crossServer whether players on different backend servers may trade over the bus ({@code cross-server},
  *     default {@code false} — it needs a proxy and the bus configured)
  * @param slotsPerSide how many item slots each participant gets in the trade window ({@code slots-per-side},
- *     default 12)
+ *     default 20, the full five-row item grid of the AxTrade-style window)
  * @param requestExpirySeconds how long a {@code /trade} request stays acceptable before it expires, in seconds
  *     ({@code request-expiry-seconds}, default 60)
  * @param audit whether a completed trade emits an audit line on the shared audit channel ({@code audit},
@@ -52,11 +52,14 @@ public record TradeConfig(
     /** The default lifetime of a pending {@code /trade} request, in seconds. */
     private static final int DEFAULT_REQUEST_EXPIRY_SECONDS = 60;
 
-    /** The default item slots per side — a compact grid within a double-chest window. */
-    private static final int DEFAULT_SLOTS_PER_SIDE = 12;
+    /** The default item slots per side, the full five-row item grid of the AxTrade-style window (four columns each). */
+    private static final int DEFAULT_SLOTS_PER_SIDE = 20;
 
-    /** The largest per-side slot count a double-chest (54-slot) window can host after controls and the divider. */
-    private static final int MAX_SLOTS_PER_SIDE = 27;
+    /**
+     * The largest per-side slot count the window can host: the item grid spans the five rows below the control row,
+     * four columns per side, so twenty slots each.
+     */
+    private static final int MAX_SLOTS_PER_SIDE = 20;
 
     public TradeConfig {
         Objects.requireNonNull(currenciesAllowed, "currenciesAllowed");

@@ -20,6 +20,9 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
+import com.uxplima.uxmessentials.trade.application.TradeSettlement;
+import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
+import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,8 +57,10 @@ class TradeWindowTest {
         TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 12, 60, false);
         layout = new TradeLayout(config.slotsPerSide(), List.of());
         sessions = new TradeSessions();
-        // Phase 2 coverage is items-only: no money prompt is driven and no economy is wired (null settlement); audit is
-        // off in this config, so the no-op sink is never consulted.
+        // This coverage is items-only: no money prompt is driven and money is off (economy disabled), and no experience
+        // is staked, so the settlement moves nothing. Audit is off in this config, so the no-op sink is never
+        // consulted.
+        TradeExperience experience = new NoopExperience();
         view = new TradeView(
                 new KeyMessages(),
                 new NoopSink(),
@@ -63,7 +68,10 @@ class TradeWindowTest {
                 config,
                 sessions,
                 (p, v, c, s, x) -> {},
-                null,
+                (p, v, s, x) -> {},
+                new TradeSettlement(new NoopEconomy(), experience),
+                experience,
+                false,
                 receipt -> {});
         server.getPluginManager().registerEvents(view.newListener(), plugin);
     }
@@ -207,6 +215,43 @@ class TradeWindowTest {
         for (int slot = 0; slot < 36; slot++) {
             player.getInventory().setItem(slot, filler.clone());
         }
+    }
+
+    /** An economy that is never charged here (money is off and none is staked), so every call is a permissive stub. */
+    private static final class NoopEconomy implements TradeEconomy {
+        @Override
+        public boolean canAfford(PlayerRef who, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public boolean transfer(PlayerRef from, PlayerRef to, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, java.math.BigDecimal amount, String currencyId) {}
+    }
+
+    /** An experience seam that is never staked against here, so every call is a permissive stub. */
+    private static final class NoopExperience implements TradeExperience {
+        @Override
+        public long available(PlayerRef who) {
+            return 0L;
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, long points) {
+            return true;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, long points) {}
     }
 
     /** Resolves any key to its plain key string; the layout renders it as literal text. */

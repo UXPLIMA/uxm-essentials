@@ -29,6 +29,13 @@ final class TradeHolder implements InventoryHolder {
     private final PlayerRef viewer;
     private @Nullable Inventory inventory;
 
+    /**
+     * Which allowed currency the single money button currently shows for this viewer. Our economy is multi-currency but
+     * the AxTrade money slot is single, so a right-click advances this index and the money button re-renders the next
+     * currency; it is per-viewer UI state, only ever touched on the viewer's own region thread.
+     */
+    private int selectedCurrency;
+
     TradeHolder(TradeId tradeId, TradeSide side, PlayerRef viewer) {
         this.tradeId = Objects.requireNonNull(tradeId, "tradeId");
         this.side = Objects.requireNonNull(side, "side");
@@ -48,6 +55,18 @@ final class TradeHolder implements InventoryHolder {
     /** The player looking at this view; the render and every settlement are attributed to them. */
     PlayerRef viewer() {
         return viewer;
+    }
+
+    /** The index of the currency the money button currently shows for this viewer. */
+    int selectedCurrency() {
+        return selectedCurrency;
+    }
+
+    /** Advance the selected currency, wrapped into {@code count} allowed currencies (a no-op when {@code count <= 1}). */
+    void cycleCurrency(int count) {
+        if (count > 1) {
+            selectedCurrency = Math.floorMod(selectedCurrency + 1, count);
+        }
     }
 
     /** Store the built menu so the holder contract can answer {@link #getInventory()}. */

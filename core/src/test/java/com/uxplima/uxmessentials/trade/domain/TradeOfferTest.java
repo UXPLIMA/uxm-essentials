@@ -13,18 +13,25 @@ import org.junit.jupiter.api.Test;
 class TradeOfferTest {
 
     @Test
-    void emptyOfferHasNoItemsOrMoney() {
+    void emptyOfferHasNoItemsMoneyOrExperience() {
         assertThat(TradeOffer.empty().isEmpty()).isTrue();
         assertThat(TradeOffer.empty().items()).isEmpty();
         assertThat(TradeOffer.empty().money()).isEmpty();
+        assertThat(TradeOffer.empty().experience()).isZero();
     }
 
     @Test
-    void anOfferWithItemsOrMoneyIsNotEmpty() {
+    void anOfferWithItemsMoneyOrExperienceIsNotEmpty() {
         assertThat(new TradeOffer(List.of(new OfferedItem("diamond", 2)), Map.of()).isEmpty())
                 .isFalse();
         assertThat(new TradeOffer(List.of(), Map.of("coins", new BigDecimal("5"))).isEmpty())
                 .isFalse();
+        assertThat(new TradeOffer(List.of(), Map.of(), 30L).isEmpty()).isFalse();
+    }
+
+    @Test
+    void negativeExperienceIsRejected() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new TradeOffer(List.of(), Map.of(), -1L));
     }
 
     @Test

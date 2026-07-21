@@ -63,7 +63,9 @@ public final class CrossServerTradeView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.bus = Objects.requireNonNull(bus, "bus");
-        this.layout = new TradeLayout(Objects.requireNonNull(config, "config").slotsPerSide(), List.of());
+        // The cross-server window is items-only in v1: no money and no experience are staked here, so both control
+        // groups are off and their slots fall back to divider filler (see CrossServerTradeView's class doc).
+        this.layout = new TradeLayout(Objects.requireNonNull(config, "config").slotsPerSide(), List.of(), false);
     }
 
     /** The window listener bound to this view — the wiring registers it. */

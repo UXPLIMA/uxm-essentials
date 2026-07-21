@@ -49,16 +49,29 @@ public final class TradeListener implements Listener {
         if (holder == null) {
             return;
         }
-        if (event.getRawSlot() == layout.confirmSlot()) {
+        int raw = event.getRawSlot();
+        if (raw == layout.confirmSlot()) {
             event.setCancelled(true);
             view.confirm(holder);
             return;
         }
-        String currency = event.getRawSlot() < top.getSize() ? layout.moneyCurrencyAt(event.getRawSlot()) : null;
-        if (currency != null) {
+        if (raw < top.getSize() && layout.isMoneySlot(raw)) {
             event.setCancelled(true);
             if (event.getWhoClicked() instanceof Player player) {
-                view.promptMoney(player, holder, currency);
+                // A left-click stakes the selected currency; a right-click cycles to the next allowed currency, so the
+                // single money slot still covers a multi-currency economy without losing any currency.
+                if (event.isRightClick()) {
+                    view.cycleCurrency(holder);
+                } else {
+                    view.promptMoney(player, holder);
+                }
+            }
+            return;
+        }
+        if (raw < top.getSize() && layout.isExperienceSlot(raw)) {
+            event.setCancelled(true);
+            if (event.getWhoClicked() instanceof Player player) {
+                view.promptExperience(player, holder);
             }
             return;
         }

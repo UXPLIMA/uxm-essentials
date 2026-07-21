@@ -26,7 +26,7 @@ class TradeConfigTest {
         assertThat(config.hasDistanceLimit()).isFalse();
         assertThat(config.cooldownSeconds()).isEqualTo(5);
         assertThat(config.crossServer()).isFalse();
-        assertThat(config.slotsPerSide()).isEqualTo(12);
+        assertThat(config.slotsPerSide()).isEqualTo(20);
         assertThat(config.requestExpirySeconds()).isEqualTo(60);
         assertThat(config.audit()).isTrue();
     }

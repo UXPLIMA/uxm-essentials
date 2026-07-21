@@ -24,6 +24,9 @@ import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeCooldown;
 import com.uxplima.uxmessentials.trade.application.TradeRequests;
+import com.uxplima.uxmessentials.trade.application.TradeSettlement;
+import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
+import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +58,7 @@ class TradeRequestFlowTest {
         plugin = MockBukkit.createMockPlugin();
         sessions = new TradeSessions();
         TradeConfig viewConfig = config(0, 0);
+        TradeExperience experience = new NoopExperience();
         view = new TradeView(
                 new KeyMessages(),
                 new NoopSink(),
@@ -62,7 +66,10 @@ class TradeRequestFlowTest {
                 viewConfig,
                 sessions,
                 (p, v, c, s, x) -> {},
-                null,
+                (p, v, s, x) -> {},
+                new TradeSettlement(new NoopEconomy(), experience),
+                experience,
+                false,
                 receipt -> {});
         server.getPluginManager().registerEvents(view.newListener(), plugin);
         // A default wiring so the request/cooldown fields are always initialised; each test re-wires with its own
@@ -187,6 +194,42 @@ class TradeRequestFlowTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    /** The request flow stages no money or experience, so the settlement's seams are permissive stubs. */
+    private static final class NoopEconomy implements TradeEconomy {
+        @Override
+        public boolean canAfford(PlayerRef who, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public boolean transfer(PlayerRef from, PlayerRef to, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, java.math.BigDecimal amount, String currencyId) {}
+    }
+
+    private static final class NoopExperience implements TradeExperience {
+        @Override
+        public long available(PlayerRef who) {
+            return 0L;
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, long points) {
+            return true;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, long points) {}
     }
 
     /** Runs every scheduled task inline so the accept's window open completes in-test. */

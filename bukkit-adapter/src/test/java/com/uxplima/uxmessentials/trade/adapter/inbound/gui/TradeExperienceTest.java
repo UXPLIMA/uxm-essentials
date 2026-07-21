@@ -4,16 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.bukkit.Material;
-import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryAction;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
@@ -36,30 +34,30 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of Phase 3: money and the item blacklist. Money is staked directly on the shared exchange (the
- * seam the anvil prompt drives) so the tests need no real anvil; a both-confirm then settles it through a fake
- * {@link TradeEconomy}. Money moves both ways atomically with the item swap when both sides can pay; a payer who cannot
- * afford their leg blocks the whole trade with no item or money moved; and a blacklisted material is refused back out of
- * the window rather than accepted.
+ * MockBukkit coverage of experience as a stakeable trade resource, the experience counterpart of the money coverage.
+ * Experience is staked directly on the shared exchange (the seam the amount prompt drives) so the test needs no real
+ * anvil. Staking experience clears both confirmations exactly as an item or money change does; a both-confirm moves each
+ * side's staked experience to the other player; a staker who cannot cover their stake at settle blocks the whole trade
+ * with nothing moved; and a cancel (window close) leaves the staker's experience untouched, since same-server
+ * experience is only debited at commit.
  */
-class TradeMoneyTest {
+class TradeExperienceTest {
 
     private ServerMock server;
     private Plugin plugin;
     private TradeLayout layout;
     private TradeSessions sessions;
     private TradeView view;
-    private RecordingEconomy economy;
+    private RecordingExperience experience;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of("BEDROCK"), 0, 5, false, 12, 60, false);
-        layout = new TradeLayout(config.slotsPerSide(), config.currenciesAllowed());
+        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 20, 60, false);
+        layout = new TradeLayout(config.slotsPerSide(), List.of());
         sessions = new TradeSessions();
-        economy = new RecordingEconomy();
-        TradeExperience experience = new NoopExperience();
+        experience = new RecordingExperience();
         view = new TradeView(
                 new KeyMessages(),
                 new NoopSink(),
@@ -68,9 +66,9 @@ class TradeMoneyTest {
                 sessions,
                 (p, v, c, s, x) -> {},
                 (p, v, s, x) -> {},
-                new TradeSettlement(economy, experience),
+                new TradeSettlement(new NoopEconomy(), experience),
                 experience,
-                true,
+                false,
                 receipt -> {});
         server.getPluginManager().registerEvents(view.newListener(), plugin);
     }
@@ -81,71 +79,77 @@ class TradeMoneyTest {
     }
 
     @Test
-    void moneyMovesBothWaysAtomicallyWithTheItemSwapOnBothConfirm() {
+    void stakingExperienceResetsBothConfirmations() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");
         view.open(alice, bob);
         place(alice, 0, new ItemStack(Material.DIAMOND, 1));
-        place(bob, 0, new ItemStack(Material.EMERALD, 1));
-        exchangeOf(alice).setMoney(TradeSide.INITIATOR, "coins", BigDecimal.valueOf(100));
-        exchangeOf(alice).setMoney(TradeSide.PARTNER, "coins", BigDecimal.valueOf(50));
+
+        view.confirm(holder(alice));
+        assertThat(exchangeOf(alice).confirmed(TradeSide.INITIATOR)).isTrue();
+
+        // Bob stakes experience after Alice confirmed; the anti-scam invariant clears BOTH confirmations.
+        exchangeOf(alice).setExperience(TradeSide.PARTNER, 50L);
+
+        assertThat(exchangeOf(alice).confirmed(TradeSide.INITIATOR)).isFalse();
+        assertThat(exchangeOf(alice).confirmed(TradeSide.PARTNER)).isFalse();
+    }
+
+    @Test
+    void bothConfirmMovesStakedExperienceBothWays() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        experience.set(alice.getUniqueId(), 500L);
+        experience.set(bob.getUniqueId(), 500L);
+        view.open(alice, bob);
+        exchangeOf(alice).setExperience(TradeSide.INITIATOR, 100L);
+        exchangeOf(alice).setExperience(TradeSide.PARTNER, 40L);
 
         view.confirm(holder(alice));
         view.confirm(holder(bob));
 
-        // Both money legs settled, in both directions.
-        assertThat(economy.moves)
-                .containsExactlyInAnyOrder(
-                        new Move(alice.getName(), bob.getName(), BigDecimal.valueOf(100)),
-                        new Move(bob.getName(), alice.getName(), BigDecimal.valueOf(50)));
-        // And the items swapped alongside the money.
-        assertThat(amount(alice, Material.EMERALD)).isEqualTo(1);
-        assertThat(amount(bob, Material.DIAMOND)).isEqualTo(1);
+        // Alice gave 100 and received Bob's 40; Bob gave 40 and received Alice's 100.
+        assertThat(experience.balance(alice.getUniqueId())).isEqualTo(440L);
+        assertThat(experience.balance(bob.getUniqueId())).isEqualTo(560L);
         assertThat(sessions.find(alice.getUniqueId())).isNull();
     }
 
     @Test
-    void aPayerWhoCannotAffordBlocksTheTradeWithNoItemOrMoneyMoved() {
+    void aStakerWhoCannotAffordTheirExperienceBlocksTheTradeWithNothingMoved() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");
-        economy.broke(alice.getName());
+        experience.set(alice.getUniqueId(), 50L); // not enough for the 100 staked below
+        experience.set(bob.getUniqueId(), 500L);
         view.open(alice, bob);
         place(alice, 0, new ItemStack(Material.DIAMOND, 1));
         place(bob, 0, new ItemStack(Material.EMERALD, 1));
-        exchangeOf(alice).setMoney(TradeSide.INITIATOR, "coins", BigDecimal.valueOf(100));
+        exchangeOf(alice).setExperience(TradeSide.INITIATOR, 100L);
 
         view.confirm(holder(alice));
         view.confirm(holder(bob));
 
-        // No money moved…
-        assertThat(economy.moves).isEmpty();
-        // …and no items swapped: each side got its own stack back.
+        // No experience moved, and the items came back to their owners rather than swapping.
+        assertThat(experience.balance(alice.getUniqueId())).isEqualTo(50L);
+        assertThat(experience.balance(bob.getUniqueId())).isEqualTo(500L);
         assertThat(amount(alice, Material.DIAMOND)).isEqualTo(1);
-        assertThat(amount(alice, Material.EMERALD)).isZero();
         assertThat(amount(bob, Material.EMERALD)).isEqualTo(1);
-        assertThat(amount(bob, Material.DIAMOND)).isZero();
+        assertThat(amount(alice, Material.EMERALD)).isZero();
         assertThat(sessions.find(alice.getUniqueId())).isNull();
     }
 
     @Test
-    void aBlacklistedItemIsRefusedIntoTheWindow() {
+    void cancellingLeavesStakedExperienceWithTheStaker() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");
+        experience.set(alice.getUniqueId(), 500L);
         view.open(alice, bob);
+        exchangeOf(alice).setExperience(TradeSide.INITIATOR, 100L);
 
-        alice.setItemOnCursor(new ItemStack(Material.BEDROCK));
-        InventoryClickEvent event = new InventoryClickEvent(
-                alice.getOpenInventory(),
-                InventoryType.SlotType.CONTAINER,
-                layout.editableSlot(0),
-                ClickType.LEFT,
-                InventoryAction.PLACE_ALL);
-        server.getPluginManager().callEvent(event);
+        // Alice closes her window before the swap; same-server experience is only debited at commit, so hers is intact.
+        server.getPluginManager().callEvent(new InventoryCloseEvent(alice.getOpenInventory()));
 
-        assertThat(event.isCancelled()).isTrue();
-        // The offer stays empty — the blacklisted stack never entered the domain offer.
-        assertThat(exchangeOf(alice).session().offer(TradeSide.INITIATOR).items())
-                .isEmpty();
+        assertThat(experience.balance(alice.getUniqueId())).isEqualTo(500L);
+        assertThat(sessions.find(alice.getUniqueId())).isNull();
     }
 
     private void place(PlayerMock player, int slot, ItemStack stack) {
@@ -169,57 +173,57 @@ class TradeMoneyTest {
                 .sum();
     }
 
-    /** A recorded money movement, by player name, for the assertions. */
-    private record Move(String from, String to, BigDecimal amount) {}
+    /** A fake experience seam over an in-memory per-player balance: a guarded withdraw and an unconditional deposit. */
+    private static final class RecordingExperience implements TradeExperience {
+        private final Map<UUID, Long> balances = new HashMap<>();
 
-    /** Records every transfer and fails any transfer/affordability for a player marked broke. */
-    private static final class RecordingEconomy implements TradeEconomy {
-        private final List<Move> moves = new ArrayList<>();
-        private final List<String> broke = new ArrayList<>();
+        void set(UUID who, long amount) {
+            balances.put(who, amount);
+        }
 
-        void broke(String name) {
-            broke.add(name);
+        long balance(UUID who) {
+            return balances.getOrDefault(who, 0L);
         }
 
         @Override
+        public long available(PlayerRef who) {
+            return balance(who.uuid());
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, long points) {
+            if (balance(who.uuid()) < points) {
+                return false;
+            }
+            balances.put(who.uuid(), balance(who.uuid()) - points);
+            return true;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, long points) {
+            balances.put(who.uuid(), balance(who.uuid()) + points);
+        }
+    }
+
+    /** No money is staked in these experience tests, so the economy seam is a permissive stub. */
+    private static final class NoopEconomy implements TradeEconomy {
+        @Override
         public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
-            return !broke.contains(who.name());
+            return true;
         }
 
         @Override
         public boolean transfer(PlayerRef from, PlayerRef to, BigDecimal amount, String currencyId) {
-            if (broke.contains(from.name())) {
-                return false;
-            }
-            moves.add(new Move(from.name(), to.name(), amount));
             return true;
         }
 
         @Override
         public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
-            throw new UnsupportedOperationException("same-server settlement uses transfer");
-        }
-
-        @Override
-        public void deposit(PlayerRef who, BigDecimal amount, String currencyId) {
-            throw new UnsupportedOperationException("same-server settlement uses transfer");
-        }
-    }
-
-    /** No experience is staked in these money tests, so the experience seam is a permissive stub. */
-    private static final class NoopExperience implements TradeExperience {
-        @Override
-        public long available(PlayerRef who) {
-            return 0L;
-        }
-
-        @Override
-        public boolean withdraw(PlayerRef who, long points) {
             return true;
         }
 
         @Override
-        public void deposit(PlayerRef who, long points) {}
+        public void deposit(PlayerRef who, BigDecimal amount, String currencyId) {}
     }
 
     /** Resolves any key to its plain key string. */
@@ -230,7 +234,7 @@ class TradeMoneyTest {
         }
     }
 
-    /** Swallows delivery; these tests assert on items, money moves, and session state, not on chat. */
+    /** Swallows delivery; these tests assert on experience balances and session state, not on chat. */
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}

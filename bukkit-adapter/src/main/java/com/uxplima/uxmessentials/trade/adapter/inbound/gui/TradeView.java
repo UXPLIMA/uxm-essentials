@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeReceipt;
 import com.uxplima.uxmessentials.trade.application.TradeSettlement;
 import com.uxplima.uxmessentials.trade.application.port.TradeAudit;
+import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
 import com.uxplima.uxmessentials.trade.domain.TradeSession;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
@@ -58,9 +59,16 @@ public final class TradeView {
     private final TradeLayout layout;
     private final TradeSessions sessions;
     private final TradeMoneyPrompt moneyPrompt;
+    private final TradeExperiencePrompt experiencePrompt;
 
-    /** The all-or-nothing money mover, present only when economy is wired; {@code null} means an items-only trade. */
-    private final @Nullable TradeSettlement settlement;
+    /** The all-or-nothing mover for staked money and experience; always present because experience is always tradeable. */
+    private final TradeSettlement settlement;
+
+    /** The experience seam, read for the amount prompt's affordability check; also settled through {@link #settlement}. */
+    private final TradeExperience experience;
+
+    /** Whether the money button is shown, true only when an economy provider is wired. */
+    private final boolean moneyEnabled;
 
     /** The completed-trade audit sink; consulted only when {@link #auditEnabled} is set. */
     private final TradeAudit audit;
@@ -84,7 +92,10 @@ public final class TradeView {
             TradeConfig config,
             TradeSessions sessions,
             TradeMoneyPrompt moneyPrompt,
-            @Nullable TradeSettlement settlement,
+            TradeExperiencePrompt experiencePrompt,
+            TradeSettlement settlement,
+            TradeExperience experience,
+            boolean moneyEnabled,
             TradeAudit audit) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
@@ -92,12 +103,16 @@ public final class TradeView {
         Objects.requireNonNull(config, "config");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.moneyPrompt = Objects.requireNonNull(moneyPrompt, "moneyPrompt");
-        this.settlement = settlement;
+        this.experiencePrompt = Objects.requireNonNull(experiencePrompt, "experiencePrompt");
+        this.settlement = Objects.requireNonNull(settlement, "settlement");
+        this.experience = Objects.requireNonNull(experience, "experience");
+        this.moneyEnabled = moneyEnabled;
         this.audit = Objects.requireNonNull(audit, "audit");
         this.auditEnabled = config.audit();
-        // Money buttons appear only when economy is wired; without it the trade moves items only and the layout paints
-        // its money slots as plain divider filler.
-        List<String> currencies = settlement != null ? config.currenciesAllowed() : List.of();
+        // The money button appears only when economy is wired; without it the trade moves items and experience only and
+        // the layout paints its money slots as plain divider filler. The experience button is always shown, experience
+        // is a native resource that needs no provider.
+        List<String> currencies = moneyEnabled ? config.currenciesAllowed() : List.of();
         this.layout = new TradeLayout(config.slotsPerSide(), currencies);
         this.blacklist = parseBlacklist(config.itemBlacklist());
     }
@@ -183,16 +198,18 @@ public final class TradeView {
     }
 
     /**
-     * A viewer clicked their "add money" button for {@code currencyId} — prompt them for an amount. The window closes
-     * to show the prompt (suppressed from the cancel path), and the prompt callback re-stakes the money and reopens.
+     * A viewer left-clicked their "add money" button, prompt them for an amount of the currently-selected currency. The
+     * window closes to show the prompt (suppressed from the cancel path), and the prompt callback re-stakes the money
+     * and reopens. Because the money slot is single but the economy is multi-currency, the currency is the one the
+     * viewer has cycled to (see {@link #cycleCurrency}); its staked amount is preserved for the currencies not selected.
      */
-    void promptMoney(Player player, TradeHolder holder, String currencyId) {
+    void promptMoney(Player player, TradeHolder holder) {
         Objects.requireNonNull(player, "player");
-        Objects.requireNonNull(currencyId, "currencyId");
         TradeExchange exchange = sessions.find(holder.tradeId());
-        if (settlement == null || exchange == null || exchange.session().state().isTerminal()) {
+        if (!moneyEnabled || exchange == null || exchange.session().state().isTerminal()) {
             return;
         }
+        String currencyId = layout.currencyAt(holder.selectedCurrency());
         PlayerRef viewer = holder.viewer();
         promptingViewers.add(viewer.uuid());
         moneyPrompt.prompt(
@@ -201,6 +218,16 @@ public final class TradeView {
                 currencyId,
                 text -> onMoneySubmitted(holder, currencyId, text, player),
                 () -> reopenAfterPrompt(holder, player));
+    }
+
+    /** A viewer right-clicked their money button, advance the selected currency and re-render both sides. */
+    void cycleCurrency(TradeHolder holder) {
+        TradeExchange exchange = sessions.find(holder.tradeId());
+        if (!moneyEnabled || exchange == null || exchange.session().state().isTerminal()) {
+            return;
+        }
+        holder.cycleCurrency(layout.currencyCount());
+        rerender(exchange);
     }
 
     private void onMoneySubmitted(TradeHolder holder, String currencyId, String text, Player player) {
@@ -212,6 +239,41 @@ public final class TradeView {
                 messageSink.deliver(viewer, messages.resolve(viewer, TradeMessageKey.TRADE_MONEY_INVALID, Map.of()));
             } else {
                 exchange.setMoney(holder.side(), currencyId, amount.get());
+            }
+        }
+        reopenAfterPrompt(holder, player);
+    }
+
+    /**
+     * A viewer clicked their "add experience" button, prompt them for an amount of experience points. The window closes
+     * to show the prompt (suppressed from the cancel path), and the prompt callback validates the amount against the
+     * experience they actually hold, re-stakes it, and reopens, exactly as the money button does.
+     */
+    void promptExperience(Player player, TradeHolder holder) {
+        Objects.requireNonNull(player, "player");
+        TradeExchange exchange = sessions.find(holder.tradeId());
+        if (exchange == null || exchange.session().state().isTerminal()) {
+            return;
+        }
+        PlayerRef viewer = holder.viewer();
+        promptingViewers.add(viewer.uuid());
+        experiencePrompt.prompt(
+                player,
+                viewer,
+                text -> onExperienceSubmitted(holder, text, player),
+                () -> reopenAfterPrompt(holder, player));
+    }
+
+    private void onExperienceSubmitted(TradeHolder holder, String text, Player player) {
+        PlayerRef viewer = holder.viewer();
+        TradeExchange exchange = sessions.find(holder.tradeId());
+        if (exchange != null && !exchange.session().state().isTerminal()) {
+            Optional<Long> amount = parseExperience(text);
+            if (amount.isEmpty() || amount.get() > experience.available(viewer)) {
+                messageSink.deliver(
+                        viewer, messages.resolve(viewer, TradeMessageKey.TRADE_EXPERIENCE_INVALID, Map.of()));
+            } else {
+                exchange.setExperience(holder.side(), amount.get());
             }
         }
         reopenAfterPrompt(holder, player);
@@ -233,11 +295,21 @@ public final class TradeView {
         rerender(exchange);
     }
 
-    /** Parse a typed money amount — a strictly-positive number, else empty (an invalid entry is rejected). */
+    /** Parse a typed money amount, a strictly-positive number, else empty (an invalid entry is rejected). */
     private static Optional<BigDecimal> parseAmount(String text) {
         try {
             BigDecimal value = new BigDecimal(text.trim());
             return value.signum() > 0 ? Optional.of(value) : Optional.empty();
+        } catch (NumberFormatException notANumber) {
+            return Optional.empty();
+        }
+    }
+
+    /** Parse a typed experience amount, a strictly-positive whole number, else empty (an invalid entry is rejected). */
+    private static Optional<Long> parseExperience(String text) {
+        try {
+            long value = Long.parseLong(text.trim());
+            return value > 0 ? Optional.of(value) : Optional.empty();
         } catch (NumberFormatException notANumber) {
             return Optional.empty();
         }
@@ -303,8 +375,11 @@ public final class TradeView {
                     exchange.offer(side.other()),
                     false,
                     false,
+                    holder.selectedCurrency(),
                     exchange.money(side),
-                    exchange.money(side.other()));
+                    exchange.money(side.other()),
+                    exchange.experience(side),
+                    exchange.experience(side.other()));
             live.openInventory(inv);
         });
     }
@@ -321,12 +396,15 @@ public final class TradeView {
         @Nullable ItemStack @Nullable [] otherOffer = exchange.offer(side.other());
         boolean self = exchange.confirmed(side);
         boolean partner = exchange.confirmed(side.other());
+        int selected = holder.selectedCurrency();
         Map<String, BigDecimal> ownMoney = exchange.money(side);
         Map<String, BigDecimal> partnerMoney = exchange.money(side.other());
+        long ownXp = exchange.experience(side);
+        long partnerXp = exchange.experience(side.other());
         scheduler.onEntity(viewer, () -> {
             Inventory inv = holder.inventoryOrNull();
             if (inv != null) {
-                renderView(inv, viewer, otherOffer, self, partner, ownMoney, partnerMoney);
+                renderView(inv, viewer, otherOffer, self, partner, selected, ownMoney, partnerMoney, ownXp, partnerXp);
             }
         });
     }
@@ -337,11 +415,15 @@ public final class TradeView {
             @Nullable ItemStack @Nullable [] otherOffer,
             boolean self,
             boolean partner,
+            int selectedCurrency,
             Map<String, BigDecimal> ownMoney,
-            Map<String, BigDecimal> partnerMoney) {
+            Map<String, BigDecimal> partnerMoney,
+            long ownExperience,
+            long partnerExperience) {
         layout.renderMirror(inv, otherOffer);
         layout.renderControls(inv, messages, viewer, self, partner);
-        layout.renderMoney(inv, messages, viewer, ownMoney, partnerMoney);
+        layout.renderMoney(inv, messages, viewer, selectedCurrency, ownMoney, partnerMoney);
+        layout.renderExperience(inv, messages, viewer, ownExperience, partnerExperience);
     }
 
     /**
@@ -381,7 +463,9 @@ public final class TradeView {
 
     private void settleAndDeliver(TradeExchange exchange) {
         sessions.remove(exchange);
-        if (settlement == null || settlement.settle(exchange.session())) {
+        // Settle the staked money and experience all-or-nothing; the items swap only when both moved (or nothing was
+        // staked), so items, money, and experience move together or not at all.
+        if (settlement.settle(exchange.session())) {
             giveBack(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.PARTNER));
             giveBack(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.INITIATOR));
             if (auditEnabled) {

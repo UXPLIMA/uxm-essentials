@@ -34,16 +34,28 @@ public enum TradeMessageKey implements MessageKey {
     TRADE_WINDOW_PARTNER_WAITING("trade.window.partner-waiting"),
     TRADE_WINDOW_PARTNER_CONFIRMED("trade.window.partner-confirmed"),
 
-    // Trade window — the money row: the viewer's per-currency "add money" button, its staked-amount line, and the
-    // read-only display of the other side's staked money.
+    // Trade window, the money button: the viewer's single "add money" button, its staked-amount line, the hint shown
+    // when several currencies are allowed (right-click cycles the selected one), and the read-only display of the other
+    // side's staked money.
     TRADE_WINDOW_MONEY("trade.window.money"),
     TRADE_WINDOW_MONEY_AMOUNT("trade.window.money-amount"),
+    TRADE_WINDOW_MONEY_CYCLE("trade.window.money-cycle"),
     TRADE_WINDOW_PARTNER_MONEY("trade.window.partner-money"),
 
-    // Money prompt — the amount capture and its rejections.
+    // Trade window, the experience button: the viewer's "add experience" button, its staked-amount line, and the
+    // read-only display of the other side's staked experience.
+    TRADE_WINDOW_EXPERIENCE("trade.window.experience"),
+    TRADE_WINDOW_EXPERIENCE_AMOUNT("trade.window.experience-amount"),
+    TRADE_WINDOW_PARTNER_EXPERIENCE("trade.window.partner-experience"),
+
+    // Money prompt, the amount capture and its rejections.
     TRADE_MONEY_PROMPT("trade.money-prompt"),
     TRADE_MONEY_INVALID("trade.money-invalid"),
     TRADE_INSUFFICIENT_FUNDS("trade.insufficient-funds"),
+
+    // Experience prompt, the amount capture and its rejections.
+    TRADE_EXPERIENCE_PROMPT("trade.experience-prompt"),
+    TRADE_EXPERIENCE_INVALID("trade.experience-invalid"),
 
     // Refusals — the request or the open could not proceed.
     TRADE_ALREADY_TRADING("trade.already-trading"),

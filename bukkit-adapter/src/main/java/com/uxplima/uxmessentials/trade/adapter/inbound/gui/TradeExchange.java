@@ -45,6 +45,8 @@ final class TradeExchange {
     private @Nullable ItemStack @Nullable [] partnerOffer;
     private final Map<String, BigDecimal> initiatorMoney = new HashMap<>();
     private final Map<String, BigDecimal> partnerMoney = new HashMap<>();
+    private long initiatorExperience;
+    private long partnerExperience;
 
     TradeExchange(TradeSession session, TradeHolder initiatorHolder, TradeHolder partnerHolder) {
         this.session = Objects.requireNonNull(session, "session");
@@ -97,9 +99,31 @@ final class TradeExchange {
         restake(side);
     }
 
-    /** {@code side}'s currently-staked money per currency id — a defensive copy for rendering. */
+    /** {@code side}'s currently-staked money per currency id, a defensive copy for rendering. */
     synchronized Map<String, BigDecimal> money(TradeSide side) {
         return Map.copyOf(side == TradeSide.INITIATOR ? initiatorMoney : partnerMoney);
+    }
+
+    /**
+     * Set {@code side}'s staked experience points (a non-positive amount clears it) and re-stake the whole offer, which
+     * clears both confirmations, the same anti-scam invariant an item or money change triggers. A no-op once settled.
+     */
+    synchronized void setExperience(TradeSide side, long points) {
+        if (session.state().isTerminal()) {
+            return;
+        }
+        long clamped = Math.max(points, 0L);
+        if (side == TradeSide.INITIATOR) {
+            initiatorExperience = clamped;
+        } else {
+            partnerExperience = clamped;
+        }
+        restake(side);
+    }
+
+    /** {@code side}'s currently-staked experience points, for rendering. */
+    synchronized long experience(TradeSide side) {
+        return side == TradeSide.INITIATOR ? initiatorExperience : partnerExperience;
     }
 
     /**
@@ -117,11 +141,12 @@ final class TradeExchange {
         }
     }
 
-    /** Rebuild {@code side}'s whole offer from its latest item array plus its staked money and re-stake it. */
+    /** Rebuild {@code side}'s whole offer from its latest item array, staked money, and staked experience, re-staking. */
     private void restake(TradeSide side) {
         @Nullable ItemStack[] items = side == TradeSide.INITIATOR ? initiatorOffer : partnerOffer;
         Map<String, BigDecimal> money = side == TradeSide.INITIATOR ? initiatorMoney : partnerMoney;
-        session = session.withOffer(side, new TradeOffer(TradeItemCodec.items(items), Map.copyOf(money)));
+        long experience = side == TradeSide.INITIATOR ? initiatorExperience : partnerExperience;
+        session = session.withOffer(side, new TradeOffer(TradeItemCodec.items(items), Map.copyOf(money), experience));
     }
 
     /** Mark {@code side} confirmed; when both sides agree, win the settle race and arm the swap. */

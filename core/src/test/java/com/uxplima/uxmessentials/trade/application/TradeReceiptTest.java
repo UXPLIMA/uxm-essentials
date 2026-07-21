@@ -26,11 +26,12 @@ class TradeReceiptTest {
     private static final PlayerRef BOB = new PlayerRef(UUID.randomUUID(), "Bob");
 
     @Test
-    void summarisesItemQuantitiesMoneyAndParticipants() {
+    void summarisesItemQuantitiesMoneyExperienceAndParticipants() {
         TradeSession session = TradeSession.open(TradeId.newId(), ALICE, BOB)
                 .withOffer(
                         TradeSide.INITIATOR,
-                        new TradeOffer(List.of(new OfferedItem("diamond", 3), new OfferedItem("gold", 2)), Map.of()))
+                        new TradeOffer(
+                                List.of(new OfferedItem("diamond", 3), new OfferedItem("gold", 2)), Map.of(), 250L))
                 .withOffer(TradeSide.PARTNER, new TradeOffer(List.of(), Map.of("coins", BigDecimal.valueOf(100))));
 
         TradeReceipt receipt = TradeReceipt.of(session);
@@ -41,5 +42,7 @@ class TradeReceiptTest {
         assertThat(receipt.partnerItems()).isZero();
         assertThat(receipt.initiatorMoney()).isEmpty();
         assertThat(receipt.partnerMoney()).containsExactly(entry("coins", BigDecimal.valueOf(100)));
+        assertThat(receipt.initiatorExperience()).isEqualTo(250L);
+        assertThat(receipt.partnerExperience()).isZero();
     }
 }

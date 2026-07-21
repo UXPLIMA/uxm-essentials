@@ -12,10 +12,10 @@ import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * A settled trade's summary — who traded whom and what each side gave — built from a committed {@link TradeSession} for
- * the audit line. Item counts are the total quantity each side staked (the sum of the offered stacks' amounts), and the
- * money maps are each side's staked amount per currency id. It carries no Bukkit item, only the domain's own view, so it
- * stays in the pure application layer.
+ * A settled trade's summary, who traded whom and what each side gave, built from a committed {@link TradeSession} for
+ * the audit line. Item counts are the total quantity each side staked (the sum of the offered stacks' amounts), the
+ * money maps are each side's staked amount per currency id, and the experience figures are each side's staked
+ * experience points. It carries no Bukkit item, only the domain's own view, so it stays in the pure application layer.
  *
  * @param initiator the player who opened the trade
  * @param partner the player who accepted it
@@ -23,6 +23,8 @@ import org.jspecify.annotations.NullMarked;
  * @param partnerItems the total item quantity the partner gave
  * @param initiatorMoney the money the initiator staked, per currency id
  * @param partnerMoney the money the partner staked, per currency id
+ * @param initiatorExperience the experience points the initiator staked
+ * @param partnerExperience the experience points the partner staked
  */
 @NullMarked
 public record TradeReceipt(
@@ -31,7 +33,9 @@ public record TradeReceipt(
         int initiatorItems,
         int partnerItems,
         Map<String, BigDecimal> initiatorMoney,
-        Map<String, BigDecimal> partnerMoney) {
+        Map<String, BigDecimal> partnerMoney,
+        long initiatorExperience,
+        long partnerExperience) {
 
     public TradeReceipt {
         Objects.requireNonNull(initiator, "initiator");
@@ -42,6 +46,9 @@ public record TradeReceipt(
         partnerMoney = Map.copyOf(partnerMoney);
         if (initiatorItems < 0 || partnerItems < 0) {
             throw new IllegalArgumentException("item counts must not be negative");
+        }
+        if (initiatorExperience < 0 || partnerExperience < 0) {
+            throw new IllegalArgumentException("experience must not be negative");
         }
     }
 
@@ -56,7 +63,9 @@ public record TradeReceipt(
                 totalItems(initiatorOffer),
                 totalItems(partnerOffer),
                 initiatorOffer.money(),
-                partnerOffer.money());
+                partnerOffer.money(),
+                initiatorOffer.experience(),
+                partnerOffer.experience());
     }
 
     private static int totalItems(TradeOffer offer) {

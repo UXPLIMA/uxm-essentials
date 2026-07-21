@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 
@@ -20,10 +21,12 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.trade.adapter.inbound.command.TradeCommand;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView;
+import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeExperiencePrompt;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeMoneyPrompt;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeSessions;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView;
 import com.uxplima.uxmessentials.trade.adapter.inbound.listener.TradeReconcileListener;
+import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeExperience;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeItemDelivery;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BusTradeBus;
 import com.uxplima.uxmessentials.trade.adapter.outbound.LoggingTradeAudit;
@@ -37,6 +40,7 @@ import com.uxplima.uxmessentials.trade.application.TradeSignal;
 import com.uxplima.uxmessentials.trade.application.port.TradeAudit;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.trade.application.port.TradeEscrowStore;
+import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import com.uxplima.uxmessentials.trade.application.port.TradeItemDelivery;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -78,11 +82,22 @@ public final class TradeWiring {
         TradeConfig config = TradeConfig.from(ctx.config());
         KernelPorts kernel = ctx.kernel();
         TradeSessions sessions = new TradeSessions();
-        @Nullable TradeSettlement settlement = economy != null ? new TradeSettlement(economy) : null;
+        // Experience is a native server resource, so its seam is always wired and the settlement is always present; a
+        // trade can move experience even on an install with no economy provider. Money legs only exist when the money
+        // button is shown (economy wired), so the items-only stand-in economy is never charged when money is off.
+        TradeExperience experience = new BukkitTradeExperience(Bukkit.getServer(), kernel.scheduler(), kernel.log());
+        boolean moneyEnabled = economy != null;
+        TradeSettlement settlement = new TradeSettlement(economy != null ? economy : itemsOnlyEconomy(), experience);
         TradeMoneyPrompt moneyPrompt = (player, viewer, currencyId, onSubmit, onCancel) -> textInput.prompt(
                 player,
                 viewer,
                 InputRequest.of("trade.money", TradeMessageKey.TRADE_MONEY_PROMPT, Map.of("currency", currencyId)),
+                onSubmit,
+                onCancel);
+        TradeExperiencePrompt experiencePrompt = (player, viewer, onSubmit, onCancel) -> textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of("trade.experience", TradeMessageKey.TRADE_EXPERIENCE_PROMPT),
                 onSubmit,
                 onCancel);
         TradeAudit audit = new LoggingTradeAudit(new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL)));
@@ -93,7 +108,10 @@ public final class TradeWiring {
                 config,
                 sessions,
                 moneyPrompt,
+                experiencePrompt,
                 settlement,
+                experience,
+                moneyEnabled,
                 audit);
         // The request/accept flow: a per-request expiry book and a per-player cooldown, both driven by the same clock,
         // gate /trade and open the window through the view once the target accepts. The clock is UTC so a request's

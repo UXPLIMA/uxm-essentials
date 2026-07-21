@@ -19,7 +19,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeReceipt;
+import com.uxplima.uxmessentials.trade.application.TradeSettlement;
 import com.uxplima.uxmessentials.trade.application.port.TradeAudit;
+import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
+import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,6 +94,7 @@ class TradeAuditTest {
         RecordingAudit audit = new RecordingAudit();
         TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 12, 60, auditEnabled);
         TradeLayout layout = new TradeLayout(config.slotsPerSide(), List.of());
+        TradeExperience experience = new NoopExperience();
         TradeView view = new TradeView(
                 new KeyMessages(),
                 new NoopSink(),
@@ -98,7 +102,10 @@ class TradeAuditTest {
                 config,
                 sessions,
                 (p, v, c, s, x) -> {},
-                null,
+                (p, v, s, x) -> {},
+                new TradeSettlement(new NoopEconomy(), experience),
+                experience,
+                false,
                 audit);
         server.getPluginManager().registerEvents(view.newListener(), plugin);
         return new Fixture(sessions, layout, view, audit);
@@ -125,6 +132,43 @@ class TradeAuditTest {
         public void completed(TradeReceipt receipt) {
             receipts.add(receipt);
         }
+    }
+
+    /** No money is staked here, so the economy seam is a permissive stub. */
+    private static final class NoopEconomy implements TradeEconomy {
+        @Override
+        public boolean canAfford(PlayerRef who, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public boolean transfer(PlayerRef from, PlayerRef to, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, java.math.BigDecimal amount, String currencyId) {
+            return true;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, java.math.BigDecimal amount, String currencyId) {}
+    }
+
+    /** No experience is staked here, so the experience seam is a permissive stub. */
+    private static final class NoopExperience implements TradeExperience {
+        @Override
+        public long available(PlayerRef who) {
+            return 0L;
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, long points) {
+            return true;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, long points) {}
     }
 
     /** Resolves any key to its plain key string. */
