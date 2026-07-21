@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.outbound.AbstractProviderEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
@@ -17,31 +18,20 @@ import org.jspecify.annotations.NullMarked;
  * {@link ProviderRankEconomy}). This is the adapter that flips the trade {@code Optional<TradeEconomy>} from empty to
  * present once economy is wired.
  *
- * <p>A staked amount is a bare {@link BigDecimal} in a currency id; this adapter denominates it in the matching
- * {@link Currency} (falling back to the configured default) before charging. {@code canAfford} is a balance read for
- * the window preview; {@link #transfer} is the guarded, atomic two-sided move — it never partially applies, so two
- * concurrent settlements can never both overdraw, and a payer who cannot cover the leg is reported by a {@code false}
- * return rather than a check-then-charge race.
+ * <p>The shared {@link AbstractProviderEconomy} supplies {@code canAfford} (the balance read for the window preview)
+ * and {@code withdraw} (the guarded escrow debit). Trade adds two moves of its own on top: {@link #transfer} is the
+ * guarded, atomic two-sided move that never partially applies, so two concurrent settlements can never both overdraw,
+ * and a payer who cannot cover the leg is reported by a {@code false} return rather than a check-then-charge race;
+ * {@link #deposit} is the delivery/refund credit, logged when the provider refuses it.
  */
 @NullMarked
-public final class ProviderTradeEconomy implements TradeEconomy {
+public final class ProviderTradeEconomy extends AbstractProviderEconomy implements TradeEconomy {
 
-    private final EconomyProvider economy;
-    private final Currency defaultCurrency;
     private final Logger logger;
 
     public ProviderTradeEconomy(EconomyProvider economy, Currency defaultCurrency, Logger logger) {
-        this.economy = Objects.requireNonNull(economy, "economy");
-        this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        super(economy, defaultCurrency);
         this.logger = Objects.requireNonNull(logger, "logger");
-    }
-
-    @Override
-    public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
-        Objects.requireNonNull(who, "who");
-        Objects.requireNonNull(amount, "amount");
-        Currency target = resolve(currencyId);
-        return !economy.balance(who, target).isLessThan(Money.of(target, amount));
     }
 
     @Override
@@ -50,15 +40,7 @@ public final class ProviderTradeEconomy implements TradeEconomy {
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
-        return economy.transfer(from, to, Money.of(target, amount)).isOk();
-    }
-
-    @Override
-    public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
-        Objects.requireNonNull(who, "who");
-        Objects.requireNonNull(amount, "amount");
-        Currency target = resolve(currencyId);
-        return economy.debit(who, Money.of(target, amount)).isOk();
+        return economy().transfer(from, to, Money.of(target, amount)).isOk();
     }
 
     @Override
@@ -66,23 +48,12 @@ public final class ProviderTradeEconomy implements TradeEconomy {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
-        if (economy.credit(who, Money.of(target, amount)).isErr()) {
+        if (economy().credit(who, Money.of(target, amount)).isErr()) {
             logger.warn(
                     "cross-server trade deposit of {} {} to {} was refused by the economy provider",
                     amount,
                     target.id().value(),
                     who.name());
         }
-    }
-
-    private Currency resolve(String currencyId) {
-        Objects.requireNonNull(currencyId, "currencyId");
-        if (currencyId.equalsIgnoreCase("default")) {
-            return defaultCurrency;
-        }
-        return economy.currencies().stream()
-                .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
-                .findFirst()
-                .orElse(defaultCurrency);
     }
 }

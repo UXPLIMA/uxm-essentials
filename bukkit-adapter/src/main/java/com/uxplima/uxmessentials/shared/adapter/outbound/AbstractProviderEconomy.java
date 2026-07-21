@@ -20,6 +20,10 @@ import org.jspecify.annotations.NullMarked;
  * resolved currency before charging. {@link #canAfford} is a balance read and {@link #withdraw} is a guarded
  * single-sided debit at the database whose {@code isOk()} reports whether the funds sufficed, so a concurrent
  * spend can never double-charge.
+ *
+ * <p>A subclass whose seam adds a credit or a two-sided move (a deposit, a transfer) composes the protected
+ * {@link #economy()} provider with the shared {@link #resolve(String)} currency resolution, so the constructor and
+ * the resolve/charge logic still live here once.
  */
 @NullMarked
 public abstract class AbstractProviderEconomy {
@@ -48,7 +52,16 @@ public abstract class AbstractProviderEconomy {
         return economy.debit(who, Money.of(target, amount)).isOk();
     }
 
-    private Currency resolve(String currencyId) {
+    /** The resolved provider, for a subclass seam that credits or transfers on top of the shared charge logic. */
+    protected EconomyProvider economy() {
+        return economy;
+    }
+
+    /**
+     * Resolves {@code currencyId} to a {@link Currency}: the configured default for {@code "default"}, an
+     * id-matched currency from the provider's set otherwise, falling back to the default when the id names none.
+     */
+    protected Currency resolve(String currencyId) {
         Objects.requireNonNull(currencyId, "currencyId");
         if (currencyId.equalsIgnoreCase("default")) {
             return currency;
