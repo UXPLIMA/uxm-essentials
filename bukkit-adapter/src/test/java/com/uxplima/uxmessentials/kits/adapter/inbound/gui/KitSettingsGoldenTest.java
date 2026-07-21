@@ -261,7 +261,7 @@ class KitSettingsGoldenTest {
         settings.applyDisplayName(player, viewer, PVP, "<gold>Arena</gold>");
 
         assertThat(repository.lastSaved())
-                .hasValueSatisfying(saved -> assertThat(saved.displayName()).contains("<gold>Arena</gold>"));
+                .hasValueSatisfying(saved -> assertThat(saved.display().name()).contains("<gold>Arena</gold>"));
     }
 
     @Test
@@ -271,7 +271,7 @@ class KitSettingsGoldenTest {
         settings.applyDisplayName(player, viewer, PVP, "none");
 
         assertThat(repository.lastSaved())
-                .hasValueSatisfying(saved -> assertThat(saved.displayName()).isEmpty());
+                .hasValueSatisfying(saved -> assertThat(saved.display().name()).isEmpty());
     }
 
     @Test
@@ -281,7 +281,7 @@ class KitSettingsGoldenTest {
         settings.applyDisplayLore(player, viewer, PVP, "a|b|c");
 
         assertThat(repository.lastSaved())
-                .hasValueSatisfying(saved -> assertThat(saved.displayLore()).containsExactly("a", "b", "c"));
+                .hasValueSatisfying(saved -> assertThat(saved.display().lore()).containsExactly("a", "b", "c"));
     }
 
     @Test
@@ -303,7 +303,8 @@ class KitSettingsGoldenTest {
         fireClick(DISPLAY_MATERIAL_SLOT);
 
         assertThat(repository.lastSaved())
-                .hasValueSatisfying(saved -> assertThat(saved.displayMaterial()).contains("NETHERITE_SWORD"));
+                .hasValueSatisfying(
+                        saved -> assertThat(saved.display().material()).contains("NETHERITE_SWORD"));
     }
 
     @Test

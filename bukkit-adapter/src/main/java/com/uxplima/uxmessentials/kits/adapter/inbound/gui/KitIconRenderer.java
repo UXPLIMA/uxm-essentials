@@ -226,12 +226,12 @@ final class KitIconRenderer {
         DisplayState state = stateOf(viewer, kit);
         Optional<String> nameOpt =
                 switch (state) {
-                    case NO_PERMISSION -> kit.noPermissionName();
-                    case CLAIMED -> kit.claimedName();
-                    case ON_COOLDOWN -> kit.cooldownName();
-                    case REQUIREMENTS -> kit.requirementsName();
-                    case UNAFFORDABLE -> kit.unaffordableName();
-                    case NORMAL -> kit.displayName();
+                    case NO_PERMISSION -> kit.noPermission().name();
+                    case CLAIMED -> kit.claimed().name();
+                    case ON_COOLDOWN -> kit.cooldownDisplay().name();
+                    case REQUIREMENTS -> kit.requirementsDisplay().name();
+                    case UNAFFORDABLE -> kit.unaffordable().name();
+                    case NORMAL -> kit.display().name();
                     // The two locked states force their own name so the icon always reads as closed/sold out.
                     case UNAVAILABLE, OUT_OF_STOCK -> Optional.empty();
                 };
@@ -263,12 +263,12 @@ final class KitIconRenderer {
         }
         Optional<String> matOpt =
                 switch (state) {
-                    case NO_PERMISSION -> kit.noPermissionMaterial();
-                    case CLAIMED -> kit.claimedMaterial();
-                    case ON_COOLDOWN -> kit.cooldownMaterial();
-                    case REQUIREMENTS -> kit.requirementsMaterial();
-                    case UNAFFORDABLE -> kit.unaffordableMaterial();
-                    case NORMAL -> kit.displayMaterial();
+                    case NO_PERMISSION -> kit.noPermission().material();
+                    case CLAIMED -> kit.claimed().material();
+                    case ON_COOLDOWN -> kit.cooldownDisplay().material();
+                    case REQUIREMENTS -> kit.requirementsDisplay().material();
+                    case UNAFFORDABLE -> kit.unaffordable().material();
+                    case NORMAL -> kit.display().material();
                     case UNAVAILABLE, OUT_OF_STOCK -> Optional.empty(); // handled above
                 };
 
@@ -313,16 +313,16 @@ final class KitIconRenderer {
         }
         List<String> stateLore =
                 switch (state) {
-                    case NO_PERMISSION -> kit.noPermissionLore();
-                    case CLAIMED -> kit.claimedLore();
-                    case ON_COOLDOWN -> kit.cooldownLore();
-                    case REQUIREMENTS -> kit.requirementsLore();
-                    case UNAFFORDABLE -> kit.unaffordableLore();
+                    case NO_PERMISSION -> kit.noPermission().lore();
+                    case CLAIMED -> kit.claimed().lore();
+                    case ON_COOLDOWN -> kit.cooldownDisplay().lore();
+                    case REQUIREMENTS -> kit.requirementsDisplay().lore();
+                    case UNAFFORDABLE -> kit.unaffordable().lore();
                     case NORMAL -> List.of();
                     case UNAVAILABLE, OUT_OF_STOCK -> List.of(); // handled above
                 };
         boolean hasOverride = !stateLore.isEmpty();
-        List<String> rawLore = hasOverride ? stateLore : kit.displayLore();
+        List<String> rawLore = hasOverride ? stateLore : kit.display().lore();
 
         List<String> lines = new ArrayList<>();
         for (String line : rawLore) {
@@ -366,7 +366,7 @@ final class KitIconRenderer {
      */
     private List<String> lockedLoreSource(PlayerRef viewer, KitDefinition kit, DisplayState state) {
         List<String> lines = new ArrayList<>();
-        for (String line : kit.displayLore()) {
+        for (String line : kit.display().lore()) {
             lines.add(processPlaceholders(viewer, kit, line));
         }
         KitsMessageKey reason = state == DisplayState.UNAVAILABLE

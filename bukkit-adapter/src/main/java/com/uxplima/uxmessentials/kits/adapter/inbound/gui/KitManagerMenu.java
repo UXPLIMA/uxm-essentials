@@ -146,8 +146,8 @@ public final class KitManagerMenu {
      * styled MiniMessage parser the old view used, so the rendered label matches.
      */
     private String name(PlayerRef viewer, KitDefinition kit) {
-        if (kit.displayName().isPresent()) {
-            return kit.displayName().get();
+        if (kit.display().name().isPresent()) {
+            return kit.display().name().get();
         }
         return messages.resolve(
                 viewer,
@@ -157,9 +157,9 @@ public final class KitManagerMenu {
 
     /** The kit icon material, reproducing the old view: a valid per-kit override, else the first item's type, else CHEST. */
     private Material material(KitDefinition kit) {
-        if (kit.displayMaterial().isPresent()) {
+        if (kit.display().material().isPresent()) {
             Material override =
-                    Material.matchMaterial(kit.displayMaterial().get().toUpperCase(java.util.Locale.ROOT));
+                    Material.matchMaterial(kit.display().material().get().toUpperCase(java.util.Locale.ROOT));
             if (override != null && !override.isAir()) {
                 return override;
             }

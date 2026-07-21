@@ -33,9 +33,7 @@ import java.util.Optional;
  * @param oneTime whether the kit may be claimed only once per player (a persisted one-time stamp)
  * @param permission whether the kit additionally requires the per-kit permission node
  * @param cost the price to claim the kit; {@link KitCost#free()} when there is no charge
- * @param displayName custom MiniMessage-formatted name for displaying in menus
- * @param displayMaterial custom item type (material name) for displaying in menus
- * @param displayLore custom lore lines for displaying in menus
+ * @param display the normal browse-menu icon override (material, MiniMessage name, lore); empty for the catalog default
  * @param commands commands to execute on successful claim
  * @param sound sound to play on successful claim
  * @param particles particles to spawn on successful claim
@@ -44,9 +42,7 @@ import java.util.Optional;
  * @param preview whether the browse menu may open a read-only preview of this kit (default on)
  * @param closeOnClaim whether a successful browse-menu claim closes the menu instead of refreshing it
  * @param requirements opaque claim conditions (placeholder comparisons) evaluated before the cost; empty for none
- * @param requirementsMaterial display material shown in the browse menu when the viewer fails requirements
- * @param requirementsName display name shown in the browse menu when the viewer fails requirements
- * @param requirementsLore display lore shown in the browse menu when the viewer fails requirements
+ * @param requirementsDisplay the browse-menu icon override shown when the viewer fails the requirements; empty for the default
  * @param claimActions ordered typed actions run on a successful claim (before/after the item grant); empty for none
  * @param denyActions ordered typed actions run when a claim is refused by any gate; empty for none
  * @param schedule the optional availability window gating when the kit may be claimed; {@link KitSchedule#always()} for none
@@ -63,9 +59,7 @@ public record KitDefinition(
         boolean oneTime,
         boolean permission,
         KitCost cost,
-        Optional<String> displayName,
-        Optional<String> displayMaterial,
-        List<String> displayLore,
+        ItemDisplay display,
         List<String> commands,
         Optional<String> sound,
         Optional<String> particles,
@@ -76,26 +70,16 @@ public record KitDefinition(
         String claimMoneyCurrency,
         java.util.Map<String, Duration> permissionCooldowns,
         int priority,
-        Optional<String> noPermissionMaterial,
-        Optional<String> noPermissionName,
-        List<String> noPermissionLore,
-        Optional<String> cooldownMaterial,
-        Optional<String> cooldownName,
-        List<String> cooldownLore,
-        Optional<String> claimedMaterial,
-        Optional<String> claimedName,
-        List<String> claimedLore,
-        Optional<String> unaffordableMaterial,
-        Optional<String> unaffordableName,
-        List<String> unaffordableLore,
+        ItemDisplay noPermission,
+        ItemDisplay cooldownDisplay,
+        ItemDisplay claimed,
+        ItemDisplay unaffordable,
         Optional<String> customPermission,
         List<KitVariant> variants,
         boolean preview,
         boolean closeOnClaim,
         List<KitRequirement> requirements,
-        Optional<String> requirementsMaterial,
-        Optional<String> requirementsName,
-        List<String> requirementsLore,
+        ItemDisplay requirementsDisplay,
         List<KitAction> claimActions,
         List<KitAction> denyActions,
         KitSchedule schedule,
@@ -109,9 +93,7 @@ public record KitDefinition(
         Objects.requireNonNull(items, "items");
         Objects.requireNonNull(cooldown, "cooldown");
         Objects.requireNonNull(cost, "cost");
-        Objects.requireNonNull(displayName, "displayName");
-        Objects.requireNonNull(displayMaterial, "displayMaterial");
-        Objects.requireNonNull(displayLore, "displayLore");
+        Objects.requireNonNull(display, "display");
         Objects.requireNonNull(commands, "commands");
         Objects.requireNonNull(sound, "sound");
         Objects.requireNonNull(particles, "particles");
@@ -119,24 +101,14 @@ public record KitDefinition(
         Objects.requireNonNull(claimMoney, "claimMoney");
         Objects.requireNonNull(claimMoneyCurrency, "claimMoneyCurrency");
         Objects.requireNonNull(permissionCooldowns, "permissionCooldowns");
-        Objects.requireNonNull(noPermissionMaterial, "noPermissionMaterial");
-        Objects.requireNonNull(noPermissionName, "noPermissionName");
-        Objects.requireNonNull(noPermissionLore, "noPermissionLore");
-        Objects.requireNonNull(cooldownMaterial, "cooldownMaterial");
-        Objects.requireNonNull(cooldownName, "cooldownName");
-        Objects.requireNonNull(cooldownLore, "cooldownLore");
-        Objects.requireNonNull(claimedMaterial, "claimedMaterial");
-        Objects.requireNonNull(claimedName, "claimedName");
-        Objects.requireNonNull(claimedLore, "claimedLore");
-        Objects.requireNonNull(unaffordableMaterial, "unaffordableMaterial");
-        Objects.requireNonNull(unaffordableName, "unaffordableName");
-        Objects.requireNonNull(unaffordableLore, "unaffordableLore");
+        Objects.requireNonNull(noPermission, "noPermission");
+        Objects.requireNonNull(cooldownDisplay, "cooldownDisplay");
+        Objects.requireNonNull(claimed, "claimed");
+        Objects.requireNonNull(unaffordable, "unaffordable");
         Objects.requireNonNull(customPermission, "customPermission");
         Objects.requireNonNull(variants, "variants");
         Objects.requireNonNull(requirements, "requirements");
-        Objects.requireNonNull(requirementsMaterial, "requirementsMaterial");
-        Objects.requireNonNull(requirementsName, "requirementsName");
-        Objects.requireNonNull(requirementsLore, "requirementsLore");
+        Objects.requireNonNull(requirementsDisplay, "requirementsDisplay");
         Objects.requireNonNull(claimActions, "claimActions");
         Objects.requireNonNull(denyActions, "denyActions");
         Objects.requireNonNull(schedule, "schedule");
@@ -146,16 +118,10 @@ public record KitDefinition(
         }
         stockLimit = Math.max(0, stockLimit);
         items = List.copyOf(items);
-        displayLore = List.copyOf(displayLore);
         commands = List.copyOf(commands);
         permissionCooldowns = java.util.Map.copyOf(permissionCooldowns);
-        noPermissionLore = List.copyOf(noPermissionLore);
-        cooldownLore = List.copyOf(cooldownLore);
-        claimedLore = List.copyOf(claimedLore);
-        unaffordableLore = List.copyOf(unaffordableLore);
         variants = List.copyOf(variants);
         requirements = List.copyOf(requirements);
-        requirementsLore = List.copyOf(requirementsLore);
         claimActions = List.copyOf(claimActions);
         denyActions = List.copyOf(denyActions);
     }
@@ -199,9 +165,7 @@ public record KitDefinition(
                 oneTime,
                 permission,
                 cost,
-                displayName,
-                displayMaterial,
-                displayLore,
+                new ItemDisplay(displayMaterial, displayName, displayLore),
                 commands,
                 sound,
                 particles,
@@ -212,26 +176,16 @@ public record KitDefinition(
                 claimMoneyCurrency,
                 permissionCooldowns,
                 priority,
-                noPermissionMaterial,
-                noPermissionName,
-                noPermissionLore,
-                cooldownMaterial,
-                cooldownName,
-                cooldownLore,
-                claimedMaterial,
-                claimedName,
-                claimedLore,
-                unaffordableMaterial,
-                unaffordableName,
-                unaffordableLore,
+                new ItemDisplay(noPermissionMaterial, noPermissionName, noPermissionLore),
+                new ItemDisplay(cooldownMaterial, cooldownName, cooldownLore),
+                new ItemDisplay(claimedMaterial, claimedName, claimedLore),
+                new ItemDisplay(unaffordableMaterial, unaffordableName, unaffordableLore),
                 Optional.empty(),
                 List.of(),
                 true,
                 false,
                 List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
+                ItemDisplay.empty(),
                 List.of(),
                 List.of(),
                 KitSchedule.always(),
@@ -464,19 +418,19 @@ public record KitDefinition(
     /** A copy of this kit with its display name set to {@code value}, every other setting preserved. */
     public KitDefinition withDisplayName(Optional<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.displayName = value);
+        return copy(b -> b.display = new ItemDisplay(b.display.material(), value, b.display.lore()));
     }
 
     /** A copy of this kit with its display material set to {@code value}, every other setting preserved. */
     public KitDefinition withDisplayMaterial(Optional<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.displayMaterial = value);
+        return copy(b -> b.display = new ItemDisplay(value, b.display.name(), b.display.lore()));
     }
 
     /** A copy of this kit with its display lore set to {@code value}, every other setting preserved. */
     public KitDefinition withDisplayLore(List<String> value) {
         Objects.requireNonNull(value, "value");
-        return copy(b -> b.displayLore = value);
+        return copy(b -> b.display = new ItemDisplay(b.display.material(), b.display.name(), value));
     }
 
     /** A copy of this kit with its claim commands set to {@code value}, every other setting preserved. */

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.kits.domain.ItemDisplay;
 import com.uxplima.uxmessentials.kits.domain.KitAction;
 import com.uxplima.uxmessentials.kits.domain.KitActionType;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
@@ -174,9 +175,7 @@ final class KitCodec {
                     oneTime,
                     permission,
                     cost,
-                    displayName,
-                    displayMaterial,
-                    displayLore,
+                    new ItemDisplay(displayMaterial, displayName, displayLore),
                     commands,
                     sound,
                     particles,
@@ -187,26 +186,16 @@ final class KitCodec {
                     claimMoneyCurrency,
                     permissionCooldowns,
                     priority,
-                    noPermissionMaterial,
-                    noPermissionName,
-                    noPermissionLore,
-                    cooldownMaterial,
-                    cooldownName,
-                    cooldownLore,
-                    claimedMaterial,
-                    claimedName,
-                    claimedLore,
-                    unaffordableMaterial,
-                    unaffordableName,
-                    unaffordableLore,
+                    new ItemDisplay(noPermissionMaterial, noPermissionName, noPermissionLore),
+                    new ItemDisplay(cooldownMaterial, cooldownName, cooldownLore),
+                    new ItemDisplay(claimedMaterial, claimedName, claimedLore),
+                    new ItemDisplay(unaffordableMaterial, unaffordableName, unaffordableLore),
                     customPermission,
                     variants,
                     preview,
                     closeOnClaim,
                     requirements,
-                    requirementsMaterial,
-                    requirementsName,
-                    requirementsLore,
+                    new ItemDisplay(requirementsMaterial, requirementsName, requirementsLore),
                     claimActions,
                     denyActions,
                     schedule,
@@ -244,29 +233,50 @@ final class KitCodec {
         writeVariants(node.node("variants"), definition.variants());
 
         node.node("no-permission-material")
-                .set(definition.noPermissionMaterial().orElse(null));
-        node.node("no-permission-name").set(definition.noPermissionName().orElse(null));
+                .set(definition.noPermission().material().orElse(null));
+        node.node("no-permission-name").set(definition.noPermission().name().orElse(null));
         node.node("no-permission-lore")
-                .set(definition.noPermissionLore().isEmpty() ? null : definition.noPermissionLore());
+                .set(
+                        definition.noPermission().lore().isEmpty()
+                                ? null
+                                : definition.noPermission().lore());
 
-        node.node("cooldown-material").set(definition.cooldownMaterial().orElse(null));
-        node.node("cooldown-name").set(definition.cooldownName().orElse(null));
-        node.node("cooldown-lore").set(definition.cooldownLore().isEmpty() ? null : definition.cooldownLore());
+        node.node("cooldown-material")
+                .set(definition.cooldownDisplay().material().orElse(null));
+        node.node("cooldown-name").set(definition.cooldownDisplay().name().orElse(null));
+        node.node("cooldown-lore")
+                .set(
+                        definition.cooldownDisplay().lore().isEmpty()
+                                ? null
+                                : definition.cooldownDisplay().lore());
 
-        node.node("claimed-material").set(definition.claimedMaterial().orElse(null));
-        node.node("claimed-name").set(definition.claimedName().orElse(null));
-        node.node("claimed-lore").set(definition.claimedLore().isEmpty() ? null : definition.claimedLore());
+        node.node("claimed-material").set(definition.claimed().material().orElse(null));
+        node.node("claimed-name").set(definition.claimed().name().orElse(null));
+        node.node("claimed-lore")
+                .set(
+                        definition.claimed().lore().isEmpty()
+                                ? null
+                                : definition.claimed().lore());
 
-        node.node("unaffordable-material").set(definition.unaffordableMaterial().orElse(null));
-        node.node("unaffordable-name").set(definition.unaffordableName().orElse(null));
+        node.node("unaffordable-material")
+                .set(definition.unaffordable().material().orElse(null));
+        node.node("unaffordable-name").set(definition.unaffordable().name().orElse(null));
         node.node("unaffordable-lore")
-                .set(definition.unaffordableLore().isEmpty() ? null : definition.unaffordableLore());
+                .set(
+                        definition.unaffordable().lore().isEmpty()
+                                ? null
+                                : definition.unaffordable().lore());
 
         writeRequirements(node.node("requirements"), definition.requirements());
-        node.node("requirements-material").set(definition.requirementsMaterial().orElse(null));
-        node.node("requirements-name").set(definition.requirementsName().orElse(null));
+        node.node("requirements-material")
+                .set(definition.requirementsDisplay().material().orElse(null));
+        node.node("requirements-name")
+                .set(definition.requirementsDisplay().name().orElse(null));
         node.node("requirements-lore")
-                .set(definition.requirementsLore().isEmpty() ? null : definition.requirementsLore());
+                .set(
+                        definition.requirementsDisplay().lore().isEmpty()
+                                ? null
+                                : definition.requirementsDisplay().lore());
 
         writeSchedule(node.node("schedule"), definition.schedule());
         node.node("stock").set(definition.stockLimit() > 0 ? definition.stockLimit() : null);
@@ -287,18 +297,18 @@ final class KitCodec {
             }
         }
 
-        if (definition.displayName().isPresent()) {
-            node.node("display-name").set(definition.displayName().get());
+        if (definition.display().name().isPresent()) {
+            node.node("display-name").set(definition.display().name().get());
         } else {
             node.node("display-name").set(null);
         }
-        if (definition.displayMaterial().isPresent()) {
-            node.node("display-material").set(definition.displayMaterial().get());
+        if (definition.display().material().isPresent()) {
+            node.node("display-material").set(definition.display().material().get());
         } else {
             node.node("display-material").set(null);
         }
-        if (!definition.displayLore().isEmpty()) {
-            node.node("display-lore").set(definition.displayLore());
+        if (!definition.display().lore().isEmpty()) {
+            node.node("display-lore").set(definition.display().lore());
         } else {
             node.node("display-lore").set(null);
         }

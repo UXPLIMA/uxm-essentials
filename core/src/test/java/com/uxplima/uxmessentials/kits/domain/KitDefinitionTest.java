@@ -121,9 +121,9 @@ class KitDefinitionTest {
         assertThat(edited.oneTime()).isEqualTo(original.oneTime());
         assertThat(edited.permission()).isEqualTo(original.permission());
         assertThat(edited.cost()).isEqualTo(original.cost());
-        assertThat(edited.displayName()).isEqualTo(original.displayName());
-        assertThat(edited.displayMaterial()).isEqualTo(original.displayMaterial());
-        assertThat(edited.displayLore()).isEqualTo(original.displayLore());
+        assertThat(edited.display().name()).isEqualTo(original.display().name());
+        assertThat(edited.display().material()).isEqualTo(original.display().material());
+        assertThat(edited.display().lore()).isEqualTo(original.display().lore());
         assertThat(edited.commands()).isEqualTo(original.commands());
         assertThat(edited.sound()).isEqualTo(original.sound());
         assertThat(edited.particles()).isEqualTo(original.particles());
@@ -134,18 +134,27 @@ class KitDefinitionTest {
         assertThat(edited.claimMoneyCurrency()).isEqualTo(original.claimMoneyCurrency());
         assertThat(edited.permissionCooldowns()).isEqualTo(original.permissionCooldowns());
         assertThat(edited.priority()).isEqualTo(original.priority());
-        assertThat(edited.noPermissionMaterial()).isEqualTo(original.noPermissionMaterial());
-        assertThat(edited.noPermissionName()).isEqualTo(original.noPermissionName());
-        assertThat(edited.noPermissionLore()).isEqualTo(original.noPermissionLore());
-        assertThat(edited.cooldownMaterial()).isEqualTo(original.cooldownMaterial());
-        assertThat(edited.cooldownName()).isEqualTo(original.cooldownName());
-        assertThat(edited.cooldownLore()).isEqualTo(original.cooldownLore());
-        assertThat(edited.claimedMaterial()).isEqualTo(original.claimedMaterial());
-        assertThat(edited.claimedName()).isEqualTo(original.claimedName());
-        assertThat(edited.claimedLore()).isEqualTo(original.claimedLore());
-        assertThat(edited.unaffordableMaterial()).isEqualTo(original.unaffordableMaterial());
-        assertThat(edited.unaffordableName()).isEqualTo(original.unaffordableName());
-        assertThat(edited.unaffordableLore()).isEqualTo(original.unaffordableLore());
+        assertThat(edited.noPermission().material())
+                .isEqualTo(original.noPermission().material());
+        assertThat(edited.noPermission().name())
+                .isEqualTo(original.noPermission().name());
+        assertThat(edited.noPermission().lore())
+                .isEqualTo(original.noPermission().lore());
+        assertThat(edited.cooldownDisplay().material())
+                .isEqualTo(original.cooldownDisplay().material());
+        assertThat(edited.cooldownDisplay().name())
+                .isEqualTo(original.cooldownDisplay().name());
+        assertThat(edited.cooldownDisplay().lore())
+                .isEqualTo(original.cooldownDisplay().lore());
+        assertThat(edited.claimed().material()).isEqualTo(original.claimed().material());
+        assertThat(edited.claimed().name()).isEqualTo(original.claimed().name());
+        assertThat(edited.claimed().lore()).isEqualTo(original.claimed().lore());
+        assertThat(edited.unaffordable().material())
+                .isEqualTo(original.unaffordable().material());
+        assertThat(edited.unaffordable().name())
+                .isEqualTo(original.unaffordable().name());
+        assertThat(edited.unaffordable().lore())
+                .isEqualTo(original.unaffordable().lore());
     }
 
     @Test

@@ -256,9 +256,9 @@ class ConfigurateKitRepositoryTest {
         assertThat(ranked.requirements().get(0).operator())
                 .isEqualTo(com.uxplima.uxmessentials.kits.domain.RequirementOperator.GTE);
         assertThat(ranked.requirements().get(0).right()).isEqualTo("10");
-        assertThat(ranked.requirementsMaterial()).contains("BARRIER");
-        assertThat(ranked.requirementsName()).contains("<red>Locked");
-        assertThat(ranked.requirementsLore()).containsExactly("Level up to unlock");
+        assertThat(ranked.requirementsDisplay().material()).contains("BARRIER");
+        assertThat(ranked.requirementsDisplay().name()).contains("<red>Locked");
+        assertThat(ranked.requirementsDisplay().lore()).containsExactly("Level up to unlock");
     }
 
     @Test
@@ -549,20 +549,20 @@ class ConfigurateKitRepositoryTest {
         KitRepository reloaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
         KitDefinition loaded = reloaded.find(KitId.of("custom")).orElseThrow();
 
-        assertThat(loaded.noPermissionMaterial()).contains("BARRIER");
-        assertThat(loaded.noPermissionName()).contains("<red>No Perm");
-        assertThat(loaded.noPermissionLore()).containsExactly("Lore line 1");
+        assertThat(loaded.noPermission().material()).contains("BARRIER");
+        assertThat(loaded.noPermission().name()).contains("<red>No Perm");
+        assertThat(loaded.noPermission().lore()).containsExactly("Lore line 1");
 
-        assertThat(loaded.cooldownMaterial()).contains("CLOCK");
-        assertThat(loaded.cooldownName()).contains("<yellow>Cooldown");
-        assertThat(loaded.cooldownLore()).containsExactly("Cooldown lore");
+        assertThat(loaded.cooldownDisplay().material()).contains("CLOCK");
+        assertThat(loaded.cooldownDisplay().name()).contains("<yellow>Cooldown");
+        assertThat(loaded.cooldownDisplay().lore()).containsExactly("Cooldown lore");
 
-        assertThat(loaded.claimedMaterial()).contains("MINECART");
-        assertThat(loaded.claimedName()).contains("<red>Claimed");
-        assertThat(loaded.claimedLore()).containsExactly("Claimed lore");
+        assertThat(loaded.claimed().material()).contains("MINECART");
+        assertThat(loaded.claimed().name()).contains("<red>Claimed");
+        assertThat(loaded.claimed().lore()).containsExactly("Claimed lore");
 
-        assertThat(loaded.unaffordableMaterial()).contains("GOLD_NUGGET");
-        assertThat(loaded.unaffordableName()).contains("<red>Cannot Afford");
-        assertThat(loaded.unaffordableLore()).containsExactly("Price is %cost%");
+        assertThat(loaded.unaffordable().material()).contains("GOLD_NUGGET");
+        assertThat(loaded.unaffordable().name()).contains("<red>Cannot Afford");
+        assertThat(loaded.unaffordable().lore()).containsExactly("Price is %cost%");
     }
 }

@@ -126,7 +126,7 @@ public final class KitSettingsView {
                 ctx -> displayMaterial(subject(ctx)).name());
         bindings.placeholder(
                 "kit_set_display_lore_count",
-                ctx -> Integer.toString(subject(ctx).displayLore().size()));
+                ctx -> Integer.toString(subject(ctx).display().lore().size()));
         bindings.placeholder(
                 "kit_set_commands_count",
                 ctx -> Integer.toString(subject(ctx).commands().size()));
@@ -350,7 +350,8 @@ public final class KitSettingsView {
     /** The display name, or the catalog "none" string when the kit sets none. */
     private String displayName(MenuContext ctx) {
         return subject(ctx)
-                .displayName()
+                .display()
+                .name()
                 .orElseGet(() -> messages.resolve(ctx.viewer(), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
     }
 
@@ -367,8 +368,9 @@ public final class KitSettingsView {
      * this so the editor always reflects the live icon rather than a fixed placeholder. Mirrors the old view exactly.
      */
     private Material displayMaterial(KitDefinition kit) {
-        if (kit.displayMaterial().isPresent()) {
-            Material parsed = Material.matchMaterial(kit.displayMaterial().get().toUpperCase(Locale.ROOT));
+        if (kit.display().material().isPresent()) {
+            Material parsed =
+                    Material.matchMaterial(kit.display().material().get().toUpperCase(Locale.ROOT));
             if (parsed != null && !parsed.isAir()) {
                 return parsed;
             }
