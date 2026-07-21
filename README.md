@@ -4,13 +4,13 @@
 [![Java 25](https://img.shields.io/badge/Java-25-orange.svg)](https://adoptium.net/)
 [![Paper 26.1.2](https://img.shields.io/badge/Paper-26.1.2-brightgreen.svg)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-ready-success.svg)](https://docs.papermc.io/folia)
-[![Modules](https://img.shields.io/badge/modules-23-blueviolet.svg)](#modules)
-[![Version](https://img.shields.io/badge/version-0.4.0-informational.svg)](#)
+[![Modules](https://img.shields.io/badge/modules-34-blueviolet.svg)](#modules)
+[![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)](#)
 
 The all-in-one essentials suite for **Paper 26.1.2** servers, on **Java 25**. Homes, warps, teleports, a
-real economy, kits, vaults, moderation, a staff mode, holograms, NPCs, scoreboards, a vote engine, multi-world
-management — the entire day-to-day toolkit a survival or network server needs — built as **23 independent
-feature modules** behind one clean, fully configurable plugin.
+real economy, kits, vaults, ranks, cross-server trade, moderation, a staff mode, vanish, holograms, NPCs,
+scoreboards, a vote engine, multi-world management — the entire day-to-day toolkit a survival or network server
+needs — built as **34 independent feature modules** behind one clean, fully configurable plugin.
 
 Every module is its own bounded context: turn one off and it wires *nothing* — no commands, no listeners, no
 database tables, no runtime cost. Everything a player ever sees resolves through a per-locale message catalog,
@@ -56,7 +56,7 @@ extensive MockBukkit/JUnit test suite.
 
 - **One platform, done well.** Paper 26.1.2 and Java 25 only — no legacy cross-version reflection to drag
   around, just the current server API used natively.
-- **Genuinely modular.** Twenty-three feature modules, each toggled on its own. A disabled module instantiates
+- **Genuinely modular.** Thirty-four feature modules, each toggled on its own. A disabled module instantiates
   zero adapters, registers zero commands and listeners, runs zero migrations, and holds zero state.
 - **Configure in-game.** Every module has a management GUI reachable from `/uxmess gui` — edit a hologram, an
   NPC, a warp, a vault, or a punishment by clicking. Every screen in the plugin renders through one data-driven
@@ -80,7 +80,7 @@ extensive MockBukkit/JUnit test suite.
 | --- | --- |
 | Server | Paper **26.1.2** (build 71), or a Paper fork (Folia / Purpur / Pufferfish) |
 | Java | **25** |
-| Optional | PlaceholderAPI · Vault / VaultUnlocked / Treasury · a Votifier-compatible vote listener · LuckPerms |
+| Optional | PlaceholderAPI · Vault / VaultUnlocked / Treasury · a Votifier-compatible vote listener · LuckPerms · WorldGuard |
 | Clients | any version a server-side ViaVersion supports can connect — the **server** must be 26.1.2 |
 
 > Spigot and CraftBukkit are **not** supported — uxmEssentials uses `paper-plugin.yml`, Brigadier, and
@@ -88,7 +88,7 @@ extensive MockBukkit/JUnit test suite.
 
 ## Installation
 
-1. Download `uxmEssentials-0.4.0.jar` and drop it in your server's `plugins/` folder.
+1. Download `uxmEssentials-0.5.0.jar` and drop it in your server's `plugins/` folder.
 2. Start the server once. uxmEssentials creates `plugins/uxmEssentials/` with a shared `config.conf`, a
    `commands.conf`, a `config.conf` per module under `modules/`, the message catalogs, and the GUI layouts.
 3. Edit what you want, then `/uxmess reload <module>` (or restart). That's it.
@@ -98,10 +98,10 @@ Three optional companion jars extend the suite onto other platforms — see
 
 | Jar | Where it goes | What it adds |
 | --- | --- | --- |
-| `uxmEssentials-0.4.0.jar` | Paper `plugins/` | The plugin itself (required). |
-| `uxmEssentials-velocity-0.4.0.jar` | Velocity `plugins/` | Proxy-side bus broker — relays every synced context (homes, warps, economy, vaults, moderation, votes, and more) across the network. |
-| `uxmEssentials-redis-0.4.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus — the same sync over Redis pub/sub, with no proxy required. |
-| `uxmEssentials-discord-0.4.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
+| `uxmEssentials-0.5.0.jar` | Paper `plugins/` | The plugin itself (required). |
+| `uxmEssentials-velocity-0.5.0.jar` | Velocity `plugins/` | Proxy-side bus broker — relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
+| `uxmEssentials-redis-0.5.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus — the same sync over Redis pub/sub, with no proxy required. |
+| `uxmEssentials-discord-0.5.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
 
 ## Modules
 
@@ -118,10 +118,19 @@ database-backed so they survive rollbacks.
 | **economy** | Multi-currency, **database-backed** balances with `/pay` · `/balance` · `/baltop`, shared banks, loans, a currency exchange, physical banknotes, a Vault / Treasury provider, and per-rank limits via numbered permission nodes. |
 | **kits** | An in-game kit editor with categories, cooldowns, one-time and first-join grants, costs, permission gating, and auto-equip — `/kit` opens a claim menu, operators edit it in place. |
 | **vaults** | **Database-backed** player item storage (survives rollbacks) with per-player vault counts and per-vault sizes via quota nodes, an item blacklist, per-vault name & icon, overflow rescue, and inactive-vault purge. |
-| **moderation** | Bans / mutes / kicks / warns / jails with silent sanctions, duration tiers, warn escalation, IP history and address-strictness, a unified `/history` · `/staffhistory` · `/checkban` · `/checkmute`, a management GUI, and a LiteBans importer. |
-| **staff** | A dedicated staff mode: toggle with loadout swap, vanish, examine, freeze, follow, navigator, staff chat, an online-staff list, alerts, flight, sanction rollback, server lockdown, and targeted socialspy. |
+| **ranks** | Rankup, prestige, and autorank driven by configurable command-actions (or LuckPerms groups + permission nodes), with economy costs, placeholder requirements, a prestige loop, and a `/ranks` GUI — `/rankup`, `/prestige`, `/setrank`. |
+| **trade** | A secure player-to-player trade window (`/trade`): both sides stake items and money, both confirm, and any change resets the confirmation (anti-scam). Multi-currency, an item blacklist, request / accept flow, distance and cooldown limits, an audit log, and **cross-server trading** between backends that share a database. |
+| **survival** | A grab-bag of survival mechanics, each independently toggled and permissioned (several player-toggleable by command): tree-feller (`/treefeller`), veinminer (`/veinminer`), fast-leaf-decay, farm protection (`/farmprotect`), farm assist, one-player-sleep, head drops, and auto-pickup / auto-smelt / auto-sell / auto-tool. |
+| **poses** | Sit, sit-on-players, lay, belly-flop, spin, and crawl, with region / WorldGuard gating, a settings GUI, and cooldowns. |
+| **villagers** | Infinite trading, restock timers, a trade manager, trade disabling, villager protection, villager-in-a-bucket, follow and leash (`/villager`), instant restock, and click-to-trade. |
+| **moderation** | Bans / mutes / kicks / warns / jails with silent sanctions, duration tiers, warn escalation, IP history and address-strictness, punishment templates, staff analytics + Discord notifications, a unified `/history` · `/staffhistory` · `/checkban` · `/checkmute`, a management GUI, and a LiteBans importer. |
+| **security** | Server-side account security (no login/auth): two-factor with a PIN GUI or TOTP (`/2fa`, `/pin`), op-command protection, same-IP alt detection (`/ipalts`), and client-brand detection / blocking. Secrets are database-hashed. |
+| **commandcontrol** | Command whitelisting, tab-completion filtering, plugin-list hiding (`/plugins`, `/pl`, `/?`, `/help`), a custom unknown-command message, and `namespace:command` bypass blocking — permission-driven, with Geyser / Folia / cross-server support. Works transparently, with no command of its own. |
+| **staff** | A dedicated staff mode: toggle with loadout swap, examine, freeze, follow, navigator, staff chat, an online-staff list, alerts, flight, sanction rollback, server lockdown, and targeted socialspy. |
+| **vanish** | Packet-level invisibility over the in-house packet layer: fake join / quit, silent chest / shulker / ender-chest access, an item-pickup toggle, night-vision and flight, layered see / interact levels, an action-bar indicator, `/vanish list`, mob-targeting suppression, cross-server + Folia. |
+| **invrollback** | Snapshots every death and logout (main, armor, offhand, ender-chest) with a configurable retention window; `/invrestore` opens a GUI of a player's past snapshots to restore from. |
 | **messaging** | Private messages (`/msg`, `/r`), a mailbox (`/mail`) with offline-message fallback and `/mail sendall`, AFK notices, and a per-player ignore list. |
-| **communication** | Server-wide announcements (multi-channel, scheduled, conditional, with placeholders), broadcasts, clear-chat, custom advancement notifications, and `/info` pages. |
+| **communication** | Public chat formatting (LuckPerms prefix / suffix + MiniMessage + PAPI), per-cause death and per-rank join messages, a first-join welcome and MOTD, a killer-weapon placeholder, plus multi-channel scheduled announcements (conditional, with placeholders), broadcasts, clear-chat, custom advancement notifications, and `/info` pages. |
 | **presence** | Nicknames, presence status, and display-name management. |
 | **playerstate** | Gamemode / heal / feed / fly / god / speed, and inventory inspection — `/invsee` and `/endersee`, offline-capable through a quarantined NMS seam. |
 | **holograms** | `Display`-entity holograms: multi-line, multi-page (per-viewer click-to-cycle), provider-driven leaderboards, click-action chains, inline animations, per-player visibility and per-hologram blacklists, glow colour and opacity, link-to-NPC follow, plus FancyHolograms and DecentHolograms importers. |
@@ -131,8 +140,10 @@ database-backed so they survive rollbacks.
 | **nametags** | Above-head nametags rendered through display entities — per-viewer, vanish-aware, with a separate view-range and cull distance. |
 | **vote** | A full vote-rewards engine: Votifier intake, totals and a leaderboard, a config-driven reward engine, a cross-server vote party with escalation, voting streaks, per-site cooldowns and reminders, multi-channel broadcasts, and Discord webhook notifications. |
 | **discordlink** | Link a Minecraft account to Discord, sync roles, and push audit / economy notifications (with the Discord add-on). |
-| **itemworld** | The everyday item & world utility surface — item tools, virtual workstations, world cleanup, powertool, mob / entity controls, time / weather aliases, and admin-fun — split into independently disableable sub-feature groups. |
+| **itemworld** | The everyday item & world utility surface — an `/itemedit` editor (rename, lore, enchants, flags, attributes, durability, custom-model-data, unbreakable), open-shulker-from-inventory, item tools, virtual workstations, world cleanup, powertool, mob / entity controls, time / weather aliases, and admin-fun — split into independently disableable sub-feature groups. |
 | **worlds** | A full multi-world manager: create / import / load / unload / delete (confirm-staged), per-world properties and gamerules, built-in void and flat generators, access gating with economy entry fees, cross-world portals, a world-editor GUI, pre-generation, backup / restore, and idle auto-unload. |
+| **regions** | A WorldGuard region-management GUI (`/regions`): list, create (two-position selection), edit flags, manage members / owners, and set priority. WorldGuard is a soft-dependency; without it the module stays inert. |
+| **servertweaks** | Small opt-in infrastructure toggles: a custom F3 server brand, console-spam filtering, no-chat-reports, and SignedVelocity coordination — each ships off. |
 | **custommenus** | Operator-authored menus over the built-in menu engine — drop a `menus/<name>.conf` and open it with `/menu open <name>`, built from a generic action / condition / placeholder vocabulary (close, open another menu, run a command, send a message, …). Custom GUIs with no code, hot-reloadable with `/menu reload`; the privileged console action is config-gated and off by default. |
 
 ## Command cheat-sheet
@@ -140,16 +151,18 @@ database-backed so they survive rollbacks.
 The muscle-memory commands are all here, each renameable and aliasable from config:
 
 ```
-Homes & warps   /home /sethome /delhome /visit /invite    /warp /setwarp /delwarp    /pwarp
-Teleport        /tpa /tpahere /tpaccept /tpdeny  /back  /rtp  /spawn /setspawn  /tp /tphere
-Economy         /balance (/bal) /pay /baltop /eco  /bank  /worth /sell   note
-Kits & vaults   /kit /kits        /vault
-Player state    /gm(s/c/sp/a) /heal /feed /fly /god /speed /more /repair   /invsee /endersee
-Messaging       /msg (/w /tell) /reply (/r)  /mail   /afk   /ignore
-Moderation      /ban /tempban /unban /mute /kick /warn /jail /history /checkban   /banip
-Staff           /staff /vanish /freeze /staffchat (/sc) /stafflist
-Worlds & more   /world /worlds   /hologram   /npc   /vote   /menu
-Admin root      /uxmess  (aliases /uxmessentials /uxe)
+Homes & warps    /home /sethome /delhome /visit /invite    /warp /setwarp /delwarp    /pwarp
+Teleport         /tpa /tpahere /tpaccept /tpdeny  /back  /rtp  /spawn /setspawn  /tp /tphere
+Economy          /balance (/bal) /pay /baltop /eco  /bank  /worth /sell   note
+Ranks & trade    /rankup /prestige /ranks /setrank      /trade
+Kits & vaults    /kit /kits        /vault
+Survival         /treefeller /veinminer /autopickup /autosmelt /autosell /autotool /farmprotect
+Player state     /gm(s/c/sp/a) /heal /feed /fly /god /speed /more /repair   /invsee /endersee
+Messaging        /msg (/w /tell) /reply (/r)  /mail   /afk   /ignore
+Moderation       /ban /tempban /unban /mute /kick /warn /jail /history /checkban   /banip   /invrestore
+Staff & security /staff /vanish /freeze /staffchat (/sc) /stafflist   /2fa /pin /ipalts
+Worlds & more    /world /worlds /regions   /hologram   /npc   /villager   /vote   /menu
+Admin root       /uxmess  (aliases /uxmessentials /uxe)
 ```
 
 The admin root drives the operator surface:
@@ -241,8 +254,8 @@ exchange, and physical banknotes.
 
 SQLite is the default — zero setup, a single file under the data folder, WAL-mode and single-writer-safe.
 Point it at a network backend to share state across a fleet — homes, warps, player-warps, economy, vaults,
-moderation, holograms, NPCs, the vote party, and the messaging ignore list all replicate between nodes that
-share one database:
+trade, vanish, moderation, holograms, NPCs, the vote party, and the messaging ignore list all replicate between
+nodes that share one database:
 
 ```hocon
 # config.conf
@@ -298,18 +311,18 @@ network {
 }
 ```
 
-- **Velocity** — drop `uxmEssentials-velocity-0.4.0.jar` on the proxy and the bus rides a proxy-side broker
+- **Velocity** — drop `uxmEssentials-velocity-0.5.0.jar` on the proxy and the bus rides a proxy-side broker
   over plugin messaging.
-- **Redis** — drop `uxmEssentials-redis-0.4.0.jar` on each backend and point `network.redis` at a Redis
+- **Redis** — drop `uxmEssentials-redis-0.5.0.jar` on each backend and point `network.redis` at a Redis
   server; the same bus then runs over Redis pub/sub with **no Velocity proxy required** — a plain set of
   backends sharing a database and a Redis instance sync directly.
 - **both** — run both transports at once (handy mid-migration); a frame goes out on each.
 
-Either way the sync covers homes, warps, player-warps, economy, vaults, moderation, holograms, NPCs, the vote
-party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
+Either way the sync covers homes, warps, player-warps, economy, vaults, trade, vanish, moderation, holograms,
+NPCs, the vote party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
 local-only — the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
 
-- **Discord** — drop `uxmEssentials-discord-0.4.0.jar` on a Paper node to bridge account linking and push
+- **Discord** — drop `uxmEssentials-discord-0.5.0.jar` on a Paper node to bridge account linking and push
   audit and economy notifications through JDA.
 
 ## Permissions
@@ -360,7 +373,7 @@ Requires a JDK 25 toolchain (Gradle provisions one via the Foojay resolver if ne
 ## Versioning
 
 uxmEssentials follows semantic versioning. Pre-1.0 (`0.x`) releases may still adjust configuration and
-behaviour between minor versions as the surface settles; the current release is **0.4.0**.
+behaviour between minor versions as the surface settles; the current release is **0.5.0**.
 
 ## Contributing
 
