@@ -33,9 +33,23 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         this.plugin = Objects.requireNonNull(plugin, "plugin");
     }
 
+    /**
+     * True once the plugin is disabling. Paper's region schedulers reject new tasks on a disabled plugin, so the
+     * region-dispatch methods short-circuit here. The only work scheduled during teardown is best-effort display
+     * cleanup (tablist, scoreboard, open menus), which is unnecessary on a full shutdown because the affected
+     * players are being disconnected anyway. On a module hot-reload the plugin stays enabled, so this is false and
+     * the cleanup still runs.
+     */
+    private boolean disabled() {
+        return !plugin.isEnabled();
+    }
+
     @Override
     public void onGlobal(Runnable task) {
         Objects.requireNonNull(task, "task");
+        if (disabled()) {
+            return;
+        }
         Bukkit.getGlobalRegionScheduler().execute(plugin, task);
     }
 
@@ -43,6 +57,9 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     public void onRegion(Position position, Runnable task) {
         Objects.requireNonNull(position, "position");
         Objects.requireNonNull(task, "task");
+        if (disabled()) {
+            return;
+        }
         World world = Bukkit.getWorld(position.world().uid());
         if (world == null) {
             return; // the world is unloaded; the region work has nothing to bind to
@@ -54,9 +71,12 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     public void onEntity(PlayerRef player, Runnable task) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(task, "task");
+        if (disabled()) {
+            return;
+        }
         Player bukkit = Bukkit.getPlayer(player.uuid());
         if (bukkit == null || !bukkit.isOnline()) {
-            return; // the entity scheduler refuses a despawned entity — silent no-op (docs/02 §2.4)
+            return; // the entity scheduler refuses a despawned entity, silent no-op (docs/02 §2.4)
         }
         bukkit.getScheduler().execute(plugin, task, null, 1L);
     }
@@ -66,6 +86,9 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(task, "task");
         Objects.requireNonNull(retired, "retired");
+        if (disabled()) {
+            return;
+        }
         Player bukkit = Bukkit.getPlayer(player.uuid());
         if (bukkit == null || !bukkit.isOnline()) {
             retired.run(); // no live entity to schedule on; tell the caller now instead of dropping it
