@@ -109,8 +109,12 @@ public final class PlayerPickerView {
         Objects.requireNonNull(viewerRef, "viewerRef");
         Objects.requireNonNull(request, "request");
         scheduler.onGlobal(() -> {
-            List<PlayerRef> roster =
-                    server.getOnlinePlayers().stream().map(BukkitRefs::toRef).toList();
+            // Route the roster through the viewer's canSee graph so a vanished player the viewer may not see is
+            // never offered as a pick target; the viewer always sees themselves (canSee-self is true).
+            List<PlayerRef> roster = server.getOnlinePlayers().stream()
+                    .filter(viewer::canSee)
+                    .map(BukkitRefs::toRef)
+                    .toList();
             menus.openList(viewerRef, spec(viewerRef, request, roster));
         });
     }

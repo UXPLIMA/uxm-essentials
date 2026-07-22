@@ -61,7 +61,7 @@ public final class LiveDataSources {
     public static void register(MenuBindings bindings, Scheduler scheduler) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(scheduler, "scheduler");
-        bindings.list("online-players", ctx -> snapshot(scheduler, LiveDataSources::onlinePlayers));
+        bindings.list("online-players", ctx -> snapshot(scheduler, () -> onlinePlayers(ctx.viewer())));
         bindings.list("worlds", ctx -> snapshot(scheduler, LiveDataSources::loadedWorlds));
         bindings.list("self-inventory", ctx -> selfStorage(scheduler, ctx.viewer(), Player::getInventory));
         bindings.list("self-enderchest", ctx -> selfStorage(scheduler, ctx.viewer(), Player::getEnderChest));
@@ -184,10 +184,19 @@ public final class LiveDataSources {
         return stacks;
     }
 
-    /** One entry per online player, captured on the global thread where the entity API is safe to touch. */
-    private static List<OnlinePlayerEntry> onlinePlayers() {
+    /**
+     * One entry per online player the menu {@code viewer} may see, captured on the global thread where the entity
+     * API is safe to touch. The roster is filtered through the viewer's {@code canSee} graph so a vanished player
+     * the viewer cannot see never appears as a tile; a viewer who has gone offline between open and snapshot yields
+     * the unfiltered roster (there is no live graph to consult, and the tiles reach nobody).
+     */
+    private static List<OnlinePlayerEntry> onlinePlayers(PlayerRef viewerRef) {
+        Player viewer = Bukkit.getPlayer(viewerRef.uuid());
         List<OnlinePlayerEntry> entries = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
+            if (viewer != null && !viewer.canSee(player)) {
+                continue;
+            }
             entries.add(new OnlinePlayerEntry(
                     player.getName(),
                     player.getUniqueId(),
