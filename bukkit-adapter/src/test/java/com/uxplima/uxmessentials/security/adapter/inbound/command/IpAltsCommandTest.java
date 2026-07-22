@@ -90,6 +90,51 @@ class IpAltsCommandTest {
     }
 
     @Test
+    void anOfflineAccountsSecondUuidResolvingToItsOwnNameIsNotListedAsItsOwnAlt() {
+        // Offline mode: one human owns two UUIDs (an old premium id and the current offline id) recorded under the
+        // same IP, both resolving to the same name. The queried account must not appear as its own alt.
+        UUID current = UUID.randomUUID();
+        UUID old = UUID.randomUUID();
+        store.record(current, TOKEN, Instant.EPOCH);
+        store.record(old, TOKEN, Instant.EPOCH);
+        lookup.names.put("Siracozmen", new PlayerRef(current, "Siracozmen"));
+        lookup.uuids.put(old, new PlayerRef(old, "Siracozmen"));
+
+        PlayerMock staff = server.addPlayer("Staff");
+        staff.addAttachment(MockBukkit.createMockPlugin(), IpAltsCommand.PERMISSION, true);
+        execute(staff, "ipalts Siracozmen");
+
+        // The other UUID resolves to the queried name, so it is excluded, and the read reports no other account.
+        assertThat(sink.delivered).contains("security.alts.none");
+        assertThat(sink.delivered).doesNotContain("security.alts.header", "security.alts.entry");
+    }
+
+    @Test
+    void twoUuidsResolvingToOneNameShowOnceWhileADistinctAltStillShows() {
+        UUID target = UUID.randomUUID();
+        UUID mateOne = UUID.randomUUID();
+        UUID mateTwo = UUID.randomUUID(); // the same human "Mate" on a second UUID
+        UUID other = UUID.randomUUID(); // a genuinely different alt
+        store.record(target, TOKEN, Instant.EPOCH);
+        store.record(mateOne, TOKEN, Instant.EPOCH);
+        store.record(mateTwo, TOKEN, Instant.EPOCH);
+        store.record(other, TOKEN, Instant.EPOCH);
+        lookup.names.put("Target", new PlayerRef(target, "Target"));
+        lookup.uuids.put(mateOne, new PlayerRef(mateOne, "Mate"));
+        lookup.uuids.put(mateTwo, new PlayerRef(mateTwo, "Mate"));
+        lookup.uuids.put(other, new PlayerRef(other, "Other"));
+
+        PlayerMock staff = server.addPlayer("Staff");
+        staff.addAttachment(MockBukkit.createMockPlugin(), IpAltsCommand.PERMISSION, true);
+        execute(staff, "ipalts Target");
+
+        // "Mate" is listed once (deduped by resolved name) and "Other" once: two entries, not three.
+        long entries =
+                sink.delivered.stream().filter("security.alts.entry"::equals).count();
+        assertThat(entries).isEqualTo(2);
+    }
+
+    @Test
     void theLookupIsUnreachableWithoutTheSecurityAltsPermission() {
         PlayerMock stranger = server.addPlayer("Stranger");
         CommandSourceStack source = CommandSourceStackMock.from(stranger);

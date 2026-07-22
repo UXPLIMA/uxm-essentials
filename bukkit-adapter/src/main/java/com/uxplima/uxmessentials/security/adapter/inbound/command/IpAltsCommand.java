@@ -1,8 +1,13 @@
 package com.uxplima.uxmessentials.security.adapter.inbound.command;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
@@ -82,21 +87,38 @@ public final class IpAltsCommand extends SecurityCommandSupport implements Comma
         }
         PlayerRef found = target.get();
         AltGroup group = findAlts.find(found.uuid());
-        if (group.isEmpty()) {
+        // The core group excludes only the queried UUID, but in offline mode one human account can own two UUIDs
+        // (an old premium id and the current offline id) recorded under the same IP, both resolving to the queried
+        // name. Resolve names here (core does not), drop any that resolve to the queried account's own name, and
+        // dedupe by resolved name so two UUIDs for one person show once; genuinely distinct alts still each show.
+        List<String> altNames = distinctAltNames(group, found.name());
+        if (altNames.isEmpty()) {
             notify(viewer, SecurityMessageKey.SECURITY_ALTS_NONE, Map.of("player", found.name()));
             return;
         }
         notify(
                 viewer,
                 SecurityMessageKey.SECURITY_ALTS_HEADER,
-                Map.of(
-                        "player",
-                        found.name(),
-                        "count",
-                        Integer.toString(group.alts().size())));
-        for (UUID alt : group.alts()) {
-            notify(viewer, SecurityMessageKey.SECURITY_ALTS_ENTRY, Map.of("alt", nameOf(alt)));
+                Map.of("player", found.name(), "count", Integer.toString(altNames.size())));
+        for (String altName : altNames) {
+            notify(viewer, SecurityMessageKey.SECURITY_ALTS_ENTRY, Map.of("alt", altName));
         }
+    }
+
+    /** Resolve each alt UUID to a name, drop any equal (case-insensitively) to {@code queriedName}, and dedupe. */
+    private List<String> distinctAltNames(AltGroup group, String queriedName) {
+        Set<String> seen = new LinkedHashSet<>();
+        List<String> names = new ArrayList<>();
+        for (UUID alt : group.alts()) {
+            String altName = nameOf(alt);
+            if (altName.equalsIgnoreCase(queriedName)) {
+                continue;
+            }
+            if (seen.add(altName.toLowerCase(Locale.ROOT))) {
+                names.add(altName);
+            }
+        }
+        return names;
     }
 
     private String nameOf(UUID account) {
