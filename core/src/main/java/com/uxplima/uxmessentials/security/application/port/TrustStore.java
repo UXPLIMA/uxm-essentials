@@ -21,4 +21,11 @@ public interface TrustStore {
 
     /** Record (or renew) a trust for {@code playerId} from {@code ipHash}, valid until {@code until}. */
     void trust(UUID playerId, String ipHash, Instant until);
+
+    /**
+     * Forget every device trust {@code playerId} holds, so their next join is not skipped by the trusted-device
+     * bypass and they must prove their second factor again. Used by the admin force-re-verification flow; a no-op
+     * for a player who holds no trust.
+     */
+    void revoke(UUID playerId);
 }

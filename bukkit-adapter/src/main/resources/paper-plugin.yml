@@ -1380,6 +1380,9 @@ permissions:
   uxmessentials.security.pin:
     description: '/pin set — set a numeric PIN second factor on your account.'
     default: true
+  uxmessentials.security.force:
+    description: '/2fa force <player>: force a player to re-verify their two-factor on their next action or join.'
+    default: op
   uxmessentials.security.bypass:
     description: 'Exempt from the two-factor join verification and op-command re-auth checks.'
     default: op

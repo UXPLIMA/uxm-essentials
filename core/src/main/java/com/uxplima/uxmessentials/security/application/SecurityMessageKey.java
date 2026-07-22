@@ -41,6 +41,12 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_2FA_STATUS("security.2fa.status"),
     SECURITY_2FA_FEATURE_DISABLED("security.2fa.feature-disabled"),
 
+    // /2fa force <player>, the admin verb that forces a target to re-verify: its usage, the confirmation that the
+    // target was forced, and the line shown when the target has no factor to force.
+    SECURITY_2FA_FORCE_USAGE("security.2fa.force-usage"),
+    SECURITY_2FA_FORCE_DONE("security.2fa.force-done"),
+    SECURITY_2FA_FORCE_NOT_ENROLLED("security.2fa.force-not-enrolled"),
+
     // /pin set — the PIN factor: its usage, success, the three PinPolicy refusals, and the feature-off refusal.
     SECURITY_PIN_USAGE("security.pin.usage"),
     SECURITY_PIN_SET("security.pin.set"),

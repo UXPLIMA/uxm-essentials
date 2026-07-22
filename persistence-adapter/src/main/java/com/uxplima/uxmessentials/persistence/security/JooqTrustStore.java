@@ -56,4 +56,12 @@ public final class JooqTrustStore extends JooqRepository implements TrustStore {
             return null;
         });
     }
+
+    @Override
+    public void revoke(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        write(dsl -> dsl.deleteFrom(SECURITY_TRUSTED)
+                .where(SECURITY_TRUSTED.UUID.eq(playerId.toString()))
+                .execute());
+    }
 }

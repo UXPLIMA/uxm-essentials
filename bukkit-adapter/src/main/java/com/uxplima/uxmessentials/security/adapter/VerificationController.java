@@ -110,6 +110,33 @@ public final class VerificationController implements KeypadActions {
         sessions.clear(Objects.requireNonNull(viewer, "viewer").uuid());
     }
 
+    /**
+     * Force {@code ref} back into the freeze now, driving the immediate half of {@code /2fa force}. It begins a
+     * session and, off the tick thread, re-reads the registration and opens the keypad on the player's region thread
+     * like a fresh join, but without the trusted-device bypass, so even a trusted device is re-prompted. It is a
+     * no-op when join verification is disabled, and self-clearing for a target who holds no factor or has already
+     * gone offline (the freeze is lifted rather than left hanging). The durable part (revoking device trust so the
+     * next join re-verifies too) is set by the {@code ForceReverification} use case before this is called.
+     */
+    public void forceReverify(PlayerRef ref) {
+        Objects.requireNonNull(ref, "ref");
+        if (!config.enabled()) {
+            return;
+        }
+        sessions.begin(ref.uuid());
+        scheduler.async(() -> forceDecide(ref));
+    }
+
+    private void forceDecide(PlayerRef ref) {
+        TwoFactorRegistration registration = repository.find(ref.uuid()).orElse(null);
+        if (registration == null || !registration.hasAnyFactor()) {
+            sessions.clear(ref.uuid()); // nothing to prove, so lift the optimistic freeze
+            return;
+        }
+        boolean totpEnabled = registration.totpEnabled();
+        scheduler.onEntity(ref, () -> beginFreeze(ref, totpEnabled));
+    }
+
     @Override
     public void submit(Player player, PlayerRef viewer, String candidate) {
         verifySubmission(player, viewer, candidate, false);

@@ -400,6 +400,11 @@ class JoinVerificationTest {
         public void trust(UUID playerId, String ipHash, Instant until) {
             trusts.put(playerId + "|" + ipHash, until);
         }
+
+        @Override
+        public void revoke(UUID playerId) {
+            trusts.keySet().removeIf(key -> key.startsWith(playerId + "|"));
+        }
     }
 
     /** Resolves every key to its dotted catalog id so the tests can assert which message was delivered. */

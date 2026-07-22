@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.security.application.BeginTotpEnrollment;
 import com.uxplima.uxmessentials.security.application.ConfirmTotpEnrollment;
 import com.uxplima.uxmessentials.security.application.DisableTwoFactor;
 import com.uxplima.uxmessentials.security.application.FindAlts;
+import com.uxplima.uxmessentials.security.application.ForceReverification;
 import com.uxplima.uxmessentials.security.application.PendingTotpEnrollments;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SetPin;
@@ -99,26 +100,10 @@ public final class SecurityWiring {
                 new ClientGuard(brands, config.clientId(), staffNotifier, kernel.scheduler(), kernel.messages());
         FindAlts findAlts = new FindAlts(ipGuardStore);
 
-        List<CommandRegistration> commands = List.of(
-                new TwoFactorCommand(
-                        begin,
-                        confirm,
-                        disable,
-                        repository,
-                        twoFactor,
-                        clock,
-                        kernel.scheduler(),
-                        kernel.messages(),
-                        kernel.messageSink()),
-                new PinCommand(setPin, twoFactor, kernel.scheduler(), kernel.messages(), kernel.messageSink()),
-                new IpAltsCommand(
-                        findAlts, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()),
-                new ClientInfoCommand(
-                        brands, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()));
-
         // Phase 2 — join verification: the DB-backed device-trust store, the transient freeze/lockout registry, the
         // keypad GUI, and the controller that decides on join and drives every submitted PIN/code to an unfreeze,
         // re-prompt, or lockout kick. A submitted code is verified through VerifyTwoFactor (TOTP or PIN), off-thread.
+        // Built ahead of the commands so /2fa force can drive an online target straight back into the freeze.
         TrustStore trustStore = TrustStores.jooq(persistence);
         VerificationSessions sessions = new VerificationSessions();
         ReauthState reauthState = new ReauthState();
@@ -140,6 +125,29 @@ public final class SecurityWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 clock);
+        // /2fa force: revoke the target's device trust (the durable forced state, so their next join re-verifies even
+        // from a trusted device), paired with the immediate online freeze driven through the controller above.
+        ForceReverification forceReverification = new ForceReverification(repository, trustStore);
+
+        List<CommandRegistration> commands = List.of(
+                new TwoFactorCommand(
+                        begin,
+                        confirm,
+                        disable,
+                        repository,
+                        twoFactor,
+                        forceReverification,
+                        controller,
+                        kernel.playerLookup(),
+                        clock,
+                        kernel.scheduler(),
+                        kernel.messages(),
+                        kernel.messageSink()),
+                new PinCommand(setPin, twoFactor, kernel.scheduler(), kernel.messages(), kernel.messageSink()),
+                new IpAltsCommand(
+                        findAlts, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()),
+                new ClientInfoCommand(
+                        brands, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()));
 
         // Phase 3 — op-command protection: a re-auth controller sharing the same keypad, a router that sends each
         // keypad submission to whichever flow the player is in, and the command listener that blocks a protected
