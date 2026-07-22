@@ -156,17 +156,18 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     }
 
     /**
-     * {@code /pwarp} with no arguments: open the {@code pwarp-categories} landing. It is a hub of quick entries into
-     * the paged browse (all / mine / favourites / top rated) plus one button per defined category; each opens the
-     * browse with the matching preset filter. The landing snapshots the bounded category set off the tick thread, then
-     * paints on the player's entity thread; it never materialises the warp table.
+     * {@code /pwarp} with no arguments: open the paged {@code pwarp-browse} warp grid directly, the way AxPlayerWarps
+     * opens on {@code /pwarp}. It is the warp list itself, not a hub: one bounded page query off the tick thread, then
+     * a paint on the player's entity thread, and a clean "no warps yet" placeholder when the server has none. The
+     * {@code pwarp-categories} hub (category filters, quick scopes, sponsors) stays reachable from the browse's own
+     * categories control.
      */
     private int openGui(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        services.categoriesView().open(sender, ref(sender));
+        services.browseView().open(sender, ref(sender));
         return Command.SINGLE_SUCCESS;
     }
 

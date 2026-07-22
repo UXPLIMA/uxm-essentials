@@ -163,6 +163,10 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_BROWSE_ALL_LORE("pwarp.gui.browse.all-lore"),
     PWARP_GUI_BROWSE_CREATE("pwarp.gui.browse.create"),
     PWARP_GUI_BROWSE_CREATE_LORE("pwarp.gui.browse.create-lore"),
+    PWARP_GUI_BROWSE_CATEGORIES("pwarp.gui.browse.categories"),
+    PWARP_GUI_BROWSE_CATEGORIES_LORE("pwarp.gui.browse.categories-lore"),
+    PWARP_GUI_BROWSE_EMPTY("pwarp.gui.browse.empty"),
+    PWARP_GUI_BROWSE_EMPTY_LORE("pwarp.gui.browse.empty-lore"),
 
     // per-warp detail panel (pwarp-view) — the browse tile opens this; teleport / favourite / rate / info
     PWARP_GUI_VIEW_TITLE("pwarp.gui.view.title"),
@@ -262,6 +266,8 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_CATEGORIES_NEXT("pwarp.gui.categories.next"),
     PWARP_GUI_CATEGORIES_CLOSE("pwarp.gui.categories.close"),
     PWARP_GUI_CATEGORIES_CLOSE_LORE("pwarp.gui.categories.close-lore"),
+    PWARP_GUI_CATEGORIES_NO_CATEGORIES("pwarp.gui.categories.no-categories"),
+    PWARP_GUI_CATEGORIES_NO_CATEGORIES_LORE("pwarp.gui.categories.no-categories-lore"),
     PWARP_GUI_CATEGORIES_HEADER("pwarp.gui.categories.header"),
     PWARP_GUI_CATEGORIES_HEADER_LORE("pwarp.gui.categories.header-lore"),
     PWARP_GUI_CATEGORIES_BROWSE_ALL_LORE("pwarp.gui.categories.browse-all-lore"),

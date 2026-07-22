@@ -216,6 +216,33 @@ class PwarpBrowseMenuTest {
     }
 
     @Test
+    void anEmptyCorpusPinsTheCentredPlaceholderInsteadOfABareGrid() {
+        browse.seed(List.of()); // a fresh server: no public warps at all
+        wireEngine();
+        var source = bindings.pagedList(PlayerWarpBrowseMenu.LIST_SOURCE).orElseThrow();
+
+        PagedResult<?> page = source.apply(subjectContext(), new PageRequest(0, PAGE_SIZE, "rating", Map.of()));
+
+        // The empty corpus scrolls no rows and reports a zero total, pinning one placeholder to the grid centre.
+        assertThat(page.rows()).isEmpty();
+        assertThat(page.totalCount()).isZero();
+        assertThat(page.pinned()).hasSize(1);
+        PlayerWarpBrowseMenu.Tile placeholder =
+                (PlayerWarpBrowseMenu.Tile) page.pinned().get(0);
+        assertThat(placeholder.pinnedSlot()).isEqualTo(22);
+    }
+
+    @Test
+    void theBrowseRendersTheEmptyPlaceholderWhenThereAreNoWarps() {
+        browse.seed(List.of());
+        Inventory inv = open();
+
+        // The centred placeholder is the only content tile; the rest of the grid stays empty.
+        assertThat(inv.getItem(22).getType()).isEqualTo(Material.BARRIER);
+        assertThat(filledContentSlots(inv)).isEqualTo(1);
+    }
+
+    @Test
     void theOwnerAndFavouritesPresetFiltersNarrowTheQueryToThatSubject() {
         browse.seed(cards(TOTAL));
         wireEngine();

@@ -18,7 +18,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
-import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpCategoriesMenu;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpBrowseMenu;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
@@ -72,16 +72,17 @@ class PlayerWarpSubcommandWiringTest {
     }
 
     @Test
-    void bareSlashPwarpOpensTheCategoriesLanding() {
+    void bareSlashPwarpOpensTheBrowseGrid() {
         PlayerMock player = server.addPlayer("Alice");
         player.setOp(true);
-        PlayerWarpCategoriesMenu categories = mock(PlayerWarpCategoriesMenu.class);
-        lenient().when(services.categoriesView()).thenReturn(categories);
+        PlayerWarpBrowseMenu browse = mock(PlayerWarpBrowseMenu.class);
+        lenient().when(services.browseView()).thenReturn(browse);
 
         dispatch(player, "pwarp");
 
-        // No-arg /pwarp opens the pwarp-categories landing, not the browse or the management list.
-        verify(categories).open(eq(player), eq(refOf(player)));
+        // No-arg /pwarp opens the paged pwarp-browse warp grid directly (the categories hub is reached from its own
+        // control), not the landing or the management list.
+        verify(browse).open(eq(player), eq(refOf(player)));
     }
 
     @Test

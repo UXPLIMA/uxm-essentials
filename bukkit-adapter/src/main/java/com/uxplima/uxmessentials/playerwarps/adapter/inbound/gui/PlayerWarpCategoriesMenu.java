@@ -113,6 +113,14 @@ public final class PlayerWarpCategoriesMenu {
                 ctx -> browseOpener.open(ctx.player(), ctx.viewer(), Map.of("sort", "rating")));
         bindings.action("playerwarps:category-open", this::openCategory);
         bindings.action("playerwarps:sponsor-open", this::openSponsor);
+        // Opens this hub from the browse's categories control, so the landing stays reachable now that a bare /pwarp
+        // opens the warp grid directly.
+        bindings.action("playerwarps:open-categories", ctx -> open(ctx.player(), ctx.viewer()));
+        // Gates the hub's "no categories yet" hint: true when the bounded snapshot carries no category, read off the
+        // immutable subject on the render thread with no store touch.
+        bindings.condition(
+                "playerwarps:has-no-categories",
+                (ctx, args) -> ctx.subject(Subject.class).categories().isEmpty());
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
     }
 

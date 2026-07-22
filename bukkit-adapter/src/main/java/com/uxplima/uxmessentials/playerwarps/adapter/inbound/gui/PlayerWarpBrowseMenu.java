@@ -84,6 +84,31 @@ public final class PlayerWarpBrowseMenu {
     /** The default ordering when the spec offers no sort, or a sort token the read model does not recognise. */
     private static final WarpSort DEFAULT_SORT = WarpSort.RATING;
 
+    /** The content slot the empty-state placeholder pins to, dead-centre of the five-row grid. */
+    private static final int EMPTY_SLOT = 22;
+
+    /**
+     * The empty-state placeholder, pinned to the grid centre when a browse resolves to no warps at all so the grid
+     * reads as a deliberate "no warps yet" panel rather than a bare gap. It is compared by reference: the one tile the
+     * icon / name / lore / click paths special-case, and it never stands for a real warp.
+     */
+    private static final Tile EMPTY = new Tile(
+            "",
+            null,
+            "",
+            "",
+            null,
+            Material.BARRIER.name(),
+            0L,
+            0.0,
+            0,
+            0,
+            BigDecimal.ZERO,
+            "",
+            WarpAccess.PUBLIC,
+            false,
+            EMPTY_SLOT);
+
     private final Menus menus;
     private final Scheduler scheduler;
     private final PlayerWarpBrowse browse;
@@ -165,6 +190,11 @@ public final class PlayerWarpBrowseMenu {
             Page<WarpCard> page = browse.page(query);
             List<Tile> tiles =
                     page.items().stream().map(PlayerWarpBrowseMenu::toTile).toList();
+            if (tiles.isEmpty()) {
+                // No warps match at all: pin the centred placeholder so the grid reads as a deliberate empty state
+                // rather than a bare page. Reported total is zero, so the page bar shows one empty page.
+                return new PagedResult<>(List.of(), 0L, List.of(EMPTY));
+            }
             return PagedResult.of(tiles, page.totalCount());
         }
         // Pinned sponsors claim the top content slots on every page, so the flow only has the remaining slots to fill:
@@ -266,6 +296,9 @@ public final class PlayerWarpBrowseMenu {
     /** The tile's rendered display name in the viewer's locale — the display name, or the warp name when unset. */
     private String name(MenuContext ctx) {
         Tile tile = tileOf(ctx);
+        if (tile == EMPTY) {
+            return resolve(ctx.viewer(), PlayerwarpsMessageKey.PWARP_GUI_BROWSE_EMPTY, Map.of());
+        }
         return resolve(
                 ctx.viewer(), PlayerwarpsMessageKey.PWARP_GUI_BROWSE_ENTRY_NAME, Map.of("warp", displayName(tile)));
     }
@@ -278,6 +311,9 @@ public final class PlayerWarpBrowseMenu {
     private String lore(MenuContext ctx) {
         Tile tile = tileOf(ctx);
         PlayerRef viewer = ctx.viewer();
+        if (tile == EMPTY) {
+            return resolve(viewer, PlayerwarpsMessageKey.PWARP_GUI_BROWSE_EMPTY_LORE, Map.of());
+        }
         List<String> lines = new ArrayList<>();
         lines.add(
                 resolve(viewer, PlayerwarpsMessageKey.PWARP_GUI_BROWSE_LORE_OWNER, Map.of("owner", tile.ownerName())));
@@ -323,6 +359,9 @@ public final class PlayerWarpBrowseMenu {
      */
     private void click(MenuActionContext ctx) {
         Tile tile = ctx.entry(Tile.class);
+        if (tile == EMPTY) {
+            return;
+        }
         openView.accept(ctx.viewer(), PlayerWarpName.of(tile.name()));
     }
 
@@ -333,6 +372,9 @@ public final class PlayerWarpBrowseMenu {
      */
     private void teleport(MenuActionContext ctx) {
         Tile tile = ctx.entry(Tile.class);
+        if (tile == EMPTY) {
+            return;
+        }
         PlayerRef viewer = ctx.viewer();
         PlayerWarpName name = PlayerWarpName.of(tile.name());
         ctx.player().closeInventory();
