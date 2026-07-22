@@ -154,6 +154,15 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_BROWSE_MINE("pwarp.gui.browse.mine"),
     PWARP_GUI_BROWSE_FAVOURITES("pwarp.gui.browse.favourites"),
     PWARP_GUI_BROWSE_ALL("pwarp.gui.browse.all"),
+    PWARP_GUI_BROWSE_PREV_LORE("pwarp.gui.browse.prev-lore"),
+    PWARP_GUI_BROWSE_NEXT_LORE("pwarp.gui.browse.next-lore"),
+    PWARP_GUI_BROWSE_SORT_LORE("pwarp.gui.browse.sort-lore"),
+    PWARP_GUI_BROWSE_SEARCH_LORE("pwarp.gui.browse.search-lore"),
+    PWARP_GUI_BROWSE_MINE_LORE("pwarp.gui.browse.mine-lore"),
+    PWARP_GUI_BROWSE_FAVOURITES_LORE("pwarp.gui.browse.favourites-lore"),
+    PWARP_GUI_BROWSE_ALL_LORE("pwarp.gui.browse.all-lore"),
+    PWARP_GUI_BROWSE_CREATE("pwarp.gui.browse.create"),
+    PWARP_GUI_BROWSE_CREATE_LORE("pwarp.gui.browse.create-lore"),
 
     // per-warp detail panel (pwarp-view) — the browse tile opens this; teleport / favourite / rate / info
     PWARP_GUI_VIEW_TITLE("pwarp.gui.view.title"),
@@ -175,6 +184,13 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_VIEW_RATE("pwarp.gui.view.rate"),
     PWARP_GUI_VIEW_MANAGE("pwarp.gui.view.manage"),
     PWARP_GUI_VIEW_BACK("pwarp.gui.view.back"),
+    PWARP_GUI_VIEW_TELEPORT_LORE("pwarp.gui.view.teleport-lore"),
+    PWARP_GUI_VIEW_TELEPORT_LOCKED_LORE("pwarp.gui.view.teleport-locked-lore"),
+    PWARP_GUI_VIEW_FAVOURITE_LORE("pwarp.gui.view.favourite-lore"),
+    PWARP_GUI_VIEW_UNFAVOURITE_LORE("pwarp.gui.view.unfavourite-lore"),
+    PWARP_GUI_VIEW_RATE_LORE("pwarp.gui.view.rate-lore"),
+    PWARP_GUI_VIEW_MANAGE_LORE("pwarp.gui.view.manage-lore"),
+    PWARP_GUI_VIEW_BACK_LORE("pwarp.gui.view.back-lore"),
 
     // five-star rating menu (pwarp-rate) — reached from the detail panel's rate button
     PWARP_GUI_RATE_TITLE("pwarp.gui.rate.title"),
@@ -184,6 +200,12 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_RATE_STAR_4("pwarp.gui.rate.star-4"),
     PWARP_GUI_RATE_STAR_5("pwarp.gui.rate.star-5"),
     PWARP_GUI_RATE_BACK("pwarp.gui.rate.back"),
+    PWARP_GUI_RATE_STAR_1_LORE("pwarp.gui.rate.star-1-lore"),
+    PWARP_GUI_RATE_STAR_2_LORE("pwarp.gui.rate.star-2-lore"),
+    PWARP_GUI_RATE_STAR_3_LORE("pwarp.gui.rate.star-3-lore"),
+    PWARP_GUI_RATE_STAR_4_LORE("pwarp.gui.rate.star-4-lore"),
+    PWARP_GUI_RATE_STAR_5_LORE("pwarp.gui.rate.star-5-lore"),
+    PWARP_GUI_RATE_BACK_LORE("pwarp.gui.rate.back-lore"),
 
     // capability-gated single-warp management panel (pwarp-manage), opened from the detail panel's manage button. Each
     // button is view-gated by the viewer's WarpRole capability and drives one P4 use case; the info tile reflects
@@ -239,6 +261,13 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_CATEGORIES_PREV("pwarp.gui.categories.prev"),
     PWARP_GUI_CATEGORIES_NEXT("pwarp.gui.categories.next"),
     PWARP_GUI_CATEGORIES_CLOSE("pwarp.gui.categories.close"),
+    PWARP_GUI_CATEGORIES_CLOSE_LORE("pwarp.gui.categories.close-lore"),
+    PWARP_GUI_CATEGORIES_HEADER("pwarp.gui.categories.header"),
+    PWARP_GUI_CATEGORIES_HEADER_LORE("pwarp.gui.categories.header-lore"),
+    PWARP_GUI_CATEGORIES_BROWSE_ALL_LORE("pwarp.gui.categories.browse-all-lore"),
+    PWARP_GUI_CATEGORIES_MINE_LORE("pwarp.gui.categories.mine-lore"),
+    PWARP_GUI_CATEGORIES_FAVOURITES_LORE("pwarp.gui.categories.favourites-lore"),
+    PWARP_GUI_CATEGORIES_TOP_LORE("pwarp.gui.categories.top-lore"),
 
     // the pwarp-icon selector the manage panel's icon button opens
     PWARP_GUI_ICON_TITLE("pwarp.gui.icon.title"),
