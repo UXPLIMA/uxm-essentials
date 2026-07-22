@@ -48,11 +48,12 @@ import org.jspecify.annotations.NullMarked;
  * {@code /store}) opens that menu's spec through the public {@link Menus} facade, exactly as {@code /menu open
  * <id>} does, but with the menu's own name, aliases, permission gate, deny message and typed arguments.
  *
- * <p>Unlike {@code /menu}, the permission is checked inside the executor rather than as a Brigadier {@code requires}
- * gate: a {@code requires} gate would hide the command from a sender who lacks the node, giving an "unknown command"
- * rather than the operator's configured deny message. So the command is always visible and the executor decides —
- * a console sender is turned away unless the block allows it, a missing permission draws the deny message (or the
- * shared no-permission line when none is configured), and only then does a real player open the menu.
+ * <p>When the menu declares a permission, the command node is gated with a Brigadier {@code requires} on that node,
+ * so its visibility matches its execution gate: a sender who lacks the node neither sees nor runs it, closing the
+ * gap where an unpermitted player still saw (and tab-completed) a command they could not use. A menu with no
+ * permission stays open to everyone. The executor still owns the rest of the decision: a console sender is turned
+ * away unless the block allows it, and it re-checks the permission (and draws the operator's deny line, or the
+ * shared no-permission line) as defence in depth before a real player opens the menu.
  *
  * <p>A command that declares {@code arguments} carries one typed Brigadier node per argument, chained in order
  * under the literal so every argument is required (the deepest node carries the executor). Each node completes
@@ -79,6 +80,10 @@ public final class MenuOpenCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> literal = Commands.literal(spec.name());
+        // Gate visibility on the menu's permission when it declares one, so the node is hidden from a sender who
+        // cannot use it (its execution still re-checks). A permissionless menu stays open to everyone.
+        spec.permission()
+                .ifPresent(permission -> literal.requires(src -> src.getSender().hasPermission(permission)));
         if (spec.arguments().isEmpty()) {
             return literal.executes(this::open).build();
         }

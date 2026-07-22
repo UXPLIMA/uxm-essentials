@@ -47,6 +47,10 @@ public final class PosesCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("poses")
+                // Hide the whole /poses tree from a player with no poses access; either self-service node (its bare
+                // GUI or the toggle) keeps it visible, so a player holding only one still sees the command.
+                .requires(src -> src.getSender().hasPermission(GUI_PERMISSION)
+                        || src.getSender().hasPermission(TOGGLE_PERMISSION))
                 .then(Commands.literal("toggle")
                         .requires(src -> src.getSender().hasPermission(TOGGLE_PERMISSION))
                         .executes(this::toggle))

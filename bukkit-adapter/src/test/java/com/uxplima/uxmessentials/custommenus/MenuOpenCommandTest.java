@@ -41,8 +41,8 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * MockBukkit coverage of an operator-declared open command through its real Brigadier node. A {@code shop} spec is
  * registered; a command block naming {@code /shop} (alias {@code /store}), permission {@code srv.shop} and a deny
- * message must open for a permitted player, draw the rendered deny line for one without the node, and turn the
- * console away — while a bare permissionless block opens for anyone.
+ * message must open for a permitted player, stay hidden (its requires gate rejects) from one without the node, and
+ * turn the console away, while a bare permissionless block opens for anyone.
  */
 class MenuOpenCommandTest {
 
@@ -91,24 +91,25 @@ class MenuOpenCommandTest {
     }
 
     @Test
-    void aPlayerWithoutThePermissionGetsTheDenyMessageAndStaysOut() {
+    void aPlayerWithoutThePermissionCannotSeeOrRunTheGatedCommand() {
         PlayerMock player = server.addPlayer("NoBuyer");
 
-        execute(gatedSpec(), "shop", player);
-
+        // The permission now gates node visibility, so the requires predicate rejects an unpermitted sender and the
+        // command never parses for them, so its visibility matches its execution gate rather than leaking to everyone.
+        assertThat(command(gatedSpec()).build().getRequirement().test(CommandSourceStackMock.from(player)))
+                .isFalse();
         assertThat(openMenuIdFor(player)).isEmpty();
-        assertThat(player.nextMessage()).contains("nope");
     }
 
     @Test
-    void aMissingDenyMessageFallsBackToTheSharedNoPermissionLine() {
+    void thePermissionGateAppliesEvenWhenNoDenyMessageIsConfigured() {
         PlayerMock player = server.addPlayer("NoBuyer");
         OpenCommandSpec spec = new OpenCommandSpec("shop", List.of(), Optional.of("srv.shop"), Optional.empty(), false);
 
-        execute(spec, "shop", player);
-
+        // A menu that declares a permission is gated whether or not it configures a deny message.
+        assertThat(command(spec).build().getRequirement().test(CommandSourceStackMock.from(player)))
+                .isFalse();
         assertThat(openMenuIdFor(player)).isEmpty();
-        assertThat(messages.keys).contains("command.no-permission");
     }
 
     @Test
