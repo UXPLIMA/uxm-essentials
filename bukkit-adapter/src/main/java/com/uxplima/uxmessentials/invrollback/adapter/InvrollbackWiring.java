@@ -7,10 +7,12 @@ import java.util.Objects;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.command.InvrestoreCommand;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotExporter;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotListView;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewListener;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotRestorer;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotTeleporter;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.listener.SnapshotCaptureListener;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.SnapshotPruneSweep;
 import com.uxplima.uxmessentials.invrollback.application.CaptureSnapshot;
@@ -68,7 +70,11 @@ public final class InvrollbackWiring {
         RestoreSnapshot restore = new RestoreSnapshot(repository, capture);
         SnapshotRestorer restorer =
                 new SnapshotRestorer(restore, kernel.scheduler(), kernel.messages(), kernel.messageSink(), clock);
-        SnapshotPreviewView preview = new SnapshotPreviewView(kernel.messages(), kernel.scheduler(), restorer);
+        SnapshotTeleporter teleporter =
+                new SnapshotTeleporter(kernel.scheduler(), kernel.messages(), kernel.messageSink(), kernel.log());
+        SnapshotExporter exporter = new SnapshotExporter(kernel.scheduler(), kernel.messages(), kernel.messageSink());
+        SnapshotPreviewView preview =
+                new SnapshotPreviewView(kernel.messages(), kernel.scheduler(), clock, restorer, teleporter, exporter);
         SnapshotListView listView = new SnapshotListView(
                 menus,
                 new GuiText(kernel.messages()),
@@ -76,8 +82,16 @@ public final class InvrollbackWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 repository,
-                preview);
-        InvrestoreCommand command = new InvrestoreCommand(listView, kernel.messages());
+                preview,
+                clock);
+        InvrestoreCommand command = new InvrestoreCommand(
+                listView,
+                exporter,
+                teleporter,
+                repository,
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink());
 
         PruneSnapshots prune = new PruneSnapshots(repository, config.retentionPolicy());
         boolean retentionOn = config.maxPerPlayer() > 0 || config.maxAgeDays() > 0;

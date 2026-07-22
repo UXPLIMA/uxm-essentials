@@ -20,9 +20,11 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotExporter;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotListView;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotRestorer;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotTeleporter;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
 import com.uxplima.uxmessentials.invrollback.application.CaptureSnapshot;
 import com.uxplima.uxmessentials.invrollback.application.RestoreSnapshot;
@@ -76,10 +78,13 @@ class InvrestoreCommandTest {
         Menus menus = engine.menus();
         RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
         SnapshotRestorer restorer = new SnapshotRestorer(restore, scheduler, messages, noopSink(), CLOCK);
-        SnapshotPreviewView preview = new SnapshotPreviewView(messages, scheduler, restorer);
+        SnapshotTeleporter teleporter = new SnapshotTeleporter(scheduler, messages, noopSink(), noopLog());
+        SnapshotExporter exporter = new SnapshotExporter(scheduler, messages, noopSink());
+        SnapshotPreviewView preview =
+                new SnapshotPreviewView(messages, scheduler, CLOCK, restorer, teleporter, exporter);
         SnapshotListView listView =
-                new SnapshotListView(menus, guiText, scheduler, messages, noopSink(), repository, preview);
-        command = new InvrestoreCommand(listView, messages);
+                new SnapshotListView(menus, guiText, scheduler, messages, noopSink(), repository, preview, CLOCK);
+        command = new InvrestoreCommand(listView, exporter, teleporter, repository, scheduler, messages, noopSink());
     }
 
     @AfterEach
@@ -145,6 +150,22 @@ class InvrestoreCommandTest {
 
     private static MessageSink noopSink() {
         return (viewer, renderedText) -> {};
+    }
+
+    private static com.uxplima.uxmessentials.shared.application.port.Logger noopLog() {
+        return new com.uxplima.uxmessentials.shared.application.port.Logger() {
+            @Override
+            public void info(String message, Object... args) {}
+
+            @Override
+            public void warn(String message, Object... args) {}
+
+            @Override
+            public void error(String message, Throwable cause) {}
+
+            @Override
+            public void debug(String message, Object... args) {}
+        };
     }
 
     /** Runs every scheduler hop inline. */

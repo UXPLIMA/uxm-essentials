@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,8 +79,11 @@ class SnapshotListViewTest {
         Menus menus = engine.menus();
         RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
         SnapshotRestorer restorer = new SnapshotRestorer(restore, scheduler, messages, noopSink(), CLOCK);
-        SnapshotPreviewView preview = new SnapshotPreviewView(messages, scheduler, restorer);
-        listView = new SnapshotListView(menus, guiText, scheduler, messages, noopSink(), repository, preview);
+        SnapshotTeleporter teleporter = new SnapshotTeleporter(scheduler, messages, noopSink(), noopLog());
+        SnapshotExporter exporter = new SnapshotExporter(scheduler, messages, noopSink());
+        SnapshotPreviewView preview =
+                new SnapshotPreviewView(messages, scheduler, CLOCK, restorer, teleporter, exporter);
+        listView = new SnapshotListView(menus, guiText, scheduler, messages, noopSink(), repository, preview, CLOCK);
     }
 
     @AfterEach
@@ -125,6 +129,28 @@ class SnapshotListViewTest {
                         view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL));
     }
 
+    @Test
+    void theIconLoreShowsALocationLineOnlyForSnapshotsThatRecordedOne() {
+        // Newest carries a location; the older one predates location capture.
+        Position where = new Position(new WorldRef(UUID.randomUUID(), "world"), 12.0, 64.0, -8.0, 0f, 0f);
+        ItemStack[] contents = new ItemStack[41];
+        contents[0] = new ItemStack(Material.DIAMOND, 1);
+        repository.save(Snapshot.capture(
+                target.uuid(),
+                SnapshotCause.DEATH,
+                minusSeconds(5),
+                InventorySnapshotCodec.encode(contents, null, where)));
+        repository.save(snapshot(SnapshotCause.LOGOUT, minusSeconds(50), Material.GOLD_INGOT));
+
+        listView.open(staffRef, target);
+
+        Inventory inv = staff.getOpenInventory().getTopInventory();
+        // The located icon carries exactly one extra lore line (the location) over the locationless one.
+        int located = inv.getItem(0).lore().size();
+        int locationless = inv.getItem(1).lore().size();
+        assertThat(located).isEqualTo(locationless + 1);
+    }
+
     private Snapshot snapshot(SnapshotCause cause, Instant createdAt, Material contentMaterial) {
         ItemStack[] contents = new ItemStack[41];
         contents[0] = new ItemStack(contentMaterial, 1);
@@ -141,6 +167,22 @@ class SnapshotListViewTest {
 
     private static MessageSink noopSink() {
         return (viewer, renderedText) -> {};
+    }
+
+    private static com.uxplima.uxmessentials.shared.application.port.Logger noopLog() {
+        return new com.uxplima.uxmessentials.shared.application.port.Logger() {
+            @Override
+            public void info(String message, Object... args) {}
+
+            @Override
+            public void warn(String message, Object... args) {}
+
+            @Override
+            public void error(String message, Throwable cause) {}
+
+            @Override
+            public void debug(String message, Object... args) {}
+        };
     }
 
     /** Runs every scheduler hop inline. */

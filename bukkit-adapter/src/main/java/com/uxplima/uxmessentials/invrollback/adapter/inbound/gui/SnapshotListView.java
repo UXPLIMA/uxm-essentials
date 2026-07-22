@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.invrollback.adapter.inbound.gui;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -9,6 +12,10 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import net.kyori.adventure.text.Component;
+
+import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
+import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec.Summary;
 import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.application.port.SnapshotRepository;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
@@ -29,13 +36,15 @@ import org.jspecify.annotations.NullMarked;
  * The {@code /invrestore} snapshot list: a paginated, engine-backed panel (the shared {@link EntityListView}, so
  * it renders through the menu engine and needs no raw-inventory allow-list entry) of one icon per snapshot the
  * target holds, newest first. The target's snapshots are resolved off the tick thread through the
- * {@link SnapshotRepository} (whose {@code list} is ordered newest-first), so the DB read never blocks a region
- * thread; the panel is then shown on the staff member's own entity thread. Each icon's material tracks the capture
- * cause and its name/lore label the cause, timestamp and the click-to-preview hint. Selecting an icon opens the
- * read-only {@link SnapshotPreviewView} for that snapshot, from which the restore is confirmed.
+ * {@link SnapshotRepository} (whose {@code list} is ordered newest-first) and each payload is summarised there into
+ * a {@link SnapshotCard} (the item-free location and slot counts), so neither the DB read nor the payload parse
+ * blocks a region thread; the panel is then shown on the staff member's own entity thread. Each icon's material
+ * tracks the capture cause and its name/lore label the cause, timestamp, item counts, and capture location.
+ * Selecting an icon opens the read-only {@link SnapshotPreviewView} for that snapshot, from which the restore,
+ * teleport, and export actions run.
  *
- * <p>A fresh {@link EntityListView} is built per open over the resolved snapshot list, so two staff members
- * inspecting different targets never share list state.
+ * <p>A fresh {@link EntityListView} is built per open over the resolved card list, so two staff members inspecting
+ * different targets never share list state.
  */
 @NullMarked
 public final class SnapshotListView {
@@ -47,6 +56,7 @@ public final class SnapshotListView {
     private final MessageSink messageSink;
     private final SnapshotRepository repository;
     private final SnapshotPreviewView preview;
+    private final Clock clock;
 
     public SnapshotListView(
             Menus menus,
@@ -55,7 +65,8 @@ public final class SnapshotListView {
             Messages messages,
             MessageSink messageSink,
             SnapshotRepository repository,
-            SnapshotPreviewView preview) {
+            SnapshotPreviewView preview,
+            Clock clock) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -63,10 +74,11 @@ public final class SnapshotListView {
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.preview = Objects.requireNonNull(preview, "preview");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
-     * Resolve {@code target}'s snapshots off-thread, then open the newest-first list for {@code staff} — or, when
+     * Resolve {@code target}'s snapshots off-thread, then open the newest-first list for {@code staff} : or, when
      * the target holds none, send {@code staff} the "no snapshots" line instead of an empty window.
      */
     public void open(PlayerRef staff, PlayerRef target) {
@@ -83,34 +95,46 @@ public final class SnapshotListView {
                                 Map.of("player", target.name())));
                 return;
             }
-            scheduler.onEntity(staff, () -> openResolved(staff, target, snapshots));
+            Instant now = clock.instant();
+            List<SnapshotCard> cards = snapshots.stream()
+                    .map(snapshot -> new SnapshotCard(snapshot, InventorySnapshotCodec.summarize(snapshot.contents())))
+                    .toList();
+            scheduler.onEntity(staff, () -> openResolved(staff, target, cards, now));
         });
     }
 
-    private void openResolved(PlayerRef staff, PlayerRef target, List<Snapshot> snapshots) {
+    private void openResolved(PlayerRef staff, PlayerRef target, List<SnapshotCard> cards, Instant now) {
         Player viewer = Bukkit.getPlayer(staff.uuid());
         if (viewer == null || !viewer.isOnline()) {
             return;
         }
-        EntityListView.<Snapshot>builder()
+        EntityListView.<SnapshotCard>builder()
                 .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(EntityListLayout.paginatedDefault(Material.CHEST))
                 .title(InvrollbackMessageKey.INVROLLBACK_GUI_TITLE)
                 .navNames(InvrollbackMessageKey.INVROLLBACK_GUI_PREV, InvrollbackMessageKey.INVROLLBACK_GUI_NEXT)
-                .entities(() -> snapshots)
-                .iconRenderer((who, snapshot) -> icon(who, target, snapshot))
-                .onSelect((clicker, snapshot) -> preview.open(BukkitRefs.toRef(clicker), target, snapshot))
+                .entities(() -> cards)
+                .iconRenderer((who, card) -> icon(who, target, card, now))
+                .onSelect((clicker, card) -> preview.open(BukkitRefs.toRef(clicker), target, card.snapshot()))
                 .build()
                 .open(viewer, staff);
     }
 
-    private ItemStack icon(PlayerRef viewer, PlayerRef target, Snapshot snapshot) {
-        Map<String, String> placeholders = SnapshotDisplay.placeholders(target, snapshot);
+    private ItemStack icon(PlayerRef viewer, PlayerRef target, SnapshotCard card, Instant now) {
+        Snapshot snapshot = card.snapshot();
+        Summary summary = card.summary();
+        Map<String, String> base = SnapshotDisplay.base(target, snapshot, summary, now);
+        List<Component> lore = new ArrayList<>();
+        lore.add(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_INFO, base));
+        summary.location()
+                .ifPresent(position -> lore.add(guiText.text(
+                        viewer, InvrollbackMessageKey.INVROLLBACK_GUI_LOCATION, SnapshotDisplay.location(position))));
+        lore.add(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_VIEW, base));
         return ItemBuilder.of(iconMaterial(snapshot.cause()))
-                .name(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_SNAPSHOT, placeholders))
-                .lore(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_VIEW, placeholders))
+                .name(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_SNAPSHOT, base))
+                .lore(lore)
                 .build();
     }
 

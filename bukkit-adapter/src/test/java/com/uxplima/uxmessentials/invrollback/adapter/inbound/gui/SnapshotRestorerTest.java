@@ -50,6 +50,7 @@ class SnapshotRestorerTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
+        server.addSimpleWorld("world"); // the restore safety-snapshot records the target's location
     }
 
     @AfterEach

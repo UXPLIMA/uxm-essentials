@@ -16,7 +16,9 @@ import org.bukkit.inventory.ItemStack;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
 import com.uxplima.uxmessentials.invrollback.application.CaptureSnapshot;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -80,7 +82,8 @@ public final class SnapshotCaptureListener implements Listener {
         ItemStack[] contents = player.getInventory().getContents();
         @Nullable ItemStack @Nullable [] enderChest =
                 includeEnderchest ? player.getEnderChest().getContents() : null;
-        byte[] payload = InventorySnapshotCodec.encode(contents, enderChest);
+        Position location = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
+        byte[] payload = InventorySnapshotCodec.encode(contents, enderChest, location);
         UUID owner = player.getUniqueId();
         Instant now = clock.instant();
         scheduler.async(() -> captureSnapshot.capture(owner, cause, payload, now));

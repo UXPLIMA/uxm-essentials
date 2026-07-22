@@ -1446,13 +1446,22 @@ permissions:
     default: op
 
   # invrollback context (docs/permissions.md "Inventory Rollback"). Inventory snapshots are captured at key moments
-  # (death, logout) and stored in the database (never PDC, so they survive a world rollback). Restore (.restore) —
-  # /invrestore <player> opens the staff GUI listing that player's snapshots newest-first; selecting one previews its
-  # contents and a restore overwrites the target's live inventory (the pre-restore inventory is itself snapshotted
-  # first as a safety copy). Restore acts on a live inventory, so the target must be online. uxmessentials.module.
-  # invrollback is the reload/inspect tier.
+  # (death, logout), record where they were taken, and are stored in the database (never PDC, so they survive a world
+  # rollback). Restore (.restore): /invrestore <player> opens the staff GUI listing that player's snapshots
+  # newest-first; selecting one previews its contents and a restore overwrites the target's live inventory (the
+  # pre-restore inventory is itself snapshotted first as a safety copy). Export (.export): the preview's export button
+  # or /invrestore export <player> <index> packs the snapshot's items into shulker boxes and hands them to the staff
+  # member, so items can be inspected or returned without a live restore. Teleport (.teleport): the preview's teleport
+  # button or /invrestore tp <player> <index> takes the staff member to where the snapshot was captured. All three
+  # verbs need the target online. uxmessentials.module.invrollback is the reload/inspect tier.
   uxmessentials.invrollback.restore:
-    description: '/invrestore <player> — open the inventory-snapshot restore GUI for a player.'
+    description: '/invrestore <player> opens the inventory-snapshot restore GUI for a player.'
+    default: op
+  uxmessentials.invrollback.export:
+    description: '/invrestore export <player> <index> packs a snapshot into shulker boxes and gives them to you.'
+    default: op
+  uxmessentials.invrollback.teleport:
+    description: '/invrestore tp <player> <index> teleports you to where the snapshot was captured.'
     default: op
   uxmessentials.module.invrollback:
     description: 'Hot-reload / inspect the invrollback module (inventory snapshots and restore).'

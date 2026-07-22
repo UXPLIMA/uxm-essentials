@@ -37,8 +37,16 @@ public final class SnapshotPreviewListener implements Listener {
         }
         event.setCancelled(true);
         boolean clickedPreview = event.getClickedInventory() == event.getView().getTopInventory();
-        if (clickedPreview && holder.isRestoreSlot(event.getRawSlot()) && event.getWhoClicked() instanceof Player who) {
+        if (!clickedPreview || !(event.getWhoClicked() instanceof Player who)) {
+            return;
+        }
+        int slot = event.getRawSlot();
+        if (holder.isRestoreSlot(slot)) {
             view.onRestoreClick(holder, who);
+        } else if (holder.isTeleportSlot(slot)) {
+            view.onTeleportClick(holder, who);
+        } else if (holder.isExportSlot(slot)) {
+            view.onExportClick(holder, who);
         }
     }
 

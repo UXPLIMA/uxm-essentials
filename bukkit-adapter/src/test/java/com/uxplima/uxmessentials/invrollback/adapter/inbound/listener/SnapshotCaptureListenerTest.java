@@ -51,6 +51,7 @@ class SnapshotCaptureListenerTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
+        server.addSimpleWorld("world"); // so a captured player has a location with a world to record
     }
 
     @AfterEach

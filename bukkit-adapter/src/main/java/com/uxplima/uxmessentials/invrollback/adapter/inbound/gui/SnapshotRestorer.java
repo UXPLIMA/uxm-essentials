@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.invrollback.application.RestoreSnapshot;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotId;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -74,7 +75,9 @@ public final class SnapshotRestorer {
             return;
         }
         byte[] current = InventorySnapshotCodec.encode(
-                live.getInventory().getContents(), live.getEnderChest().getContents());
+                live.getInventory().getContents(),
+                live.getEnderChest().getContents(),
+                BukkitRefs.toPosition(Objects.requireNonNull(live.getLocation(), "target location")));
         Instant now = clock.instant();
         scheduler.async(() -> {
             Optional<Snapshot> chosen = restoreSnapshot.restore(target.uuid(), id, current, now);
