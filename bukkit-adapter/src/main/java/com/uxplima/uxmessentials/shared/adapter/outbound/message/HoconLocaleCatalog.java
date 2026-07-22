@@ -26,9 +26,13 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  * of catalog key to MiniMessage template. Catalog keys are quoted, dot-separated strings
  * ({@code "home.teleported"}), so they are read as literal HOCON map keys rather than nested paths.
  *
- * <p>The fallback chain is per key: a key missing from the requested locale falls back to English, and
- * a key missing from English too falls back to the key's own name so a message is never blank. English
- * is always loaded; additional locales are loaded on demand and cached.
+ * <p>Each locale is loaded as a merge of two layers: the bundled classpath default
+ * ({@code messages/messages_<lang>.conf} inside the jar) as the base, and the on-disk
+ * {@code messages_<lang>.conf} the operator edits layered over it as the per-key override. So a key an update
+ * adds to the bundled catalog still resolves on a server whose on-disk file predates it (from the bundled
+ * default), while an operator's edit to a key still wins. The fallback chain is then per key: operator disk
+ * override, then bundled default (both captured in the requested locale's merged table), then English, then the
+ * key's own name so a message is never blank. English is always loaded; additional locales load on demand and cache.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. Per-locale tables are immutable maps held in a
@@ -45,7 +49,8 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
 
     /**
      * @param messagesDir the on-disk {@code messages} directory; a {@code messages_<lang>.conf}
-     *     present there is read in preference to the bundled copy, so operator edits take effect.
+     *     present there is layered over the bundled copy as a per-key override, so operator edits take effect
+     *     while a key present only in the bundled default still resolves.
      */
     public HoconLocaleCatalog(Logger log, Path messagesDir) {
         this.log = Objects.requireNonNull(log, "log");
@@ -80,10 +85,23 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     }
 
     private Map<String, String> loadLanguage(String language) {
-        Path onDisk = messagesDir.resolve("messages_" + language + ".conf");
-        if (Files.isRegularFile(onDisk)) {
-            return parse(HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString());
+        Map<String, String> bundled = loadBundled(language);
+        Map<String, String> onDisk = loadOnDisk(language);
+        if (onDisk.isEmpty()) {
+            return bundled;
         }
+        if (bundled.isEmpty()) {
+            return onDisk;
+        }
+        // Bundled default is the base; the operator's on-disk file overrides it per key. A key the operator kept
+        // resolves from disk; a key an update added but the disk file never had resolves from the bundled default.
+        Map<String, String> merged = new java.util.HashMap<>(bundled);
+        merged.putAll(onDisk);
+        return Map.copyOf(merged);
+    }
+
+    /** The bundled classpath default for {@code language}, the base layer, or empty when the jar ships none. */
+    private Map<String, String> loadBundled(String language) {
         String resource = RESOURCE_DIR + "messages_" + language + ".conf";
         if (getClass().getClassLoader().getResource(resource) == null) {
             return Map.of();
@@ -93,6 +111,15 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
                         .source(() -> openReader(resource))
                         .build(),
                 resource);
+    }
+
+    /** The operator's on-disk file for {@code language}, the override layer, or empty when it is absent. */
+    private Map<String, String> loadOnDisk(String language) {
+        Path onDisk = messagesDir.resolve("messages_" + language + ".conf");
+        if (!Files.isRegularFile(onDisk)) {
+            return Map.of();
+        }
+        return parse(HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString());
     }
 
     private Map<String, String> parse(HoconConfigurationLoader loader, String origin) {
