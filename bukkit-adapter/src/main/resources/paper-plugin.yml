@@ -1417,6 +1417,9 @@ permissions:
   # up into a captured-villager item and place it back. Follow (.follow) — /villager follow makes the villager you look
   # at pathfind after you. Leash (.leash) — right-click a villager with a lead to leash it. All features ship off in
   # config; the module reload/inspect tier is uxmessentials.module.villagers.
+  uxmessentials.villagers.use:
+    description: '/villager: the root command''s base node; its subcommands each gate further on their own node.'
+    default: op
   uxmessentials.villagers.manager:
     description: '/villager manager — open and edit the trades of the villager you are looking at.'
     default: op

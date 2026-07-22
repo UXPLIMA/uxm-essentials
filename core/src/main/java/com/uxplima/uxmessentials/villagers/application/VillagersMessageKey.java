@@ -21,6 +21,11 @@ public enum VillagersMessageKey implements MessageKey {
     // does not open.
     VILLAGERS_TRADES_DISABLED("villagers.trades-disabled"),
 
+    // The bare /villager root: a usage line pointing at the manager/protect/follow verbs, and the line shown when the
+    // module is on but every villager sub-feature is off so there is nothing to do.
+    VILLAGERS_USAGE("villagers.usage"),
+    VILLAGERS_NONE_ENABLED("villagers.none-enabled"),
+
     // Trade manager — /villager manager could not find a villager the player is looking at (or within reach).
     VILLAGERS_MANAGER_NO_TARGET("villagers.manager.no-target"),
 

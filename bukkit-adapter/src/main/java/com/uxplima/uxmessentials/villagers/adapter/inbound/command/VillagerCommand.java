@@ -38,6 +38,9 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VillagerCommand implements CommandRegistration {
 
+    /** The base node gating whether the {@code /villager} root is visible at all (its subcommands self-gate further). */
+    private static final String USE_PERMISSION = "uxmessentials.villagers.use";
+
     /** How far the player's line of sight (and the nearest-villager fallback) reaches for a target, in blocks. */
     private static final int REACH = 5;
 
@@ -68,7 +71,9 @@ public final class VillagerCommand implements CommandRegistration {
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("villager");
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("villager")
+                .requires(src -> src.getSender().hasPermission(USE_PERMISSION))
+                .executes(this::help);
         if (managerView != null && managerPermission != null) {
             String permission = managerPermission;
             root.then(Commands.literal("manager")
@@ -93,6 +98,18 @@ public final class VillagerCommand implements CommandRegistration {
     @Override
     public String description() {
         return "Manage the villager you are looking at (/villager manager, /villager protect, /villager follow).";
+    }
+
+    /**
+     * The bare {@code /villager}: point the sender at the verbs their operator enabled, or, when the module is on
+     * but every villager sub-feature is off, a clear line saying no villager tools are available.
+     */
+    private int help(CommandContext<CommandSourceStack> ctx) {
+        boolean anyEnabled = managerView != null || protectToggle != null || followService != null;
+        feedback.send(
+                ctx.getSource().getSender(),
+                anyEnabled ? VillagersMessageKey.VILLAGERS_USAGE : VillagersMessageKey.VILLAGERS_NONE_ENABLED);
+        return Command.SINGLE_SUCCESS;
     }
 
     private int openManager(CommandContext<CommandSourceStack> ctx) {

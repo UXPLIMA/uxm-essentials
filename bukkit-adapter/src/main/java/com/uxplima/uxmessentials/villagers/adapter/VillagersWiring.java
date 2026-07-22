@@ -48,9 +48,10 @@ import org.jspecify.annotations.Nullable;
  * {@link VillagerProtectionListener} and the {@code /villager protect} toggle wire only under {@code protect}, while the
  * {@link VillagerBucketListener} — like the disable listener — always registers and honours its own {@code bucket}
  * switch. The {@link VillagerFollowService} and the {@code /villager follow} toggle wire only under {@code follow}, and
- * the {@link VillagerLeashListener} lands only under {@code leash}. The one {@code /villager} command carries whichever
- * of the {@code manager} / {@code protect} / {@code follow} subcommands their features enabled, so it is registered when
- * any is on.
+ * the {@link VillagerLeashListener} lands only under {@code leash}. The one {@code /villager} command registers whenever
+ * the module is on (gated on {@code uxmessentials.villagers.use}) and carries whichever of the {@code manager} /
+ * {@code protect} / {@code follow} subcommands their features enabled; with every sub-feature off it is just the root,
+ * whose bare executor reports that no villager tools are available.
  *
  * <p>The context persists nothing relational — the last-restock stamp, the disable flag, the follow-owner mark, and the
  * manager's custom recipe set are all PDC state on the villager entity — so there is no repository or migration. The
@@ -134,17 +135,18 @@ public final class VillagersWiring {
                     kernel.messages(),
                     true);
         }
-        // The one /villager command carries whichever subcommands their features enabled; register it when any is on.
-        if (managerView != null || protectToggle != null || followService != null) {
-            commands.add(new VillagerCommand(
-                    managerView != null ? MANAGER_PERMISSION : null,
-                    managerView,
-                    protectToggle != null ? PROTECT_PERMISSION : null,
-                    protectToggle,
-                    followService != null ? FOLLOW_PERMISSION : null,
-                    followService,
-                    kernel.messages()));
-        }
+        // The one /villager command registers whenever the module is on: its subcommands each self-gate on their own
+        // permission and are present only when their feature wired, so with every sub-feature off the root still
+        // exists (gated on uxmessentials.villagers.use) and its bare executor reports that no tools are enabled,
+        // rather than the command silently not existing while the module reads as running.
+        commands.add(new VillagerCommand(
+                managerView != null ? MANAGER_PERMISSION : null,
+                managerView,
+                protectToggle != null ? PROTECT_PERMISSION : null,
+                protectToggle,
+                followService != null ? FOLLOW_PERMISSION : null,
+                followService,
+                kernel.messages()));
         // Leashing: intercept a lead right-click on a villager and attach the lead. Wires only under the leash switch.
         if (config.leash().enabled()) {
             listeners.add(new VillagerLeashListener(true, LEASH_PERMISSION));
