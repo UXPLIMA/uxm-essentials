@@ -11,12 +11,21 @@ dependencies {
     implementation(project(":core"))
     api(project(":api"))
     compileOnly(libs.velocity.api)
+    // Command-control reuses the pure :core domain, reads its config with Configurate HOCON, renders
+    // deny/spam text with MiniMessage, and resolves groups via LuckPerms. All three are provided by the
+    // Velocity proxy at runtime, so they are compileOnly here and are never shaded into the jar.
+    compileOnly(libs.bundles.configs)
+    compileOnly(libs.bundles.adventure)
+    compileOnly(libs.luckperms.api)
     // The @Plugin annotation processor also emits a velocity-plugin.json. We ship a hand-written
     // descriptor instead (expanded with the project version by processResources below), the single
     // source of truth Velocity loads, so the processor output is suppressed to avoid a duplicate entry.
     annotationProcessor(libs.velocity.api)
 
     testImplementation(libs.velocity.api) // the broker test mocks ProxyServer / ServerConnection
+    // The command-control tests build real Brigadier command trees, parse HOCON, and render MiniMessage.
+    testImplementation(libs.bundles.configs)
+    testImplementation(libs.bundles.adventure)
 }
 
 // The velocity-api annotation processor generates its own velocity-plugin.json from the @Plugin

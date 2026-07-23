@@ -2,8 +2,10 @@
   "id": "uxmessentials-velocity",
   "name": "uxmEssentials Velocity",
   "version": "${version}",
-  "description": "Cross-server bus broker for uxmEssentials homes/warps/economy/vaults sync.",
+  "description": "Cross-server bus broker and proxy command-control for uxmEssentials.",
   "authors": ["UXPLIMA"],
-  "dependencies": [],
+  "dependencies": [
+    { "id": "luckperms", "optional": true }
+  ],
   "main": "com.uxplima.uxmessentials.velocity.UxmEssentialsVelocity"
 }

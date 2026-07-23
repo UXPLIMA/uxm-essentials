@@ -1,13 +1,17 @@
 package com.uxplima.uxmessentials.velocity;
 
+import java.nio.file.Path;
 import java.util.Objects;
 
 import com.google.inject.Inject;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.velocity.commandcontrol.ProxyCommandControl;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.plugin.Dependency;
 import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import org.jspecify.annotations.NullMarked;
@@ -29,29 +33,33 @@ import org.slf4j.Logger;
         id = "uxmessentials-velocity",
         name = "uxmEssentials Velocity",
         version = BuildConstants.VERSION,
-        description = "Cross-server bus broker for uxmEssentials homes/warps/economy/vaults sync.",
-        authors = {"UXPLIMA"})
+        description = "Cross-server bus broker and proxy command-control for uxmEssentials.",
+        authors = {"UXPLIMA"},
+        dependencies = {@Dependency(id = "luckperms", optional = true)})
 @NullMarked
 public final class UxmEssentialsVelocity {
 
     private final ProxyServer proxy;
     private final Logger logger;
+    private final Path dataDirectory;
     private final BusBroker broker;
     private final MinecraftChannelIdentifier channel;
 
     @Inject
-    public UxmEssentialsVelocity(ProxyServer proxy, Logger logger) {
+    public UxmEssentialsVelocity(ProxyServer proxy, Logger logger, @DataDirectory Path dataDirectory) {
         this.proxy = Objects.requireNonNull(proxy, "proxy");
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.dataDirectory = Objects.requireNonNull(dataDirectory, "dataDirectory");
         this.broker = new BusBroker(proxy, logger);
         this.channel = MinecraftChannelIdentifier.create(BusChannel.NAMESPACE, BusChannel.NAME);
     }
 
-    /** Register the bus channel on the proxy so backends can send and receive frames through it. */
+    /** Register the bus channel and, when configured, the proxy command-control layer on proxy init. */
     @Subscribe
     public void onProxyInitialize(ProxyInitializeEvent event) {
         proxy.getChannelRegistrar().register(channel);
         logger.info("uxmEssentials bus broker ready on channel {}", channel.getId());
+        ProxyCommandControl.enable(this, proxy, logger, dataDirectory);
     }
 
     /** Relay an incoming bus frame from its origin backend to every other backend. */
