@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.PrestigeCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RanksCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RankupCommand;
+import com.uxplima.uxmessentials.ranks.adapter.inbound.command.SetRankCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.gui.RanksPanelMenu;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.AutorankScan;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankActionRunner;
@@ -52,8 +53,8 @@ import org.jspecify.annotations.NullMarked;
  * {@link CurrentRank} read, the {@link RankRequirementEvaluator} that resolves a rank's typed requirements against
  * the economy / playtime / permission / stored-rank / placeholder / inventory seams, and the
  * {@link RankActionRunner} that runs a rank's configured actions through the shared click-action engine. Those
- * assemble the {@link Rankup} and {@link SetRank} use cases, published as the {@code /rankup} and
- * {@code /ranks setrank} commands.
+ * assemble the {@link Rankup} and {@link SetRank} use cases, published as the {@code /rankup} command and the
+ * {@code /ranks setrank} subcommand (which the top-level {@code /setrank} alias also publishes).
  *
  * <p>The rank cost is charged through the {@link RankEconomy} seam bridged in the economy context and handed in
  * here as an {@link Optional} — empty when economy is disabled, in which case a priced rank is free. The rank
@@ -94,7 +95,10 @@ public final class RanksWiring {
                 ladderPanel(plugin, kernel, config, menus, menuBindings, rankup, currentRank, ladder);
         List<CommandRegistration> commands = new ArrayList<>(List.of(
                 new RankupCommand(rankup, kernel.messages()),
-                new RanksCommand(setRank, ladder, panel, kernel.messages())));
+                new RanksCommand(setRank, ladder, panel, kernel.messages()),
+                // The standalone /setrank publishes the same admin direct-set as /ranks setrank, under its own command
+                // id so it renames/disables independently through commands.conf.
+                new SetRankCommand(setRank, ladder, kernel.messages())));
         if (config.prestige().enabled()) {
             // Prestige is config-gated: when off, the /prestige verb is not published at all — it reuses the same
             // requirement evaluator, action runner and economy seam a rankup goes through.

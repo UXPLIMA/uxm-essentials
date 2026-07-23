@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.ranks.adapter.inbound.command;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -10,28 +8,19 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
-import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.gui.RanksPanelMenu;
-import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
 import com.uxplima.uxmessentials.ranks.application.SetRank;
-import com.uxplima.uxmessentials.ranks.domain.Rank;
-import com.uxplima.uxmessentials.ranks.domain.RankId;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -56,14 +45,13 @@ public final class RanksCommand implements CommandRegistration {
     /** The self-service permission a player holds to open the {@code /ranks} ladder panel. */
     public static final String GUI_PERMISSION = "uxmessentials.ranks.gui";
 
-    private final SetRank setRank;
-    private final RankLadder ladder;
+    private final SetRankExecutor setRank;
     private final Optional<RanksPanelMenu> panel;
     private final CommandFeedback feedback;
 
     public RanksCommand(SetRank setRank, RankLadder ladder, Optional<RanksPanelMenu> panel, Messages messages) {
-        this.setRank = Objects.requireNonNull(setRank, "setRank");
-        this.ladder = Objects.requireNonNull(ladder, "ladder");
+        this.setRank = new SetRankExecutor(
+                Objects.requireNonNull(setRank, "setRank"), Objects.requireNonNull(ladder, "ladder"), messages);
         this.panel = Objects.requireNonNull(panel, "panel");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
@@ -75,11 +63,7 @@ public final class RanksCommand implements CommandRegistration {
                         || (panel.isPresent() && src.getSender().hasPermission(GUI_PERMISSION)))
                 .then(Commands.literal("setrank")
                         .requires(src -> src.getSender().hasPermission(PERMISSION))
-                        .then(Commands.argument("player", ArgumentTypes.player())
-                                .suggests(CommandSuggestions.singlePlayerTarget())
-                                .then(Commands.argument("rank", StringArgumentType.word())
-                                        .suggests(CommandSuggestions.fromStrings(this::rankIds))
-                                        .executes(this::setRank))));
+                        .then(setRank.arguments()));
         // The no-argument ladder panel is wired only when the GUI is enabled; when off, /ranks stays setrank-only.
         panel.ifPresent(view -> root.executes(this::openGui));
         return root.build();
@@ -101,43 +85,5 @@ public final class RanksCommand implements CommandRegistration {
         }
         panel.orElseThrow().open(player, BukkitRefs.toRef(player));
         return Command.SINGLE_SUCCESS;
-    }
-
-    private List<String> rankIds() {
-        return ladder.ranks().stream().map(rank -> rank.id().value()).toList();
-    }
-
-    private int setRank(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
-        if (target.isEmpty()) {
-            return 0;
-        }
-        RankId rankId = RankId.of(ctx.getArgument("rank", String.class));
-        Optional<Rank> set = setRank.setRank(target.get().uuid(), rankId);
-        if (set.isEmpty()) {
-            feedback.send(sender, RanksMessageKey.RANKS_SETRANK_UNKNOWN_RANK, Map.of("rank", rankId.value()));
-            return 0;
-        }
-        feedback.send(
-                sender,
-                RanksMessageKey.RANKS_SETRANK_SUCCESS,
-                Map.of("player", target.get().name(), "rank", set.get().displayName()));
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
-        try {
-            PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
-            List<Player> resolved = resolver.resolve(ctx.getSource());
-            if (resolved.isEmpty()) {
-                feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
-                return Optional.empty();
-            }
-            return Optional.of(BukkitRefs.toRef(resolved.get(0)));
-        } catch (CommandSyntaxException unmatched) {
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
-            return Optional.empty();
-        }
     }
 }
