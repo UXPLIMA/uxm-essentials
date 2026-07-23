@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.regions.adapter.outbound;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -14,7 +16,7 @@ import org.bukkit.Server;
 import org.bukkit.World;
 
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
-import com.uxplima.uxmessentials.regions.domain.FlagState;
+import com.uxplima.uxmessentials.regions.domain.FlagDescriptor;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
@@ -26,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The WorldGuard side of the {@link RegionService}, reached purely by reflection behind a plugin-present guard — the
+ * The WorldGuard side of the {@link RegionService}, reached purely by reflection behind a plugin-present guard: the
  * same pattern the poses {@code WorldGuardPoseFlags} and the menu vocabulary's {@code worldguard-region} condition
  * use. It walks {@code WorldGuard.getInstance().getPlatform().getRegionContainer().get(world)} to a
  * {@code RegionManager} and reads the region map, each region's priority, roster and flags off it.
@@ -34,11 +36,11 @@ import org.jspecify.annotations.Nullable;
  * <p>The SDK is named only by string class-name ({@code com.sk89q.worldguard.WorldGuard},
  * {@code com.sk89q.worldedit.bukkit.BukkitAdapter}), so no field or method signature carries a {@code com.sk89q}
  * type: on a server without WorldGuard the {@link #available()} guard short-circuits before any {@code Class.forName},
- * so none of its classes load. Every read is fail-safe — an absent plugin, an unknown world, an unmanaged world, a
+ * so none of its classes load. Every read is fail-safe: an absent plugin, an unknown world, an unmanaged world, a
  * missing region, or any reflective failure (a version bump moving a method) reports an empty result and is logged
  * at most once, because a blank list is a better failure than a thrown command.
  *
- * <p>The mutations — {@code create}, {@code setFlag}, {@code applyMemberChange} and {@code setPriority} — must, unlike
+ * <p>The mutations: {@code create}, {@code setFlag}, {@code applyMemberChange} and {@code setPriority}: must, unlike
  * the fail-safe reads, not fail silently: a reflective failure or a rejected request is wrapped in a
  * {@link RegionServiceException} the command surface turns into an operator-facing error rather than a swallowed
  * no-op. Each mutates the live region in memory and leans on WorldGuard's own background/shutdown save to persist
@@ -129,6 +131,57 @@ public final class WorldGuardRegionService implements RegionService {
     }
 
     @Override
+    public List<FlagDescriptor> flagDescriptors(RegionRef region) {
+        Objects.requireNonNull(region, "region");
+        if (!available()) {
+            return List.of();
+        }
+        try {
+            List<?> allFlags = registeredFlags();
+            Map<String, Object> current = setValuesByName(region);
+            List<FlagDescriptor> descriptors = new ArrayList<>();
+            for (Object flag : allFlags) {
+                String name = WorldGuardFlagTypes.flagName(flag);
+                descriptors.add(WorldGuardFlagTypes.describe(flag, current.get(name)));
+            }
+            descriptors.sort(Comparator.comparing(FlagDescriptor::name));
+            return List.copyOf(descriptors);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+            degrade(failure);
+            return List.of();
+        }
+    }
+
+    /** The region's currently-set flag values keyed by flag name, for pairing with the full registry list. */
+    private Map<String, Object> setValuesByName(RegionRef region) throws ReflectiveOperationException {
+        Object protectedRegion = protectedRegion(region);
+        if (protectedRegion == null) {
+            return Map.of();
+        }
+        Object result = protectedRegion.getClass().getMethod("getFlags").invoke(protectedRegion);
+        Map<String, Object> byName = new HashMap<>();
+        if (result instanceof Map<?, ?> flagMap) {
+            for (Map.Entry<?, ?> entry : flagMap.entrySet()) {
+                byName.put(WorldGuardFlagTypes.flagName(entry.getKey()), entry.getValue());
+            }
+        }
+        return byName;
+    }
+
+    /** Every flag WorldGuard has registered ({@code FlagRegistry#getAll}), across every type. */
+    private List<?> registeredFlags() throws ReflectiveOperationException {
+        Object registry = flagRegistry();
+        Object all = registry.getClass().getMethod("getAll").invoke(registry);
+        return all instanceof List<?> flags ? flags : List.of();
+    }
+
+    /** {@code WorldGuard.getInstance().getFlagRegistry()}: the registry both reads and writes look flags up in. */
+    private static Object flagRegistry() throws ReflectiveOperationException {
+        Object instance = worldGuardInstance();
+        return instance.getClass().getMethod("getFlagRegistry").invoke(instance);
+    }
+
+    @Override
     public List<String> members(RegionRef region) {
         Objects.requireNonNull(region, "region");
         return domainIdentifiers(region, "getMembers");
@@ -191,23 +244,29 @@ public final class WorldGuardRegionService implements RegionService {
         if (!available()) {
             throw new UnsupportedOperationException("WorldGuard is not installed");
         }
-        // Reject an out-of-range value before any reflection touches WorldGuard.
-        FlagState state = FlagState.parse(flag.value());
         try {
             Object protectedRegion = protectedRegion(region);
             if (protectedRegion == null) {
                 throw new RegionServiceException("no region " + region.id() + " to flag");
             }
-            Object stateFlag = stateFlag(flag.name());
-            if (stateFlag == null) {
-                throw new RegionServiceException("unknown or non-state flag: " + flag.name());
+            Object wgFlag = flagByName(flag.name());
+            if (wgFlag == null) {
+                throw new RegionServiceException("unknown flag: " + flag.name());
             }
-            // A null value clears the flag (unset); a state value sets it explicitly.
-            Object value = state == FlagState.UNSET ? null : stateValue(state);
-            setRegionFlag(protectedRegion, stateFlag, value);
+            // A blank value clears the flag (unset); otherwise the portable value is converted to the flag's own type.
+            Object value = WorldGuardFlagTypes.toWgValue(wgFlag, flag.value());
+            setRegionFlag(protectedRegion, wgFlag, value);
         } catch (ReflectiveOperationException failure) {
             throw new RegionServiceException("could not set flag " + flag.name(), failure);
+        } catch (IllegalArgumentException invalid) {
+            throw new RegionServiceException("invalid value for flag " + flag.name() + ": " + flag.value(), invalid);
         }
+    }
+
+    /** The registered flag named {@code name}, of any type, or {@code null} when the registry has none. */
+    private static @Nullable Object flagByName(String name) throws ReflectiveOperationException {
+        Object registry = flagRegistry();
+        return registry.getClass().getMethod("get", String.class).invoke(registry, name);
     }
 
     @Override
@@ -223,7 +282,7 @@ public final class WorldGuardRegionService implements RegionService {
             }
             Object domain = domainOf(protectedRegion, change.role());
             applyToDomain(domain, change.player(), change.action());
-            // Mutating the domain marks it — and so the region — dirty; WorldGuard's periodic and shutdown saves
+            // Mutating the domain marks it: and so the region: dirty; WorldGuard's periodic and shutdown saves
             // persist it, keeping this a fast in-memory call rather than a blocking disk write on the tick thread.
         } catch (ReflectiveOperationException failure) {
             throw new RegionServiceException(
@@ -256,7 +315,7 @@ public final class WorldGuardRegionService implements RegionService {
         return protectedRegion.getClass().getMethod(getter).invoke(protectedRegion);
     }
 
-    /** {@code DefaultDomain.addPlayer(UUID)} / {@code removePlayer(UUID)} — the uuid overload, chosen by parameter. */
+    /** {@code DefaultDomain.addPlayer(UUID)} / {@code removePlayer(UUID)}: the uuid overload, chosen by parameter. */
     private static void applyToDomain(Object domain, UUID player, RegionMemberChange.Action action)
             throws ReflectiveOperationException {
         String method = action == RegionMemberChange.Action.ADD ? "addPlayer" : "removePlayer";
@@ -318,7 +377,7 @@ public final class WorldGuardRegionService implements RegionService {
         return regionContainerGet(container, weWorld);
     }
 
-    /** {@code RegionContainer#get(World)} — matched by the single WorldEdit-world argument; may return {@code null}. */
+    /** {@code RegionContainer#get(World)}: matched by the single WorldEdit-world argument; may return {@code null}. */
     private static @Nullable Object regionContainerGet(Object container, Object weWorld)
             throws ReflectiveOperationException {
         for (Method candidate : container.getClass().getMethods()) {
@@ -346,7 +405,7 @@ public final class WorldGuardRegionService implements RegionService {
         return regionsMap(manager).get(region.id());
     }
 
-    /** {@code WorldGuard.getInstance()} — the singleton entry point every reflective walk starts from. */
+    /** {@code WorldGuard.getInstance()}: the singleton entry point every reflective walk starts from. */
     private static Object worldGuardInstance() throws ReflectiveOperationException {
         return Class.forName("com.sk89q.worldguard.WorldGuard")
                 .getMethod("getInstance")
@@ -370,35 +429,13 @@ public final class WorldGuardRegionService implements RegionService {
                 .invoke(null, position.blockX(), position.blockY(), position.blockZ());
     }
 
-    /** {@code RegionManager.addRegion(ProtectedRegion)} — matched by the single {@code ProtectedRegion} argument. */
+    /** {@code RegionManager.addRegion(ProtectedRegion)}: matched by the single {@code ProtectedRegion} argument. */
     private static void addRegion(Object manager, Object region) throws ReflectiveOperationException {
         Class<?> protectedRegionClass = Class.forName("com.sk89q.worldguard.protection.regions.ProtectedRegion");
         manager.getClass().getMethod("addRegion", protectedRegionClass).invoke(manager, region);
     }
 
-    /**
-     * The WorldGuard {@code StateFlag} registered under {@code name}, or {@code null} when no flag carries that name
-     * or the flag is not a state flag (a free-text flag the cycle editor cannot drive). Read off the flag registry so
-     * a flag's canonical type — not a guessed one — decides whether the editor may cycle it.
-     */
-    private static @Nullable Object stateFlag(String name) throws ReflectiveOperationException {
-        Object registry =
-                worldGuardInstance().getClass().getMethod("getFlagRegistry").invoke(worldGuardInstance());
-        Object flag = registry.getClass().getMethod("get", String.class).invoke(registry, name);
-        if (flag == null) {
-            return null;
-        }
-        Class<?> stateFlagClass = Class.forName("com.sk89q.worldguard.protection.flags.StateFlag");
-        return stateFlagClass.isInstance(flag) ? flag : null;
-    }
-
-    /** The {@code StateFlag.State} enum constant for a domain {@link FlagState} ({@code ALLOW} / {@code DENY}). */
-    private static Object stateValue(FlagState state) throws ReflectiveOperationException {
-        Class<?> stateEnum = Class.forName("com.sk89q.worldguard.protection.flags.StateFlag$State");
-        return stateEnum.getMethod("valueOf", String.class).invoke(null, state.token());
-    }
-
-    /** {@code ProtectedRegion.setFlag(Flag, value)} — a null value clears the flag; matched by its two arguments. */
+    /** {@code ProtectedRegion.setFlag(Flag, value)}: a null value clears the flag; matched by its two arguments. */
     private static void setRegionFlag(Object region, Object flag, @Nullable Object value)
             throws ReflectiveOperationException {
         for (Method candidate : region.getClass().getMethods()) {
@@ -410,7 +447,7 @@ public final class WorldGuardRegionService implements RegionService {
         throw new NoSuchMethodException("ProtectedRegion.setFlag");
     }
 
-    private void degrade(Exception failure) {
+    private void degrade(Throwable failure) {
         if (warned.compareAndSet(false, true)) {
             log.warn("event=regions_worldguard_query_failed reason={}", failure.toString());
         }

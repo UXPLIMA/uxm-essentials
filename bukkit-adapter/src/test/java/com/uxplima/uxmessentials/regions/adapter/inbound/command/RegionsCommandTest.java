@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionListView;
 import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionRosterView;
 import com.uxplima.uxmessentials.regions.adapter.outbound.NoWorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
+import com.uxplima.uxmessentials.regions.domain.FlagDescriptor;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
@@ -350,7 +351,9 @@ class RegionsCommandTest {
                 guiText,
                 scheduler,
                 messages,
+                noopSink(),
                 service,
+                (player, viewer, request, onSubmit, onCancel) -> {},
                 List.of("pvp", "build"),
                 EntityListLayout.paginatedDefault(Material.GRAY_DYE),
                 (clicker, region) -> {});
@@ -463,6 +466,11 @@ class RegionsCommandTest {
 
         @Override
         public List<FlagValue> flags(RegionRef region) {
+            return List.of();
+        }
+
+        @Override
+        public List<FlagDescriptor> flagDescriptors(RegionRef region) {
             return List.of();
         }
 

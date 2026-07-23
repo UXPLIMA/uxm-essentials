@@ -17,8 +17,9 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param listPageSize how many regions fill one page of the {@code /regions} list ({@code list.page-size},
  *     default {@code 45}; clamped to a single chest page)
- * @param editableFlags the state-flag names the flag editor lists, in display order ({@code flags.editable}); each
- *     is a WorldGuard state flag cycled {@code UNSET → ALLOW → DENY}, lower-cased and de-duplicated
+ * @param editableFlags an optional allow-list of flag names the editor shows, in display order ({@code
+ *     flags.editable}), lower-cased and de-duplicated. When empty (the shipped default) the editor lists <em>every</em>
+ *     registered WorldGuard flag; a non-empty list restricts it to exactly those flags.
  */
 public record RegionsConfig(boolean enabled, int listPageSize, List<String> editableFlags) {
 
@@ -29,23 +30,11 @@ public record RegionsConfig(boolean enabled, int listPageSize, List<String> edit
     private static final int MAX_LIST_PAGE_SIZE = 45;
 
     /**
-     * The state flags the editor ships enabled: the everyday protection flags an operator reaches for most, each a
-     * WorldGuard {@code StateFlag} the editor can cycle {@code ALLOW}/{@code DENY}/unset. Free-text flags (greeting,
-     * farewell) are not state flags and so are not part of the cycle editor.
+     * The default allow-list: empty, so out of the box the editor lists every flag WorldGuard has registered (all
+     * types, not just the everyday protection flags). An operator who wants a curated subset lists exactly those flag
+     * names under {@code flags.editable}.
      */
-    private static final List<String> DEFAULT_EDITABLE_FLAGS = List.of(
-            "pvp",
-            "build",
-            "mob-spawning",
-            "mob-damage",
-            "creeper-explosion",
-            "tnt",
-            "entry",
-            "exit",
-            "use",
-            "chest-access",
-            "ride",
-            "interact");
+    private static final List<String> DEFAULT_EDITABLE_FLAGS = List.of();
 
     public RegionsConfig {
         if (listPageSize < 1 || listPageSize > MAX_LIST_PAGE_SIZE) {

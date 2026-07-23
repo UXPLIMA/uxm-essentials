@@ -38,7 +38,7 @@ public enum RegionsMessageKey implements MessageKey {
     REGIONS_CREATE_FAILED("regions.create.failed"),
 
     // The flag editor GUI: the panel title, empty-state title, a per-flag icon name (its flag name) and lore
-    // (current state + a hint), the previous/next page buttons, and the three cycle-state words.
+    // (current value + type + a click hint), the previous/next page buttons, and the cycle-state words.
     REGIONS_FLAGS_TITLE("regions.flags.title"),
     REGIONS_FLAGS_EMPTY("regions.flags.empty"),
     REGIONS_FLAGS_FLAG("regions.flags.flag"),
@@ -48,6 +48,34 @@ public enum RegionsMessageKey implements MessageKey {
     REGIONS_FLAGS_STATE_ALLOW("regions.flags.state-allow"),
     REGIONS_FLAGS_STATE_DENY("regions.flags.state-deny"),
     REGIONS_FLAGS_STATE_UNSET("regions.flags.state-unset"),
+
+    // The boolean flag value words (its unset word reuses the state-unset word above).
+    REGIONS_FLAGS_BOOL_TRUE("regions.flags.bool-true"),
+    REGIONS_FLAGS_BOOL_FALSE("regions.flags.bool-false"),
+
+    // The per-kind type label shown in a flag's lore, one per FlagKind.
+    REGIONS_FLAGS_KIND_STATE("regions.flags.kind-state"),
+    REGIONS_FLAGS_KIND_BOOLEAN("regions.flags.kind-boolean"),
+    REGIONS_FLAGS_KIND_STRING("regions.flags.kind-string"),
+    REGIONS_FLAGS_KIND_INTEGER("regions.flags.kind-integer"),
+    REGIONS_FLAGS_KIND_DOUBLE("regions.flags.kind-double"),
+    REGIONS_FLAGS_KIND_ENUM("regions.flags.kind-enum"),
+    REGIONS_FLAGS_KIND_OTHER("regions.flags.kind-other"),
+
+    // The per-kind click hint shown in a flag's lore: cycle, edit, choose, or read-only.
+    REGIONS_FLAGS_HINT_CYCLE("regions.flags.hint-cycle"),
+    REGIONS_FLAGS_HINT_INPUT("regions.flags.hint-input"),
+    REGIONS_FLAGS_HINT_PICK("regions.flags.hint-pick"),
+    REGIONS_FLAGS_HINT_READONLY("regions.flags.hint-readonly"),
+
+    // The choice picker (ENUM flags): its title and per-option name. The text/number prompt: its label and the
+    // not-a-number rejection. The read-only refusal, and the write-failed error.
+    REGIONS_FLAGS_PICK_TITLE("regions.flags.pick-title"),
+    REGIONS_FLAGS_PICK_OPTION("regions.flags.pick-option"),
+    REGIONS_FLAGS_INPUT_PROMPT("regions.flags.input-prompt"),
+    REGIONS_FLAGS_NUMBER_INVALID("regions.flags.number-invalid"),
+    REGIONS_FLAGS_NOT_EDITABLE("regions.flags.not-editable"),
+    REGIONS_FLAGS_FAILED("regions.flags.failed"),
 
     // The members/owners editor GUI: the panel title, empty-state title, per-entry icon name (its player/group name)
     // and lore (its role + whether it can be removed), the previous/next page buttons, the flag-editor's button that

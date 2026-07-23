@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
+import com.uxplima.uxmessentials.regions.domain.FlagDescriptor;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
@@ -44,6 +45,12 @@ public final class NoWorldGuardRegionService implements RegionService {
 
     @Override
     public List<FlagValue> flags(RegionRef region) {
+        Objects.requireNonNull(region, "region");
+        return List.of();
+    }
+
+    @Override
+    public List<FlagDescriptor> flagDescriptors(RegionRef region) {
         Objects.requireNonNull(region, "region");
         return List.of();
     }

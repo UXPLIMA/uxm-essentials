@@ -18,6 +18,7 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
+import com.uxplima.uxmessentials.regions.domain.FlagDescriptor;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
@@ -198,6 +199,11 @@ class RegionRosterViewTest {
 
         @Override
         public List<FlagValue> flags(RegionRef region) {
+            return List.of();
+        }
+
+        @Override
+        public List<FlagDescriptor> flagDescriptors(RegionRef region) {
             return List.of();
         }
 

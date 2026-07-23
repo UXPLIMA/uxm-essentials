@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -66,11 +67,12 @@ public final class RegionsWiring {
 
     private RegionsWiring() {}
 
-    /** Build the regions adapters and the {@code /regions} command from {@code plugin}, {@code ctx} and {@code menus}. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Menus menus) {
+    /** Build the regions adapters and the {@code /regions} command from the injected ports, menu engine and input seam. */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Menus menus, TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         RegionsConfig config = RegionsConfig.from(ctx.config());
         GuiText guiText = new GuiText(kernel.messages());
@@ -89,7 +91,9 @@ public final class RegionsWiring {
                 guiText,
                 kernel.scheduler(),
                 kernel.messages(),
+                kernel.messageSink(),
                 service,
+                textInput::prompt,
                 config.editableFlags(),
                 EntityListLayout.paginatedDefault(REGION_ICON),
                 openRosterOnClick(kernel, rosterView));

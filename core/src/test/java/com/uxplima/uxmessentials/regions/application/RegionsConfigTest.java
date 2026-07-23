@@ -31,7 +31,8 @@ class RegionsConfigTest {
 
         assertThat(config.enabled()).isTrue();
         assertThat(config.listPageSize()).isEqualTo(45);
-        assertThat(config.editableFlags()).contains("pvp", "build", "mob-spawning");
+        // The shipped default allow-list is empty, which the editor reads as "show every registered flag".
+        assertThat(config.editableFlags()).isEmpty();
     }
 
     @Test

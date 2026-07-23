@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.regions.application.port;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.regions.domain.FlagDescriptor;
 import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
@@ -40,6 +41,15 @@ public interface RegionService {
     /** The region's currently-set flags as rendered name/value pairs; empty when it sets none or is gone. */
     List<FlagValue> flags(RegionRef region);
 
+    /**
+     * Every flag WorldGuard has registered, each described for the editor: its name, its portable {@link
+     * com.uxplima.uxmessentials.regions.domain.FlagKind kind}, the region's current value (empty when unset), and the
+     * choices a fixed-choice flag offers. Unlike {@link #flags} (which reports only the flags a region has <em>set</em>),
+     * this lists the whole registry so the editor can expose every flag with a type-appropriate control. Empty when
+     * WorldGuard is absent or the region is gone; the result is ordered by flag name.
+     */
+    List<FlagDescriptor> flagDescriptors(RegionRef region);
+
     /** The region's member identifiers (player names, uuids, and {@code g:group} entries); empty when it has none. */
     List<String> members(RegionRef region);
 
@@ -57,9 +67,11 @@ public interface RegionService {
     RegionRef create(WorldRef world, String id, Position min, Position max);
 
     /**
-     * Set {@code flag} on {@code region} to its carried value. Phase 2.
-     *
-     * @throws UnsupportedOperationException until Phase 2 wires the flag editor
+     * Set {@code flag} on {@code region} to its carried value, or clear it when the value is empty. The adapter looks
+     * the flag up by name in WorldGuard's registry and converts the carried portable value to the flag's concrete
+     * WorldGuard value ({@code StateFlag.State}, {@code Boolean}, a number, a {@code String}, an enum, or a
+     * registry-backed value) per its registered type; an unknown flag, a value the flag cannot accept, or a flag whose
+     * type the editor does not support surfaces as an error rather than a silently discarded write.
      */
     void setFlag(RegionRef region, FlagValue flag);
 
