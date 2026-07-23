@@ -8,7 +8,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +40,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -51,8 +55,10 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of {@code /invrestore <player>}: the command is gated by {@code
- * uxmessentials.invrollback.restore}; dispatching it against an online target with snapshots opens the restore list;
- * dispatching it against an offline/unknown name refuses without opening a window.
+ * uxmessentials.invrollback.restore}; the target is resolved by name through the {@link PlayerLookup} port, so
+ * dispatching it against an online target opens the restore list, dispatching it against an offline-but-known target
+ * still opens the list (and export still hands the staff member shulkers), and only a name the server has never seen
+ * refuses without opening a window.
  */
 class InvrestoreCommandTest {
 
@@ -62,6 +68,7 @@ class InvrestoreCommandTest {
     private ServerMock server;
     private Plugin plugin;
     private SnapshotRepository repository;
+    private FakePlayerLookup lookup;
     private InvrestoreCommand command;
 
     @BeforeEach
@@ -69,6 +76,7 @@ class InvrestoreCommandTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         repository = new RecordingRepository();
+        lookup = new FakePlayerLookup();
 
         Scheduler scheduler = new SyncScheduler();
         Messages messages = keyEcho();
@@ -84,7 +92,8 @@ class InvrestoreCommandTest {
                 new SnapshotPreviewView(messages, scheduler, CLOCK, restorer, teleporter, exporter);
         SnapshotListView listView =
                 new SnapshotListView(menus, guiText, scheduler, messages, noopSink(), repository, preview, CLOCK);
-        command = new InvrestoreCommand(listView, exporter, teleporter, repository, scheduler, messages, noopSink());
+        command = new InvrestoreCommand(
+                listView, exporter, teleporter, repository, lookup, scheduler, messages, noopSink());
     }
 
     @AfterEach
@@ -109,6 +118,7 @@ class InvrestoreCommandTest {
         PlayerMock staff = server.addPlayer("Staff");
         staff.addAttachment(plugin, PERMISSION, true);
         PlayerMock victim = server.addPlayer("Victim");
+        lookup.register(new PlayerRef(victim.getUniqueId(), victim.getName()));
         ItemStack[] contents = new ItemStack[41];
         contents[0] = new ItemStack(Material.DIAMOND, 1);
         repository.save(Snapshot.capture(
@@ -123,15 +133,57 @@ class InvrestoreCommandTest {
     }
 
     @Test
-    void dispatchingAgainstAnOfflineNameRefusesWithoutAWindow() {
+    void dispatchingAgainstAnOfflineButKnownTargetOpensTheList() {
+        PlayerMock staff = server.addPlayer("Staff");
+        staff.addAttachment(plugin, PERMISSION, true);
+        // The target is never connected in this test: only its owner UUID is known to the lookup and its snapshots
+        // live in the repository, exactly the "player has logged off" case AxInventoryRestore supports.
+        PlayerRef offlineVictim = new PlayerRef(UUID.randomUUID(), "Victim");
+        lookup.register(offlineVictim);
+        ItemStack[] contents = new ItemStack[41];
+        contents[0] = new ItemStack(Material.DIAMOND, 1);
+        repository.save(Snapshot.capture(
+                offlineVictim.uuid(),
+                SnapshotCause.LOGOUT,
+                CLOCK.instant(),
+                InventorySnapshotCodec.encode(contents, null)));
+
+        dispatch(CommandSourceStackMock.from(staff), "invrestore Victim");
+
+        assertThat(staff.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
+    }
+
+    @Test
+    void exportingAnOfflineTargetsSnapshotHandsTheStaffMemberShulkers() {
+        PlayerMock staff = server.addPlayer("Staff");
+        staff.addAttachment(plugin, "uxmessentials.invrollback.export", true);
+        PlayerRef offlineVictim = new PlayerRef(UUID.randomUUID(), "Victim");
+        lookup.register(offlineVictim);
+        ItemStack[] contents = new ItemStack[41];
+        contents[0] = new ItemStack(Material.DIAMOND, 5);
+        repository.save(Snapshot.capture(
+                offlineVictim.uuid(),
+                SnapshotCause.DEATH,
+                CLOCK.instant(),
+                InventorySnapshotCodec.encode(contents, null)));
+
+        dispatch(CommandSourceStackMock.from(staff), "invrestore export Victim 1");
+
+        // The export reads the stored snapshot and gives the packed box to the online staff member: the offline
+        // target never needed a live session.
+        assertThat(staff.getInventory().contains(Material.SHULKER_BOX)).isTrue();
+    }
+
+    @Test
+    void dispatchingAgainstAnUnknownNameRefusesWithoutAWindow() {
         PlayerMock staff = server.addPlayer("Staff");
         staff.addAttachment(plugin, PERMISSION, true);
 
         dispatch(CommandSourceStackMock.from(staff), "invrestore Ghost");
 
-        // A target who is not online is refused with the not-online line and no GUI opens (the positive test proves
-        // a window opens only on the success path).
-        assertThat(staff.nextMessage()).contains("invrollback.player-not-found");
+        // A name the server has never seen resolves to nothing: the shared unknown-player line, and no GUI opens (the
+        // positive tests prove a window opens only on the success path).
+        assertThat(staff.nextMessage()).contains("command.unknown-player");
     }
 
     private void dispatch(CommandSourceStack source, String input) {
@@ -193,6 +245,37 @@ class InvrestoreCommandTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+    }
+
+    /** A name/uuid {@link PlayerLookup} whose registered refs resolve whether or not a live player is connected. */
+    private static final class FakePlayerLookup implements PlayerLookup {
+        private final Map<String, PlayerRef> byName = new HashMap<>();
+
+        void register(PlayerRef ref) {
+            byName.put(ref.name().toLowerCase(Locale.ROOT), ref);
+        }
+
+        @Override
+        public Optional<PlayerRef> findByName(String name) {
+            return Optional.ofNullable(byName.get(name.toLowerCase(Locale.ROOT)));
+        }
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return findByName(name);
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return byName.values().stream()
+                    .filter(ref -> ref.uuid().equals(uuid))
+                    .findFirst();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
         }
     }
 

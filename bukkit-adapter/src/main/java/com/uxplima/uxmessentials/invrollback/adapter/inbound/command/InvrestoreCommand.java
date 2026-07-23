@@ -3,8 +3,8 @@ package com.uxplima.uxmessentials.invrollback.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -46,10 +47,13 @@ import org.jspecify.annotations.NullMarked;
  *       member to where the snapshot was captured.
  * </ul>
  *
- * <p>Each verb is gated on its own node and the root is visible to anyone holding any of the three. All three verbs
- * require the target <b>online</b> (the same constraint as opening the GUI); their snapshots persist, so the action
- * succeeds once the target rejoins. Resolving the target and the snapshot list both stay off the tick thread, so the
- * command itself only validates its inputs and delegates.
+ * <p>Each verb is gated on its own node and the root is visible to anyone holding any of the three. The target is
+ * resolved by name to a {@link PlayerRef} through the {@link PlayerLookup} port, online-first then from the profile
+ * cache, so opening the list, exporting to shulkers, and teleporting to the scene all work for an <b>offline</b>
+ * target (they read stored snapshot data and act on the staff member, not on the target's live session); a name the
+ * server has never seen answers the shared unknown-player line. Only the restore write requires the target online,
+ * enforced downstream by the {@code SnapshotRestorer}. The snapshot list stays off the tick thread; the command
+ * itself only validates its inputs, resolves the name, and delegates.
  */
 @NullMarked
 public final class InvrestoreCommand implements CommandRegistration {
@@ -62,6 +66,7 @@ public final class InvrestoreCommand implements CommandRegistration {
     private final SnapshotExporter exporter;
     private final SnapshotTeleporter teleporter;
     private final SnapshotRepository repository;
+    private final PlayerLookup lookup;
     private final Scheduler scheduler;
     private final Messages messages;
     private final MessageSink messageSink;
@@ -72,6 +77,7 @@ public final class InvrestoreCommand implements CommandRegistration {
             SnapshotExporter exporter,
             SnapshotTeleporter teleporter,
             SnapshotRepository repository,
+            PlayerLookup lookup,
             Scheduler scheduler,
             Messages messages,
             MessageSink messageSink) {
@@ -79,6 +85,7 @@ public final class InvrestoreCommand implements CommandRegistration {
         this.exporter = Objects.requireNonNull(exporter, "exporter");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.lookup = Objects.requireNonNull(lookup, "lookup");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
@@ -123,12 +130,12 @@ public final class InvrestoreCommand implements CommandRegistration {
             return 0;
         }
         String name = StringArgumentType.getString(ctx, "player");
-        Player targetPlayer = Bukkit.getPlayerExact(name);
-        if (targetPlayer == null || !targetPlayer.isOnline()) {
-            feedback.send(staff, InvrollbackMessageKey.INVROLLBACK_PLAYER_NOT_FOUND, Map.of("player", name));
+        Optional<PlayerRef> target = lookup.findByName(name);
+        if (target.isEmpty()) {
+            feedback.send(staff, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
             return Command.SINGLE_SUCCESS;
         }
-        listView.open(BukkitRefs.toRef(staff), BukkitRefs.toRef(targetPlayer));
+        listView.open(BukkitRefs.toRef(staff), target.get());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -141,8 +148,10 @@ public final class InvrestoreCommand implements CommandRegistration {
     }
 
     /**
-     * Resolve the target and the chosen snapshot off the tick thread, then run {@code action}. The target must be
-     * online; an out-of-range index answers the "no snapshot at index" line and acts on nothing.
+     * Resolve the target by name (offline-capable) and the chosen snapshot off the tick thread, then run
+     * {@code action}. A name the server has never seen answers the unknown-player line; an out-of-range index answers
+     * the "no snapshot at index" line and acts on nothing. Export and teleport act on stored data plus the staff
+     * member, so an offline target is fine.
      */
     private int withSnapshot(CommandContext<CommandSourceStack> ctx, SnapshotAction action) {
         CommandSender sender = ctx.getSource().getSender();
@@ -152,13 +161,13 @@ public final class InvrestoreCommand implements CommandRegistration {
         }
         String name = StringArgumentType.getString(ctx, "player");
         int index = IntegerArgumentType.getInteger(ctx, "index");
-        Player targetPlayer = Bukkit.getPlayerExact(name);
-        if (targetPlayer == null || !targetPlayer.isOnline()) {
-            feedback.send(staff, InvrollbackMessageKey.INVROLLBACK_PLAYER_NOT_FOUND, Map.of("player", name));
+        Optional<PlayerRef> resolved = lookup.findByName(name);
+        if (resolved.isEmpty()) {
+            feedback.send(staff, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef staffRef = BukkitRefs.toRef(staff);
-        PlayerRef targetRef = BukkitRefs.toRef(targetPlayer);
+        PlayerRef targetRef = resolved.get();
         scheduler.async(() -> {
             List<Snapshot> snapshots = repository.list(targetRef.uuid());
             if (index < 1 || index > snapshots.size()) {

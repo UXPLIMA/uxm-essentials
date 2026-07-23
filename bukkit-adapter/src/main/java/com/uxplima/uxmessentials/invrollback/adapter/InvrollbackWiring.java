@@ -89,6 +89,7 @@ public final class InvrollbackWiring {
                 exporter,
                 teleporter,
                 repository,
+                kernel.playerLookup(),
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink());

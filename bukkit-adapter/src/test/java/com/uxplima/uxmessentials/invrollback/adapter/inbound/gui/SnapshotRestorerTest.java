@@ -107,6 +107,22 @@ class SnapshotRestorerTest {
         assertThat(repository.list(target.getUniqueId())).isEmpty();
     }
 
+    @Test
+    void restoringForAnOfflineTargetReportsTheOnlineRequirementAndChangesNothing() {
+        PlayerMock staff = server.addPlayer();
+        // The target is never connected: restore is the one verb that must write to a live inventory, so it refuses.
+        PlayerRef offlineTarget = new PlayerRef(UUID.randomUUID(), "Ghost");
+        SnapshotRepository repository = new RecordingRepository();
+        CapturingSink sink = new CapturingSink();
+        RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
+
+        new SnapshotRestorer(restore, inlineScheduler(), keyEchoMessages(), sink, CLOCK)
+                .restore(ref(staff), offlineTarget, SnapshotId.random());
+
+        assertThat(sink.last).contains("invrollback.player-not-found");
+        assertThat(repository.list(offlineTarget.uuid())).isEmpty();
+    }
+
     private static SnapshotRestorer restorer(SnapshotRepository repository) {
         RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
         return new SnapshotRestorer(restore, inlineScheduler(), keyEchoMessages(), noopSink(), CLOCK);
@@ -122,6 +138,16 @@ class SnapshotRestorerTest {
 
     private static MessageSink noopSink() {
         return (viewer, renderedText) -> {};
+    }
+
+    /** A {@link MessageSink} that keeps the last rendered string so a test can assert which line was delivered. */
+    private static final class CapturingSink implements MessageSink {
+        private String last = "";
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            last = renderedText;
+        }
     }
 
     /** A scheduler whose entity/async hops run inline, so the restore completes within the test. */
