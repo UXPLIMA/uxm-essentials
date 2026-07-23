@@ -13,12 +13,12 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * the module-level tunables. It is resolved once from the module's scoped {@link ConfigStore} on start and, per
  * the atomic-reload rule, swapped whole on reload — so a reader always sees one coherent snapshot.
  *
- * <p>Prestige and autorank ship {@code false}: both are opt-in progression mechanics an operator turns on once
- * their ladder is authored, so a fresh install has plain rankup only. An operator who deletes a line falls back
- * to the shipped default rather than to an accidental {@code true}.
+ * <p>Prestige ships {@code true} so the {@code /prestige} verb is published out of the box; it no-ops sensibly
+ * until a ladder and prestige rewards are authored. Autorank ships {@code false}: it is an opt-in an operator
+ * turns on once their ladder is authored. An operator who deletes a line falls back to the shipped default.
  *
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
- * @param prestige the prestige settings ({@code prestige.*}); {@link PrestigeSettings#enabled()} ships {@code false}
+ * @param prestige the prestige settings ({@code prestige.*}); {@link PrestigeSettings#enabled()} ships {@code true}
  * @param autorank the autorank scan settings ({@code autorank.*}); {@link AutorankSettings#enabled()} ships {@code false}
  * @param gui the {@code /ranks} panel settings ({@code gui.*}); {@link GuiSettings#enabled()} ships {@code true}
  */
@@ -63,7 +63,7 @@ public record RanksConfig(boolean enabled, PrestigeSettings prestige, AutorankSe
      * multiplier. The requirement and action lines are operator content parsed by the same requirement/action
      * machinery a rankup uses; the numbers are validated here so a nonsensical negative never reaches the domain.
      *
-     * @param enabled whether the prestige mechanic is on ({@code prestige.enabled}, default {@code false})
+     * @param enabled whether the prestige mechanic is on ({@code prestige.enabled}, default {@code true})
      * @param maxLevel the highest prestige level reachable, {@code 0} for no cap ({@code prestige.max-level})
      * @param cost the amount charged through the economy on a prestige ({@code prestige.cost}, {@code 0} for free)
      * @param requirements the raw requirement lines that gate a prestige ({@code prestige.requirements})
@@ -95,7 +95,7 @@ public record RanksConfig(boolean enabled, PrestigeSettings prestige, AutorankSe
         public static PrestigeSettings from(ConfigStore config) {
             Objects.requireNonNull(config, "config");
             return new PrestigeSettings(
-                    config.getBoolean("prestige.enabled", false),
+                    config.getBoolean("prestige.enabled", true),
                     Math.max(0, config.getInt("prestige.max-level", 0)),
                     Math.max(0L, config.getLong("prestige.cost", 0L)),
                     config.getStringList("prestige.requirements", List.of()),

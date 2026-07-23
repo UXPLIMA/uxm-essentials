@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins {@link RanksConfig}'s resolution from the module's scoped config: an empty store yields the shipped
- * defaults (module on, prestige and autorank off — both opt-in — with a no-cap, free, no-bonus prestige), and
- * explicit keys override each switch and every prestige tunable.
+ * defaults (module on, prestige on so {@code /prestige} publishes out of the box, autorank off, with a no-cap,
+ * free, no-bonus prestige), and explicit keys override each switch and every prestige tunable.
  */
 class RanksConfigTest {
 
@@ -20,7 +20,7 @@ class RanksConfigTest {
         RanksConfig config = RanksConfig.from(new FixedConfig(Map.of()));
 
         assertThat(config.enabled()).isTrue();
-        assertThat(config.prestige().enabled()).isFalse();
+        assertThat(config.prestige().enabled()).isTrue();
         assertThat(config.prestige().maxLevel()).isZero();
         assertThat(config.prestige().cost()).isZero();
         assertThat(config.prestige().requirements()).isEmpty();
