@@ -23,7 +23,14 @@ public enum CommandControlMessageKey implements MessageKey {
 
     // Plugin-hide — shown when the plugin-listing / help commands are blocked from executing for a player who may not
     // see them, so /plugins and /help cannot leak plugin names. Reads like vanilla's "unknown command".
-    COMMANDCONTROL_PLUGIN_HIDDEN("commandcontrol.plugin-hidden");
+    COMMANDCONTROL_PLUGIN_HIDDEN("commandcontrol.plugin-hidden"),
+
+    // Command-spam - shown when a player sends commands faster than the configured window allows. SPAM_KICK is the
+    // disconnect reason for the KICK action; SPAM_BLOCKED is the in-chat notice for the BLOCK action (the command was
+    // cancelled); SPAM_WARN is the nudge for the WARN action (the command still ran).
+    COMMANDCONTROL_SPAM_KICK("commandcontrol.spam-kick"),
+    COMMANDCONTROL_SPAM_BLOCKED("commandcontrol.spam-blocked"),
+    COMMANDCONTROL_SPAM_WARN("commandcontrol.spam-warn");
 
     private final String key;
 

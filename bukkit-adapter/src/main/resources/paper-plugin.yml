@@ -1409,6 +1409,12 @@ permissions:
   uxmessentials.commandcontrol.viewplugins:
     description: 'See the plugin-listing / help commands (/plugins, /pl, /help, ...) hidden by the plugin-hide feature.'
     default: op
+  uxmessentials.commandcontrol.spam.bypass:
+    description: 'Exempt from the command-spam rate limiter - commands are never counted and no spam action fires.'
+    default: op
+  uxmessentials.commandcontrol.channelhide.bypass:
+    description: 'Exempt from the plugin-channel hider - the full channel-registration list is sent to this player.'
+    default: op
   uxmessentials.module.commandcontrol:
     description: 'Hot-reload / inspect the commandcontrol module (command whitelist, tab-completion filter, plugin-hide).'
     default: op

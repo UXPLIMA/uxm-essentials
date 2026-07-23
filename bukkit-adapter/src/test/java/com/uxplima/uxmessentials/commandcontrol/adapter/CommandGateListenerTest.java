@@ -14,15 +14,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
 import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandGateListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
-import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleMode;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
+import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -64,8 +65,8 @@ class CommandGateListenerTest {
 
     private CommandGateListener listener(RuleSet rules, PlayerGroupSource groups, boolean blockNamespaceBypass) {
         return new CommandGateListener(
-                rules,
-                NamespaceBypassRule.of(rules, blockNamespaceBypass),
+                WorldRuleSets.ofBase(rules),
+                blockNamespaceBypass,
                 groups,
                 messages,
                 sink,
@@ -217,6 +218,40 @@ class CommandGateListenerTest {
         PlayerCommandPreprocessEvent bare = new PlayerCommandPreprocessEvent(player, "/gamemode", null);
         listener.onCommand(bare);
         assertThat(bare.isCancelled()).isTrue();
+    }
+
+    @Test
+    void perWorldRulesAreResolvedFromThePlayersWorld() {
+        // Base denies /fly; the "creative" world overrides it with an empty blacklist that denies nothing.
+        RuleSet base = RuleSet.of(RuleMode.BLACKLIST, List.of("fly"), Map.of(), BYPASS);
+        RuleSet creative = RuleSet.of(RuleMode.BLACKLIST, List.of(), Map.of(), BYPASS);
+        CommandGateListener listener = new CommandGateListener(
+                WorldRuleSets.of(base, Map.of("creative", creative)),
+                true,
+                noGroup(),
+                messages,
+                sink,
+                CommandControlMessageKey.COMMANDCONTROL_UNKNOWN_COMMAND);
+
+        // In the creative world /fly runs; in the survival world it is denied - the same player, the same command.
+        World creativeWorld = world("creative");
+        World survivalWorld = world("survival");
+
+        when(player.getWorld()).thenReturn(creativeWorld);
+        PlayerCommandPreprocessEvent inCreative = new PlayerCommandPreprocessEvent(player, "/fly", null);
+        listener.onCommand(inCreative);
+        assertThat(inCreative.isCancelled()).isFalse();
+
+        when(player.getWorld()).thenReturn(survivalWorld);
+        PlayerCommandPreprocessEvent inSurvival = new PlayerCommandPreprocessEvent(player, "/fly", null);
+        listener.onCommand(inSurvival);
+        assertThat(inSurvival.isCancelled()).isTrue();
+    }
+
+    private static World world(String name) {
+        World world = mock(World.class);
+        when(world.getName()).thenReturn(name);
+        return world;
     }
 
     @Test

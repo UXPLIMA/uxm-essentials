@@ -17,8 +17,11 @@ import org.jspecify.annotations.NullMarked;
  * whitelist/blacklist and the custom "unknown command" deny message; Phase 2 adds the tab-completion filter and the
  * plugin-hide (scrubbing disallowed and plugin-listing commands from the client command list, tab completion, and the
  * scrub-help output); Phase 3 adds the namespace-bypass block, so a {@code /minecraft:gamemode} escape is denied when
- * {@code /gamemode} is. The gate and filters are client-agnostic — a Bedrock / Geyser player is gated like a Java one —
- * and run per backend, so a proxy-forwarded command is gated on arrival.
+ * {@code /gamemode} is. The PlHidePro-parity extras layer on top: command-spam rate-limiting (kick/block/warn a player
+ * who floods commands), the plugin-channel hider (strip non-allowed plugin-messaging channels from the client so mods
+ * cannot fingerprint installed plugins), auto-lowercasing the base command label, and per-world overrides of the
+ * command lists and hide behaviour. The gate and filters are client-agnostic - a Bedrock / Geyser player is gated like
+ * a Java one - and run per backend, so a proxy-forwarded command is gated on arrival.
  *
  * <p><b>Ships enabled by default</b> but inert: the bundled config is a blacklist with empty lists and the plugin-hide
  * is off, so an enabled module gates and hides nothing until an operator names commands or turns the hide on. An

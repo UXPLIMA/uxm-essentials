@@ -1,32 +1,53 @@
 package com.uxplima.uxmessentials.commandcontrol.adapter;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 import org.bukkit.Server;
 import org.bukkit.event.Listener;
 
+import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.ChannelHideConnectionListener;
+import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.ChannelHideListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandGateListener;
+import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandNormalizationListener;
+import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandSpamListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandVisibilityListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.CommandPermissionView;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSources;
+import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.ReflectiveChannelRegistrationRewriter;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlConfig;
-import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
-import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
-import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
+import com.uxplima.uxmessentials.commandcontrol.domain.ChannelHidePolicy;
+import com.uxplima.uxmessentials.commandcontrol.domain.CommandRateLimiter;
+import com.uxplima.uxmessentials.commandcontrol.domain.WorldHidePolicies;
+import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmlib.npc.ChannelResolver;
+import com.uxplima.uxmlib.npc.PacketListenerRegistry;
+import com.uxplima.uxmlib.npc.PacketPipeline;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Constructs the command-control context's listeners over the injected kernel ports and the module's scoped config.
- * The rule set and the hide policy are derived from config once here — per the atomic-reload rule a hot-reload re-runs
- * this wiring and swaps in fresh listeners — and the group source is chosen by probing the server for LuckPerms (an
- * empty fallback otherwise). Two listeners are contributed: the {@link CommandGateListener} that blocks a disallowed
- * command's execution, and the {@link CommandVisibilityListener} that keeps disallowed and hidden commands out of what
- * a client sees (the sent command list, tab-completion, and the scrub-help block). The context persists nothing and
- * holds no runtime state, so there is nothing to drain on stop; unregistering the listeners is enough.
+ * The world-scoped rule set and hide policy, the command-spam rate limiter, and the channel-hide policy are all derived
+ * from config once here - per the atomic-reload rule a hot-reload re-runs this wiring and swaps in fresh listeners - and
+ * the group source is chosen by probing the server for LuckPerms (an empty fallback otherwise). The listeners
+ * contributed:
+ *
+ * <ul>
+ *   <li>{@link CommandNormalizationListener} - lowercases the base command label first ({@code auto-lowercase-base-commands});
+ *   <li>{@link CommandSpamListener} - rate-limits commands per player when {@code command-spam.enabled};
+ *   <li>{@link CommandGateListener} - blocks a disallowed command's execution, per the player's current world;
+ *   <li>{@link CommandVisibilityListener} - keeps disallowed / hidden commands out of the client command list, tab
+ *       completion, and the scrub-help output, recomputing on a world change;
+ *   <li>{@link ChannelHideConnectionListener} - when {@code plugin-channel-hide.enabled}, splices the packet
+ *       interceptor that strips non-allowed plugin-messaging channels from the client's channel-registration list.
+ * </ul>
+ *
+ * <p>Each optional listener is wired only when its feature is switched on, so a disabled feature registers nothing. The
+ * context persists nothing and holds no runtime state that must drain on stop; unregistering the listeners is enough.
  */
 @NullMarked
 public final class CommandControlWiring {
@@ -37,6 +58,12 @@ public final class CommandControlWiring {
     /** The node that reveals the plugin-listing / help commands the plugin-hide otherwise removes and blocks. */
     public static final String VIEW_PERMISSION = "uxmessentials.commandcontrol.viewplugins";
 
+    /** The node that exempts a holder from the command-spam rate limiter (never counted, never actioned). */
+    public static final String SPAM_BYPASS_PERMISSION = "uxmessentials.commandcontrol.spam.bypass";
+
+    /** The node that exempts a holder from the plugin-channel hider (their channel list is never stripped). */
+    public static final String CHANNELHIDE_BYPASS_PERMISSION = "uxmessentials.commandcontrol.channelhide.bypass";
+
     private CommandControlWiring() {}
 
     /** Build the command-control listeners from {@code server} and {@code ctx}, ready to register. */
@@ -45,23 +72,59 @@ public final class CommandControlWiring {
         Objects.requireNonNull(ctx, "ctx");
         KernelPorts kernel = ctx.kernel();
         CommandControlConfig config = CommandControlConfig.from(ctx.config());
-        RuleSet rules = config.toRuleSet(BYPASS_PERMISSION);
-        NamespaceBypassRule namespaceBypass = config.toNamespaceRule(rules);
-        HidePolicy hidePolicy = config.toHidePolicy(VIEW_PERMISSION);
+        WorldRuleSets worldRules = config.toWorldRuleSets(BYPASS_PERMISSION);
+        WorldHidePolicies worldHidePolicies = config.toWorldHidePolicies(VIEW_PERMISSION);
         PlayerGroupSource groups = PlayerGroupSources.create(server);
         CommandPermissionView permissions = CommandPermissionView.backedBy(server.getCommandMap());
-        Listener gate = new CommandGateListener(
-                rules, namespaceBypass, groups, kernel.messages(), kernel.messageSink(), config.denyMessage());
-        Listener visibility = new CommandVisibilityListener(
-                rules,
-                hidePolicy,
+
+        List<Listener> listeners = new ArrayList<>();
+        if (config.autoLowercaseBaseCommands()) {
+            listeners.add(new CommandNormalizationListener());
+        }
+        CommandRateLimiter rateLimiter = config.toRateLimiter();
+        if (rateLimiter.isEnabled()) {
+            listeners.add(new CommandSpamListener(
+                    rateLimiter, SPAM_BYPASS_PERMISSION, kernel.messages(), kernel.messageSink()));
+        }
+        listeners.add(new CommandGateListener(
+                worldRules,
+                config.blockNamespaceBypass(),
+                groups,
+                kernel.messages(),
+                kernel.messageSink(),
+                config.denyMessage()));
+        listeners.add(new CommandVisibilityListener(
+                worldRules,
+                worldHidePolicies,
                 groups,
                 permissions,
                 config.tabCompletionEnabled(),
                 config.denyListCommands(),
                 BYPASS_PERMISSION,
                 kernel.messages(),
-                kernel.messageSink());
-        return List.of(gate, visibility);
+                kernel.messageSink()));
+        ChannelHidePolicy channelHide = config.toChannelHidePolicy();
+        if (channelHide.isEnabled()) {
+            listeners.add(channelHideConnection(channelHide, kernel));
+        }
+        return List.copyOf(listeners);
+    }
+
+    /**
+     * Build the plugin-channel hider: a namespaced packet pipeline whose single shared listener strips non-allowed
+     * channels from the outbound register/unregister advertisement, and the join listener that splices it per
+     * connection. Mirrors the tablist-suppression pipeline wiring so it never collides with the nametag/npc/tablist
+     * packet stacks, and listener faults are logged off the I/O thread through the kernel log.
+     */
+    private static Listener channelHideConnection(ChannelHidePolicy policy, KernelPorts kernel) {
+        PacketListenerRegistry registry = new PacketListenerRegistry();
+        PacketPipeline pipeline = new PacketPipeline(
+                new ChannelResolver(),
+                registry,
+                "uxmessentials:commandcontrol-channelhide",
+                fault -> kernel.log().error("commandcontrol channel-hide listener fault", fault));
+        registry.register(
+                new ChannelHideListener(new ReflectiveChannelRegistrationRewriter(kernel.log()), policy, kernel.log()));
+        return new ChannelHideConnectionListener(pipeline, CHANNELHIDE_BYPASS_PERMISSION);
     }
 }

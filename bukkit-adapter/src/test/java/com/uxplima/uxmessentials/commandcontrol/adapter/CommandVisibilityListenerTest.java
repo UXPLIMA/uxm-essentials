@@ -27,6 +27,8 @@ import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessag
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleMode;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
+import com.uxplima.uxmessentials.commandcontrol.domain.WorldHidePolicies;
+import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -67,7 +69,16 @@ class CommandVisibilityListenerTest {
 
     private CommandVisibilityListener listener(
             RuleSet rules, HidePolicy hide, boolean tabOn, boolean scrub, CommandPermissionView perms) {
-        return new CommandVisibilityListener(rules, hide, NO_GROUP, perms, tabOn, scrub, BYPASS, messages, sink);
+        return new CommandVisibilityListener(
+                WorldRuleSets.ofBase(rules),
+                WorldHidePolicies.ofBase(hide),
+                NO_GROUP,
+                perms,
+                tabOn,
+                scrub,
+                BYPASS,
+                messages,
+                sink);
     }
 
     private static RuleSet blacklist(String... denied) {
