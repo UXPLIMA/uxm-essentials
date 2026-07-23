@@ -1,7 +1,15 @@
 package com.uxplima.uxmessentials.poses.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -94,6 +102,7 @@ class PosesAdapterTest {
     private PoseSessions sessions;
     private CrawlSessions crawlSessions;
     private BukkitSeatPort seats;
+    private NpcPackets packets;
     private BukkitPacketPosePort posePort;
     private BukkitSnores snores;
     private RecordingCrawlView crawlView;
@@ -128,7 +137,10 @@ class PosesAdapterTest {
 
         // A spin step of 30 degrees per pass makes the seat's yaw advance visibly across the ticks the spin test
         // drives; the snore loop is exercised only through isSnoring/tick, so its sound is a soft fox-sleep default.
-        posePort = new BukkitPacketPosePort(server, scheduler, mock(NpcPackets.class), new NoopLogger(), 1, 30f);
+        packets = mock(NpcPackets.class);
+        // Hand back a distinct built packet so the pose-broadcast tests can verify which viewers it was sent to.
+        when(packets.pose(anyInt(), any())).thenReturn(new Object());
+        posePort = new BukkitPacketPosePort(server, scheduler, packets, new NoopLogger(), 1, 30f);
         snores = new BukkitSnores(server, scheduler, new NoopLogger(), "minecraft:entity.fox.sleep", 0.5f, 1.0f, 20);
 
         PoseCooldownNotice cooldownNotice = new PoseCooldownNotice(PoseCooldown.unlimited(), new KeyMessages());
@@ -212,6 +224,20 @@ class PosesAdapterTest {
         assertThat(tagged.get(0)).isInstanceOf(ArmorStand.class);
         assertThat(tagged.get(0).getPassengers()).contains(player);
         assertThat(sessions.isPosing(BukkitRefs.toRef(player))).isTrue();
+    }
+
+    @Test
+    void theSeatIsAGroundedMarkerSoTheRiderSitsOnTheBlockNotFloatingAboveIt() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+
+        interactListener.onInteract(rightClick(player, stairAt(1, 64, 0)));
+
+        ArmorStand seat = (ArmorStand) taggedSeats().get(0);
+        // A marker stand seats its rider at its own Y, so the seat sits on the stair surface (blockY + half a block +
+        // the small mount tune) instead of a full-bodied stand that would push the rider about a block into the air.
+        assertThat(seat.isMarker()).isTrue();
+        double seatY = Objects.requireNonNull(seat.getLocation(), "location").getY();
+        assertThat(seatY).isCloseTo(64.55, within(1e-6));
     }
 
     @Test
@@ -311,6 +337,36 @@ class PosesAdapterTest {
         assertThat(placeholders.posing(who)).isTrue();
         assertThat(placeholders.pose(who)).isEqualTo("lay");
         assertThat(placeholders.sitting(who)).isFalse();
+    }
+
+    @Test
+    void layingReassertsTheSwimmingPoseOnEachTickSoAServerResyncCannotClobberIt() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+        // The initial anchor sends the lie-down pose once; each loop pass re-sends it so a mount or resync that reset
+        // the player to standing is corrected within a tick or two rather than leaving them looking merely seated.
+        posePort.tick();
+        posePort.tick();
+
+        verify(packets, times(3)).send(eq(player), any());
+    }
+
+    @Test
+    void crawlBroadcastsThePoseToOtherViewersButNeverTheCrawlersOwnClient() {
+        PlayerMock crawler = playerAt(0.5, 64, 0.5);
+        PlayerMock observer = server.addPlayer("Observer");
+        observer.teleport(new Location(world, 2, 64, 2)); // a second player sharing the crawler's world
+        PlayerRef who = BukkitRefs.toRef(crawler);
+
+        startCrawl.start(who, feetOf(crawler));
+
+        // The observer sees the crawl pose; the crawler's own client is left to the fake block, so pushing them a
+        // pose (which would fight their movement prediction and jitter them) is skipped.
+        verify(packets).send(eq(observer), any());
+        verify(packets, never()).send(eq(crawler), any());
     }
 
     @Test

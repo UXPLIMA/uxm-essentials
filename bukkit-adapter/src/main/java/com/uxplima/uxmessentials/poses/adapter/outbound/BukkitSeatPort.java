@@ -44,6 +44,16 @@ public final class BukkitSeatPort implements SeatPort {
     /** The PDC key value every seat entity carries; created once (never on a hot path). */
     private static final String SEAT_KEY = "poses_seat";
 
+    /**
+     * The vertical nudge applied to the seat so a marker armour stand's rider lands on the block surface rather than
+     * floating above it. A marker armour stand has a zero-size hitbox and a passenger attachment at its own origin, so
+     * the rider sits at the seat's Y; GSit tunes that by +0.05 on modern servers (its {@code baseOffset} of -0.05 for
+     * 1.20.2+) so the seated model's weight rests on the surface instead of sinking a hair into it. The seat position
+     * the caller passes already carries the block's surface height (a full block's top, half a block for a slab or
+     * stair), so this is the only mount-geometry constant the port owns.
+     */
+    private static final double SEAT_MOUNT_OFFSET = 0.05;
+
     private final Plugin plugin;
     private final Scheduler scheduler;
     private final Logger log;
@@ -76,6 +86,8 @@ public final class BukkitSeatPort implements SeatPort {
         }
         Location at = BukkitRefs.toLocation(world, seat);
         at.setYaw(yaw);
+        // Raise the spawn so the marker seat's rider rests on the surface instead of floating a block up.
+        at.setY(at.getY() + SEAT_MOUNT_OFFSET);
         entry.attach(world.spawn(at, ArmorStand.class, stand -> configureSeat(stand, id)));
     }
 
@@ -83,6 +95,9 @@ public final class BukkitSeatPort implements SeatPort {
     private void configureSeat(ArmorStand stand, String id) {
         stand.setInvisible(true);
         stand.setSmall(true);
+        // A marker stand has a zero hitbox and seats its rider at its own Y (GSit's seat mechanism), so the rider sits
+        // on the block instead of floating above it the way a full-bodied stand's ~1-block ride height would push them.
+        stand.setMarker(true);
         stand.setBasePlate(false);
         stand.setArms(false);
         stand.setGravity(false);

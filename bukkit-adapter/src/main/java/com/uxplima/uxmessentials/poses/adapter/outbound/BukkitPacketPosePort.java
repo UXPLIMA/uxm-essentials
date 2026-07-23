@@ -27,14 +27,19 @@ import org.jspecify.annotations.NullMarked;
  * rotation to viewers on its own) on a repeating scheduler pass.
  *
  * <p>Because the server never itself sends a swimming pose for a seated player, the lie-down is a client override:
- * the metadata packet is broadcast to everyone in the poser's world (the poser included, so they see their own pose
- * in third person) on the global region thread, where {@code getOnlinePlayers()} is coherent under Folia — the
- * {@code npc} renderer's discipline. {@link #clearPose} resends the {@link NpcPose#STANDING} default to undo it and
- * drops the player from the spin loop; a player who never held a free pose is a clean no-op.
+ * the metadata packet is broadcast to everyone in the poser's world on the global region thread, where {@code
+ * getOnlinePlayers()} is coherent under Folia, the {@code npc} renderer's discipline. A lie-down is sent to the
+ * poser too (so they see their own pose in third person); a crawl is sent to <em>everyone but</em> the poser, whose
+ * own client already holds the crawl through the fake block, since a self-sent pose there fights their movement
+ * prediction and jitters them. The server re-syncs the real (standing) metadata on a mount, a new nearby viewer, or a
+ * damage tick, so {@link #tick} re-asserts every held pose each pass rather than sending it once and losing it.
+ * {@link #clearPose} resends the {@link NpcPose#STANDING} default to undo it and drops the player from the spin loop;
+ * a player who never held a free pose is a clean no-op.
  *
- * <p>The spin rides one repeating {@code repeatGlobal} pass (the {@code StaffFollowService} idiom): the pass only
- * iterates the spinning set and hops each player onto their own entity thread, where the seat rotation actually
- * runs, so no entity is ever touched off its owning region. {@link #shutdown()} cancels that pass on module stop.
+ * <p>One repeating {@code repeatGlobal} pass drives both jobs (the {@code StaffFollowService} idiom): it re-asserts
+ * each held lie-down/crawl pose on the global thread it fires on, then hops each spinning player onto their own entity
+ * thread, where the seat rotation actually runs, so no entity is ever touched off its owning region. {@link
+ * #shutdown()} cancels that pass on module stop.
  */
 @NullMarked
 public final class BukkitPacketPosePort implements PosePort {
@@ -73,7 +78,11 @@ public final class BukkitPacketPosePort implements PosePort {
         UUID id = who.uuid();
         active.put(id, pose);
         switch (pose) {
-            case LAY, BELLYFLOP, CRAWL -> broadcastPose(id, NpcPose.SWIMMING);
+            // A lie-down is seen third-person by the poser too, so it goes to everyone; a crawl is the one pose the
+            // poser drives on their own client (the fake block holds them prone), so sending them the pose would fight
+            // their own movement prediction and jitter them - only the other viewers need it.
+            case LAY, BELLYFLOP -> broadcastPose(id, NpcPose.SWIMMING, true);
+            case CRAWL -> broadcastPose(id, NpcPose.SWIMMING, false);
             case SPIN -> spinning.put(id, 0f);
             default ->
                 throw new IllegalArgumentException("BukkitPacketPosePort renders only the free poses, not " + pose);
@@ -89,7 +98,7 @@ public final class BukkitPacketPosePort implements PosePort {
         if (previous != null) {
             // Reset the client's body pose to standing. Harmless for a spin (it never overrode the pose) and a
             // no-op when the player has already left — the send resolves nothing for an offline uuid.
-            broadcastPose(id, NpcPose.STANDING);
+            broadcastPose(id, NpcPose.STANDING, true);
         }
     }
 
@@ -98,10 +107,28 @@ public final class BukkitPacketPosePort implements PosePort {
         return spinning.containsKey(Objects.requireNonNull(id, "id"));
     }
 
-    /** One spin pass: hop each spinning player onto their own entity thread and rotate their seat there. */
+    /**
+     * One loop pass: re-assert every held lie-down pose so the server's own metadata re-sync (a mount, a new nearby
+     * viewer, a damage tick) cannot clobber it back to standing, then advance each spin on its player's entity thread.
+     * This runs on the global region thread the repeating loop fires on, where {@code getOnlinePlayers()} is coherent
+     * under Folia, so the pose re-send needs no further hop.
+     */
     public void tick() {
+        active.forEach(this::refreshPose);
         for (UUID id : spinning.keySet()) {
             scheduler.onEntity(new PlayerRef(id, id.toString()), () -> rotate(id));
+        }
+    }
+
+    // Re-send the body pose a lie-down or crawl overrides, so it holds against the server's re-sync. A spin overrides
+    // no pose (it rotates the seat), and a sit never reaches this port, so both fall through to nothing.
+    private void refreshPose(UUID id, PoseType pose) {
+        switch (pose) {
+            case LAY, BELLYFLOP -> sendPose(id, NpcPose.SWIMMING, true);
+            case CRAWL -> sendPose(id, NpcPose.SWIMMING, false);
+            default -> {
+                // SPIN is advanced by the spin loop below; SIT/PLAYER_SIT never reach this port.
+            }
         }
     }
 
@@ -138,20 +165,24 @@ public final class BukkitPacketPosePort implements PosePort {
         seat.setRotation(next, pitch);
     }
 
-    private void broadcastPose(UUID id, NpcPose pose) {
-        scheduler.onGlobal(() -> sendPose(id, pose));
+    private void broadcastPose(UUID id, NpcPose pose, boolean includeSelf) {
+        scheduler.onGlobal(() -> sendPose(id, pose, includeSelf));
     }
 
-    // Send the pose-metadata override to everyone sharing the poser's world (the poser too, for their own third-
-    // person view). Runs on the global region thread, where getOnlinePlayers() is coherent under Folia; a client
-    // not tracking the poser's entity id simply ignores the packet, so no per-viewer range check is needed.
-    private void sendPose(UUID id, NpcPose pose) {
+    // Send the pose-metadata override to everyone sharing the poser's world. When includeSelf is false the poser's own
+    // client is skipped (a crawl, which the poser drives locally through the fake block); a lie-down includes them so
+    // they see their own pose in third person. Runs on the global region thread, where getOnlinePlayers() is coherent
+    // under Folia; a client not tracking the poser's entity id simply ignores the packet, so no range check is needed.
+    private void sendPose(UUID id, NpcPose pose, boolean includeSelf) {
         Player posed = server.getPlayer(id);
         if (posed == null) {
             return;
         }
         Object packet = packets.pose(posed.getEntityId(), pose);
         for (Player viewer : server.getOnlinePlayers()) {
+            if (!includeSelf && viewer.getUniqueId().equals(id)) {
+                continue;
+            }
             if (viewer.getWorld().equals(posed.getWorld())) {
                 packets.send(viewer, packet);
             }
