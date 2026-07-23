@@ -498,7 +498,7 @@ class ItemEditCommandTest {
                 ItemworldConfig.from(config),
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.storageDefault(6));
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        for (CommandRegistration command : ItemworldGroupACommands.all(services, null)) {
+        for (CommandRegistration command : ItemworldGroupACommands.all(services, null, null)) {
             dispatcher.getRoot().addChild(command.build());
         }
         return dispatcher;

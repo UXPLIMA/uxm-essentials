@@ -132,7 +132,7 @@ class ItemInfoTest {
         ItemworldServices services = new ItemworldServices(
                 kernel(), new NoopAudit(), ItemworldConfig.from(new EmptyConfig()), GuiLayout.storageDefault(6));
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        for (CommandRegistration command : ItemworldGroupACommands.all(services, null)) {
+        for (CommandRegistration command : ItemworldGroupACommands.all(services, null, null)) {
             dispatcher.getRoot().addChild(command.build());
         }
         return dispatcher;

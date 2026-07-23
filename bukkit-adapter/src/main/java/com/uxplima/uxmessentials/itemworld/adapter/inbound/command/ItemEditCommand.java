@@ -1,9 +1,9 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
@@ -19,9 +19,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -29,7 +26,9 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.itemworld.adapter.ItemEdits;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemEditView;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.BukkitItemResolver;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.AttributeSpec;
@@ -63,20 +62,32 @@ import org.jspecify.annotations.Nullable;
  * executor (rather than the node {@code requires}) so a denied actor gets a localized
  * {@link SharedMessageKey#COMMAND_NO_PERMISSION} reply, and an empty hand replies
  * {@link ItemworldMessageKey#NO_ITEM_IN_HAND}. Every mutation runs on the actor's entity region thread.
+ *
+ * <p>A bare {@code /itemedit} (no subcommand) opens the click-driven {@link ItemEditView} on the held item through
+ * the same config/permission/held-item gate, so an operator can edit by clicking instead of typing; the GUI applies
+ * every change through the shared {@link ItemEdits} the subcommands now also use, so the two paths never drift. Each
+ * subcommand keeps working unchanged for a command-first workflow.
  */
 @NullMarked
 public final class ItemEditCommand extends ItemworldCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.itemworld.itemedit";
-    private static final MiniMessage MINI = MiniMessage.miniMessage();
 
-    public ItemEditCommand(ItemworldServices services) {
+    /**
+     * The click-driven editor a bare {@code /itemedit} opens; {@code null} on a wiring (or test) with no GUI, in which
+     * case a bare {@code /itemedit} gates as usual and then does nothing rather than opening a window.
+     */
+    private final @Nullable ItemEditView view;
+
+    public ItemEditCommand(ItemworldServices services, @Nullable ItemEditView view) {
         super(services, "itemedit", SubFeatureGroup.ITEM_UTILS, "Edit the held item's name, lore and meta.");
+        this.view = view;
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
+                .executes(this::openEditor)
                 .then(Commands.literal("rename")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(ctx -> rename(ctx, StringArgumentType.getString(ctx, "name")))))
@@ -129,7 +140,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         apply(
                 ctx,
                 held,
-                ItemBuilder.from(held.hand()).name(MINI.deserialize(name)).build(),
+                ItemEdits.rename(held.hand(), name),
                 ItemworldMessageKey.ITEMEDIT_NAME_SET,
                 Map.of("name", name));
         return Command.SINGLE_SUCCESS;
@@ -140,12 +151,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
-        apply(
-                ctx,
-                held,
-                ItemBuilder.from(held.hand()).clearName().build(),
-                ItemworldMessageKey.ITEMEDIT_NAME_RESET,
-                Map.of());
+        apply(ctx, held, ItemEdits.resetName(held.hand()), ItemworldMessageKey.ITEMEDIT_NAME_RESET, Map.of());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -157,7 +163,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         writeLore(
                 ctx,
                 held,
-                LorePolicy.add(currentLore(held.hand()), text),
+                LorePolicy.add(ItemEdits.currentLore(held.hand()), text),
                 ItemworldMessageKey.ITEMEDIT_LORE_ADDED,
                 Map.of("text", text));
         return Command.SINGLE_SUCCESS;
@@ -180,7 +186,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         return bounded(
                 ctx,
                 held,
-                LorePolicy.set(currentLore(held.hand()), index, text),
+                LorePolicy.set(ItemEdits.currentLore(held.hand()), index, text),
                 index,
                 ItemworldMessageKey.ITEMEDIT_LORE_SET,
                 Map.of("index", str(index), "text", text));
@@ -194,7 +200,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         return bounded(
                 ctx,
                 held,
-                LorePolicy.insert(currentLore(held.hand()), index, text),
+                LorePolicy.insert(ItemEdits.currentLore(held.hand()), index, text),
                 index,
                 ItemworldMessageKey.ITEMEDIT_LORE_INSERTED,
                 Map.of("index", str(index), "text", text));
@@ -208,7 +214,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         return bounded(
                 ctx,
                 held,
-                LorePolicy.remove(currentLore(held.hand()), index),
+                LorePolicy.remove(ItemEdits.currentLore(held.hand()), index),
                 index,
                 ItemworldMessageKey.ITEMEDIT_LORE_REMOVED,
                 Map.of("index", str(index)));
@@ -256,7 +262,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         apply(
                 ctx,
                 held,
-                ItemBuilder.from(held.hand()).removeEnchant(enchant).build(),
+                ItemEdits.removeEnchant(held.hand(), enchant),
                 ItemworldMessageKey.ITEMEDIT_ENCHANT_REMOVED,
                 Map.of("enchant", rawId));
         return Command.SINGLE_SUCCESS;
@@ -277,7 +283,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         apply(
                 ctx,
                 held,
-                ItemBuilder.from(held.hand()).enchant(enchant, spec.level()).build(),
+                ItemEdits.enchant(held.hand(), enchant, spec.level()),
                 ItemworldMessageKey.ITEMEDIT_ENCHANTED,
                 Map.of("enchant", rawId, "level", str(spec.level())));
     }
@@ -304,11 +310,10 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         }
         ItemMeta meta = held.hand().getItemMeta();
         boolean state = requested.orElse(meta == null || !meta.hasItemFlag(flag.get()));
-        ItemBuilder builder = ItemBuilder.from(held.hand());
         apply(
                 ctx,
                 held,
-                (state ? builder.flags(flag.get()) : builder.removeFlags(flag.get())).build(),
+                ItemEdits.setFlag(held.hand(), flag.get(), state),
                 ItemworldMessageKey.ITEMEDIT_FLAG_TOGGLED,
                 Map.of("flag", token, "state", state ? "on" : "off"));
         return Command.SINGLE_SUCCESS;
@@ -422,7 +427,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         apply(
                 ctx,
                 held,
-                ItemBuilder.from(held.hand()).damage(value).build(),
+                ItemEdits.damage(held.hand(), value),
                 ItemworldMessageKey.ITEMEDIT_DURABILITY_SET,
                 Map.of("value", str(value)));
         return Command.SINGLE_SUCCESS;
@@ -438,12 +443,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
             reply(ctx, ItemworldMessageKey.ITEMEDIT_REPAIR_NOTHING);
             return Command.SINGLE_SUCCESS;
         }
-        apply(
-                ctx,
-                held,
-                ItemBuilder.from(held.hand()).damage(0).build(),
-                ItemworldMessageKey.ITEMEDIT_REPAIRED,
-                Map.of());
+        apply(ctx, held, ItemEdits.damage(held.hand(), 0), ItemworldMessageKey.ITEMEDIT_REPAIRED, Map.of());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -465,7 +465,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         apply(
                 ctx,
                 held,
-                ItemBuilder.from(held.hand()).unbreakable(state).build(),
+                ItemEdits.unbreakable(held.hand(), state),
                 ItemworldMessageKey.ITEMEDIT_UNBREAKABLE_SET,
                 Map.of("state", state ? "on" : "off"));
         return Command.SINGLE_SUCCESS;
@@ -484,9 +484,8 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
-        List<Float> floats = id.map(value -> List.of((float) (int) value)).orElseGet(List::of);
         ItemStack updated =
-                ItemBuilder.from(held.hand()).customModelDataFloats(floats).build();
+                ItemEdits.customModelData(held.hand(), id.isPresent() ? OptionalInt.of(id.get()) : OptionalInt.empty());
         if (id.isPresent()) {
             apply(ctx, held, updated, ItemworldMessageKey.ITEMEDIT_MODEL_SET, Map.of("id", str(id.get())));
         } else {
@@ -538,13 +537,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
             List<String> lines,
             MessageKey key,
             Map<String, String> placeholders) {
-        ItemBuilder builder = ItemBuilder.from(held.hand());
-        apply(
-                ctx,
-                held,
-                (lines.isEmpty() ? builder.clearLore() : builder.lore(toComponents(lines))).build(),
-                key,
-                placeholders);
+        apply(ctx, held, ItemEdits.withLore(held.hand(), lines), key, placeholders);
     }
 
     private void apply(
@@ -559,25 +552,18 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
         });
     }
 
-    private static List<String> currentLore(ItemStack hand) {
-        ItemMeta meta = hand.getItemMeta();
-        @Nullable List<Component> lore = meta == null ? null : meta.lore();
-        if (lore == null) {
-            return List.of();
+    /**
+     * Open the click-driven editor for a bare {@code /itemedit}: the same config/permission/held-item gate the
+     * subcommands run, then hand the held item to the GUI. A wiring without a view (a unit-test dispatcher) gates and
+     * then does nothing, so the bare verb never opens an empty window.
+     */
+    private int openEditor(CommandContext<CommandSourceStack> ctx) {
+        Held held = resolve(ctx);
+        if (held == null || view == null) {
+            return Command.SINGLE_SUCCESS;
         }
-        List<String> out = new ArrayList<>(lore.size());
-        for (Component line : lore) {
-            out.add(MINI.serialize(line));
-        }
-        return out;
-    }
-
-    private static List<Component> toComponents(List<String> lines) {
-        List<Component> out = new ArrayList<>(lines.size());
-        for (String line : lines) {
-            out.add(MINI.deserialize(line));
-        }
-        return out;
+        view.open(held.player(), ref(held.player()));
+        return Command.SINGLE_SUCCESS;
     }
 
     private static String str(int value) {

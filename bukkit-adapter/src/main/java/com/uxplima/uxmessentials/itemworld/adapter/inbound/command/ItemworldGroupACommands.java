@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemEditView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import org.jspecify.annotations.NullMarked;
@@ -30,22 +31,26 @@ public final class ItemworldGroupACommands {
     private ItemworldGroupACommands() {}
 
     /** Every itemworld group-A command, in surface order grouped by sub-feature group. */
-    public static List<CommandRegistration> all(ItemworldServices services, @Nullable RecipeGridMenu recipeView) {
+    public static List<CommandRegistration> all(
+            ItemworldServices services, @Nullable RecipeGridMenu recipeView, @Nullable ItemEditView itemEditView) {
         List<CommandRegistration> commands = new ArrayList<>();
-        addItemUtils(commands, services, recipeView);
+        addItemUtils(commands, services, recipeView, itemEditView);
         addWorkstations(commands, services);
         addCleanup(commands, services);
         return List.copyOf(commands);
     }
 
     private static void addItemUtils(
-            List<CommandRegistration> commands, ItemworldServices services, @Nullable RecipeGridMenu recipeView) {
+            List<CommandRegistration> commands,
+            ItemworldServices services,
+            @Nullable RecipeGridMenu recipeView,
+            @Nullable ItemEditView itemEditView) {
         commands.add(new GiveCommand(services));
         commands.add(new GiveAllCommand(services));
         commands.add(new ItemCommand(services));
         commands.add(new ItemNameCommand(services));
         commands.add(new ItemLoreCommand(services));
-        commands.add(new ItemEditCommand(services));
+        commands.add(new ItemEditCommand(services, itemEditView));
         commands.add(new ItemFlagCommand(services));
         commands.add(new SkullCommand(services));
         commands.add(new FireworkCommand(services));

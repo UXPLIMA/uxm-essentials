@@ -895,7 +895,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
-            wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry, menus, menuBindings);
+            wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("communication"))) {
@@ -1648,6 +1648,7 @@ public final class PluginModule {
             CloseableResources resources,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
+            TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
         // itemworld persists nothing: it is the full item/world command surface as stateless ACL-thin
@@ -1656,7 +1657,7 @@ public final class PluginModule {
         // and dropped with the wiring on module stop. /repair /repairall /hat /more are owned here (playerstate
         // deferred them, §15.6), so they register here and the two modules never double-register. The utilities
         // hub, the /recipe grid, and the /entitycount tally render through the shared menu engine.
-        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts, menus, menuBindings);
+        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts, textInput, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Write back any still-open in-inventory shulker view before the module stops, so no edit is lost on disable.

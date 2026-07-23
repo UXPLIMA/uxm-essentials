@@ -95,6 +95,7 @@ final class DefaultResources {
             "modules/homes/gui/home-list.conf",
             "modules/homes/gui/icon-selector.conf",
             "modules/itemworld/gui/disposal.conf",
+            "modules/itemworld/gui/itemedit.conf",
             "modules/itemworld/gui/itemworld-entitycount-empty.conf",
             "modules/itemworld/gui/itemworld-entitycount.conf",
             "modules/itemworld/gui/itemworld-hub.conf",

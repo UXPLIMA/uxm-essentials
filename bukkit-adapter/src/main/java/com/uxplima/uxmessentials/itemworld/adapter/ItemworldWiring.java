@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGrou
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGroupBCommands;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGuiCommand;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemEditView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ShulkerBoxListener;
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -61,10 +63,16 @@ public final class ItemworldWiring {
 
     /** Build the itemworld adapters from {@code ctx}, ready to register with the plugin. */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, Menus menus, MenuBindings menuBindings) {
+            Plugin plugin,
+            ModuleContext ctx,
+            GuiLayouts guiLayouts,
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
@@ -92,9 +100,14 @@ public final class ItemworldWiring {
         entityCountView.register(menuBindings, dataFolder, kernel.log());
         RecipeGridMenu recipeView = new RecipeGridMenu(menus, kernel.messages(), Material.BLACK_STAINED_GLASS_PANE);
         recipeView.register(menuBindings, dataFolder, kernel.log());
+        // The click-driven /itemedit editor: a bare /itemedit opens it on the held item, editing through the same
+        // shared item-edit path the /itemedit subcommands use. Registers its preview placeholders and per-button
+        // actions here, then the ItemEditCommand hands it the opener.
+        ItemEditView itemEditView = new ItemEditView(menus, services, textInput);
+        itemEditView.register(menuBindings, dataFolder, kernel.log());
 
         List<CommandRegistration> commands =
-                new java.util.ArrayList<>(ItemworldGroupACommands.all(services, recipeView));
+                new java.util.ArrayList<>(ItemworldGroupACommands.all(services, recipeView, itemEditView));
         commands.addAll(ItemworldGroupBCommands.all(
                 services, powertoolPolicy, purgePolicy, powertoolStore, powertoolToggles, unlimited, entityCountView));
         commands.add(new ItemworldGuiCommand(hubView, kernel.messages(), kernel.messageSink()));
