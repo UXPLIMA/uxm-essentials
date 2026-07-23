@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.security.adapter.inbound.command.ClientInfoComm
 import com.uxplima.uxmessentials.security.adapter.inbound.command.IpAltsCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.PinCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
-import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadListener;
+import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadCloseListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityGuardListener;
@@ -38,6 +38,8 @@ import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.SecretGenerator;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -56,11 +58,19 @@ public final class SecurityWiring {
     private SecurityWiring() {}
 
     /** Build the security use cases, commands, and join-verification listeners from {@code ctx} and persistence. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, TextInput textInput) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         SecurityConfig config = SecurityConfig.from(ctx.config());
         SecurityConfig.TwoFactorSettings twoFactor = config.twoFactor();
@@ -108,7 +118,7 @@ public final class SecurityWiring {
         VerificationSessions sessions = new VerificationSessions();
         ReauthState reauthState = new ReauthState();
         ReauthSessions reauthSessions = new ReauthSessions();
-        PinKeypadView keypad = new PinKeypadView(kernel.messages(), kernel.scheduler());
+        PinKeypadView keypad = new PinKeypadView(menus, kernel.messages(), kernel.scheduler());
         VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
         TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(textInput);
         VerificationController controller = new VerificationController(
@@ -167,10 +177,15 @@ public final class SecurityWiring {
                 kernel.messageSink(),
                 clock);
         KeypadRouter router = new KeypadRouter(reauthSessions, controller, reauthController);
+        // The keypad renders through the menu engine: register its per-button actions (routed to whichever verify flow
+        // the player is in), its masked-display / digit-label placeholders and its spec now that the router exists. The
+        // close listener is the one behaviour the engine does not model: reopening the window if a still-frozen player
+        // escapes it.
+        keypad.register(menuBindings, router, plugin.getDataFolder().toPath(), kernel.log());
         List<Listener> listeners = List.of(
                 new SecurityJoinListener(controller),
                 new VerificationFreezeListener(sessions, kernel.messages(), kernel.messageSink()),
-                new PinKeypadListener(keypad, router, sessions),
+                new PinKeypadCloseListener(menus, keypad, sessions),
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
                 new SecurityGuardListener(ipGuardController, clientGuard, brands));

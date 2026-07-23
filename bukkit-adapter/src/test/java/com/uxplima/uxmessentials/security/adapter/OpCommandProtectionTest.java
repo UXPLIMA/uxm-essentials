@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.security.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -10,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -29,8 +32,14 @@ import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
 import com.uxplima.uxmessentials.security.domain.TotpCode;
 import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -82,7 +91,13 @@ class OpCommandProtectionTest {
         Scheduler scheduler = new InlineScheduler();
         Messages messages = new KeyMessages();
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        PinKeypadView keypad = new PinKeypadView(messages, scheduler);
+        // The keypad renders through the real menu engine; the re-auth flow opens it as a side effect (the tests drive
+        // the proof through the controller directly), so the engine is wired and the shipped spec registered.
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(new GuiText(messages), bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        PinKeypadView keypad = new PinKeypadView(menus, messages, scheduler);
         reauthController = new ReauthController(
                 repository,
                 new VerifyTwoFactor(repository, 1),
@@ -95,6 +110,7 @@ class OpCommandProtectionTest {
                 messages,
                 sink,
                 clock);
+        keypad.register(bindings, reauthController, specDir(), new NoopLogger());
         policy = new ReauthPolicy(Set.of("op", "gamemode", "stop"), WINDOW);
         listener = new ReauthCommandListener(true, policy, reauthState, reauthController, clock);
     }
@@ -248,6 +264,16 @@ class OpCommandProtectionTest {
         assertThat(reauthState.lastVerified(player.getUniqueId())).isEqualTo(NOW);
     }
 
+    /** The bundled spec directory under the source tree, so the test loads the shipped keypad spec from disk. */
+    private static Path specDir() {
+        Path repoRoot = Path.of("").toAbsolutePath();
+        while (repoRoot != null && !Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        Objects.requireNonNull(repoRoot, "repo root");
+        return repoRoot.resolve("bukkit-adapter/src/main/resources");
+    }
+
     private PlayerMock enrolledWithPin() {
         PlayerMock player = addPlayer();
         repository.setPin(player.getUniqueId(), PIN);
@@ -278,6 +304,21 @@ class OpCommandProtectionTest {
         public void prompt(Player player, PlayerRef viewer, Consumer<String> onSubmit, Runnable onCancel) {
             // The keypad/direct-submit path covers verification; this seam is left inert here.
         }
+    }
+
+    /** Swallows the menu-spec loader's diagnostics; the shipped keypad spec loads cleanly from the source tree. */
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /** An in-memory two-factor store mirroring the jOOQ store's contract, keeping the PIN as plaintext for the test. */

@@ -7,9 +7,9 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The two verification actions the keypad delegates to the controller when a player clicks submit or the "type a code"
- * button. Keeping them behind this interface lets {@link PinKeypadListener} (in the GUI package) route clicks without
- * depending on the concrete controller, and lets the controller own the verify/lockout/trust decision the GUI has no
- * business knowing. The GUI is the hands; the controller is the judgement.
+ * button. Keeping them behind this interface lets {@link PinKeypadView} (in the GUI package) route the engine's
+ * submit / code actions without depending on the concrete controller, and lets the controller own the
+ * verify/lockout/trust decision the GUI has no business knowing. The GUI is the hands; the controller is the judgement.
  */
 @NullMarked
 public interface KeypadActions {

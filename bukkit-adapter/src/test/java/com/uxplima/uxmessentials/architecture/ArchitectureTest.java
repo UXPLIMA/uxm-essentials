@@ -184,9 +184,10 @@ class ArchitectureTest {
     //     OpenContainer / InventoryViewer use cases.
     //   - trade TradeView / TradeHolder are the two-player trade window: a genuine dual item container each
     //     participant places real stacks into, driven over a shared TradeSession.
-    //   - security PinKeypadView / PinKeypadHolder are the join-verification numeric keypad: a locked window that
-    //     captures live per-keystroke clicks and force-reopens on an escape, which the declarative engine does not
-    //     model — every click is cancelled and no item ever moves.
+    //   - villagers VillagerManagerView / VillagerManagerHolder are the trade-manager window: staff drag real buy/sell
+    //     stacks into its rows as trade templates and it reads them back into the villager's recipes on close, so its
+    //     editable slots let items move and it is a genuine item-capture editor, not a spec menu. (The 2FA keypad
+    //     migrated onto the engine, so it is no longer here.)
     // Every spec-driven MENU instead renders through the engine (the Menus facade); the engine's own MenuHolder,
     // Menus and EditorRefresh live inside ..gui.menu.. and are exempt by package. A new bespoke createInventory /
     // InventoryHolder GUI appearing anywhere else fails this fence until it is migrated onto the engine, rather
@@ -272,8 +273,6 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView",
                 "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeHolder",
                 "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener",
-                "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView",
-                "com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadHolder",
                 "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView",
                 "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerHolder",
                 "com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView",

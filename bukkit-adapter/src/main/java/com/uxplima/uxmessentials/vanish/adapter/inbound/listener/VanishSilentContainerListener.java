@@ -72,7 +72,7 @@ public final class VanishSilentContainerListener implements Listener {
         if (original.getLocation() == null) {
             // A plugin GUI (the menu engine, the PIN keypad) is a virtual inventory with no block; only a real
             // block-backed container carries a world location. Mirroring a virtual GUI would swap it for a null-holder
-            // copy, so its MenuHolder / PinKeypadHolder is lost and clicks stop being cancelled. Never mirror one.
+            // copy, so its MenuHolder is lost and clicks stop being cancelled. Never mirror one.
             return;
         }
         Inventory copy = Bukkit.createInventory(null, original.getSize());

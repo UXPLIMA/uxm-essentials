@@ -972,7 +972,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(ctx, persistence, resources, textInput, links, bus);
         } else if (module.id().equals(ModuleId.of("security"))) {
-            wireSecurity(plugin, ctx, persistence, resources, textInput);
+            wireSecurity(plugin, ctx, persistence, resources, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
             wireCommandControl(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
@@ -1049,7 +1049,9 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // security stands up the DB-backed two-factor store (the PIN hashed, the TOTP secret AES-encrypted under a
         // key-file kept beside the module's config) and publishes the /2fa and /pin enrolment verbs over the shared
         // persistence DSL (through the security persistence factory, so no jOOQ type reaches this layer). Phase 2 adds
@@ -1057,7 +1059,7 @@ public final class PluginModule {
         // through the keypad GUI (or the TOTP text prompt) before they can act, with a device-trust store and a
         // failure lockout. The transient freeze/enrolment state is cleared and every keypad closed on stop, so a
         // disable or reload leaves no residual secret and no locked player.
-        SecurityWiring.Wired wired = SecurityWiring.wire(plugin, ctx, persistence, textInput);
+        SecurityWiring.Wired wired = SecurityWiring.wire(plugin, ctx, persistence, textInput, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

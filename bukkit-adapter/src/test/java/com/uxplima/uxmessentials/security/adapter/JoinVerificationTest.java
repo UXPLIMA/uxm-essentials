@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.security.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -11,19 +13,23 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadListener;
+import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadCloseListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
@@ -35,8 +41,16 @@ import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.TotpCode;
 import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuOpenEvent;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -70,6 +84,7 @@ class JoinVerificationTest {
     private static final int SLOT_SUBMIT = 42;
 
     private ServerMock server;
+    private Plugin plugin;
     private FakeRepository repository;
     private FakeTrustStore trustStore;
     private VerificationSessions sessions;
@@ -79,11 +94,12 @@ class JoinVerificationTest {
     private PinKeypadView keypad;
     private VerificationController controller;
     private VerificationFreezeListener freezeListener;
+    private MenuListener menuListener;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        MockBukkit.createMockPlugin();
+        plugin = MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         repository = new FakeRepository();
         trustStore = new FakeTrustStore();
@@ -93,7 +109,17 @@ class JoinVerificationTest {
         sink = new RecordingSink();
         Scheduler scheduler = new InlineScheduler();
         Messages messages = new KeyMessages();
-        keypad = new PinKeypadView(messages, scheduler);
+        // The keypad renders through the real menu engine here, so a keypad click routes through the engine to the
+        // registered security:pin-* actions exactly as it does in production: the click/drag cancel that locks the
+        // window is the engine's, and the digit/submit buttons are its actions.
+        GuiText guiText = new GuiText(messages);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        menuListener = new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        server.getPluginManager().registerEvents(menuListener, plugin);
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        keypad = new PinKeypadView(menus, messages, scheduler);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         controller = new VerificationController(
                 repository,
@@ -109,11 +135,20 @@ class JoinVerificationTest {
                 messages,
                 sink,
                 clock);
+        keypad.register(bindings, controller, specDir(), new NoopLogger());
         freezeListener = new VerificationFreezeListener(sessions, messages, sink);
-        server.getPluginManager().registerEvents(freezeListener, MockBukkit.createMockPlugin("Freeze"));
-        server.getPluginManager()
-                .registerEvents(
-                        new PinKeypadListener(keypad, controller, sessions), MockBukkit.createMockPlugin("Keypad"));
+        server.getPluginManager().registerEvents(freezeListener, plugin);
+        server.getPluginManager().registerEvents(new PinKeypadCloseListener(menus, keypad, sessions), plugin);
+    }
+
+    /** The bundled spec directory under the source tree, so the test loads the shipped keypad spec from disk. */
+    private static Path specDir() {
+        Path repoRoot = Path.of("").toAbsolutePath();
+        while (repoRoot != null && !Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        Objects.requireNonNull(repoRoot, "repo root");
+        return repoRoot.resolve("bukkit-adapter/src/main/resources");
     }
 
     @AfterEach
@@ -181,9 +216,42 @@ class JoinVerificationTest {
         InventoryDragEvent drag = new InventoryDragEvent(
                 view, null, new ItemStack(Material.STONE), false, Map.of(SLOT_1, new ItemStack(Material.STONE)));
 
-        new PinKeypadListener(keypad, controller, sessions).onDrag(drag);
+        menuListener.onDrag(drag);
 
-        assertThat(drag.isCancelled()).isTrue(); // no item may be dragged into or out of the frozen keypad window
+        assertThat(drag.isCancelled()).isTrue(); // the engine locks the frozen keypad: no item may be dragged in or out
+    }
+
+    // The frozen re-open invariant: a still-frozen player who escapes the keypad has it reopened, so verification can
+    // never be slipped past by closing the window. The open is counted through the engine's MenuOpenEvent so the assert
+    // does not hinge on MockBukkit's close-then-open inventory finalisation.
+    @SuppressWarnings("removal")
+    @Test
+    void escapingTheKeypadWhileStillFrozenReopensIt() {
+        OpenCounter opens = new OpenCounter();
+        server.getPluginManager().registerEvents(opens, plugin);
+        PlayerMock player = joinedPlayerWithPin();
+        assertThat(opens.count).isEqualTo(1); // the first keypad open
+
+        player.closeInventory(); // the frozen player tries to escape the keypad
+
+        assertThat(sessions.isPending(player.getUniqueId())).isTrue(); // still frozen
+        assertThat(opens.count).isEqualTo(2); // and the keypad was reopened
+    }
+
+    // The counterpart: once a deliberate close is flagged (the TOTP handoff, a verify success, a lockout, a stop), the
+    // escaped-window reopen must not fight it, so a flagged close does not reopen.
+    @SuppressWarnings("removal")
+    @Test
+    void aDeliberatelyFlaggedCloseIsNotReopened() {
+        OpenCounter opens = new OpenCounter();
+        server.getPluginManager().registerEvents(opens, plugin);
+        PlayerMock player = joinedPlayerWithPin();
+        assertThat(opens.count).isEqualTo(1);
+
+        keypad.suppressNextClose(ref(player)); // e.g. the handoff to the TOTP prompt
+        player.closeInventory();
+
+        assertThat(opens.count).isEqualTo(1); // no reopen: the flagged close was left alone
     }
 
     @Test
@@ -345,6 +413,35 @@ class JoinVerificationTest {
                 org.bukkit.entity.Player player, PlayerRef viewer, Consumer<String> onSubmit, Runnable onCancel) {
             // The keypad digit path covers verification; this seam is left inert here.
         }
+    }
+
+    /** Counts every keypad open the engine fires, so the reopen invariant is asserted through the engine's own event. */
+    private static final class OpenCounter implements Listener {
+        private int count;
+
+        // Invoked reflectively by Bukkit's event bus, so it reads as unused to static analysis.
+        @SuppressWarnings("UnusedMethod")
+        @EventHandler
+        public void onOpen(MenuOpenEvent event) {
+            if (event.getMenuId().equals(PinKeypadView.SPEC_ID)) {
+                count++;
+            }
+        }
+    }
+
+    /** Swallows the menu-spec loader's diagnostics; the shipped keypad spec loads cleanly from the source tree. */
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /** An in-memory two-factor store mirroring the jOOQ store's contract, keeping the PIN as plaintext for the test. */

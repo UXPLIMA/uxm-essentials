@@ -483,6 +483,18 @@ public final class Menus {
         }
     }
 
+    /**
+     * The spec id of the engine menu backing {@code inventory}, or empty when it is not an engine menu window. Unlike
+     * {@link #currentMenu(UUID)}, which reads a viewer's current top inventory, this inspects a specific inventory the
+     * caller already holds (an {@code InventoryCloseEvent}'s inventory), so a feature can recognise one of its own
+     * spec menus closing (to reopen it, say) through the facade, without reaching for the engine-internal
+     * {@link MenuHolder} itself. A pure holder read, safe on any thread.
+     */
+    public Optional<String> menuIdOf(Inventory inventory) {
+        Objects.requireNonNull(inventory, "inventory");
+        return inventory.getHolder() instanceof MenuHolder menu ? Optional.of(menu.specId()) : Optional.empty();
+    }
+
     /** Read the open menu's id, its 1-based page (the context page is 0-based), row count and typed arguments. */
     private static OpenMenuInfo openMenuInfo(MenuHolder holder) {
         return new OpenMenuInfo(

@@ -106,8 +106,8 @@ class VanishSilentContainerListenerTest {
     @Test
     void aVanishedPlayersVirtualGuiOpenIsNotMirrored() {
         // A plugin GUI (the menu engine, the PIN keypad) is a virtual CHEST inventory with no block, so getLocation()
-        // is null. Mirroring it would swap it for a null-holder copy and strip its MenuHolder / PinKeypadHolder, which
-        // silently breaks click-cancelling; the listener must leave a virtual GUI alone even though its type is CHEST.
+        // is null. Mirroring it would swap it for a null-holder copy and strip its MenuHolder, which silently breaks
+        // click-cancelling; the listener must leave a virtual GUI alone even though its type is CHEST.
         PlayerMock alice = server.addPlayer("Alice");
         store.vanish(alice.getUniqueId(), VanishLevel.DEFAULT);
         Inventory virtualChestGui = mock(Inventory.class);
