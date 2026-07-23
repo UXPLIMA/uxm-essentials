@@ -387,6 +387,7 @@ public final class PlayerwarpsWiring {
                 menus,
                 kernel.scheduler(),
                 com.uxplima.uxmessentials.persistence.warps.WarpRepositories.categories(persistence),
+                kernel.messages(),
                 browse,
                 browseMenu::open,
                 (viewer, name) -> viewHolder[0].open(viewer, name),

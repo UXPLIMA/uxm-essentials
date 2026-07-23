@@ -284,7 +284,6 @@ class ShippedSpecBindingsDriftTest {
             "playerwarps:viewer-member",
             "pwarp-viewer-can",
             "playerwarps:manage-sponsor",
-            "playerwarps:has-no-categories",
             "moderation:confirm-silent-offered",
             "economy:can-add-member",
             "economy:multi-currency",

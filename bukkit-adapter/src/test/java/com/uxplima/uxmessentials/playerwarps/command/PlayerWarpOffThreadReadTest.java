@@ -363,6 +363,7 @@ class PlayerWarpOffThreadReadTest {
                 menus,
                 scheduler,
                 categories,
+                messages,
                 browse,
                 (player, viewer, filters) -> {},
                 (viewer, name) -> {},

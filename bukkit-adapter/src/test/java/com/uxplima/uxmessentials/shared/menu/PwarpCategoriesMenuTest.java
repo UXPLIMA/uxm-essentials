@@ -52,12 +52,11 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  */
 class PwarpCategoriesMenuTest {
 
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
     private static final int BROWSE_ALL_SLOT = 10;
     private static final int MY_WARPS_SLOT = 12;
     private static final int FAVOURITES_SLOT = 14;
     private static final int TOP_RATED_SLOT = 16;
-    private static final int FIRST_CATEGORY_SLOT = 27;
+    private static final int FIRST_CATEGORY_SLOT = 28;
 
     private ServerMock server;
     private Plugin plugin;
@@ -157,15 +156,14 @@ class PwarpCategoriesMenuTest {
     }
 
     @Test
-    void anEmptyCategorySetDrawsNoCategoryButtons() {
+    void anEmptyCategorySetFallsBackToTheShippedDefaults() {
         categories = List.of();
         Inventory inv = open();
 
-        // With no categories the grid draws nothing in its first content slot — empty (or the backdrop), never a
-        // category button. The quick-entry buttons above still render.
-        org.bukkit.inventory.ItemStack cell = inv.getItem(FIRST_CATEGORY_SLOT);
-        assertThat(cell == null || cell.getType().isAir() || cell.getType() == FILLER)
-                .isTrue();
+        // With no operator categories the grid shows the shipped default set, so the hub is never an empty panel: the
+        // first default (Building, an OAK_PLANKS icon) renders at the first content slot. The quick entries still
+        // render.
+        assertThat(inv.getItem(FIRST_CATEGORY_SLOT).getType()).isEqualTo(Material.OAK_PLANKS);
         assertThat(inv.getItem(BROWSE_ALL_SLOT).getType()).isEqualTo(Material.BOOKSHELF);
     }
 
@@ -188,6 +186,7 @@ class PwarpCategoriesMenuTest {
                 menus,
                 scheduler,
                 new StubCategories(),
+                new KeyMessages(),
                 query -> new com.uxplima.uxmessentials.playerwarps.domain.Page<>(java.util.List.of(), 0L, 0, 50),
                 this::recordBrowse,
                 (viewer, name) -> {},

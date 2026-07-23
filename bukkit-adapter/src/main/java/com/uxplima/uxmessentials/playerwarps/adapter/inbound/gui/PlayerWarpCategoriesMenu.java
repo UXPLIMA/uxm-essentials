@@ -5,11 +5,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
@@ -20,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAct
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
@@ -65,9 +68,24 @@ public final class PlayerWarpCategoriesMenu {
     /** The reserved sponsor slots on the landing, so the snapshot never reads more sponsors than can be drawn. */
     private static final int SPONSOR_SLOTS = 3;
 
+    /**
+     * The category set shipped out of the box, so the hub reads as a full, useful panel on a fresh server rather than
+     * an empty grid. Each is a browse filter tag with a localised name and an icon; a viewer's click filters the browse
+     * to that tag exactly as an operator-defined category does. They are the fallback only: the moment the operator
+     * defines any warp_categories, those replace the whole default set. Names resolve per viewer through the catalog.
+     */
+    private static final List<DefaultCategory> DEFAULT_CATEGORIES = List.of(
+            new DefaultCategory("building", PlayerwarpsMessageKey.PWARP_GUI_CATEGORIES_CAT_BUILDING, "OAK_PLANKS", 0),
+            new DefaultCategory("shop", PlayerwarpsMessageKey.PWARP_GUI_CATEGORIES_CAT_SHOP, "EMERALD", 1),
+            new DefaultCategory("pvp", PlayerwarpsMessageKey.PWARP_GUI_CATEGORIES_CAT_PVP, "IRON_SWORD", 2),
+            new DefaultCategory("farm", PlayerwarpsMessageKey.PWARP_GUI_CATEGORIES_CAT_FARM, "WHEAT", 3),
+            new DefaultCategory("redstone", PlayerwarpsMessageKey.PWARP_GUI_CATEGORIES_CAT_REDSTONE, "REDSTONE", 4),
+            new DefaultCategory("misc", PlayerwarpsMessageKey.PWARP_GUI_CATEGORIES_CAT_MISC, "CHEST", 5));
+
     private final Menus menus;
     private final Scheduler scheduler;
     private final WarpCategoryRepository categories;
+    private final Messages messages;
     private final PlayerWarpBrowse browse;
     private final BrowseOpener browseOpener;
     private final BiConsumer<PlayerRef, PlayerWarpName> openView;
@@ -77,6 +95,7 @@ public final class PlayerWarpCategoriesMenu {
             Menus menus,
             Scheduler scheduler,
             WarpCategoryRepository categories,
+            Messages messages,
             PlayerWarpBrowse browse,
             BrowseOpener browseOpener,
             BiConsumer<PlayerRef, PlayerWarpName> openView,
@@ -84,12 +103,16 @@ public final class PlayerWarpCategoriesMenu {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.categories = Objects.requireNonNull(categories, "categories");
+        this.messages = Objects.requireNonNull(messages, "messages");
         this.browse = Objects.requireNonNull(browse, "browse");
         this.browseOpener = Objects.requireNonNull(browseOpener, "browseOpener");
         this.openView = Objects.requireNonNull(openView, "openView");
         this.sponsorEnabled =
                 Objects.requireNonNull(sponsorConfig, "sponsorConfig").enabled();
     }
+
+    /** One shipped default category: a browse-filter id, its localised name key, an icon material, and a sort slot. */
+    private record DefaultCategory(String id, PlayerwarpsMessageKey nameKey, String material, int slot) {}
 
     /** Register the category and sponsor sources, the entry placeholders, the actions, and the spec. */
     public void register(MenuBindings bindings, Path dataFolder, Logger log) {
@@ -116,11 +139,6 @@ public final class PlayerWarpCategoriesMenu {
         // Opens this hub from the browse's categories control, so the landing stays reachable now that a bare /pwarp
         // opens the warp grid directly.
         bindings.action("playerwarps:open-categories", ctx -> open(ctx.player(), ctx.viewer()));
-        // Gates the hub's "no categories yet" hint: true when the bounded snapshot carries no category, read off the
-        // immutable subject on the render thread with no store touch.
-        bindings.condition(
-                "playerwarps:has-no-categories",
-                (ctx, args) -> ctx.subject(Subject.class).categories().isEmpty());
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
     }
 
@@ -133,7 +151,7 @@ public final class PlayerWarpCategoriesMenu {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         scheduler.async(() -> {
-            Subject subject = new Subject(snapshotCategories(), snapshotSponsors());
+            Subject subject = new Subject(snapshotCategories(viewer), snapshotSponsors());
             scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, subject));
         });
     }
@@ -191,17 +209,32 @@ public final class PlayerWarpCategoriesMenu {
 
     /**
      * The bounded category snapshot for the list source, ordered by the operator's configured slot then id for a stable
-     * layout. Read off the tick thread at open; any failure (a store hiccup, a missing table on a stripped install)
-     * degrades to no category buttons rather than aborting the landing.
+     * layout. Read off the tick thread at open. The operator's defined categories win; when none are defined (a fresh
+     * server) or the read faults, it falls back to the shipped {@link #DEFAULT_CATEGORIES} so the hub is always a full,
+     * useful panel rather than an empty grid.
      */
-    private List<WarpCategory> snapshotCategories() {
+    private List<WarpCategory> snapshotCategories(PlayerRef viewer) {
         try {
-            return categories.all().stream()
+            List<WarpCategory> defined = categories.all().stream()
                     .sorted(Comparator.comparingInt(WarpCategory::slot).thenComparing(WarpCategory::id))
                     .toList();
+            return defined.isEmpty() ? defaultCategories(viewer) : defined;
         } catch (RuntimeException failure) {
-            return List.of();
+            return defaultCategories(viewer);
         }
+    }
+
+    /** The shipped default categories as {@link WarpCategory} tiles, each name resolved in the viewer's locale. */
+    private List<WarpCategory> defaultCategories(PlayerRef viewer) {
+        return DEFAULT_CATEGORIES.stream()
+                .map(def -> new WarpCategory(
+                        def.id(),
+                        messages.resolve(viewer, def.nameKey(), Map.of()),
+                        Optional.of(def.material()),
+                        List.of(),
+                        def.slot(),
+                        Optional.empty()))
+                .toList();
     }
 
     /**
