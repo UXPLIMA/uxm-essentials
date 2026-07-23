@@ -15,6 +15,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -26,17 +27,20 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Gives a command that requires arguments but carries no root executor (the {@code /gamemode}/{@code /pay}/
- * {@code /msg} shape) a default root executor that replies with the command's usage, instead of letting bare
- * input fall through to Brigadier's red "Unknown or incomplete command".
+ * Gives every literal node that requires arguments but carries no executor of its own (the {@code /gamemode}/
+ * {@code /pay}/{@code /msg} root, and every intermediate subcommand such as {@code /warp create}) a usage
+ * executor that replies with that node's usage line, instead of letting the incomplete input fall through to
+ * Brigadier's red "Unknown or incomplete command". Injection recurses the whole tree, so typing a command up to
+ * any incomplete point prints the usage for that exact node ({@code /warp create} answers
+ * {@code /warp create <name>}).
  *
  * <p>This sits between the {@link CatalogBinding} and the {@link LocaleBinding} at the registration
  * chokepoint: after any rename it sees the effective literal, and before the locale wrap so the usage
  * executor runs inside the bound locale scope and resolves {@link SharedMessageKey#COMMAND_USAGE} in the
- * sender's language. A root that already has an executor is returned untouched (same executor instance), so
- * a command that lists or toggles on bare input keeps doing so. The root requirement predicate is carried
- * across verbatim, so a player without permission still gets the vanilla no-permission response and only a
- * permitted player running bare sees the usage line.
+ * sender's language. A node that already has an executor is left untouched (same executor instance), so a
+ * command that lists or toggles on bare input keeps doing so; a leaf needs no prompt. Each node's requirement
+ * predicate is carried across verbatim, so a player without permission still gets the vanilla no-permission
+ * response and only a permitted player running an incomplete command sees the usage line.
  */
 @NullMarked
 public final class UsageBinding {
@@ -55,31 +59,53 @@ public final class UsageBinding {
 
     private LiteralCommandNode<CommandSourceStack> inject(
             LiteralCommandNode<CommandSourceStack> node, String description) {
-        if (node.getCommand() != null || node.getChildren().isEmpty()) {
-            return node; // already executable, or a leaf that needs no usage prompt
-        }
-        String literal = node.getLiteral();
-        String usage = BrigadierUsage.of(node);
-        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(literal);
+        return literalBuilder(node, node.getLiteral(), description).build();
+    }
+
+    /**
+     * Rebuild {@code node} carrying its requirement and executor, giving it a usage executor when it has children
+     * but no executor of its own, and recursing into every literal descendant so each incomplete point in the tree
+     * prints its own usage line ({@code /warp create} answers {@code /warp create <name>}, not the vanilla error).
+     * {@code path} is the space-joined literals from the root down to {@code node}, so a nested prompt names the full
+     * command. A node that already carries an executor keeps it untouched; only an intermediate literal that has no
+     * executor gains the usage prompt.
+     */
+    private LiteralArgumentBuilder<CommandSourceStack> literalBuilder(
+            LiteralCommandNode<CommandSourceStack> node, String path, String description) {
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(node.getLiteral());
         if (node.getRequirement() != null) {
             builder.requires(node.getRequirement());
         }
-        builder.executes(usageExecutor(literal, usage, description));
-        for (CommandNode<CommandSourceStack> child : node.getChildren()) {
-            builder.then(BrigadierNodes.rebindChild(child));
+        Command<CommandSourceStack> executor = node.getCommand();
+        if (executor != null) {
+            builder.executes(executor);
+        } else if (!node.getChildren().isEmpty()) {
+            builder.executes(usageExecutor(path, BrigadierUsage.of(node), description));
         }
-        return builder.build();
+        for (CommandNode<CommandSourceStack> child : node.getChildren()) {
+            builder.then(rebindChild(child, path, description));
+        }
+        return builder;
     }
 
-    private Command<CommandSourceStack> usageExecutor(String literal, String usage, String description) {
+    /** Recurse usage injection into a literal child; an argument child keeps its subtree verbatim (no usage on an arg). */
+    private ArgumentBuilder<CommandSourceStack, ?> rebindChild(
+            CommandNode<CommandSourceStack> child, String parentPath, String description) {
+        if (child instanceof LiteralCommandNode<CommandSourceStack> literal) {
+            return literalBuilder(literal, parentPath + " " + literal.getLiteral(), description);
+        }
+        return BrigadierNodes.rebindChild(child);
+    }
+
+    private Command<CommandSourceStack> usageExecutor(String command, String usage, String description) {
         return ctx -> {
-            reply(ctx.getSource().getSender(), literal, usage, description);
+            reply(ctx.getSource().getSender(), command, usage, description);
             return Command.SINGLE_SUCCESS;
         };
     }
 
-    private void reply(CommandSender sender, String literal, String usage, String description) {
-        Map<String, String> placeholders = Map.of("command", literal, "usage", usage, "description", description);
+    private void reply(CommandSender sender, String command, String usage, String description) {
+        Map<String, String> placeholders = Map.of("command", command, "usage", usage, "description", description);
         String rendered = messages.resolve(refOf(sender), SharedMessageKey.COMMAND_USAGE, placeholders);
         sender.sendMessage(MiniMessage.miniMessage().deserialize(rendered, StyleTags.resolver()));
     }

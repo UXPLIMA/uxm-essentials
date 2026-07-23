@@ -14,6 +14,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
@@ -82,6 +83,35 @@ class UsageBindingTest {
 
         String line = nextPlainMessage(player);
         assertThat(line).contains("gamemode").contains("<mode> [<player>]").contains("Set game mode.");
+    }
+
+    @Test
+    void bareNestedSubcommandSendsItsOwnUsage() {
+        PlayerMock player = server.addPlayer("Alice");
+        var plugin = MockBukkit.createMockPlugin();
+        player.addAttachment(plugin, "uxmessentials.warp.use", true);
+        player.addAttachment(plugin, "uxmessentials.warp.create", true);
+        CommandRegistration wrapped = binding.wrap(new WarpStub());
+
+        assertThatCode(() -> dispatch(wrapped, "warp create", CommandSourceStackMock.from(player)))
+                .doesNotThrowAnyException();
+
+        assertThat(messages.lastKey).isEqualTo(SharedMessageKey.COMMAND_USAGE);
+        assertThat(messages.lastPlaceholders)
+                .containsEntry("command", "warp create")
+                .containsEntry("usage", "<name>");
+    }
+
+    @Test
+    void nestedArgOnlyNodeGainsAUsageExecutor() {
+        LiteralCommandNode<CommandSourceStack> root =
+                binding.wrap(new WarpStub()).build();
+
+        CommandNode<CommandSourceStack> create = root.getChild("create");
+        // The intermediate literal had no executor of its own (only a required <name> child); the binding gives it one
+        // so bare input answers with usage rather than the vanilla parse error, while its <name> child is preserved.
+        assertThat(create.getCommand()).isNotNull();
+        assertThat(create.getChild("name")).isNotNull();
     }
 
     @Test
@@ -154,6 +184,24 @@ class UsageBindingTest {
         @Override
         public List<String> aliases() {
             return List.of("gm");
+        }
+    }
+
+    private record WarpStub() implements CommandRegistration {
+        @Override
+        public LiteralCommandNode<CommandSourceStack> build() {
+            return Commands.literal("warp")
+                    .requires(src -> src.getSender().hasPermission("uxmessentials.warp.use"))
+                    .then(Commands.literal("create")
+                            .requires(src -> src.getSender().hasPermission("uxmessentials.warp.create"))
+                            .then(Commands.argument("name", StringArgumentType.word())
+                                    .executes(c -> 1)))
+                    .build();
+        }
+
+        @Override
+        public String description() {
+            return "Manage warps.";
         }
     }
 
