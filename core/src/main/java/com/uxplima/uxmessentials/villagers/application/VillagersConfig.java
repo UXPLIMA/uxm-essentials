@@ -10,8 +10,10 @@ import com.uxplima.uxmessentials.villagers.domain.VillagerProtectionPolicy;
 /**
  * The typed, immutable view of {@code modules/villagers/config.conf}: the module enable gate plus one sub-record per
  * trade-availability feature. Each feature carries its own {@code enabled} switch on top of the module gate, so an
- * operator turns the whole context off with {@code enabled = false} or leaves it on and enables exactly the features
- * they want. Every feature ships {@code false}, so the module is enabled-but-inert out of the box.
+ * operator turns the whole context off with {@code enabled = false} or leaves it on and picks exactly the features
+ * they want. The common villager tools ship on out of the box (infinite trading, the restock timer, the staff trade
+ * manager, click-to-trade, protection, and follow); the niche or disruptive ones ship off (instant restock, the
+ * blanket disable-trades switch, the villager bucket, and leash).
  *
  * <p>It is resolved once from the module's scoped {@link ConfigStore} when the module starts and, per the
  * atomic-reload rule, swapped whole on reload — so a trade handled mid-reload sees one coherent snapshot. The HOCON
@@ -77,14 +79,14 @@ public record VillagersConfig(
     /**
      * The infinite-trading feature under {@code infinite-trading { … }}: a villager's trades never lock out from use —
      * on every trade the plugin resets the villager's recipe uses and suppresses the usual use increment, so no trade
-     * ever greys out. Ships off; it is a gameplay change an operator opts into.
+     * ever greys out. Ships on as a common convenience; set it to {@code false} to restore vanilla trade limits.
      *
-     * @param enabled whether infinite trading runs ({@code infinite-trading.enabled}, default {@code false})
+     * @param enabled whether infinite trading runs ({@code infinite-trading.enabled}, default {@code true})
      */
     public record InfiniteTrading(boolean enabled) {
 
         static InfiniteTrading from(ConfigStore config) {
-            return new InfiniteTrading(config.getBoolean("infinite-trading.enabled", false));
+            return new InfiniteTrading(config.getBoolean("infinite-trading.enabled", true));
         }
     }
 
@@ -94,7 +96,7 @@ public record VillagersConfig(
      * The last-restock instant is stamped in the villager's PDC and compared against the interval by the domain
      * {@link com.uxplima.uxmessentials.villagers.domain.RestockPolicy}.
      *
-     * @param enabled whether the restock sweep runs ({@code restock.enabled}, default {@code false})
+     * @param enabled whether the restock sweep runs ({@code restock.enabled}, default {@code true})
      * @param intervalSeconds how long a villager's trades stay fresh between restocks, in seconds, clamped to at least
      *     one ({@code restock.interval-seconds}, default {@code 600})
      */
@@ -109,7 +111,7 @@ public record VillagersConfig(
 
         static Restock from(ConfigStore config) {
             return new Restock(
-                    config.getBoolean("restock.enabled", false),
+                    config.getBoolean("restock.enabled", true),
                     config.getInt("restock.interval-seconds", DEFAULT_INTERVAL_SECONDS));
         }
 
@@ -155,15 +157,15 @@ public record VillagersConfig(
      * are looking at and edit its trades — change a recipe's buy/sell items and amounts, add a recipe, remove one, or
      * toggle the villager's per-villager disable flag. Edits apply to the live merchant and are PDC-serialised on the
      * villager so they survive a chunk reload / restart (reapplied when the villager loads). When this feature is on
-     * the reapply listener registers so a managed villager keeps its custom trades. Ships off with the rest of the
-     * module — an operator opts the staff tool in.
+     * the reapply listener registers so a managed villager keeps its custom trades. Ships on as a common staff tool;
+     * set it to {@code false} to drop {@code /villager manager}.
      *
-     * @param enabled whether the trade manager is available ({@code trade-manager.enabled}, default {@code false})
+     * @param enabled whether the trade manager is available ({@code trade-manager.enabled}, default {@code true})
      */
     public record TradeManager(boolean enabled) {
 
         static TradeManager from(ConfigStore config) {
-            return new TradeManager(config.getBoolean("trade-manager.enabled", false));
+            return new TradeManager(config.getBoolean("trade-manager.enabled", true));
         }
     }
 
@@ -171,15 +173,15 @@ public record VillagersConfig(
      * The click-to-trade feature under {@code click-to-trade { … }}: with {@code enabled} on, a permitted player
      * (gated on {@code uxmessentials.villagers.trade}) who right-clicks a villager opens its trade window directly,
      * even where the vanilla gate would refuse it (a professionless villager, one already claimed by another trader).
-     * The per-villager and global disable flags are still honoured — a disabled villager never opens. A gameplay
-     * change, so it ships off.
+     * The per-villager and global disable flags are still honoured, so a disabled villager never opens. Ships on as a
+     * common convenience; set it to {@code false} to leave villager access to the vanilla gate.
      *
-     * @param enabled whether click-to-trade runs ({@code click-to-trade.enabled}, default {@code false})
+     * @param enabled whether click-to-trade runs ({@code click-to-trade.enabled}, default {@code true})
      */
     public record ClickToTrade(boolean enabled) {
 
         static ClickToTrade from(ConfigStore config) {
-            return new ClickToTrade(config.getBoolean("click-to-trade.enabled", false));
+            return new ClickToTrade(config.getBoolean("click-to-trade.enabled", true));
         }
     }
 
@@ -188,11 +190,12 @@ public record VillagersConfig(
      * chosen to shield never dies to the deaths a settlement loses villagers to — a zombie infection, a lightning
      * strike (and the witch transform it triggers), suffocation, or any other blow — and is kept loaded so it never
      * despawns. {@code all} widens the shield from individually-marked villagers (the {@code /villager protect} toggle)
-     * to every villager. The four per-threat gates ship on, so turning the feature on shields everything unless the
-     * operator narrows it; the feature itself ships off with the rest of the module. The pure decision lives in
+     * to every villager. The four per-threat gates ship on, so the feature shields against every listed threat unless
+     * the operator narrows it; the feature itself ships on out of the box, though only villagers marked with
+     * {@code /villager protect} are shielded until {@code all} is set. The pure decision lives in
      * {@link VillagerProtectionPolicy}.
      *
-     * @param enabled whether protection runs ({@code protect.enabled}, default {@code false})
+     * @param enabled whether protection runs ({@code protect.enabled}, default {@code true})
      * @param all whether every villager is protected, not only flagged ones ({@code protect.all}, default {@code false})
      * @param fromZombies whether zombie conversion is prevented ({@code protect.from-zombies}, default {@code true})
      * @param fromLightning whether lightning death / transform is prevented ({@code protect.from-lightning}, default
@@ -211,7 +214,7 @@ public record VillagersConfig(
 
         static Protect from(ConfigStore config) {
             return new Protect(
-                    config.getBoolean("protect.enabled", false),
+                    config.getBoolean("protect.enabled", true),
                     config.getBoolean("protect.all", false),
                     config.getBoolean("protect.from-zombies", true),
                     config.getBoolean("protect.from-lightning", true),
@@ -246,9 +249,10 @@ public record VillagersConfig(
      * (or the nearest within reach) pathfind after them. The villager keeps up while it stays within {@code range}
      * blocks of its owner in the same world — beyond that it stops until the owner returns — and a second
      * {@code /villager follow} un-follows it. The owner is stamped in the villager's PDC so the pairing is durable,
-     * and the pure range decision lives in {@link FollowRange}. A gameplay change, so it ships off.
+     * and the pure range decision lives in {@link FollowRange}. Ships on as a common tool; set it to {@code false} to
+     * drop {@code /villager follow}.
      *
-     * @param enabled whether the follow feature runs ({@code follow.enabled}, default {@code false})
+     * @param enabled whether the follow feature runs ({@code follow.enabled}, default {@code true})
      * @param speed the villager's pathfinder speed multiplier while following ({@code follow.speed}, default
      *     {@code 1.0}), clamped to a strictly positive value
      * @param range how far, in blocks, the owner may stray before the villager stops following ({@code follow.range},
@@ -270,7 +274,7 @@ public record VillagersConfig(
 
         static Follow from(ConfigStore config) {
             return new Follow(
-                    config.getBoolean("follow.enabled", false),
+                    config.getBoolean("follow.enabled", true),
                     config.getDouble("follow.speed", DEFAULT_SPEED),
                     config.getInt("follow.range", DEFAULT_RANGE));
         }

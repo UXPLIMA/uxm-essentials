@@ -9,26 +9,27 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the villagers module's typed config view: the module ships enabled while every trade-availability feature ships
- * off (so a fresh install is inert), the restock interval defaults to ten minutes and is clamped to at least one
- * second, and explicit overrides are read back.
+ * Pins the villagers module's typed config view: the module ships enabled with the common trade tools on by default
+ * (infinite trading, the restock timer, the trade manager, click-to-trade, protection, and follow) while the niche or
+ * disruptive features stay off (instant restock, disable-trades, bucket, and leash), the restock interval defaults to
+ * ten minutes and is clamped to at least one second, and explicit overrides are read back.
  */
 class VillagersConfigTest {
 
     @Test
-    void moduleEnabledButEveryFeatureOffByDefault() {
+    void moduleEnabledWithCommonToolsOnAndNicheFeaturesOffByDefault() {
         VillagersConfig config = VillagersConfig.from(new FixedConfig(Map.of()));
 
         assertThat(config.enabled()).isTrue();
-        assertThat(config.infiniteTrading().enabled()).isFalse();
-        assertThat(config.restock().enabled()).isFalse();
+        assertThat(config.infiniteTrading().enabled()).isTrue();
+        assertThat(config.restock().enabled()).isTrue();
         assertThat(config.instantRestock().enabled()).isFalse();
         assertThat(config.disableTrades().enabled()).isFalse();
-        assertThat(config.tradeManager().enabled()).isFalse();
-        assertThat(config.clickToTrade().enabled()).isFalse();
-        assertThat(config.protect().enabled()).isFalse();
+        assertThat(config.tradeManager().enabled()).isTrue();
+        assertThat(config.clickToTrade().enabled()).isTrue();
+        assertThat(config.protect().enabled()).isTrue();
         assertThat(config.bucket().enabled()).isFalse();
-        assertThat(config.follow().enabled()).isFalse();
+        assertThat(config.follow().enabled()).isTrue();
         assertThat(config.leash().enabled()).isFalse();
     }
 
@@ -51,17 +52,19 @@ class VillagersConfigTest {
     }
 
     @Test
-    void protectionShipsOffButItsPerThreatGatesDefaultOn() {
+    void protectionShipsOnWithItsPerThreatGatesDefaultOn() {
         VillagersConfig config = VillagersConfig.from(new FixedConfig(Map.of()));
 
-        assertThat(config.protect().enabled()).isFalse();
+        assertThat(config.protect().enabled()).isTrue();
         assertThat(config.protect().all()).isFalse();
         assertThat(config.protect().fromZombies()).isTrue();
         assertThat(config.protect().fromLightning()).isTrue();
         assertThat(config.protect().fromDamage()).isTrue();
         assertThat(config.protect().noDespawn()).isTrue();
-        // The derived pure policy cancels nothing while the feature is off, whatever the gates say.
-        assertThat(config.protect().policy().protectsDespawn(true)).isFalse();
+        // With the feature on and every gate on, a marked villager is shielded from despawn; an unmarked one is not
+        // (all is off by default, so only villagers flagged with /villager protect fall in scope).
+        assertThat(config.protect().policy().protectsDespawn(true)).isTrue();
+        assertThat(config.protect().policy().protectsDespawn(false)).isFalse();
     }
 
     @Test
