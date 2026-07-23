@@ -186,9 +186,9 @@ public final class MenuRenderer {
             (item.list().isPresent() ? listItems : staticItems).add(item);
         }
         MenuContext staticCtx = pagedAwareStaticCtx(ctx, listItems, resolvedLists);
-        populateStatic(inv, staticItems, staticCtx, clickSink);
+        Map<Integer, MenuItemSpec> placed = populateStatic(inv, staticItems, staticCtx, clickSink);
         for (MenuItemSpec listItem : listItems) {
-            populateList(inv, listItem, ctx, clickSink, resolvedLists);
+            populateList(inv, listItem, ctx, staticCtx, placed, clickSink, resolvedLists);
         }
     }
 
@@ -266,8 +266,8 @@ public final class MenuRenderer {
         return resolvedLists.getOrDefault(listSpec.source().id(), List.of());
     }
 
-    /** Resolve the static items to one-per-slot and render the survivors, recording each as a static slot. */
-    private void populateStatic(
+    /** Resolve the static items to one-per-slot, render the survivors, and return the placement the lists layer over. */
+    private Map<Integer, MenuItemSpec> populateStatic(
             Inventory inv,
             List<MenuItemSpec> staticItems,
             MenuContext ctx,
@@ -282,6 +282,7 @@ public final class MenuRenderer {
             inv.setItem(slot, itemRenderer.render(item, ctx));
             clickSink.accept(slot, new RenderedSlot(item, null));
         }
+        return placed;
     }
 
     /** Page one list item's pre-resolved entries across its content slots, stamping the template once per entry. */
@@ -289,6 +290,8 @@ public final class MenuRenderer {
             Inventory inv,
             MenuItemSpec item,
             MenuContext ctx,
+            MenuContext staticCtx,
+            Map<Integer, MenuItemSpec> staticPlacement,
             BiConsumer<Integer, RenderedSlot> clickSink,
             Map<String, List<?>> resolvedLists) {
         ListSpec listSpec = item.list().orElseThrow();
@@ -300,11 +303,21 @@ public final class MenuRenderer {
         int renderPage = ctx.pagedViews().containsKey(listSpec.source().id()) ? 0 : ctx.page();
         @SuppressWarnings("unchecked") // a list source's element type is opaque to the engine; entries flow as Object
         Pagination.Page<Object> page = Pagination.paginate((List<Object>) entries, contentSlots, renderPage);
-        // Clear every content slot first so a re-render into a reused window — a page flip to a shorter page, or a
-        // refresh that dropped entries — leaves no stale tile behind in a slot this page does not fill.
+        // Clear every content slot this page does not fill, so a reused window (a page flip to a shorter page, a
+        // refresh that dropped entries) leaves no stale list tile behind. A slot backed by a deliberately layered
+        // decoration (a frame the author placed over the base backdrop, priority > 0) clears back to that decoration
+        // rather than to a bare hole, so the frame shows through where the list runs short. The base backdrop itself
+        // (priority 0) is what a list is meant to replace, so those slots still clear to empty, keeping the convention
+        // that an engine list leaves its unfilled cells bare. The click record stays the static item's, already
+        // stamped by populateStatic, so a click on a restored slot routes to it.
         for (int slot : contentSlots) {
             if (fits(inv, slot)) {
-                inv.setItem(slot, null);
+                MenuItemSpec beneath = staticPlacement.get(slot);
+                if (beneath != null && beneath.priority() > 0) {
+                    inv.setItem(slot, itemRenderer.render(beneath, staticCtx));
+                } else {
+                    inv.setItem(slot, null);
+                }
             }
         }
         MenuItemSpec template = listSpec.template();

@@ -156,6 +156,17 @@ class PwarpCategoriesMenuTest {
     }
 
     @Test
+    void theEmptySponsorSlotsShowTheFrameSoTheBottomLeftIsNeverBare() {
+        // Sponsors ship off (SponsorConfig.disabled()), so the sponsors list at 45-47 resolves to nothing. The frame
+        // claims those slots too, so they render as the cyan panel rather than three bare grey holes.
+        Inventory inv = open();
+
+        assertThat(inv.getItem(45).getType()).isEqualTo(Material.CYAN_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(46).getType()).isEqualTo(Material.CYAN_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(47).getType()).isEqualTo(Material.CYAN_STAINED_GLASS_PANE);
+    }
+
+    @Test
     void anEmptyCategorySetFallsBackToTheShippedDefaults() {
         categories = List.of();
         Inventory inv = open();
