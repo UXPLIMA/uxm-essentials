@@ -98,12 +98,17 @@ public final class InvrestoreCommand implements CommandRegistration {
                 .requires(src -> src.getSender().hasPermission(RESTORE_PERMISSION)
                         || src.getSender().hasPermission(EXPORT_PERMISSION)
                         || src.getSender().hasPermission(TELEPORT_PERMISSION))
+                .executes(ctx -> usage(ctx, "invrestore", "<player>", description()))
                 .then(Commands.literal("export")
                         .requires(src -> src.getSender().hasPermission(EXPORT_PERMISSION))
-                        .then(indexed(this::exportSnapshot)))
+                        .executes(ctx ->
+                                usage(ctx, "invrestore export", "<player> <index>", "Export an inventory snapshot"))
+                        .then(indexed("invrestore export", "Export an inventory snapshot", this::exportSnapshot)))
                 .then(Commands.literal("tp")
                         .requires(src -> src.getSender().hasPermission(TELEPORT_PERMISSION))
-                        .then(indexed(this::teleportSnapshot)))
+                        .executes(
+                                ctx -> usage(ctx, "invrestore tp", "<player> <index>", "Teleport to snapshot location"))
+                        .then(indexed("invrestore tp", "Teleport to snapshot location", this::teleportSnapshot)))
                 .then(Commands.argument("player", StringArgumentType.word())
                         .requires(src -> src.getSender().hasPermission(RESTORE_PERMISSION))
                         .suggests(CommandSuggestions.onlinePlayers())
@@ -112,10 +117,24 @@ public final class InvrestoreCommand implements CommandRegistration {
     }
 
     /** The shared {@code <player> <index>} argument tail every subcommand appends to its literal. */
-    private static RequiredArgumentBuilder<CommandSourceStack, String> indexed(Command<CommandSourceStack> action) {
+    private RequiredArgumentBuilder<CommandSourceStack, String> indexed(
+            String command, String desc, Command<CommandSourceStack> action) {
         return Commands.argument("player", StringArgumentType.word())
                 .suggests(CommandSuggestions.onlinePlayers())
+                .executes(ctx -> usage(ctx, command, "<player> <index>", desc))
                 .then(Commands.argument("index", IntegerArgumentType.integer(1)).executes(action));
+    }
+
+    private int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
+        CommandSender sender = ctx.getSource().getSender();
+        feedback.send(
+                sender,
+                SharedMessageKey.COMMAND_USAGE,
+                Map.of(
+                        "command", command,
+                        "usage", usage,
+                        "description", description));
+        return 0;
     }
 
     @Override

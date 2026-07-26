@@ -64,6 +64,21 @@ abstract class KitCommandSupport {
         return null;
     }
 
+    /** Send the command usage format to the sender. */
+    final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
+        Player sender = player(ctx);
+        if (sender != null) {
+            feedback.send(
+                    sender,
+                    SharedMessageKey.COMMAND_USAGE,
+                    Map.of(
+                            "command", command,
+                            "usage", usage,
+                            "description", description));
+        }
+        return 0;
+    }
+
     /** Tell {@code sender} the named target was not found, in their locale. */
     final void unknownPlayer(CommandSender sender, String name) {
         feedback.send(sender, UNKNOWN_PLAYER, Map.of("player", name));
