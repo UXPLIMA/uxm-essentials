@@ -54,7 +54,7 @@ class NpcExtraUseCasesTest {
         assertThat(view.rendered).hasSize(1);
 
         new SetNpcDisplayName(repository, view, notifier).setDisplayName(actor, GUIDE, "  ");
-        assertThat(reload().displayName()).isNull();
+        assertThat(reload().displayName()).isEqualTo(" ");
     }
 
     @Test

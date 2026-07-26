@@ -225,6 +225,9 @@ public final class NpcViewSpawner {
             return profileName(npc);
         }
         String shown = Objects.requireNonNull(npc.displayName(), "displayName").strip();
+        if (shown.isEmpty()) {
+            return " ";
+        }
         return shown.length() <= MAX_PROFILE_NAME ? shown : shown.substring(0, MAX_PROFILE_NAME);
     }
 

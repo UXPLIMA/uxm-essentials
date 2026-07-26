@@ -74,7 +74,7 @@ public record NpcAppearance(
         pose = normalizePose(pose);
         scale = validateScale(scale);
         typeData = copyTypeData(typeData);
-        displayName = blankToNull(displayName);
+        displayName = normalizeDisplayName(displayName);
         viewDistance = validateDistance(viewDistance, "viewDistance");
         turnDistance = validateDistance(turnDistance, "turnDistance");
     }
@@ -288,8 +288,22 @@ public record NpcAppearance(
         return distance;
     }
 
-    private static @Nullable String blankToNull(@Nullable String value) {
-        return value == null || value.isBlank() ? null : value;
+    private static @Nullable String normalizeDisplayName(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String stripped = value.strip();
+        if (stripped.equals("-")
+                || stripped.equalsIgnoreCase("none")
+                || stripped.equalsIgnoreCase("clear")
+                || stripped.equalsIgnoreCase("empty")
+                || stripped.isEmpty()) {
+            return " ";
+        }
+        if (stripped.equalsIgnoreCase("default") || stripped.equalsIgnoreCase("reset")) {
+            return null;
+        }
+        return value;
     }
 
     /** An immutable, empty-tolerant copy of the equipment map keyed in slot order. */

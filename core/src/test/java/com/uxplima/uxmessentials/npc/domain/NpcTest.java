@@ -511,8 +511,8 @@ class NpcTest {
         assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
         assertThat(npc.clickCommand()).isEqualTo("spawn");
 
-        // A blank display name hides the label (stored as null).
-        assertThat(npc.withDisplayName(" ").displayName()).isNull();
+        // A blank display name hides the label (stored as " " for invisible nametag).
+        assertThat(npc.withDisplayName(" ").displayName()).isEqualTo(" ");
         assertThat(npc.withDisplayName(null).hasDisplayName()).isFalse();
     }
 

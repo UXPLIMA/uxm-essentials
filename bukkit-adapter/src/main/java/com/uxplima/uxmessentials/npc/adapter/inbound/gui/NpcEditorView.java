@@ -480,7 +480,14 @@ public final class NpcEditorView {
     }
 
     private void applyDisplayName(NpcName name, String raw) {
-        String value = raw.equals("-") || raw.equalsIgnoreCase("none") || raw.equalsIgnoreCase("clear") ? null : raw;
+        String s = raw.strip();
+        String value = s.equals("-")
+                        || s.equalsIgnoreCase("none")
+                        || s.equalsIgnoreCase("clear")
+                        || s.equalsIgnoreCase("empty")
+                        || s.isEmpty()
+                ? " "
+                : (s.equalsIgnoreCase("default") || s.equalsIgnoreCase("reset") ? null : raw);
         services.displayName().setDisplayName(GUI_ACTOR, name, value);
     }
 

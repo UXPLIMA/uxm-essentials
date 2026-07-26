@@ -41,11 +41,27 @@ public final class SetNpcDisplayName {
             notifier.send(actor, NpcError.NOT_FOUND.messageKey(), Map.of("name", name.value()));
             return Result.err(NpcError.NOT_FOUND);
         }
-        String trimmed = displayName == null || displayName.isBlank() ? null : displayName.strip();
+        String trimmed;
+        if (displayName == null) {
+            trimmed = null;
+        } else {
+            String s = displayName.strip();
+            if (s.equals("-")
+                    || s.equalsIgnoreCase("none")
+                    || s.equalsIgnoreCase("clear")
+                    || s.equalsIgnoreCase("empty")
+                    || s.isEmpty()) {
+                trimmed = " ";
+            } else if (s.equalsIgnoreCase("default") || s.equalsIgnoreCase("reset")) {
+                trimmed = null;
+            } else {
+                trimmed = s;
+            }
+        }
         Npc updated = existing.get().withDisplayName(trimmed);
         repository.save(updated);
         view.render(updated);
-        if (trimmed == null) {
+        if (trimmed == null || trimmed.equals(" ")) {
             notifier.send(actor, NpcMessageKey.NPC_DISPLAY_NAME_CLEARED, Map.of("name", name.value()));
         } else {
             notifier.send(actor, NpcMessageKey.NPC_DISPLAY_NAME_SET, Map.of("name", name.value(), "display", trimmed));
