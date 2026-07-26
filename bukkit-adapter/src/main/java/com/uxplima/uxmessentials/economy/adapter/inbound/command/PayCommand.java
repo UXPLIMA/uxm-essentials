@@ -44,7 +44,9 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pay")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(ctx -> usage(ctx, "pay", "<player> <amount> [currency]", "Pay money to a player"))
                 .then(CommandSuggestions.playerArgument("player")
+                        .executes(ctx -> usage(ctx, "pay", "<player> <amount> [currency]", "Pay money to a player"))
                         .then(Commands.argument("amount", StringArgumentType.word())
                                 .executes(this::run)
                                 .then(currencyArgument().executes(this::run))))

@@ -153,6 +153,18 @@ abstract class ItemworldCommandSupport {
                 .deliver(viewer, services.kernel().messages().resolve(viewer, key, placeholders));
     }
 
+    /** Send the command usage format to the sender. */
+    final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
+        reply(
+                ctx,
+                SharedMessageKey.COMMAND_USAGE,
+                Map.of(
+                        "command", command,
+                        "usage", usage,
+                        "description", description));
+        return 0;
+    }
+
     private PlayerRef viewer(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         return sender instanceof Player player

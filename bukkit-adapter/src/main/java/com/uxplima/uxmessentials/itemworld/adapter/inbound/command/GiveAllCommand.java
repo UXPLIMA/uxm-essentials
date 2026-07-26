@@ -53,6 +53,7 @@ public final class GiveAllCommand extends ItemworldCommandSupport implements Com
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(ctx -> usage(ctx, "giveall", "<item> [amount]", describe()))
                 .then(itemArgument()
                         .executes(ctx -> run(ctx, 1))
                         .then(Commands.argument("amount", IntegerArgumentType.integer(1))

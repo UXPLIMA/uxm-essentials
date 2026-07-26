@@ -47,6 +47,7 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                 .executes(this::runStatus)
                 .then(Commands.literal("status").executes(this::runStatus))
                 .then(Commands.literal("take")
+                        .executes(ctx -> usage(ctx, "loan take", "<amount> [currency] [installments]", "Take a loan"))
                         .then(Commands.argument("amount", StringArgumentType.word())
                                 .executes(ctx -> this.runTake(ctx, null, 10)) // default 10 installments
                                 .then(Commands.argument("installments", IntegerArgumentType.integer(1, 100))
@@ -61,8 +62,10 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                                                         ctx.getArgument("currency", String.class),
                                                         ctx.getArgument("installments", Integer.class)))))))
                 .then(Commands.literal("pay")
+                        .executes(ctx -> usage(ctx, "loan pay", "<loan_id> <amount>", "Repay a loan"))
                         .then(Commands.argument("loan_id", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(services.loanService()::getActiveLoanIds))
+                                .executes(ctx -> usage(ctx, "loan pay", "<loan_id> <amount>", "Repay a loan"))
                                 .then(Commands.argument("amount", StringArgumentType.word())
                                         .executes(this::runPay))))
                 .build();

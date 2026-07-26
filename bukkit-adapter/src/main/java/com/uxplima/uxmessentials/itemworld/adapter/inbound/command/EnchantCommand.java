@@ -50,11 +50,12 @@ public final class EnchantCommand extends ItemworldCommandSupport implements Com
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(ctx -> usage(ctx, "enchant", "<enchantment> [level]", describe()))
                 .then(enchantArgument()
                         .executes(ctx -> run(ctx, 1))
                         .then(Commands.argument("level", IntegerArgumentType.integer(1))
                                 .suggests(CommandSuggestions.fromStrings(() -> LEVELS))
-                                .executes(ctx -> run(ctx, IntegerArgumentType.getInteger(ctx, "level")))))
+                                .executes(ctx -> run(ctx, ctx.getArgument("level", Integer.class)))))
                 .build();
     }
 

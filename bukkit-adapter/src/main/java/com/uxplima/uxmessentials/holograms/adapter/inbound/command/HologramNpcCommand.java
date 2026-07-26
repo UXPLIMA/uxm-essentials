@@ -49,9 +49,10 @@ final class HologramNpcCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> linkNode() {
         return Commands.literal("linknpc")
-                .executes(ctx -> usage(ctx, "/hologram linknpc <hologram> <npc>"))
+                .executes(ctx -> usage(ctx, "hologram linknpc", "<hologram> <npc>", "Link a hologram to an NPC"))
                 .then(nameArgument("name")
-                        .executes(ctx -> usage(ctx, "/hologram linknpc <hologram> <npc>"))
+                        .executes(
+                                ctx -> usage(ctx, "hologram linknpc", "<hologram> <npc>", "Link a hologram to an NPC"))
                         .then(Commands.argument("npc", StringArgumentType.string())
                                 .suggests(CommandSuggestions.fromStrings(npcNames))
                                 .executes(this::link)));
@@ -59,7 +60,7 @@ final class HologramNpcCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .executes(ctx -> usage(ctx, "/hologram " + literal + " <name>"))
+                .executes(ctx -> usage(ctx, "hologram " + literal, "<name>", "Manage hologram " + literal))
                 .then(nameArgument("name").executes(action));
     }
 

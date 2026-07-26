@@ -51,7 +51,12 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::openGui)
                 .then(Commands.argument("amount", StringArgumentType.word())
-                        .then(sourceArgument().then(targetArgument().executes(this::executeDirect))))
+                        .executes(ctx ->
+                                usage(ctx, "exchange", "<amount> <from_currency> <to_currency>", "Exchange currency"))
+                        .then(sourceArgument()
+                                .executes(ctx -> usage(
+                                        ctx, "exchange", "<amount> <from_currency> <to_currency>", "Exchange currency"))
+                                .then(targetArgument().executes(this::executeDirect))))
                 .build();
     }
 

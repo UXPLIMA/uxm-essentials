@@ -123,7 +123,10 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     private LiteralArgumentBuilder<CommandSourceStack> targetVerb(String literal, String node) {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(BASE + "." + node))
+                .executes(ctx -> usage(ctx, "eco " + literal, "<player> <amount> [currency]", "Economy " + literal))
                 .then(CommandSuggestions.playerArgument("player")
+                        .executes(ctx ->
+                                usage(ctx, "eco " + literal, "<player> <amount> [currency]", "Economy " + literal))
                         .then(Commands.argument("amount", StringArgumentType.word())
                                 .executes(ctx -> runTarget(ctx, literal))
                                 .then(currencyArgument().executes(ctx -> runTarget(ctx, literal)))));

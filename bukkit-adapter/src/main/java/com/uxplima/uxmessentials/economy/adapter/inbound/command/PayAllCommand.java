@@ -42,6 +42,7 @@ public final class PayAllCommand extends EconomyCommandSupport implements Comman
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("payall")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(ctx -> usage(ctx, "payall", "<amount> [currency]", "Pay all online players"))
                 .then(Commands.argument("amount", StringArgumentType.word())
                         .executes(this::run)
                         .then(currencyArgument().executes(this::run)))

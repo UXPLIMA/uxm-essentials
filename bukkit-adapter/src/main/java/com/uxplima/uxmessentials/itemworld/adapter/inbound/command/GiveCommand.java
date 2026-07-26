@@ -51,7 +51,9 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(ctx -> usage(ctx, "give", "<player> <item> [amount]", describe()))
                 .then(CommandSuggestions.playerArgument("player")
+                        .executes(ctx -> usage(ctx, "give", "<player> <item> [amount]", describe()))
                         .then(itemArgument()
                                 .executes(ctx -> run(ctx, 1))
                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1))

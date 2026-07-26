@@ -71,6 +71,21 @@ abstract class EconomyCommandSupport {
         return null;
     }
 
+    /** Send the command usage format to the sender. */
+    final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
+        Player sender = player(ctx);
+        if (sender != null) {
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
+                    Map.of(
+                            "command", command,
+                            "usage", usage,
+                            "description", description));
+        }
+        return 0;
+    }
+
     /** Resolve the {@code [currency]} argument against the registry, defaulting to the configured default. */
     final Optional<Currency> currency(CommandContext<CommandSourceStack> ctx) {
         if (!hasArgument(ctx)) {

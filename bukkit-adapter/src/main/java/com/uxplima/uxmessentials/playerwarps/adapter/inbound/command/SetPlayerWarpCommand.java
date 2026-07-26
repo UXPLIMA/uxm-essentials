@@ -34,7 +34,8 @@ public final class SetPlayerWarpCommand extends PlayerWarpCommandSupport impleme
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("setpwarp")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word()).executes(this::run))
+                .executes(ctx -> usage(ctx, "setpwarp", "<name>", description()))
+                .then(Commands.argument("name", StringArgumentType.string()).executes(this::run))
                 .build();
     }
 

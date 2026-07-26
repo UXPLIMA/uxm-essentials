@@ -44,6 +44,7 @@ public final class WithdrawCommand extends EconomyCommandSupport implements Comm
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("withdraw")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(ctx -> usage(ctx, "withdraw", "<amount> [currency]", "Withdraw money into a banknote"))
                 .then(Commands.argument("amount", StringArgumentType.word())
                         .executes(this::run)
                         .then(currencyArgument().executes(this::run)))

@@ -61,10 +61,16 @@ abstract class HologramCommandSupport {
     }
 
     /** Send the command usage format to the sender. */
-    final int usage(CommandContext<CommandSourceStack> ctx, String syntax) {
+    final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
         Player sender = player(ctx);
         if (sender != null) {
-            feedback.send(sender, HologramsMessageKey.COMMAND_USAGE, Map.of("usage", syntax));
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
+                    Map.of(
+                            "command", command,
+                            "usage", usage,
+                            "description", description));
         }
         return 0;
     }

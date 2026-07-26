@@ -105,9 +105,9 @@ final class NpcStateCommands extends NpcCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> displayNameNode() {
         return Commands.literal("displayname")
-                .executes(ctx -> usage(ctx, "/npc displayname <name> <text>"))
+                .executes(ctx -> usage(ctx, "npc displayname", "<name> <text>", "Set NPC display name"))
                 .then(nameArgument()
-                        .executes(ctx -> usage(ctx, "/npc displayname <name> <text>"))
+                        .executes(ctx -> usage(ctx, "npc displayname", "<name> <text>", "Set NPC display name"))
                         .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(this::displayName)));
     }

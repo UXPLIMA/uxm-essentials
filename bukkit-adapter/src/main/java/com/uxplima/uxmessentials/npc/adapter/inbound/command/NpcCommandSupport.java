@@ -70,10 +70,16 @@ abstract class NpcCommandSupport {
     }
 
     /** Send the command usage format to the sender. */
-    final int usage(CommandContext<CommandSourceStack> ctx, String syntax) {
+    final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
         Player sender = player(ctx);
         if (sender != null) {
-            feedback.send(sender, NpcMessageKey.COMMAND_USAGE, Map.of("usage", syntax));
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
+                    Map.of(
+                            "command", command,
+                            "usage", usage,
+                            "description", description));
         }
         return 0;
     }
@@ -86,16 +92,16 @@ abstract class NpcCommandSupport {
     /** A {@code <literal> <name>} subcommand whose name word completes against the current NPC names. */
     final LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .executes(ctx -> usage(ctx, "/npc " + literal + " <name>"))
+                .executes(ctx -> usage(ctx, "npc " + literal, "<name>", "Manage NPC " + literal))
                 .then(nameArgument().executes(action));
     }
 
     /** A {@code <literal> <name> <value…>} subcommand whose value is the greedy rest of the line. */
     final LiteralArgumentBuilder<CommandSourceStack> greedy(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .executes(ctx -> usage(ctx, "/npc " + literal + " <name> <text>"))
+                .executes(ctx -> usage(ctx, "npc " + literal, "<name> <text>", "Set NPC " + literal))
                 .then(nameArgument()
-                        .executes(ctx -> usage(ctx, "/npc " + literal + " <name> <text>"))
+                        .executes(ctx -> usage(ctx, "npc " + literal, "<name> <text>", "Set NPC " + literal))
                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                 .executes(action)));
     }
