@@ -57,7 +57,16 @@ abstract class HologramCommandSupport {
      * never touches the database (the set is warm after the one load on enable).
      */
     final RequiredArgumentBuilder<CommandSourceStack, String> nameArgument(String literal) {
-        return Commands.argument(literal, StringArgumentType.word()).suggests(nameSuggestions());
+        return Commands.argument(literal, StringArgumentType.string()).suggests(nameSuggestions());
+    }
+
+    /** Send the command usage format to the sender. */
+    final int usage(CommandContext<CommandSourceStack> ctx, String syntax) {
+        Player sender = player(ctx);
+        if (sender != null) {
+            feedback.send(sender, HologramsMessageKey.COMMAND_USAGE, Map.of("usage", syntax));
+        }
+        return 0;
     }
 
     /** The suggestion provider over the current hologram names, reusable for any {@code name} argument. */

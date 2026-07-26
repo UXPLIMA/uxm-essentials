@@ -220,6 +220,7 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_GUI_SELECT_VISIBILITY("hologram.gui.select.visibility"),
 
     // failures
+    COMMAND_USAGE("hologram.command-usage"),
     HOLOGRAM_NOT_FOUND("hologram.not-found"),
     HOLOGRAM_NAME_TAKEN("hologram.name-taken"),
     HOLOGRAM_LINE_INDEX_INVALID("hologram.line-index-invalid"),

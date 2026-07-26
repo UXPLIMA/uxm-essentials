@@ -49,14 +49,18 @@ final class HologramNpcCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> linkNode() {
         return Commands.literal("linknpc")
+                .executes(ctx -> usage(ctx, "/hologram linknpc <hologram> <npc>"))
                 .then(nameArgument("name")
-                        .then(Commands.argument("npc", StringArgumentType.word())
+                        .executes(ctx -> usage(ctx, "/hologram linknpc <hologram> <npc>"))
+                        .then(Commands.argument("npc", StringArgumentType.string())
                                 .suggests(CommandSuggestions.fromStrings(npcNames))
                                 .executes(this::link)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal).then(nameArgument("name").executes(action));
+        return Commands.literal(literal)
+                .executes(ctx -> usage(ctx, "/hologram " + literal + " <name>"))
+                .then(nameArgument("name").executes(action));
     }
 
     private int link(CommandContext<CommandSourceStack> ctx) {

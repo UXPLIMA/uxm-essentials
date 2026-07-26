@@ -203,7 +203,8 @@ public enum NpcMessageKey implements MessageKey {
     NPC_GUI_ACTIONS_ADD_PROMPT("npc.gui.actions.add-prompt"),
     NPC_GUI_ACTIONS_EDIT_PROMPT("npc.gui.actions.edit-prompt"),
     NPC_GUI_ACTIONS_REMOVE_CONFIRM("npc.gui.actions.remove-confirm"),
-    NPC_GUI_ACTIONS_BACK("npc.gui.actions.back");
+    NPC_GUI_ACTIONS_BACK("npc.gui.actions.back"),
+    COMMAND_USAGE("npc.command-usage");
 
     private final String key;
 
