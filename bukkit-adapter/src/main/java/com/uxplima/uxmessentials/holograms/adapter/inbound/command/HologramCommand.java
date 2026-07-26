@@ -108,35 +108,46 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     private LiteralArgumentBuilder<CommandSourceStack> createNode() {
         // The create name is a brand-new name, so it deliberately does not complete against the existing set.
         return Commands.literal("create")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .executes(ctx -> usage(ctx, "/hologram create <name> <text>"))
+                .then(Commands.argument("name", StringArgumentType.string())
+                        .executes(ctx -> usage(ctx, "/hologram create <name> <text>"))
                         .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(this::create)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> textNode(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
+                .executes(ctx -> usage(ctx, "/hologram " + literal + " <name> <text>"))
                 .then(nameArgument("name")
+                        .executes(ctx -> usage(ctx, "/hologram " + literal + " <name> <text>"))
                         .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(action)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> setLineNode() {
         return Commands.literal("setline")
+                .executes(ctx -> usage(ctx, "/hologram setline <name> <index> <text>"))
                 .then(nameArgument("name")
+                        .executes(ctx -> usage(ctx, "/hologram setline <name> <index> <text>"))
                         .then(Commands.argument("index", IntegerArgumentType.integer(1))
+                                .executes(ctx -> usage(ctx, "/hologram setline <name> <index> <text>"))
                                 .then(Commands.argument("text", StringArgumentType.greedyString())
                                         .executes(this::setLine))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> indexNode(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
+                .executes(ctx -> usage(ctx, "/hologram " + literal + " <name> <index>"))
                 .then(nameArgument("name")
+                        .executes(ctx -> usage(ctx, "/hologram " + literal + " <name> <index>"))
                         .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                 .executes(action)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal).then(nameArgument("name").executes(action));
+        return Commands.literal(literal)
+                .executes(ctx -> usage(ctx, "/hologram " + literal + " <name>"))
+                .then(nameArgument("name").executes(action));
     }
 
     /**
@@ -223,9 +234,13 @@ public final class HologramCommand extends HologramCommandSupport implements Com
 
     private LiteralArgumentBuilder<CommandSourceStack> moveToNode() {
         return Commands.literal("moveto")
+                .executes(ctx -> usage(ctx, "/hologram moveto <name> <x> <y> <z>"))
                 .then(nameArgument("name")
+                        .executes(ctx -> usage(ctx, "/hologram moveto <name> <x> <y> <z>"))
                         .then(Commands.argument("x", StringArgumentType.word())
+                                .executes(ctx -> usage(ctx, "/hologram moveto <name> <x> <y> <z>"))
                                 .then(Commands.argument("y", StringArgumentType.word())
+                                        .executes(ctx -> usage(ctx, "/hologram moveto <name> <x> <y> <z>"))
                                         .then(Commands.argument("z", StringArgumentType.word())
                                                 .executes(this::moveTo)))));
     }

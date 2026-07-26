@@ -65,7 +65,9 @@ final class NpcSkinCommands extends NpcCommandSupport {
     /** The skin subcommand node the {@code /npc} literal attaches. */
     LiteralArgumentBuilder<CommandSourceStack> node() {
         return Commands.literal("skin")
+                .executes(ctx -> usage(ctx, "/npc skin <name> <spec>"))
                 .then(nameArgument()
+                        .executes(ctx -> usage(ctx, "/npc skin <name> <spec>"))
                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                 .suggests(this::suggestSkinPrefixes)
                                 .executes(this::skin)));

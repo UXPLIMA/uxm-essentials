@@ -66,7 +66,16 @@ abstract class NpcCommandSupport {
      * reads the renderer's warm in-memory name set on the tick thread, never the DB.
      */
     final RequiredArgumentBuilder<CommandSourceStack, String> nameArgument() {
-        return Commands.argument("name", StringArgumentType.word()).suggests(nameSuggestions());
+        return Commands.argument("name", StringArgumentType.string()).suggests(nameSuggestions());
+    }
+
+    /** Send the command usage format to the sender. */
+    final int usage(CommandContext<CommandSourceStack> ctx, String syntax) {
+        Player sender = player(ctx);
+        if (sender != null) {
+            feedback.send(sender, NpcMessageKey.COMMAND_USAGE, Map.of("usage", syntax));
+        }
+        return 0;
     }
 
     /** The shared NPC-name suggestion provider, for a {@code name} argument that is not the first under a literal. */
@@ -76,13 +85,17 @@ abstract class NpcCommandSupport {
 
     /** A {@code <literal> <name>} subcommand whose name word completes against the current NPC names. */
     final LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal).then(nameArgument().executes(action));
+        return Commands.literal(literal)
+                .executes(ctx -> usage(ctx, "/npc " + literal + " <name>"))
+                .then(nameArgument().executes(action));
     }
 
     /** A {@code <literal> <name> <value…>} subcommand whose value is the greedy rest of the line. */
     final LiteralArgumentBuilder<CommandSourceStack> greedy(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
+                .executes(ctx -> usage(ctx, "/npc " + literal + " <name> <text>"))
                 .then(nameArgument()
+                        .executes(ctx -> usage(ctx, "/npc " + literal + " <name> <text>"))
                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                 .executes(action)));
     }
