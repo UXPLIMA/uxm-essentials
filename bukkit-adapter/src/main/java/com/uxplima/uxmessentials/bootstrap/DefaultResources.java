@@ -2,24 +2,33 @@ package com.uxplima.uxmessentials.bootstrap;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+import org.spongepowered.configurate.ConfigurateException;
 
 /**
- * Writes the bundled default config files into the plugin data folder on first run.
+ * Writes the bundled default config files into the plugin data folder on first run, and keeps them current
+ * across updates.
  *
  * <p>Every operator-facing file ships as a jar resource and is copied out verbatim the first time the
  * plugin enables, so a fresh install lands an editable root {@code config.conf}, the per-module tree
- * under {@code modules/}, and the message catalogs next to the database rather than an empty folder. A
- * file the operator already has is left untouched — the copy happens only when the target is absent, so
- * edits and reloads survive every restart and upgrade. The config tree itself is still read with per-key
- * fallbacks, so a partially-trimmed file keeps working; these copies exist to give the operator
- * something to edit.
+ * under {@code modules/}, and the message catalogs next to the database rather than an empty folder.
+ *
+ * <p>A file the operator already has is never overwritten: their values, comments and formatting stay exactly
+ * as they left them. What an update does add is the settings that did not exist when they installed. Those are
+ * appended as a commented HOCON block at the end of the file, so a new knob is something they can read and edit
+ * rather than an invisible default buried in the jar. Which keys count as new is decided against the copy of the
+ * previously shipped default kept under {@code .defaults/} (see {@link BundledDefaultsMerge}); a key they
+ * deleted on purpose stays deleted. The config tree is still read with per-key fallbacks either way, so a
+ * trimmed or half-merged file keeps working.
  */
 @NullMarked
 final class DefaultResources {
@@ -162,34 +171,123 @@ final class DefaultResources {
 
     private DefaultResources() {}
 
+    /**
+     * Where the last reconciled copy of each bundled default is kept. It is the plugin's own bookkeeping, not
+     * an operator-facing file: editing anything in here only changes which keys a later update thinks are new.
+     */
+    static final String BASELINE_DIR = ".defaults";
+
     /** The bundled default resource paths, exposed package-private for the first-run coverage drift guard. */
     static List<String> files() {
         return FILES;
     }
 
-    /** Copy each bundled default into {@code dataFolder}, skipping any the operator already has. */
-    static void writeInto(Path dataFolder, Logger log) {
+    /**
+     * Write each bundled default into {@code dataFolder}, and append to the files the operator already has any
+     * setting this version added since the default they were last reconciled against.
+     *
+     * @param version the plugin version, named in the comment above an appended block so the operator can see
+     *     which update brought the settings in
+     */
+    static void writeInto(Path dataFolder, Logger log, String version) {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(version, "version");
         for (String resource : FILES) {
-            writeIfMissing(dataFolder.resolve(resource), resource, log);
+            reconcile(dataFolder, resource, version, log);
         }
     }
 
-    private static void writeIfMissing(Path target, String resource, Logger log) {
-        if (Files.exists(target)) {
+    private static void reconcile(Path dataFolder, String resource, String version, Logger log) {
+        String bundled = bundled(resource, log);
+        if (bundled == null) {
             return;
         }
-        try (InputStream in = DefaultResources.class.getClassLoader().getResourceAsStream(resource)) {
-            if (in == null) {
-                log.warning("bundled default resource is missing from the jar: " + resource);
+        Path target = dataFolder.resolve(resource);
+        Path baseline = dataFolder.resolve(BASELINE_DIR).resolve(resource);
+        try {
+            if (!Files.exists(target)) {
+                write(target, bundled);
+                write(baseline, bundled);
+                log.info("wrote default " + resource);
                 return;
             }
-            Files.createDirectories(Objects.requireNonNull(target.getParent(), "parent"));
-            Files.copy(in, target);
-            log.info("wrote default " + resource);
+            if (!Files.exists(baseline)) {
+                // First enable after this bookkeeping existed: record what this version ships and merge nothing.
+                // Without a baseline there is no way to tell a key an update added from one the operator removed,
+                // and guessing wrong would undo their edits. From here on the comparison is exact.
+                write(baseline, bundled);
+                return;
+            }
+            String previous = Files.readString(baseline, StandardCharsets.UTF_8);
+            if (previous.equals(bundled)) {
+                return;
+            }
+            if (appendNewSettings(target, resource, bundled, previous, version, log)) {
+                write(baseline, bundled);
+            }
         } catch (IOException failure) {
             log.warning("could not write default " + resource + ": " + failure.getMessage());
         }
+    }
+
+    /**
+     * Append the settings this version added to the operator's copy. Returns whether the file is now in step
+     * with the bundled default: a false means their file could not be read or parsed, so the baseline is left
+     * behind and the next enable tries again rather than silently swallowing the new keys.
+     */
+    private static boolean appendNewSettings(
+            Path target, String resource, String bundled, String previous, String version, Logger log)
+            throws IOException {
+        String operator = Files.readString(target, StandardCharsets.UTF_8);
+        Optional<String> added;
+        try {
+            added = BundledDefaultsMerge.newSettings(bundled, previous, operator);
+        } catch (ConfigurateException failure) {
+            log.warning("could not check " + resource + " for new settings: " + failure.getMessage());
+            return false;
+        }
+        if (added.isEmpty()) {
+            return true;
+        }
+        StringBuilder upgraded = new StringBuilder(operator);
+        if (!operator.endsWith("\n")) {
+            upgraded.append('\n');
+        }
+        upgraded.append('\n').append(header(version)).append(added.get());
+        Files.writeString(target, upgraded.toString(), StandardCharsets.UTF_8);
+        log.info("added the settings new in " + version + " to " + resource);
+        return true;
+    }
+
+    /** The comment written above an appended block, so the operator knows where it came from and why. */
+    private static String header(String version) {
+        return """
+                # -----------------------------------------------------------------------------
+                # Added by the update to %s. These settings are new in this version, so your
+                # file did not have them yet. The values below are the shipped defaults, and
+                # nothing above this line was touched. Edit them here, or move them up into the
+                # matching block: HOCON merges repeated blocks, so both read the same.
+                # -----------------------------------------------------------------------------
+                """.formatted(version);
+    }
+
+    /** The bundled text of {@code resource}, or {@code null} when the jar is missing it. */
+    private static @Nullable String bundled(String resource, Logger log) {
+        try (InputStream in = DefaultResources.class.getClassLoader().getResourceAsStream(resource)) {
+            if (in == null) {
+                log.warning("bundled default resource is missing from the jar: " + resource);
+                return null;
+            }
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            log.warning("could not read bundled default " + resource + ": " + failure.getMessage());
+            return null;
+        }
+    }
+
+    private static void write(Path target, String content) throws IOException {
+        Files.createDirectories(Objects.requireNonNull(target.getParent(), "parent"));
+        Files.writeString(target, content, StandardCharsets.UTF_8);
     }
 }

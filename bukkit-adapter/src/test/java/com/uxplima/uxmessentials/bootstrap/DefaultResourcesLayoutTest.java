@@ -18,7 +18,7 @@ class DefaultResourcesLayoutTest {
 
     @Test
     void firstRunExtractsThePerModuleTree(@TempDir Path dir) {
-        DefaultResources.writeInto(dir, Logger.getLogger("test"));
+        DefaultResources.writeInto(dir, Logger.getLogger("test"), "test");
         assertThat(Files.exists(dir.resolve("config.conf"))).isTrue();
         assertThat(Files.exists(dir.resolve("modules/teleport/config.conf"))).isTrue();
         assertThat(Files.exists(dir.resolve("modules/teleport/rtp.conf"))).isTrue();

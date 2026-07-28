@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.ConfigurateConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -12,10 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Covers the first-run extraction of the bundled default config files: every file lands, the written
- * {@code config.conf} parses back to the same defaults the code reads with its fallbacks, and an existing
- * file is never overwritten. Guards against a regression where the data folder ships with only the
- * database and no editable config.
+ * Covers the extraction of the bundled default config files: on a fresh install every file lands and the
+ * written {@code config.conf} parses back to the same defaults the code reads with its fallbacks, and on an
+ * upgrade an existing file keeps every operator value while gaining the settings the update added. Guards two
+ * regressions: a data folder that ships with only the database and no editable config, and a new setting that
+ * exists only inside the jar so the operator never learns it is there.
  */
 class DefaultResourcesTest {
 
@@ -23,7 +25,7 @@ class DefaultResourcesTest {
 
     @Test
     void writesEveryBundledDefault(@TempDir Path dataFolder) {
-        DefaultResources.writeInto(dataFolder, JUL);
+        DefaultResources.writeInto(dataFolder, JUL, "test");
 
         assertThat(dataFolder.resolve("config.conf")).isRegularFile();
         assertThat(dataFolder.resolve("modules/communication/config.conf")).isRegularFile();
@@ -36,7 +38,7 @@ class DefaultResourcesTest {
 
     @Test
     void writtenConfigParsesToTheDocumentedDefaults(@TempDir Path dataFolder) {
-        DefaultResources.writeInto(dataFolder, JUL);
+        DefaultResources.writeInto(dataFolder, JUL, "test");
         ConfigStore config = ConfigurateConfigStore.loadLayout(dataFolder, new NoopLogger());
 
         assertThat(config.getString("storage.backend", "?")).isEqualTo("sqlite");
@@ -66,9 +68,63 @@ class DefaultResourcesTest {
         String operatorEdit = "storage { backend = \"mysql\" }\n";
         Files.writeString(config, operatorEdit);
 
-        DefaultResources.writeInto(dataFolder, JUL);
+        DefaultResources.writeInto(dataFolder, JUL, "test");
 
+        // No baseline yet, so this enable only records what the current jar ships: an operator upgrading into
+        // this behaviour must not have their file rewritten on the strength of a guess.
         assertThat(Files.readString(config)).isEqualTo(operatorEdit);
+    }
+
+    @Test
+    void recordsTheShippedDefaultAsTheBaseline(@TempDir Path dataFolder) throws Exception {
+        DefaultResources.writeInto(dataFolder, JUL, "test");
+
+        Path baseline = dataFolder.resolve(DefaultResources.BASELINE_DIR).resolve("modules/survival/config.conf");
+        assertThat(baseline).isRegularFile();
+        assertThat(Files.readString(baseline))
+                .isEqualTo(Files.readString(dataFolder.resolve("modules/survival/config.conf")));
+    }
+
+    @Test
+    void appendsTheSettingsAnUpdateAddedToAnExistingFile(@TempDir Path dataFolder) throws Exception {
+        // An install from an older version: their file, and the default it came from, knew only about storage.
+        String oldDefault = "storage { backend = \"sqlite\" }\n";
+        String operatorEdit = "storage { backend = \"mysql\" }\n";
+        Files.createDirectories(dataFolder);
+        Files.writeString(dataFolder.resolve("config.conf"), operatorEdit);
+        Path baseline = dataFolder.resolve(DefaultResources.BASELINE_DIR).resolve("config.conf");
+        Files.createDirectories(Objects.requireNonNull(baseline.getParent()));
+        Files.writeString(baseline, oldDefault);
+
+        DefaultResources.writeInto(dataFolder, JUL, "9.9.9");
+
+        String upgraded = Files.readString(dataFolder.resolve("config.conf"));
+        assertThat(upgraded).startsWith(operatorEdit);
+        assertThat(upgraded).contains("9.9.9");
+        // The settings the newer default ships are now in their file, and their own value still wins.
+        ConfigStore config = ConfigurateConfigStore.loadLayout(dataFolder, new NoopLogger());
+        assertThat(config.getString("storage.backend", "?")).isEqualTo("mysql");
+        assertThat(config.getString("messages.default-locale", "?")).isEqualTo("en");
+        // The baseline has moved on, so a restart appends nothing a second time.
+        String afterFirstRun = Files.readString(dataFolder.resolve("config.conf"));
+        DefaultResources.writeInto(dataFolder, JUL, "9.9.9");
+        assertThat(Files.readString(dataFolder.resolve("config.conf"))).isEqualTo(afterFirstRun);
+    }
+
+    @Test
+    void leavesAMalformedFileAloneAndTriesAgainNextTime(@TempDir Path dataFolder) throws Exception {
+        String broken = "storage { backend = \n";
+        Files.createDirectories(dataFolder);
+        Files.writeString(dataFolder.resolve("config.conf"), broken);
+        Path baseline = dataFolder.resolve(DefaultResources.BASELINE_DIR).resolve("config.conf");
+        Files.createDirectories(Objects.requireNonNull(baseline.getParent()));
+        Files.writeString(baseline, "storage { backend = \"sqlite\" }\n");
+
+        DefaultResources.writeInto(dataFolder, JUL, "9.9.9");
+
+        assertThat(Files.readString(dataFolder.resolve("config.conf"))).isEqualTo(broken);
+        // The baseline stays behind, so fixing the syntax error and restarting still brings the new settings in.
+        assertThat(Files.readString(baseline)).doesNotContain("default-locale");
     }
 
     private static final class NoopLogger implements Logger {

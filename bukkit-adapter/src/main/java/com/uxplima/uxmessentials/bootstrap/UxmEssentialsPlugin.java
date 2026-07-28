@@ -61,9 +61,11 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         long startTime = System.currentTimeMillis();
 
         getLogger().info("[1/4] Writing default resources...");
-        // First-run side effect: drop the editable default config files next to the database so an
-        // operator has something to configure. Existing files are never overwritten (see DefaultResources).
-        DefaultResources.writeInto(getDataFolder().toPath(), getLogger());
+        // First-run side effect: drop the editable default config files next to the database so an operator has
+        // something to configure. Existing files are never overwritten; an update only appends the settings it
+        // added, so a new knob is visible in their file instead of only in the jar (see DefaultResources).
+        DefaultResources.writeInto(
+                getDataFolder().toPath(), getLogger(), getPluginMeta().getVersion());
 
         getLogger().info("[2/4] Wiring core modules and persistence...");
         CloseableResources wired = PluginModule.wire(this);

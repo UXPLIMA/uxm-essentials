@@ -33,7 +33,7 @@ class ConfigLayoutFirstRunDriftTest {
 
     @Test
     void firstRunTreeResolvesAPerModuleKey(@TempDir Path dir) {
-        DefaultResources.writeInto(dir, java.util.logging.Logger.getLogger("t"));
+        DefaultResources.writeInto(dir, java.util.logging.Logger.getLogger("t"), "test");
         ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
         assertThat(store.getInt("modules.teleport.rtp.min-radius", -1)).isEqualTo(100);
         assertThat(store.getInt("modules.homes.default-limit", -1)).isEqualTo(3);
@@ -42,7 +42,7 @@ class ConfigLayoutFirstRunDriftTest {
 
     @Test
     void firstRunTreeSurfacesTheDiscordlinkHostConfig(@TempDir Path dir) {
-        DefaultResources.writeInto(dir, java.util.logging.Logger.getLogger("t"));
+        DefaultResources.writeInto(dir, java.util.logging.Logger.getLogger("t"), "test");
         ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
         assertThat(store.getBoolean("modules.discordlink.enabled", false)).isTrue();
         assertThat(store.getInt("modules.discordlink.code-ttl-seconds", -1)).isEqualTo(600);
