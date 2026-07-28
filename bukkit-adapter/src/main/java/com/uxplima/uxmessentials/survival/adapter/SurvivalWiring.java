@@ -43,9 +43,11 @@ import com.uxplima.uxmessentials.survival.adapter.inbound.listener.HeadDropListe
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.OnePlayerSleepListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.TreeFellerListener;
 import com.uxplima.uxmessentials.survival.adapter.inbound.listener.VeinminerListener;
+import com.uxplima.uxmessentials.survival.adapter.outbound.AutoSellNotices;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
+import com.uxplima.uxmessentials.survival.application.SurvivalConfig.SaleNotice;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.survival.domain.AutoToolSelector;
@@ -108,7 +110,8 @@ public final class SurvivalWiring {
         // The break-drop pipeline (auto-pickup / smelt / sell) is built once when at least one of its stages is on, so
         // the AutoDropsListener and the tree-feller / veinminer cascades all route through the same transform; it is
         // null when every stage is off, and then the cascades drop naturally on the ground.
-        @Nullable AutoDropsPipeline autoDrops = autoDropsPipeline(config, sales, toggles);
+        @Nullable AutoDropsPipeline autoDrops =
+                autoDropsPipeline(config, sales, saleNotices(config, sales, kernel, server), toggles);
 
         List<CommandRegistration> commands = new ArrayList<>();
         List<Listener> listeners = new ArrayList<>();
@@ -178,7 +181,10 @@ public final class SurvivalWiring {
      * then fall back to a plain ground-dropping break.
      */
     private static @Nullable AutoDropsPipeline autoDropsPipeline(
-            SurvivalConfig config, Optional<SurvivalSales> sales, PdcSurvivalToggles toggles) {
+            SurvivalConfig config,
+            Optional<SurvivalSales> sales,
+            Optional<AutoSellNotices> notices,
+            PdcSurvivalToggles toggles) {
         if (!config.autoPickup().enabled()
                 && !config.autoSmelt().enabled()
                 && !config.autoSell().enabled()) {
@@ -191,7 +197,27 @@ public final class SurvivalWiring {
                 config.autoSell().enabled(),
                 new SellPrices(config.autoSell().prices()),
                 sales,
+                notices,
                 toggles);
+    }
+
+    /**
+     * The auto-sell receipt, present only when there is something to report: auto-sell enabled, an economy wired to
+     * pay for the drops, and a notice surface configured ({@code autosell.notify.mode} other than {@code off}). It is
+     * the economy seam itself that renders the money figure, so the receipt reads like every other balance line.
+     */
+    private static Optional<AutoSellNotices> saleNotices(
+            SurvivalConfig config, Optional<SurvivalSales> sales, KernelPorts kernel, Server server) {
+        if (!config.autoSell().enabled() || config.autoSell().notice() == SaleNotice.OFF) {
+            return Optional.empty();
+        }
+        return sales.map(seam -> new AutoSellNotices(
+                server,
+                kernel.scheduler(),
+                kernel.messages(),
+                seam,
+                config.autoSell().notice(),
+                config.autoSell().noticeIntervalSeconds()));
     }
 
     /**

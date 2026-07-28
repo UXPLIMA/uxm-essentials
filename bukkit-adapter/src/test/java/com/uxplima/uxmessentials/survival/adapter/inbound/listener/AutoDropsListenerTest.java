@@ -18,10 +18,14 @@ import org.bukkit.entity.Item;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.survival.adapter.outbound.AutoSellNotices;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
+import com.uxplima.uxmessentials.survival.application.SurvivalConfig.SaleNotice;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.survival.domain.SellPrices;
 import com.uxplima.uxmessentials.survival.domain.SmeltMap;
@@ -101,6 +105,7 @@ class AutoDropsListenerTest {
                         false,
                         new SellPrices(Map.of()),
                         Optional.empty(),
+                        Optional.empty(),
                         toggles),
                 scheduler,
                 false);
@@ -122,6 +127,7 @@ class AutoDropsListenerTest {
                         new SmeltMap(Map.of("RAW_IRON", "IRON_INGOT")),
                         false,
                         new SellPrices(Map.of()),
+                        Optional.empty(),
                         Optional.empty(),
                         toggles),
                 scheduler,
@@ -170,6 +176,7 @@ class AutoDropsListenerTest {
                         true,
                         new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
                         Optional.of(sales),
+                        Optional.empty(),
                         toggles),
                 scheduler,
                 false);
@@ -180,6 +187,32 @@ class AutoDropsListenerTest {
         assertThat(sales.credited).isEqualTo(new BigDecimal("600"));
         assertThat(player.getInventory().contains(Material.DIAMOND)).isFalse();
         assertThat(groundItems()).isEmpty();
+    }
+
+    @Test
+    void autoSellTellsTheSellerWhatTheDropFetched() {
+        toggles.toggleAutoSell(player, false); // opt in, as the mechanic defaults off per player
+        Block ore = blockWithDrops(Material.DIAMOND_ORE, new ItemStack(Material.DIAMOND, 2));
+        RecordingSales sales = new RecordingSales(true);
+        AutoSellNotices notices =
+                new AutoSellNotices(server, scheduler, new KeyMessages(), sales, SaleNotice.ACTIONBAR, 0);
+        AutoDropsListener listener = new AutoDropsListener(
+                new AutoDropsPipeline(
+                        true,
+                        false,
+                        new SmeltMap(Map.of()),
+                        true,
+                        new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
+                        Optional.of(sales),
+                        Optional.of(notices),
+                        toggles),
+                scheduler,
+                false);
+
+        listener.onBreak(new BlockBreakEvent(ore, player));
+
+        // The sold stack is what makes the drop vanish, so the seller gets a receipt for it rather than silence.
+        assertThat(player.nextActionBar()).isNotNull();
     }
 
     @Test
@@ -194,6 +227,7 @@ class AutoDropsListenerTest {
                         new SmeltMap(Map.of()),
                         true,
                         new SellPrices(Map.of("DIAMOND", new BigDecimal("300"))),
+                        Optional.empty(),
                         Optional.empty(),
                         toggles),
                 scheduler,
@@ -216,6 +250,7 @@ class AutoDropsListenerTest {
                         new SmeltMap(Map.of("RAW_IRON", "IRON_INGOT")),
                         false,
                         new SellPrices(Map.of()),
+                        Optional.empty(),
                         Optional.empty(),
                         toggles),
                 capturing,
@@ -258,6 +293,7 @@ class AutoDropsListenerTest {
                         false,
                         new SellPrices(Map.of()),
                         Optional.empty(),
+                        Optional.empty(),
                         toggles),
                 scheduler,
                 false);
@@ -288,6 +324,14 @@ class AutoDropsListenerTest {
             }
         }
         return items;
+    }
+
+    /** A Messages stub that renders every template to its own key, so the receipt path runs without a catalog. */
+    private static final class KeyMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return key.key();
+        }
     }
 
     /** A fake economy seam that records the total credited and reports a fixed success. */

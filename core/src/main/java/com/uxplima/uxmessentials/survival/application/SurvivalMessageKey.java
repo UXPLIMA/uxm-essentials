@@ -37,6 +37,14 @@ public enum SurvivalMessageKey implements MessageKey {
     SURVIVAL_AUTOSELL_ENABLED("survival.autosell-enabled"),
     SURVIVAL_AUTOSELL_DISABLED("survival.autosell-disabled"),
 
+    // The auto-sell receipt: what a mined drop fetched. The line is built from one entry per sold material
+    // ({amount} of that material, {item} its client-localized name), joined by the separator, and slotted into the
+    // chat or action-bar form as {items} beside the {amount} of money the sale credited.
+    SURVIVAL_AUTOSELL_SOLD("survival.autosell-sold"),
+    SURVIVAL_AUTOSELL_SOLD_BAR("survival.autosell-sold-bar"),
+    SURVIVAL_AUTOSELL_SOLD_ENTRY("survival.autosell-sold-entry"),
+    SURVIVAL_AUTOSELL_SOLD_SEPARATOR("survival.autosell-sold-separator"),
+
     // /autotool — the per-player toggle's on and off notices.
     SURVIVAL_AUTOTOOL_ENABLED("survival.autotool-enabled"),
     SURVIVAL_AUTOTOOL_DISABLED("survival.autotool-disabled"),

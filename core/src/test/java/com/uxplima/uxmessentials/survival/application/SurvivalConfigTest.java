@@ -93,6 +93,9 @@ class SurvivalConfigTest {
                 .isNotEmpty()
                 .containsEntry("DIAMOND", java.math.BigDecimal.valueOf(80))
                 .containsEntry("IRON_INGOT", java.math.BigDecimal.valueOf(8));
+        // A sold drop never reaches the inventory, so the receipt ships on: silence there reads as a lost item.
+        assertThat(sell.notice()).isEqualTo(SurvivalConfig.SaleNotice.ACTIONBAR);
+        assertThat(sell.noticeIntervalSeconds()).isEqualTo(3);
 
         // Auto-tool ships on for the same reason: its enable gate also owns whether /autotool exists at all.
         assertThat(config.autoTool().enabled()).isTrue();
@@ -126,6 +129,8 @@ class SurvivalConfigTest {
                 Map.entry("autosell.enabled", true),
                 Map.entry("autosell.prices", List.of("DIAMOND")),
                 Map.entry("autosell.prices.DIAMOND", 300.0),
+                Map.entry("autosell.notify.mode", "chat"),
+                Map.entry("autosell.notify.interval-seconds", 10),
                 Map.entry("autotool.enabled", false))));
 
         assertThat(config.enabled()).isFalse();
@@ -152,7 +157,23 @@ class SurvivalConfigTest {
         assertThat(config.autoSmelt().smelt()).containsExactly(Map.entry("RAW_COPPER", "COPPER_INGOT"));
         assertThat(config.autoSell().enabled()).isTrue();
         assertThat(config.autoSell().prices()).containsEntry("DIAMOND", new java.math.BigDecimal("300.0"));
+        // The notice mode is read case-insensitively, so "chat", "CHAT" and "Chat" all name the same surface.
+        assertThat(config.autoSell().notice()).isEqualTo(SurvivalConfig.SaleNotice.CHAT);
+        assertThat(config.autoSell().noticeIntervalSeconds()).isEqualTo(10);
         assertThat(config.autoTool().enabled()).isFalse();
+    }
+
+    @Test
+    void anUnknownNoticeModeFallsBackToTheActionBarRatherThanGoingSilent() {
+        SurvivalConfig config = SurvivalConfig.from(new FixedConfig(Map.of("autosell.notify.mode", "popup")));
+
+        // A typo must not turn the receipt off: that would look exactly like the item loss the receipt exists to
+        // explain. Only an explicit "off" is silence.
+        assertThat(config.autoSell().notice()).isEqualTo(SurvivalConfig.SaleNotice.ACTIONBAR);
+        assertThat(SurvivalConfig.from(new FixedConfig(Map.of("autosell.notify.mode", "OFF")))
+                        .autoSell()
+                        .notice())
+                .isEqualTo(SurvivalConfig.SaleNotice.OFF);
     }
 
     /** A map-backed {@link ConfigStore} that honours the boolean/int/double/list getters the config reads. */

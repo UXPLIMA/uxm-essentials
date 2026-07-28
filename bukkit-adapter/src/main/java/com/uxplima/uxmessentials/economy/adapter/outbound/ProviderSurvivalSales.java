@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.economy.adapter.outbound;
 import java.math.BigDecimal;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
@@ -20,6 +21,9 @@ import org.jspecify.annotations.NullMarked;
  * default {@link Currency} before crediting. {@code credit} is a single guarded deposit whose {@code isOk()} reports
  * whether the proceeds were banked — so a sale pays out exactly once, and a refused deposit (a balance cap) reports
  * {@code false} rather than silently dropping the coin.
+ *
+ * <p>{@code format} renders the proceeds for the sale notice through the same {@link MoneyFormat} every other economy
+ * surface uses, so the figure in "sold for" reads exactly like the one {@code /balance} prints.
  */
 @NullMarked
 public final class ProviderSurvivalSales implements SurvivalSales {
@@ -37,5 +41,11 @@ public final class ProviderSurvivalSales implements SurvivalSales {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         return economy.credit(who, Money.of(currency, amount)).isOk();
+    }
+
+    @Override
+    public String format(BigDecimal amount) {
+        Objects.requireNonNull(amount, "amount");
+        return MoneyFormat.withSymbol(Money.of(currency, amount));
     }
 }

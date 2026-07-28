@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.survival.adapter.outbound.AutoSellNotices;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.survival.domain.SellPrices;
@@ -33,7 +34,8 @@ import org.jspecify.annotations.NullMarked;
  * is gated independently by its own config switch, per-player toggle, and use permission — resolved once per break by
  * {@link #stagesFor} — so a server that enables only auto-pickup gets exactly auto-pickup. Auto-sell removes a stack
  * from the set only once the wallet credit has actually succeeded, so a refused deposit never destroys the item: it
- * falls through to pickup or the ground.
+ * falls through to pickup or the ground. A completed sale is reported through {@link AutoSellNotices}: the sold stack
+ * never reaches the inventory, so without the receipt it reads as a lost drop.
  *
  * <h2>Folia</h2>
  * The inventory, the world drops, and the wallet credit are all applied inline on the caller's thread — the region
@@ -52,6 +54,7 @@ public final class AutoDropsPipeline {
     private final SmeltMap smeltMap;
     private final SellPrices sellPrices;
     private final Optional<SurvivalSales> sales;
+    private final Optional<AutoSellNotices> notices;
     private final PdcSurvivalToggles toggles;
 
     public AutoDropsPipeline(
@@ -61,6 +64,7 @@ public final class AutoDropsPipeline {
             boolean sellEnabled,
             SellPrices sellPrices,
             Optional<SurvivalSales> sales,
+            Optional<AutoSellNotices> notices,
             PdcSurvivalToggles toggles) {
         this.pickupEnabled = pickupEnabled;
         this.smeltEnabled = smeltEnabled;
@@ -68,6 +72,7 @@ public final class AutoDropsPipeline {
         this.sellEnabled = sellEnabled;
         this.sellPrices = Objects.requireNonNull(sellPrices, "sellPrices");
         this.sales = Objects.requireNonNull(sales, "sales");
+        this.notices = Objects.requireNonNull(notices, "notices");
         this.toggles = Objects.requireNonNull(toggles, "toggles");
     }
 
@@ -125,6 +130,10 @@ public final class AutoDropsPipeline {
         }
         if (total.signum() > 0 && sales.orElseThrow().credit(BukkitRefs.toRef(player), total)) {
             drops.removeAll(sold);
+            // The sale is what makes the item disappear, so the seller is told what it fetched; without the receipt
+            // an autosold drop is indistinguishable from a lost one.
+            BigDecimal paid = total;
+            notices.ifPresent(notice -> notice.sold(player, sold, paid));
         }
     }
 

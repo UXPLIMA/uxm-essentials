@@ -65,7 +65,14 @@ class TreeFellerAutoDropsIntegrationTest {
     void aFellWithAutoPickupOnRoutesEveryLogToTheInventory() {
         logColumn(5); // five stacked logs, each dropping one OAK_LOG
         AutoDropsPipeline pipeline = new AutoDropsPipeline(
-                true, false, new SmeltMap(Map.of()), false, new SellPrices(Map.of()), Optional.empty(), toggles);
+                true,
+                false,
+                new SmeltMap(Map.of()),
+                false,
+                new SellPrices(Map.of()),
+                Optional.empty(),
+                Optional.empty(),
+                toggles);
         AutoDropsListener autoDrops = new AutoDropsListener(pipeline, new SyncScheduler(), false);
         TreeFellerListener treeFeller = new TreeFellerListener(config(), toggles, new SyncScheduler(), pipeline);
 

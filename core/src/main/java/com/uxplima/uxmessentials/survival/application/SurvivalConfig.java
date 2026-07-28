@@ -403,8 +403,13 @@ public record SurvivalConfig(
      * @param enabled whether auto-sell runs ({@code autosell.enabled}, default {@code true})
      * @param prices the material to per-item price pairs read from {@code autosell.prices}; a small default set of
      *     common sellables when the block is absent
+     * @param notice where the seller is told what their drops fetched ({@code autosell.notify.mode}, default
+     *     {@link SaleNotice#ACTIONBAR})
+     * @param noticeIntervalSeconds how long sales are pooled before one notice reports them ({@code
+     *     autosell.notify.interval-seconds}, default 3); 0 reports every sale on its own
      */
-    public record AutoSell(boolean enabled, Map<String, BigDecimal> prices) {
+    public record AutoSell(
+            boolean enabled, Map<String, BigDecimal> prices, SaleNotice notice, int noticeIntervalSeconds) {
 
         /** A small, sensible default price table so autosell is not a silent no-op the moment it is enabled. */
         private static final Map<String, BigDecimal> DEFAULT_PRICES = Map.ofEntries(
@@ -421,7 +426,9 @@ public record SurvivalConfig(
 
         public AutoSell {
             Objects.requireNonNull(prices, "prices");
+            Objects.requireNonNull(notice, "notice");
             prices = Map.copyOf(prices);
+            noticeIntervalSeconds = Math.max(0, noticeIntervalSeconds);
         }
 
         static AutoSell from(ConfigStore config) {
@@ -434,7 +441,36 @@ public record SurvivalConfig(
                     prices.put(material, BigDecimal.valueOf(config.getDouble("autosell.prices." + material, 0.0)));
                 }
             }
-            return new AutoSell(config.getBoolean("autosell.enabled", true), prices);
+            return new AutoSell(
+                    config.getBoolean("autosell.enabled", true),
+                    prices,
+                    SaleNotice.parse(config.getString("autosell.notify.mode", SaleNotice.ACTIONBAR.name())),
+                    config.getInt("autosell.notify.interval-seconds", 3));
+        }
+    }
+
+    /**
+     * Where auto-sell tells the seller what their drops fetched. A sale that takes a stack out of the drops with no
+     * word to the player is indistinguishable from losing the item, so the notice is on by default; an operator who
+     * wants the silent behaviour back sets {@code off}.
+     *
+     * <p>{@link #ACTIONBAR} is the default because a mining session sells constantly: the bar overwrites itself and
+     * leaves the chat log alone. {@link #CHAT} is the choice for a server that wants the sale in the log, and pairs
+     * with a longer {@code interval-seconds} so a vein does not print a line per block.
+     */
+    public enum SaleNotice {
+        ACTIONBAR,
+        CHAT,
+        OFF;
+
+        /** The mode named by {@code raw}, case-insensitively; an unreadable or unknown name falls back to the default. */
+        static SaleNotice parse(String raw) {
+            for (SaleNotice mode : values()) {
+                if (mode.name().equalsIgnoreCase(raw.trim())) {
+                    return mode;
+                }
+            }
+            return ACTIONBAR;
         }
     }
 

@@ -30,4 +30,20 @@ public interface SurvivalSales {
      * @return whether the proceeds were credited
      */
     boolean credit(PlayerRef who, BigDecimal amount);
+
+    /**
+     * Render {@code amount} the way the economy shows money, for the {@code {amount}} placeholder of the sale notice.
+     * The economy owns how a figure reads (grouping, decimals, the currency symbol), so the adapter that implements
+     * {@link #credit} answers this too and the survival context never has to know the currency.
+     *
+     * <p>The default is the bare figure with trailing zeros trimmed, which is what a server with no economy provider
+     * would show if it ever rendered one; it exists so a test double or a future provider only has to implement the
+     * credit.
+     *
+     * @param amount the figure to render, non-negative
+     * @return the figure as it should appear to a player
+     */
+    default String format(BigDecimal amount) {
+        return amount.stripTrailingZeros().toPlainString();
+    }
 }
