@@ -13,6 +13,7 @@ import org.bukkit.Server;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.Nullable;
 
@@ -114,7 +115,7 @@ public final class LuckPermsGroupSource {
         }
 
         List<GroupEntry> groups() {
-            if (!server.getPluginManager().isPluginEnabled("LuckPerms")) {
+            if (!LuckPermsAccess.isPresent(server)) {
                 return List.of();
             }
             try {

@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAct
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.Nullable;
@@ -342,13 +343,13 @@ public final class IntegrationConditions {
     }
 
     /**
-     * The WorldGuard (plugin {@code WorldGuard}) standing-region check, reached purely by reflection. Named the SDK
-     * only by string class-name ({@code com.sk89q.worldguard.WorldGuard}, {@code com.sk89q.worldedit.bukkit
-     * .BukkitAdapter}), so no field or method signature here carries a {@code com.sk89q} type: constructing this on a
-     * server without WorldGuard loads none of its classes, and the present-guard short-circuits before any reflection
-     * runs. The region-query chain is version-fiddly, so it is best-effort: any {@link ReflectiveOperationException}
-     * or unchecked failure is logged exactly once and degraded to {@code false}. The absent path plus this fail-closed
-     * degrade are the tested contract; the happy path degrades safely if a version bump moves the chain.
+     * The WorldGuard (plugin {@code WorldGuard}) standing-region check, reached through the shared
+     * {@link WorldGuardReflection} entry point, so no field or method signature here carries a {@code com.sk89q}
+     * type: constructing this on a server without WorldGuard loads none of its classes, and the present-guard
+     * short-circuits before any reflection runs. The region-query chain is version-fiddly, so it is best-effort: any
+     * {@link ReflectiveOperationException} or unchecked failure is logged exactly once and degraded to {@code false}.
+     * The absent path plus this fail-closed degrade are the tested contract; the happy path degrades safely if a
+     * version bump moves the chain.
      */
     private static final class WorldGuardRegions {
 
@@ -362,7 +363,7 @@ public final class IntegrationConditions {
         }
 
         boolean inRegion(Player player, String regionId) {
-            if (regionId.isBlank() || !server.getPluginManager().isPluginEnabled("WorldGuard")) {
+            if (regionId.isBlank() || !WorldGuardReflection.isEnabled(server)) {
                 return false;
             }
             try {
@@ -378,9 +379,8 @@ public final class IntegrationConditions {
             if (location == null) {
                 return false;
             }
-            Object query = createQuery();
-            Object located = adapt(location);
-            Object applicable = invokeSingleArg(query, "getApplicableRegions", located);
+            Object applicable = WorldGuardReflection.applicableRegions(
+                    WorldGuardReflection.createQuery(), WorldGuardReflection.adapt(location));
             if (applicable == null) {
                 return false;
             }
@@ -395,20 +395,6 @@ public final class IntegrationConditions {
                 }
             }
             return false;
-        }
-
-        private static Object createQuery() throws ReflectiveOperationException {
-            Class<?> worldGuard = Class.forName("com.sk89q.worldguard.WorldGuard");
-            Object instance = worldGuard.getMethod("getInstance").invoke(null);
-            Object platform = instance.getClass().getMethod("getPlatform").invoke(instance);
-            Object container =
-                    platform.getClass().getMethod("getRegionContainer").invoke(platform);
-            return container.getClass().getMethod("createQuery").invoke(container);
-        }
-
-        private static Object adapt(Location location) throws ReflectiveOperationException {
-            Class<?> adapter = Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter");
-            return adapter.getMethod("adapt", Location.class).invoke(null, location);
         }
 
         private void degrade(Exception failure) {

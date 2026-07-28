@@ -40,7 +40,7 @@ public final class BukkitWorldGuardFlags implements WorldGuardFlags {
 
     @Override
     public boolean supported() {
-        return server.getPluginManager().isPluginEnabled("WorldGuard");
+        return WorldGuardReflection.isEnabled(server);
     }
 
     @Override

@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
-import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -9,11 +8,11 @@ import org.bukkit.Location;
 import org.bukkit.Server;
 import org.bukkit.World;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The WorldGuard side of the random-teleport protection check, reached purely by reflection behind a plugin-present
@@ -21,10 +20,10 @@ import org.jspecify.annotations.Nullable;
  * A position is protected when <em>any</em> WorldGuard region covers it: the pre-warmed pool is shared and has no
  * owning player, so the question is spatial ("is this spot inside a region") rather than "may player X enter it".
  *
- * <p>Named the SDK only by string class-name ({@code com.sk89q.worldguard.WorldGuard},
- * {@code com.sk89q.worldedit.bukkit.BukkitAdapter}), so no field or method signature carries a {@code com.sk89q}
- * type: on a server without WorldGuard the present-guard short-circuits before any {@code Class.forName}, so none of
- * its classes load — no classload on the WorldGuard-absent path. The check is fail-open: an absent plugin, an unknown
+ * <p>The reflective walk itself belongs to {@link WorldGuardReflection}, the one entry point every WorldGuard
+ * adapter shares, so a WorldGuard release that moves a step in the query chain is fixed in one place rather than
+ * four. No field or method signature here carries a {@code com.sk89q} type: on a server without WorldGuard the
+ * present-guard short-circuits before any {@code Class.forName}, so none of its classes load. The check is fail-open: an absent plugin, an unknown
  * world, or any reflective failure (a version bump moving the query chain) all report "not protected" and are logged
  * at most once, because wrongly refusing wilderness would starve the pool, and the global {@code __global__} region —
  * which has no physical bounds — is not returned by the spatial query, so pure wilderness reports empty.
@@ -47,7 +46,7 @@ public final class WorldGuardRegions implements ProtectedLand {
     @Override
     public boolean isProtected(Position where) {
         Objects.requireNonNull(where, "where");
-        if (!server.getPluginManager().isPluginEnabled("WorldGuard")) {
+        if (!WorldGuardReflection.isEnabled(server)) {
             return false;
         }
         World world = server.getWorld(where.world().uid());
@@ -64,43 +63,13 @@ public final class WorldGuardRegions implements ProtectedLand {
 
     /** True when the region container reports at least one region physically covering {@code location}. */
     private boolean coversAnyRegion(Location location) throws ReflectiveOperationException {
-        Object query = createQuery();
-        Object applicable = getApplicableRegions(query, adapt(location));
+        Object applicable = WorldGuardReflection.applicableRegions(
+                WorldGuardReflection.createQuery(), WorldGuardReflection.adapt(location));
         if (applicable == null) {
             return false;
         }
         Object regions = applicable.getClass().getMethod("getRegions").invoke(applicable);
         return regions instanceof Collection<?> set && !set.isEmpty();
-    }
-
-    /** {@code WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery()}. */
-    private static Object createQuery() throws ReflectiveOperationException {
-        Object instance = Class.forName("com.sk89q.worldguard.WorldGuard")
-                .getMethod("getInstance")
-                .invoke(null);
-        Object platform = instance.getClass().getMethod("getPlatform").invoke(instance);
-        Object container = platform.getClass().getMethod("getRegionContainer").invoke(platform);
-        return container.getClass().getMethod("createQuery").invoke(container);
-    }
-
-    /** Adapt a Bukkit {@link Location} to the WorldEdit location the region container's query expects. */
-    private static Object adapt(Location location) throws ReflectiveOperationException {
-        return Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter")
-                .getMethod("adapt", Location.class)
-                .invoke(null, location);
-    }
-
-    /** {@code RegionQuery#getApplicableRegions(Location)} — matched by the single WorldEdit-location argument. */
-    private static @Nullable Object getApplicableRegions(Object query, Object weLocation)
-            throws ReflectiveOperationException {
-        for (Method candidate : query.getClass().getMethods()) {
-            if (candidate.getName().equals("getApplicableRegions")
-                    && candidate.getParameterCount() == 1
-                    && candidate.getParameterTypes()[0].isInstance(weLocation)) {
-                return candidate.invoke(query, weLocation);
-            }
-        }
-        throw new NoSuchMethodException("getApplicableRegions");
     }
 
     private void degrade(Exception failure) {

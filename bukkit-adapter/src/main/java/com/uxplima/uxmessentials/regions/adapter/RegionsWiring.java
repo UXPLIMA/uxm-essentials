@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -172,14 +173,14 @@ public final class RegionsWiring {
 
     /**
      * The region-service seam bound for this run: the reflective WorldGuard implementation when the WorldGuard
-     * plugin is installed, else the no-op fallback. The probe is a plain plugin-present check
-     * ({@code getPlugin("WorldGuard") != null}) — the same soft-dep pattern the economy Vault/Treasury bridge uses —
-     * so no {@code com.sk89q} class loads on a server without WorldGuard. Package-visible for the wiring probe test.
+     * plugin is installed, else the no-op fallback. The probe is the shared plugin-installed check, the same soft-dep
+     * pattern the economy Vault/Treasury bridge uses, so no {@code com.sk89q} class loads on a server without
+     * WorldGuard. Package-visible for the wiring probe test.
      */
     public static RegionService regionService(Server server, Logger log) {
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(log, "log");
-        if (server.getPluginManager().getPlugin("WorldGuard") != null) {
+        if (WorldGuardReflection.isInstalled(server)) {
             return new WorldGuardRegionService(server, log);
         }
         return new NoWorldGuardRegionService();

@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 import org.bukkit.Server;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -32,9 +33,7 @@ public final class WorldGuardPoseFlagRegistrar {
     public static void register(Server server, Logger log) {
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(log, "log");
-        // During the load phase a plugin is known to the manager but not yet "enabled", so we test presence, not
-        // enabled-state — isPluginEnabled would be false here for WorldGuard even though its registry is ready.
-        if (server.getPluginManager().getPlugin("WorldGuard") == null) {
+        if (!WorldGuardReflection.isInstalled(server)) {
             return;
         }
         try {
@@ -45,10 +44,7 @@ public final class WorldGuardPoseFlagRegistrar {
     }
 
     private static void registerAll() throws ReflectiveOperationException {
-        Object instance = Class.forName("com.sk89q.worldguard.WorldGuard")
-                .getMethod("getInstance")
-                .invoke(null);
-        Object registry = instance.getClass().getMethod("getFlagRegistry").invoke(instance);
+        Object registry = WorldGuardReflection.flagRegistry();
         Constructor<?> stateFlag = Class.forName("com.sk89q.worldguard.protection.flags.StateFlag")
                 .getConstructor(String.class, boolean.class);
         for (String name : WorldGuardPoseFlags.FLAG_NAMES) {

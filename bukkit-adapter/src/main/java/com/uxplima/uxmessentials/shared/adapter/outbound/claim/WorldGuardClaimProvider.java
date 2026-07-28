@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.claim;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -14,11 +13,11 @@ import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.ClaimProvider;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
  * {@link ClaimProvider} backed by WorldGuard regions, reached <b>entirely by reflection</b> — there is no
@@ -49,8 +48,6 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class WorldGuardClaimProvider implements ClaimProvider {
 
-    private static final String WORLD_GUARD = "WorldGuard";
-
     /** The id of WorldGuard's world-wide region, excluded so unregioned wilderness reads as unclaimed. */
     static final String GLOBAL_REGION = "__global__";
 
@@ -71,8 +68,7 @@ public final class WorldGuardClaimProvider implements ClaimProvider {
 
     @Override
     public boolean active() {
-        Plugin worldGuard = server.getPluginManager().getPlugin(WORLD_GUARD);
-        return worldGuard != null && worldGuard.isEnabled();
+        return WorldGuardReflection.isEnabled(server);
     }
 
     @Override
@@ -108,7 +104,8 @@ public final class WorldGuardClaimProvider implements ClaimProvider {
     }
 
     private List<RegionView> coveringRegionViews(Location location) throws ReflectiveOperationException {
-        Object applicable = getApplicableRegions(createQuery(), adapt(location));
+        Object applicable = WorldGuardReflection.applicableRegions(
+                WorldGuardReflection.createQuery(), WorldGuardReflection.adapt(location));
         if (applicable == null) {
             return List.of();
         }
@@ -125,36 +122,6 @@ public final class WorldGuardClaimProvider implements ClaimProvider {
 
     private static String regionId(Object region) throws ReflectiveOperationException {
         return String.valueOf(region.getClass().getMethod("getId").invoke(region));
-    }
-
-    /** {@code WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery()}. */
-    private static Object createQuery() throws ReflectiveOperationException {
-        Object instance = Class.forName("com.sk89q.worldguard.WorldGuard")
-                .getMethod("getInstance")
-                .invoke(null);
-        Object platform = instance.getClass().getMethod("getPlatform").invoke(instance);
-        Object container = platform.getClass().getMethod("getRegionContainer").invoke(platform);
-        return container.getClass().getMethod("createQuery").invoke(container);
-    }
-
-    /** Adapt a Bukkit {@link Location} to the WorldEdit location the region container's query expects. */
-    private static Object adapt(Location location) throws ReflectiveOperationException {
-        return Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter")
-                .getMethod("adapt", Location.class)
-                .invoke(null, location);
-    }
-
-    /** {@code RegionQuery#getApplicableRegions(Location)} — matched by the single WorldEdit-location argument. */
-    private static @Nullable Object getApplicableRegions(Object query, Object weLocation)
-            throws ReflectiveOperationException {
-        for (Method candidate : query.getClass().getMethods()) {
-            if (candidate.getName().equals("getApplicableRegions")
-                    && candidate.getParameterCount() == 1
-                    && candidate.getParameterTypes()[0].isInstance(weLocation)) {
-                return candidate.invoke(query, weLocation);
-            }
-        }
-        throw new NoSuchMethodException("getApplicableRegions");
     }
 
     /**

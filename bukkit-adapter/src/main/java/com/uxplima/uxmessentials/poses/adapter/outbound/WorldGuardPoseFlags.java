@@ -57,7 +57,7 @@ public final class WorldGuardPoseFlags implements PoseRegionFlags {
     public boolean deniesPose(Position where, PoseType type) {
         Objects.requireNonNull(where, "where");
         Objects.requireNonNull(type, "type");
-        if (!server.getPluginManager().isPluginEnabled("WorldGuard")) {
+        if (!WorldGuardReflection.isEnabled(server)) {
             return false;
         }
         World world = server.getWorld(where.world().uid());

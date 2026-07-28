@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.regions.domain.RegionServiceException;
+import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -34,7 +35,8 @@ import org.jspecify.annotations.Nullable;
  * {@code RegionManager} and reads the region map, each region's priority, roster and flags off it.
  *
  * <p>The SDK is named only by string class-name ({@code com.sk89q.worldguard.WorldGuard},
- * {@code com.sk89q.worldedit.bukkit.BukkitAdapter}), so no field or method signature carries a {@code com.sk89q}
+ * {@code com.sk89q.worldedit.bukkit.BukkitAdapter}) through the shared {@link WorldGuardReflection} entry point,
+ * so no field or method signature carries a {@code com.sk89q}
  * type: on a server without WorldGuard the {@link #available()} guard short-circuits before any {@code Class.forName},
  * so none of its classes load. Every read is fail-safe: an absent plugin, an unknown world, an unmanaged world, a
  * missing region, or any reflective failure (a version bump moving a method) reports an empty result and is logged
@@ -61,7 +63,7 @@ public final class WorldGuardRegionService implements RegionService {
 
     @Override
     public boolean available() {
-        return server.getPluginManager().isPluginEnabled("WorldGuard");
+        return WorldGuardReflection.isEnabled(server);
     }
 
     @Override
@@ -177,7 +179,7 @@ public final class WorldGuardRegionService implements RegionService {
 
     /** {@code WorldGuard.getInstance().getFlagRegistry()}: the registry both reads and writes look flags up in. */
     private static Object flagRegistry() throws ReflectiveOperationException {
-        Object instance = worldGuardInstance();
+        Object instance = WorldGuardReflection.instance();
         return instance.getClass().getMethod("getFlagRegistry").invoke(instance);
     }
 
@@ -368,13 +370,7 @@ public final class WorldGuardRegionService implements RegionService {
         if (bukkit == null) {
             return null;
         }
-        Object instance = worldGuardInstance();
-        Object platform = instance.getClass().getMethod("getPlatform").invoke(instance);
-        Object container = platform.getClass().getMethod("getRegionContainer").invoke(platform);
-        Object weWorld = Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter")
-                .getMethod("adapt", World.class)
-                .invoke(null, bukkit);
-        return regionContainerGet(container, weWorld);
+        return regionContainerGet(WorldGuardReflection.regionContainer(), WorldGuardReflection.adaptWorld(bukkit));
     }
 
     /** {@code RegionContainer#get(World)}: matched by the single WorldEdit-world argument; may return {@code null}. */
@@ -403,13 +399,6 @@ public final class WorldGuardRegionService implements RegionService {
             return null;
         }
         return regionsMap(manager).get(region.id());
-    }
-
-    /** {@code WorldGuard.getInstance()}: the singleton entry point every reflective walk starts from. */
-    private static Object worldGuardInstance() throws ReflectiveOperationException {
-        return Class.forName("com.sk89q.worldguard.WorldGuard")
-                .getMethod("getInstance")
-                .invoke(null);
     }
 
     /** A new {@code ProtectedCuboidRegion(id, min, max)} spanning the two positions' block cells. */

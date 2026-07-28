@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.PdcLocaleStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BukkitPermissions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsMetaSource;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.MetaSource;
 import com.uxplima.uxmessentials.shared.adapter.outbound.scheduler.FoliaScheduler;
@@ -187,7 +188,7 @@ final class KernelWiring {
     }
 
     private static MetaSource metaSource(Logger log) {
-        if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
+        if (!LuckPermsAccess.isPresent(Bukkit.getServer())) {
             return MetaSource.none();
         }
         // Loading LuckPermsMetaSource (and thus the net.luckperms symbols) only happens past the

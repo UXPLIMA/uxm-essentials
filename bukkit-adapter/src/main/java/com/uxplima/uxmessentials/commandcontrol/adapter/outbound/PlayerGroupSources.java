@@ -4,27 +4,26 @@ import java.util.Objects;
 
 import org.bukkit.Server;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
 import net.luckperms.api.LuckPermsProvider;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Chooses the {@link PlayerGroupSource} for the command gate, keeping LuckPerms a soft dependency exactly as the chat
- * renderer's {@code ChatMetaSources} does: it probes the {@code Server} for the LuckPerms plugin and only reaches the
- * {@code net.luckperms} symbols (via {@link LuckPermsPlayerGroupSource}) past that guard, so a server without
- * LuckPerms never resolves those classes and falls back to {@link PlayerGroupSource#empty()} — every player gated
- * through the {@code default} command list.
+ * Chooses the {@link PlayerGroupSource} for the command gate. LuckPerms stays a soft dependency: the shared
+ * {@link LuckPermsAccess} guard answers whether it is usable, and the {@code net.luckperms} symbols (via
+ * {@link LuckPermsPlayerGroupSource}) are reached only past that guard, so a server without LuckPerms never resolves
+ * those classes and falls back to {@link PlayerGroupSource#empty()}, every player gated through the {@code default}
+ * command list.
  */
 @NullMarked
 public final class PlayerGroupSources {
-
-    private static final String LUCKPERMS = "LuckPerms";
 
     private PlayerGroupSources() {}
 
     /** The LuckPerms-backed source when LuckPerms is installed, otherwise the empty fallback. */
     public static PlayerGroupSource create(Server server) {
         Objects.requireNonNull(server, "server");
-        if (server.getPluginManager().getPlugin(LUCKPERMS) == null) {
+        if (!LuckPermsAccess.isPresent(server)) {
             return PlayerGroupSource.empty();
         }
         // Loading LuckPermsPlayerGroupSource (and thus the net.luckperms symbols) only happens past the

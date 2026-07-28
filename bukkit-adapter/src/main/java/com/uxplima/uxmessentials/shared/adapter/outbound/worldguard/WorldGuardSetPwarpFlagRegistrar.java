@@ -36,9 +36,7 @@ public final class WorldGuardSetPwarpFlagRegistrar {
     public static void register(Server server, Logger log) {
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(log, "log");
-        // During the load phase a plugin is known to the manager but not yet "enabled", so we test presence, not
-        // enabled-state — isPluginEnabled would be false here for WorldGuard even though its registry is ready.
-        if (server.getPluginManager().getPlugin("WorldGuard") == null) {
+        if (!WorldGuardReflection.isInstalled(server)) {
             return;
         }
         try {
@@ -50,10 +48,7 @@ public final class WorldGuardSetPwarpFlagRegistrar {
 
     /** Register the flag, skipping it when one of that name is already present so a re-run never conflicts. */
     private static void registerFlag() throws ReflectiveOperationException {
-        Object instance = Class.forName("com.sk89q.worldguard.WorldGuard")
-                .getMethod("getInstance")
-                .invoke(null);
-        Object registry = instance.getClass().getMethod("getFlagRegistry").invoke(instance);
+        Object registry = WorldGuardReflection.flagRegistry();
         Object existing = registry.getClass().getMethod("get", String.class).invoke(registry, FLAG_NAME);
         if (existing != null) {
             return;
