@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -20,6 +21,8 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.staff.StaffStores;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
@@ -48,6 +51,7 @@ import com.uxplima.uxmessentials.staff.application.EnterStaffMode;
 import com.uxplima.uxmessentials.staff.application.ExitStaffMode;
 import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
+import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -74,6 +78,9 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class StaffWiring {
 
+    /** The node {@code /stafflist} requires, reused for the hub entry that opens the same roster. */
+    private static final String STAFF_LIST_PERMISSION = "uxmessentials.staff.list";
+
     private StaffWiring() {}
 
     /**
@@ -88,6 +95,7 @@ public final class StaffWiring {
             Persistence persistence,
             StaffSeams seams,
             InProcessDomainEventPublisher events,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
@@ -95,6 +103,7 @@ public final class StaffWiring {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(seams, "seams");
         Objects.requireNonNull(events, "events");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
@@ -166,17 +175,16 @@ public final class StaffWiring {
                 plugin.getServer(),
                 notifier);
 
+        StaffListCommand staffList = new StaffListCommand(
+                services, kernel.messages(), kernel.scheduler(), plugin.getServer(), kernel.messageSink(), playerMenu);
+        // The hub entry opens the same online-staff roster /stafflist opens, under the same node.
+        guiRegistry.register(new ManagementGuiEntry(
+                "staff", StaffMessageKey.STAFF_LIST_TITLE, Material.SHIELD, STAFF_LIST_PERMISSION, staffList::open));
         List<CommandRegistration> commands = List.of(
                 new StaffModeCommand(
                         services, kernel.messages(), kernel.scheduler(), kernel.playerLookup(), running::get),
                 new StaffChatCommand(services, kernel.messages()),
-                new StaffListCommand(
-                        services,
-                        kernel.messages(),
-                        kernel.scheduler(),
-                        plugin.getServer(),
-                        kernel.messageSink(),
-                        playerMenu));
+                staffList);
         List<Listener> listeners = List.of(
                 new StaffModeListener(services, gadgetItems, followService, actions),
                 new StaffJoinListener(services, repository, kernel.scheduler()));

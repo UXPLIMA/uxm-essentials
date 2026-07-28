@@ -170,6 +170,15 @@ public final class RegionsCommand implements CommandRegistration {
         return openList(staff, world);
     }
 
+    /**
+     * Open the region browser for the world {@code staff} is standing in, the same screen a bare {@code /regions}
+     * opens. The {@code /uxmess gui} hub entry routes here so both surfaces share one WorldGuard-present gate.
+     */
+    public void openBrowser(Player staff) {
+        Objects.requireNonNull(staff, "staff");
+        openList(staff, staff.getWorld());
+    }
+
     /** Gate on WorldGuard being present, then hand the world to the list view. */
     private int openList(Player staff, World world) {
         if (!service.available()) {

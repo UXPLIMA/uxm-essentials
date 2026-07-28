@@ -949,13 +949,13 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("tablist"))) {
             wireTablist(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
-            wireVote(plugin, ctx, persistence, resources, links, bus, menus);
+            wireVote(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
             wireDiscordlink(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
-            wireStaff(plugin, ctx, persistence, resources, links, menus, menuBindings);
+            wireStaff(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("npc"))) {
             wireNpc(
                     plugin,
@@ -974,9 +974,9 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("poses"))) {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
         } else if (module.id().equals(ModuleId.of("survival"))) {
-            wireSurvival(plugin, ctx, resources, links, guiLayouts, menus);
+            wireSurvival(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("ranks"))) {
-            wireRanks(plugin, ctx, persistence, resources, links, menus, menuBindings);
+            wireRanks(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(ctx, persistence, resources, textInput, links, bus);
         } else if (module.id().equals(ModuleId.of("security"))) {
@@ -988,7 +988,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
             wireInvrollback(ctx, persistence, resources, menus);
         } else if (module.id().equals(ModuleId.of("regions"))) {
-            wireRegions(plugin, ctx, resources, menus, textInput);
+            wireRegions(plugin, ctx, resources, guiRegistry, menus, textInput);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources);
         }
@@ -1008,7 +1008,12 @@ public final class PluginModule {
     }
 
     private static void wireRegions(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, Menus menus, TextInput textInput) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            TextInput textInput) {
         // regions manages WorldGuard regions behind a SOFT dependency. The wiring probes for the WorldGuard plugin and
         // binds either the reflective WorldGuardRegionService (WG present) or the NoWorldGuardRegionService no-op (WG
         // absent); the /regions command consults RegionService.available() and, on the no-op, replies "WorldGuard not
@@ -1016,7 +1021,7 @@ public final class PluginModule {
         // shared menu engine's paginated list (no raw inventory), reading the region set + each region's priority and
         // roster counts off the tick thread on the global region thread. The context persists nothing and holds no
         // runtime state, so there is no stop hook. A disabled module wires none of this.
-        RegionsWiring.Wired wired = RegionsWiring.wire(plugin, ctx, menus, textInput);
+        RegionsWiring.Wired wired = RegionsWiring.wire(plugin, ctx, guiRegistry, menus, textInput);
         wired.commands().forEach(resources::addCommand);
     }
 
@@ -1115,6 +1120,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         // ranks stands up the DB-backed rank pointer, the parsed ladder and the CurrentRank read over the shared
@@ -1128,7 +1134,7 @@ public final class PluginModule {
         Optional<RankEconomy> economy = provider != null && currency != null
                 ? Optional.of(new ProviderRankEconomy(provider, currency))
                 : Optional.empty();
-        RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy, menus, menuBindings);
+        RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         // The autorank scan's repeating task is cancelled on module stop so a disable strands no scheduled work.
         resources.onClose(wired.stop());
@@ -1143,6 +1149,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry,
             Menus menus) {
         // survival persists nothing: the per-player mechanic toggles are transient PDC stamps and the config is
         // read once into an immutable snapshot. Each mechanic wires only when its config gate is on, so a disabled
@@ -1155,7 +1162,8 @@ public final class PluginModule {
         Optional<SurvivalSales> sales = provider != null && currency != null
                 ? Optional.of(new ProviderSurvivalSales(provider, currency))
                 : Optional.empty();
-        SurvivalWiring.Wired wired = SurvivalWiring.wire(ctx, sales, guiLayouts, menus, plugin.getServer());
+        SurvivalWiring.Wired wired =
+                SurvivalWiring.wire(ctx, sales, guiLayouts, guiRegistry, menus, plugin.getServer());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }
@@ -2076,6 +2084,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         // staff persists the captured loadout through the jOOQ StaffLoadoutRepository over persistence.dsl() (the
@@ -2095,7 +2104,8 @@ public final class PluginModule {
         // and unsubscribed on stop (the kernel port exposes only publish). With messaging off no alert is wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams, events, menus, menuBindings);
+        StaffWiring.Wired wired =
+                StaffWiring.wire(plugin, ctx, persistence, seams, events, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
@@ -2111,6 +2121,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
+            ManagementGuiRegistry guiRegistry,
             Menus menus) {
         // vote builds its counter-cached jOOQ VoteRepository over persistence.dsl() (the vote_party counter and
         // vote_queue offline reward batches ship in the persistence V15 baseline, always applied), the console
@@ -2123,7 +2134,7 @@ public final class PluginModule {
         // threshold are surfaced for the PAPI vote placeholder seam registered after all contexts have wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        VoteWiring.Wired wired = VoteWiring.wire(plugin, ctx, persistence, events, bus, menus);
+        VoteWiring.Wired wired = VoteWiring.wire(plugin, ctx, persistence, events, bus, guiRegistry, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

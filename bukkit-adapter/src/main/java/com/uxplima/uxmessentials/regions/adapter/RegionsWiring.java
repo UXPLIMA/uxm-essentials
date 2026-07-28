@@ -20,12 +20,15 @@ import com.uxplima.uxmessentials.regions.adapter.inbound.gui.RegionRosterView;
 import com.uxplima.uxmessentials.regions.adapter.outbound.NoWorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.adapter.outbound.WorldGuardRegionService;
 import com.uxplima.uxmessentials.regions.application.RegionsConfig;
+import com.uxplima.uxmessentials.regions.application.RegionsMessageKey;
 import com.uxplima.uxmessentials.regions.application.port.RegionService;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -59,6 +62,9 @@ public final class RegionsWiring {
     /** Each region is drawn as, and the paginated-list fallback icon is, a sheet of paper. */
     private static final Material REGION_ICON = Material.PAPER;
 
+    /** The browse gate {@code /regions} itself requires, reused for the hub entry that opens the same list. */
+    private static final String LIST_PERMISSION = "uxmessentials.regions.list";
+
     /** The clicked-a-region-without-the-flags-permission refusal is gated on this node. */
     private static final String FLAGS_PERMISSION = "uxmessentials.regions.flags";
 
@@ -68,9 +74,11 @@ public final class RegionsWiring {
     private RegionsWiring() {}
 
     /** Build the regions adapters and the {@code /regions} command from the injected ports, menu engine and input seam. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Menus menus, TextInput textInput) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, ManagementGuiRegistry guiRegistry, Menus menus, TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
@@ -116,6 +124,14 @@ public final class RegionsWiring {
                 kernel.scheduler(),
                 plugin.getServer(),
                 kernel.messages());
+        // The hub entry opens the browser for the world the viewer is standing in, the same screen a bare
+        // /regions opens, and shares its WorldGuard-present gate.
+        guiRegistry.register(new ManagementGuiEntry(
+                "regions",
+                RegionsMessageKey.REGIONS_GUI_TITLE,
+                Material.BRICKS,
+                LIST_PERMISSION,
+                (player, viewer) -> command.openBrowser(player)));
         return new Wired(List.of(command));
     }
 

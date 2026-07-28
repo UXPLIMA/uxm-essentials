@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.Material;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
@@ -32,6 +33,8 @@ import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
@@ -64,6 +67,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class RanksWiring {
 
+    /** The node that gates the ladder panel, shared by {@code /ranks} and the hub entry. */
+    private static final String RANKS_GUI_PERMISSION = "uxmessentials.ranks.gui";
+
     private RanksWiring() {}
 
     /** Build the ranks use cases and commands from {@code ctx}, the shared {@code persistence} handle and economy. */
@@ -72,12 +78,14 @@ public final class RanksWiring {
             ModuleContext ctx,
             Persistence persistence,
             Optional<RankEconomy> economy,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
@@ -93,6 +101,10 @@ public final class RanksWiring {
         // /ranks command publishes only its admin setrank surface (the panel Optional stays empty).
         Optional<RanksPanelMenu> panel =
                 ladderPanel(plugin, kernel, config, menus, menuBindings, rankup, currentRank, ladder);
+        // The hub entry only exists when the panel does: with gui.enabled off there is nothing to open, so the
+        // /uxmess gui hub shows no ranks icon rather than one that leads nowhere.
+        panel.ifPresent(menu -> guiRegistry.register(new ManagementGuiEntry(
+                "ranks", RanksMessageKey.RANKS_GUI_TITLE, Material.DIAMOND, RANKS_GUI_PERMISSION, menu::open)));
         List<CommandRegistration> commands = new ArrayList<>(List.of(
                 new RankupCommand(rankup, kernel.messages()),
                 new RanksCommand(setRank, ladder, panel, kernel.messages()),

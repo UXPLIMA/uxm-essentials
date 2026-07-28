@@ -23,6 +23,8 @@ import com.uxplima.uxmessentials.persistence.vote.VoteRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
@@ -112,6 +114,9 @@ public final class VoteWiring {
 
     private static final int DEFAULT_THRESHOLD = 25;
 
+    /** The node that gates {@code /vote} itself, reused for the hub entry that opens the same board. */
+    private static final String VOTE_GUI_PERMISSION = "uxmessentials.vote.use";
+
     private VoteWiring() {}
 
     /**
@@ -129,12 +134,14 @@ public final class VoteWiring {
             Persistence persistence,
             InProcessDomainEventPublisher events,
             Bus bus,
+            ManagementGuiRegistry guiRegistry,
             Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
@@ -165,6 +172,16 @@ public final class VoteWiring {
         GuiText guiText = new GuiText(kernel.messages());
         VoteSitesGuiView sitesGuiView = new VoteSitesGuiView(
                 siteCatalog, repository, kernel.scheduler(), kernel.messages(), menus, guiText, guiCfg);
+        // The vote-site board is on the /uxmess gui hub only while gui.enabled is on, so the hub never shows an
+        // icon for a screen /vote itself refuses to open.
+        if (guiCfg.enabled()) {
+            guiRegistry.register(new ManagementGuiEntry(
+                    "vote",
+                    VoteMessageKey.VOTE_GUI_TITLE,
+                    Material.EMERALD,
+                    VOTE_GUI_PERMISSION,
+                    (player, viewer) -> sitesGuiView.open(player)));
+        }
 
         VoteServices services = assemble(
                 kernel,

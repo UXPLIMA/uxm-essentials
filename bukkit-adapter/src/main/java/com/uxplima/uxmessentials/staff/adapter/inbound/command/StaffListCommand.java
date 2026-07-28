@@ -74,6 +74,17 @@ public final class StaffListCommand extends StaffCommandSupport implements Comma
         return "List who is currently online and on staff.";
     }
 
+    /**
+     * Open the online-staff GUI for {@code sender}, the same screen {@code /stafflist} opens. The
+     * {@code /uxmess gui} hub entry routes here so both surfaces share one roster snapshot and one empty-roster
+     * reply.
+     */
+    public void open(Player sender, PlayerRef looker) {
+        Objects.requireNonNull(sender, "sender");
+        Objects.requireNonNull(looker, "looker");
+        scheduler.onGlobal(() -> openRoster(sender, looker));
+    }
+
     private int open(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {

@@ -17,6 +17,8 @@ import org.bukkit.event.Listener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -44,6 +46,7 @@ import com.uxplima.uxmessentials.survival.adapter.inbound.listener.VeinminerList
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
+import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.survival.domain.AutoToolSelector;
 import com.uxplima.uxmessentials.survival.domain.Crops;
@@ -70,6 +73,9 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class SurvivalWiring {
 
+    /** The node that gates the settings panel, shared by {@code /survival} and the hub entry. */
+    private static final String SURVIVAL_GUI_PERMISSION = "uxmessentials.survival.gui";
+
     private SurvivalWiring() {}
 
     /**
@@ -79,14 +85,21 @@ public final class SurvivalWiring {
      * @param sales the economy seam auto-sell credits through, empty when no economy provider is wired (auto-sell is
      *     then inert)
      * @param guiLayouts the operator-editable GUI layout loader the {@code /survival} panel reads its geometry from
+     * @param guiRegistry the {@code /uxmess gui} hub the settings panel registers its entry on
      * @param menus the menu engine the {@code /survival} panel opens through
      * @param server the server the panel resolves the viewer's live {@code Player} from to read their PDC toggles
      */
     public static Wired wire(
-            ModuleContext ctx, Optional<SurvivalSales> sales, GuiLayouts guiLayouts, Menus menus, Server server) {
+            ModuleContext ctx,
+            Optional<SurvivalSales> sales,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            Server server) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(sales, "sales");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(server, "server");
         KernelPorts kernel = ctx.kernel();
@@ -99,18 +112,25 @@ public final class SurvivalWiring {
 
         List<CommandRegistration> commands = new ArrayList<>();
         List<Listener> listeners = new ArrayList<>();
-        commands.add(new SurvivalCommand(
-                new SurvivalSettingsView(
-                        new GuiText(kernel.messages()),
-                        kernel.scheduler(),
-                        guiLayouts,
-                        kernel.messages(),
-                        kernel.permissions(),
-                        menus,
-                        server,
-                        toggles,
-                        config),
-                kernel.messages()));
+        // The panel /survival opens is the same one the /uxmess gui hub entry opens, so both surfaces show one
+        // player the same live toggles.
+        SurvivalSettingsView settingsView = new SurvivalSettingsView(
+                new GuiText(kernel.messages()),
+                kernel.scheduler(),
+                guiLayouts,
+                kernel.messages(),
+                kernel.permissions(),
+                menus,
+                server,
+                toggles,
+                config);
+        guiRegistry.register(new ManagementGuiEntry(
+                "survival",
+                SurvivalMessageKey.SURVIVAL_GUI_TITLE,
+                Material.IRON_PICKAXE,
+                SURVIVAL_GUI_PERMISSION,
+                settingsView::open));
+        commands.add(new SurvivalCommand(settingsView, kernel.messages()));
         if (config.treeFeller().enabled()) {
             commands.add(new TreeFellerCommand(toggles, kernel.messages()));
             listeners.add(new TreeFellerListener(config.treeFeller(), toggles, kernel.scheduler(), autoDrops));
