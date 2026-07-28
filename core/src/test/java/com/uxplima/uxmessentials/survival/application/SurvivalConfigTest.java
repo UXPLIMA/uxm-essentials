@@ -10,7 +10,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins {@link SurvivalConfig}'s resolution from the module's scoped config: an empty store falls back to the shipped
- * defaults (both mechanics on, the common ore set for veinminer), and explicit keys override each knob.
+ * defaults (most mechanics on, the two that silently rewrite a player's mining off, the common ore set for veinminer),
+ * and explicit keys override each knob.
  */
 class SurvivalConfigTest {
 
@@ -69,11 +70,21 @@ class SurvivalConfigTest {
         assertThat(pickup.enabled()).isTrue();
         assertThat(pickup.transferXp()).isFalse();
 
+        // Auto-smelt rewrites what a block drops for every player who has not turned it off, so it ships off and
+        // an operator opts in. Its default table is ores only: smelting cobblestone, sand or clay away would take
+        // the vanilla source of those materials off the server, which is never what "smelt my ores" means.
         SurvivalConfig.AutoSmelt smelt = config.autoSmelt();
-        assertThat(smelt.enabled()).isTrue();
+        assertThat(smelt.enabled()).isFalse();
         assertThat(smelt.smelt())
                 .containsEntry("RAW_IRON", "IRON_INGOT")
-                .containsEntry("ANCIENT_DEBRIS", "NETHERITE_SCRAP");
+                .containsEntry("RAW_GOLD", "GOLD_INGOT")
+                .containsEntry("RAW_COPPER", "COPPER_INGOT")
+                .containsEntry("ANCIENT_DEBRIS", "NETHERITE_SCRAP")
+                .doesNotContainKey("COBBLESTONE")
+                .doesNotContainKey("COBBLED_DEEPSLATE")
+                .doesNotContainKey("SAND")
+                .doesNotContainKey("RED_SAND")
+                .doesNotContainKey("CLAY_BALL");
 
         SurvivalConfig.AutoSell sell = config.autoSell();
         assertThat(sell.enabled()).isTrue();
@@ -82,7 +93,9 @@ class SurvivalConfigTest {
                 .containsEntry("DIAMOND", java.math.BigDecimal.valueOf(80))
                 .containsEntry("IRON_INGOT", java.math.BigDecimal.valueOf(8));
 
-        assertThat(config.autoTool().enabled()).isTrue();
+        // Auto-tool moves the player's held slot for them, so it too ships off rather than surprising every player
+        // on a fresh install.
+        assertThat(config.autoTool().enabled()).isFalse();
     }
 
     @Test

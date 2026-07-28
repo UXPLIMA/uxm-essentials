@@ -355,26 +355,25 @@ public record SurvivalConfig(
      * smelted result before it reaches the player, so mining iron ore yields an ingot. It composes with auto-pickup —
      * the drop is smelted first, then routed. Players toggle it with {@code /autosmelt}.
      *
-     * @param enabled whether auto-smelt runs ({@code autosmelt.enabled}, default {@code true})
-     * @param smelt the drop-material → smelted-result pairs read from {@code autosmelt.smelt}; defaults to the common
-     *     ore-to-ingot set when the block is absent
+     * @param enabled whether auto-smelt runs ({@code autosmelt.enabled}, default {@code false}: it rewrites what
+     *     mining gives every player, so an operator opts in)
+     * @param smelt the drop-material → smelted-result pairs read from {@code autosmelt.smelt}; defaults to the
+     *     ore-to-ingot set below when the block is absent
      */
     public record AutoSmelt(boolean enabled, Map<String, String> smelt) {
 
-        /** The default smelt map: the raw metals to ingots, ancient debris to scrap, and a few common furnace items. */
-        private static final Map<String, String> DEFAULT_SMELT = Map.ofEntries(
-                Map.entry("RAW_IRON", "IRON_INGOT"),
-                Map.entry("RAW_GOLD", "GOLD_INGOT"),
-                Map.entry("RAW_COPPER", "COPPER_INGOT"),
-                Map.entry("ANCIENT_DEBRIS", "NETHERITE_SCRAP"),
-                Map.entry("COBBLESTONE", "STONE"),
-                Map.entry("COBBLED_DEEPSLATE", "DEEPSLATE"),
-                Map.entry("SAND", "GLASS"),
-                Map.entry("RED_SAND", "GLASS"),
-                Map.entry("CLAY_BALL", "BRICK"),
-                Map.entry("WET_SPONGE", "SPONGE"),
-                Map.entry("KELP", "DRIED_KELP"),
-                Map.entry("CHORUS_FRUIT", "POPPED_CHORUS_FRUIT"));
+        /**
+         * The default smelt map: the raw metals to ingots and ancient debris to scrap, and nothing else. Every
+         * entry here rewrites what a block drops for every player who has not turned auto-smelt off, so the
+         * shipped set is limited to the ores the mechanic is named for. Smelting cobblestone, deepslate, sand or
+         * clay would take the vanilla source of those materials off the server entirely: a player mining stone
+         * would never see cobblestone again. Those remain one config line away for an operator who wants them.
+         */
+        private static final Map<String, String> DEFAULT_SMELT = Map.of(
+                "RAW_IRON", "IRON_INGOT",
+                "RAW_GOLD", "GOLD_INGOT",
+                "RAW_COPPER", "COPPER_INGOT",
+                "ANCIENT_DEBRIS", "NETHERITE_SCRAP");
 
         public AutoSmelt {
             Objects.requireNonNull(smelt, "smelt");
@@ -391,7 +390,7 @@ public record SurvivalConfig(
                     smelt.put(raw, config.getString("autosmelt.smelt." + raw, raw));
                 }
             }
-            return new AutoSmelt(config.getBoolean("autosmelt.enabled", true), smelt);
+            return new AutoSmelt(config.getBoolean("autosmelt.enabled", false), smelt);
         }
     }
 
@@ -444,12 +443,13 @@ public record SurvivalConfig(
      * slot is switched to the strongest tool of the family that block needs. Players toggle it with {@code /autotool}.
      * It carries no tuning of its own beyond its enable gate — the selection rules live in the domain.
      *
-     * @param enabled whether auto-tool runs ({@code autotool.enabled}, default {@code true})
+     * @param enabled whether auto-tool runs ({@code autotool.enabled}, default {@code false}: it moves the player's
+     *     held slot for them, so an operator opts in)
      */
     public record AutoTool(boolean enabled) {
 
         static AutoTool from(ConfigStore config) {
-            return new AutoTool(config.getBoolean("autotool.enabled", true));
+            return new AutoTool(config.getBoolean("autotool.enabled", false));
         }
     }
 }
