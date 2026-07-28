@@ -58,8 +58,32 @@ final class FakeTwoFactorRepository implements TwoFactorRepository {
     }
 
     @Override
+    public void clearTotp(UUID playerId) {
+        clear(playerId, row -> new Row(null, row.pin(), row.enrolledAt()));
+    }
+
+    @Override
+    public void clearPin(UUID playerId) {
+        clear(playerId, row -> new Row(row.secret(), null, row.enrolledAt()));
+    }
+
+    @Override
     public void delete(UUID playerId) {
         rows.remove(playerId);
+    }
+
+    /** Apply {@code without} to the stored row, dropping it entirely once neither factor is left, as the store does. */
+    private void clear(UUID playerId, java.util.function.UnaryOperator<Row> without) {
+        Row row = rows.get(playerId);
+        if (row == null) {
+            return;
+        }
+        Row stripped = without.apply(row);
+        if (stripped.secret() == null && stripped.pin() == null) {
+            rows.remove(playerId);
+        } else {
+            rows.put(playerId, stripped);
+        }
     }
 
     private Instant stamp(@Nullable Row existing) {

@@ -1370,18 +1370,25 @@ permissions:
   uxmessentials.module.trade:
     description: 'Hot-reload / inspect the trade module.'
     default: op
-  # Security — account-security features (NOT a login system). Two-factor enrolment is the self-service surface: every
-  # player may protect their own account, so uxmessentials.security.2fa and .pin ship true; .bypass exempts a holder
-  # from the two-factor join verification and op-command re-auth checks; uxmessentials.module.security is the
-  # reload/inspect tier.
+  # Security — account-security features (NOT a login system). The two enrolment commands are self-service and each
+  # owns exactly one factor: /2fa the authenticator, /pin the numeric PIN. Every player may protect their own account,
+  # so uxmessentials.security.2fa and .pin ship true. The operator verbs live on /security behind .admin, with .force
+  # and .reset layered on top so a moderator can be given the read without the recovery. .bypass exempts a holder from
+  # the join verification and op-command re-auth checks; uxmessentials.module.security is the reload/inspect tier.
   uxmessentials.security.2fa:
-    description: '/2fa — set up, confirm or disable an authenticator second factor on your account.'
+    description: '/2fa: set up, confirm or disable an authenticator second factor on your own account.'
     default: true
   uxmessentials.security.pin:
-    description: '/pin set — set a numeric PIN second factor on your account.'
+    description: '/pin: set, change or remove a numeric PIN second factor on your own account.'
     default: true
+  uxmessentials.security.admin:
+    description: '/security: inspect and manage another player&apos;s second factors.'
+    default: op
   uxmessentials.security.force:
-    description: '/2fa force <player>: force a player to re-verify their two-factor on their next action or join.'
+    description: '/security force <player>: force a player to re-verify their second factor on their next action or join.'
+    default: op
+  uxmessentials.security.reset:
+    description: '/security reset <player> [totp|pin|all]: clear a factor a player can no longer prove.'
     default: op
   uxmessentials.security.bypass:
     description: 'Exempt from the two-factor join verification and op-command re-auth checks.'

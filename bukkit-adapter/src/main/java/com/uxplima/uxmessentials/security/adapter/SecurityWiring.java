@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.persistence.security.TwoFactorRepositories;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.ClientInfoCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.IpAltsCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.PinCommand;
+import com.uxplima.uxmessentials.security.adapter.inbound.command.SecurityCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadCloseListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
@@ -24,11 +25,14 @@ import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityJoinL
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.BeginTotpEnrollment;
+import com.uxplima.uxmessentials.security.application.ChangePin;
 import com.uxplima.uxmessentials.security.application.ConfirmTotpEnrollment;
-import com.uxplima.uxmessentials.security.application.DisableTwoFactor;
+import com.uxplima.uxmessentials.security.application.DisableTotp;
 import com.uxplima.uxmessentials.security.application.FindAlts;
 import com.uxplima.uxmessentials.security.application.ForceReverification;
 import com.uxplima.uxmessentials.security.application.PendingTotpEnrollments;
+import com.uxplima.uxmessentials.security.application.RemovePin;
+import com.uxplima.uxmessentials.security.application.ResetFactors;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SetPin;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
@@ -45,8 +49,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Constructs the security context's two-factor store, enrolment use cases, and the {@code /2fa} and {@code /pin}
- * commands over the injected kernel ports and the shared persistence DSL. The store is the jOOQ
+ * Constructs the security context's two-factor store, enrolment use cases, and the {@code /2fa}, {@code /pin} and
+ * {@code /security} commands over the injected kernel ports and the shared persistence DSL. The store is the jOOQ
  * {@code TwoFactorRepository} (built through the security persistence factory, so no jOOQ type reaches this layer),
  * which hashes the PIN and encrypts the TOTP secret under an AES key-file kept beside the module's config. The
  * pending, un-confirmed TOTP secrets are transient in-memory state held in {@link PendingTotpEnrollments}, cleared on
@@ -77,16 +81,18 @@ public final class SecurityWiring {
         Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
         TwoFactorRepository repository = TwoFactorRepositories.jooq(persistence, keyFile);
         PendingTotpEnrollments pending = new PendingTotpEnrollments();
-        // The durable, account-scoped brute-force limiter is shared by every verification surface — the join freeze,
-        // the op re-auth keypad, and /2fa disable — so a failed proof on any of them counts toward, and a lockout
-        // blocks, all three. Built from the join-verification lockout policy and duration.
+        // The durable, account-scoped brute-force limiter is shared by every verification surface: the join freeze,
+        // the op re-auth keypad, /2fa disable, /pin change and /pin remove. A failed proof on any of them counts
+        // toward, and a lockout blocks, all of them. Built from the join-verification lockout policy and duration.
         AttemptLimiter limiter = new AttemptLimiter(
                 config.joinVerification().lockoutPolicy(),
                 config.joinVerification().lockout());
         BeginTotpEnrollment begin = new BeginTotpEnrollment(new SecretGenerator(), pending, twoFactor.issuer());
         ConfirmTotpEnrollment confirm = new ConfirmTotpEnrollment(repository, pending, twoFactor.codeWindow());
-        DisableTwoFactor disable = new DisableTwoFactor(repository, limiter, twoFactor.codeWindow());
+        DisableTotp disable = new DisableTotp(repository, limiter, twoFactor.codeWindow());
         SetPin setPin = new SetPin(repository, twoFactor.pinPolicy());
+        ChangePin changePin = new ChangePin(repository, limiter, twoFactor.pinPolicy());
+        RemovePin removePin = new RemovePin(repository, limiter);
         Clock clock = Clock.systemUTC();
 
         // Phase 4 — IP/alt guard + ClientID: the DB-backed IP association store (hashed tokens only, never a raw
@@ -135,9 +141,12 @@ public final class SecurityWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 clock);
-        // /2fa force: revoke the target's device trust (the durable forced state, so their next join re-verifies even
-        // from a trusted device), paired with the immediate online freeze driven through the controller above.
+        // The two /security operator verbs. Force revokes the target's device trust (the durable forced state, so
+        // their next join re-verifies even from a trusted device), paired with the immediate online freeze driven
+        // through the controller above. Reset is the recovery door: the one path that clears a factor without proving
+        // it, for a player who has lost their authenticator or forgotten their PIN.
         ForceReverification forceReverification = new ForceReverification(repository, trustStore);
+        ResetFactors resetFactors = new ResetFactors(repository, trustStore);
 
         List<CommandRegistration> commands = List.of(
                 new TwoFactorCommand(
@@ -146,14 +155,30 @@ public final class SecurityWiring {
                         disable,
                         repository,
                         twoFactor,
-                        forceReverification,
-                        controller,
-                        kernel.playerLookup(),
                         clock,
                         kernel.scheduler(),
                         kernel.messages(),
                         kernel.messageSink()),
-                new PinCommand(setPin, twoFactor, kernel.scheduler(), kernel.messages(), kernel.messageSink()),
+                new PinCommand(
+                        setPin,
+                        changePin,
+                        removePin,
+                        repository,
+                        twoFactor,
+                        clock,
+                        kernel.scheduler(),
+                        kernel.messages(),
+                        kernel.messageSink()),
+                new SecurityCommand(
+                        repository,
+                        forceReverification,
+                        resetFactors,
+                        controller,
+                        kernel.playerLookup(),
+                        kernel.log(),
+                        kernel.scheduler(),
+                        kernel.messages(),
+                        kernel.messageSink()),
                 new IpAltsCommand(
                         findAlts, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()),
                 new ClientInfoCommand(
@@ -193,8 +218,8 @@ public final class SecurityWiring {
     }
 
     /**
-     * Everything the security module contributes once wired: the {@code /2fa} and {@code /pin} command registrations
-     * and the join-verification listeners to publish, plus the transient registries cleared on stop (the pending
+     * Everything the security module contributes once wired: the {@code /2fa}, {@code /pin} and {@code /security}
+     * command registrations and the join-verification listeners to publish, plus the transient registries cleared on stop (the pending
      * un-confirmed enrolments, the freeze/lockout sessions) and the keypad view whose open windows close on stop — so
      * a disable or reload leaves no residual secret and no locked player.
      *

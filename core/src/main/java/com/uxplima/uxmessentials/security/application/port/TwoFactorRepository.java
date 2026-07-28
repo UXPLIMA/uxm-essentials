@@ -30,6 +30,16 @@ public interface TwoFactorRepository {
     /** Re-hash {@code candidate} and compare in constant time against the stored PIN; false when no PIN is set. */
     boolean verifyPin(UUID playerId, String candidate);
 
-    /** Remove the player's registration entirely — both factors — leaving no row behind. */
+    /**
+     * Drop only the player's TOTP secret, leaving any PIN they hold intact. The two factors are independent, so
+     * removing one must never touch the other; a player left holding no factor at all is no longer enrolled and
+     * {@link #find} reports them as such.
+     */
+    void clearTotp(UUID playerId);
+
+    /** Drop only the player's PIN hash, leaving any TOTP secret they hold intact. The mirror of {@link #clearTotp}. */
+    void clearPin(UUID playerId);
+
+    /** Remove the player's registration entirely (both factors), leaving no row behind. */
     void delete(UUID playerId);
 }

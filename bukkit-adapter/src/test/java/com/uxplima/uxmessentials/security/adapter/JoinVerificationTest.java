@@ -478,6 +478,16 @@ class JoinVerificationTest {
         }
 
         @Override
+        public void clearTotp(UUID playerId) {
+            // The verification tests never remove a factor mid-flight; the removal paths have their own coverage.
+        }
+
+        @Override
+        public void clearPin(UUID playerId) {
+            // The verification tests never remove a factor mid-flight; the removal paths have their own coverage.
+        }
+
+        @Override
         public void delete(UUID playerId) {
             rows.remove(playerId);
         }

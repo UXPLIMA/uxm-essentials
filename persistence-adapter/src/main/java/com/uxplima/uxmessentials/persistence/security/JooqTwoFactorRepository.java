@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.Record;
 
 /**
@@ -108,11 +109,44 @@ public final class JooqTwoFactorRepository extends JooqRepository implements Two
     }
 
     @Override
+    public void clearTotp(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        clearColumn(playerId, SECURITY_2FA.TOTP_SECRET_ENC);
+    }
+
+    @Override
+    public void clearPin(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        clearColumn(playerId, SECURITY_2FA.PIN_HASH);
+    }
+
+    @Override
     public void delete(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         write(dsl -> dsl.deleteFrom(SECURITY_2FA)
                 .where(SECURITY_2FA.UUID.eq(playerId.toString()))
                 .execute());
+    }
+
+    /**
+     * Null out one factor column and, in the same transaction, drop the row when that leaves both columns empty. The
+     * sweep matters: a row carrying neither factor would still answer {@link #find} with a registration, and the
+     * application reads a present registration as "this player is enrolled".
+     */
+    private void clearColumn(UUID playerId, Field<String> column) {
+        String id = playerId.toString();
+        write(dsl -> {
+            dsl.update(SECURITY_2FA)
+                    .setNull(column)
+                    .where(SECURITY_2FA.UUID.eq(id))
+                    .execute();
+            dsl.deleteFrom(SECURITY_2FA)
+                    .where(SECURITY_2FA.UUID.eq(id))
+                    .and(SECURITY_2FA.PIN_HASH.isNull())
+                    .and(SECURITY_2FA.TOTP_SECRET_ENC.isNull())
+                    .execute();
+            return null;
+        });
     }
 
     /** Rebuild a registration from a queried row, decrypting the TOTP secret and flagging whether a PIN is set. */

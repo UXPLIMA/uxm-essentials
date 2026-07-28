@@ -29,31 +29,59 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_2FA_CONFIRM_INVALID("security.2fa.confirm-invalid"),
     SECURITY_2FA_ENABLED("security.2fa.enabled"),
 
-    // /2fa disable — removing a factor, which requires proving a current one first.
+    // /2fa disable — removing the authenticator factor, which requires proving it with a current code first. A PIN
+    // neither proves this nor is touched by it; that is /pin remove's business.
     SECURITY_2FA_DISABLE_USAGE("security.2fa.disable-usage"),
     SECURITY_2FA_DISABLE_NOT_ENROLLED("security.2fa.disable-not-enrolled"),
     SECURITY_2FA_DISABLE_INVALID("security.2fa.disable-invalid"),
     SECURITY_2FA_DISABLE_LOCKED_OUT("security.2fa.disable-locked-out"),
     SECURITY_2FA_DISABLED("security.2fa.disabled"),
 
-    // The bare /2fa root: its usage line, a status line, and the refusal when the whole 2FA feature is switched off.
+    // The bare /2fa root: its usage line, the enrolled/not-enrolled status lines, and the refusal when authenticator
+    // enrolment is switched off server-side.
     SECURITY_2FA_USAGE("security.2fa.usage"),
     SECURITY_2FA_STATUS("security.2fa.status"),
+    SECURITY_2FA_STATUS_NONE("security.2fa.status-none"),
     SECURITY_2FA_FEATURE_DISABLED("security.2fa.feature-disabled"),
 
-    // /2fa force <player>, the admin verb that forces a target to re-verify: its usage, the confirmation that the
-    // target was forced, and the line shown when the target has no factor to force.
-    SECURITY_2FA_FORCE_USAGE("security.2fa.force-usage"),
-    SECURITY_2FA_FORCE_DONE("security.2fa.force-done"),
-    SECURITY_2FA_FORCE_NOT_ENROLLED("security.2fa.force-not-enrolled"),
-
-    // /pin set — the PIN factor: its usage, success, the three PinPolicy refusals, and the feature-off refusal.
+    // /pin — the PIN factor's own surface: the root usage and status lines, the first-set verbs, and the feature-off
+    // refusal. The three PinPolicy refusals are shared by /pin set and /pin change.
     SECURITY_PIN_USAGE("security.pin.usage"),
+    SECURITY_PIN_STATUS("security.pin.status"),
+    SECURITY_PIN_STATUS_NONE("security.pin.status-none"),
     SECURITY_PIN_SET("security.pin.set"),
+    SECURITY_PIN_ALREADY_SET("security.pin.already-set"),
     SECURITY_PIN_TOO_SHORT("security.pin.too-short"),
     SECURITY_PIN_TOO_LONG("security.pin.too-long"),
     SECURITY_PIN_NOT_NUMERIC("security.pin.not-numeric"),
     SECURITY_PIN_FEATURE_DISABLED("security.pin.feature-disabled"),
+
+    // /pin change <old> <new> — replacing a live PIN, which requires proving the current one.
+    SECURITY_PIN_CHANGE_USAGE("security.pin.change-usage"),
+    SECURITY_PIN_CHANGED("security.pin.changed"),
+
+    // /pin remove <pin> — removing the PIN factor, which requires proving it. Shares the not-set / invalid / locked
+    // refusals with /pin change, since both fail the same three ways before they touch the store.
+    SECURITY_PIN_REMOVE_USAGE("security.pin.remove-usage"),
+    SECURITY_PIN_REMOVED("security.pin.removed"),
+    SECURITY_PIN_NOT_SET("security.pin.not-set"),
+    SECURITY_PIN_INVALID("security.pin.invalid"),
+    SECURITY_PIN_LOCKED_OUT("security.pin.locked-out"),
+
+    // /security — the operator surface over another player's factors: the root usage, the per-target status lines,
+    // the force verb that pushes a target back into verification, and the reset verb that clears a factor without a
+    // proof so a locked-out player can be recovered.
+    SECURITY_ADMIN_USAGE("security.admin.usage"),
+    SECURITY_ADMIN_STATUS_HEADER("security.admin.status-header"),
+    SECURITY_ADMIN_STATUS_TOTP("security.admin.status-totp"),
+    SECURITY_ADMIN_STATUS_PIN("security.admin.status-pin"),
+    SECURITY_ADMIN_STATUS_NONE("security.admin.status-none"),
+    SECURITY_ADMIN_FORCE_USAGE("security.admin.force-usage"),
+    SECURITY_ADMIN_FORCE_DONE("security.admin.force-done"),
+    SECURITY_ADMIN_FORCE_NOT_ENROLLED("security.admin.force-not-enrolled"),
+    SECURITY_ADMIN_RESET_USAGE("security.admin.reset-usage"),
+    SECURITY_ADMIN_RESET_DONE("security.admin.reset-done"),
+    SECURITY_ADMIN_RESET_NOTHING("security.admin.reset-nothing"),
 
     // Phase 2 — join verification: the freeze prompt on join, the keypad GUI (title, digit/clear/submit/TOTP buttons
     // and the masked entry display), the TOTP text prompt, the success and failed replies, the must-verify nudge when
