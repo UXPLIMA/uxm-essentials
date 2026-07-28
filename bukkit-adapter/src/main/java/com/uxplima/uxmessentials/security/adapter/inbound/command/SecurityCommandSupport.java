@@ -67,4 +67,26 @@ abstract class SecurityCommandSupport {
     protected void notify(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         sink.deliver(viewer, messages.resolve(viewer, key, placeholders));
     }
+
+    /** Deliver {@code key} to whoever ran the command, from off the tick thread. */
+    protected void notifySender(CommandSender sender, MessageKey key) {
+        notifySender(sender, key, Map.of());
+    }
+
+    /**
+     * Deliver {@code key} to whoever ran the command, from off the tick thread. A player goes through the sink, which
+     * hops to their entity thread. The console cannot: the sink resolves its recipient by looking the viewer's uuid up
+     * among the online players, and a console sender is not one, so its reply would be rendered and then silently
+     * dropped. That branch renders in the sender's locale and writes on a global-scheduler hop instead, which is what
+     * keeps the staff reads answering an operator who runs them from the server console rather than in game.
+     */
+    protected void notifySender(CommandSender sender, MessageKey key, Map<String, String> placeholders) {
+        if (sender instanceof Player player) {
+            notify(ref(player), key, placeholders);
+            return;
+        }
+        PlayerRef viewer = CommandFeedback.refOf(sender);
+        String rendered = messages.resolve(viewer, key, placeholders);
+        scheduler.onGlobal(() -> feedback.sendRendered(sender, viewer, rendered));
+    }
 }

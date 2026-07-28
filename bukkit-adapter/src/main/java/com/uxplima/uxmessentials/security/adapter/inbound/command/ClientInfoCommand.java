@@ -3,10 +3,8 @@ package com.uxplima.uxmessentials.security.adapter.inbound.command;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -68,31 +66,24 @@ public final class ClientInfoCommand extends SecurityCommandSupport implements C
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        PlayerRef viewer = viewer(sender);
         String name = ctx.getArgument("player", String.class);
-        scheduler.async(() -> report(viewer, name));
+        scheduler.async(() -> report(sender, name));
         return Command.SINGLE_SUCCESS;
     }
 
-    private void report(PlayerRef viewer, String name) {
+    private void report(CommandSender sender, String name) {
         Optional<PlayerRef> target = lookup.findByName(name);
         if (target.isEmpty()) {
-            notify(viewer, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            notifySender(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
             return;
         }
         PlayerRef found = target.get();
         Optional<String> brand = registry.brandOf(found.uuid());
         if (brand.isEmpty()) {
-            notify(viewer, SecurityMessageKey.SECURITY_CLIENT_UNKNOWN, Map.of("player", found.name()));
+            notifySender(sender, SecurityMessageKey.SECURITY_CLIENT_UNKNOWN, Map.of("player", found.name()));
             return;
         }
-        notify(viewer, SecurityMessageKey.SECURITY_CLIENT_INFO, Map.of("player", found.name(), "brand", brand.get()));
-    }
-
-    /** The viewer to deliver output to: the invoking player, or a stable system ref for a console sender. */
-    private static PlayerRef viewer(CommandSender sender) {
-        return sender instanceof Player player
-                ? new PlayerRef(player.getUniqueId(), player.getName())
-                : new PlayerRef(new UUID(0L, 0L), sender.getName());
+        notifySender(
+                sender, SecurityMessageKey.SECURITY_CLIENT_INFO, Map.of("player", found.name(), "brand", brand.get()));
     }
 }

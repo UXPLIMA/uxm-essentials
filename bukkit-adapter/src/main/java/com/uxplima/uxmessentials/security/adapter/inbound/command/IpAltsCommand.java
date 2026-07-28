@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -73,16 +72,15 @@ public final class IpAltsCommand extends SecurityCommandSupport implements Comma
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        PlayerRef viewer = viewer(sender);
         String name = ctx.getArgument("player", String.class);
-        scheduler.async(() -> report(viewer, name));
+        scheduler.async(() -> report(sender, name));
         return Command.SINGLE_SUCCESS;
     }
 
-    private void report(PlayerRef viewer, String name) {
+    private void report(CommandSender sender, String name) {
         Optional<PlayerRef> target = lookup.findByName(name);
         if (target.isEmpty()) {
-            notify(viewer, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            notifySender(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
             return;
         }
         PlayerRef found = target.get();
@@ -93,15 +91,15 @@ public final class IpAltsCommand extends SecurityCommandSupport implements Comma
         // dedupe by resolved name so two UUIDs for one person show once; genuinely distinct alts still each show.
         List<String> altNames = distinctAltNames(group, found.name());
         if (altNames.isEmpty()) {
-            notify(viewer, SecurityMessageKey.SECURITY_ALTS_NONE, Map.of("player", found.name()));
+            notifySender(sender, SecurityMessageKey.SECURITY_ALTS_NONE, Map.of("player", found.name()));
             return;
         }
-        notify(
-                viewer,
+        notifySender(
+                sender,
                 SecurityMessageKey.SECURITY_ALTS_HEADER,
                 Map.of("player", found.name(), "count", Integer.toString(altNames.size())));
         for (String altName : altNames) {
-            notify(viewer, SecurityMessageKey.SECURITY_ALTS_ENTRY, Map.of("alt", altName));
+            notifySender(sender, SecurityMessageKey.SECURITY_ALTS_ENTRY, Map.of("alt", altName));
         }
     }
 
@@ -123,12 +121,5 @@ public final class IpAltsCommand extends SecurityCommandSupport implements Comma
 
     private String nameOf(UUID account) {
         return lookup.findByUuid(account).map(PlayerRef::name).orElse(account.toString());
-    }
-
-    /** The viewer to deliver output to: the invoking player, or a stable system ref for a console sender. */
-    private static PlayerRef viewer(CommandSender sender) {
-        return sender instanceof Player player
-                ? new PlayerRef(player.getUniqueId(), player.getName())
-                : new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

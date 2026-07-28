@@ -5,11 +5,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -130,21 +128,21 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
 
     /** {@code /security status <player>}: which factors the target holds, one line each. */
     private int status(CommandContext<CommandSourceStack> ctx) {
-        PlayerRef admin = senderRef(ctx.getSource().getSender());
+        CommandSender sender = ctx.getSource().getSender();
         String name = ctx.getArgument("player", String.class);
-        scheduler.async(() -> onTarget(admin, name, target -> {
+        scheduler.async(() -> onTarget(sender, name, target -> {
             TwoFactorRegistration registration = repository.find(target.uuid()).orElse(null);
             Map<String, String> who = Map.of("player", target.name());
-            notify(admin, SecurityMessageKey.SECURITY_ADMIN_STATUS_HEADER, who);
+            notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_STATUS_HEADER, who);
             if (registration == null || !registration.hasAnyFactor()) {
-                notify(admin, SecurityMessageKey.SECURITY_ADMIN_STATUS_NONE, who);
+                notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_STATUS_NONE, who);
                 return;
             }
             if (registration.totpEnabled()) {
-                notify(admin, SecurityMessageKey.SECURITY_ADMIN_STATUS_TOTP, who);
+                notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_STATUS_TOTP, who);
             }
             if (registration.pinSet()) {
-                notify(admin, SecurityMessageKey.SECURITY_ADMIN_STATUS_PIN, who);
+                notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_STATUS_PIN, who);
             }
         }));
         return Command.SINGLE_SUCCESS;
@@ -156,16 +154,17 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
      * back into the freeze.
      */
     private int force(CommandContext<CommandSourceStack> ctx) {
-        PlayerRef admin = senderRef(ctx.getSource().getSender());
+        CommandSender sender = ctx.getSource().getSender();
         String name = ctx.getArgument("player", String.class);
-        scheduler.async(() -> onTarget(admin, name, target -> {
+        scheduler.async(() -> onTarget(sender, name, target -> {
             if (forceReverification.force(target.uuid()) == ForceResult.NOT_ENROLLED) {
-                notify(admin, SecurityMessageKey.SECURITY_ADMIN_FORCE_NOT_ENROLLED, Map.of("player", target.name()));
+                notifySender(
+                        sender, SecurityMessageKey.SECURITY_ADMIN_FORCE_NOT_ENROLLED, Map.of("player", target.name()));
                 return;
             }
             // The trust is revoked (next join re-verifies); if the target is online now, freeze them immediately.
             verification.forceReverify(target);
-            notify(admin, SecurityMessageKey.SECURITY_ADMIN_FORCE_DONE, Map.of("player", target.name()));
+            notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_FORCE_DONE, Map.of("player", target.name()));
         }));
         return Command.SINGLE_SUCCESS;
     }
@@ -177,32 +176,32 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
 
     /** {@code /security reset <player> [scope]}: clear a factor the target can no longer prove, and log it. */
     private int reset(CommandContext<CommandSourceStack> ctx, FactorScope scope) {
-        PlayerRef admin = senderRef(ctx.getSource().getSender());
+        CommandSender sender = ctx.getSource().getSender();
         String name = ctx.getArgument("player", String.class);
-        scheduler.async(() -> onTarget(admin, name, target -> {
-            Map<String, String> placeholders =
-                    Map.of("player", target.name(), "factor", scope.name().toLowerCase(Locale.ROOT));
+        String scopeName = scope.name().toLowerCase(Locale.ROOT);
+        scheduler.async(() -> onTarget(sender, name, target -> {
+            Map<String, String> placeholders = Map.of("player", target.name(), "factor", scopeName);
             if (resetFactors.reset(target.uuid(), scope) == ResetResult.NOTHING_TO_RESET) {
-                notify(admin, SecurityMessageKey.SECURITY_ADMIN_RESET_NOTHING, placeholders);
+                notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_RESET_NOTHING, placeholders);
                 return;
             }
             // Staff removing someone's second factor without proving it is an auditable event, so it always lands in
             // the log with who did it, to whom, and how much was cleared.
             log.info(
                     "event=security_factor_reset operator={} target={} scope={}",
-                    admin.name(),
+                    sender.getName(),
                     target.name(),
-                    scope.name().toLowerCase(Locale.ROOT));
-            notify(admin, SecurityMessageKey.SECURITY_ADMIN_RESET_DONE, placeholders);
+                    scopeName);
+            notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_RESET_DONE, placeholders);
         }));
         return Command.SINGLE_SUCCESS;
     }
 
     /** Resolve {@code name} off-thread and run {@code action} on the match, or tell the caller there is none. */
-    private void onTarget(PlayerRef admin, String name, Consumer<PlayerRef> action) {
+    private void onTarget(CommandSender sender, String name, Consumer<PlayerRef> action) {
         Optional<PlayerRef> target = lookup.findByName(name);
         if (target.isEmpty()) {
-            notify(admin, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            notifySender(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
             return;
         }
         action.accept(target.get());
@@ -215,12 +214,5 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
             case "pin" -> FactorScope.PIN;
             default -> FactorScope.ALL;
         };
-    }
-
-    /** The ref to reply to: the invoking player, or a stable system ref for a console sender. */
-    private static PlayerRef senderRef(CommandSender sender) {
-        return sender instanceof Player player
-                ? new PlayerRef(player.getUniqueId(), player.getName())
-                : new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }
