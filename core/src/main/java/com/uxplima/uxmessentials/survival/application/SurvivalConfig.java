@@ -355,8 +355,8 @@ public record SurvivalConfig(
      * smelted result before it reaches the player, so mining iron ore yields an ingot. It composes with auto-pickup —
      * the drop is smelted first, then routed. Players toggle it with {@code /autosmelt}.
      *
-     * @param enabled whether auto-smelt runs ({@code autosmelt.enabled}, default {@code false}: it rewrites what
-     *     mining gives every player, so an operator opts in)
+     * @param enabled whether auto-smelt runs ({@code autosmelt.enabled}, default {@code true}); turning it off also
+     *     unregisters {@code /autosmelt}
      * @param smelt the drop-material → smelted-result pairs read from {@code autosmelt.smelt}; defaults to the
      *     ore-to-ingot set below when the block is absent
      */
@@ -390,7 +390,7 @@ public record SurvivalConfig(
                     smelt.put(raw, config.getString("autosmelt.smelt." + raw, raw));
                 }
             }
-            return new AutoSmelt(config.getBoolean("autosmelt.enabled", false), smelt);
+            return new AutoSmelt(config.getBoolean("autosmelt.enabled", true), smelt);
         }
     }
 
@@ -443,13 +443,13 @@ public record SurvivalConfig(
      * slot is switched to the strongest tool of the family that block needs. Players toggle it with {@code /autotool}.
      * It carries no tuning of its own beyond its enable gate — the selection rules live in the domain.
      *
-     * @param enabled whether auto-tool runs ({@code autotool.enabled}, default {@code false}: it moves the player's
-     *     held slot for them, so an operator opts in)
+     * @param enabled whether auto-tool runs ({@code autotool.enabled}, default {@code true}); turning it off also
+     *     unregisters {@code /autotool}
      */
     public record AutoTool(boolean enabled) {
 
         static AutoTool from(ConfigStore config) {
-            return new AutoTool(config.getBoolean("autotool.enabled", false));
+            return new AutoTool(config.getBoolean("autotool.enabled", true));
         }
     }
 }

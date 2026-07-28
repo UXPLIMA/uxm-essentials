@@ -70,11 +70,12 @@ class SurvivalConfigTest {
         assertThat(pickup.enabled()).isTrue();
         assertThat(pickup.transferXp()).isFalse();
 
-        // Auto-smelt rewrites what a block drops for every player who has not turned it off, so it ships off and
-        // an operator opts in. Its default table is ores only: smelting cobblestone, sand or clay away would take
-        // the vanilla source of those materials off the server, which is never what "smelt my ores" means.
+        // Auto-smelt ships on like every other survival mechanic; turning it off unregisters /autosmelt with it, so
+        // shipping it off left players with an "unknown command" and no way to find the feature. Its default table is
+        // ores only: smelting cobblestone, sand or clay away would take the vanilla source of those materials off the
+        // server, which is never what "smelt my ores" means.
         SurvivalConfig.AutoSmelt smelt = config.autoSmelt();
-        assertThat(smelt.enabled()).isFalse();
+        assertThat(smelt.enabled()).isTrue();
         assertThat(smelt.smelt())
                 .containsEntry("RAW_IRON", "IRON_INGOT")
                 .containsEntry("RAW_GOLD", "GOLD_INGOT")
@@ -93,9 +94,8 @@ class SurvivalConfigTest {
                 .containsEntry("DIAMOND", java.math.BigDecimal.valueOf(80))
                 .containsEntry("IRON_INGOT", java.math.BigDecimal.valueOf(8));
 
-        // Auto-tool moves the player's held slot for them, so it too ships off rather than surprising every player
-        // on a fresh install.
-        assertThat(config.autoTool().enabled()).isFalse();
+        // Auto-tool ships on for the same reason: its enable gate also owns whether /autotool exists at all.
+        assertThat(config.autoTool().enabled()).isTrue();
     }
 
     @Test
@@ -120,6 +120,7 @@ class SurvivalConfigTest {
                 Map.entry("headdrop.mobs", List.of("ZOMBIE", "SKELETON")),
                 Map.entry("headdrop.mobs.ZOMBIE", 40.0),
                 Map.entry("autopickup.transfer-xp", true),
+                Map.entry("autosmelt.enabled", false),
                 Map.entry("autosmelt.smelt", List.of("RAW_COPPER")),
                 Map.entry("autosmelt.smelt.RAW_COPPER", "COPPER_INGOT"),
                 Map.entry("autosell.enabled", true),
@@ -147,6 +148,7 @@ class SurvivalConfigTest {
         assertThat(config.headDrop().mobs()).containsEntry("ZOMBIE", 40.0).containsEntry("SKELETON", 25.0);
         assertThat(config.autoPickup().transferXp()).isTrue();
         // An explicit smelt map replaces the shipped defaults entirely.
+        assertThat(config.autoSmelt().enabled()).isFalse();
         assertThat(config.autoSmelt().smelt()).containsExactly(Map.entry("RAW_COPPER", "COPPER_INGOT"));
         assertThat(config.autoSell().enabled()).isTrue();
         assertThat(config.autoSell().prices()).containsEntry("DIAMOND", new java.math.BigDecimal("300.0"));
