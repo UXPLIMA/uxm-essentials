@@ -181,8 +181,8 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // soft-coupled and land with the later phases), and like the steady-state features it ships ENABLED but
         // inert until an operator authors a ladder, so it lands last after survival.
         delegate.register(new RanksModule());
-        // security is a new bounded context — account-security features (NOT a login system; the server is
-        // premium-only).
+        // security is a new bounded context — account-security features (NOT a login system; on an offline-mode
+        // server it waits for the login plugin rather than replacing it).
         // Phase 1 is the two-factor enrolment surface (/2fa and /pin) over a DB-backed store with the PIN hashed and
         // the TOTP secret AES-encrypted at rest. It carries no hard dependency edge in Phase 1 (its collaborator is the
         // shared persistence DSL plus the Scheduler, messages and event ports; the join-verification freeze,

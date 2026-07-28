@@ -4,6 +4,7 @@ import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
@@ -116,8 +117,14 @@ public final class VotifierListener implements Listener {
     }
 
     private PlayerRef resolveVoter(String username) {
-        return players.findOnlineByName(username)
-                .orElseGet(() -> new PlayerRef(Bukkit.getOfflinePlayer(username).getUniqueId(), username));
+        Optional<PlayerRef> online = players.findOnlineByName(username);
+        if (online.isPresent()) {
+            return online.get();
+        }
+        // The by-name resolution costs a Mojang round-trip for an uncached name on an online-mode server, which is
+        // why this method only ever runs on the async pool and never on the Votifier event thread.
+        UUID id = Bukkit.getOfflinePlayer(username).getUniqueId(); // allow-blocking: async pool
+        return new PlayerRef(id, username);
     }
 
     private Optional<Class<? extends Event>> loadEventClass() {

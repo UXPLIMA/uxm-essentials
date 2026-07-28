@@ -67,15 +67,20 @@ public final class SkullCommand extends ItemworldCommandSupport implements Comma
     }
 
     private void give(CommandContext<CommandSourceStack> ctx, Player player, String owner) {
-        // Resolve the name -> profile off the region thread (the by-name lookup blocks); applying the head by
-        // its resolved UUID at build time does not, so the region-thread hop below stays non-blocking.
-        OfflinePlayer profile = player.getServer().getOfflinePlayer(owner);
-        services.kernel().scheduler().onEntity(ref(player), () -> {
-            ItemStack head = ItemBuilder.of(Material.PLAYER_HEAD)
-                    .skull(SkullData.ofUuid(profile.getUniqueId()))
-                    .build();
-            player.getInventory().addItem(head);
-            reply(ctx, ItemworldMessageKey.SKULL_GIVEN, Map.of("player", owner));
+        // getOfflinePlayer(String) is a blocking call on an online-mode server: an uncached name costs a Mojang
+        // round-trip, and running that where the command lands would stall the tick for the length of it. So the
+        // lookup goes to the async pool and only the resolved UUID comes back. (On an offline-mode server the same
+        // call derives the UUID from the name locally, so this costs nothing there.)
+        services.kernel().scheduler().async(() -> {
+            OfflinePlayer profile = player.getServer().getOfflinePlayer(owner); // allow-blocking: on the async pool
+            java.util.UUID id = profile.getUniqueId();
+            services.kernel().scheduler().onEntity(ref(player), () -> {
+                ItemStack head = ItemBuilder.of(Material.PLAYER_HEAD)
+                        .skull(SkullData.ofUuid(id))
+                        .build();
+                player.getInventory().addItem(head);
+                reply(ctx, ItemworldMessageKey.SKULL_GIVEN, Map.of("player", owner));
+            });
         });
     }
 }

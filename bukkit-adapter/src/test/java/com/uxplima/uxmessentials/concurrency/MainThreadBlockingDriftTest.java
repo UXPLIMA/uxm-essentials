@@ -47,7 +47,10 @@ class MainThreadBlockingDriftTest {
             + "|\\bjava\\.sql\\."
             + "|\\.getConnection\\s*\\("
             + "|\\bjava\\.net\\.http\\."
-            + "|\\bHttpClient\\b");
+            + "|\\bHttpClient\\b"
+            // getOfflinePlayer(String) costs a Mojang round-trip for an uncached name on an online-mode server.
+            // The IfCached variant is the deliberate non-blocking read and does not match this alternative.
+            + "|\\bgetOfflinePlayer\\s*\\(");
 
     /** A line carrying this trailing marker is a reviewed, justified exception and is not flagged. */
     private static final String ALLOW_MARKER = "allow-blocking:";
