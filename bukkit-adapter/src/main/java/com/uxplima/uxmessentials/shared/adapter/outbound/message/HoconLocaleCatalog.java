@@ -80,6 +80,17 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
         return Set.copyOf(locales);
     }
 
+    @Override
+    public void reload() {
+        // Re-read every language that is already loaded rather than clearing the map: a concurrent lookup then
+        // always finds a complete table (the old one or the new one) instead of racing an empty map back through
+        // the lazy load. English stays loaded because it is the fallback layer for every other locale.
+        for (String language : Set.copyOf(byLanguage.keySet())) {
+            byLanguage.put(language, loadLanguage(language));
+        }
+        byLanguage.computeIfAbsent(Locale.ENGLISH.getLanguage(), this::loadLanguage);
+    }
+
     private Map<String, String> tableFor(String language) {
         return byLanguage.computeIfAbsent(language, this::loadLanguage);
     }

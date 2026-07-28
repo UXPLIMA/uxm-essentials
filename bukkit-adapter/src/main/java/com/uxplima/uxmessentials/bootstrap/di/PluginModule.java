@@ -190,6 +190,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
@@ -241,6 +242,13 @@ public final class PluginModule {
         // the hub command below; module wiring (SP1+) registers each module's opener into it. Empty until then.
         ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
         CloseableResources resources = new CloseableResources(log);
+        // The two things every /uxmess reload re-reads, registered before any module wiring so they always run
+        // first: the config tree (swapped atomically behind the ConfigStore) and the message catalogs. A module
+        // step registered later therefore reads the fresh tree, never the one it was wired from. Both are pure
+        // file re-reads, which is what lets the whole run go off-tick.
+        resources.addReloadTask(ReloadTask.kernel("config", config::reload, "re-read from disk"));
+        resources.addReloadTask(
+                ReloadTask.kernel("messages", wiredKernel.catalog()::reload, "catalogs re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
         resources.localeBinding(new LocaleBinding(
                 wiredKernel.localeStore(), wiredKernel.serverDefault(), kernel.messages(), kernel.log()));
@@ -568,8 +576,8 @@ public final class PluginModule {
         ManagementHubView hub =
                 new ManagementHubView(menus, guiText, kernel.scheduler(), kernel.permissions(), guiRegistry, hubLayout);
         GuiSubcommand guiNode = new GuiSubcommand(guiRegistry, hub, kernel.permissions(), kernel.messages());
-        resources.addCommand(
-                new UxmessCommand(registry, config, importNode, guiNode, kernel.scheduler(), healthChecks));
+        resources.addCommand(new UxmessCommand(
+                registry, config, importNode, guiNode, kernel.scheduler(), healthChecks, resources.reloadTasks()));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
@@ -1827,6 +1835,11 @@ public final class PluginModule {
         // The communication PAPI seam reads the same global chat lock /togglechat flips and the per-player announcer
         // subscription /broadcasttoggle flips, so a placeholder matches the live chat state and the player's opt-in.
         links.placeholders.communication(new StoreCommunicationPlaceholders(wired.chatLock(), wired.optOutStore()));
+        // communication is genuinely re-readable at runtime: the announcer rotates over a supplier that re-reads the
+        // settings each tick, so re-reading the files and re-arming the override loops is enough for the new schedule
+        // to take effect. /uxmess reload communication runs the same path /announce reload does.
+        resources.addReloadTask(ReloadTask.forModule(
+                ctx.moduleId(), wired.reload(), "announcer schedule and info pages re-read from disk"));
         resources.onClose(wired::stop);
         // Register the communication admin panel on the /uxmess gui hub, gated by the communication GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(

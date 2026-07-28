@@ -22,4 +22,12 @@ public interface LocaleCatalog {
 
     /** Locales this catalog has loaded; always contains {@link Locale#ENGLISH}. */
     Set<Locale> loadedLocales();
+
+    /**
+     * Drop every loaded table and re-read the catalogs from disk, so an operator's edit to a
+     * {@code messages_<lang>.conf} takes effect without a restart. The swap is atomic per locale: a concurrent
+     * lookup sees either the old table or the new one. The default is a no-op for a catalog with nothing to
+     * re-read (a fixed in-memory test catalog).
+     */
+    default void reload() {}
 }

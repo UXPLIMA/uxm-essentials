@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -47,6 +48,7 @@ public final class CloseableResources implements AutoCloseable {
     private final Deque<Runnable> stopHooks = new ArrayDeque<>();
     private final List<CommandRegistration> commands = new ArrayList<>();
     private final List<Listener> listeners = new ArrayList<>();
+    private final List<ReloadTask> reloadTasks = new ArrayList<>();
     private final Logger log;
     private @Nullable LocaleBinding localeBinding;
     private @Nullable CatalogBinding catalogBinding;
@@ -95,6 +97,20 @@ public final class CloseableResources implements AutoCloseable {
     /** Adds a Bukkit listener to register on enable; only ever from an enabled module. */
     public void addListener(Listener listener) {
         listeners.add(Objects.requireNonNull(listener, "listener"));
+    }
+
+    /**
+     * Adds a {@code /uxmess reload} step. A module registers one only when it can genuinely re-read its files at
+     * runtime; a module that registers none is reported to the operator as needing a restart, which is why this
+     * is opt-in rather than a method on the module contract that every module would have to answer.
+     */
+    public void addReloadTask(ReloadTask task) {
+        reloadTasks.add(Objects.requireNonNull(task, "task"));
+    }
+
+    /** The registered reload steps, in registration order (kernel steps first, then module steps). */
+    public List<ReloadTask> reloadTasks() {
+        return List.copyOf(reloadTasks);
     }
 
     /** Sets the boundary {@link LocaleBinding} every published command is wrapped with. */

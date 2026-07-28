@@ -194,7 +194,14 @@ public final class CommunicationWiring {
                 kernel.scheduler(),
                 chatMeta,
                 chatPlaceholders);
-        return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminMenu);
+        // The same re-read /announce reload performs, exposed so /uxmess reload communication applies the module's
+        // file edits through one path rather than a second copy that could drift from it.
+        Runnable reload = () -> {
+            settings.reload();
+            announcer.rearmOverrides();
+        };
+        return new Wired(
+                List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminMenu, reload);
     }
 
     /**
@@ -297,6 +304,7 @@ public final class CommunicationWiring {
      * @param chatLock the global chat lock the PAPI seam reads the chat-enabled state from
      * @param optOutStore the per-player announcer subscription the PAPI seam reads the broadcast state from
      * @param adminMenu the engine-rendered admin panel the {@code /uxmess gui} hub entry opens
+     * @param reload the module's file re-read, shared by {@code /announce reload} and {@code /uxmess reload}
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -305,7 +313,8 @@ public final class CommunicationWiring {
             AtomicBoolean running,
             ChatLock chatLock,
             BroadcastOptOutStore optOutStore,
-            CommunicationAdminMenu adminMenu) {
+            CommunicationAdminMenu adminMenu,
+            Runnable reload) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -315,6 +324,7 @@ public final class CommunicationWiring {
             Objects.requireNonNull(chatLock, "chatLock");
             Objects.requireNonNull(optOutStore, "optOutStore");
             Objects.requireNonNull(adminMenu, "adminMenu");
+            Objects.requireNonNull(reload, "reload");
         }
 
         /** Arm the announcer timer. */

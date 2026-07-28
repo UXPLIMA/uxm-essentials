@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -14,85 +15,86 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
-import com.uxplima.uxmessentials.shared.application.command.CommandId;
-import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
-import com.uxplima.uxmessentials.shared.application.health.HealthResult;
+import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
- * Pins the {@code /uxmess doctor} subcommand onto the operator surface. {@code doctor} is a child of the
- * {@code /uxmess} root (not its own catalog literal), so it is not tracked by {@code CommandCatalogDriftTest};
- * this guard asserts the literal is wired under the root and — the point of the command — that its run is
- * resilient: a health check whose probe throws is still rendered (as a {@code FAIL} entry) rather than aborting
- * the run, because every check goes through {@link HealthCheck#safe()}.
+ * Guards {@code /uxmess reload} against the regression it was written for: the subcommand once replied with a
+ * success line while doing no work at all, so an operator's config edit silently never took effect. These tests
+ * pin that running the literal actually runs the registered {@link ReloadTask}s, and that a scoped run narrows to
+ * the named module while still re-reading the shared kernel sources.
  */
-class DoctorCommandSurfaceTest {
+class ReloadCommandSurfaceTest {
+
+    private static final ModuleId COMMUNICATION = ModuleId.of("communication");
 
     @Test
-    void doctorIsWiredAsAChildOfTheUxmessRoot() {
-        UxmessCommand command = command(List.of(okCheck()));
+    void reloadIsWiredAsAChildOfTheUxmessRoot() {
+        UxmessCommand command = command(List.of());
 
-        CommandNode<CommandSourceStack> doctor = command.build().getChild("doctor");
+        CommandNode<CommandSourceStack> reload = command.build().getChild("reload");
 
-        assertThat(doctor)
-                .as("/uxmess doctor must be a child literal of the root")
+        assertThat(reload)
+                .as("/uxmess reload must be a child literal of the root")
                 .isNotNull();
-        assertThat(doctor.getName()).isEqualTo("doctor");
+        assertThat(reload.getChild("module"))
+                .as("/uxmess reload <module> must accept a module argument")
+                .isNotNull();
     }
 
     @Test
-    void uxmessLiteralStaysAValidCommandId() {
-        // doctor lives under the existing /uxmess catalog literal, which must stay a valid id.
-        assertThat(new CommandId("uxmess").value()).isEqualTo("uxmess");
-    }
+    void reloadRunsEveryRegisteredTask() throws Exception {
+        List<String> ran = new ArrayList<>();
+        UxmessCommand command = command(List.of(
+                ReloadTask.kernel("config", () -> ran.add("config"), "re-read"),
+                ReloadTask.forModule(COMMUNICATION, () -> ran.add("communication"), "re-read")));
 
-    @Test
-    void aThrowingCheckDoesNotPropagateThroughTheRun() throws Exception {
-        HealthCheck explodes = new HealthCheck() {
-            @Override
-            public String name() {
-                return "boom";
-            }
+        int result = command.build().getChild("reload").getCommand().run(contextFor(sourceStack()));
 
-            @Override
-            public HealthResult check() {
-                throw new IllegalStateException("probe failed");
-            }
-        };
-        // The InlineScheduler runs the async + onGlobal stages synchronously, so the whole doctor run executes on
-        // this thread; a leaked exception would surface here. It must not — every check is safe()-wrapped.
-        UxmessCommand command = command(List.of(okCheck(), explodes));
-        CommandSourceStack source = sourceStack();
-
-        int result = command.build().getChild("doctor").getCommand().run(contextFor(source));
-
+        // The whole point: the reply must follow real work, not stand in for it.
+        assertThat(ran).containsExactly("config", "communication");
         assertThat(result).isEqualTo(com.mojang.brigadier.Command.SINGLE_SUCCESS);
     }
 
-    private static UxmessCommand command(List<HealthCheck> checks) {
+    @Test
+    void aThrowingTaskDoesNotPropagateThroughTheRun() throws Exception {
+        List<String> ran = new ArrayList<>();
+        UxmessCommand command = command(List.of(
+                ReloadTask.kernel(
+                        "config",
+                        () -> {
+                            throw new IllegalStateException("malformed HOCON");
+                        },
+                        "re-read"),
+                ReloadTask.kernel("messages", () -> ran.add("messages"), "re-read")));
+
+        // The InlineScheduler runs the async and onGlobal stages on this thread, so a leaked exception would
+        // surface here. A bad config file must degrade to a FAIL line, never abort the run.
+        int result = command.build().getChild("reload").getCommand().run(contextFor(sourceStack()));
+
+        assertThat(ran).containsExactly("messages");
+        assertThat(result).isEqualTo(com.mojang.brigadier.Command.SINGLE_SUCCESS);
+    }
+
+    private static UxmessCommand command(List<ReloadTask> tasks) {
         ModuleRegistry registry = new DefaultModuleRegistry();
         ConfigStore config = Mockito.mock(ConfigStore.class);
         Mockito.when(config.scoped(Mockito.anyString())).thenReturn(config);
         MigrationImportService service = Mockito.mock(MigrationImportService.class);
         return new UxmessCommand(
-                registry,
-                config,
-                new MigrationImportNode(service),
-                guiNode(),
-                new InlineScheduler(),
-                checks,
-                List.of());
+                registry, config, new MigrationImportNode(service), guiNode(), new InlineScheduler(), List.of(), tasks);
     }
 
-    /** A minimal /uxmess gui node — this surface guard only inspects the doctor child, never opens the hub. */
+    /** A minimal /uxmess gui node: this surface guard only runs the reload child, never opens the hub. */
     private static GuiSubcommand guiNode() {
         Scheduler scheduler = new InlineScheduler();
         Permissions permissions = Mockito.mock(Permissions.class);
@@ -105,20 +107,6 @@ class DoctorCommandSurfaceTest {
                         .menus();
         ManagementHubView hub = new ManagementHubView(menus, guiText, scheduler, permissions, guiRegistry, layout);
         return new GuiSubcommand(guiRegistry, hub, permissions, messages);
-    }
-
-    private static HealthCheck okCheck() {
-        return new HealthCheck() {
-            @Override
-            public String name() {
-                return "ok";
-            }
-
-            @Override
-            public HealthResult check() {
-                return HealthResult.ok("up");
-            }
-        };
     }
 
     @SuppressWarnings("unchecked") // Mockito.mock on a generic type needs the unchecked cast.
@@ -137,7 +125,7 @@ class DoctorCommandSurfaceTest {
         return source;
     }
 
-    /** Runs every scheduled stage inline so the off-tick doctor run executes synchronously in the test thread. */
+    /** Runs every scheduled stage inline so the off-tick reload run executes synchronously in the test thread. */
     private static final class InlineScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
