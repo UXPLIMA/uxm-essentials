@@ -374,6 +374,37 @@ class NpcRendererTest {
 
         // The shown name above the head (the player-info profile name) is the display name, not the id.
         assertThat(packets.tabAdds.get(0).name()).isEqualTo("Greeter");
+        // A visible label needs no team of its own, so the nametag is left at the client default.
+        assertThat(packets.collidables)
+                .allSatisfy(team -> assertThat(team.hideNametag()).isFalse());
+    }
+
+    @Test
+    void hidesTheNametagOfAnNpcWhoseDisplayNameWasCleared() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withDisplayName("none"));
+
+        // A cleared label hides the nametag through the team's visibility rule, not by sending a blank profile
+        // name: the entry keeps the id so the team membership and the tab entry both stay well-formed.
+        assertThat(packets.tabAdds.get(0).name()).isEqualTo("guide");
+        assertThat(packets.collidables).hasSize(1);
+        assertThat(packets.collidables.get(0).memberName()).isEqualTo("guide");
+        assertThat(packets.collidables.get(0).hideNametag()).isTrue();
+    }
+
+    @Test
+    void keepsTheNametagOfAnNpcThatNeverHadADisplayName() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // The default NPC is non-collidable, so it already sends a team; that team must not hide the nametag.
+        renderer.render(npcAt(viewer, 1.0));
+
+        assertThat(packets.tabAdds.get(0).name()).isEqualTo("guide");
+        assertThat(packets.collidables).hasSize(1);
+        assertThat(packets.collidables.get(0).hideNametag()).isFalse();
     }
 
     @Test
@@ -1678,8 +1709,13 @@ class NpcRendererTest {
         }
 
         @Override
-        public Object collidable(String teamName, String memberName, @Nullable NamedColor color, boolean collidable) {
-            Collidable packet = new Collidable(teamName, memberName, color, collidable);
+        public Object team(
+                String teamName,
+                String memberName,
+                @Nullable NamedColor color,
+                boolean collidable,
+                boolean hideNametag) {
+            Collidable packet = new Collidable(teamName, memberName, color, collidable, hideNametag);
             collidables.add(packet);
             return packet;
         }
@@ -2158,7 +2194,8 @@ class NpcRendererTest {
                 String teamName,
                 String memberName,
                 @Nullable NamedColor color,
-                boolean collidable) {}
+                boolean collidable,
+                boolean hideNametag) {}
 
         private record PoseSet(int entityId, com.uxplima.uxmlib.packet.npc.NpcPose pose) {}
 

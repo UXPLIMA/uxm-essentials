@@ -15,8 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /npc displayname <name> <text|none>}: set the name shown above an NPC, distinct from its id, or clear it
- * ({@code none}/blank) so only the id renders. The new snapshot is saved and re-rendered so the label changes at
+ * {@code /npc displayname <name> <text|none>}: set the name shown above an NPC, distinct from its id. A clear word
+ * ({@code -}, {@code none}, {@code clear}, {@code empty} or a blank value) hides the label entirely, and a reset word
+ * ({@code default}, {@code reset}) puts the id back. The new snapshot is saved and re-rendered so the label changes at
  * once. A name no NPC exists at is rejected with {@link NpcError#NOT_FOUND}. The operator-only permission is
  * enforced at the adapter gate.
  */
@@ -41,30 +42,18 @@ public final class SetNpcDisplayName {
             notifier.send(actor, NpcError.NOT_FOUND.messageKey(), Map.of("name", name.value()));
             return Result.err(NpcError.NOT_FOUND);
         }
-        String trimmed;
-        if (displayName == null) {
-            trimmed = null;
-        } else {
-            String s = displayName.strip();
-            if (s.equals("-")
-                    || s.equalsIgnoreCase("none")
-                    || s.equalsIgnoreCase("clear")
-                    || s.equalsIgnoreCase("empty")
-                    || s.isEmpty()) {
-                trimmed = " ";
-            } else if (s.equalsIgnoreCase("default") || s.equalsIgnoreCase("reset")) {
-                trimmed = null;
-            } else {
-                trimmed = s;
-            }
-        }
-        Npc updated = existing.get().withDisplayName(trimmed);
+        // The clear words and the reset words are interpreted by the appearance itself, so every surface that sets a
+        // display name (this use case, the editor GUI) resolves them the same way rather than each carrying a copy.
+        Npc updated = existing.get().withDisplayName(displayName);
         repository.save(updated);
         view.render(updated);
-        if (trimmed == null || trimmed.equals(" ")) {
+        if (!updated.hasDisplayName()) {
             notifier.send(actor, NpcMessageKey.NPC_DISPLAY_NAME_CLEARED, Map.of("name", name.value()));
         } else {
-            notifier.send(actor, NpcMessageKey.NPC_DISPLAY_NAME_SET, Map.of("name", name.value(), "display", trimmed));
+            notifier.send(
+                    actor,
+                    NpcMessageKey.NPC_DISPLAY_NAME_SET,
+                    Map.of("name", name.value(), "display", Objects.requireNonNull(updated.displayName())));
         }
         return Result.ok();
     }

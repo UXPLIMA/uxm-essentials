@@ -164,19 +164,21 @@ public final class NpcViewSpawner {
     }
 
     /**
-     * Send the per-NPC scoreboard team that tints a glowing outline and sets the collision rule — both ride one
-     * team because an entity is on only one. A glow colour and a non-default (non-colliding) state each need the
-     * team; an NPC that glows white and collides needs nothing (the no-team default is exactly that). The colour
-     * falls back to the default white outline when the name is unknown, never failing the spawn.
+     * Send the per-NPC scoreboard team carrying the three team-scoped properties: the glow tint, the collision rule,
+     * and whether the nametag renders. All three ride one team because an entity is on only one. A glow colour, a
+     * non-default (non-colliding) state, and a cleared display name each need the team; an NPC that glows white,
+     * collides and shows its name needs nothing (the no-team default is exactly that). The colour falls back to the
+     * default white outline when the name is unknown, never failing the spawn.
      */
     private void applyTeam(Player viewer, Npc npc) {
         NamedColor color = npc.glowing() && npc.hasGlowColor() ? parseColor(npc.glowColor()) : null;
-        if (color == null && npc.collidable()) {
-            return; // the no-team default already collides with no colour, so no team packet is needed
+        boolean hideNametag = npc.displayNameHidden();
+        if (color == null && npc.collidable() && !hideNametag) {
+            return; // the no-team default already collides, shows the name, and carries no colour
         }
-        // Seat the rendered name (display name or id) on the team — the fake player's nametag is its profile name,
-        // so the colour/collision must bind to the same name the tab-add carried.
-        packets.send(viewer, packets.collidable(glowTeam(npc), renderedName(npc), color, npc.collidable()));
+        // Seat the rendered name (display name or id) on the team: the fake player's nametag is its profile name, so
+        // every team property must bind to the same name the tab-add carried.
+        packets.send(viewer, packets.team(glowTeam(npc), renderedName(npc), color, npc.collidable(), hideNametag));
     }
 
     /**
@@ -215,19 +217,18 @@ public final class NpcViewSpawner {
     }
 
     /**
-     * The name rendered above the fake player and seated on its team: the display name when one is set, otherwise
-     * the NPC id. A fake player's nametag is its player-info profile name, so the display name lands here (capped
-     * to the protocol's 16-char profile-name limit); a blank display name falls back to the id, which is the
-     * default. The team member name must equal this so a glow colour / collision rule binds to the same name.
+     * The name rendered above the fake player and seated on its team: the display name when one is shown, otherwise
+     * the NPC id. A fake player's nametag is its player-info profile name, so the display name lands here (capped to
+     * the protocol's 16-char profile-name limit). An unset display name falls back to the id, which is the default,
+     * and so does a cleared one: a cleared label is hidden through the team's nametag visibility rather than by
+     * sending a blank profile name, which would leave the entry and the team membership malformed. The team member
+     * name must equal this so the glow colour, collision rule and nametag rule all bind to the same name.
      */
     private static String renderedName(Npc npc) {
         if (!npc.hasDisplayName()) {
             return profileName(npc);
         }
         String shown = Objects.requireNonNull(npc.displayName(), "displayName").strip();
-        if (shown.isEmpty()) {
-            return " ";
-        }
         return shown.length() <= MAX_PROFILE_NAME ? shown : shown.substring(0, MAX_PROFILE_NAME);
     }
 

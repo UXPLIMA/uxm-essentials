@@ -489,6 +489,7 @@ class NpcTest {
 
         assertThat(npc.displayName()).isNull();
         assertThat(npc.hasDisplayName()).isFalse();
+        assertThat(npc.displayNameHidden()).isFalse();
         assertThat(npc.mirrorSkin()).isFalse();
         assertThat(npc.collidable()).isFalse();
         assertThat(npc.showInTab()).isFalse();
@@ -508,12 +509,28 @@ class NpcTest {
 
         assertThat(npc.displayName()).isEqualTo("<gold>Town Guide");
         assertThat(npc.hasDisplayName()).isTrue();
+        assertThat(npc.displayNameHidden()).isFalse();
         assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
         assertThat(npc.clickCommand()).isEqualTo("spawn");
 
-        // A blank display name hides the label (stored as " " for invisible nametag).
+        // A blank display name hides the label: it is stored as the " " sentinel, which reads as hidden rather
+        // than as "no display name set" — the two are different render outcomes (no nametag vs the id).
         assertThat(npc.withDisplayName(" ").displayName()).isEqualTo(" ");
+        assertThat(npc.withDisplayName(" ").displayNameHidden()).isTrue();
+        assertThat(npc.withDisplayName(" ").hasDisplayName()).isFalse();
+
+        // The clear words every command and GUI surface accepts all reach the same hidden state.
+        for (String cleared : new String[] {"-", "none", "NONE", "clear", "empty", ""}) {
+            assertThat(npc.withDisplayName(cleared).displayNameHidden())
+                    .as("display name %s hides the label", cleared)
+                    .isTrue();
+        }
+
+        // Unset is not hidden: it falls back to rendering the id, which is the default.
         assertThat(npc.withDisplayName(null).hasDisplayName()).isFalse();
+        assertThat(npc.withDisplayName(null).displayNameHidden()).isFalse();
+        assertThat(npc.withDisplayName("reset").displayName()).isNull();
+        assertThat(npc.withDisplayName("default").displayNameHidden()).isFalse();
     }
 
     @Test

@@ -32,8 +32,10 @@ import org.jspecify.annotations.Nullable;
  * and positive. {@code typeData} is the per-entity-type appearance metadata as opaque key/value strings the render
  * adapter alone interprets. The equipment and type-data maps are copied defensively so a stored snapshot is immutable.
  *
- * <p>{@code displayName} is the name shown above the NPC, distinct from its id — {@code null} or blank hides the
- * name entirely (the tab/profile name stays the id; only the visible label changes). {@code mirrorSkin} renders
+ * <p>{@code displayName} is the name shown above the NPC, distinct from its id, and carries three states rather than
+ * two: {@code null} is unset and falls back to rendering the id (the default), a blank value is the explicitly
+ * cleared sentinel that renders no name at all, and any other value is the shown label. The tab and profile name
+ * stay the id in every case; only the rendered label changes. {@code mirrorSkin} renders
  * each viewer's own skin on the NPC (per-viewer, resolved at render time). {@code collidable} toggles whether the
  * NPC pushes players. {@code showInTab} keeps the NPC as a tab-list entry instead of hiding it after spawn.
  * {@code viewDistance}/{@code turnDistance} are per-NPC overrides of the module's render/look ranges, or
@@ -249,6 +251,11 @@ public record NpcAppearance(
         return displayName != null && !displayName.isBlank();
     }
 
+    /** Whether the label was explicitly cleared (the blank sentinel) rather than never set. */
+    boolean displayNameHidden() {
+        return displayName != null && displayName.isBlank();
+    }
+
     /** Upper-case the entity-type name and reject a blank one — the type is always a non-blank uppercase name. */
     private static String normalizeType(String entityType) {
         Objects.requireNonNull(entityType, "entityType");
@@ -303,7 +310,7 @@ public record NpcAppearance(
         if (stripped.equalsIgnoreCase("default") || stripped.equalsIgnoreCase("reset")) {
             return null;
         }
-        return value;
+        return stripped;
     }
 
     /** An immutable, empty-tolerant copy of the equipment map keyed in slot order. */

@@ -359,7 +359,12 @@ class NpcInteractionListenerTest {
         }
 
         @Override
-        public Object collidable(String teamName, String memberName, @Nullable NamedColor color, boolean collidable) {
+        public Object team(
+                String teamName,
+                String memberName,
+                @Nullable NamedColor color,
+                boolean collidable,
+                boolean hideNametag) {
             return new Object();
         }
 

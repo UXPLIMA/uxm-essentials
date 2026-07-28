@@ -479,16 +479,13 @@ public final class NpcEditorView {
         }
     }
 
+    /**
+     * Hand the typed name straight to the use case. The clear words ({@code -}, {@code none}, {@code clear},
+     * {@code empty}) and the reset words ({@code default}, {@code reset}) are the appearance's to interpret, so the
+     * anvil field behaves exactly like {@code /npc displayname} rather than carrying its own copy of the rules.
+     */
     private void applyDisplayName(NpcName name, String raw) {
-        String s = raw.strip();
-        String value = s.equals("-")
-                        || s.equalsIgnoreCase("none")
-                        || s.equalsIgnoreCase("clear")
-                        || s.equalsIgnoreCase("empty")
-                        || s.isEmpty()
-                ? " "
-                : (s.equalsIgnoreCase("default") || s.equalsIgnoreCase("reset") ? null : raw);
-        services.displayName().setDisplayName(GUI_ACTOR, name, value);
+        services.displayName().setDisplayName(GUI_ACTOR, name, raw);
     }
 
     /** Set (or, with a blank {@code color}, clear) the glow-colour override, keeping the glowing flag as-is. */

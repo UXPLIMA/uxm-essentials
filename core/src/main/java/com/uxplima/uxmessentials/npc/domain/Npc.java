@@ -413,8 +413,16 @@ public record Npc(
         return appearance.hasTypeData();
     }
 
-    /** Whether this NPC shows a display name distinct from its id (a blank one hides the label). */
+    /** Whether this NPC shows a display name distinct from its id (an unset or hidden one does not). */
     public boolean hasDisplayName() {
         return appearance.hasDisplayName();
+    }
+
+    /**
+     * Whether this NPC's label was explicitly cleared, so it must render no name at all. This is distinct from
+     * carrying no display name, which falls back to rendering the id.
+     */
+    public boolean displayNameHidden() {
+        return appearance.displayNameHidden();
     }
 }
