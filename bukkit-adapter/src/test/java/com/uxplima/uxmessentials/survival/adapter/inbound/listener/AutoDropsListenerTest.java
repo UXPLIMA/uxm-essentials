@@ -133,6 +133,30 @@ class AutoDropsListenerTest {
         assertThat(groundItems().get(0).getType()).isEqualTo(Material.IRON_INGOT);
     }
 
+    /**
+     * The point every broken-block drop is spawned at is the block centre, because that is what
+     * {@code World#dropItemNaturally} scatters around ({@code +-0.25} per axis, half an item height down on Y) and
+     * what vanilla {@code Block#popResource} is handed ({@code pos + 0.5}). Passing {@link Block#getLocation()}, the
+     * block's minimum corner, spawns the item where four blocks meet and below the broken block's own floor, so it
+     * starts inside the solid neighbours and is shoved out: the drop flies off or lodges in the wall out of sight.
+     *
+     * <p>This asserts the point rather than where the item ends up, because MockBukkit's {@code dropItemNaturally}
+     * still models the legacy CraftBukkit offset ({@code +0.25..+0.75}, always forward from the given point) instead
+     * of Paper's current centred scatter. Under that legacy offset a corner-spawned item still lands inside the
+     * block, so an end-to-end assertion here would pass on a server where the drop is visibly wrong. That mismatch
+     * is exactly why the rest of this class never caught it.
+     */
+    @Test
+    void everyBrokenBlockDropIsSpawnedAtTheBlockCentre() {
+        Block ore = world.getBlockAt(10, 64, -3);
+
+        Location point = SurvivalBlocks.dropPoint(ore);
+
+        assertThat(point.getX()).isEqualTo(10.5);
+        assertThat(point.getY()).isEqualTo(64.5);
+        assertThat(point.getZ()).isEqualTo(-2.5);
+    }
+
     @Test
     void autoSellCreditsTheWalletAtTheConfiguredPrice() {
         toggles.toggleAutoSell(player, false); // autosell now defaults off per player: opt in for this case
@@ -253,10 +277,14 @@ class AutoDropsListenerTest {
     }
 
     private List<ItemStack> groundItems() {
-        List<ItemStack> items = new ArrayList<>();
+        return groundItemEntities().stream().map(Item::getItemStack).toList();
+    }
+
+    private List<Item> groundItemEntities() {
+        List<Item> items = new ArrayList<>();
         for (Entity entity : world.getEntities()) {
             if (entity instanceof Item item) {
-                items.add(item.getItemStack());
+                items.add(item);
             }
         }
         return items;

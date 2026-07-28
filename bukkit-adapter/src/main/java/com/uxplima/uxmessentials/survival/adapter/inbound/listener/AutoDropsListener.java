@@ -79,7 +79,7 @@ public final class AutoDropsListener implements Listener {
         }
         // Route a tick later, once the vanilla break has cleared the origin, so the ground drop spawns into now-air
         // instead of being flung out of the still-solid block (and so we never touch the block mid-event).
-        Location where = block.getLocation();
+        Location where = SurvivalBlocks.dropPoint(block);
         Position region = BukkitRefs.toPosition(where);
         scheduler.onRegion(region, () -> pipeline.route(player, where, drops, stages));
     }

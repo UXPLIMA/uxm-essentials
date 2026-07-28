@@ -34,6 +34,21 @@ final class SurvivalBlocks {
     private SurvivalBlocks() {}
 
     /**
+     * The point a broken block's drops belong at: the centre of the block, not the corner {@link Block#getLocation()}
+     * returns.
+     *
+     * <p>{@code World#dropItemNaturally} scatters the item around the point it is handed, {@code +-0.25} on each axis
+     * and half an item's height down on Y, which is the same scatter vanilla's {@code Block#popResource} applies
+     * around {@code pos + 0.5}. So the API expects the block centre. Handing it {@code block.getLocation()} instead
+     * puts the item where four blocks meet and, on Y, below the broken block's own floor: it spawns embedded in the
+     * solid neighbours, and the entity's push-out-of-block routine then flings it away or leaves it lodged in the
+     * wall where the player never sees it. That is the whole difference between our drops and a vanilla break.
+     */
+    static Location dropPoint(Block block) {
+        return block.getLocation().toCenterLocation();
+    }
+
+    /**
      * Break every block connected to {@code origin} that shares its material, up to the search's cap, leaving the
      * origin itself to the event's own break. Drops respect {@code tool} (enchantments, silk touch), and fall on the
      * ground as a natural break — the plain cascade with no auto-drops routing.
@@ -92,7 +107,7 @@ final class SurvivalBlocks {
                 block.breakNaturally(tool);
             } else {
                 List<ItemStack> drops = new ArrayList<>(block.getDrops(tool));
-                Location where = block.getLocation();
+                Location where = dropPoint(block);
                 block.setType(Material.AIR);
                 sink.accept(where, drops);
             }
