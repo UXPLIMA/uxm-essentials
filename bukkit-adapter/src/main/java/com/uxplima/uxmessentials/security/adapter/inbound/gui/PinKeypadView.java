@@ -25,9 +25,10 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The join-verification / op-command re-auth keypad, rendered through the menu engine: the phone-pad chest a frozen
- * player taps their PIN or authenticator code into. The engine cancels every click and drag on the window, so the pad
- * is input-only and no item can move; each button runs one of this view's registered {@code security:pin-*} actions.
+ * The join-verification / op-command re-auth keypad, rendered through the menu engine: the numbered-head pad a frozen
+ * player taps their PIN or authenticator code into, laid out 0-4 over 5-9 so every digit including zero sits in one
+ * even grid. The engine cancels every click and drag on the window, so the pad is input-only and no item can move;
+ * each button runs one of this view's registered {@code security:pin-*} actions.
  * This view owns the per-viewer entered-PIN buffer (carried on the open menu as its subject) and the verify handoff:
  * a digit appends and re-renders the masked display, clear empties it, submit reads and verifies it, and the code
  * button hands off to the text-input prompt. The verify/lockout/trust decision lives behind {@link KeypadActions}.
@@ -47,7 +48,9 @@ public final class PinKeypadView {
     public static final String SPEC_ID = "pin-keypad";
 
     private static final String SPEC_RESOURCE = "modules/security/gui/pin-keypad.conf";
-    private static final int ROWS = 6;
+
+    /** The fallback row count when the spec cannot be read: enough for the entry row, the two digit rows and the controls. */
+    private static final int ROWS = 4;
 
     /** The most digits the pad accepts, comfortably above an 8-digit PIN and a 6-digit code. */
     private static final int MAX_ENTRY = 12;

@@ -76,12 +76,13 @@ class JoinVerificationTest {
     private static final String PIN = "1234";
     private static final int MAX_ATTEMPTS = 3;
 
-    // The stable keypad slots for the digits used in the click-through test, and the submit button.
-    private static final int SLOT_1 = 11;
+    // The keypad slots for the digits used in the click-through test, and the submit button. The pad runs 0-4 across
+    // slots 11-15 and 5-9 across 20-24, with the controls on the bottom row.
+    private static final int SLOT_1 = 12;
     private static final int SLOT_2 = 13;
-    private static final int SLOT_3 = 15;
-    private static final int SLOT_4 = 20;
-    private static final int SLOT_SUBMIT = 42;
+    private static final int SLOT_3 = 14;
+    private static final int SLOT_4 = 15;
+    private static final int SLOT_SUBMIT = 33;
 
     private ServerMock server;
     private Plugin plugin;
