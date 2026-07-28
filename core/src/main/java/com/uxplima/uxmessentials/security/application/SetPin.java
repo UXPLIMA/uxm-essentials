@@ -28,6 +28,22 @@ public final class SetPin {
         this.pinPolicy = Objects.requireNonNull(pinPolicy, "pinPolicy");
     }
 
+    /**
+     * Check {@code rawPin} against the policy without touching the store, reporting {@link PinSetResult#SET} when it
+     * would be accepted. The create-a-PIN pad uses this to refuse a bad first entry before asking for it a second
+     * time, so a player who picks something the server will not take hears it once rather than after typing it twice.
+     */
+    public PinSetResult validate(String rawPin) {
+        Objects.requireNonNull(rawPin, "rawPin");
+        return switch (pinPolicy.validate(rawPin)) {
+            case OK -> PinSetResult.SET;
+            case TOO_SHORT -> PinSetResult.TOO_SHORT;
+            case TOO_LONG -> PinSetResult.TOO_LONG;
+            case NOT_NUMERIC -> PinSetResult.NOT_NUMERIC;
+            case BLOCKED -> PinSetResult.BLOCKED;
+        };
+    }
+
     /** Validate and, if it passes the policy and no PIN is set yet, hash-and-store {@code rawPin} as the PIN factor. */
     public PinSetResult set(UUID playerId, String rawPin) {
         Objects.requireNonNull(playerId, "playerId");
@@ -43,6 +59,7 @@ public final class SetPin {
             case TOO_SHORT -> PinSetResult.TOO_SHORT;
             case TOO_LONG -> PinSetResult.TOO_LONG;
             case NOT_NUMERIC -> PinSetResult.NOT_NUMERIC;
+            case BLOCKED -> PinSetResult.BLOCKED;
         };
     }
 }

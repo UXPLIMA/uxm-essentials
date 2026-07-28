@@ -73,6 +73,7 @@ final class DefaultResources {
             "modules/ranks/ranks.conf",
             "modules/security/config.conf",
             "modules/security/gui/pin-keypad.conf",
+            "modules/security/gui/pin-create.conf",
             "modules/commandcontrol/config.conf",
             "modules/trade/config.conf",
             "modules/villagers/config.conf",

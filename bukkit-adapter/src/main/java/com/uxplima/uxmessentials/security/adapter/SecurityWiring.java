@@ -37,6 +37,7 @@ import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SetPin;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.IpGuardStore;
+import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.SecretGenerator;
@@ -44,6 +45,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -68,13 +70,17 @@ public final class SecurityWiring {
             Persistence persistence,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            LockoutBan lockoutBan,
+            ServerConnector proxy) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(lockoutBan, "lockoutBan");
+        Objects.requireNonNull(proxy, "proxy");
         KernelPorts kernel = ctx.kernel();
         SecurityConfig config = SecurityConfig.from(ctx.config());
         SecurityConfig.TwoFactorSettings twoFactor = config.twoFactor();
@@ -124,9 +130,37 @@ public final class SecurityWiring {
         VerificationSessions sessions = new VerificationSessions();
         ReauthState reauthState = new ReauthState();
         ReauthSessions reauthSessions = new ReauthSessions();
-        PinKeypadView keypad = new PinKeypadView(menus, kernel.messages(), kernel.scheduler());
+        PinEnrolmentSessions enrolmentSessions = new PinEnrolmentSessions();
+        // The titles over the keypad and the sounds each step makes, shared by the join freeze and the op re-auth so
+        // both flows feel the same. The keypad plays the tap sound itself; the controller plays the outcomes.
+        VerificationFeedback feedback =
+                new VerificationFeedback(config.feedback(), kernel.scheduler(), kernel.messages(), kernel.log());
+        PinKeypadView keypad = new PinKeypadView(menus, kernel.messages(), feedback, kernel.scheduler());
+        FreezeGameMode freezeGameMode =
+                new FreezeGameMode(plugin, config.joinVerification().spectator());
+        // The module's own two teleports (into the holding area and back out) announce themselves here, because the
+        // freeze cancels teleports and a teleport event names a cause, never an author.
+        FreezeTeleports ownTeleports = new FreezeTeleports();
+        FreezeHoldingArea holdingArea = new FreezeHoldingArea(
+                FreezeHoldingArea.parse(config.joinVerification().holdingArea(), kernel.log())
+                        .orElse(null),
+                ownTeleports,
+                kernel.log());
         VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
         TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(textInput);
+        // The create-a-PIN pad: shown to a player holding uxmessentials.security.pin.required who has no factor, so
+        // "you must have a PIN" is enforceable rather than advisory. It writes through the same SetPin the /pin
+        // command uses, so a PIN made here obeys the same length and blocked-list rules.
+        PinEnrolmentController enrolment = new PinEnrolmentController(
+                setPin,
+                enrolmentSessions,
+                sessions,
+                keypad,
+                feedback,
+                freezeGameMode,
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink());
         VerificationController controller = new VerificationController(
                 repository,
                 verify,
@@ -137,9 +171,17 @@ public final class SecurityWiring {
                 config.joinVerification(),
                 keypad,
                 totpPrompt,
+                freezeGameMode,
+                feedback,
+                lockoutBan,
+                enrolment,
+                kernel.permissions(),
+                holdingArea,
+                proxy,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
+                kernel.log(),
                 clock);
         // The two /security operator verbs. Force revokes the target's device trust (the durable forced state, so
         // their next join re-verifies even from a trusted device), paired with the immediate online freeze driven
@@ -165,6 +207,7 @@ public final class SecurityWiring {
                         removePin,
                         repository,
                         twoFactor,
+                        (player, viewer) -> controller.forceReverify(viewer),
                         clock,
                         kernel.scheduler(),
                         kernel.messages(),
@@ -201,20 +244,48 @@ public final class SecurityWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 clock);
-        KeypadRouter router = new KeypadRouter(reauthSessions, controller, reauthController);
+        KeypadRouter router =
+                new KeypadRouter(reauthSessions, enrolmentSessions, controller, reauthController, enrolment);
         // The keypad renders through the menu engine: register its per-button actions (routed to whichever verify flow
         // the player is in), its masked-display / digit-label placeholders and its spec now that the router exists. The
         // close listener is the one behaviour the engine does not model: reopening the window if a still-frozen player
         // escapes it.
         keypad.register(menuBindings, router, plugin.getDataFolder().toPath(), kernel.log());
+        // On an offline-mode server the login plugin owns the first half of the login, so the second factor waits for
+        // it rather than racing it. The hook is reflective and finds nothing on a server with no login plugin, which
+        // leaves the plain join hook in charge exactly as before.
+        LoginPluginHandoff handoff = new LoginPluginHandoff(plugin, kernel.log());
+        if (config.joinVerification().waitForLoginPlugin() && handoff.hook(controller::onAuthenticated)) {
+            controller.deferToLoginPlugin();
+        }
         List<Listener> listeners = List.of(
                 new SecurityJoinListener(controller),
-                new VerificationFreezeListener(sessions, kernel.messages(), kernel.messageSink()),
+                new VerificationFreezeListener(
+                        sessions,
+                        config.joinVerification()::restricts,
+                        ownTeleports,
+                        player -> menus.menuIdOf(player.getOpenInventory().getTopInventory())
+                                .isPresent(),
+                        kernel.messages(),
+                        kernel.messageSink()),
                 new PinKeypadCloseListener(menus, keypad, sessions),
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
                 new SecurityGuardListener(ipGuardController, clientGuard, brands));
-        return new Wired(commands, listeners, pending, sessions, limiter, keypad, reauthSessions, reauthState, brands);
+        return new Wired(
+                commands,
+                listeners,
+                pending,
+                sessions,
+                limiter,
+                keypad,
+                reauthSessions,
+                enrolmentSessions,
+                reauthState,
+                brands,
+                ownTeleports,
+                holdingArea,
+                handoff);
     }
 
     /**
@@ -230,8 +301,12 @@ public final class SecurityWiring {
      * @param limiter the shared durable brute-force limiter, cleared on module stop
      * @param keypad the keypad view whose open windows close on module stop
      * @param reauthSessions the in-flight op-command re-auth prompts, cleared on module stop
+     * @param enrolmentSessions the in-flight create-a-PIN entries, cleared on module stop
      * @param reauthState the per-player last-verified stamps, cleared on module stop
      * @param brands the session-only client-brand registry, cleared on module stop
+     * @param ownTeleports the module's outstanding teleport exemptions, dropped on module stop
+     * @param holdingArea the remembered pre-freeze origins, dropped on module stop
+     * @param handoff the login-plugin hook, unregistered on module stop
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -241,8 +316,12 @@ public final class SecurityWiring {
             AttemptLimiter limiter,
             PinKeypadView keypad,
             ReauthSessions reauthSessions,
+            PinEnrolmentSessions enrolmentSessions,
             ReauthState reauthState,
-            ClientBrandRegistry brands) {
+            ClientBrandRegistry brands,
+            FreezeTeleports ownTeleports,
+            FreezeHoldingArea holdingArea,
+            LoginPluginHandoff handoff) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -252,8 +331,12 @@ public final class SecurityWiring {
             Objects.requireNonNull(limiter, "limiter");
             Objects.requireNonNull(keypad, "keypad");
             Objects.requireNonNull(reauthSessions, "reauthSessions");
+            Objects.requireNonNull(enrolmentSessions, "enrolmentSessions");
             Objects.requireNonNull(reauthState, "reauthState");
             Objects.requireNonNull(brands, "brands");
+            Objects.requireNonNull(ownTeleports, "ownTeleports");
+            Objects.requireNonNull(holdingArea, "holdingArea");
+            Objects.requireNonNull(handoff, "handoff");
         }
 
         /** Drop every pending secret, freeze, lockout and re-auth window, close every keypad, and forget every brand. */
@@ -263,8 +346,14 @@ public final class SecurityWiring {
             sessions.clearAll();
             limiter.clearAll();
             reauthSessions.clearAll();
+            enrolmentSessions.clearAll();
             reauthState.clearAll();
             brands.clearAll();
+            ownTeleports.clearAll();
+            holdingArea.clearAll();
+            // The hook lives on another plugin's handler list, so a disable that left it there would keep calling into
+            // a module that is no longer running.
+            handoff.unhook();
         }
     }
 }

@@ -3,13 +3,19 @@ package com.uxplima.uxmessentials.security.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.security.domain.ClientIdMode;
+import com.uxplima.uxmessentials.security.domain.FreezeRestriction;
 import com.uxplima.uxmessentials.security.domain.PinPolicy;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
+import com.uxplima.uxmessentials.security.domain.RevokedAccess;
+import com.uxplima.uxmessentials.security.domain.SafetyNet;
+import com.uxplima.uxmessentials.security.domain.SpectatorPolicy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +33,11 @@ class SecurityConfigTest {
         assertThat(twoFactor.pin()).isTrue();
         assertThat(twoFactor.issuer()).isEqualTo("uxmEssentials");
         assertThat(twoFactor.codeWindow()).isEqualTo(1);
-        assertThat(twoFactor.pinPolicy()).isEqualTo(new PinPolicy(4, 8));
+        assertThat(twoFactor.pinPolicy().minLength()).isEqualTo(4);
+        assertThat(twoFactor.pinPolicy().maxLength()).isEqualTo(8);
+        // The blocked list ships populated, because a length rule cannot catch 1234: it is a perfectly valid
+        // four-digit PIN and also the first thing anybody guessing would try.
+        assertThat(twoFactor.pinPolicy().blocked()).contains("1234", "0000", "123456");
 
         SecurityConfig.JoinVerification join = config.joinVerification();
         assertThat(join.enabled()).isTrue();
@@ -35,6 +45,16 @@ class SecurityConfigTest {
         assertThat(join.trustDuration()).isEqualTo(Duration.ofHours(24));
         assertThat(join.maxAttempts()).isEqualTo(3);
         assertThat(join.lockout()).isEqualTo(Duration.ofMinutes(5));
+        // Every restriction ships on, so an operator opts out one line at a time rather than having to list the
+        // whole set to get the safe default.
+        assertThat(join.restrictions()).containsExactlyInAnyOrderElementsOf(EnumSet.allOf(FreezeRestriction.class));
+        assertThat(join.spectator()).isEqualTo(SpectatorPolicy.ADVENTURE);
+        assertThat(join.safetyNet()).isEqualTo(SafetyNet.KICK);
+        // A reset ends with a factor rather than without one, which is the middle answer of the three.
+        assertThat(join.revokedAccess()).isEqualTo(RevokedAccess.REVERIFY);
+        assertThat(join.holdingArea()).isEmpty();
+        assertThat(join.transferTo()).isEmpty();
+        assertThat(join.waitForLoginPlugin()).isTrue();
 
         SecurityConfig.OpProtection op = config.opProtection();
         assertThat(op.enabled()).isTrue();
@@ -51,6 +71,68 @@ class SecurityConfigTest {
         assertThat(clientId.enabled()).isTrue();
         assertThat(clientId.mode()).isEqualTo(ClientIdMode.FLAG);
         assertThat(clientId.brands()).isEmpty();
+    }
+
+    // The deny-list is an opt-out: a single false line drops one restriction and leaves the rest alone. The two
+    // enum-valued knobs fall back to their safe value rather than to nothing when they are misspelled.
+    @Test
+    void readsTheJoinRestrictionsBlockAsAnOptOut() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("join-verification.restrictions.damage-taken", false);
+        values.put("join-verification.restrictions.hunger", false);
+        values.put("join-verification.spectator-mode", "survival");
+        values.put("join-verification.safety-net", "allow");
+
+        SecurityConfig.JoinVerification join =
+                SecurityConfig.from(new MapConfig(values)).joinVerification();
+
+        assertThat(join.restricts(FreezeRestriction.DAMAGE_TAKEN)).isFalse();
+        assertThat(join.restricts(FreezeRestriction.HUNGER)).isFalse();
+        assertThat(join.restricts(FreezeRestriction.MOVE)).isTrue();
+        assertThat(join.restricts(FreezeRestriction.TELEPORT)).isTrue();
+        assertThat(join.spectator()).isEqualTo(SpectatorPolicy.SURVIVAL);
+        assertThat(join.safetyNet()).isEqualTo(SafetyNet.ALLOW);
+    }
+
+    @Test
+    void readsThePhaseFourJoinKnobs() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("join-verification.holding-area", "world,0,64,0");
+        values.put("join-verification.transfer-to", "survival");
+        values.put("join-verification.wait-for-login-plugin", false);
+        values.put("join-verification.on-access-revoked", "kick");
+
+        SecurityConfig.JoinVerification join =
+                SecurityConfig.from(new MapConfig(values)).joinVerification();
+
+        assertThat(join.hasHoldingArea()).isTrue();
+        assertThat(join.holdingArea()).isEqualTo("world,0,64,0");
+        assertThat(join.hasTransferTarget()).isTrue();
+        assertThat(join.transferTo()).isEqualTo("survival");
+        assertThat(join.waitForLoginPlugin()).isFalse();
+        assertThat(join.revokedAccess()).isEqualTo(RevokedAccess.KICK);
+    }
+
+    @Test
+    void anUnreadableRevokedAccessValueFallsBackToReverify() {
+        SecurityConfig.JoinVerification join = SecurityConfig.from(
+                        new MapConfig(Map.of("join-verification.on-access-revoked", "explode")))
+                .joinVerification();
+
+        assertThat(join.revokedAccess()).isEqualTo(RevokedAccess.REVERIFY);
+    }
+
+    @Test
+    void anUnreadableSpectatorOrSafetyNetValueFallsBackToTheSafeOne() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("join-verification.spectator-mode", "sepctator");
+        values.put("join-verification.safety-net", "wahtever");
+
+        SecurityConfig.JoinVerification join =
+                SecurityConfig.from(new MapConfig(values)).joinVerification();
+
+        assertThat(join.spectator()).isEqualTo(SpectatorPolicy.ADVENTURE);
+        assertThat(join.safetyNet()).isEqualTo(SafetyNet.KICK);
     }
 
     @Test
@@ -151,7 +233,26 @@ class SecurityConfigTest {
 
         assertThat(twoFactor.issuer()).isEqualTo("MyServer");
         assertThat(twoFactor.codeWindow()).isEqualTo(2);
-        assertThat(twoFactor.pinPolicy()).isEqualTo(new PinPolicy(6, 6));
+        assertThat(twoFactor.pinPolicy().minLength()).isEqualTo(6);
+        assertThat(twoFactor.pinPolicy().maxLength()).isEqualTo(6);
+    }
+
+    @Test
+    void takesTheBlockedPinListFromTheFileWhenOneIsGiven() {
+        SecurityConfig.TwoFactorSettings twoFactor = SecurityConfig.from(
+                        new MapConfig(Map.of("two-factor.blocked-pins", List.of("1379", "2468"))))
+                .twoFactor();
+
+        assertThat(twoFactor.pinPolicy()).isEqualTo(new PinPolicy(4, 8, Set.of("1379", "2468")));
+    }
+
+    @Test
+    void anEmptyBlockedPinListRefusesNothing() {
+        SecurityConfig.TwoFactorSettings twoFactor = SecurityConfig.from(
+                        new MapConfig(Map.of("two-factor.blocked-pins", List.of())))
+                .twoFactor();
+
+        assertThat(twoFactor.pinPolicy().blocked()).isEmpty();
     }
 
     @Test

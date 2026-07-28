@@ -57,6 +57,7 @@ public final class ChangePin {
             case TOO_SHORT -> PinChangeResult.TOO_SHORT;
             case TOO_LONG -> PinChangeResult.TOO_LONG;
             case NOT_NUMERIC -> PinChangeResult.NOT_NUMERIC;
+            case BLOCKED -> PinChangeResult.BLOCKED;
         };
     }
 }

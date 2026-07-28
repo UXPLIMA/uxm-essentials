@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.security.adapter.VerificationFeedback;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -47,7 +48,12 @@ public final class PinKeypadView {
     /** The engine spec id this keypad registers and opens under. */
     public static final String SPEC_ID = "pin-keypad";
 
+    /** The engine spec id of the create-a-PIN pad: the same buttons, its own title and no authenticator handoff. */
+    public static final String CREATE_SPEC_ID = "pin-create";
+
     private static final String SPEC_RESOURCE = "modules/security/gui/pin-keypad.conf";
+
+    private static final String CREATE_SPEC_RESOURCE = "modules/security/gui/pin-create.conf";
 
     /** The fallback row count when the spec cannot be read: enough for the entry row, the two digit rows and the controls. */
     private static final int ROWS = 4;
@@ -57,6 +63,7 @@ public final class PinKeypadView {
 
     private final Menus menus;
     private final Messages messages;
+    private final VerificationFeedback feedback;
     private final Scheduler scheduler;
 
     /** viewer UUID -> their open keypad's viewer + totp flag; the tracking that lets closeAll close and reopen rebuild. */
@@ -68,9 +75,10 @@ public final class PinKeypadView {
     /** Viewers whose reopen is in flight, so the transient close that reopen fires cannot recurse into another reopen. */
     private final Set<UUID> reopening = ConcurrentHashMap.newKeySet();
 
-    public PinKeypadView(Menus menus, Messages messages, Scheduler scheduler) {
+    public PinKeypadView(Menus menus, Messages messages, VerificationFeedback feedback, Scheduler scheduler) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = Objects.requireNonNull(feedback, "feedback");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
@@ -91,6 +99,7 @@ public final class PinKeypadView {
         bindings.action("security:pin-totp", ctx -> pressTotp(ctx, actions));
         bindings.condition("security:totp-enabled", (ctx, args) -> totpEnabled(ctx));
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(CREATE_SPEC_ID, MenuSpecs.loadOrBundled(CREATE_SPEC_RESOURCE, dataFolder, ROWS, log));
     }
 
     /** Open a fresh keypad for {@code viewer}; {@code totpEnabled} shows the "type a code" button. */
@@ -98,6 +107,18 @@ public final class PinKeypadView {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         show(viewer, totpEnabled);
+    }
+
+    /**
+     * Open the create-a-PIN pad for {@code viewer}, with an empty entry. Tracked like the verify pad so an escape is
+     * reopened and a module stop closes it; it never shows the authenticator button, because there is no factor to
+     * hand off to yet.
+     */
+    public void openCreate(Player player, PlayerRef viewer) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        open.put(viewer.uuid(), new Tracked(viewer, false, true));
+        menus.open(viewer, CREATE_SPEC_ID, new PinSession(viewer, false));
     }
 
     /** Close the viewer's keypad, flagging the close so it is not reopened; the deliberate-close path (the close
@@ -140,9 +161,15 @@ public final class PinKeypadView {
         }
         try {
             Tracked tracked = open.get(viewer);
-            if (tracked != null) {
-                show(tracked.viewer(), tracked.totpEnabled());
+            if (tracked == null) {
+                return;
             }
+            Player live = Bukkit.getPlayer(viewer);
+            if (tracked.creating() && live != null) {
+                openCreate(live, tracked.viewer());
+                return;
+            }
+            show(tracked.viewer(), tracked.totpEnabled());
         } finally {
             reopening.remove(viewer);
         }
@@ -154,7 +181,7 @@ public final class PinKeypadView {
     }
 
     private void show(PlayerRef viewer, boolean totpEnabled) {
-        open.put(viewer.uuid(), new Tracked(viewer, totpEnabled));
+        open.put(viewer.uuid(), new Tracked(viewer, totpEnabled, false));
         menus.open(viewer, SPEC_ID, new PinSession(viewer, totpEnabled));
     }
 
@@ -185,6 +212,8 @@ public final class PinKeypadView {
         PinSession session = ctx.subject(PinSession.class);
         session.append(Character.forDigit(digit, 10), MAX_ENTRY);
         ctx.control().refresh();
+        // The click is what tells the player the pad took the tap; the masked display only says how many it has.
+        feedback.keyPress(ctx.viewer());
     }
 
     private void pressClear(MenuActionContext ctx) {
@@ -219,8 +248,11 @@ public final class PinKeypadView {
         return "*".repeat(Math.max(0, length));
     }
 
-    /** The per-viewer tracking a close/reopen needs: who is at the window and whether their code button shows. */
-    private record Tracked(PlayerRef viewer, boolean totpEnabled) {}
+    /**
+     * The per-viewer tracking a close/reopen needs: who is at the window, whether their code button shows, and which
+     * of the two pads they are on, so a reopened window is the one they were actually using.
+     */
+    private record Tracked(PlayerRef viewer, boolean totpEnabled, boolean creating) {}
 
     /**
      * The per-viewer keypad state carried as the open menu's subject: who is verifying, whether they hold a TOTP

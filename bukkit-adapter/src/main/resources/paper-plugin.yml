@@ -1381,6 +1381,12 @@ permissions:
   uxmessentials.security.pin:
     description: '/pin: set, change or remove a numeric PIN second factor on your own account.'
     default: true
+  # Holding this means the server requires a PIN of you: joining without one holds you at the create-a-PIN pad
+  # instead of letting you through. Denied by default, so nothing changes until it is granted (to everyone, to a
+  # staff group, to whoever you want covered).
+  uxmessentials.security.pin.required:
+    description: Must set a PIN before playing.
+    default: false
   uxmessentials.security.admin:
     description: '/security: inspect and manage another player&apos;s second factors.'
     default: op

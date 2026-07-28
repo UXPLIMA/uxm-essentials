@@ -25,6 +25,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
+import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
@@ -97,7 +98,9 @@ class OpCommandProtectionTest {
         MenuRenderer renderer = new MenuRenderer(
                 new ItemRenderer(new GuiText(messages), bindings.placeholders()), bindings.conditions());
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
-        PinKeypadView keypad = new PinKeypadView(menus, messages, scheduler);
+        VerificationFeedback feedback = new VerificationFeedback(
+                new SecurityConfig.Feedback(false, "", "", "", ""), scheduler, messages, new NoopLogger());
+        PinKeypadView keypad = new PinKeypadView(menus, messages, feedback, scheduler);
         reauthController = new ReauthController(
                 repository,
                 new VerifyTwoFactor(repository, 1),

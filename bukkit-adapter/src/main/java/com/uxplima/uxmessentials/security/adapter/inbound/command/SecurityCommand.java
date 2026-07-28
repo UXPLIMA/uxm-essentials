@@ -192,6 +192,9 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
                     sender.getName(),
                     target.name(),
                     scopeName);
+            // A target who is online right now has just had their second factor taken away underneath them. What that
+            // should mean for the session they are standing in is the operator's call, not ours.
+            verification.onAccessRevoked(target);
             notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_RESET_DONE, placeholders);
         }));
         return Command.SINGLE_SUCCESS;

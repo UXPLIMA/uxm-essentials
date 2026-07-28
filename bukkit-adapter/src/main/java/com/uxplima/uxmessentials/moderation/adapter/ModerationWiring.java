@@ -293,6 +293,7 @@ public final class ModerationWiring {
                 mutePolicy,
                 jailGate,
                 services.freeze(),
+                services.tempBan(),
                 repository,
                 clock,
                 guiViews);
@@ -493,6 +494,7 @@ public final class ModerationWiring {
      *     the live freeze-state read)
      * @param repository the sanction-state read side the {@code moderation_ban_*}/{@code moderation_mute_*}/
      *     {@code moderation_warns} placeholders query (clock-gated through {@link #clock})
+     * @param tempBan the tempban use case, lent to security so a verification lockout is an ordinary ban
      * @param clock the clock the placeholder seam gates active ban/mute reads against
      * @param guiViews the management GUI views, whose active-punishments list the {@code /uxmess gui} hub opens
      */
@@ -504,6 +506,7 @@ public final class ModerationWiring {
             RepositoryMutePolicy mutePolicy,
             RepositoryJailGate jailGate,
             Freeze freeze,
+            TempBan tempBan,
             ModerationRepository repository,
             Clock clock,
             ModerationGuiViews guiViews) {
@@ -516,6 +519,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(mutePolicy, "mutePolicy");
             Objects.requireNonNull(jailGate, "jailGate");
             Objects.requireNonNull(freeze, "freeze");
+            Objects.requireNonNull(tempBan, "tempBan");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(clock, "clock");
             Objects.requireNonNull(guiViews, "guiViews");

@@ -54,6 +54,19 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_PIN_TOO_SHORT("security.pin.too-short"),
     SECURITY_PIN_TOO_LONG("security.pin.too-long"),
     SECURITY_PIN_NOT_NUMERIC("security.pin.not-numeric"),
+    SECURITY_PIN_BLOCKED("security.pin.blocked"),
+
+    // The create-a-PIN pad shown to a player the server requires a PIN from: the two step prompts, the mismatch, the
+    // window title, and the line that says they are free to play.
+    SECURITY_PIN_CREATE_TITLE("security.pin.create-title"),
+    SECURITY_PIN_CREATE_PROMPT("security.pin.create-prompt"),
+    SECURITY_PIN_CREATE_CONFIRM("security.pin.create-confirm"),
+    SECURITY_PIN_CREATE_MISMATCH("security.pin.create-mismatch"),
+    SECURITY_PIN_CREATE_DONE("security.pin.create-done"),
+
+    // /pin lock — locking your own account from the keypad before stepping away.
+    SECURITY_PIN_LOCK_DONE("security.pin.lock-done"),
+    SECURITY_PIN_LOCK_NOT_SET("security.pin.lock-not-set"),
     SECURITY_PIN_FEATURE_DISABLED("security.pin.feature-disabled"),
 
     // /pin change <old> <new> — replacing a live PIN, which requires proving the current one.
@@ -98,6 +111,18 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_VERIFY_FAILED("security.verify.failed"),
     SECURITY_VERIFY_MUST_VERIFY("security.verify.must-verify"),
     SECURITY_VERIFY_LOCKED_OUT("security.verify.locked-out"),
+    SECURITY_VERIFY_UNAVAILABLE("security.verify.unavailable"),
+    SECURITY_VERIFY_TIMED_OUT("security.verify.timed-out"),
+    SECURITY_ACCESS_REVOKED("security.verify.access-revoked"),
+
+    // The titles shown over the keypad, where a player with a window open is actually looking, and the two outcome
+    // titles that replace them. Paired with the feedback sounds; both are operator-switchable.
+    SECURITY_VERIFY_TITLE("security.verify.title"),
+    SECURITY_VERIFY_SUBTITLE("security.verify.subtitle"),
+    SECURITY_VERIFY_SUCCESS_TITLE("security.verify.success-title"),
+    SECURITY_VERIFY_SUCCESS_SUBTITLE("security.verify.success-subtitle"),
+    SECURITY_VERIFY_FAILED_TITLE("security.verify.failed-title"),
+    SECURITY_VERIFY_FAILED_SUBTITLE("security.verify.failed-subtitle"),
 
     // Phase 3 — op-command protection: the prompt when a protected command is blocked pending a fresh proof, the
     // reply when the re-auth succeeds and the command is retried, the reply when the submitted code is wrong, and the

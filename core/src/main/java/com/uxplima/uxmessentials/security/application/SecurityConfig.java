@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.security.application;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -9,9 +11,13 @@ import java.util.Set;
 import com.uxplima.uxmessentials.security.domain.AltLimitPolicy;
 import com.uxplima.uxmessentials.security.domain.ClientIdMode;
 import com.uxplima.uxmessentials.security.domain.ClientPolicy;
+import com.uxplima.uxmessentials.security.domain.FreezeRestriction;
 import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 import com.uxplima.uxmessentials.security.domain.PinPolicy;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
+import com.uxplima.uxmessentials.security.domain.RevokedAccess;
+import com.uxplima.uxmessentials.security.domain.SafetyNet;
+import com.uxplima.uxmessentials.security.domain.SpectatorPolicy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
 /**
@@ -37,7 +43,8 @@ public record SecurityConfig(
         JoinVerification joinVerification,
         OpProtection opProtection,
         IpGuard ipGuard,
-        ClientId clientId) {
+        ClientId clientId,
+        Feedback feedback) {
 
     public SecurityConfig {
         Objects.requireNonNull(twoFactor, "twoFactor");
@@ -45,6 +52,7 @@ public record SecurityConfig(
         Objects.requireNonNull(opProtection, "opProtection");
         Objects.requireNonNull(ipGuard, "ipGuard");
         Objects.requireNonNull(clientId, "clientId");
+        Objects.requireNonNull(feedback, "feedback");
     }
 
     /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */
@@ -56,7 +64,8 @@ public record SecurityConfig(
                 JoinVerification.from(config),
                 OpProtection.from(config),
                 IpGuard.from(config),
-                ClientId.from(config));
+                ClientId.from(config),
+                Feedback.from(config));
     }
 
     /**
@@ -70,7 +79,8 @@ public record SecurityConfig(
      * @param pin whether the PIN factor is offered ({@code two-factor.pin}, default true)
      * @param issuer the issuer label in the authenticator app ({@code two-factor.issuer}, default "uxmEssentials")
      * @param codeWindow the ± time-steps of tolerance when checking a code ({@code two-factor.code-window}, default 1)
-     * @param pinPolicy the PIN length policy built from {@code two-factor.pin-min-length}/{@code pin-max-length}
+     * @param pinPolicy the PIN policy built from {@code two-factor.pin-min-length}/{@code pin-max-length} and
+     *     {@code two-factor.blocked-pins}
      */
     public record TwoFactorSettings(
             boolean enabled, boolean totp, boolean pin, String issuer, int codeWindow, PinPolicy pinPolicy) {
@@ -83,6 +93,14 @@ public record SecurityConfig(
 
         private static final int DEFAULT_PIN_MIN = 4;
         private static final int DEFAULT_PIN_MAX = 8;
+
+        /**
+         * The PINs refused out of the box: the runs, the repeats and the two dates everybody picks. Length rules
+         * cannot catch these, and they are the whole of a lazy attacker's first guesses.
+         */
+        private static final List<String> DEFAULT_BLOCKED_PINS = List.of(
+                "0000", "1111", "2222", "3333", "4444", "5555", "6666", "7777", "8888", "9999", "1234", "4321", "12345",
+                "123456", "654321", "1212", "2580", "0852", "1122", "2000", "1990", "2024", "2025");
 
         /** The hard ceiling on the accepted window, so a misconfigured value cannot widen the factor open. */
         private static final int MAX_WINDOW = 5;
@@ -103,13 +121,14 @@ public record SecurityConfig(
             Objects.requireNonNull(config, "config");
             int min = Math.max(1, config.getInt("two-factor.pin-min-length", DEFAULT_PIN_MIN));
             int max = Math.max(min, config.getInt("two-factor.pin-max-length", DEFAULT_PIN_MAX));
+            Set<String> blocked = Set.copyOf(config.getStringList("two-factor.blocked-pins", DEFAULT_BLOCKED_PINS));
             return new TwoFactorSettings(
                     config.getBoolean("two-factor.enabled", true),
                     config.getBoolean("two-factor.totp", true),
                     config.getBoolean("two-factor.pin", true),
                     config.getString("two-factor.issuer", DEFAULT_ISSUER),
                     Math.min(MAX_WINDOW, Math.max(0, config.getInt("two-factor.code-window", DEFAULT_WINDOW))),
-                    new PinPolicy(min, max));
+                    new PinPolicy(min, max, blocked));
         }
     }
 
@@ -124,17 +143,60 @@ public record SecurityConfig(
      * @param trustDuration how long a trusted device skips the prompt ({@code join-verification.trust-duration-hours})
      * @param maxAttempts failures allowed before a lockout ({@code join-verification.max-attempts}, default 3)
      * @param lockout how long a locked-out player is kicked for ({@code join-verification.lockout-seconds}, default 300)
+     * @param restrictions what a frozen player is stopped from doing ({@code join-verification.restrictions.*})
+     * @param spectator what to do with a frozen spectator ({@code join-verification.spectator-mode}, default adventure)
+     * @param safetyNet what happens when the decision itself fails ({@code join-verification.safety-net}, default kick)
+     * @param entryTimeout how long a frozen player has to verify, zero for no limit
+     *     ({@code join-verification.entry-timeout-seconds}, default 60)
+     * @param lockoutBans whether a lockout is also a real tempban on the server's own ban list
+     *     ({@code join-verification.lockout-bans}, default true)
+     * @param lockoutBanReason the reason recorded against that ban ({@code join-verification.lockout-ban-reason})
+     * @param holdingArea where a verifying player is held, {@code world,x,y,z[,yaw,pitch]}, blank to leave them put
+     *     ({@code join-verification.holding-area})
+     * @param transferTo the proxy backend a verified player is sent to, blank to leave them here
+     *     ({@code join-verification.transfer-to})
+     * @param waitForLoginPlugin whether a detected login plugin's own authentication runs first
+     *     ({@code join-verification.wait-for-login-plugin}, default true)
+     * @param revokedAccess what happens to an online player whose factor staff have just cleared
+     *     ({@code join-verification.on-access-revoked}, default reverify)
      */
     public record JoinVerification(
-            boolean enabled, boolean trustDevices, Duration trustDuration, int maxAttempts, Duration lockout) {
+            boolean enabled,
+            boolean trustDevices,
+            Duration trustDuration,
+            int maxAttempts,
+            Duration lockout,
+            Set<FreezeRestriction> restrictions,
+            SpectatorPolicy spectator,
+            SafetyNet safetyNet,
+            Duration entryTimeout,
+            boolean lockoutBans,
+            String lockoutBanReason,
+            String holdingArea,
+            String transferTo,
+            boolean waitForLoginPlugin,
+            RevokedAccess revokedAccess) {
 
         private static final int DEFAULT_TRUST_HOURS = 24;
         private static final int DEFAULT_MAX_ATTEMPTS = 3;
         private static final int DEFAULT_LOCKOUT_SECONDS = 300;
+        private static final int DEFAULT_ENTRY_TIMEOUT_SECONDS = 60;
+        private static final String DEFAULT_LOCKOUT_REASON = "Too many failed verification attempts";
 
         public JoinVerification {
             Objects.requireNonNull(trustDuration, "trustDuration");
             Objects.requireNonNull(lockout, "lockout");
+            Objects.requireNonNull(restrictions, "restrictions");
+            Objects.requireNonNull(spectator, "spectator");
+            Objects.requireNonNull(safetyNet, "safetyNet");
+            Objects.requireNonNull(entryTimeout, "entryTimeout");
+            Objects.requireNonNull(lockoutBanReason, "lockoutBanReason");
+            Objects.requireNonNull(holdingArea, "holdingArea");
+            Objects.requireNonNull(transferTo, "transferTo");
+            Objects.requireNonNull(revokedAccess, "revokedAccess");
+            if (entryTimeout.isNegative()) {
+                throw new IllegalArgumentException("join-verification entry-timeout must not be negative");
+            }
             if (maxAttempts < 1) {
                 throw new IllegalArgumentException("join-verification max-attempts must be at least 1: " + maxAttempts);
             }
@@ -144,6 +206,8 @@ public record SecurityConfig(
             if (lockout.isNegative()) {
                 throw new IllegalArgumentException("join-verification lockout must not be negative");
             }
+            restrictions =
+                    restrictions.isEmpty() ? Set.of() : Collections.unmodifiableSet(EnumSet.copyOf(restrictions));
         }
 
         /** Resolve the join-verification settings from the module's scoped {@link ConfigStore}. */
@@ -158,7 +222,53 @@ public record SecurityConfig(
                     config.getBoolean("join-verification.trust-devices", true),
                     Duration.ofHours(trustHours),
                     maxAttempts,
-                    Duration.ofSeconds(lockoutSeconds));
+                    Duration.ofSeconds(lockoutSeconds),
+                    restrictionsFrom(config),
+                    SpectatorPolicy.parse(config.getString("join-verification.spectator-mode", "adventure")),
+                    SafetyNet.parse(config.getString("join-verification.safety-net", "kick")),
+                    Duration.ofSeconds(Math.max(
+                            0,
+                            config.getInt("join-verification.entry-timeout-seconds", DEFAULT_ENTRY_TIMEOUT_SECONDS))),
+                    config.getBoolean("join-verification.lockout-bans", true),
+                    config.getString("join-verification.lockout-ban-reason", DEFAULT_LOCKOUT_REASON),
+                    config.getString("join-verification.holding-area", ""),
+                    config.getString("join-verification.transfer-to", ""),
+                    config.getBoolean("join-verification.wait-for-login-plugin", true),
+                    RevokedAccess.parse(config.getString("join-verification.on-access-revoked", "reverify")));
+        }
+
+        /** Whether a frozen player is kicked after a time limit rather than left at the keypad indefinitely. */
+        public boolean hasEntryTimeout() {
+            return !entryTimeout.isZero();
+        }
+
+        /** Whether a verifying player is moved to a holding area for the length of the freeze. */
+        public boolean hasHoldingArea() {
+            return !holdingArea.isBlank();
+        }
+
+        /** Whether a verified player is handed to another backend rather than left where they logged in. */
+        public boolean hasTransferTarget() {
+            return !transferTo.isBlank();
+        }
+
+        /** Whether a frozen player is stopped from {@code restriction}. */
+        public boolean restricts(FreezeRestriction restriction) {
+            return restrictions.contains(Objects.requireNonNull(restriction, "restriction"));
+        }
+
+        /**
+         * Every restriction whose {@code restrictions.<key>} flag is on. All of them ship on, so an operator opts
+         * out one line at a time rather than having to list the whole set to get the safe default.
+         */
+        private static Set<FreezeRestriction> restrictionsFrom(ConfigStore config) {
+            EnumSet<FreezeRestriction> on = EnumSet.noneOf(FreezeRestriction.class);
+            for (FreezeRestriction restriction : FreezeRestriction.values()) {
+                if (config.getBoolean("join-verification.restrictions." + restriction.configKey(), true)) {
+                    on.add(restriction);
+                }
+            }
+            return on;
         }
 
         /** The pure lockout decision this config drives — reused by the keypad to judge a failed attempt. */
@@ -240,6 +350,48 @@ public record SecurityConfig(
         /** The pure same-IP account-cap decision this config drives. */
         public AltLimitPolicy limitPolicy() {
             return new AltLimitPolicy(maxAccountsPerIp);
+        }
+    }
+
+    /**
+     * How verification talks back to the player beyond chat ({@code feedback.*}): the title over the keypad and the
+     * sound each step makes. Chat is a poor channel here, because the player has a window open and their chat is
+     * scrolled away behind it, so the title says where they are already looking why the server is not responding.
+     *
+     * <p>Every sound is a namespaced key rather than an enum constant, so a resource-pack sound works as well as a
+     * vanilla one and neither a rename between game versions nor an operator's typo can stop the module loading: an
+     * unusable key plays nothing and logs a line. A blank key is an explicit "play nothing here".
+     *
+     * @param titles whether the keypad and outcome titles are shown ({@code feedback.titles}, default true)
+     * @param promptSound played when the keypad opens ({@code feedback.sounds.prompt})
+     * @param keySound played on each digit tap ({@code feedback.sounds.key})
+     * @param successSound played when a proof is accepted ({@code feedback.sounds.success})
+     * @param failureSound played when a proof is rejected ({@code feedback.sounds.failure})
+     */
+    public record Feedback(
+            boolean titles, String promptSound, String keySound, String successSound, String failureSound) {
+
+        private static final String DEFAULT_PROMPT = "block.note_block.pling";
+        private static final String DEFAULT_KEY = "ui.button.click";
+        private static final String DEFAULT_SUCCESS = "entity.player.levelup";
+        private static final String DEFAULT_FAILURE = "entity.villager.no";
+
+        public Feedback {
+            Objects.requireNonNull(promptSound, "promptSound");
+            Objects.requireNonNull(keySound, "keySound");
+            Objects.requireNonNull(successSound, "successSound");
+            Objects.requireNonNull(failureSound, "failureSound");
+        }
+
+        /** Resolve the feedback settings from the module's scoped {@link ConfigStore}. */
+        public static Feedback from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new Feedback(
+                    config.getBoolean("feedback.titles", true),
+                    config.getString("feedback.sounds.prompt", DEFAULT_PROMPT),
+                    config.getString("feedback.sounds.key", DEFAULT_KEY),
+                    config.getString("feedback.sounds.success", DEFAULT_SUCCESS),
+                    config.getString("feedback.sounds.failure", DEFAULT_FAILURE));
         }
     }
 

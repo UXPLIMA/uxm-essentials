@@ -56,6 +56,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
     private final RemovePin removePin;
     private final TwoFactorRepository repository;
     private final SecurityConfig.TwoFactorSettings settings;
+    private final SelfLock selfLock;
     private final Clock clock;
 
     public PinCommand(
@@ -64,6 +65,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
             RemovePin removePin,
             TwoFactorRepository repository,
             SecurityConfig.TwoFactorSettings settings,
+            SelfLock selfLock,
             Clock clock,
             Scheduler scheduler,
             Messages messages,
@@ -74,6 +76,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
         this.removePin = Objects.requireNonNull(removePin, "removePin");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.selfLock = Objects.requireNonNull(selfLock, "selfLock");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -95,13 +98,54 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_PIN_REMOVE_USAGE))
                         .then(Commands.argument("pin", StringArgumentType.word())
                                 .executes(this::remove)))
+                .then(Commands.literal("lock").executes(this::lock))
                 .executes(this::status)
                 .build();
     }
 
     @Override
     public String description() {
-        return "/pin set, change or remove your numeric PIN second factor.";
+        return "/pin set, change, remove or lock with your numeric PIN second factor.";
+    }
+
+    /**
+     * What {@code /pin lock} drives: putting the caller back behind their own keypad. The seam keeps this command
+     * clear of the join-verification controller, which is the thing that actually owns the freeze.
+     */
+    @FunctionalInterface
+    public interface SelfLock {
+
+        /** Freeze {@code viewer} and show them the keypad, as though they had just joined. */
+        void lock(Player player, PlayerRef viewer);
+    }
+
+    /**
+     * {@code /pin lock}: hand your own session back to the keypad before you step away from the keyboard. It is the
+     * cheap answer to the most ordinary way an account is taken, which is not a cracked password but an unattended
+     * client someone else sits down at. A player with no PIN has nothing to unlock with, so they are told to set one
+     * rather than frozen out of their own session.
+     */
+    private int lock(CommandContext<CommandSourceStack> ctx) {
+        Player player = requirePlayer(ctx.getSource().getSender());
+        if (player == null) {
+            return 0;
+        }
+        PlayerRef who = ref(player);
+        scheduler.async(() -> {
+            boolean set = repository
+                    .find(who.uuid())
+                    .map(TwoFactorRegistration::pinSet)
+                    .orElse(false);
+            if (!set) {
+                notify(who, SecurityMessageKey.SECURITY_PIN_LOCK_NOT_SET);
+                return;
+            }
+            scheduler.onEntity(who, () -> {
+                notify(who, SecurityMessageKey.SECURITY_PIN_LOCK_DONE);
+                selfLock.lock(player, who);
+            });
+        });
+        return Command.SINGLE_SUCCESS;
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx, MessageKey key) {
@@ -186,6 +230,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
             case TOO_SHORT -> notifyTooShort(who);
             case TOO_LONG -> notifyTooLong(who);
             case NOT_NUMERIC -> notify(who, SecurityMessageKey.SECURITY_PIN_NOT_NUMERIC);
+            case BLOCKED -> notify(who, SecurityMessageKey.SECURITY_PIN_BLOCKED);
         }
     }
 
@@ -198,6 +243,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
             case TOO_SHORT -> notifyTooShort(who);
             case TOO_LONG -> notifyTooLong(who);
             case NOT_NUMERIC -> notify(who, SecurityMessageKey.SECURITY_PIN_NOT_NUMERIC);
+            case BLOCKED -> notify(who, SecurityMessageKey.SECURITY_PIN_BLOCKED);
         }
     }
 

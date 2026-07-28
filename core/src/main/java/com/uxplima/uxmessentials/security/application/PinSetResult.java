@@ -19,5 +19,8 @@ public enum PinSetResult {
     TOO_LONG,
 
     /** The PIN contained a non-digit character. */
-    NOT_NUMERIC
+    NOT_NUMERIC,
+
+    /** The PIN is on the operator-configured blocked list: well-formed, but the first thing anybody would guess. */
+    BLOCKED
 }

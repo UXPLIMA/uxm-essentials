@@ -17,5 +17,11 @@ public enum PinValidation {
     TOO_LONG,
 
     /** The PIN contains a character that is not a digit. */
-    NOT_NUMERIC
+    NOT_NUMERIC,
+
+    /**
+     * The PIN is on the blocked list: a sequence so common that it is the first thing anybody guessing would try.
+     * Length rules cannot catch these, because {@code 1234} is a perfectly well-formed four-digit PIN.
+     */
+    BLOCKED
 }

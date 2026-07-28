@@ -25,5 +25,8 @@ public enum PinChangeResult {
     TOO_LONG,
 
     /** The replacement contained a non-digit character; the current PIN stands. */
-    NOT_NUMERIC
+    NOT_NUMERIC,
+
+    /** The replacement is on the blocked list; the current PIN stands. */
+    BLOCKED
 }

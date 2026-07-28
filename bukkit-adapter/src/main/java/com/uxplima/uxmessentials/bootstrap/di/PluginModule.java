@@ -83,8 +83,11 @@ import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
+import com.uxplima.uxmessentials.security.adapter.outbound.ModerationLockoutBan;
+import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.servertweaks.adapter.ServerTweaksWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
@@ -980,7 +983,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(ctx, persistence, resources, textInput, links, bus);
         } else if (module.id().equals(ModuleId.of("security"))) {
-            wireSecurity(plugin, ctx, persistence, resources, textInput, menus, menuBindings);
+            wireSecurity(plugin, ctx, persistence, resources, links, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
             wireCommandControl(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
@@ -1062,6 +1065,7 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
+            ContextLinks links,
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
@@ -1072,7 +1076,23 @@ public final class PluginModule {
         // through the keypad GUI (or the TOTP text prompt) before they can act, with a device-trust store and a
         // failure lockout. The transient freeze/enrolment state is cleared and every keypad closed on stop, so a
         // disable or reload leaves no residual secret and no locked player.
-        SecurityWiring.Wired wired = SecurityWiring.wire(plugin, ctx, persistence, textInput, menus, menuBindings);
+        // The lockout escalation goes through moderation's own tempban when that module is enabled, so it lands in
+        // the same ban table, history and staff broadcast as every other ban; with moderation off it binds to NONE
+        // and the lockout stays the in-memory cooldown.
+        LockoutBan lockoutBan = links.securityLockoutBan == null
+                ? LockoutBan.NONE
+                : new ModerationLockoutBan(
+                        links.securityLockoutBan,
+                        CommandFeedback.refOf(plugin.getServer().getConsoleSender()));
+        // The optional post-verify transfer reuses the one proxy channel the menu connect action already built; a
+        // hot-reload that reaches this wiring before that substrate exists builds its own over the same channel, so
+        // the transfer works either way and degrades to a logged no-op with no proxy in front.
+        ServerConnector resolvedProxy = resources.serverConnector();
+        ServerConnector proxy = resolvedProxy != null
+                ? resolvedProxy
+                : new BukkitServerConnector(plugin, ctx.kernel().log());
+        SecurityWiring.Wired wired =
+                SecurityWiring.wire(plugin, ctx, persistence, textInput, menus, menuBindings, lockoutBan, proxy);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -1659,6 +1679,9 @@ public final class PluginModule {
         // live freeze-state read (BukkitSanctions is the Sanctions adapter).
         links.staffModerationFreeze = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.ModerationFreezeSeam(
                 wired.freeze(), wired.sanctions());
+        // Captured for security (wired later): a verification lockout is issued as an ordinary tempban here rather
+        // than the security module keeping a private ban list staff cannot see or lift.
+        links.securityLockoutBan = wired.tempBan();
     }
 
     private static void wireItemworld(
@@ -2252,6 +2275,8 @@ public final class PluginModule {
                 staffModerationFreeze;
         private com.uxplima.uxmessentials.staff.adapter.StaffWiring.@org.jspecify.annotations.Nullable TeleportSeam
                 staffTeleport;
+        private com.uxplima.uxmessentials.moderation.application.@org.jspecify.annotations.Nullable TempBan
+                securityLockoutBan;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
         // Built once and shared by the scoreboard and nametags wirings (in either registry order): the nametags
