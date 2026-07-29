@@ -55,6 +55,15 @@ class IntegrationCatalogTest {
     }
 
     @Test
+    void theLoginHandoffIntegrationsAreCataloged() {
+        // The handoff probes login plugins by event class name, which no drift guard can see, so this is the
+        // only place the catalog and LoginPluginHandoff.LOGIN_EVENTS are held to the same two plugins.
+        assertThat(IntegrationCatalog.byFamily().get(IntegrationFamily.LOGIN))
+                .extracting(Integration::plugin)
+                .containsExactly("AuthMe", "nLogin");
+    }
+
+    @Test
     void aPluginWeDoNotIntegrateWithIsNotFound() {
         assertThat(IntegrationCatalog.byPlugin("GhostPlugin")).isEmpty();
         assertThat(IntegrationCatalog.byPlugin("Lands")).isPresent();

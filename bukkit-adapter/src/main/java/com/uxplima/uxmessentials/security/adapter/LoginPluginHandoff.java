@@ -20,8 +20,8 @@ import org.jspecify.annotations.Nullable;
  * Lets an offline-mode server's login plugin finish before this module asks for a second factor.
  *
  * <p>On a cracked server a connecting client has proved nothing at all: the name is whatever they typed. A login
- * plugin (AuthMe and the several forks of it) is what turns that into an account, and until it has, the player at the
- * keyboard is nobody in particular. Freezing them for a second factor before then is both wrong and useless: wrong
+ * plugin (AuthMe or nLogin) is what turns that into an account, and until it has, the player at the keyboard is
+ * nobody in particular. Freezing them for a second factor before then is both wrong and useless: wrong
  * because we would be asking an unauthenticated stranger for the account holder's PIN, and useless because the login
  * plugin has them frozen for its own prompt anyway, so the two fight over the same screen.
  *
@@ -39,14 +39,13 @@ import org.jspecify.annotations.Nullable;
 public final class LoginPluginHandoff {
 
     /**
-     * The login events worth waiting on, most-used first. All of them carry a {@code getPlayer()}, which is the only
-     * thing this class needs from them.
+     * The login events worth waiting on, most-used first: AuthMe, then nLogin. Both carry a {@code getPlayer()},
+     * which is the only thing this class needs from them. The list is deliberately short. A login plugin that is no
+     * longer maintained does not belong here, because a name in this list is a support claim an operator will read
+     * off the integrations page.
      */
-    private static final List<String> LOGIN_EVENTS = List.of(
-            "fr.xephi.authme.events.LoginEvent",
-            "com.nickuc.login.api.events.bukkit.LoginEvent",
-            "me.vagdedes.authenticator.events.PlayerLoginEvent",
-            "net.craftersland.customauth.events.AuthEvent");
+    private static final List<String> LOGIN_EVENTS =
+            List.of("fr.xephi.authme.events.LoginEvent", "com.nickuc.login.api.events.bukkit.LoginEvent");
 
     private final Plugin plugin;
     private final Logger log;

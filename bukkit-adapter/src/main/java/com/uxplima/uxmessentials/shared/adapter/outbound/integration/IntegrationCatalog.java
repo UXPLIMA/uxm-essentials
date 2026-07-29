@@ -175,6 +175,16 @@ public final class IntegrationCatalog {
                     "BedrockDetector.java",
                     "shows Bedrock players native forms instead of chest menus"),
             new Integration(
+                    "AuthMe",
+                    IntegrationFamily.LOGIN,
+                    "LoginPluginHandoff.java",
+                    "holds our security prompts until AuthMe has authenticated the player"),
+            new Integration(
+                    "nLogin",
+                    IntegrationFamily.LOGIN,
+                    "LoginPluginHandoff.java",
+                    "holds our security prompts until nLogin has authenticated the player"),
+            new Integration(
                     "Jobs",
                     IntegrationFamily.CONDITIONS,
                     "IntegrationConditions.java",

@@ -145,6 +145,17 @@ dependencies:
     floodgate:
       load: BEFORE
       required: false
+    # Login plugins back the offline-mode handoff (security.adapter LoginPluginHandoff): on a cracked server our
+    # second-factor prompt must wait until the login plugin has authenticated the player, or we would be asking an
+    # unauthenticated stranger for the account holder's PIN. The handoff resolves the login event reflectively past
+    # a present check, so a server with neither installed behaves exactly as before. Loaded before us so the event
+    # class is resolvable when we register the listener rather than after.
+    AuthMe:
+      load: BEFORE
+      required: false
+    nLogin:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with

@@ -20,6 +20,7 @@ public enum IntegrationFamily {
     MAPS("web maps"),
     VOTE("voting"),
     BEDROCK("bedrock"),
+    LOGIN("login"),
     CONDITIONS("menu conditions");
 
     private final String label;
