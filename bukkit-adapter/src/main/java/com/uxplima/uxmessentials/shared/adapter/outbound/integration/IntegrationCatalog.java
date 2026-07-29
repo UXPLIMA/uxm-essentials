@@ -225,6 +225,16 @@ public final class IntegrationCatalog {
                     "LoginPluginHandoff.java",
                     "holds our security prompts until nLogin has authenticated the player"),
             new Integration(
+                    "SuperVanish",
+                    IntegrationFamily.VANISH,
+                    "ForeignVanishStore.java",
+                    "players SuperVanish has hidden are vanished for our tab list, nametags and /msg too"),
+            new Integration(
+                    "PremiumVanish",
+                    IntegrationFamily.VANISH,
+                    "ForeignVanishStore.java",
+                    "players PremiumVanish has hidden are vanished for our tab list, nametags and /msg too"),
+            new Integration(
                     "CombatLogX",
                     IntegrationFamily.COMBAT,
                     "ForeignCombatGate.java",

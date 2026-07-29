@@ -195,6 +195,16 @@ dependencies:
     nLogin:
       load: BEFORE
       required: false
+    # SuperVanish and PremiumVanish publish the same de.myzelyam vanish API, and the overlay over our own vanish
+    # authority (vanish.adapter.outbound ForeignVanishStore) reads it so a player they have hidden is hidden from
+    # our tab list, nametags and /msg as well. Reflective past a plugin-present guard; with neither installed the
+    # plain in-memory store is bound and nothing changes.
+    SuperVanish:
+      load: BEFORE
+      required: false
+    PremiumVanish:
+      load: BEFORE
+      required: false
     # Combat plugins back the teleport combat gate (teleport.adapter.outbound ForeignCombatGate): a tagged
     # player may not /home, /tpa or /rtp out of a fight. Read reflectively past a plugin-present guard, so a
     # server with neither installed keeps the gate bound to NEVER and behaves exactly as before.

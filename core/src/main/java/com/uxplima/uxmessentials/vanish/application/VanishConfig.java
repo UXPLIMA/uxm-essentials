@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vanish.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
  * The typed, immutable view of {@code modules/vanish/config.conf}: the module enable gate plus the Phase 3 behaviour
@@ -53,6 +54,11 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param crossServer sync vanish state across backends over the bus, so a player vanished on one server arrives still
  *     vanished on another and {@code /vanish list} shows the whole network ({@code cross-server}, default {@code
  *     false}); inert unless the network bus is also enabled
+ * @param readForeignVanish treat a player hidden by SuperVanish or PremiumVanish as vanished for our tab list,
+ *     nametags, {@code /msg} and {@code /list} ({@code foreign.read-supervanish}, default {@code true}); inert when
+ *     neither plugin is installed
+ * @param foreignVanishLevel the use level a foreign-hidden player is folded in at, so the usual see-level rule decides
+ *     who still sees them ({@code foreign.level}, default {@code 1})
  */
 public record VanishConfig(
         boolean enabled,
@@ -70,7 +76,9 @@ public record VanishConfig(
         String fakeJoinMessage,
         String fakeQuitMessageStaff,
         String fakeJoinMessageStaff,
-        boolean crossServer) {
+        boolean crossServer,
+        boolean readForeignVanish,
+        int foreignVanishLevel) {
 
     private static final String DEFAULT_FAKE_QUIT = "<yellow>{player} left the game";
     private static final String DEFAULT_FAKE_JOIN = "<yellow>{player} joined the game";
@@ -101,6 +109,8 @@ public record VanishConfig(
                 config.getString("fake-join-message", DEFAULT_FAKE_JOIN),
                 config.getString("fake-quit-message-staff", ""),
                 config.getString("fake-join-message-staff", ""),
-                config.getBoolean("cross-server", false));
+                config.getBoolean("cross-server", false),
+                config.getBoolean("foreign.read-supervanish", true),
+                config.getInt("foreign.level", VanishLevel.MIN_LEVEL));
     }
 }

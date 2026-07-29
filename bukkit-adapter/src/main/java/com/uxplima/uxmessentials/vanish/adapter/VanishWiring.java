@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
+import org.bukkit.Server;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
@@ -14,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.command.VanishCommand;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLifecycleListener;
@@ -23,6 +25,7 @@ import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishBuffs;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BusVanishBus;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.ForeignVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryNetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.PdcVanishPickup;
@@ -42,6 +45,7 @@ import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishPickupPreferences;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
+import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -56,12 +60,19 @@ import org.jspecify.annotations.Nullable;
  * permissions. The store, the toggle, and the resolver are exposed on {@link Wired} so bootstrap can hand them to the
  * consumers' vanish gates (which now read the layered see level) and to staff-mode vanish. On stop the store is cleared
  * so a disable or reload leaves zero residual state.
+ *
+ * <p>When SuperVanish or PremiumVanish is running, what the consumers get is the {@link ForeignVanishStore} overlay
+ * over that same store, so a player the other plugin has hidden is hidden from our tab list and {@code /msg} too. Only
+ * the read side is overlaid: our own use cases keep the plain store and never act on somebody else's vanish.
  */
 @NullMarked
 public final class VanishWiring {
 
     /** How often the action-bar indicator is re-sent to a vanished player, chosen to outrun the vanilla bar fade. */
     private static final Duration ACTION_BAR_REFRESH = Duration.ofSeconds(1);
+
+    /** How often a foreign vanish plugin's hidden players are re-read; five ticks, well under a human's notice. */
+    private static final Duration FOREIGN_VANISH_POLL = Duration.ofMillis(250);
 
     private VanishWiring() {}
 
@@ -112,8 +123,43 @@ public final class VanishWiring {
         @Nullable AutoCloseable actionBarTask = config.actionBar()
                 ? kernel.scheduler().repeatGlobal(actionBar::refresh, ACTION_BAR_REFRESH, ACTION_BAR_REFRESH)
                 : null;
-        return new Wired(commands, listeners, store, toggleVanish, levels, network, actionBarTask);
+        Foreign foreign = foreign(config, store, plugin.getServer(), kernel);
+        return new Wired(
+                commands,
+                listeners,
+                store,
+                foreign.store(),
+                toggleVanish,
+                levels,
+                network,
+                actionBarTask,
+                foreign.poll());
     }
+
+    /**
+     * The authority the consumers read: our own store, or that store with SuperVanish's or PremiumVanish's hidden
+     * players folded in when one of them is running and the operator has left the fold on. Only the read side is
+     * overlaid — our own use cases, listeners and the action-bar indicator keep the plain store, so we never announce
+     * or act on a vanish that belongs to the other plugin.
+     *
+     * <p>The other plugin's state is re-read by a repeating global-region task rather than on every question, both
+     * because the questions come from render paths and because the online roster is only coherent on that thread
+     * under Folia.
+     */
+    private static Foreign foreign(VanishConfig config, VanishStore store, Server server, KernelPorts kernel) {
+        if (!config.readForeignVanish() || !ForeignVanishStore.present(server)) {
+            return new Foreign(store, null);
+        }
+        Logger log = kernel.log();
+        ForeignVanishStore.ForeignVanishPoll poll = new ForeignVanishStore.ForeignVanishPoll(server, log);
+        log.info("event=foreign_vanish_bound level={}", config.foreignVanishLevel());
+        return new Foreign(
+                new ForeignVanishStore(store, poll, VanishLevel.of(config.foreignVanishLevel())),
+                kernel.scheduler().repeatGlobal(poll::refresh, FOREIGN_VANISH_POLL, FOREIGN_VANISH_POLL));
+    }
+
+    /** The read-side authority and, when a foreign vanish plugin is bound, the timer keeping its reading fresh. */
+    private record Foreign(VanishStore store, @Nullable AutoCloseable poll) {}
 
     /**
      * Wire the cross-server vanish sync, or the inert shape when it is off. With {@code cross-server=true} it builds
@@ -146,47 +192,60 @@ public final class VanishWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join/quit listener to register
-     * @param store the in-memory vanish authority, exposed for the messaging/nametags gates and cleared on stop
+     * @param store the in-memory vanish authority, cleared on stop
+     * @param shared the authority the consumers' vanish gates read: {@code store}, or {@code store} with a foreign
+     *     vanish plugin's hidden players folded in
      * @param toggleVanish the vanish use case, exposed for staff-mode vanish
      * @param levels the see/use level resolver, exposed for the messaging/nametags vanish gates
      * @param network the network-wide vanish view, cleared on stop; the empty view when cross-server is off
      * @param actionBarTask the repeating action-bar refresh handle, cancelled on stop; {@code null} when the indicator
      *     is disabled and no timer was armed
+     * @param foreignVanishPoll the repeating global-region read of a foreign vanish plugin's hidden players, cancelled
+     *     on stop; {@code null} when no such plugin is bound
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             InMemoryVanishStore store,
+            VanishStore shared,
             ToggleVanish toggleVanish,
             VanishLevelResolver levels,
             NetworkVanishStore network,
-            @Nullable AutoCloseable actionBarTask) {
+            @Nullable AutoCloseable actionBarTask,
+            @Nullable AutoCloseable foreignVanishPoll) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(store, "store");
+            Objects.requireNonNull(shared, "shared");
             Objects.requireNonNull(toggleVanish, "toggleVanish");
             Objects.requireNonNull(levels, "levels");
             Objects.requireNonNull(network, "network");
         }
 
-        /** Expose the store as the shared {@link VanishStore} authority the consumers' vanish gates read. */
+        /** Expose the shared {@link VanishStore} authority the consumers' vanish gates read. */
         public VanishStore vanishStore() {
-            return store;
+            return shared;
         }
 
-        /** Drop the vanish state and cancel the action-bar timer so a disable or reload leaves no residual state. */
+        /** Drop the vanish state and cancel both timers so a disable or reload leaves no residual state. */
         public void stop() {
             store.clear();
             network.clear();
-            if (actionBarTask != null) {
-                try {
-                    actionBarTask.close();
-                } catch (Exception cancelFailed) {
-                    // The repeating-task handle's cancel does not throw; close() only declares the checked type.
-                    throw new IllegalStateException("failed to cancel the vanish action-bar task", cancelFailed);
-                }
+            cancel(actionBarTask, "action-bar");
+            cancel(foreignVanishPoll, "foreign-vanish poll");
+        }
+
+        private static void cancel(@Nullable AutoCloseable task, String what) {
+            if (task == null) {
+                return;
+            }
+            try {
+                task.close();
+            } catch (Exception cancelFailed) {
+                // The repeating-task handle's cancel does not throw; close() only declares the checked type.
+                throw new IllegalStateException("failed to cancel the vanish " + what + " task", cancelFailed);
             }
         }
     }

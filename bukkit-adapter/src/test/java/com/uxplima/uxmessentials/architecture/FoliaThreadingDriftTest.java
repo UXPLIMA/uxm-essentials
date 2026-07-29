@@ -185,6 +185,10 @@ class FoliaThreadingDriftTest {
                 pkg + "vanish.adapter.outbound.VanishConnectionMessenger",
                 "GLOBAL: fake join/quit fan-out enumerates inside scheduler.onGlobal, delivering per-viewer via the sink");
         allow.put(
+                pkg + "vanish.adapter.outbound.ForeignVanishStore",
+                "GLOBAL: the SuperVanish/PremiumVanish reading is taken by a repeatGlobal poll armed in VanishWiring, "
+                        + "and read-only: the overlay's own answers never touch the roster");
+        allow.put(
                 pkg + "scoreboard.adapter.ScoreboardWiring",
                 "GLOBAL: module stop() tear-down enumerates inside scheduler.onGlobal");
         allow.put(

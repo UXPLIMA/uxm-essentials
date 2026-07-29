@@ -55,7 +55,8 @@ class VanishCommandTest {
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     // enabled, silentChests, pickupItems, nightVision, allowFlight, noHunger, noDamage, mobTarget, fakeJoinQuit,
-    // actionBar, joinVanished, fake-quit, fake-join, fake-quit-staff, fake-join-staff, cross-server.
+    // actionBar, joinVanished, fake-quit, fake-join, fake-quit-staff, fake-join-staff, cross-server,
+    // read-foreign-vanish, foreign-vanish-level.
     private static final VanishConfig CONFIG = new VanishConfig(
             true,
             true,
@@ -72,7 +73,9 @@ class VanishCommandTest {
             "{player} joined",
             "",
             "",
-            false);
+            false,
+            true,
+            1);
 
     private ServerMock server;
     private InMemoryVanishStore store;

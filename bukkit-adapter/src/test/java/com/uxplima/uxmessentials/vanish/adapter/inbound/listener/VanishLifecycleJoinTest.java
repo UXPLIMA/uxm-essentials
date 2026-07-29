@@ -45,7 +45,24 @@ class VanishLifecycleJoinTest {
 
     private static VanishConfig config(boolean joinVanished) {
         return new VanishConfig(
-                true, true, false, true, true, true, true, true, true, true, joinVanished, "", "", "", "", false);
+                true,
+                true,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                joinVanished,
+                "",
+                "",
+                "",
+                "",
+                false,
+                true,
+                1);
     }
 
     private ServerMock server;

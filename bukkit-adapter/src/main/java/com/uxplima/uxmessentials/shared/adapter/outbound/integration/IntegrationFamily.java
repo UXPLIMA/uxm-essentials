@@ -21,6 +21,7 @@ public enum IntegrationFamily {
     VOTE("voting"),
     BEDROCK("bedrock"),
     LOGIN("login"),
+    VANISH("vanish"),
     COMBAT("combat"),
     PROTOCOL("client protocol"),
     CONDITIONS("menu conditions");

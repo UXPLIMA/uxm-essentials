@@ -119,7 +119,8 @@ class VanishAdapterTest {
                 toggleVanish,
                 new JoinVanishReconciler(NetworkVanishStore.empty(), store),
                 new com.uxplima.uxmessentials.vanish.application.VanishConfig(
-                        true, true, false, true, true, true, true, true, true, true, false, "", "", "", "", false),
+                        true, true, false, true, true, true, true, true, true, true, false, "", "", "", "", false, true,
+                        1),
                 server);
         PlayerQuitEvent quit = new PlayerQuitEvent(
                 alice, net.kyori.adventure.text.Component.text("Alice left"), PlayerQuitEvent.QuitReason.DISCONNECTED);

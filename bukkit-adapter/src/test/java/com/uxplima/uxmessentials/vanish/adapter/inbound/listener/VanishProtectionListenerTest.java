@@ -38,10 +38,10 @@ class VanishProtectionListenerTest {
     // enabled, silentChests, pickupItems, nightVision, allowFlight, noHunger, noDamage, mobTarget, then the Phase 4
     // fake-join-quit / action-bar / join-vanished toggles and the four fake-message templates (unused by this
     // listener).
-    private static final VanishConfig ALL_ON =
-            new VanishConfig(true, true, false, true, true, true, true, true, true, true, true, "", "", "", "", false);
+    private static final VanishConfig ALL_ON = new VanishConfig(
+            true, true, false, true, true, true, true, true, true, true, true, "", "", "", "", false, true, 1);
     private static final VanishConfig ALL_OFF = new VanishConfig(
-            true, false, false, false, false, false, false, false, false, false, false, "", "", "", "", false);
+            true, false, false, false, false, false, false, false, false, false, false, "", "", "", "", false, true, 1);
 
     private ServerMock server;
     private InMemoryVanishStore store;
