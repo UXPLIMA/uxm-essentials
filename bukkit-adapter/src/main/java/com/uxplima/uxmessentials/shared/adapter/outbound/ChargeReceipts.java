@@ -24,7 +24,9 @@ import org.jspecify.annotations.NullMarked;
  * economy surface uses, so it reads exactly like the figure {@code /balance} prints.
  *
  * <p>A refused charge is not reported here: the feature already answers that with its own "you cannot afford" line,
- * and nothing left the wallet to explain. A zero or negative amount is likewise silent, since no money moved.
+ * and nothing left the wallet to explain. A zero or negative amount is likewise silent, since no money moved. An
+ * operator who wants no receipts at all blanks {@code eco.charged} in the catalog: an empty sentence would otherwise
+ * reach the player as an empty chat line, so a blank one is treated as "say nothing".
  */
 @NullMarked
 public final class ChargeReceipts {
@@ -53,11 +55,11 @@ public final class ChargeReceipts {
             return;
         }
         String label = messages.resolve(who, what, Map.of());
-        sink.deliver(
-                who,
-                messages.resolve(
-                        who,
-                        EconomyMessageKey.CHARGED,
-                        Map.of("amount", MoneyFormat.withSymbol(amount), "what", label)));
+        String receipt = messages.resolve(
+                who, EconomyMessageKey.CHARGED, Map.of("amount", MoneyFormat.withSymbol(amount), "what", label));
+        if (receipt.isBlank()) {
+            return;
+        }
+        sink.deliver(who, receipt);
     }
 }

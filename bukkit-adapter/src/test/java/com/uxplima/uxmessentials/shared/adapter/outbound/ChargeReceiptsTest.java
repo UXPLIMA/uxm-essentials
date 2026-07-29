@@ -44,6 +44,16 @@ class ChargeReceiptsTest {
     }
 
     @Test
+    void blankingTheSentenceInTheCatalogTurnsReceiptsOff() {
+        // Without this, an operator who empties the line gets an empty chat line per charge instead of silence.
+        ChargeReceipts silenced = new ChargeReceipts(new BlankMessages(), sink);
+
+        silenced.charged(PAYER, Money.of(currency(), new BigDecimal("50")), EconomyMessageKey.CHARGE_WARP);
+
+        assertThat(sink.delivered).isEmpty();
+    }
+
+    @Test
     void aChargeOfNothingSaysNothing() {
         // A free warp, a waived kit price, a zero fee: no money moved, so there is no receipt to write.
         receipts.charged(PAYER, Money.of(currency(), BigDecimal.ZERO), EconomyMessageKey.CHARGE_WARP);
@@ -74,6 +84,14 @@ class ChargeReceiptsTest {
                 template = template.replace("{" + placeholder.getKey() + "}", placeholder.getValue());
             }
             return template;
+        }
+    }
+
+    /** A catalog whose receipt sentence has been emptied by the operator. */
+    private static final class BlankMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return "eco.charged".equals(key.key()) ? "" : key.key();
         }
     }
 
