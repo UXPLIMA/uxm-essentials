@@ -1,0 +1,71 @@
+name: Release
+
+# A tag is the release. Pushing v0.5.1 builds that commit and publishes the four
+# jars under it, so what people download is exactly what the tag points at.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and publish (e.g. v0.5.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out uxmEssentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          path: uxmEssentials
+
+      # settings.gradle.kts builds against a sibling ../uxmLib checkout as a composite
+      # build, so the library is compiled from source here rather than pulled from a
+      # publish step that would have to happen first.
+      - name: Check out uxmLib
+        uses: actions/checkout@v4
+        with:
+          repository: UXPLIMA/uxmLib
+          path: uxmLib
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify
+        working-directory: uxmEssentials
+        run: ./gradlew check
+
+      - name: Build the release jars
+        working-directory: uxmEssentials
+        run: >-
+          ./gradlew
+          :bukkit-adapter:shadowJar
+          :velocity-adapter:shadowJar
+          :discord-adapter:shadowJar
+          :redis-adapter:shadowJar
+
+      - name: Publish the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: ${{ inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            uxmEssentials/bukkit-adapter/build/libs/uxmEssentials-*.jar
+            uxmEssentials/velocity-adapter/build/libs/uxmEssentials-velocity-*.jar
+            uxmEssentials/discord-adapter/build/libs/uxmEssentials-discord-*.jar
+            uxmEssentials/redis-adapter/build/libs/uxmEssentials-redis-*.jar
