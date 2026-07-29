@@ -2,11 +2,15 @@ package com.uxplima.uxmessentials.economy.adapter.outbound;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.outbound.AbstractProviderEconomy;
+import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
@@ -29,8 +33,9 @@ public final class ProviderTradeEconomy extends AbstractProviderEconomy implemen
 
     private final Logger logger;
 
-    public ProviderTradeEconomy(EconomyProvider economy, Currency defaultCurrency, Logger logger) {
-        super(economy, defaultCurrency);
+    public ProviderTradeEconomy(
+            EconomyProvider economy, Currency defaultCurrency, Logger logger, Optional<ChargeReceipts> receipts) {
+        super(economy, defaultCurrency, receipts);
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 
@@ -55,5 +60,10 @@ public final class ProviderTradeEconomy extends AbstractProviderEconomy implemen
                     target.id().value(),
                     who.name());
         }
+    }
+
+    @Override
+    protected MessageKey chargeLabel() {
+        return EconomyMessageKey.CHARGE_TRADE;
     }
 }

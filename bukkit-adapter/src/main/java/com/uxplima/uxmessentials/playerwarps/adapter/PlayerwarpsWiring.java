@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.Playerwarp
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitCrossServerTeleport;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitRatingRewardGranter;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.ReceiptedPlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RentSweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.SponsorExpirySweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
@@ -88,6 +89,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
@@ -617,13 +619,17 @@ public final class PlayerwarpsWiring {
         }
         BigDecimal cutPercent = BigDecimal.valueOf(rawCutPercent);
         boolean autoPayout = ctx.config().getBoolean("payout.auto-payout", false);
-        return Optional.of(new JooqPlayerWarpEconomy(
+        // Wrapped so every charge it makes reports itself: the entry fee rides along with a teleport, the
+        // sponsorship fee with a purchase, and rent arrives on a timer while the owner is doing something else.
+        PlayerWarpEconomy economy = new JooqPlayerWarpEconomy(
                 persistence,
                 economyProvider,
                 economyCurrencies,
                 economyBackends,
                 new JooqPlayerWarpEconomy.PayoutConfig(cutPercent, autoPayout),
-                kernel.log()));
+                kernel.log());
+        return Optional.of(new ReceiptedPlayerWarpEconomy(
+                economy, economyCurrencies, new ChargeReceipts(kernel.messages(), kernel.messageSink())));
     }
 
     /**

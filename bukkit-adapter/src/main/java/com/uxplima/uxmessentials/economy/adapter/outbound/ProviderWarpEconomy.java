@@ -1,8 +1,13 @@
 package com.uxplima.uxmessentials.economy.adapter.outbound;
 
+import java.util.Optional;
+
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.shared.adapter.outbound.AbstractProviderEconomy;
+import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import org.jspecify.annotations.NullMarked;
 
@@ -17,7 +22,12 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ProviderWarpEconomy extends AbstractProviderEconomy implements WarpEconomy {
 
-    public ProviderWarpEconomy(EconomyProvider economy, Currency currency) {
-        super(economy, currency);
+    public ProviderWarpEconomy(EconomyProvider economy, Currency currency, Optional<ChargeReceipts> receipts) {
+        super(economy, currency, receipts);
+    }
+
+    @Override
+    protected MessageKey chargeLabel() {
+        return EconomyMessageKey.CHARGE_WARP;
     }
 }

@@ -2,12 +2,16 @@ package com.uxplima.uxmessentials.economy.adapter.outbound;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.AbstractProviderEconomy;
+import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -22,8 +26,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ProviderKitEconomy extends AbstractProviderEconomy implements KitEconomy {
 
-    public ProviderKitEconomy(EconomyProvider economy, Currency currency) {
-        super(economy, currency);
+    public ProviderKitEconomy(EconomyProvider economy, Currency currency, Optional<ChargeReceipts> receipts) {
+        super(economy, currency, receipts);
     }
 
     @Override
@@ -32,5 +36,10 @@ public final class ProviderKitEconomy extends AbstractProviderEconomy implements
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
         return economy().credit(who, Money.of(target, amount)).isOk();
+    }
+
+    @Override
+    protected MessageKey chargeLabel() {
+        return EconomyMessageKey.CHARGE_KIT;
     }
 }

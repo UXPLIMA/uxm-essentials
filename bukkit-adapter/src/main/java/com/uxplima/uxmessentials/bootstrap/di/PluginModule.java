@@ -1126,7 +1126,7 @@ public final class PluginModule {
         var provider = links.economyProvider;
         var currency = links.economyCurrency;
         @org.jspecify.annotations.Nullable TradeEconomy economy = provider != null && currency != null
-                ? new ProviderTradeEconomy(provider, currency, ctx.kernel().log())
+                ? new ProviderTradeEconomy(provider, currency, ctx.kernel().log(), receipts(ctx))
                 : null;
         TradeWiring.Wired wired = TradeWiring.wire(ctx, textInput, economy, persistence, bus);
         wired.commands().forEach(resources::addCommand);
@@ -1152,7 +1152,7 @@ public final class PluginModule {
         var provider = links.economyProvider;
         var currency = links.economyCurrency;
         Optional<RankEconomy> economy = provider != null && currency != null
-                ? Optional.of(new ProviderRankEconomy(provider, currency))
+                ? Optional.of(new ProviderRankEconomy(provider, currency, receipts(ctx)))
                 : Optional.empty();
         RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
@@ -1267,7 +1267,8 @@ public final class PluginModule {
                 () -> links.economyProvider,
                 () -> links.economyCurrency,
                 ctx.kernel().scheduler(),
-                ctx.kernel().log());
+                ctx.kernel().log(),
+                receipts(ctx));
         TeleportWiring.Wired wired = TeleportWiring.wire(
                 plugin, ctx, persistence, guiLayouts, guiRegistry, menus, menuBindings, fee, claimProviders);
         wired.commands().forEach(resources::addCommand);
@@ -2284,6 +2285,17 @@ public final class PluginModule {
         // after every board switch through it. Inert until a nametags hide call marks a player, so it costs nothing
         // when either module is off.
         private final NameVisibilityCoordinator nameVisibility = new NameVisibilityCoordinator();
+    }
+
+    /**
+     * The charge receipt the economy seams wired here report through. Each of them debits as a side effect of
+     * something else the player asked for, so without it the money leaves with no word for it and only a balance
+     * nobody was watching records that it happened.
+     */
+    private static Optional<com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts> receipts(
+            ModuleContext ctx) {
+        return Optional.of(new com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts(
+                ctx.kernel().messages(), ctx.kernel().messageSink()));
     }
 
     private static boolean skippedByCapability(FeatureModule module, ModuleContext ctx, Logger log) {

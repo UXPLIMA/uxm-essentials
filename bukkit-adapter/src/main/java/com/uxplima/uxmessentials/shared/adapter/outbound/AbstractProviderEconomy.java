@@ -2,10 +2,12 @@ package com.uxplima.uxmessentials.shared.adapter.outbound;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -30,10 +32,16 @@ public abstract class AbstractProviderEconomy {
 
     private final EconomyProvider economy;
     private final Currency currency;
+    private final Optional<ChargeReceipts> receipts;
 
     protected AbstractProviderEconomy(EconomyProvider economy, Currency currency) {
+        this(economy, currency, Optional.empty());
+    }
+
+    protected AbstractProviderEconomy(EconomyProvider economy, Currency currency, Optional<ChargeReceipts> receipts) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.currency = Objects.requireNonNull(currency, "currency");
+        this.receipts = Objects.requireNonNull(receipts, "receipts");
     }
 
     /** True when {@code who} can afford {@code amount} in the resolved currency (a read, no money moves). */
@@ -44,13 +52,29 @@ public abstract class AbstractProviderEconomy {
         return !economy.balance(who, target).isLessThan(Money.of(target, amount));
     }
 
-    /** Guarded single-sided debit; {@code true} means the funds sufficed and the money left exactly once. */
+    /**
+     * Guarded single-sided debit; {@code true} means the funds sufficed and the money left exactly once. A debit that
+     * takes is reported to the payer through {@link ChargeReceipts}: the feature's own success line says nothing
+     * about the money, so without the receipt the charge is invisible until someone checks their balance.
+     */
     public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
-        return economy.debit(who, Money.of(target, amount)).isOk();
+        Money charge = Money.of(target, amount);
+        if (economy.debit(who, charge).isErr()) {
+            return false;
+        }
+        receipts.ifPresent(receipt -> receipt.charged(who, charge, chargeLabel()));
+        return true;
     }
+
+    /**
+     * The catalog label naming what this seam's charges are for, slotted into the receipt as {@code {what}}. Each
+     * subclass answers for its own feature ("a warp", "a kit"), which is what keeps the receipt sentence itself a
+     * single shared catalog entry.
+     */
+    protected abstract MessageKey chargeLabel();
 
     /** The resolved provider, for a subclass seam that credits or transfers on top of the shared charge logic. */
     protected EconomyProvider economy() {

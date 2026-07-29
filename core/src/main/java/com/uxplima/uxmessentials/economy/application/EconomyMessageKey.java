@@ -114,6 +114,19 @@ public enum EconomyMessageKey implements MessageKey {
     COMMAND_COST_CHARGED("eco.command-cost.charged"),
     COMMAND_COST_INSUFFICIENT("eco.command-cost.insufficient"),
 
+    // The charge receipt every feature that takes money as a side effect emits: the sentence, then one label
+    // per feature naming what the money went to, so the line reads "Paid 50 coins for a warp".
+    CHARGED("eco.charged"),
+    CHARGE_WARP("eco.charge.warp"),
+    CHARGE_KIT("eco.charge.kit"),
+    CHARGE_HOME("eco.charge.home"),
+    CHARGE_RANK("eco.charge.rank"),
+    CHARGE_TRADE("eco.charge.trade"),
+    CHARGE_ACTION("eco.charge.action"),
+    CHARGE_TELEPORT("eco.charge.teleport"),
+    CHARGE_VAULT("eco.charge.vault"),
+    CHARGE_PLAYERWARP("eco.charge.playerwarp"),
+
     // Banknotes
     BANKNOTE_WITHDRAWN("eco.banknote.withdrawn"),
     BANKNOTE_DEPOSITED("eco.banknote.deposited"),

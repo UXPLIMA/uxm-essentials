@@ -2,11 +2,14 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -35,16 +38,19 @@ public final class LinkedTeleportFee implements TeleportFee {
     private final Supplier<@Nullable Currency> currency;
     private final Scheduler scheduler;
     private final Logger log;
+    private final Optional<ChargeReceipts> receipts;
 
     public LinkedTeleportFee(
             Supplier<@Nullable EconomyProvider> provider,
             Supplier<@Nullable Currency> currency,
             Scheduler scheduler,
-            Logger log) {
+            Logger log,
+            Optional<ChargeReceipts> receipts) {
         this.provider = Objects.requireNonNull(provider, "provider");
         this.currency = Objects.requireNonNull(currency, "currency");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.receipts = Objects.requireNonNull(receipts, "receipts");
     }
 
     @Override
@@ -72,8 +78,13 @@ public final class LinkedTeleportFee implements TeleportFee {
     }
 
     private void debit(EconomyProvider live, Currency unit, PlayerRef who, BigDecimal amount) {
-        if (live.debit(who, Money.of(unit, amount)).isErr()) {
+        Money charge = Money.of(unit, amount);
+        if (live.debit(who, charge).isErr()) {
             log.warn("rtp charge of {} failed for {} after landing", amount.toPlainString(), who.name());
+            return;
         }
+        // The fee is taken after the teleport has landed, when the player is looking at the new place and not at
+        // their balance, so the receipt is the only thing that connects the two.
+        receipts.ifPresent(receipt -> receipt.charged(who, charge, EconomyMessageKey.CHARGE_TELEPORT));
     }
 }

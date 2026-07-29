@@ -300,11 +300,16 @@ public final class EconomyWiring {
         }
         List<CommandRegistration> commands =
                 EconomyCommands.all(plugin, settings, services, kernel.messages(), adminGui);
-        WarpEconomy warpEconomy = new ProviderWarpEconomy(resolved, currencies.defaultCurrency());
-        KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
-        HomeEconomy homeEconomy = new ProviderHomeEconomy(resolved, currencies.defaultCurrency());
-        VaultEconomy vaultEconomy = new ProviderVaultEconomy(resolved, currencies.defaultCurrency());
-        ClickActionEconomy npcEconomy = new ProviderNpcEconomy(resolved, currencies.defaultCurrency());
+        // Every seam below charges as a side effect of something else the player asked for, so each one reports
+        // what it took: a silent debit is indistinguishable from money going missing.
+        Optional<com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts> receipts =
+                Optional.of(new com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts(
+                        kernel.messages(), kernel.messageSink()));
+        WarpEconomy warpEconomy = new ProviderWarpEconomy(resolved, currencies.defaultCurrency(), receipts);
+        KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency(), receipts);
+        HomeEconomy homeEconomy = new ProviderHomeEconomy(resolved, currencies.defaultCurrency(), receipts);
+        VaultEconomy vaultEconomy = new ProviderVaultEconomy(resolved, currencies.defaultCurrency(), receipts);
+        ClickActionEconomy npcEconomy = new ProviderNpcEconomy(resolved, currencies.defaultCurrency(), receipts);
 
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(

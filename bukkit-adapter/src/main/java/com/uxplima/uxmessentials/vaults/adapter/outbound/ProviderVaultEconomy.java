@@ -2,10 +2,13 @@ package com.uxplima.uxmessentials.vaults.adapter.outbound;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import org.jspecify.annotations.NullMarked;
@@ -29,10 +32,12 @@ public final class ProviderVaultEconomy implements VaultEconomy {
 
     private final EconomyProvider economy;
     private final Currency currency;
+    private final Optional<ChargeReceipts> receipts;
 
-    public ProviderVaultEconomy(EconomyProvider economy, Currency currency) {
+    public ProviderVaultEconomy(EconomyProvider economy, Currency currency, Optional<ChargeReceipts> receipts) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.currency = Objects.requireNonNull(currency, "currency");
+        this.receipts = Objects.requireNonNull(receipts, "receipts");
     }
 
     @Override
@@ -49,7 +54,12 @@ public final class ProviderVaultEconomy implements VaultEconomy {
         // The guarded debit is itself the gate: it rejects rather than going negative, so its result reports
         // whether the funds sufficed. VaultCharge trusts this result instead of a preceding canAfford, which
         // closes the check-then-charge double-spend window.
-        return economy.debit(who, Money.of(currency, amount)).isOk();
+        Money charge = Money.of(currency, amount);
+        if (economy.debit(who, charge).isErr()) {
+            return false;
+        }
+        receipts.ifPresent(receipt -> receipt.charged(who, charge, EconomyMessageKey.CHARGE_VAULT));
+        return true;
     }
 
     @Override

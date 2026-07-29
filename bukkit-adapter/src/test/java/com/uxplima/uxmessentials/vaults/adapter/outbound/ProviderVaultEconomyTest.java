@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -36,7 +37,7 @@ class ProviderVaultEconomyTest {
     @Test
     void canAffordReadsTheBalanceAgainstTheFee() {
         FakeProvider provider = new FakeProvider(new BigDecimal("100"));
-        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
+        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS, Optional.empty());
 
         assertThat(economy.canAfford(WHO, new BigDecimal("40"))).isTrue();
         assertThat(economy.canAfford(WHO, new BigDecimal("100"))).isTrue();
@@ -46,7 +47,7 @@ class ProviderVaultEconomyTest {
     @Test
     void withdrawDebitsTheFeeInTheConfiguredCurrencyAndReportsSuccess() {
         FakeProvider provider = new FakeProvider(new BigDecimal("100"));
-        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
+        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS, Optional.empty());
 
         boolean ok = economy.withdraw(WHO, new BigDecimal("25"));
 
@@ -59,7 +60,7 @@ class ProviderVaultEconomyTest {
     void withdrawReportsFalseWhenTheGuardedDebitIsRejected() {
         FakeProvider provider = new FakeProvider(new BigDecimal("100"));
         provider.debitResult = Result.err(TransferError.INSUFFICIENT_FUNDS);
-        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
+        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS, Optional.empty());
 
         boolean ok = economy.withdraw(WHO, new BigDecimal("25"));
 
@@ -70,7 +71,7 @@ class ProviderVaultEconomyTest {
     @Test
     void depositCreditsTheRefundInTheConfiguredCurrencyAndReportsSuccess() {
         FakeProvider provider = new FakeProvider(new BigDecimal("100"));
-        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
+        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS, Optional.empty());
 
         boolean ok = economy.deposit(WHO, new BigDecimal("10"));
 
@@ -83,7 +84,7 @@ class ProviderVaultEconomyTest {
     void depositReportsFalseWhenTheCreditIsRejected() {
         FakeProvider provider = new FakeProvider(new BigDecimal("100"));
         provider.creditResult = Result.err(TransferError.BALANCE_MAX_EXCEEDED);
-        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
+        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS, Optional.empty());
 
         boolean ok = economy.deposit(WHO, new BigDecimal("10"));
 
