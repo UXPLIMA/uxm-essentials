@@ -148,7 +148,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEv
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.NbtApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
@@ -284,7 +283,6 @@ public final class PluginModule {
                         new PlaceholderApiHook(),
                         new VaultEconomyHook(),
                         new VaultPermissionHook(),
-                        new NbtApiHook(kernel.log()),
                         new HeadDatabaseHook(kernel.log())));
         resources.hooks(hooks);
 
