@@ -24,6 +24,8 @@ import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
+import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -40,6 +42,7 @@ public final class DryRunRecordWriter implements RecordWriter {
     private final ModerationRepository moderation;
     private final KitRepository kits;
     private final HologramRepository holograms;
+    private final WorldRepository worlds;
     private final PlayerWarpRecordWriter playerWarps;
     private final Clock clock;
 
@@ -48,12 +51,14 @@ public final class DryRunRecordWriter implements RecordWriter {
             ModerationRepository moderation,
             KitRepository kits,
             HologramRepository holograms,
+            WorldRepository worlds,
             PlayerWarpRecordWriter playerWarps,
             Clock clock) {
         this.warps = Objects.requireNonNull(warps, "warps");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
         this.holograms = Objects.requireNonNull(holograms, "holograms");
+        this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -73,7 +78,17 @@ public final class DryRunRecordWriter implements RecordWriter {
             case ImportRecord.WarnRecord warn -> warnOutcome(warn.target(), warn.warn());
             case ImportRecord.HologramRecord hologram ->
                 hologramOutcome(hologram.hologram().hologram().name(), options);
+            case ImportRecord.WorldRecord world ->
+                worldOutcome(world.world().world().name(), options);
         };
+    }
+
+    private RecordOutcome worldOutcome(WorldName name, ImportOptions options) {
+        boolean existed = worlds.exists(name);
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
     }
 
     private RecordOutcome hologramOutcome(HologramName name, ImportOptions options) {

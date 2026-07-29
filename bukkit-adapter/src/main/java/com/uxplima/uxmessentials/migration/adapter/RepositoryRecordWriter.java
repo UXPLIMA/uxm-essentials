@@ -41,6 +41,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
+import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -61,6 +63,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
     private final ModerationRepository moderation;
     private final KitRepository kits;
     private final HologramRepository holograms;
+    private final WorldRepository worlds;
     private final PlayerWarpRecordWriter playerWarps;
     private final Currency defaultCurrency;
     private final Clock clock;
@@ -72,6 +75,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
             ModerationRepository moderation,
             KitRepository kits,
             HologramRepository holograms,
+            WorldRepository worlds,
             PlayerWarpRecordWriter playerWarps,
             Currency defaultCurrency,
             Clock clock) {
@@ -81,6 +85,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
         this.holograms = Objects.requireNonNull(holograms, "holograms");
+        this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -101,7 +106,17 @@ public final class RepositoryRecordWriter implements RecordWriter {
             case ImportRecord.WarnRecord warn -> writeWarn(warn);
             case ImportRecord.HologramRecord hologram ->
                 writeHologram(hologram.hologram().hologram(), options);
+            case ImportRecord.WorldRecord world -> writeWorld(world.world().world(), options);
         };
+    }
+
+    private RecordOutcome writeWorld(ManagedWorld world, ImportOptions options) {
+        boolean existed = worlds.exists(world.name());
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        worlds.save(world);
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
     }
 
     private RecordOutcome writeHologram(Hologram hologram, ImportOptions options) {

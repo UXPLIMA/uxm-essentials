@@ -11,7 +11,15 @@ public final class SpawnCodec {
     private SpawnCodec() {}
 
     public static String encode(Position p) {
-        return p.x() + ";" + p.y() + ";" + p.z() + ";" + p.yaw() + ";" + p.pitch();
+        return encode(p.x(), p.y(), p.z(), p.yaw(), p.pitch());
+    }
+
+    /**
+     * Encodes the five components on their own, for a caller that has coordinates but no world identity to build a
+     * {@link Position} from — the world-import path, where the world's uid is not known until it is first loaded.
+     */
+    public static String encode(double x, double y, double z, float yaw, float pitch) {
+        return x + ";" + y + ";" + z + ";" + yaw + ";" + pitch;
     }
 
     /** Parses the 5 numeric components {x,y,z,yaw,pitch} from an encoded spawn string (world-agnostic). */

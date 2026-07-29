@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedPlayerWarp;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedWarp;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedWorld;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
@@ -17,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * One mapped record streamed out of a source's {@link com.uxplima.uxmessentials.migration.convert.Convert#plan
  * plan}, ready for the writer. A sealed family over the importable kinds (user, warp, kit, moderation, ban,
- * IP ban, warning) so the writer and the dry-run accumulator dispatch exhaustively with no default branch —
+ * IP ban, warning, hologram, world) so the writer and the dry-run accumulator dispatch exhaustively with no default branch —
  * adding a kind is a compile error until every site handles it. Every kind carries an already-mapped domain
  * aggregate; the record itself is platform-neutral and free of any foreign-format type. Mutes and jails ride
  * in {@link ModerationRecord}; bans, IP bans and warnings are their own kinds carrying the moderation
@@ -117,6 +118,18 @@ public sealed interface ImportRecord {
         @Override
         public String kind() {
             return "warn";
+        }
+    }
+
+    /** A mapped world registry entry, keyed by its folder name. */
+    record WorldRecord(ImportedWorld world) implements ImportRecord {
+        public WorldRecord {
+            Objects.requireNonNull(world, "world");
+        }
+
+        @Override
+        public String kind() {
+            return "world";
         }
     }
 

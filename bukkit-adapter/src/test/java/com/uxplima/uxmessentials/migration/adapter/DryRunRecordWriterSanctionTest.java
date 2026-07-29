@@ -96,6 +96,7 @@ class DryRunRecordWriterSanctionTest {
                 moderation,
                 mock(KitRepository.class),
                 mock(com.uxplima.uxmessentials.holograms.application.port.HologramRepository.class),
+                mock(com.uxplima.uxmessentials.worlds.application.port.WorldRepository.class),
                 mock(com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }

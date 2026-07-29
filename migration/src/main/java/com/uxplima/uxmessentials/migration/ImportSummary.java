@@ -28,6 +28,7 @@ public final class ImportSummary {
     private final LongAdder ipBans = new LongAdder();
     private final LongAdder warns = new LongAdder();
     private final LongAdder holograms = new LongAdder();
+    private final LongAdder worlds = new LongAdder();
     private final LongAdder skipped = new LongAdder();
     private final LongAdder failed = new LongAdder();
 
@@ -57,6 +58,7 @@ public final class ImportSummary {
             case ImportRecord.IpBanRecord ignored -> ipBans.increment();
             case ImportRecord.WarnRecord ignored -> warns.increment();
             case ImportRecord.HologramRecord ignored -> holograms.increment();
+            case ImportRecord.WorldRecord ignored -> worlds.increment();
         }
     }
 
@@ -119,6 +121,10 @@ public final class ImportSummary {
         return holograms.sum();
     }
 
+    public long worlds() {
+        return worlds.sum();
+    }
+
     public long skipped() {
         return skipped.sum();
     }
@@ -132,7 +138,16 @@ public final class ImportSummary {
      * once here (it is one record) even though it feeds two of the finish line's counters.
      */
     public long total() {
-        return users() + warps() + playerWarps() + kits() + moderation() + bans() + ipBans() + warns() + holograms();
+        return users()
+                + warps()
+                + playerWarps()
+                + kits()
+                + moderation()
+                + bans()
+                + ipBans()
+                + warns()
+                + holograms()
+                + worlds();
     }
 
     private long moderation() {
@@ -147,6 +162,7 @@ public final class ImportSummary {
         return "source=" + source + " dry_run=" + dryRun() + " users=" + users() + " warps=" + warps()
                 + " player_warps=" + playerWarps() + " kits=" + kits() + " jails=" + jails() + " mutes=" + mutes()
                 + " bans=" + bans() + " ip_bans=" + ipBans() + " warns=" + warns() + " holograms=" + holograms()
-                + " skipped=" + skipped() + " failed=" + failed() + " duration_ms=" + elapsed.toMillis();
+                + " worlds=" + worlds() + " skipped=" + skipped() + " failed=" + failed() + " duration_ms="
+                + elapsed.toMillis();
     }
 }

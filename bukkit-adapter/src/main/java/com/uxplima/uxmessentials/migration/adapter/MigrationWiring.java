@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.migration.convert.fancyholograms.FancyHolograms
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
+import com.uxplima.uxmessentials.migration.convert.multiverse.MultiverseConvert;
 import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsConfig;
 import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsConvert;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -50,11 +51,13 @@ import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
+import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import org.jspecify.annotations.NullMarked;
 import org.slf4j.LoggerFactory;
 
@@ -130,6 +133,7 @@ public final class MigrationWiring {
         built.add(new AxPlayerWarpsConvert(axPlayerWarpsConfig(plugin, migrationConfig), worlds, log));
         built.add(new AthelionPlayerWarpsConvert(worlds, athelionDataFile(plugin, migrationConfig), log));
         built.add(new OlziePlayerWarpsConvert(olziePlayerWarpsConfig(plugin, migrationConfig), worlds, log));
+        built.add(new MultiverseConvert(multiverseWorldsFile(plugin), Clock.systemUTC(), log));
         return new SourceRegistry(built);
     }
 
@@ -168,6 +172,11 @@ public final class MigrationWiring {
         return pluginsDirectory(plugin).resolve("DecentHolograms").resolve("holograms");
     }
 
+    /** The {@code plugins/Multiverse-Core/worlds.yml} file the Multiverse source reads the world registry from. */
+    private static Path multiverseWorldsFile(Plugin plugin) {
+        return pluginsDirectory(plugin).resolve("Multiverse-Core").resolve("worlds.yml");
+    }
+
     /** The {@code plugins/FancyHolograms/holograms.yml} file the FancyHolograms source reads its holograms from. */
     private static Path fancyHologramsFile(Plugin plugin) {
         return pluginsDirectory(plugin).resolve("FancyHolograms").resolve("holograms.yml");
@@ -197,14 +206,16 @@ public final class MigrationWiring {
         ModerationRepository moderation = ModerationStores.repository(persistence);
         KitRepository kits = kitRepository(plugin, log);
         HologramRepository holograms = HologramRepositories.cached(persistence);
+        WorldRepository worldRegistry = WorldRepositories.cached(persistence);
         CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
         Currency defaultCurrency = currencies.defaultCurrency();
         Clock clock = Clock.systemUTC();
         WalletRepository wallets = WalletRepositories.repository(persistence, currencies, clock);
         PlayerWarpRecordWriter playerWarps = playerWarpWriter(persistence, clock, log);
         RecordWriter live = new RepositoryRecordWriter(
-                homes, warps, wallets, moderation, kits, holograms, playerWarps, defaultCurrency, clock);
-        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits, holograms, playerWarps, clock);
+                homes, warps, wallets, moderation, kits, holograms, worldRegistry, playerWarps, defaultCurrency, clock);
+        RecordWriter dryRun =
+                new DryRunRecordWriter(warps, moderation, kits, holograms, worldRegistry, playerWarps, clock);
         return new Writers(live, dryRun);
     }
 

@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXMappin
 import com.uxplima.uxmessentials.migration.convert.fancyholograms.FancyHologramsMappings;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansMappings;
 import com.uxplima.uxmessentials.migration.convert.live.LiveSourceMappings;
+import com.uxplima.uxmessentials.migration.convert.multiverse.MultiverseMappings;
 import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsMappings;
 import org.jspecify.annotations.NullMarked;
 
@@ -39,7 +40,8 @@ public final class SupportedMappings {
             Map.entry(SourceId.of("fancyholograms"), FancyHologramsMappings.rows()),
             Map.entry(SourceId.of("axplayerwarps"), AxPlayerWarpsMappings.rows()),
             Map.entry(SourceId.of("athelionplayerwarps"), AthelionPlayerWarpsMappings.rows()),
-            Map.entry(SourceId.of("olzieplayerwarps"), OlziePlayerWarpsMappings.rows()));
+            Map.entry(SourceId.of("olzieplayerwarps"), OlziePlayerWarpsMappings.rows()),
+            Map.entry(SourceId.of("multiverse"), MultiverseMappings.rows()));
 
     private SupportedMappings() {}
 

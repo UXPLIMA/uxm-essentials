@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.BalanceFeed;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
+import com.uxplima.uxmessentials.migration.convert.multiverse.MultiverseConvert;
 import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsConfig;
 import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsConvert;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -29,8 +30,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The source-registry drift guard (docs/12-migration §8.3). It keeps the multi-source machinery honest:
  * the built sources are EssentialsX, the live economy sources Vault and PlayerPoints, LiteBans, the two
- * hologram sources DecentHolograms and FancyHolograms, and the three player-warp sources AxPlayerWarps, Athelion
- * PlayerWarps and Olzie PlayerWarps; the remaining planned sources have a reserved id but
+ * hologram sources DecentHolograms and FancyHolograms, the three player-warp sources AxPlayerWarps, Athelion
+ * PlayerWarps and Olzie PlayerWarps, and the world source Multiverse-Core; the remaining planned sources have a reserved id but
  * no registry entry (planned ≠ stubbed, §1.2). The registry keys, the per-source mapping tables, and the
  * built-source roster stay in lock-step — a {@code Convert} impl with no mapping table, or a planned id that
  * tab-completes, fails here.
@@ -62,7 +63,9 @@ class MigrationSourceRegistryDriftTest {
             new OlziePlayerWarpsConvert(
                     new OlziePlayerWarpsConfig(Optional.empty(), "", "", Optional.empty()),
                     name -> Optional.empty(),
-                    noOpLogger())));
+                    noOpLogger()),
+            new MultiverseConvert(
+                    Path.of("Multiverse-Core", "worlds.yml"), java.time.Clock.systemUTC(), noOpLogger())));
 
     private static Logger noOpLogger() {
         return new Logger() {
@@ -95,7 +98,7 @@ class MigrationSourceRegistryDriftTest {
     }
 
     @Test
-    void theBuiltSourcesAreEssentialsxVaultPlayerpointsLitebansTheHologramSourcesAndThePlayerWarpSourcesAndResolve() {
+    void theBuiltSourcesAreEssentialsxVaultPlayerpointsLitebansTheHologramPlayerWarpAndWorldSourcesAndResolve() {
         assertThat(registry.builtIds())
                 .containsExactlyInAnyOrder(
                         SourceId.of("essentialsx"),
@@ -106,7 +109,8 @@ class MigrationSourceRegistryDriftTest {
                         SourceId.of("fancyholograms"),
                         SourceId.of("axplayerwarps"),
                         SourceId.of("athelionplayerwarps"),
-                        SourceId.of("olzieplayerwarps"));
+                        SourceId.of("olzieplayerwarps"),
+                        SourceId.of("multiverse"));
         assertThat(registry.resolve(SourceId.of("essentialsx")))
                 .map(Convert::id)
                 .contains(SourceId.of("essentialsx"));
@@ -126,6 +130,7 @@ class MigrationSourceRegistryDriftTest {
         assertThat(registry.resolve(SourceId.of("olzieplayerwarps")))
                 .map(Convert::id)
                 .contains(SourceId.of("olzieplayerwarps"));
+        assertThat(registry.resolve(SourceId.of("multiverse"))).map(Convert::id).contains(SourceId.of("multiverse"));
     }
 
     @Test
