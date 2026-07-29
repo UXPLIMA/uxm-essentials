@@ -130,6 +130,11 @@ public final class IntegrationCatalog {
                     "KingdomsClaimProvider.java",
                     "KingdomsX land gates homes and warps"),
             new Integration(
+                    "HuskClaims",
+                    IntegrationFamily.CLAIMS,
+                    "HuskClaimsClaimProvider.java",
+                    "HuskClaims claims gate homes and warps"),
+            new Integration(
                     "BentoBox",
                     IntegrationFamily.CLAIMS,
                     "BentoBoxClaimProvider.java",

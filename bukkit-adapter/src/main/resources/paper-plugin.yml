@@ -87,6 +87,9 @@ dependencies:
     Kingdoms:
       load: BEFORE
       required: false
+    HuskClaims:
+      load: BEFORE
+      required: false
     BentoBox:
       load: BEFORE
       required: false
