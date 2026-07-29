@@ -148,9 +148,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEv
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.NbtApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PlaceholderApiHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
@@ -280,12 +278,7 @@ public final class PluginModule {
         Hooks hooks = Hooks.resolve(
                 plugin.getServer(),
                 kernel.log(),
-                List.of(
-                        new PlaceholderApiHook(),
-                        new VaultEconomyHook(),
-                        new VaultPermissionHook(),
-                        new NbtApiHook(kernel.log()),
-                        new HeadDatabaseHook(kernel.log())));
+                List.of(new VaultEconomyHook(), new VaultPermissionHook(), new HeadDatabaseHook(kernel.log())));
         resources.hooks(hooks);
 
         GuiText guiText = new GuiText(kernel.messages());

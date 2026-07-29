@@ -55,10 +55,10 @@ import org.junit.jupiter.api.Test;
  * pretend to catch.
  *
  * <p><strong>The exception table.</strong> {@link #SHARED_SEAMS} names, per plugin, the exact files allowed to
- * span more than one. Each entry states why. Two of them record real debt rather than a design: they are the
- * unused PlaceholderAPI worked-example hook and the unwired claim-deletion listener, both of which drop out of
- * the table the day they are wired or deleted. Pinning the file names means even those cannot spread further: a
- * third file probing PlaceholderAPI fails the build exactly like a second file probing Jobs would.
+ * span more than one, and each entry states why. Every current entry is a design rather than debt: two
+ * unrelated Vault services, two independent Floodgate factory seams, and a PlayerPoints back-end beside a
+ * PlayerPoints balance feed. Pinning the file names means none of them can spread further: a third file probing
+ * Vault fails the build exactly like a second file probing Jobs would.
  */
 class SoftDependSeamDriftTest {
 
@@ -77,17 +77,7 @@ class SoftDependSeamDriftTest {
             Set.of("BedrockDetector.java", "BedrockScreen.java"),
             // A currency back-end and a balance feed: separate ports, separate lifetimes, same plugin.
             "PlayerPoints",
-            Set.of("PlayerPointsBalanceFeed.java", "PlayerPointsCurrencyBackend.java"),
-            // Debt, not design: PlaceholderApiHook is the documented worked example for the hooks SPI and has
-            // no production consumer. When it is wired or moved to test sources this entry goes.
-            "PlaceholderAPI",
-            Set.of("PlaceholderApiHook.java", "PlaceholderApiSupport.java"),
-            // Debt, not design: BukkitClaimDeletionEvents is not wired into bootstrap yet, so it carries its
-            // own probes for the two claim plugins whose deletion events it listens for.
-            "Lands",
-            Set.of("BukkitClaimDeletionEvents.java", "LandsClaimProvider.java"),
-            "GriefPrevention",
-            Set.of("BukkitClaimDeletionEvents.java", "GriefPreventionClaimProvider.java"));
+            Set.of("PlayerPointsBalanceFeed.java", "PlayerPointsCurrencyBackend.java"));
 
     /** A plugin-manager present-check naming the plugin inline: the direct form of the guard. */
     private static final Pattern PRESENT_CHECK =

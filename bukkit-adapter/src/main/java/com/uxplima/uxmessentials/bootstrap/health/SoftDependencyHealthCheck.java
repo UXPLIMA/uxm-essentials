@@ -5,11 +5,16 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.integration.Integration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.integration.IntegrationCatalog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.integration.IntegrationFamily;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthResult;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -21,10 +26,12 @@ import org.jspecify.annotations.NullMarked;
  * informational; a <em>configured-but-absent</em> dependency is the warning case (the classic silent failure
  * where redis is enabled in config but the server cannot reach it, or the plugin is simply not installed).
  *
- * <p>PlaceholderAPI, Vault, and Treasury are detected by plugin presence. Redis is only probed when the network
- * bus is enabled with a Redis transport ({@code network.enabled = true} and {@code network.transport} is
- * {@code redis} or {@code both}): a short-timeout TCP connect to the configured {@code network.redis} host/port
- * decides reachable vs not. Aggregates to {@code WARN} when any configured dependency is unreachable,
+ * <p>The integrations line is derived from {@link IntegrationCatalog}, so every plugin we integrate with is
+ * covered the moment it is catalogued and no shortlist can fall behind. Presence means installed <em>and</em>
+ * enabled: a plugin that failed its own startup is not something we can call into. Redis is probed only when
+ * the network bus is enabled with a Redis transport ({@code network.enabled = true} and {@code network.transport}
+ * is {@code redis} or {@code both}): a short-timeout TCP connect to the configured {@code network.redis}
+ * host/port decides reachable vs not. Aggregates to {@code WARN} when any configured dependency is unreachable,
  * {@code OK} otherwise.
  */
 @NullMarked
@@ -48,16 +55,39 @@ public final class SoftDependencyHealthCheck implements HealthCheck {
     @Override
     public HealthResult check() {
         List<String> notes = new ArrayList<>();
-        notes.add("PlaceholderAPI " + presence("PlaceholderAPI"));
-        notes.add("Vault " + presence("Vault"));
-        notes.add("Treasury " + presence("Treasury"));
+        notes.add(integrationSummary());
         boolean warn = appendRedis(notes);
         String summary = String.join(", ", notes);
         return warn ? HealthResult.warn(summary) : HealthResult.ok(summary);
     }
 
-    private String presence(String pluginName) {
-        return plugins.getPlugin(pluginName) != null ? "present" : "absent";
+    /**
+     * The integrations line: how many of the catalogued plugins this server actually has, then the present ones
+     * named per family. Absent ones are counted rather than listed, since a server running none of the
+     * thirty-odd optional plugins should not be told so thirty times.
+     */
+    private String integrationSummary() {
+        int present = 0;
+        List<String> families = new ArrayList<>();
+        for (Map.Entry<IntegrationFamily, List<Integration>> family :
+                IntegrationCatalog.byFamily().entrySet()) {
+            List<String> installed = family.getValue().stream()
+                    .map(Integration::plugin)
+                    .filter(this::installed)
+                    .toList();
+            present += installed.size();
+            if (!installed.isEmpty()) {
+                families.add(family.getKey().label() + ": " + String.join(", ", installed));
+            }
+        }
+        String counted = present + "/" + IntegrationCatalog.all().size() + " integrations present";
+        return families.isEmpty() ? counted : counted + " (" + String.join("; ", families) + ")";
+    }
+
+    /** True when {@code pluginName} is installed and enabled: a plugin that failed its own startup is not usable. */
+    private boolean installed(String pluginName) {
+        Plugin plugin = plugins.getPlugin(pluginName);
+        return plugin != null && plugin.isEnabled();
     }
 
     private boolean appendRedis(List<String> notes) {
