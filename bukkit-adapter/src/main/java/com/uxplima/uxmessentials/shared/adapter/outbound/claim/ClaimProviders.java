@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  * provider.
  *
  * <p>Every candidate (uxmClaims, Lands, GriefPrevention, GriefDefender, ExcellentClaims, SimpleClaimSystem,
- * RClaim, XClaim, Homestead, WorldGuard, Towny, KingdomsX, HuskClaims, BentoBox, Residence, PlotSquared,
+ * RClaim, XClaim, Homestead, WorldGuard, Towny, KingdomsX, HuskClaims, HuskTowns, BentoBox, Residence, PlotSquared,
  * SuperiorSkyblock2)
  * is constructed and asked {@link ClaimProvider#active()}; those that are both
  * active and enabled become composite members, so a server running two claim plugins consults both and their
@@ -58,6 +58,7 @@ public final class ClaimProviders {
             new Registration("towny", TownyClaimProvider::new),
             new Registration("kingdoms", KingdomsClaimProvider::new),
             new Registration("huskclaims", HuskClaimsClaimProvider::new),
+            new Registration("husktowns", HuskTownsClaimProvider::new),
             new Registration("bentobox", BentoBoxClaimProvider::new),
             new Registration("residence", ResidenceClaimProvider::new),
             new Registration("plotsquared", PlotSquaredClaimProvider::new),

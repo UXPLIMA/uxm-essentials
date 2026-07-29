@@ -90,6 +90,9 @@ dependencies:
     HuskClaims:
       load: BEFORE
       required: false
+    HuskTowns:
+      load: BEFORE
+      required: false
     BentoBox:
       load: BEFORE
       required: false

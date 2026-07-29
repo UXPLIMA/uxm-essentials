@@ -135,6 +135,11 @@ public final class IntegrationCatalog {
                     "HuskClaimsClaimProvider.java",
                     "HuskClaims claims gate homes and warps"),
             new Integration(
+                    "HuskTowns",
+                    IntegrationFamily.CLAIMS,
+                    "HuskTownsClaimProvider.java",
+                    "HuskTowns town claims gate homes and warps"),
+            new Integration(
                     "BentoBox",
                     IntegrationFamily.CLAIMS,
                     "BentoBoxClaimProvider.java",
