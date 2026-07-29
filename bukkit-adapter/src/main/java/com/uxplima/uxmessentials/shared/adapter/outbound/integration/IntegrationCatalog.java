@@ -86,6 +86,11 @@ public final class IntegrationCatalog {
             new Integration(
                     "MMOItems", IntegrationFamily.ITEMS, "MMOItemsIconProvider.java", "MMOItems items as menu icons"),
             new Integration(
+                    "ExecutableItems",
+                    IntegrationFamily.ITEMS,
+                    "ExecutableItemsIconProvider.java",
+                    "ExecutableItems items as menu icons"),
+            new Integration(
                     "Lands", IntegrationFamily.CLAIMS, "LandsClaimProvider.java", "Lands claims gate homes and warps"),
             new Integration(
                     "GriefPrevention",

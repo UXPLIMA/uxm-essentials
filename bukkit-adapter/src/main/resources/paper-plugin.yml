@@ -129,6 +129,9 @@ dependencies:
     MMOItems:
       load: BEFORE
       required: false
+    ExecutableItems:
+      load: BEFORE
+      required: false
     # Currency back-ends the menu engine can target by spec (shared.adapter.outbound.currency). Vault is already
     # listed above; these three are reached purely by reflection past a plugin-present guard, so the menu engine
     # runs fully without any of them and an absent one loads no class. Loaded before us so the guard sees them on

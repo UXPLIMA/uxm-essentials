@@ -22,8 +22,8 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The four custom-item icon providers (ItemsAdder, Oraxen, Nexo, MMOItems) in the only states a test without those
- * SDKs on the classpath can reach. Each is built purely by reflection behind a plugin-present guard, so the proved
+ * The five custom-item icon providers (ItemsAdder, Oraxen, Nexo, MMOItems, ExecutableItems) in the only states a
+ * test without those SDKs on the classpath can reach. Each is built purely by reflection behind a plugin-present guard, so the proved
  * contract is the load-safe one, exactly as the currency reflection providers prove:
  *
  * <ul>
@@ -65,6 +65,7 @@ class CustomItemIconProvidersTest {
         assertAbsentIsSilentEmpty(log -> new OraxenIconProvider(server, log), "oraxen:ruby_sword");
         assertAbsentIsSilentEmpty(log -> new NexoIconProvider(server, log), "nexo:ruby_sword");
         assertAbsentIsSilentEmpty(log -> new MMOItemsIconProvider(server, log), "mmoitems:SWORD:ruby");
+        assertAbsentIsSilentEmpty(log -> new ExecutableItemsIconProvider(server, log), "ei:ruby_sword");
     }
 
     @Test
@@ -75,6 +76,8 @@ class CustomItemIconProvidersTest {
         assertThat(referencesPackage(OraxenIconProvider.class, "io.th0rgal")).isFalse();
         assertThat(referencesPackage(NexoIconProvider.class, "com.nexomc")).isFalse();
         assertThat(referencesPackage(MMOItemsIconProvider.class, "net.Indyuce")).isFalse();
+        assertThat(referencesPackage(ExecutableItemsIconProvider.class, "com.ssomar"))
+                .isFalse();
         // The shared base itself names none of the four SDK packages.
         assertThat(referencesPackage(ReflectiveItemProvider.class, "dev.lone")).isFalse();
         assertThat(referencesPackage(ReflectiveItemProvider.class, "io.th0rgal"))
@@ -82,6 +85,8 @@ class CustomItemIconProvidersTest {
         assertThat(referencesPackage(ReflectiveItemProvider.class, "com.nexomc"))
                 .isFalse();
         assertThat(referencesPackage(ReflectiveItemProvider.class, "net.Indyuce"))
+                .isFalse();
+        assertThat(referencesPackage(ReflectiveItemProvider.class, "com.ssomar"))
                 .isFalse();
     }
 
@@ -98,6 +103,8 @@ class CustomItemIconProvidersTest {
         assertThat(new NexoIconProvider(server, SILENT).icon("oraxen:ruby", ctx))
                 .isEmpty();
         assertThat(new MMOItemsIconProvider(server, SILENT).icon("DIAMOND", ctx))
+                .isEmpty();
+        assertThat(new ExecutableItemsIconProvider(server, SILENT).icon("nexo:ruby", ctx))
                 .isEmpty();
     }
 
@@ -119,6 +126,7 @@ class CustomItemIconProvidersTest {
                     assertThat(chain.resolve("nexo:ruby", ctx)).isEmpty();
                     assertThat(chain.resolve("mmoitems:SWORD:ruby", ctx)).isEmpty();
                     assertThat(chain.resolve("mmoitems:NOTYPE", ctx)).isEmpty();
+                    assertThat(chain.resolve("ei:ruby", ctx)).isEmpty();
                     // A plain material is claimed by no provider and left for the material lookup.
                     assertThat(chain.resolve("DIAMOND", ctx)).isEmpty();
                 })
@@ -136,6 +144,7 @@ class CustomItemIconProvidersTest {
         assertReachesLookupAndWarnsOnce("Oraxen", log -> new OraxenIconProvider(server, log), "oraxen:x");
         assertReachesLookupAndWarnsOnce("Nexo", log -> new NexoIconProvider(server, log), "nexo:x");
         assertReachesLookupAndWarnsOnce("MMOItems", log -> new MMOItemsIconProvider(server, log), "mmoitems:SWORD:x");
+        assertReachesLookupAndWarnsOnce("ExecutableItems", log -> new ExecutableItemsIconProvider(server, log), "ei:x");
     }
 
     /** With its plugin absent, a matching spec is empty and silent — the present-guard runs no reflection. */
