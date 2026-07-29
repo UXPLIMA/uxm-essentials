@@ -1,0 +1,63 @@
+name: CI
+
+# Runs the same gate the contributing rules ask for locally, on a machine nobody
+# has configured: static analysis, the full test suite, and the shaded jar. The
+# jar is built here on purpose, because shading and relocation problems only
+# appear in the assembled artifact and no unit test can see them.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out uxmEssentials
+        uses: actions/checkout@v4
+        with:
+          path: uxmEssentials
+
+      # settings.gradle.kts builds against a sibling ../uxmLib checkout as a composite
+      # build, so the library is compiled from source alongside the plugin.
+      - name: Check out uxmLib
+        uses: actions/checkout@v4
+        with:
+          repository: UXPLIMA/uxmLib
+          path: uxmLib
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Check
+        working-directory: uxmEssentials
+        run: ./gradlew check
+
+      - name: Assemble the shaded jars
+        working-directory: uxmEssentials
+        run: >-
+          ./gradlew
+          :bukkit-adapter:shadowJar
+          :velocity-adapter:shadowJar
+          :discord-adapter:shadowJar
+          :redis-adapter:shadowJar
+
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: uxmEssentials/*/build/reports/tests/
+          retention-days: 7
