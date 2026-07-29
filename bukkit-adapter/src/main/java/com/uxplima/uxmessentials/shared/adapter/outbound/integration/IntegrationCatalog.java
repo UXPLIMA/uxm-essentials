@@ -165,6 +165,11 @@ public final class IntegrationCatalog {
                     "MapMarkerPublishers.java",
                     "publishes spawn and warp markers to the squaremap web map"),
             new Integration(
+                    "BlueMap",
+                    IntegrationFamily.MAPS,
+                    "MapMarkerPublishers.java",
+                    "publishes spawn and warp markers to the BlueMap web map"),
+            new Integration(
                     "Votifier",
                     IntegrationFamily.VOTE,
                     "VotifierListener.java",

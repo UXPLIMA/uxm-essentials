@@ -40,12 +40,16 @@ dependencies:
     Votifier:
       load: BEFORE
       required: false
-    # Dynmap/squaremap back the map-marker integration. Loaded before us so the marker API is ready when
-    # we render on enable; reached only past a plugin-present guard, so the plugin runs fully without either.
+    # Dynmap/squaremap/BlueMap back the map-marker integration. Loaded before us so the marker API is ready
+    # when we render on enable; reached only past a plugin-present guard, so the plugin runs fully without any
+    # of them. Only one binds: squaremap, then Dynmap, then BlueMap.
     dynmap:
       load: BEFORE
       required: false
     squaremap:
+      load: BEFORE
+      required: false
+    BlueMap:
       load: BEFORE
       required: false
     # Land-claim plugins back the homes claim-policy integration (homes set/teleport respect claims). Loaded
