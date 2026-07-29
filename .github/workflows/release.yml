@@ -1,7 +1,9 @@
 name: Release
 
 # A tag is the release. Pushing v0.5.2 builds that commit and publishes the four
-# jars under it, so what people download is exactly what the tag points at.
+# jars under it, so what people download is exactly what the tag points at. The
+# same jars then go to the four Modrinth projects, so the store never trails the
+# tag by a release the way 0.5.1 did.
 on:
   push:
     tags:
@@ -18,6 +20,11 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      # Read through env rather than straight from secrets so the Modrinth step can ask whether it is set: the
+      # secrets context is not available to a step's `if`. A repository without the token still cuts its GitHub
+      # release, and a fork publishes nowhere.
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
     steps:
       - name: Check out uxmEssentials
         uses: actions/checkout@v4
@@ -69,3 +76,60 @@ jobs:
             uxmEssentials/velocity-adapter/build/libs/uxmEssentials-velocity-*.jar
             uxmEssentials/discord-adapter/build/libs/uxmEssentials-discord-*.jar
             uxmEssentials/redis-adapter/build/libs/uxmEssentials-redis-*.jar
+
+      # The same four jars onto the four Modrinth projects, straight through the v2 API. No publishing action sits
+      # in between on purpose: they resolve the game versions against a list of their own, and this plugin targets
+      # the 26.x line, which is exactly the kind of version such a list is last to learn. The tag's own release
+      # notes become the Modrinth changelog, so the two stores read the same.
+      - name: Publish the jars to Modrinth
+        if: env.MODRINTH_TOKEN != ''
+        working-directory: uxmEssentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          changelog="$(gh release view "$TAG" --json body --jq .body)"
+          if [ -z "$changelog" ]; then
+            changelog="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          fi
+
+          publish() {
+            project="$1"
+            jar="$2"
+            loaders="$3"
+            payload="$(jq -n \
+              --arg project "$project" \
+              --arg name "uxmEssentials $version" \
+              --arg version "$version" \
+              --arg changelog "$changelog" \
+              --argjson loaders "$loaders" \
+              '{
+                 project_id: $project,
+                 name: $name,
+                 version_number: $version,
+                 changelog: $changelog,
+                 version_type: "alpha",
+                 loaders: $loaders,
+                 game_versions: ["26.1", "26.1.1", "26.1.2", "26.2"],
+                 dependencies: [],
+                 featured: true,
+                 file_parts: ["file"],
+                 primary_file: "file"
+               }')"
+            # The payload goes through a file rather than inline: curl reads `;` inside an -F value as the start of
+            # a parameter, and release notes are full of them.
+            printf '%s' "$payload" > "${RUNNER_TEMP}/modrinth-data.json"
+            echo "publishing $(basename "$jar") to modrinth project $project"
+            curl -sS --fail-with-body -X POST https://api.modrinth.com/v2/version \
+              -H "Authorization: ${MODRINTH_TOKEN}" \
+              -F "data=@${RUNNER_TEMP}/modrinth-data.json;type=application/json" \
+              -F "file=@${jar}" \
+              -o /dev/null
+          }
+
+          publish QVeOROXV "bukkit-adapter/build/libs/uxmEssentials-${version}.jar" '["paper","folia","purpur"]'
+          publish giFPy916 "velocity-adapter/build/libs/uxmEssentials-velocity-${version}-all.jar" '["velocity"]'
+          publish IpIrzRV9 "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" '["paper","folia","purpur"]'
+          publish DCyMsr3U "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" '["paper","folia","purpur"]'
