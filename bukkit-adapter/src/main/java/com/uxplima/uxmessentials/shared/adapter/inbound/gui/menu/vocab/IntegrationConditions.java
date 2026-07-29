@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
+import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
@@ -39,14 +40,15 @@ import org.jspecify.annotations.Nullable;
  * ({@code has-group}, {@code weather}) with the remainder carried as {@code value}. So every handler here reads its
  * argument from {@code value}, exactly as an action does.
  *
- * <p>Two of the six lean on existing substrate: {@code has-group} rides the Vault {@link PermissionQuery} seam (which
+ * <p>Several lean on existing substrate: {@code has-group} rides the Vault {@link PermissionQuery} seam (which
  * resolves LuckPerms and friends through Vault — absent → false), and {@code has-points} is a convenience alias over
- * the existing PlayerPoints {@link Currencies} back-end. {@code weather} reads the viewer's own world, and
- * {@code cooldown}/{@code set-cooldown} ride the shared {@link Cooldowns} PDC-backed port. The remaining two —
- * {@code job} (JobsReborn) and {@code worldguard-region} (WorldGuard) — are soft-depends reached purely by
- * reflection behind a plugin-present guard, exactly as the reflective currency and item providers are: they name the
- * SDK only by string class-name, so a server without the plugin loads none of its classes, and any reflective or
- * unchecked failure is warned once then degraded to {@code false}.
+ * the existing PlayerPoints {@link Currencies} back-end. {@code weather} reads the viewer's own world,
+ * {@code cooldown}/{@code set-cooldown} ride the shared {@link Cooldowns} PDC-backed port, and
+ * {@code client-version} reads the {@link ClientProtocol} port ViaVersion backs. The rest ({@code job} for
+ * JobsReborn, {@code worldguard-region} for WorldGuard, {@code mcmmo-level} and {@code mcmmo-power} for mcMMO) are
+ * soft-depends reached purely by reflection behind a plugin-present guard, exactly as the reflective currency and
+ * item providers are: they name the SDK only by string class-name, so a server without the plugin loads none of its
+ * classes, and any reflective or unchecked failure is warned once then degraded to {@code false}.
  *
  * <p><strong>Every condition fails closed.</strong> A gate that cannot be evaluated must not pass: an offline viewer
  * (where a live world is needed), a blank or unknown argument, an absent integration, or anything a lookup
@@ -96,6 +98,7 @@ public final class IntegrationConditions {
         registerJob(bindings, server, log);
         registerRegion(bindings, server, log);
         registerClientVersion(bindings, protocol, log);
+        registerMcMmo(bindings, server, log);
     }
 
     /** {@code has-group:<group>} (aliases {@code luckperm-group}, {@code group}) — the viewer's Vault group membership. */
@@ -161,6 +164,18 @@ public final class IntegrationConditions {
         bindings.condition("worldguard-region", gate);
         bindings.condition("wg-region", gate);
         bindings.condition("region", gate);
+    }
+
+    /**
+     * {@code mcmmo-level:<skill>:<level>} and {@code mcmmo-power:<level>} — the viewer's mcMMO standing, for menus
+     * that gate a reward or a warp on how far a player has actually got (reflection, absent → false).
+     */
+    private static void registerMcMmo(MenuBindings bindings, Server server, Logger log) {
+        McMmoIntegration mcmmo = new McMmoIntegration(server, log);
+        bindings.condition(
+                "mcmmo-level", closed("mcmmo-level", log, (ctx, args) -> mcmmoLevel(ctx, args, mcmmo, server)));
+        bindings.condition(
+                "mcmmo-power", closed("mcmmo-power", log, (ctx, args) -> mcmmoPower(ctx, args, mcmmo, server)));
     }
 
     /**
@@ -277,6 +292,32 @@ public final class IntegrationConditions {
         return player != null && regions.inRegion(player, value(args).strip());
     }
 
+    /**
+     * {@code mcmmo-level:<skill>:<level>} — whether the viewer's level in that mcMMO skill is at least {@code level}.
+     * The skill and the level arrive as one argument because the runtime's split carries everything after the head, so
+     * they are separated here; a missing level, an unknown skill or an absent mcMMO is false.
+     */
+    private static boolean mcmmoLevel(
+            MenuContext ctx, Map<String, String> args, McMmoIntegration mcmmo, Server server) {
+        String[] parts = value(args).strip().split("[:\\s]+", 2);
+        if (parts.length < 2) {
+            return false;
+        }
+        OptionalDouble required = parseNumber(parts[1]);
+        Player player = viewer(ctx, server);
+        return player != null
+                && required.isPresent()
+                && atLeast(mcmmo.skillLevel(player, parts[0]), required.getAsDouble());
+    }
+
+    /** {@code mcmmo-power:<level>} — whether the viewer's mcMMO power level is at least {@code level}. */
+    private static boolean mcmmoPower(
+            MenuContext ctx, Map<String, String> args, McMmoIntegration mcmmo, Server server) {
+        OptionalDouble required = parseNumber(value(args));
+        Player player = viewer(ctx, server);
+        return player != null && required.isPresent() && atLeast(mcmmo.powerLevel(player), required.getAsDouble());
+    }
+
     // --- helpers -----------------------------------------------------------------------------------------------------
 
     /** The live {@link Player} for the open context's viewer, or {@code null} when that player is offline. */
@@ -293,6 +334,11 @@ public final class IntegrationConditions {
     private static String firstToken(String value) {
         String stripped = value.strip();
         return stripped.isEmpty() ? "" : stripped.split("\\s+", 2)[0];
+    }
+
+    /** Whether an integration answered at all, and answered at least {@code required}; an empty answer denies. */
+    private static boolean atLeast(OptionalInt actual, double required) {
+        return actual.isPresent() && actual.getAsInt() >= required;
     }
 
     /** The token as a finite-or-not {@code double}, or empty when it is blank or not numeric. */

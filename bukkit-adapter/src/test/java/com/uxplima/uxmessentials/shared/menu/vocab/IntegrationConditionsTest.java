@@ -48,10 +48,10 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * MockBukkit coverage of the integration condition pack. The substrate-backed gates run over real collaborators: a
  * fake {@link PermissionQuery} for {@code has-group}, a real {@link Currencies} over an in-memory economy for
  * {@code has-points}, the {@link PlayerMock}'s own live world weather for {@code weather}, and a fake {@link Cooldowns}
- * for {@code cooldown} / {@code set-cooldown}. JobsReborn and WorldGuard are not on the test classpath, so their gates
- * are asserted on the contract a plugin-less test can reach — the fail-closed absent path — plus the structural
- * guarantee that the class (and its reflective nested helpers) names none of their SDK packages, so loading it on a
- * plugin-less server pulls in zero SDK class. Every condition is asserted both ways where possible, and the
+ * for {@code cooldown} / {@code set-cooldown}. JobsReborn, WorldGuard and mcMMO are not on the test classpath, so their
+ * gates are asserted on the contract a plugin-less test can reach (the fail-closed absent path) plus the structural
+ * guarantee that the pack, its reflective nested helpers and the mcMMO reader beside it name none of their SDK
+ * packages, so loading them on a plugin-less server pulls in zero SDK class. Every condition is asserted both ways where possible, and the
  * fail-closed contract is pinned by the offline-viewer and malformed-argument cases.
  */
 class IntegrationConditionsTest {
@@ -227,6 +227,48 @@ class IntegrationConditionsTest {
                 })
                 .as("an absent integration never throws")
                 .doesNotThrowAnyException();
+    }
+
+    // --- mcmmo (absent path) -------------------------------------------------------------------------------------
+
+    @Test
+    void mcmmoGatesFailClosedWhenMcmmoIsAbsent() {
+        assertThatCode(() -> {
+                    assertThat(test("mcmmo-level", "mining:50")).isFalse();
+                    assertThat(test("mcmmo-power", "1000")).isFalse();
+                })
+                .as("an absent integration never throws")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void mcmmoLevelFailsClosedOnAMalformedArgument() {
+        // A skill with no level, a level that is not a number, and nothing at all are all authoring mistakes, and
+        // an unreadable gate must deny rather than open every item it guards.
+        assertThat(test("mcmmo-level", "mining")).as("no level").isFalse();
+        assertThat(test("mcmmo-level", "mining:soon"))
+                .as("level is not a number")
+                .isFalse();
+        assertThat(test("mcmmo-level", "")).as("blank").isFalse();
+        assertThat(test("mcmmo-power", "lots")).as("power is not a number").isFalse();
+    }
+
+    @Test
+    void mcmmoGatesFailClosedForAnOfflineViewer() {
+        assertThat(testOffline("mcmmo-level", "mining:1")).isFalse();
+        assertThat(testOffline("mcmmo-power", "1")).isFalse();
+    }
+
+    @Test
+    void theMcmmoReaderDeclaresNoSdkType() throws ClassNotFoundException {
+        // Same structural guarantee as the pack itself: the mcMMO reader names its SDK only by string class-name,
+        // so loading it on a server without mcMMO pulls in zero com.gmail.nossr50 class.
+        Class<?> reader =
+                Class.forName("com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.McMmoIntegration");
+
+        assertThat(declaresPackage(reader, "com.gmail.nossr50"))
+                .as("mcMMO SDK type in a signature")
+                .isFalse();
     }
 
     @Test

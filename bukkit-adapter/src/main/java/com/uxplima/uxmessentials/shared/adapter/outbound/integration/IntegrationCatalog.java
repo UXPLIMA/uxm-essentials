@@ -213,7 +213,12 @@ public final class IntegrationCatalog {
                     "Jobs",
                     IntegrationFamily.CONDITIONS,
                     "IntegrationConditions.java",
-                    "job and level conditions in menu requirements"));
+                    "job and level conditions in menu requirements"),
+            new Integration(
+                    "mcMMO",
+                    IntegrationFamily.CONDITIONS,
+                    "McMmoIntegration.java",
+                    "skill-level and power-level conditions in menu requirements"));
 
     /** Every catalogued integration, in declaration order. */
     public static List<Integration> all() {

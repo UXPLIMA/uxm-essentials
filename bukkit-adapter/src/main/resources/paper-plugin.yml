@@ -127,10 +127,14 @@ dependencies:
       load: BEFORE
       required: false
     # Integration condition back-ends the menu engine gates on (shared.adapter.inbound.gui.menu.vocab
-    # IntegrationConditions). Both are reached purely by reflection past a plugin-present guard — job:<name> against
-    # JobsReborn and worldguard-region:<id> against WorldGuard — so the menu engine runs fully without either and an
-    # absent one loads no class. Loaded before us so the guard sees them on enable.
+    # IntegrationConditions). All are reached purely by reflection past a plugin-present guard: job:<name> against
+    # JobsReborn, worldguard-region:<id> against WorldGuard, mcmmo-level:<skill>:<n> and mcmmo-power:<n> against
+    # mcMMO, so the menu engine runs fully without any of them and an absent one loads no class. Loaded before us
+    # so the guard sees them on enable.
     Jobs:
+      load: BEFORE
+      required: false
+    mcMMO:
       load: BEFORE
       required: false
     WorldGuard:
