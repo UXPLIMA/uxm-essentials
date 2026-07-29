@@ -9,6 +9,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
 import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
@@ -35,6 +36,7 @@ public final class RequestTeleport {
     private final DomainEventPublisher events;
     private final TeleportSettings settings;
     private final JailGate jail;
+    private final CombatGate combat;
     private final Clock clock;
 
     public RequestTeleport(
@@ -45,12 +47,25 @@ public final class RequestTeleport {
             TeleportSettings settings,
             JailGate jail,
             Clock clock) {
+        this(requests, flags, notifier, events, settings, jail, CombatGate.NEVER, clock);
+    }
+
+    public RequestTeleport(
+            RequestRegistry requests,
+            TeleportFlags flags,
+            PlayerNotifier notifier,
+            DomainEventPublisher events,
+            TeleportSettings settings,
+            JailGate jail,
+            CombatGate combat,
+            Clock clock) {
         this.requests = Objects.requireNonNull(requests, "requests");
         this.flags = Objects.requireNonNull(flags, "flags");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.jail = Objects.requireNonNull(jail, "jail");
+        this.combat = Objects.requireNonNull(combat, "combat");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -75,6 +90,11 @@ public final class RequestTeleport {
     private Optional<TeleportError> gate(PlayerRef requester, PlayerRef target) {
         if (jail.isJailed(requester)) {
             return reject(requester, TeleportError.JAILED);
+        }
+        if (combat.isTagged(requester)) {
+            // Without this, a player blocked from /home simply asks a friend for a /tpa and is pulled out
+            // of the fight anyway, which would leave the whole gate decorative.
+            return reject(requester, TeleportError.COMBAT_TAGGED);
         }
         if (requester.equals(target)) {
             return reject(requester, TeleportError.SELF_REQUEST);

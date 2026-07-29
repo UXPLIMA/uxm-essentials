@@ -62,7 +62,10 @@ public enum TeleportError {
     SPAWN_UNRESOLVED(TeleportMessageKey.SPAWN_UNRESOLVED),
 
     /** The mover is jailed; the moderation context's jail gate blocks every self-initiated teleport. */
-    JAILED(TeleportMessageKey.JAILED);
+    JAILED(TeleportMessageKey.JAILED),
+
+    /** An installed combat plugin has the mover tagged, so they may not teleport out of the fight. */
+    COMBAT_TAGGED(TeleportMessageKey.COMBAT_TAGGED);
 
     private final TeleportMessageKey messageKey;
 

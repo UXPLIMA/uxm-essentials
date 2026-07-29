@@ -190,6 +190,16 @@ public final class IntegrationCatalog {
                     "LoginPluginHandoff.java",
                     "holds our security prompts until nLogin has authenticated the player"),
             new Integration(
+                    "CombatLogX",
+                    IntegrationFamily.COMBAT,
+                    "ForeignCombatGate.java",
+                    "a CombatLogX combat tag blocks self-teleports out of a fight"),
+            new Integration(
+                    "PvPManager",
+                    IntegrationFamily.COMBAT,
+                    "ForeignCombatGate.java",
+                    "a PvPManager combat tag blocks self-teleports out of a fight"),
+            new Integration(
                     "Jobs",
                     IntegrationFamily.CONDITIONS,
                     "IntegrationConditions.java",

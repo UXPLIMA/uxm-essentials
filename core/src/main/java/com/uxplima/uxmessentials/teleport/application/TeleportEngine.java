@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
+import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
 import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
@@ -56,6 +57,7 @@ public final class TeleportEngine {
     private final DomainEventPublisher events;
     private final TeleportSettings settings;
     private final JailGate jail;
+    private final CombatGate combat;
     private final TeleportFee fee;
     private final ArrivalGrace grace;
 
@@ -67,7 +69,29 @@ public final class TeleportEngine {
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail) {
-        this(cooldowns, warmups, executor, notifier, events, settings, jail, TeleportFee.FREE, ArrivalGrace.NONE);
+        this(cooldowns, warmups, executor, notifier, events, settings, jail, CombatGate.NEVER);
+    }
+
+    public TeleportEngine(
+            Cooldowns cooldowns,
+            Warmups warmups,
+            TeleportExecutor executor,
+            PlayerNotifier notifier,
+            DomainEventPublisher events,
+            TeleportSettings settings,
+            JailGate jail,
+            CombatGate combat) {
+        this(
+                cooldowns,
+                warmups,
+                executor,
+                notifier,
+                events,
+                settings,
+                jail,
+                combat,
+                TeleportFee.FREE,
+                ArrivalGrace.NONE);
     }
 
     public TeleportEngine(
@@ -80,6 +104,20 @@ public final class TeleportEngine {
             JailGate jail,
             TeleportFee fee,
             ArrivalGrace grace) {
+        this(cooldowns, warmups, executor, notifier, events, settings, jail, CombatGate.NEVER, fee, grace);
+    }
+
+    public TeleportEngine(
+            Cooldowns cooldowns,
+            Warmups warmups,
+            TeleportExecutor executor,
+            PlayerNotifier notifier,
+            DomainEventPublisher events,
+            TeleportSettings settings,
+            JailGate jail,
+            CombatGate combat,
+            TeleportFee fee,
+            ArrivalGrace grace) {
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.warmups = Objects.requireNonNull(warmups, "warmups");
         this.executor = Objects.requireNonNull(executor, "executor");
@@ -87,6 +125,7 @@ public final class TeleportEngine {
         this.events = Objects.requireNonNull(events, "events");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.jail = Objects.requireNonNull(jail, "jail");
+        this.combat = Objects.requireNonNull(combat, "combat");
         this.fee = Objects.requireNonNull(fee, "fee");
         this.grace = Objects.requireNonNull(grace, "grace");
     }
@@ -106,6 +145,12 @@ public final class TeleportEngine {
             // (docs/permissions.md). The moderation context owns the gate; without moderation it is NEVER.
             notifier.send(mover, TeleportMessageKey.JAILED);
             return Result.err(TeleportError.JAILED);
+        }
+        if (combat.isTagged(mover)) {
+            // Same shape as the jail gate, and checked before the cooldown so a refused escape costs nothing.
+            // The tag belongs to whichever combat plugin is installed; without one the gate is NEVER.
+            notifier.send(mover, TeleportMessageKey.COMBAT_TAGGED);
+            return Result.err(TeleportError.COMBAT_TAGGED);
         }
         Result<Unit, Duration> gate = cooldowns.check(mover, cooldownKind(kind, destination));
         if (gate.isErr()) {
@@ -141,6 +186,10 @@ public final class TeleportEngine {
         if (jail.isJailed(who)) {
             notifier.send(who, TeleportMessageKey.JAILED);
             return Result.err(TeleportError.JAILED);
+        }
+        if (combat.isTagged(who)) {
+            notifier.send(who, TeleportMessageKey.COMBAT_TAGGED);
+            return Result.err(TeleportError.COMBAT_TAGGED);
         }
         Result<Unit, Duration> gate = cooldowns.check(who, randomCooldownKind());
         if (gate.isErr()) {

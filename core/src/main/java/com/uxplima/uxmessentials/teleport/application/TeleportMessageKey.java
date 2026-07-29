@@ -88,6 +88,9 @@ public enum TeleportMessageKey implements MessageKey {
     // a jailed player may not self-teleport — the moderation context's JailGate denies it here
     JAILED("teleport.jailed"),
 
+    // an installed combat plugin has the mover tagged; CombatGate denies the self-teleport here
+    COMBAT_TAGGED("teleport.combat-tagged"),
+
     // shared cooldown / warmup feedback owned by the teleport tiers
     COOLDOWN_ACTIVE("teleport.cooldown.active"),
     WARMUP_STARTED("teleport.warmup.started"),

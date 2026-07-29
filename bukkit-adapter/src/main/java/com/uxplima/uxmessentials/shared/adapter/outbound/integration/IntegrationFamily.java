@@ -21,6 +21,7 @@ public enum IntegrationFamily {
     VOTE("voting"),
     BEDROCK("bedrock"),
     LOGIN("login"),
+    COMBAT("combat"),
     CONDITIONS("menu conditions");
 
     private final String label;

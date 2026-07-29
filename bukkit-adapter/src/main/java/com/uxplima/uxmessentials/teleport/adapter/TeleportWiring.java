@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.bukkit.Server;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.RtpCommand;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
@@ -45,6 +47,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.AsyncTeleportExecutor
 import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitBiomeCatalog;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitChunkAccess;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitRtpAreaSource;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.ForeignCombatGate;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryBackLocationStore;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
@@ -83,6 +86,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.BiomeCatalog;
 import com.uxplima.uxmessentials.teleport.application.port.BiomeHotspots;
+import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
 import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
@@ -152,6 +156,10 @@ public final class TeleportWiring {
         WarmupTracker warmupTracker = new WarmupTracker();
         // The jail gate forwards to NEVER until the moderation context lands and rebinds it (soft couple).
         MutableJailGate jailGate = new MutableJailGate();
+        // Reads an installed combat plugin's tag so a losing fight cannot be escaped with /home or /tpa. We own
+        // no combat timer: with the switch off or with no supported plugin installed this is NEVER, and every
+        // teleport route behaves exactly as it did before.
+        CombatGate combatGate = combatGate(config, plugin.getServer(), kernel.log());
         // The home-respawn seam resolves to empty until the homes context lands and rebinds it (soft couple),
         // so a HOME step in a configured respawn chain falls through whenever homes is disabled.
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
@@ -162,7 +170,18 @@ public final class TeleportWiring {
         ArrivalGraceGuard graceGuard =
                 new ArrivalGraceGuard(plugin.getServer(), kernel.scheduler(), settings::arrivalGrace, clock);
         TeleportServices services = assemble(
-                plugin, kernel, settings, notifier, warmupTracker, jailGate, spawns, clock, rtp, fee, graceGuard);
+                plugin,
+                kernel,
+                settings,
+                notifier,
+                warmupTracker,
+                jailGate,
+                combatGate,
+                spawns,
+                clock,
+                rtp,
+                fee,
+                graceGuard);
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener = new RespawnListener(
@@ -218,6 +237,7 @@ public final class TeleportWiring {
             PlayerNotifier notifier,
             WarmupTracker warmupTracker,
             MutableJailGate jailGate,
+            CombatGate combatGate,
             SpawnDirectory spawns,
             Clock clock,
             RtpBundle rtp,
@@ -242,7 +262,16 @@ public final class TeleportWiring {
         Warmups warmups = new TrackingWarmups(
                 kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock);
         TeleportEngine engine = new TeleportEngine(
-                kernel.cooldowns(), warmups, executor, notifier, kernel.events(), settings, jailGate, fee, grace);
+                kernel.cooldowns(),
+                warmups,
+                executor,
+                notifier,
+                kernel.events(),
+                settings,
+                jailGate,
+                combatGate,
+                fee,
+                grace);
         // The /rtp biome use case shares the engine (so it charges after success like a normal RTP), the live area
         // source (so /settpr moves both zones at once), and the biome-targeted search built in buildRtp.
         ResolveBiomeRtp resolveBiomeRtp = new ResolveBiomeRtp(
@@ -268,8 +297,8 @@ public final class TeleportWiring {
                 .players(kernel.playerLookup())
                 .worlds(kernel.worldLookup())
                 .scheduler(kernel.scheduler())
-                .requestTeleport(
-                        new RequestTeleport(requests, flags, notifier, kernel.events(), settings, jailGate, clock))
+                .requestTeleport(new RequestTeleport(
+                        requests, flags, notifier, kernel.events(), settings, jailGate, combatGate, clock))
                 .acceptTeleport(new AcceptTeleport(requests, engine, notifier, kernel.events(), clock))
                 .listPendingRequests(new ListPendingRequests(requests, notifier))
                 .captureBack(new CaptureBack(backStore, engine, notifier, kernel.events(), clock))
@@ -408,6 +437,23 @@ public final class TeleportWiring {
         // redirects; the decorator adds the vanilla world spawn as the bottom-of-chain last resort so
         // /spawn answers on a fresh server before any /setspawn.
         return new VanillaFallbackSpawnDirectory(SpawnDirectories.jooq(persistence), plugin.getServer());
+    }
+
+    /**
+     * The combat gate to bind: the foreign reader when {@code combat.block-teleport} is on and a supported
+     * combat plugin is actually installed, otherwise {@link CombatGate#NEVER}. Binding the reader on a server
+     * with no combat plugin would only add a plugin-manager lookup to every teleport for an answer that can
+     * never be anything but false, so the decision is made once here rather than on each call.
+     */
+    private static CombatGate combatGate(ConfigStore config, Server server, Logger log) {
+        if (!config.getBoolean("combat.block-teleport", true)) {
+            return CombatGate.NEVER;
+        }
+        if (!ForeignCombatGate.anyPresent(server)) {
+            return CombatGate.NEVER;
+        }
+        log.info("event=combat_gate_bound providers={}", ForeignCombatGate.supportedPlugins());
+        return new ForeignCombatGate(server, log);
     }
 
     private static List<Listener> listeners(
