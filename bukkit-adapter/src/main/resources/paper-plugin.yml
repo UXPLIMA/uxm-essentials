@@ -145,6 +145,12 @@ dependencies:
     zEssentials:
       load: BEFORE
       required: false
+    # EconomyShopGUI is the bottom layer of the worth chain (economy.adapter.outbound ShopWorthSource):
+    # an item nobody has priced with /setworth or in config falls back to the shop's own sell price.
+    # Read reflectively past a plugin-present guard, and only on the first /worth or /sell.
+    EconomyShopGUI:
+      load: BEFORE
+      required: false
     # Integration condition back-ends the menu engine gates on (shared.adapter.inbound.gui.menu.vocab
     # IntegrationConditions). All are reached purely by reflection past a plugin-present guard: job:<name> against
     # JobsReborn, worldguard-region:<id> against WorldGuard, mcmmo-level:<skill>:<n> and mcmmo-power:<n> against

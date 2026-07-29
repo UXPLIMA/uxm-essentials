@@ -60,6 +60,11 @@ public final class IntegrationCatalog {
                     "ZEssentialsCurrencyBackend.java",
                     "zEssentials currencies menus and requirements can charge"),
             new Integration(
+                    "EconomyShopGUI",
+                    IntegrationFamily.ECONOMY,
+                    "ShopWorthSource.java",
+                    "prices unpriced items for /worth and /sell from the shop's own sell prices"),
+            new Integration(
                     "PlaceholderAPI",
                     IntegrationFamily.PLACEHOLDERS,
                     "PlaceholderApiSupport.java",

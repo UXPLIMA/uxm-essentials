@@ -480,6 +480,14 @@ public final class EconomyConfig {
         return config.getBoolean("worth.enabled", true);
     }
 
+    /**
+     * Whether an item with no override and no configured worth may fall back to EconomyShopGUI's own sell price.
+     * With that plugin absent the setting has no effect: there is nothing to fall back to.
+     */
+    public boolean shopWorthFallbackEnabled() {
+        return config.getBoolean("worth.economyshopgui-fallback", true);
+    }
+
     /** Whether command costs are enabled. */
     public boolean commandCostsEnabled() {
         return config.getBoolean("command-costs-enabled", true);

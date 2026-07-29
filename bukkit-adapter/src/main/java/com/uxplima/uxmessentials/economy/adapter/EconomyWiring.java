@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.command.EconomyCommands;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderTaxSink;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderWarpEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SalaryTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SchedulerPendingPayRegistry;
+import com.uxplima.uxmessentials.economy.adapter.outbound.ShopWorthSource;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SnapshotBaltopProvider;
 import com.uxplima.uxmessentials.economy.adapter.outbound.backend.CurrencyBackends;
 import com.uxplima.uxmessentials.economy.application.AmountFormat;
@@ -77,6 +79,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.ProviderVaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
@@ -427,6 +430,21 @@ public final class EconomyWiring {
         return false;
     }
 
+    /**
+     * The EconomyShopGUI-backed bottom layer of the worth chain, or empty when it should not be bound: the
+     * operator turned the fallback off, or the plugin is simply not installed. Reading the shop catalogue is
+     * deferred to the first {@code /worth} or {@code /sell}, so binding this costs nothing on enable.
+     */
+    private static Optional<WorthSource> shopWorthFallback(
+            EconomyConfig settings, Server server, Logger log, CurrencyRegistry currencies) {
+        if (!settings.shopWorthFallbackEnabled() || !ShopWorthSource.present(server)) {
+            return Optional.empty();
+        }
+        log.info("event=worth_fallback_bound provider=economyshopgui");
+        return Optional.of(new ShopWorthSource(
+                server, log, currencies.defaultCurrency().id().value()));
+    }
+
     /** The configured currencies whose balances live outside our ledger, as {@code <id>=<backend>} pairs. */
     static List<String> foreignBackedCurrencies(CurrencyRegistry currencies) {
         Objects.requireNonNull(currencies, "currencies");
@@ -482,7 +500,12 @@ public final class EconomyWiring {
         EconomyProvider baltopProvider = new SnapshotBaltopProvider(resolved, snapshots);
         WorthTable configWorth = settings.worthTable(currencies, kernel.log());
         WorthOverrideStore worthOverrides = WalletRepositories.worthOverrideStore(persistence);
-        WorthSource worth = new CombiningWorthSource(worthOverrides, configWorth);
+        // The bottom worth layer: EconomyShopGUI's own prices, so a shop that has already priced the server's
+        // items answers for anything the operator has not priced themselves. Bound only when that plugin is
+        // installed and the operator left the fallback on, so the usual server keeps the plain two-layer chain.
+        WorthSource worth = shopWorthFallback(settings, plugin.getServer(), kernel.log(), currencies)
+                .map(shop -> (WorthSource) new CombiningWorthSource(worthOverrides, configWorth, shop))
+                .orElseGet(() -> new CombiningWorthSource(worthOverrides, configWorth));
         Currency defaultCurrency = currencies.defaultCurrency();
         PayTaxation taxation = new PayTaxation(
                 settings.taxPolicy(),
