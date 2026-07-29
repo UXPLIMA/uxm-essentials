@@ -5,7 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
-import java.util.UUID;
+
+import org.bukkit.Server;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,16 +14,18 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 
 /**
- * The optional-plugin hook SPI, proven on the worked PlaceholderAPI example in both states via the reusable
- * {@link HookHarness}.
+ * The optional-plugin hook SPI itself, proven on a hook that integrates with nothing. The subject is the
+ * contract (resolve once, real when present, no-op when absent, one capability per hook, a throwing hook
+ * degrades rather than aborting bootstrap), so it is exercised against a test-only capability rather than
+ * against whichever real integration happens to exist today.
  *
- * <p>PlaceholderAPI is a {@code compileOnly} soft-depend, so {@code me.clip.placeholderapi} is absent from the
- * test runtime classpath. That makes the absent path a genuine proof of the trap-avoidance: if {@link Hooks}
- * ever reached the real {@link PlaceholderApiExpander} when the plugin is not installed, loading that class
- * would surface as a {@link NoClassDefFoundError}. It must not — the no-op default carries none of those types,
- * so an absent integration is a silent, safe no-op.
+ * <p>The companion property, that an absent plugin's SDK classes are never loaded, is proven where it can be
+ * proven honestly: over a real compileOnly SDK in {@link HeadDatabaseHookTest} and {@link VaultHooksTest},
+ * whose types are genuinely off the test runtime classpath.
  */
 class HooksTest {
+
+    private static final String FAKE_PLUGIN = "ExampleIntegration";
 
     @BeforeEach
     void setUp() {
@@ -36,54 +39,135 @@ class HooksTest {
 
     @Test
     void absentHook_resolvesToTheNoOpDefault() {
-        PlaceholderApiHook hook = new PlaceholderApiHook();
+        GreetingHook hook = new GreetingHook();
 
-        PlaceholderApiQuery query = HookHarness.absent(hook);
+        Greeting greeting = HookHarness.absent(hook);
 
-        assertThat(query).isSameAs(hook.whenAbsent());
-        assertThat(query.available()).isFalse();
+        assertThat(greeting).isSameAs(hook.whenAbsent());
+        assertThat(greeting.available()).isFalse();
     }
 
     @Test
     void absentHook_capabilityCallsAreSafeNoOps() {
-        // With no PlaceholderAPI plugin installed and its SDK off the test classpath, calling the capability
-        // returns the text unchanged and must NOT throw NoClassDefFoundError — proving the real expander (the
-        // only class importing me.clip.placeholderapi) was never reached.
-        PlaceholderApiQuery query = HookHarness.absent(new PlaceholderApiHook());
-        UUID viewer = UUID.randomUUID();
+        Greeting greeting = HookHarness.absent(new GreetingHook());
 
-        assertThatCode(() -> assertThat(query.expand(viewer, "%player_name%")).isEqualTo("%player_name%"))
+        assertThatCode(() -> assertThat(greeting.greet("world")).isEqualTo("world"))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void presentHook_resolvesToTheRealImplementation() {
-        PlaceholderApiHook hook = new PlaceholderApiHook();
+        GreetingHook hook = new GreetingHook();
 
-        PlaceholderApiQuery query = HookHarness.present(hook);
+        Greeting greeting = HookHarness.present(hook);
 
-        // The real expander reports available; expand() itself is left uncalled because the live PlaceholderAPI
-        // class is absent from the test classpath — resolving to the present branch is what this asserts.
-        assertThat(query).isNotSameAs(hook.whenAbsent());
-        assertThat(query.available()).isTrue();
+        assertThat(greeting).isNotSameAs(hook.whenAbsent());
+        assertThat(greeting.available()).isTrue();
+        assertThat(greeting.greet("world")).isEqualTo("hello world");
     }
 
     @Test
     void resolve_isKeyedByCapabilityAndRejectsUnknownTypes() {
-        Hooks hooks = Hooks.resolve(MockBukkit.getMock(), HookHarness.SILENT, List.of(new PlaceholderApiHook()));
+        Hooks hooks = Hooks.resolve(MockBukkit.getMock(), HookHarness.SILENT, List.of(new GreetingHook()));
 
-        assertThat(hooks.provides(PlaceholderApiQuery.class)).isTrue();
+        assertThat(hooks.provides(Greeting.class)).isTrue();
         assertThat(hooks.provides(String.class)).isFalse();
-        assertThat(hooks.capability(PlaceholderApiQuery.class)).isNotNull();
+        assertThat(hooks.capability(Greeting.class)).isNotNull();
         assertThatThrownBy(() -> hooks.capability(String.class)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void resolve_rejectsTwoHooksClaimingTheSameCapability() {
         assertThatThrownBy(() -> Hooks.resolve(
-                        MockBukkit.getMock(),
-                        HookHarness.SILENT,
-                        List.of(new PlaceholderApiHook(), new PlaceholderApiHook())))
+                        MockBukkit.getMock(), HookHarness.SILENT, List.of(new GreetingHook(), new GreetingHook())))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void aHookThatThrowsWhilePresentDegradesToItsNoOpDefault() {
+        // The bootstrap contract: an incompatible SDK surfaces inside whenPresent, and one broken integration
+        // must not take the server's whole enable with it.
+        MockBukkit.createMockPlugin(FAKE_PLUGIN);
+        Hooks hooks = Hooks.resolve(MockBukkit.getMock(), HookHarness.SILENT, List.of(new BrokenHook()));
+
+        assertThat(hooks.capability(Greeting.class)).isSameAs(Greeting.ABSENT);
+    }
+
+    /** A capability that integrates with nothing: enough surface to exercise present, absent and no-op. */
+    private interface Greeting {
+
+        Greeting ABSENT = new Greeting() {
+            @Override
+            public boolean available() {
+                return false;
+            }
+
+            @Override
+            public String greet(String name) {
+                return name;
+            }
+        };
+
+        boolean available();
+
+        String greet(String name);
+    }
+
+    /** The ordinary hook: resolves to a real greeting when its plugin is installed. */
+    private static final class GreetingHook implements PluginHook<Greeting> {
+
+        @Override
+        public String pluginName() {
+            return FAKE_PLUGIN;
+        }
+
+        @Override
+        public Class<Greeting> capability() {
+            return Greeting.class;
+        }
+
+        @Override
+        public Greeting whenAbsent() {
+            return Greeting.ABSENT;
+        }
+
+        @Override
+        public Greeting whenPresent(Server server) {
+            return new Greeting() {
+                @Override
+                public boolean available() {
+                    return true;
+                }
+
+                @Override
+                public String greet(String name) {
+                    return "hello " + name;
+                }
+            };
+        }
+    }
+
+    /** A hook whose real implementation cannot be built: stands in for an incompatible or partial SDK. */
+    private static final class BrokenHook implements PluginHook<Greeting> {
+
+        @Override
+        public String pluginName() {
+            return FAKE_PLUGIN;
+        }
+
+        @Override
+        public Class<Greeting> capability() {
+            return Greeting.class;
+        }
+
+        @Override
+        public Greeting whenAbsent() {
+            return Greeting.ABSENT;
+        }
+
+        @Override
+        public Greeting whenPresent(Server server) {
+            throw new NoClassDefFoundError("com/example/MissingSdkType");
+        }
     }
 }
