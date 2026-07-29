@@ -1,6 +1,6 @@
 name: Release
 
-# A tag is the release. Pushing v0.5.1 builds that commit and publishes the four
+# A tag is the release. Pushing v0.5.2 builds that commit and publishes the four
 # jars under it, so what people download is exactly what the tag points at.
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to build and publish (e.g. v0.5.1)'
+        description: 'Existing tag to build and publish (e.g. v0.5.2)'
         required: true
 
 permissions:
