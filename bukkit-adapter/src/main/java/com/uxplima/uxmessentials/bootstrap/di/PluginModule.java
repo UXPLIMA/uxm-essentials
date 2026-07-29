@@ -176,6 +176,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlace
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreRanksPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
+import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
@@ -190,6 +191,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
+import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
@@ -527,11 +529,15 @@ public final class PluginModule {
         // currency the economy actions reach, and cooldown/set-cooldown the shared PDC-backed Cooldowns port; job and
         // worldguard-region are soft-depends reached purely by reflection past a plugin-present guard (an absent one
         // loads no SDK class). Weather reads only the viewer's own world, and every condition fails closed.
+        // ViaVersion, when installed, is the only thing that knows what version a translated client actually
+        // speaks; without it every player reports UNKNOWN and the client-version condition passes for everyone.
+        ClientProtocol clientProtocol = ViaVersionClientProtocol.bind(plugin.getServer(), kernel.log());
         IntegrationConditions.register(
                 menuBindings,
                 hooks.capability(PermissionQuery.class),
                 menuCurrencies,
                 kernel.cooldowns(),
+                clientProtocol,
                 plugin.getServer(),
                 kernel.log());
 

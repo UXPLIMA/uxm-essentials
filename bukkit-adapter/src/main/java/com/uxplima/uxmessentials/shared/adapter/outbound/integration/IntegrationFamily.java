@@ -22,6 +22,7 @@ public enum IntegrationFamily {
     BEDROCK("bedrock"),
     LOGIN("login"),
     COMBAT("combat"),
+    PROTOCOL("client protocol"),
     CONDITIONS("menu conditions");
 
     private final String label;

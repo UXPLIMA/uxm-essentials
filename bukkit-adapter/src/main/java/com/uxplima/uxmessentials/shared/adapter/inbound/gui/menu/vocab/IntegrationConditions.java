@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuCon
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
+import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.Nullable;
@@ -78,12 +79,14 @@ public final class IntegrationConditions {
             PermissionQuery permissions,
             Currencies currencies,
             Cooldowns cooldowns,
+            ClientProtocol protocol,
             Server server,
             Logger log) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(permissions, "permissions");
         Objects.requireNonNull(currencies, "currencies");
         Objects.requireNonNull(cooldowns, "cooldowns");
+        Objects.requireNonNull(protocol, "protocol");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(log, "log");
         registerGroup(bindings, permissions, log);
@@ -92,6 +95,7 @@ public final class IntegrationConditions {
         registerCooldown(bindings, cooldowns, log);
         registerJob(bindings, server, log);
         registerRegion(bindings, server, log);
+        registerClientVersion(bindings, protocol, log);
     }
 
     /** {@code has-group:<group>} (aliases {@code luckperm-group}, {@code group}) — the viewer's Vault group membership. */
@@ -120,6 +124,24 @@ public final class IntegrationConditions {
     private static void registerCooldown(MenuBindings bindings, Cooldowns cooldowns, Logger log) {
         bindings.condition("cooldown", closed("cooldown", log, (ctx, args) -> cooldownReady(ctx, args, cooldowns)));
         bindings.action("set-cooldown", safe("set-cooldown", log, ctx -> setCooldown(ctx, cooldowns)));
+    }
+
+    /**
+     * {@code client-version:<protocol>} (alias {@code protocol}) — whether the viewer's client speaks at least that
+     * protocol version, for hiding items an older client renders badly.
+     *
+     * <p>This is the one condition here that does <em>not</em> fail closed on a missing answer, and the asymmetry is
+     * deliberate. Every other gate answers a question about the player (their group, their balance, their job) where
+     * an unknown answer means "we could not verify, so deny". This one answers a question about their client, and an
+     * unknown answer means there is no translation layer installed at all, in which case every player is on the
+     * server's own version and the gate should pass. Denying instead would empty every menu that uses it on the
+     * overwhelmingly common server that has no ViaVersion.
+     */
+    private static void registerClientVersion(MenuBindings bindings, ClientProtocol protocol, Logger log) {
+        BiPredicate<MenuContext, Map<String, String>> gate =
+                closed("client-version", log, (ctx, args) -> clientVersion(ctx, args, protocol));
+        bindings.condition("client-version", gate);
+        bindings.condition("protocol", gate);
     }
 
     /** {@code job:<jobname>} — whether the viewer holds that JobsReborn job (reflection, absent → false). */
@@ -185,6 +207,20 @@ public final class IntegrationConditions {
         OptionalDouble amount = parseNumber(value(args));
         return amount.isPresent()
                 && currencies.resolve("playerpoints").has(ctx.viewer().uuid(), amount.getAsDouble());
+    }
+
+    /**
+     * {@code client-version:<protocol>} — true when the viewer's protocol version is at least the given number, and
+     * true as well when no version is known (see {@link #registerClientVersion}). A blank or unparseable argument is
+     * still false: that is an authoring mistake, not a missing answer.
+     */
+    private static boolean clientVersion(MenuContext ctx, Map<String, String> args, ClientProtocol protocol) {
+        OptionalDouble required = parseNumber(value(args));
+        if (required.isEmpty()) {
+            return false;
+        }
+        int actual = protocol.protocolVersion(ctx.viewer());
+        return actual == ClientProtocol.UNKNOWN || actual >= required.getAsDouble();
     }
 
     /** {@code weather:<clear|rain|thunder>} — matches the viewer's world weather; an unknown token or offline is false. */

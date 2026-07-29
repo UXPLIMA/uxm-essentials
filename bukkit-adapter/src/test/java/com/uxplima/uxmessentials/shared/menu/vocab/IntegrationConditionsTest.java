@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.FakeCurrencyBackend;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
+import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -74,7 +75,13 @@ class IntegrationConditionsTest {
         permissions = new FakePermissions("vip");
         cooldowns = new FakeCooldowns();
         IntegrationConditions.register(
-                bindings, permissions, currenciesOver(economy), cooldowns, server, new RecordingLogger());
+                bindings,
+                permissions,
+                currenciesOver(economy),
+                cooldowns,
+                ClientProtocol.UNAVAILABLE,
+                server,
+                new RecordingLogger());
     }
 
     @AfterEach
@@ -106,6 +113,7 @@ class IntegrationConditionsTest {
                 PermissionQuery.ABSENT,
                 currenciesOver(economy),
                 cooldowns,
+                ClientProtocol.UNAVAILABLE,
                 server,
                 new RecordingLogger());
         assertThat(fire(absentBindings, "has-group", "vip", online())).isFalse();

@@ -200,6 +200,11 @@ public final class IntegrationCatalog {
                     "ForeignCombatGate.java",
                     "a PvPManager combat tag blocks self-teleports out of a fight"),
             new Integration(
+                    "ViaVersion",
+                    IntegrationFamily.PROTOCOL,
+                    "ViaVersionClientProtocol.java",
+                    "reports what protocol version a translated client actually speaks"),
+            new Integration(
                     "Jobs",
                     IntegrationFamily.CONDITIONS,
                     "IntegrationConditions.java",

@@ -169,6 +169,12 @@ dependencies:
     PvPManager:
       load: BEFORE
       required: false
+    # ViaVersion reports the protocol version a translated client actually speaks (shared.adapter.outbound
+    # protocol ViaVersionClientProtocol), which the client-version menu condition reads. Reflective past a
+    # plugin-present guard; without it every player reports UNKNOWN and the condition passes for everyone.
+    ViaVersion:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with
