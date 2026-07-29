@@ -48,6 +48,15 @@ class ShopWorthSourceTest {
     }
 
     @Test
+    void present_isTrue_forThePremiumEditionToo() {
+        // The premium edition registers under its own plugin name and ships the same API; asking only for the
+        // free name would leave every premium server without the fallback.
+        MockBukkit.createMockPlugin("EconomyShopGUI-Premium");
+
+        assertThat(ShopWorthSource.present(server)).isTrue();
+    }
+
+    @Test
     void withoutTheShopEveryMaterialIsUnpricedAndNothingIsLogged() {
         CountingLogger log = new CountingLogger();
         ShopWorthSource worth = new ShopWorthSource(server, log, "coins");

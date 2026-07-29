@@ -45,6 +45,7 @@ import org.jspecify.annotations.Nullable;
 public final class ShopWorthSource implements WorthSource {
 
     private static final String ECONOMY_SHOP_GUI = "EconomyShopGUI";
+    private static final String ECONOMY_SHOP_GUI_PREMIUM = "EconomyShopGUI-Premium";
     private static final String HOOK_CLASS = "me.gypopo.economyshopgui.api.EconomyShopGUIHook";
 
     private final Server server;
@@ -60,10 +61,16 @@ public final class ShopWorthSource implements WorthSource {
         this.currencyId = Objects.requireNonNull(currencyId, "currencyId");
     }
 
-    /** Whether EconomyShopGUI is installed and enabled, so the wiring can decide whether binding this is worth it. */
+    /**
+     * Whether EconomyShopGUI is installed and enabled, so the wiring can decide whether binding this is worth it.
+     * Both editions count: the premium one registers under its own plugin name but ships the same
+     * {@code me.gypopo.economyshopgui.api} surface, so one reader serves both and asking for only the free name
+     * would leave every premium server without the fallback.
+     */
     public static boolean present(Server server) {
         Objects.requireNonNull(server, "server");
-        return server.getPluginManager().isPluginEnabled(ECONOMY_SHOP_GUI);
+        return server.getPluginManager().isPluginEnabled(ECONOMY_SHOP_GUI)
+                || server.getPluginManager().isPluginEnabled(ECONOMY_SHOP_GUI_PREMIUM);
     }
 
     @Override

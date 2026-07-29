@@ -147,8 +147,13 @@ dependencies:
       required: false
     # EconomyShopGUI is the bottom layer of the worth chain (economy.adapter.outbound ShopWorthSource):
     # an item nobody has priced with /setworth or in config falls back to the shop's own sell price.
-    # Read reflectively past a plugin-present guard, and only on the first /worth or /sell.
+    # Read reflectively past a plugin-present guard, and only on the first /worth or /sell. The premium
+    # edition registers under its own plugin name and ships the same API, so both names are declared and
+    # one reader serves either.
     EconomyShopGUI:
+      load: BEFORE
+      required: false
+    EconomyShopGUI-Premium:
       load: BEFORE
       required: false
     # Integration condition back-ends the menu engine gates on (shared.adapter.inbound.gui.menu.vocab

@@ -65,6 +65,11 @@ public final class IntegrationCatalog {
                     "ShopWorthSource.java",
                     "prices unpriced items for /worth and /sell from the shop's own sell prices"),
             new Integration(
+                    "EconomyShopGUI-Premium",
+                    IntegrationFamily.ECONOMY,
+                    "ShopWorthSource.java",
+                    "the premium edition of the same shop, under its own plugin name"),
+            new Integration(
                     "PlaceholderAPI",
                     IntegrationFamily.PLACEHOLDERS,
                     "PlaceholderApiSupport.java",
