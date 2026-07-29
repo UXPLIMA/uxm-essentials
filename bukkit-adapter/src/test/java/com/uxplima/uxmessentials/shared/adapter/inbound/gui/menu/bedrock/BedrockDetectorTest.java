@@ -13,13 +13,13 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 
 /**
- * The Bedrock detector in its Floodgate-absent state — the only state reachable in a test, since Floodgate is a
- * {@code compileOnly} soft-depend that is not on the test runtime (exactly like {@code LuckPermsMetaSource} and
- * the reflective hooks). The contract proved here is the load-safe one: with no {@code floodgate} plugin the
- * {@link BedrockDetector#forServer} factory returns the always-{@code false} {@link BedrockDetector#NONE}, and
- * neither the interface nor {@code NONE} declares any {@code org.geysermc.floodgate} type, so loading them pulls
- * in zero SDK class. The Floodgate-backed happy path stays untested by design — there is no Floodgate to delegate
- * to — so the absent-path selection and the structural isolation are the tested contract.
+ * The Bedrock detector's selection rule and its degrade. Neither SDK is on the test runtime (Floodgate is a
+ * {@code compileOnly} soft-depend, Geyser is purely reflective), exactly like {@code LuckPermsMetaSource} and the
+ * other reflective hooks, so the delegating happy paths cannot be exercised here. What can be, and what decides
+ * behaviour on a real server, is which detector {@link BedrockDetector#forServer} picks for each of the three
+ * server shapes, that an unreachable API answers "Java player" rather than throwing into a menu open, and that
+ * neither the interface nor {@code NONE} declares any {@code org.geysermc} type, so loading them on a Java-only
+ * server pulls in zero SDK class.
  */
 class BedrockDetectorTest {
 
@@ -48,6 +48,33 @@ class BedrockDetectorTest {
 
         assertThat(detector).isSameAs(BedrockDetector.NONE);
         assertThat(detector.isBedrock(UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void forServer_withGeyserOnly_selectsTheGeyserDetector() {
+        // The Floodgate-less network shape: Geyser alone still knows who came from Bedrock, so the factory must
+        // fall through to it rather than giving every Bedrock player a chest menu.
+        MockBukkit.createMockPlugin("Geyser-Spigot");
+
+        BedrockDetector detector = BedrockDetector.forServer(server);
+
+        assertThat(detector).isNotSameAs(BedrockDetector.NONE);
+        assertThat(detector.backend()).isEqualTo("geyser");
+    }
+
+    @Test
+    void geyserDetector_withoutTheGeyserApi_answersJavaRatherThanThrowing() {
+        // Geyser's API is not on the test classpath, so this exercises the degrade an unreachable API takes: a
+        // menu open must not fail because Bedrock detection could not answer.
+        MockBukkit.createMockPlugin("Geyser-Spigot");
+        BedrockDetector detector = BedrockDetector.forServer(server);
+
+        assertThat(detector.isBedrock(UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void none_reportsNoBackend() {
+        assertThat(BedrockDetector.NONE.backend()).isEqualTo("none");
     }
 
     @Test

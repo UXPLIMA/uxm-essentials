@@ -26,4 +26,9 @@ final class FloodgateBedrockDetector implements BedrockDetector {
             return false;
         }
     }
+
+    @Override
+    public String backend() {
+        return "floodgate";
+    }
 }

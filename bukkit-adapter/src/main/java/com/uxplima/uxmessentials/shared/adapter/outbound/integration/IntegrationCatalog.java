@@ -180,6 +180,11 @@ public final class IntegrationCatalog {
                     "BedrockDetector.java",
                     "shows Bedrock players native forms instead of chest menus"),
             new Integration(
+                    "Geyser-Spigot",
+                    IntegrationFamily.BEDROCK,
+                    "BedrockDetector.java",
+                    "names Bedrock players on networks running Geyser without Floodgate"),
+            new Integration(
                     "AuthMe",
                     IntegrationFamily.LOGIN,
                     "LoginPluginHandoff.java",

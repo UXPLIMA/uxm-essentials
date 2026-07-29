@@ -331,16 +331,16 @@ public final class PluginModule {
         // so it never retains an offline player; and the custommenus wiring hands the same instance to the /menu
         // command so `last` reopens what open recorded.
         LastMenu lastMenu = new LastMenu();
-        // The Bedrock hybrid seam: resolve once whether Floodgate is installed and pick the detector and the form
-        // screen accordingly — the Floodgate/Cumulus-backed pair when present, otherwise the always-false NONE
-        // detector and the no-op NONE screen. Only the enabled branch of each forServer names an org.geysermc class,
-        // so a Java-only server never loads Floodgate or Cumulus. Both are threaded into the façade so the open
-        // choke-point can redirect a Bedrock viewer to a native SimpleForm; the detector is also held on
-        // resources.bedrock() for any other consumer. A Java viewer (isBedrock false) opens the chest exactly as
-        // before.
+        // The Bedrock hybrid seam: resolve once which Bedrock plugin is installed and pick the detector and the
+        // form screen accordingly: the Floodgate/Cumulus-backed pair when present, a Geyser-only detector when
+        // Geyser runs without Floodgate, otherwise the always-false NONE detector and the no-op NONE screen. Only
+        // the enabled branch of each forServer names an org.geysermc class, so a Java-only server never loads
+        // Floodgate, Geyser or Cumulus. Both are threaded into the façade so the open choke-point can redirect a
+        // Bedrock viewer to a native SimpleForm; the detector is also held on resources.bedrock() for any other
+        // consumer. A Java viewer (isBedrock false) opens the chest exactly as before.
         BedrockDetector bedrock = BedrockDetector.forServer(plugin.getServer());
         resources.bedrock(bedrock);
-        kernel.log().info("event=bedrock_detector backend={}", bedrock == BedrockDetector.NONE ? "none" : "floodgate");
+        kernel.log().info("event=bedrock_detector backend={}", bedrock.backend());
         BedrockScreen bedrockScreen = BedrockScreen.forServer(plugin.getServer());
         resources.bedrockScreen(bedrockScreen);
         kernel.log().info("event=bedrock_screen backend={}", bedrockScreen == BedrockScreen.NONE ? "none" : "cumulus");
