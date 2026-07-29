@@ -29,6 +29,12 @@ dependencies:
     PlaceholderAPI:
       load: BEFORE
       required: false
+    # MiniPlaceholders contributes MiniMessage-native tags our catalog lines may use (shared.adapter.outbound
+    # miniplaceholders MiniPlaceholdersSupport). Reached only past a plugin-present guard, so the plugin runs
+    # fully without it. Loaded before us so the guard sees it on enable rather than after.
+    MiniPlaceholders:
+      load: BEFORE
+      required: false
     # NuVotifier/Votifier feeds the vote context; the vote listener is reached reflectively behind a
     # plugin-present guard, so the plugin runs fully without Votifier installed.
     Votifier:
@@ -124,6 +130,12 @@ dependencies:
       load: BEFORE
       required: false
     WorldGuard:
+      load: BEFORE
+      required: false
+    # WorldEdit backs '/region select', which reads your current WorldEdit selection (regions.adapter.inbound
+    # command WorldEditRegionSelection). Reached reflectively past a present-guard, so the regions module runs
+    # fully without it. Loaded before us so its selection API is ready when the command resolves.
+    WorldEdit:
       load: BEFORE
       required: false
     # Floodgate backs the Bedrock-form integration (shared.adapter.inbound.gui.menu.bedrock BedrockDetector). The
