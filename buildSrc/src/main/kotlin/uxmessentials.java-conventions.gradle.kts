@@ -97,4 +97,9 @@ tasks.withType<Test>().configureEach {
         showStandardStreams = false
     }
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
+    // Pinned, because an unset max heap is a quarter of the host's RAM: the same suite got ~5 GB on a
+    // workstation and ~1.7 GB on a 7 GB CI runner, where the parallel MockBukkit servers then ran out of
+    // heap. With a fixed ceiling every machine runs the test JVM the same way, and one runner-sized value
+    // is what the build is verified against.
+    maxHeapSize = "2g"
 }
