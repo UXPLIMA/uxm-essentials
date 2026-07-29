@@ -55,6 +55,7 @@ class ClaimProviderCoverageDriftTest {
             Map.entry("homestead", "Homestead"),
             Map.entry("worldguard", "WorldGuard"),
             Map.entry("towny", "Towny"),
+            Map.entry("kingdoms", "Kingdoms"),
             Map.entry("bentobox", "BentoBox"),
             Map.entry("residence", "Residence"),
             Map.entry("plotsquared", "PlotSquared"),

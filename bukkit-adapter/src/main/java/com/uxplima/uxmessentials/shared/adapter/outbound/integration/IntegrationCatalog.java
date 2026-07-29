@@ -125,6 +125,11 @@ public final class IntegrationCatalog {
             new Integration(
                     "Towny", IntegrationFamily.CLAIMS, "TownyClaimProvider.java", "town plots gate homes and warps"),
             new Integration(
+                    "Kingdoms",
+                    IntegrationFamily.CLAIMS,
+                    "KingdomsClaimProvider.java",
+                    "KingdomsX land gates homes and warps"),
+            new Integration(
                     "BentoBox",
                     IntegrationFamily.CLAIMS,
                     "BentoBoxClaimProvider.java",

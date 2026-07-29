@@ -19,8 +19,9 @@ import org.jspecify.annotations.NullMarked;
  * MapMarkerPublishers} discovers a map plugin and {@code ForeignEconomyProviders} discovers an economy
  * provider.
  *
- * <p>Every candidate — uxmClaims, Lands, GriefPrevention, GriefDefender, ExcellentClaims, SimpleClaimSystem,
- * RClaim, XClaim, Homestead, WorldGuard, Towny, BentoBox, Residence, PlotSquared, SuperiorSkyblock2 — is constructed and asked {@link ClaimProvider#active()}; those that are both
+ * <p>Every candidate (uxmClaims, Lands, GriefPrevention, GriefDefender, ExcellentClaims, SimpleClaimSystem,
+ * RClaim, XClaim, Homestead, WorldGuard, Towny, KingdomsX, BentoBox, Residence, PlotSquared, SuperiorSkyblock2)
+ * is constructed and asked {@link ClaimProvider#active()}; those that are both
  * active and enabled become composite members, so a server running two claim plugins consults both and their
  * answers are folded per {@link ClaimProvidersConfig#combine()}. Ordering no longer matters. Constructing a
  * candidate never loads its plugin SDK (each typed provider keeps its references behind its own present-guard,
@@ -54,6 +55,7 @@ public final class ClaimProviders {
             new Registration("homestead", HomesteadClaimProvider::new),
             new Registration("worldguard", WorldGuardClaimProvider::new),
             new Registration("towny", TownyClaimProvider::new),
+            new Registration("kingdoms", KingdomsClaimProvider::new),
             new Registration("bentobox", BentoBoxClaimProvider::new),
             new Registration("residence", ResidenceClaimProvider::new),
             new Registration("plotsquared", PlotSquaredClaimProvider::new),

@@ -82,6 +82,11 @@ dependencies:
     Towny:
       load: BEFORE
       required: false
+    # KingdomsX registers under the name Kingdoms, which is the name to probe and the one that has to
+    # appear here; KingdomsX is only how the resource is listed.
+    Kingdoms:
+      load: BEFORE
+      required: false
     BentoBox:
       load: BEFORE
       required: false
