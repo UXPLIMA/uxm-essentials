@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.bootstrap.health.BusTransportHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.ClusterPeersHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.CommandConflictHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.DatabaseHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.EconomyProviderHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.ModuleCountHealthCheck;
@@ -684,6 +685,9 @@ public final class PluginModule {
         }
         // The Redis probe reads the unified network.redis block from the plugin-wide config, not a per-module one.
         checks.add(new SoftDependencyHealthCheck(plugin.getServer().getPluginManager(), config));
+        // Not an integration check: this one names plugins we deliberately do not talk to, whose command
+        // names collide with ours. It is informational, so it never fails the doctor run.
+        checks.add(new CommandConflictHealthCheck(plugin.getServer().getPluginManager()));
         // The bus line reads the running transport's live healthy() flag (a cheap volatile read) so the operator
         // sees whether cross-server delivery is actually working, not just configured.
         checks.add(new BusTransportHealthCheck(bus.health()));
