@@ -282,6 +282,44 @@ class AutoDropsListenerTest {
         assertThat(ore.getType()).isEqualTo(Material.COAL_ORE);
     }
 
+    /**
+     * The chest bug, frozen out. Cancelling a break's drops does not merely suppress the block's own item: the server
+     * opens a capture list before it removes the block and spawns what it caught only when {@code isDropItems()} is
+     * still true, so a chest's contents, which drop during that removal, went with it. Taking ownership of a
+     * container's drops therefore deleted whatever was inside, and {@link Block#getDrops} handed back only the empty
+     * chest. A block with a block entity is now left to vanilla, whole.
+     */
+    @Test
+    void aBlockThatHoldsSomethingIsLeftToVanillaSoItsContentsAreNotCancelledAway() {
+        Block chest = blockWithDrops(Material.CHEST, new ItemStack(Material.CHEST, 1));
+        BlockBreakEvent event = new BlockBreakEvent(chest, player);
+        AutoDropsListener listener = pickupOnly();
+
+        listener.onBreak(event);
+
+        assertThat(event.isDropItems())
+                .as("the vanilla drop still runs, so the chest spills what is in it")
+                .isTrue();
+        assertThat(player.getInventory().contains(Material.CHEST))
+                .as("nothing is pocketed: the whole break belongs to vanilla")
+                .isFalse();
+        assertThat(groundItems()).isEmpty();
+    }
+
+    @Test
+    void aPlainBlockIsStillTakenOverAsBefore() {
+        Block ore = blockWithDrops(Material.COAL_ORE, new ItemStack(Material.COAL, 1));
+        BlockBreakEvent event = new BlockBreakEvent(ore, player);
+        AutoDropsListener listener = pickupOnly();
+
+        listener.onBreak(event);
+
+        // The guard is a block-entity test, not a blanket retreat: an ore has nothing to spill, so the mechanics
+        // keep taking its drops.
+        assertThat(event.isDropItems()).isFalse();
+        assertThat(player.getInventory().contains(Material.COAL, 1)).isTrue();
+    }
+
     // --- helpers -----------------------------------------------------------------------------------------------------
 
     private AutoDropsListener pickupOnly() {

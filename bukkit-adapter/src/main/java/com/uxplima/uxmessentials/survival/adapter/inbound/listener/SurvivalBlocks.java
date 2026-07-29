@@ -7,6 +7,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.TileState;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -49,6 +50,24 @@ final class SurvivalBlocks {
     }
 
     /**
+     * Whether {@code block} carries a block entity, which is this module's "do not take ownership of these drops"
+     * test.
+     *
+     * <p>What a block entity holds (a chest's inventory, a furnace's smelt, a lectern's book, a campfire's food) is
+     * dropped by the server as the block is removed, not by {@link Block#getDrops}. Both ways this module has of
+     * taking a break's drops for itself throw that away: cancelling the event's drops discards the server's whole
+     * capture list, and {@code setType(AIR)} clears the block entity before the removal that would have dropped its
+     * contents. So a block entity is left to vanilla, whole, and the mechanics act on the plain blocks they are
+     * meant for.
+     *
+     * <p>The state is read without a snapshot, so this is a type test on the live block rather than a copy of a
+     * chest's inventory on every swing.
+     */
+    static boolean hasBlockEntity(Block block) {
+        return block.getState(false) instanceof TileState;
+    }
+
+    /**
      * Break every block connected to {@code origin} that shares its material, up to the search's cap, leaving the
      * origin itself to the event's own break. Drops respect {@code tool} (enchantments, silk touch), and fall on the
      * ground as a natural break — the plain cascade with no auto-drops routing.
@@ -64,7 +83,8 @@ final class SurvivalBlocks {
      * {@code sink} is present route each broken block's drops through it instead of dropping them on the ground —
      * this is how the tree-feller and veinminer cascades feed the auto-drops pipeline (auto-pickup / smelt / sell).
      * With a sink, the block is computed for its drops, cleared to air (no vanilla ground drop), and the sink is
-     * handed the captured drops at that block's location; with none, the block breaks naturally.
+     * handed the captured drops at that block's location; with none, the block breaks naturally. A block carrying a
+     * block entity always breaks naturally, sink or not (see {@link #hasBlockEntity}).
      *
      * @return how many blocks were broken, the origin excluded
      */
@@ -103,7 +123,9 @@ final class SurvivalBlocks {
                 continue; // the origin is broken by the vanilla event itself; the cascade takes only the extras
             }
             Block block = world.getBlockAt(pos.x(), pos.y(), pos.z());
-            if (sink == null) {
+            if (sink == null || hasBlockEntity(block)) {
+                // A natural break keeps the block entity alive through the removal, so a container caught in a
+                // cascade spills its contents the way a hand-break does instead of losing them to the clear below.
                 block.breakNaturally(tool);
             } else {
                 List<ItemStack> drops = new ArrayList<>(block.getDrops(tool));

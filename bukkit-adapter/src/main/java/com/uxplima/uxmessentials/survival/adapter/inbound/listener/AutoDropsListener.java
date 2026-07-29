@@ -29,6 +29,15 @@ import org.jspecify.annotations.NullMarked;
  * <p>A break in creative mode, or one whose drops another plugin has already suppressed ({@code isDropItems()} is
  * false), is left entirely to vanilla: the auto-* mechanics never fire, so a creative break drops and pockets nothing.
  *
+ * <h2>Blocks that hold something</h2>
+ * A block with a block entity is left to vanilla for the same reason, and this one is not a nicety: {@code
+ * setDropItems(false)} does not merely suppress the block's own item. The server opens a capture list before it
+ * removes the block and only spawns what it caught when {@code isDropItems()} is still true, so a chest's contents,
+ * which drop during that removal, are discarded with everything else. Taking ownership of the drops of a container,
+ * furnace, hopper, brewing stand, lectern or campfire would therefore delete what is inside it, and
+ * {@link Block#getDrops} would hand back only the empty block. The convenience of pocketing the chest itself is not
+ * worth an inventory, so those breaks stay vanilla.
+ *
  * <p>The one thing that is genuinely event-shaped stays here: transferring the block's dropped experience straight to
  * the player when auto-pickup and {@code transfer-xp} are both on. Everything else, the smelt/sell/route transform, is
  * the pipeline's, shared verbatim with the tree-feller and veinminer cascades.
@@ -65,11 +74,14 @@ public final class AutoDropsListener implements Listener {
         if (player.getGameMode() == GameMode.CREATIVE || !event.isDropItems()) {
             return; // a creative or drop-suppressed break does the vanilla nothing: no auto-drops
         }
+        Block block = event.getBlock();
+        if (SurvivalBlocks.hasBlockEntity(block)) {
+            return; // a chest's contents ride the drop we would be cancelling: leave the whole break to vanilla
+        }
         Stages stages = pipeline.stagesFor(player);
         if (!stages.anyActive()) {
             return;
         }
-        Block block = event.getBlock();
         List<ItemStack> drops =
                 new ArrayList<>(block.getDrops(player.getInventory().getItemInMainHand()));
         event.setDropItems(false);
