@@ -93,6 +93,11 @@ dependencies:
     HuskTowns:
       load: BEFORE
       required: false
+    # FactionsUUID and SaberFactions both register under the name Factions and share the same
+    # com.massivecraft.factions API, so this one entry covers either fork.
+    Factions:
+      load: BEFORE
+      required: false
     BentoBox:
       load: BEFORE
       required: false

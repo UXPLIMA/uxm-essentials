@@ -140,6 +140,11 @@ public final class IntegrationCatalog {
                     "HuskTownsClaimProvider.java",
                     "HuskTowns town claims gate homes and warps"),
             new Integration(
+                    "Factions",
+                    IntegrationFamily.CLAIMS,
+                    "FactionsClaimProvider.java",
+                    "FactionsUUID or SaberFactions territory gates homes and warps"),
+            new Integration(
                     "BentoBox",
                     IntegrationFamily.CLAIMS,
                     "BentoBoxClaimProvider.java",
