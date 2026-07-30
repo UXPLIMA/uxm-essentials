@@ -21,10 +21,11 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      # Read through env rather than straight from secrets so the Modrinth step can ask whether it is set: the
-      # secrets context is not available to a step's `if`. A repository without the token still cuts its GitHub
+      # Read through env rather than straight from secrets so the store steps can ask whether they are set: the
+      # secrets context is not available to a step's `if`. A repository without the tokens still cuts its GitHub
       # release, and a fork publishes nowhere.
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+      HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
     steps:
       - name: Check out uxmEssentials
         uses: actions/checkout@v4
@@ -162,3 +163,61 @@ jobs:
             "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" '["paper","folia","purpur"]'
           publish DCyMsr3U "uxmEssentials Redis" \
             "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" '["paper","folia","purpur"]'
+
+      # Hangar knows PAPER, WATERFALL and VELOCITY and nothing else, and a version carries one file per platform, so
+      # the server jar and the proxy jar ride the same version and the discord and redis jars have no seat here.
+      # Their home stays the GitHub release and Modrinth.
+      - name: Publish the jars to Hangar
+        if: env.HANGAR_TOKEN != ''
+        working-directory: uxmEssentials
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          project=uxmEssentials
+
+          existing="$(curl -sS -o /dev/null -w '%{http_code}' \
+            "https://hangar.papermc.io/api/v1/projects/${project}/versions/${version}")"
+          if [ "$existing" = "200" ]; then
+            echo "hangar already has $version, leaving it alone"
+            exit 0
+          fi
+
+          # The key buys a JWT that lasts well under an hour, so it is fetched here rather than carried around.
+          jwt="$(curl -sS --fail-with-body -X POST \
+            "https://hangar.papermc.io/api/v1/authenticate?apiKey=${HANGAR_TOKEN}" | jq -r .token)"
+
+          # The file parts go up in the order the platforms are listed here, which is what pairs each jar with its
+          # platform. LuckPerms and PlaceholderAPI are soft-depends, and the listing says so.
+          jq -n \
+            --arg version "$version" \
+            --rawfile description "${RUNNER_TEMP}/release-notes.md" \
+            '{
+               version: $version,
+               channel: "Alpha",
+               description: $description,
+               files: [
+                 {platforms: ["PAPER"]},
+                 {platforms: ["VELOCITY"]}
+               ],
+               platformDependencies: {
+                 PAPER: ["26.1", "26.1.1", "26.1.2", "26.2"],
+                 VELOCITY: ["3.4"]
+               },
+               pluginDependencies: {
+                 PAPER: [
+                   {name: "LuckPerms", required: false, externalUrl: "https://luckperms.net/"},
+                   {name: "PlaceholderAPI", required: false, projectId: 1289}
+                 ]
+               }
+             }' > "${RUNNER_TEMP}/hangar-data.json"
+
+          echo "publishing $version to hangar project $project"
+          curl -sS --fail-with-body -X POST \
+            "https://hangar.papermc.io/api/v1/projects/${project}/upload" \
+            -H "Authorization: Bearer ${jwt}" \
+            -F "versionUpload=@${RUNNER_TEMP}/hangar-data.json;type=application/json" \
+            -F "files=@bukkit-adapter/build/libs/uxmEssentials-${version}.jar" \
+            -F "files=@velocity-adapter/build/libs/uxmEssentials-velocity-${version}-all.jar" \
+            -o /dev/null
