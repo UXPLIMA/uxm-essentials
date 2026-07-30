@@ -115,6 +115,13 @@ jobs:
             label="$2"
             jar="$3"
             loaders="$4"
+            # Modrinth accepts the same version number twice and lists it twice rather than refusing it, so a second
+            # run over a tag that is already out has to be stopped here.
+            if curl -sS "https://api.modrinth.com/v2/project/${project}/version" \
+                 | jq -e --arg v "$version" 'any(.[]; .version_number == $v)' > /dev/null; then
+              echo "modrinth project $project already has $version, leaving it alone"
+              return
+            fi
             payload="$(jq -n \
               --arg project "$project" \
               --arg name "$label $version" \
