@@ -64,12 +64,29 @@ jobs:
           :discord-adapter:shadowJar
           :redis-adapter:shadowJar
 
+      # Written once and read by both publishers, so the two stores show the same text. A tag that already has a
+      # release keeps the notes it has: asking GitHub to generate them again on an update puts the existing body in
+      # front of the freshly generated one, and re-running the workflow over a published tag says everything twice.
+      - name: Prepare the release notes
+        working-directory: uxmEssentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          notes="$(gh release view "$TAG" --json body --jq .body 2>/dev/null || true)"
+          if [ -z "$notes" ]; then
+            notes="$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="$TAG" --jq .body)"
+          fi
+          printf '%s\n' "$notes" > "${RUNNER_TEMP}/release-notes.md"
+          cat "${RUNNER_TEMP}/release-notes.md"
+
       - name: Publish the GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           name: ${{ inputs.tag || github.ref_name }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
           fail_on_unmatched_files: true
           files: |
             uxmEssentials/bukkit-adapter/build/libs/uxmEssentials-*.jar
@@ -79,18 +96,16 @@ jobs:
 
       # The same four jars onto the four Modrinth projects, straight through the v2 API. No publishing action sits
       # in between on purpose: they resolve the game versions against a list of their own, and this plugin targets
-      # the 26.x line, which is exactly the kind of version such a list is last to learn. The tag's own release
-      # notes become the Modrinth changelog, so the two stores read the same.
+      # the 26.x line, which is exactly the kind of version such a list is last to learn.
       - name: Publish the jars to Modrinth
         if: env.MODRINTH_TOKEN != ''
         working-directory: uxmEssentials
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          changelog="$(gh release view "$TAG" --json body --jq .body)"
+          changelog="$(cat "${RUNNER_TEMP}/release-notes.md")"
           if [ -z "$changelog" ]; then
             changelog="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
           fi
