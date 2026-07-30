@@ -112,11 +112,12 @@ jobs:
 
           publish() {
             project="$1"
-            jar="$2"
-            loaders="$3"
+            label="$2"
+            jar="$3"
+            loaders="$4"
             payload="$(jq -n \
               --arg project "$project" \
-              --arg name "uxmEssentials $version" \
+              --arg name "$label $version" \
               --arg version "$version" \
               --arg changelog "$changelog" \
               --argjson loaders "$loaders" \
@@ -144,7 +145,13 @@ jobs:
               -o /dev/null
           }
 
-          publish QVeOROXV "bukkit-adapter/build/libs/uxmEssentials-${version}.jar" '["paper","folia","purpur"]'
-          publish giFPy916 "velocity-adapter/build/libs/uxmEssentials-velocity-${version}-all.jar" '["velocity"]'
-          publish IpIrzRV9 "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" '["paper","folia","purpur"]'
-          publish DCyMsr3U "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" '["paper","folia","purpur"]'
+          # The label is what the version is called on its own project page, where "uxmEssentials 0.5.2" on all four
+          # would read as the same download listed four times.
+          publish QVeOROXV "uxmEssentials" \
+            "bukkit-adapter/build/libs/uxmEssentials-${version}.jar" '["paper","folia","purpur"]'
+          publish giFPy916 "uxmEssentials Velocity" \
+            "velocity-adapter/build/libs/uxmEssentials-velocity-${version}-all.jar" '["velocity"]'
+          publish IpIrzRV9 "uxmEssentials Discord" \
+            "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" '["paper","folia","purpur"]'
+          publish DCyMsr3U "uxmEssentials Redis" \
+            "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" '["paper","folia","purpur"]'
