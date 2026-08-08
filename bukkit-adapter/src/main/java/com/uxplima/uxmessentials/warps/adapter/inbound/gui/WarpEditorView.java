@@ -75,7 +75,7 @@ public final class WarpEditorView {
     private final EditableWarpLoader loader;
 
     /** The sub-screen collaborators the buttons open; injected after this view to break their re-open cycle. */
-    private @Nullable WarpCategorySelectorView categorySelector;
+    private @Nullable WarpCategorySelectorMenu categorySelector;
 
     private @Nullable WarpWelcomeMessagesView welcomeMessagesView;
     private @Nullable WarpSoundMenu soundMenu;
@@ -112,7 +112,7 @@ public final class WarpEditorView {
      * and this view holds them; this setter breaks that cycle, mirroring the category settings panel's {@code bind}.
      */
     public void bind(
-            WarpCategorySelectorView categorySelector,
+            WarpCategorySelectorMenu categorySelector,
             WarpWelcomeMessagesView welcomeMessagesView,
             WarpSoundMenu soundMenu,
             WarpSoundSelectorView soundSelectorView,

@@ -36,7 +36,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
@@ -101,7 +101,7 @@ class WarpCategorySelectorGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingWarps warps;
-    private WarpCategorySelectorView selector;
+    private WarpCategorySelectorMenu selector;
 
     @BeforeEach
     void setUp() {
@@ -128,8 +128,9 @@ class WarpCategorySelectorGoldenTest {
                 new PlayerWarpRepositoryHandle(),
                 new PlayerWarpGoToHandle());
         editorView.register(engine.bindings(), dataFolder, NOOP);
-        selector = new WarpCategorySelectorView(
-                new KeyMessages(), categories, warps, editorView, engine.menus(), scheduler);
+        selector = new WarpCategorySelectorMenu(
+                engine.menus(), new KeyMessages(), scheduler, categories, warps, editorView);
+        selector.register(engine.bindings(), dataFolder, NOOP);
     }
 
     @AfterEach

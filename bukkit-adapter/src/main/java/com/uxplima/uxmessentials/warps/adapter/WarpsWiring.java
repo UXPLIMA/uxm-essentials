@@ -153,8 +153,9 @@ public final class WarpsWiring {
         // Warm the category set once on enable so every browse-menu open and category-GUI render is served from
         // memory rather than a synchronous SQLite read on the command/region thread.
         categoryRepository.all();
-        var categoryManagerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView(
-                kernel.messages(), categoryRepository, textInput, menus, kernel.scheduler());
+        var categoryManagerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerMenu(
+                menus, kernel.messages(), kernel.scheduler(), categoryRepository, textInput);
+        categoryManagerView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         // The per-category settings panel now renders through the menu engine: a declarative spec over the edited
         // category as its subject. The manager opens it on a category click and on create; each shares this one
         // instance. It closes a small cycle with the parent selector (settings opens the selector, the selector reopens
@@ -166,16 +167,18 @@ public final class WarpsWiring {
                 categoryRepository,
                 (player, viewer) -> categoryManagerView.open(player, viewer));
         categorySettingsView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
-        var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView(
-                kernel.messages(), categoryRepository, repository, editorView, menus, kernel.scheduler());
+        var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorMenu(
+                menus, kernel.messages(), kernel.scheduler(), categoryRepository, repository, editorView);
+        categorySelectorView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         // Close the editor's sub-screen cycle now that every collaborator exists: the editor's category / welcome /
         // sound / particle buttons open these views, and each reopens the editor after its work. The editor registers
         // its spec last, once its bindings can resolve.
         editorView.bind(categorySelectorView, welcomeMessagesView, soundMenu, soundSelectorView, particleSelectorView);
         editorView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categoryParentSelectorView =
-                new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView(
-                        kernel.messages(), categoryRepository, categorySettingsView, menus, kernel.scheduler());
+                new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorMenu(
+                        menus, kernel.messages(), kernel.scheduler(), categoryRepository, categorySettingsView);
+        categoryParentSelectorView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         categorySettingsView.bind(categoryParentSelectorView);
         SetWarp setWarp = new SetWarp(
                 repository,

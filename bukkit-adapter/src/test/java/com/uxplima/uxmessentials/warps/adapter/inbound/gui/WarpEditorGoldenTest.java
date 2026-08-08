@@ -129,8 +129,9 @@ class WarpEditorGoldenTest {
                 playerWarpHandle,
                 new PlayerWarpGoToHandle());
         // Bind the real engine sub-screens so a button click opens its child window through the same façade.
-        WarpCategorySelectorView categorySelector = new WarpCategorySelectorView(
-                new KeyMessages(), new EmptyCategories(), repository, editor, engine.menus(), scheduler);
+        WarpCategorySelectorMenu categorySelector = new WarpCategorySelectorMenu(
+                engine.menus(), new KeyMessages(), scheduler, new EmptyCategories(), repository, editor);
+        categorySelector.register(engine.bindings(), dataFolder, NOOP);
         WarpWelcomeMessagesView welcome =
                 WarpWelcomeMessagesView.create(engine.menus(), scheduler, textInput, repository, editor);
         welcome.register(engine.bindings(), dataFolder, NOOP);
@@ -272,8 +273,8 @@ class WarpEditorGoldenTest {
         repository.save(serverWarp("spawn"));
         editor.open(player, viewer, "spawn", null);
         fireClick(CATEGORY_SLOT, ClickType.LEFT);
-        // The category selector renders through the engine's paginated-list runtime (openList).
-        assertThat(holderSpecId(top())).startsWith("list:");
+        // The category selector is a spec of its own now, so the window carries that spec's id.
+        assertThat(holderSpecId(top())).isEqualTo(WarpCategorySelectorMenu.SPEC_ID);
     }
 
     @Test

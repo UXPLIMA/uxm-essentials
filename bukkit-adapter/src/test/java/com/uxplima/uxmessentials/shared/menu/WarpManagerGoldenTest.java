@@ -43,7 +43,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu;
@@ -72,7 +72,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * be deleted. Then, through the engine's own {@link MenuListener}, a left click on the first warp icon proves the
  * migrated path opens that warp's engine {@link WarpEditorView}, a left click on the create button proves it reaches
  * the create prompt, and a left click on the categories button proves it opens the bespoke
- * {@link WarpCategoryManagerView} — so the move is faithful in both appearance and behaviour.
+ * {@link WarpCategoryManagerMenu} — so the move is faithful in both appearance and behaviour.
  *
  * <p>The {@code KeyMessages} catalog surfaces the entry name's {@code warp} token, so a warp's name appears in the
  * rendered label; every other key renders verbatim. A real rendering difference (a wrong key, a wrong material, a
@@ -212,11 +212,12 @@ class WarpManagerGoldenTest {
         // The manager only opens the editor here; its sub-screens are exercised by the editor's own golden test, so the
         // editor is registered (its spec must be known for the open) but not bound to live sub-screens.
         editorView.register(bindings, dataFolder, NOOP);
-        WarpCategoryManagerView categoryManager =
-                new WarpCategoryManagerView(messages, new StubCategoryRepository(), textInput, menus, scheduler);
+        WarpCategoryManagerMenu categoryManager =
+                new WarpCategoryManagerMenu(menus, messages, scheduler, new StubCategoryRepository(), textInput);
         // The category manager is only the warp manager's category-button target here; this test never drives its own
-        // create/click/back seams, so the loop-closing collaborators are no-ops. The engine settings panel is bound but
-        // never opened, so its spec is not registered here.
+        // create/click/back seams, so the loop-closing collaborators are no-ops. Its spec is registered because the
+        // category button opens it. The engine settings panel is bound but never opened, so its spec is not registered.
+        categoryManager.register(bindings, dataFolder, NOOP);
         categoryManager.bind(
                 new WarpCategorySettingsView(menus, messages, textInput, new StubCategoryRepository(), (p, v) -> {}),
                 (p, v) -> {});

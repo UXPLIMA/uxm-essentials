@@ -38,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>A left click on a warp runs {@code warps:manager-edit}, opening that warp's still-bespoke {@link WarpEditorView};
  * the create button runs {@code warps:manager-create}, the same name-prompt → create-at-position → editor flow the old
  * create button drove; the categories button runs {@code warps:manager-categories}, opening the still-bespoke
- * {@link WarpCategoryManagerView}; the close button shuts the window. The list adds no domain logic of its own.
+ * {@link WarpCategoryManagerMenu}; the close button shuts the window. The list adds no domain logic of its own.
  */
 @NullMarked
 public final class WarpManagerMenu {
@@ -54,7 +54,7 @@ public final class WarpManagerMenu {
     private final WarpRepository repository;
     private final Messages messages;
     private final WarpEditorView editorView;
-    private final WarpCategoryManagerView categoryManagerView;
+    private final WarpCategoryManagerMenu categoryManagerView;
     private final BiConsumer<Player, PlayerRef> createPrompt;
 
     /**
@@ -67,7 +67,7 @@ public final class WarpManagerMenu {
             WarpRepository repository,
             Messages messages,
             WarpEditorView editorView,
-            WarpCategoryManagerView categoryManagerView,
+            WarpCategoryManagerMenu categoryManagerView,
             BiConsumer<Player, PlayerRef> createPrompt) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");

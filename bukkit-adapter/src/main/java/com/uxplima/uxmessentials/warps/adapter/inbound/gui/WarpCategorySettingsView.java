@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * {@link WarpCategory}: labeled buttons for its display name, material, lore, sorting slot, and parent category, a
  * delete button, and a back button to the category manager. The display-name / lore / slot buttons capture a value
  * through the shared input seam, the material button copies the item in the operator's main hand, and the parent
- * button opens the already-engine {@link WarpCategoryParentSelectorView}; each mutation saves the edited category and
+ * button opens the already-engine {@link WarpCategoryParentSelectorMenu}; each mutation saves the edited category and
  * re-opens this panel with the new subject so the operator sees the result.
  *
  * <p>The edited category is handed in as the menu subject, so the title and every current-value line fill from the
@@ -61,7 +61,7 @@ public final class WarpCategorySettingsView {
     private final BiConsumer<Player, PlayerRef> onBack;
 
     /** The parent selector the parent button opens; injected after this view to break the settings↔selector cycle. */
-    private @Nullable WarpCategoryParentSelectorView parentSelector;
+    private @Nullable WarpCategoryParentSelectorMenu parentSelector;
 
     public WarpCategorySettingsView(
             Menus menus,
@@ -80,7 +80,7 @@ public final class WarpCategorySettingsView {
      * Wire the parent-category selector the parent button opens. The selector reopens this panel after a pick, so it
      * holds this view and this view holds it; this setter breaks that cycle, mirroring the manager's {@code bind}.
      */
-    public void bind(WarpCategoryParentSelectorView parentSelector) {
+    public void bind(WarpCategoryParentSelectorMenu parentSelector) {
         this.parentSelector = Objects.requireNonNull(parentSelector, "parentSelector");
     }
 

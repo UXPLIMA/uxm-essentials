@@ -30,7 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
@@ -45,7 +45,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * The parent-category selector golden test: the engine-rendered selector must draw the exact grid the original
- * bespoke {@code WarpCategoryParentSelectorView} drew on its own {@code Bukkit.createInventory}. The fixture edits the
+ * bespoke {@code WarpCategoryParentSelectorMenu} drew on its own {@code Bukkit.createInventory}. The fixture edits the
  * "child" category over a three-category set, so the candidate list is the two others (a {@code DIAMOND}-iconed "pvp"
  * and a default-BOOK "misc"), drawn at content slots 0 and 1, with the "no parent" BARRIER at slot 49 and the back
  * ARROW at slot 53. The window is snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for
@@ -77,7 +77,7 @@ class WarpCategoryParentSelectorGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingCategories categories;
-    private WarpCategoryParentSelectorView selector;
+    private WarpCategoryParentSelectorMenu selector;
 
     @org.junit.jupiter.api.io.TempDir
     java.nio.file.Path dataFolder;
@@ -97,11 +97,11 @@ class WarpCategoryParentSelectorGoldenTest {
         TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
         WarpCategorySettingsView settingsView =
                 new WarpCategorySettingsView(engine.menus(), new KeyMessages(), textInput, categories, (p, v) -> {});
-        settingsView.bind(new WarpCategoryParentSelectorView(
-                new KeyMessages(), categories, settingsView, engine.menus(), scheduler));
+        selector = new WarpCategoryParentSelectorMenu(
+                engine.menus(), new KeyMessages(), scheduler, categories, settingsView);
+        settingsView.bind(selector);
         settingsView.register(engine.bindings(), dataFolder, NOOP);
-        selector = new WarpCategoryParentSelectorView(
-                new KeyMessages(), categories, settingsView, engine.menus(), scheduler);
+        selector.register(engine.bindings(), dataFolder, NOOP);
     }
 
     @AfterEach
@@ -168,7 +168,7 @@ class WarpCategoryParentSelectorGoldenTest {
     }
 
     /**
-     * The slot -> (material, plain name) map the bespoke {@code WarpCategoryParentSelectorView} produced for this
+     * The slot -> (material, plain name) map the bespoke {@code WarpCategoryParentSelectorMenu} produced for this
      * fixture: a DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback),
      * the "no parent" BARRIER at slot 49 and the back ARROW at slot 53, each named through the catalog key the test's
      * {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46. The category being

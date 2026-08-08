@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
@@ -88,8 +88,8 @@ class WarpCategorySettingsMaterialTest {
                 org.mockito.Mockito.mock(TextInput.class),
                 new FixedCategories(category),
                 (p, v) -> {});
-        view.bind(new WarpCategoryParentSelectorView(
-                new KeyMessages(), new FixedCategories(category), view, engine.menus(), new SyncScheduler()));
+        view.bind(new WarpCategoryParentSelectorMenu(
+                engine.menus(), new KeyMessages(), new SyncScheduler(), new FixedCategories(category), view));
         view.register(engine.bindings(), dataFolder, NOOP);
         view.open(player, viewer, category);
         ItemStack button = player.getOpenInventory().getTopInventory().getItem(MATERIAL_SLOT);

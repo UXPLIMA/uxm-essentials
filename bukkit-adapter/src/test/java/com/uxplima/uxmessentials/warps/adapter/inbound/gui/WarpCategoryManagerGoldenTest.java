@@ -46,7 +46,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * The warp-category manager golden test: the engine-rendered manager must draw the exact grid the original bespoke
- * {@code WarpCategoryManagerView} drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
+ * category manager drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
  * {@code DIAMOND}-iconed "pvp" and a default-BOOK "misc") over the six-row layout (content slots 0..44, gray-glass
  * filler), so page 0 places one icon per category at content slots 0 and 1, the EMERALD_BLOCK "create category" button
  * at slot 49, and the back ARROW at slot 53. The window is snapshotted as {@code (slot -> material, plain name)} and
@@ -77,7 +77,7 @@ class WarpCategoryManagerGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingCategories categories;
-    private WarpCategoryManagerView manager;
+    private WarpCategoryManagerMenu manager;
     private AtomicReference<PlayerRef> backTarget;
 
     @org.junit.jupiter.api.io.TempDir
@@ -95,14 +95,16 @@ class WarpCategoryManagerGoldenTest {
         categories = new RecordingCategories(List.of(PVP, MISC));
         backTarget = new AtomicReference<>();
         TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
-        manager = new WarpCategoryManagerView(new KeyMessages(), categories, textInput, engine.menus(), scheduler);
+        manager = new WarpCategoryManagerMenu(engine.menus(), new KeyMessages(), scheduler, categories, textInput);
+        manager.register(engine.bindings(), tempFolder, NOOP);
         // A category click and a create open the engine-rendered settings panel; the back button records its target.
         // The settings panel renders through the same engine and its spec is registered, so the click assertions then
         // see a menu-backed window. Both seams are bound after the manager exists, exactly as in production wiring.
         WarpCategorySettingsView settingsView = new WarpCategorySettingsView(
                 engine.menus(), new KeyMessages(), textInput, categories, (p, v) -> backTarget.set(v));
-        WarpCategoryParentSelectorView parentSelector = new WarpCategoryParentSelectorView(
-                new KeyMessages(), categories, settingsView, engine.menus(), scheduler);
+        WarpCategoryParentSelectorMenu parentSelector = new WarpCategoryParentSelectorMenu(
+                engine.menus(), new KeyMessages(), scheduler, categories, settingsView);
+        parentSelector.register(engine.bindings(), tempFolder, NOOP);
         settingsView.bind(parentSelector);
         settingsView.register(engine.bindings(), tempFolder, NOOP);
         manager.bind(settingsView, (p, v) -> backTarget.set(v));
@@ -174,7 +176,7 @@ class WarpCategoryManagerGoldenTest {
     }
 
     /**
-     * The slot -> (material, plain name) map the bespoke {@code WarpCategoryManagerView} produced for this fixture: a
+     * The slot -> (material, plain name) map the bespoke {@code WarpCategoryManagerMenu} produced for this fixture: a
      * DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback), the
      * EMERALD_BLOCK "create category" button at slot 49 and the back ARROW at slot 53, each named through the catalog
      * key the test's {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46. The

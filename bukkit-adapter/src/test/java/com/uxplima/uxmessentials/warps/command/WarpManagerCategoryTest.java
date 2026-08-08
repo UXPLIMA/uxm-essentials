@@ -35,8 +35,8 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerMenu;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import org.junit.jupiter.api.AfterEach;
@@ -108,10 +108,11 @@ class WarpManagerCategoryTest {
         // The back button reopens the warp manager; these tests do not exercise it, so the seam is a no-op here.
         categorySettingsView =
                 new WarpCategorySettingsView(engine.menus(), messages, textInput, categories, (p, v) -> {});
-        WarpCategoryManagerView categoryManagerView =
-                new WarpCategoryManagerView(messages, categories, textInput, engine.menus(), scheduler);
-        WarpCategoryParentSelectorView parentSelectorView = new WarpCategoryParentSelectorView(
-                messages, categories, categorySettingsView, engine.menus(), scheduler);
+        WarpCategoryManagerMenu categoryManagerView =
+                new WarpCategoryManagerMenu(engine.menus(), messages, scheduler, categories, textInput);
+        WarpCategoryParentSelectorMenu parentSelectorView = new WarpCategoryParentSelectorMenu(
+                engine.menus(), messages, scheduler, categories, categorySettingsView);
+        parentSelectorView.register(engine.bindings(), plugin.getDataFolder().toPath(), new SilentLogger());
         categorySettingsView.bind(parentSelectorView);
         categoryManagerView.bind(categorySettingsView, (p, v) -> {});
         categorySettingsView.register(engine.bindings(), plugin.getDataFolder().toPath(), new SilentLogger());
