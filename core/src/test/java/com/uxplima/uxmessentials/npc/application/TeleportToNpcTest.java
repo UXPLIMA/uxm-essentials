@@ -7,11 +7,11 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
-import com.uxplima.uxmessentials.npc.application.port.NpcTeleporter;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.DirectTeleporter;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -62,7 +62,7 @@ class TeleportToNpcTest {
         assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_NOT_FOUND.key());
     }
 
-    private static final class RecordingTeleporter implements NpcTeleporter {
+    private static final class RecordingTeleporter implements DirectTeleporter {
         private @Nullable PlayerRef who;
         private @Nullable Position destination;
 

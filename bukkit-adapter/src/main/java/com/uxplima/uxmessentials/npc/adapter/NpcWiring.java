@@ -22,7 +22,6 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
-import com.uxplima.uxmessentials.npc.adapter.outbound.NpcTeleportAdapter;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
 import com.uxplima.uxmessentials.npc.application.CenterNpc;
@@ -85,6 +84,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.teleport.BukkitDirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -286,7 +286,7 @@ public final class NpcWiring {
                 new ListNpcs(repository, notifier),
                 new NearbyNpcs(repository, notifier),
                 new DescribeNpc(repository, notifier),
-                new TeleportToNpc(repository, new NpcTeleportAdapter(kernel.scheduler(), kernel.log()), notifier),
+                new TeleportToNpc(repository, new BukkitDirectTeleporter(kernel.scheduler(), kernel.log()), notifier),
                 new MoveNpc(repository, renderer, notifier, kernel.events()),
                 new CopyNpc(repository, renderer, notifier, kernel.events(), clock),
                 new CenterNpc(repository, renderer, notifier, kernel.events()),

@@ -11,7 +11,6 @@ import com.uxplima.uxmessentials.holograms.application.HologramTestSupport.Captu
 import com.uxplima.uxmessentials.holograms.application.HologramTestSupport.FakeHologramRepository;
 import com.uxplima.uxmessentials.holograms.application.HologramTestSupport.KeyMessages;
 import com.uxplima.uxmessentials.holograms.application.HologramTestSupport.RecordingView;
-import com.uxplima.uxmessentials.holograms.application.port.HologramTeleporter;
 import com.uxplima.uxmessentials.holograms.domain.Appearance;
 import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
@@ -21,6 +20,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.DirectTeleporter;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -309,7 +309,7 @@ class HologramConvenienceTest {
     }
 
     /** Records the single teleport request so the use-case side effect can be asserted. */
-    private static final class RecordingTeleporter implements HologramTeleporter {
+    private static final class RecordingTeleporter implements DirectTeleporter {
         private @org.jspecify.annotations.Nullable PlayerRef who;
         private @org.jspecify.annotations.Nullable Position destination;
 

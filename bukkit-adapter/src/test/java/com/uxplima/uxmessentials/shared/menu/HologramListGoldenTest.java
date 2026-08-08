@@ -67,7 +67,6 @@ import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.TeleportToHologram;
 import com.uxplima.uxmessentials.holograms.application.UnlinkHologramFromNpc;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
-import com.uxplima.uxmessentials.holograms.application.port.HologramTeleporter;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
@@ -87,6 +86,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuLis
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.DirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -295,7 +295,7 @@ class HologramListGoldenTest {
         Notifier notifier = new Notifier(new KeyMessages(), new SilentSink());
         HologramView view = new SilentView();
         DomainEventPublisher events = new SilentEvents();
-        HologramTeleporter teleporter = (who, destination) -> {};
+        DirectTeleporter teleporter = (who, destination) -> {};
         LinkedNpcLocator npc = name -> Optional.of(AT);
         return new HologramServices(
                 new CreateHologram(repository, view, notifier, events, Clock.systemUTC()),
