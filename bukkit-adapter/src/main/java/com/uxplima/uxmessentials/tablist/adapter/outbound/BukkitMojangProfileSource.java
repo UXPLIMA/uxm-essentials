@@ -8,31 +8,34 @@ import org.bukkit.entity.Player;
 
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.destroystokyo.paper.profile.ProfileProperty;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.SkinTextures;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The live {@link MojangProfileSource}: reads textures from Bukkit player profiles. An online name reads the player's
- * live {@link PlayerProfile} (no network); an offline name builds a profile with {@code Bukkit.createProfile(name)} and
- * {@link PlayerProfile#complete() completes} it against Mojang — a blocking call the resolver only makes on the async
- * scheduler. Every read fails closed: an unknown name, an absent {@code textures} property, or a fetch failure returns
- * empty so the resolver falls back to the no-skin native path.
+ * The live {@link MojangProfileSource}. An online name reads the player's own {@link PlayerProfile}, which costs no
+ * network and picks up whatever a skin plugin put there; any other name goes to the shared {@link SkinTextures} fetch,
+ * a blocking call the resolver only makes on the async scheduler.
  *
- * <p>A fetch failure (a misspelled {@code player:<name>}, a Mojang rate-limit, a network outage) is logged at debug
- * before the empty fall-back so the failure leaves an operator signal without spamming the default log — a bad name is
- * not worth a warning, and the tablist still renders fine on the native path.
+ * <p>The fetch asks Mojang directly rather than through {@code PlayerProfile.complete()}, which consults the session
+ * service only on an online-mode server: completing a profile on a cracked server returns no textures at all, so every
+ * tablist skin by name used to be blank there. Reading a live player's profile stays a Bukkit call because that is
+ * where another plugin's skin would be.
+ *
+ * <p>Every read fails closed: an unknown name, an absent {@code textures} property, or a fetch failure returns empty so
+ * the resolver falls back to the no-skin native path.
  */
 @NullMarked
 public final class BukkitMojangProfileSource implements MojangProfileSource {
 
     private static final String TEXTURES_PROPERTY = "textures";
 
-    private final Logger log;
+    private final SkinTextures skins;
 
-    public BukkitMojangProfileSource(Logger log) {
-        this.log = Objects.requireNonNull(log, "log");
+    public BukkitMojangProfileSource(SkinTextures skins) {
+        this.skins = Objects.requireNonNull(skins, "skins");
     }
 
     @Override
@@ -46,19 +49,11 @@ public final class BukkitMojangProfileSource implements MojangProfileSource {
 
     @Override
     public Optional<TabSkin> fetchTexture(String name) {
-        try {
-            PlayerProfile profile = Bukkit.createProfile(name);
-            // Blocking Mojang round-trip; the resolver guarantees this runs on the async scheduler, never a tick
-            // thread.
-            profile.complete(true);
-            return textureOf(profile);
-        } catch (RuntimeException failure) {
-            // A network failure or rate-limit must not blank the tablist: fall back to no skin (the native path).
-            // Debug,
-            // not warn, so a single bad name does not spam the log while the operator still gets a signal to grep.
-            log.debug("tablist skin fetch failed for {}: {}", name, failure);
-            return Optional.empty();
-        }
+        // Blocking Mojang round-trip; the resolver guarantees this runs on the async scheduler, never a tick thread.
+        // The source swallows and logs every failure itself, so a rate-limit or an outage arrives here as an empty
+        // result and the tablist keeps rendering on the native path.
+        Optional<SkinTexture> fetched = skins.fetchNow(name);
+        return fetched.map(texture -> new TabSkin(texture.value(), texture.signature()));
     }
 
     /** Pull the {@code textures} property off a profile and map it to a {@link TabSkin}; empty when none is present. */

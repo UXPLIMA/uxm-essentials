@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MojangSkins;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -57,7 +59,7 @@ class CompositeSkinServiceTest {
 
     private static SkinService composite(FakeFetcher mojang, FakeFetcher mineskin) {
         return new CompositeSkinService(
-                new MojangSkinService(new ImmediateScheduler(), new NoOpLogger(), mojang),
+                new MojangSkins(new ImmediateScheduler(), new NoOpLogger(), mojang),
                 new MineSkinService(
                         new ImmediateScheduler(), new NoOpLogger(), mineskin, null, java.time.Duration.ZERO));
     }

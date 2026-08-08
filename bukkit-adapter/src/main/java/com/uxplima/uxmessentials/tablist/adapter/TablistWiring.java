@@ -75,7 +75,7 @@ public final class TablistWiring {
         // thread through the kernel Scheduler, caching the result.
         TabListPackets packets = new NmsTabListPackets(new PacketSender(new ChannelResolver()));
         TablistSkinResolver skinResolver =
-                new TablistSkinResolver(new BukkitMojangProfileSource(kernel.log()), kernel.scheduler());
+                new TablistSkinResolver(new BukkitMojangProfileSource(kernel.skins()), kernel.scheduler());
 
         // The opt-in "suppress real players" interception (TAB-C): a pipeline splices a per-viewer interceptor that
         // rewrites outbound player-info packets to force every non-filler entry unlisted while the viewer's selected
