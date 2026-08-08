@@ -17,6 +17,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLocator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLookup;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.IndexedPlayerLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTranslations;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
@@ -77,19 +79,22 @@ final class KernelWiring {
      * @param catalog the loaded message catalog
      * @param resolver the per-viewer locale resolver
      * @param serverDefault the configured server-default locale (client fallback at the boundary)
+     * @param nameIndex the player-name index behind the lookup port, still to be backed by the database
      */
     record Kernel(
             KernelPorts ports,
             LocaleStore localeStore,
             LocaleCatalog catalog,
             LocaleResolver resolver,
-            java.util.Locale serverDefault) {
+            java.util.Locale serverDefault,
+            CachingPlayerNameIndex nameIndex) {
         Kernel {
             Objects.requireNonNull(ports, "ports");
             Objects.requireNonNull(localeStore, "localeStore");
             Objects.requireNonNull(catalog, "catalog");
             Objects.requireNonNull(resolver, "resolver");
             Objects.requireNonNull(serverDefault, "serverDefault");
+            Objects.requireNonNull(nameIndex, "nameIndex");
         }
     }
 
@@ -154,6 +159,11 @@ final class KernelWiring {
         // connection's locale. The MessageKey-resolve path stays the primary surface.
         new AdventureTranslations(catalog, log).register(MessageKeyCatalog.all());
 
+        // The plugin's own name-to-account index. Paper only consults the server's name cache on an online-mode
+        // server, so without this an offline-mode server cannot resolve a name typed in a different case at all.
+        // It starts empty and memory-only; PluginModule backs it with the database once persistence is open.
+        CachingPlayerNameIndex nameIndex = new CachingPlayerNameIndex(scheduler, log);
+
         KernelPorts ports = new KernelPorts(
                 scheduler,
                 permissions,
@@ -161,12 +171,12 @@ final class KernelWiring {
                 new SchedulerWarmups(scheduler, permissions),
                 new CatalogMessages(catalog, resolver),
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
-                new BukkitPlayerLookup(),
+                new IndexedPlayerLookup(new BukkitPlayerLookup(), nameIndex),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),
                 log);
-        return new Kernel(ports, localeStore, catalog, resolver, serverDefault);
+        return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex);
     }
 
     private static java.util.Locale serverDefaultLocale(ConfigStore config) {

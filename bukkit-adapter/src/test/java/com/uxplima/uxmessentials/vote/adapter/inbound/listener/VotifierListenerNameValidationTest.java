@@ -135,6 +135,27 @@ class VotifierListenerNameValidationTest {
         assertThat(repository.handled).isZero();
     }
 
+    @Test
+    void aVoteUnderADifferentCaseCreditsTheAccountThatVoted() {
+        PlayerRef account = new PlayerRef(UUID.randomUUID(), "Cofteey");
+        VotifierListener listener =
+                new VotifierListener(plugin, services(), new KnownLookup(account), RULES, new NoLog());
+
+        listener.handleRaw("PMC", "cofteey");
+
+        assertThat(repository.voter).isEqualTo(account);
+    }
+
+    @Test
+    void aVoterTheServerHasNeverSeenIsStillCredited() {
+        VotifierListener listener = listener();
+
+        listener.handleRaw("PMC", "Newcomer");
+
+        assertThat(repository.handled).isEqualTo(1);
+        assertThat(repository.voter).isNotNull();
+    }
+
     private VotifierListener listener() {
         return new VotifierListener(plugin, services(), new NoLookup(), RULES, new NoLog());
     }
@@ -219,6 +240,9 @@ class VotifierListenerNameValidationTest {
     private static final class CountingRepository implements VoteRepository {
         int handled = 0;
 
+        /** The account the handled vote was credited to, witnessed as the tally is written. */
+        @org.jspecify.annotations.Nullable PlayerRef voter = null;
+
         @Override
         public int incrementAndGetPartyCount() {
             handled++;
@@ -257,7 +281,9 @@ class VotifierListenerNameValidationTest {
         }
 
         @Override
-        public void saveTotals(PlayerRef player, VoteTally tally) {}
+        public void saveTotals(PlayerRef player, VoteTally tally) {
+            voter = player;
+        }
 
         @Override
         public List<VoteRanking> topVoters(VotePeriod period, int limit) {
@@ -306,6 +332,29 @@ class VotifierListenerNameValidationTest {
 
         @Override
         public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {}
+    }
+
+    /** The kernel lookup as the decorated one behaves: one known account, resolvable by name in any case. */
+    private record KnownLookup(PlayerRef account) implements PlayerLookup {
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByName(String name) {
+            return account.name().equalsIgnoreCase(name) ? Optional.of(account) : Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return account.uuid().equals(uuid) ? Optional.of(account) : Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
+        }
     }
 
     private static final class NoLookup implements PlayerLookup {

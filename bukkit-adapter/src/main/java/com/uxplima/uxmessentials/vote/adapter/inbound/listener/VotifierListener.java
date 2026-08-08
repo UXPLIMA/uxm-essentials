@@ -117,13 +117,16 @@ public final class VotifierListener implements Listener {
     }
 
     private PlayerRef resolveVoter(String username) {
-        Optional<PlayerRef> online = players.findOnlineByName(username);
-        if (online.isPresent()) {
-            return online.get();
+        Optional<PlayerRef> known = players.findByName(username);
+        if (known.isPresent()) {
+            return known.get();
         }
-        // The by-name resolution costs a Mojang round-trip for an uncached name on an online-mode server, which is
-        // why this method only ever runs on the async pool and never on the Votifier event thread.
+        // Nobody by that name has ever joined, so the vote is for a player still to arrive: derive the uuid the
+        // way the server would and let the reward wait for them. The by-name resolution costs a Mojang round-trip
+        // for an uncached name on an online-mode server, which is why this method only ever runs on the async pool
+        // and never on the Votifier event thread.
         UUID id = Bukkit.getOfflinePlayer(username).getUniqueId(); // allow-blocking: async pool
+        log.debug("event=vote_voter_unknown name={}", username);
         return new PlayerRef(id, username);
     }
 

@@ -4,6 +4,8 @@ import static com.tngtech.archunit.lang.conditions.ArchConditions.callMethodWher
 import static com.tngtech.archunit.lang.conditions.ArchConditions.implement;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import java.util.List;
+
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
@@ -355,4 +357,63 @@ class ArchitectureTest {
         return DescribedPredicate.describe(
                 "are production classes", javaClass -> !javaClass.getName().contains("Test"));
     }
+
+    /**
+     * A typed player name becomes an account in one place. Paper reads the server's own name cache only when the
+     * server is in online mode ({@code CraftServer.getOfflinePlayer(String)} gates it on
+     * {@code proxies.isProxyOnlineMode()}) and otherwise derives the uuid from the typed name verbatim, so a
+     * second by-name resolver anywhere in the plugin is a name that an offline-mode server cannot resolve unless
+     * its case matches exactly. Everything goes through the kernel {@code PlayerLookup} instead.
+     */
+    @ArchTest
+    static final ArchRule nameResolutionGoesThroughTheSharedLookup = noClasses()
+            .that()
+            .resideInAPackage("..uxmessentials..")
+            .and(areProductionClasses())
+            .and(areNotAllowedByNameResolvers())
+            .should(callMethodWhere(callsGetOfflinePlayerByName()))
+            .because("a player name becomes an account in exactly one place, the kernel PlayerLookup (backed by "
+                    + "the plugin's own name index), so an offline-mode server resolves a name the same way an "
+                    + "online-mode one does");
+
+    /**
+     * Matches {@code Bukkit.getOfflinePlayer(String)} / {@code Server.getOfflinePlayer(String)}, never the
+     * {@code UUID} overload, which carries the identity already and is fine anywhere.
+     */
+    private static DescribedPredicate<JavaMethodCall> callsGetOfflinePlayerByName() {
+        return DescribedPredicate.describe(
+                "call getOfflinePlayer(String)",
+                call -> call.getTargetOwner().getPackageName().startsWith("org.bukkit")
+                        && call.getName().equals("getOfflinePlayer")
+                        && call.getTarget().getRawParameterTypes().size() == 1
+                        && call.getTarget()
+                                .getRawParameterTypes()
+                                .get(0)
+                                .getName()
+                                .equals("java.lang.String"));
+    }
+
+    /**
+     * The classes allowed to resolve a name against the server themselves, by fully qualified name so this
+     * predicate adds no dependency on them. {@code BukkitPlayerLookup} is the kernel fallback the whole plugin
+     * routes through. The claim, Vault and PlaceholderAPI adapters are handed a bare name by a third-party API
+     * and have no account to start from. {@code SkullCommand} resolves a skull owner who need never have joined,
+     * and {@code VotifierListener} keeps a vote for a player who has not joined yet. Every other by-name
+     * resolution belongs on the kernel lookup.
+     */
+    private static DescribedPredicate<JavaClass> areNotAllowedByNameResolvers() {
+        return DescribedPredicate.describe("are not the allowed by-name resolvers", javaClass -> {
+            String name = javaClass.getName();
+            return ALLOWED_BY_NAME_RESOLVERS.stream().noneMatch(name::startsWith);
+        });
+    }
+
+    private static final List<String> ALLOWED_BY_NAME_RESOLVERS = List.of(
+            "com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup",
+            "com.uxplima.uxmessentials.shared.adapter.outbound.claim.",
+            "com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionService",
+            "com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyService",
+            "com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport",
+            "com.uxplima.uxmessentials.itemworld.adapter.inbound.command.SkullCommand",
+            "com.uxplima.uxmessentials.vote.adapter.inbound.listener.VotifierListener");
 }
