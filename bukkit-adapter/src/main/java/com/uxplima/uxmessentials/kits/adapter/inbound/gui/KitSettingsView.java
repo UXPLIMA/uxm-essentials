@@ -41,7 +41,7 @@ import org.jspecify.annotations.Nullable;
  * commands, a hand-copy display-material button, a category button into the engine category selector, a delete
  * button, and a back button to the manager. The cooldown / cost / display-name / display-lore / commands buttons
  * capture a value through the shared input seam; the display-material button copies the item in the operator's main
- * hand; the category button opens the already-engine {@link KitCategorySelectorView}; each mutation saves the edited
+ * hand; the category button opens the already-engine {@link KitCategorySelectorMenu}; each mutation saves the edited
  * kit and re-opens this panel with the new subject so the operator sees the result.
  *
  * <p>The edited kit is handed in as the menu subject, so the title and every current-value line fill from the
@@ -69,7 +69,7 @@ public final class KitSettingsView {
     private final BiConsumer<Player, PlayerRef> onBack;
 
     /** The category selector the category button opens; injected after this view to break the settings↔selector cycle. */
-    private @Nullable KitCategorySelectorView categorySelector;
+    private @Nullable KitCategorySelectorMenu categorySelector;
 
     public KitSettingsView(
             Menus menus,
@@ -94,7 +94,7 @@ public final class KitSettingsView {
      * Wire the kit category selector the category button opens. The selector reopens this panel after a pick, so it
      * holds this view and this view holds it; this setter breaks that cycle, mirroring the manager's {@code bind}.
      */
-    public void bind(KitCategorySelectorView categorySelector) {
+    public void bind(KitCategorySelectorMenu categorySelector) {
         this.categorySelector = Objects.requireNonNull(categorySelector, "categorySelector");
     }
 

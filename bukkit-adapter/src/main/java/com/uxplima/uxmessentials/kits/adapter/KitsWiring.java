@@ -13,9 +13,9 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommands;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerMenu;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorMenu;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreatePrompt;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
@@ -154,8 +154,9 @@ public final class KitsWiring {
                 kitEditorView,
                 (player, viewer) -> managerHolder[0].open(player, viewer));
         settingsView.register(menuBindings, dataFolder, kernel.log());
-        KitCategoryManagerView categoryManagerView = new KitCategoryManagerView(
-                guiText, kernel.messages(), categoryRepository, textInput, menus, kernel.scheduler());
+        KitCategoryManagerMenu categoryManagerView =
+                new KitCategoryManagerMenu(menus, kernel.messages(), kernel.scheduler(), categoryRepository, textInput);
+        categoryManagerView.register(menuBindings, dataFolder, kernel.log());
         KitCategorySettingsView categorySettingsView = new KitCategorySettingsView(
                 menus,
                 guiText,
@@ -164,8 +165,9 @@ public final class KitsWiring {
                 categoryRepository,
                 (player, viewer) -> categoryManagerView.open(player, viewer));
         categorySettingsView.register(menuBindings, dataFolder, kernel.log());
-        KitCategoryParentSelectorView categoryParentSelectorView = new KitCategoryParentSelectorView(
-                guiText, categoryRepository, categorySettingsView, menus, kernel.scheduler());
+        KitCategoryParentSelectorMenu categoryParentSelectorView = new KitCategoryParentSelectorMenu(
+                menus, kernel.messages(), kernel.scheduler(), categoryRepository, categorySettingsView);
+        categoryParentSelectorView.register(menuBindings, dataFolder, kernel.log());
         categorySettingsView.bind(categoryParentSelectorView);
         categoryManagerView.bind(categorySettingsView, (player, viewer) -> managerHolder[0].open(player, viewer));
         KitCreatePrompt createPrompt = new KitCreatePrompt(
@@ -180,10 +182,11 @@ public final class KitsWiring {
                 createPrompt.boundTo((player, viewer) -> managerHolder[0].open(player, viewer)));
         managerHolder[0] = kitManager;
         kitManager.register(menuBindings, dataFolder, kernel.log());
-        // The kit→category selector renders through the menu engine, so it takes the engine façade, the GuiText catalog
-        // adapter, and the kit editor its pick saves through, plus the bespoke kit settings view it reopens once done.
-        KitCategorySelectorView categorySelectorView = new KitCategorySelectorView(
-                guiText, categoryRepository, kitEditor, settingsView, menus, kernel.scheduler());
+        // The kit to category selector renders from its own spec, so it takes the engine façade, the message catalog,
+        // and the kit editor its pick saves through, plus the kit settings view it reopens once done.
+        KitCategorySelectorMenu categorySelectorView = new KitCategorySelectorMenu(
+                menus, kernel.messages(), kernel.scheduler(), categoryRepository, kitEditor, settingsView);
+        categorySelectorView.register(menuBindings, dataFolder, kernel.log());
         settingsView.bind(categorySelectorView);
 
         // The placeholder requirement evaluator soft-couples to PlaceholderAPI exactly like the economy bridge:
@@ -268,10 +271,10 @@ public final class KitsWiring {
             GuiLayout menuLayout,
             GuiLayout previewLayout,
             KitManagerMenu kitManager,
-            KitCategoryManagerView categoryManagerView,
+            KitCategoryManagerMenu categoryManagerView,
             KitCategorySettingsView categorySettingsView,
-            KitCategorySelectorView categorySelectorView,
-            KitCategoryParentSelectorView categoryParentSelectorView,
+            KitCategorySelectorMenu categorySelectorView,
+            KitCategoryParentSelectorMenu categoryParentSelectorView,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder) {

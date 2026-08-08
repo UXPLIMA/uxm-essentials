@@ -25,7 +25,7 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreatePrompt;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
@@ -137,8 +137,8 @@ class KitManagerCreateButtonTest {
                 (p, v) -> {});
         settingsView.register(bindings, dataFolder, new SilentLogger());
 
-        KitCategoryManagerView categoryManager = new KitCategoryManagerView(
-                guiText, messages, new StubCategoryRepository(), textInput, menus, scheduler);
+        KitCategoryManagerMenu categoryManager =
+                new KitCategoryManagerMenu(menus, messages, scheduler, new StubCategoryRepository(), textInput);
         KitCreatePrompt createPrompt =
                 new KitCreatePrompt(messages, textInput, new CreateKit(repository, notifier), repository, settingsView);
 

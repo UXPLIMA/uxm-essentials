@@ -3,9 +3,9 @@ package com.uxplima.uxmessentials.kits.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerMenu;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorMenu;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
@@ -55,10 +55,10 @@ public record KitServices(
         KitEditorView kitEditorView,
         @Nullable KitManagerMenu kitManager,
         PlayerLookup players,
-        @Nullable KitCategoryManagerView kitCategoryManagerView,
+        @Nullable KitCategoryManagerMenu kitCategoryManagerView,
         @Nullable KitCategorySettingsView kitCategorySettingsView,
-        @Nullable KitCategorySelectorView kitCategorySelectorView,
-        @Nullable KitCategoryParentSelectorView kitCategoryParentSelectorView) {
+        @Nullable KitCategorySelectorMenu kitCategorySelectorView,
+        @Nullable KitCategoryParentSelectorMenu kitCategoryParentSelectorView) {
 
     public KitServices {
         Objects.requireNonNull(claimKit, "claimKit");

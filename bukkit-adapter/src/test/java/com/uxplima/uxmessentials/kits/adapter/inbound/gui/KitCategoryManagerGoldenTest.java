@@ -49,7 +49,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * The kit-category manager golden test: the engine-rendered manager must draw the exact grid the original bespoke
- * {@code KitCategoryManagerView} drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
+ * {@code KitCategoryManagerMenu} drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
  * {@code DIAMOND}-iconed "pvp" and a default-BOOK "misc") over the six-row layout (content slots 0..44, gray-glass
  * filler), so page 0 places one icon per category at content slots 0 and 1, the EMERALD_BLOCK "Create New Category"
  * button at slot 49, and the back ARROW at slot 53. The window is snapshotted as {@code (slot -> material, plain name)}
@@ -81,7 +81,7 @@ class KitCategoryManagerGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingCategories categories;
-    private KitCategoryManagerView manager;
+    private KitCategoryManagerMenu manager;
     private AtomicReference<PlayerRef> backTarget;
 
     @TempDir
@@ -100,8 +100,8 @@ class KitCategoryManagerGoldenTest {
         categories = new RecordingCategories(List.of(PVP, MISC));
         backTarget = new AtomicReference<>();
         TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
-        manager = new KitCategoryManagerView(
-                guiText, new KeyMessages(), categories, textInput, engine.menus(), scheduler);
+        manager = new KitCategoryManagerMenu(engine.menus(), new KeyMessages(), scheduler, categories, textInput);
+        manager.register(engine.bindings(), dataFolder, NOOP);
         // The settings panel a category click opens renders through the same engine, so it registers its spec here; a
         // category click must land the viewer on that holder-backed panel.
         KitCategorySettingsView settingsView = new KitCategorySettingsView(
@@ -176,7 +176,7 @@ class KitCategoryManagerGoldenTest {
     }
 
     /**
-     * The slot -> (material, plain name) map the bespoke {@code KitCategoryManagerView} produced for this fixture: a
+     * The slot -> (material, plain name) map the bespoke {@code KitCategoryManagerMenu} produced for this fixture: a
      * DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback), the
      * EMERALD_BLOCK "Create New Category" button at slot 49 and the back ARROW at slot 53, each named through the
      * catalog key the test's {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46.

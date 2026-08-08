@@ -23,7 +23,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
 import com.uxplima.uxmessentials.kits.application.DelKit;
@@ -55,7 +55,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * The kit→category selector golden test: the engine-rendered selector must draw the exact grid the original bespoke
- * {@code KitCategorySelectorView} drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
+ * {@code KitCategorySelectorMenu} drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
  * {@code DIAMOND}-iconed "pvp" and a default-BOOK "misc") over the selector's six-row layout (content slots 0..44,
  * gray-glass filler), so page 0 places one icon per category at content slots 0 and 1, the "No Category" BARRIER at
  * slot 49, and the back ARROW at slot 53. The engine window is snapshotted as {@code (slot -> material, plain name)}
@@ -85,7 +85,7 @@ class KitCategorySelectorGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingRepository kits;
-    private KitCategorySelectorView selector;
+    private KitCategorySelectorMenu selector;
 
     @TempDir
     Path dataFolder;
@@ -116,7 +116,9 @@ class KitCategorySelectorGoldenTest {
                 new KitEditorView(new KeyMessages(), editor, scheduler),
                 (p, v) -> {});
         settingsView.register(engine.bindings(), dataFolder, NOOP);
-        selector = new KitCategorySelectorView(guiText, categories, editor, settingsView, engine.menus(), scheduler);
+        selector = new KitCategorySelectorMenu(
+                engine.menus(), new KeyMessages(), scheduler, categories, editor, settingsView);
+        selector.register(engine.bindings(), dataFolder, NOOP);
     }
 
     @AfterEach
@@ -174,7 +176,7 @@ class KitCategorySelectorGoldenTest {
     }
 
     /**
-     * The slot -> (material, plain name) map the bespoke {@code KitCategorySelectorView} produced for this fixture: a
+     * The slot -> (material, plain name) map the bespoke {@code KitCategorySelectorMenu} produced for this fixture: a
      * DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback), the "No
      * Category" BARRIER at slot 49 and the back ARROW at slot 53, each named through the catalog key the test's
      * {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46. The gray-glass filler

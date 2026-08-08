@@ -24,7 +24,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
@@ -70,7 +70,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * captured once while both rendered the same fixture, then frozen here as the contract so the old class could be
  * deleted. Then, through the engine's own {@link MenuListener}, a left click on the first kit icon proves the migrated
  * path opens that kit's bespoke {@link KitSettingsView}, and a left click on the categories button proves it opens the
- * bespoke {@link KitCategoryManagerView} — so the move is faithful in both appearance and behaviour.
+ * bespoke {@link KitCategoryManagerMenu} — so the move is faithful in both appearance and behaviour.
  *
  * <p>The {@code KeyMessages} catalog surfaces the entry name's {@code kit} token, so a kit's id appears in the rendered
  * label; every other key renders verbatim. A real rendering difference (a wrong key, a wrong material, a misplaced
@@ -204,13 +204,9 @@ class KitManagerGoldenTest {
         settingsView.register(bindings, dataFolder, NOOP);
         // The category manager renders through the engine now; the categories-button test only opens it (an empty
         // grid), so the input seam it would prompt through is a stand-in and the click/back collaborators stay unbound.
-        KitCategoryManagerView categoryManager = new KitCategoryManagerView(
-                guiText,
-                messages,
-                new StubCategoryRepository(),
-                org.mockito.Mockito.mock(TextInput.class),
-                menus,
-                scheduler);
+        KitCategoryManagerMenu categoryManager = new KitCategoryManagerMenu(
+                menus, messages, scheduler, new StubCategoryRepository(), org.mockito.Mockito.mock(TextInput.class));
+        categoryManager.register(bindings, dataFolder, NOOP);
         return new KitManagerMenu(menus, scheduler, repository, messages, settingsView, categoryManager, (p, v) -> {});
     }
 

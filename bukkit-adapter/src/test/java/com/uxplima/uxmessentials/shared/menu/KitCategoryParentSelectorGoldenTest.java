@@ -24,7 +24,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
@@ -48,7 +48,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * The parent-category selector golden test: the engine-rendered selector must draw the exact grid the original
- * bespoke {@code KitCategoryParentSelectorView} drew on its own {@code Bukkit.createInventory}. The fixture edits the
+ * bespoke {@code KitCategoryParentSelectorMenu} drew on its own {@code Bukkit.createInventory}. The fixture edits the
  * "child" category over a three-category set, so the candidate list is the two others (a {@code DIAMOND}-iconed "pvp"
  * and a default-BOOK "misc"), drawn at content slots 0 and 1, with the "No Parent" BARRIER at slot 49 and the back
  * ARROW at slot 53. The window is snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for
@@ -81,7 +81,7 @@ class KitCategoryParentSelectorGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingCategories categories;
-    private KitCategoryParentSelectorView selector;
+    private KitCategoryParentSelectorMenu selector;
 
     @TempDir
     Path dataFolder;
@@ -107,7 +107,9 @@ class KitCategoryParentSelectorGoldenTest {
                 categories,
                 (p, v) -> {});
         settingsView.register(engine.bindings(), dataFolder, NOOP);
-        selector = new KitCategoryParentSelectorView(guiText, categories, settingsView, engine.menus(), scheduler);
+        selector = new KitCategoryParentSelectorMenu(
+                engine.menus(), new KeyMessages(), scheduler, categories, settingsView);
+        selector.register(engine.bindings(), dataFolder, NOOP);
     }
 
     @AfterEach
@@ -176,7 +178,7 @@ class KitCategoryParentSelectorGoldenTest {
     }
 
     /**
-     * The slot -> (material, plain name) map the bespoke {@code KitCategoryParentSelectorView} produced for this
+     * The slot -> (material, plain name) map the bespoke {@code KitCategoryParentSelectorMenu} produced for this
      * fixture: a DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback),
      * the "No Parent" BARRIER at slot 49 and the back ARROW at slot 53, each named through the catalog key the test's
      * {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46. The category being

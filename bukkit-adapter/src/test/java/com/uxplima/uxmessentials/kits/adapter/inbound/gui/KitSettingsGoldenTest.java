@@ -147,8 +147,9 @@ class KitSettingsGoldenTest {
         // The category button opens the engine category selector; binding a real one keeps the panel whole, but the
         // category assign itself is proven by the category-selector golden test, so this test exercises the other
         // buttons.
-        KitCategorySelectorView categorySelector = new KitCategorySelectorView(
-                guiText, new EmptyCategories(), kitEditor, settings, engine.menus(), scheduler);
+        KitCategorySelectorMenu categorySelector = new KitCategorySelectorMenu(
+                engine.menus(), new KeyMessages(), scheduler, new EmptyCategories(), kitEditor, settings);
+        categorySelector.register(engine.bindings(), dataFolder, NOOP);
         settings.bind(categorySelector);
         settings.register(engine.bindings(), dataFolder, NOOP);
     }

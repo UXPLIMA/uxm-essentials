@@ -106,8 +106,8 @@ class KitCategorySettingsGoldenTest {
                 engine.menus(), guiText, new KeyMessages(), textInput, categories, (p, v) -> backTarget.set(v));
         // The parent button opens the engine parent selector; binding a real one keeps the panel whole, but the parent
         // assign itself is proven by the parent-selector golden test, so this test exercises the other six buttons.
-        KitCategoryParentSelectorView parentSelector =
-                new KitCategoryParentSelectorView(guiText, categories, settings, engine.menus(), scheduler);
+        KitCategoryParentSelectorMenu parentSelector =
+                new KitCategoryParentSelectorMenu(engine.menus(), new KeyMessages(), scheduler, categories, settings);
         settings.bind(parentSelector);
         settings.register(engine.bindings(), dataFolder, NOOP);
     }

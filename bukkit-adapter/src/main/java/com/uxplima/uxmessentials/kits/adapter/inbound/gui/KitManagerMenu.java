@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>A left click on a kit runs {@code kits:manager-edit}, opening that kit's still-bespoke {@link KitSettingsView}; the
  * create button runs {@code kits:manager-create}, the same name-prompt → empty-kit → settings flow the old create
  * button drove; the categories button runs {@code kits:manager-categories}, opening the still-bespoke
- * {@link KitCategoryManagerView}; the close button shuts the window. The list adds no domain logic of its own.
+ * {@link KitCategoryManagerMenu}; the close button shuts the window. The list adds no domain logic of its own.
  */
 @NullMarked
 public final class KitManagerMenu {
@@ -55,7 +55,7 @@ public final class KitManagerMenu {
     private final KitRepository repository;
     private final Messages messages;
     private final KitSettingsView settingsView;
-    private final KitCategoryManagerView categoryManagerView;
+    private final KitCategoryManagerMenu categoryManagerView;
     private final BiConsumer<Player, PlayerRef> createPrompt;
 
     /**
@@ -68,7 +68,7 @@ public final class KitManagerMenu {
             KitRepository repository,
             Messages messages,
             KitSettingsView settingsView,
-            KitCategoryManagerView categoryManagerView,
+            KitCategoryManagerMenu categoryManagerView,
             BiConsumer<Player, PlayerRef> createPrompt) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
