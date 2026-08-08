@@ -22,13 +22,13 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJ
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationLoginListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
-import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitTargetResolver;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.DiscordPunishmentAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetResolver;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
@@ -415,7 +415,7 @@ public final class ModerationWiring {
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
                 .players(kernel.playerLookup())
-                .targets(new BukkitTargetResolver(plugin.getServer()))
+                .targets(new PlayerLookupTargetResolver(kernel.playerLookup()))
                 .build();
     }
 

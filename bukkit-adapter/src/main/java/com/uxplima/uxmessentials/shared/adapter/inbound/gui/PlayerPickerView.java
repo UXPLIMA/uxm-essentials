@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * engine, text, scheduler, anvil, server) live on the instance, and the per-use parts (the title, the pick callback,
  * the offline-name resolver, and the unknown-player reply key) are passed to {@link #open}. The moderation
  * {@code /ban} and {@code /mute} GUI flows reuse it; the offline resolver a caller passes is its own (moderation backs
- * it with {@code BukkitTargetResolver}), so this class never reaches for a context's lookup itself.
+ * it with {@code PlayerLookupTargetResolver}), so this class never reaches for a context's lookup itself.
  *
  * <p>A caller may also supply optional {@link Request#footerButtons() footer buttons} — extra bottom-row actions that
  * are not a player pick (the jail hub uses two: a "jails" manager and a "jailed players" list). They default to empty,

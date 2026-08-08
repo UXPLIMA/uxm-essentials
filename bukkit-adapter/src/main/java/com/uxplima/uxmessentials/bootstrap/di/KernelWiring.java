@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLoca
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.IndexedPlayerLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTranslations;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
@@ -170,7 +171,7 @@ final class KernelWiring {
                 new SchedulerWarmups(scheduler, permissions),
                 new CatalogMessages(catalog, resolver),
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
-                new BukkitPlayerLookup(),
+                new IndexedPlayerLookup(new BukkitPlayerLookup(), nameIndex),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),
