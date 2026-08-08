@@ -50,14 +50,15 @@ class DefaultResourcesTest {
                 .isEqualTo("coins");
         assertThat(config.getInt("modules.vaults.default-size", -1)).isEqualTo(6);
         assertThat(config.getBoolean("modules.teleport.enabled", false)).isTrue();
-        // communication now ships enabled (inert by default): the display/communication contexts default on so a fresh
-        // install shows a working experience out of the box.
+        // communication ships enabled but inert: every content file defaults to the vanilla behaviour, so being on
+        // changes nothing until an operator authors a template.
         assertThat(config.getBoolean("modules.communication.enabled", false)).isTrue();
-        assertThat(config.getBoolean("modules.scoreboard.enabled", false)).isTrue();
-        assertThat(config.getBoolean("modules.tablist.enabled", false)).isTrue();
         assertThat(config.getBoolean("modules.staff.enabled", false)).isTrue();
-        // nametags now ships on: its default renders one clean custom name with the vanilla name hidden under it.
-        assertThat(config.getBoolean("modules.nametags.enabled", false)).isTrue();
+        // The HUD trio ships off: a sidebar, a tab list and a replacement nametag are the most visible surfaces a
+        // plugin can claim, and a server that already draws them should keep drawing them.
+        assertThat(config.getBoolean("modules.scoreboard.enabled", true)).isFalse();
+        assertThat(config.getBoolean("modules.tablist.enabled", true)).isFalse();
+        assertThat(config.getBoolean("modules.nametags.enabled", true)).isFalse();
         assertThat(config.getBoolean("modules.migration.enabled", true)).isFalse();
     }
 

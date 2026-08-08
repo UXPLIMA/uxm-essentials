@@ -10,9 +10,10 @@ import org.jspecify.annotations.NullMarked;
  * owns the self-rescheduling render timer on the {@code Scheduler} port that re-renders every viewer each configured
  * refresh interval; the render/join/quit machinery is Bukkit-facing and lands with the adapter wiring.
  *
- * <p><b>Ships enabled by default.</b> A fresh install bundles an example header/footer authored with the built-in
- * {@code {online}}/{@code {max_players}} tokens (no PlaceholderAPI required), so out of the box a new operator sees a
- * working tab and brands or disables it from there.
+ * <p><b>Ships disabled by default.</b> The tab list is a surface a dedicated tab plugin also draws, and two of them
+ * fight over it. A fresh install still bundles an example header/footer authored with the built-in
+ * {@code {online}}/{@code {max_players}} tokens (no PlaceholderAPI required), so
+ * {@code modules.tablist.enabled = true} shows a working tab straight away, ready to brand.
  *
  * <p>The tablist is always-on for every viewer when enabled, so this module supplies only its id: the shared enable
  * gate, the empty command/listener/migration surfaces, and the running/drain lifecycle come from

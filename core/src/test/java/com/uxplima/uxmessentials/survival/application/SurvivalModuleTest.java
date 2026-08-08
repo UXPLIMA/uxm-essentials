@@ -9,8 +9,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the {@link SurvivalModule} feature-module contract: it reports the {@code survival} id, ships enabled by
- * default, honours an explicit {@code modules.survival.enabled = false}, and contributes its commands and listeners
+ * Pins the {@link SurvivalModule} feature-module contract: it reports the {@code survival} id, ships disabled by
+ * default, honours an explicit {@code modules.survival.enabled = true}, and contributes its commands and listeners
  * through the adapter wiring (so the declarative lists are empty) with no migration. The registry-level wiring is
  * covered by {@code FeatureModuleRegistryDriftTest}.
  */
@@ -25,12 +25,13 @@ class SurvivalModuleTest {
     }
 
     @Test
-    void shipsEnabledByDefaultAndHonoursAnExplicitOptOut() {
+    void shipsDisabledByDefaultAndHonoursAnExplicitOptIn() {
         SurvivalModule module = new SurvivalModule();
 
-        assertThat(module.enabled(new FixedConfig(Map.of()))).isTrue();
-        assertThat(module.enabled(new FixedConfig(Map.of("modules.survival.enabled", false))))
-                .isFalse();
+        // These mechanics change how survival plays, so a fresh install leaves them to the operator.
+        assertThat(module.enabled(new FixedConfig(Map.of()))).isFalse();
+        assertThat(module.enabled(new FixedConfig(Map.of("modules.survival.enabled", true))))
+                .isTrue();
     }
 
     @Test

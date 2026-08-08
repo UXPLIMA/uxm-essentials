@@ -53,9 +53,10 @@ public abstract class AbstractHudModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // Ships enabled (like the steady-state contexts): the bundled config carries a working default, so a fresh
-        // install shows the HUD out of the box; an operator opts out via modules.conf.
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // Ships DISABLED: a HUD is a display surface most servers already own, and a dedicated tab-list or
+        // nametag plugin drawing the same surface fights with this one. The bundled config still carries a working
+        // default, so turning it on is one line and shows something immediately.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override

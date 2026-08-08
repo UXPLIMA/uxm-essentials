@@ -17,9 +17,9 @@ import org.jspecify.annotations.NullMarked;
  * snapshots are DB-backed and survive a world rollback (the same hard invariant the economy and vaults ledgers
  * hold), never PDC.
  *
- * <p><b>Ships enabled by default.</b> A fresh install captures on death and logout out of the box, so
- * {@link #enabled(ConfigStore)} defaults to {@code true} like the steady-state contexts; an operator flips
- * {@code modules.invrollback.enabled = false} to turn it off.
+ * <p><b>Ships disabled by default.</b> Every death and logout writes a snapshot row, a cost worth paying only on
+ * a server whose staff actually restore inventories, so {@link #enabled(ConfigStore)} defaults to {@code false};
+ * an operator flips {@code modules.invrollback.enabled = true} to start capturing.
  *
  * <p>The {@code inv_snapshots} table ships in the persistence baseline ({@code db/migration}, always applied by
  * the persistence layer), so the module declares no extra migration location of its own — the same arrangement
@@ -68,7 +68,9 @@ public final class InvrollbackModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // The module ships DISABLED: every death and logout writes an inventory snapshot to the database, a cost
+        // worth paying only on a server whose staff actually restore inventories.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override

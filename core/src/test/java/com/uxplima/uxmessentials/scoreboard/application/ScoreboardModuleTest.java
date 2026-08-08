@@ -19,15 +19,16 @@ class ScoreboardModuleTest {
     }
 
     @Test
-    void shipsEnabledByDefault() {
+    void shipsDisabledByDefault() {
         ScoreboardModule module = new ScoreboardModule();
 
-        // With no override the module is on — a fresh install bundles an example sidebar (built-in {tokens}, no
-        // PlaceholderAPI required) so a new operator sees a working board out of the box.
-        assertThat(module.enabled(new FixedConfig(Map.of()))).isTrue();
-        // An explicit disable in modules.conf turns it off.
-        assertThat(module.enabled(new FixedConfig(Map.of("modules.scoreboard.enabled", false))))
-                .isFalse();
+        // With no override the module is off: the sidebar is a surface a dedicated scoreboard plugin also draws,
+        // and two of them fight over the same slot.
+        assertThat(module.enabled(new FixedConfig(Map.of()))).isFalse();
+        // An explicit enable in modules.conf turns it on, and the bundled example board renders straight away
+        // (built-in {tokens}, no PlaceholderAPI required).
+        assertThat(module.enabled(new FixedConfig(Map.of("modules.scoreboard.enabled", true))))
+                .isTrue();
     }
 
     @Test

@@ -21,13 +21,11 @@ import org.jspecify.annotations.NullMarked;
  * {@code testreward} subcommand) and {@code /voteparty} (the party progress). The Votifier event
  * listener and the join handler are Bukkit-facing and land with the adapter wiring.
  *
- * <p><b>Ships enabled by default, inert until configured.</b> Out of the box the reward and vote-link
- * lists are empty, so an installed-but-unconfigured server sees {@code /vote} report no links and a vote
- * pays nothing; an operator authors the rewards and links and they take effect on reload. The
- * {@link #enabled(ConfigStore)} gate therefore defaults to {@code true} (like the steady-state
- * contexts). The Votifier soft-depend is handled in the adapter listener behind a plugin-present guard,
- * so the module stays loaded and {@code /vote} / {@code /voteparty} work even when Votifier is absent —
- * only the vote listener is then a no-op.
+ * <p><b>Ships disabled by default.</b> A vote reaches the server through Votifier and pays out of a reward list
+ * the operator writes, so a server that has installed neither has nothing for this to do and
+ * {@link #enabled(ConfigStore)} defaults to {@code false}. Once on, the Votifier soft-depend is handled in the
+ * adapter listener behind a plugin-present guard, so {@code /vote} and {@code /voteparty} work even when Votifier
+ * is absent; only the vote listener is then a no-op.
  *
  * <p>It persists the global party counter and the per-player offline reward queue, but those tables ship
  * in the persistence V15 baseline ({@code db/migration}), which the persistence layer always applies, so
@@ -73,7 +71,9 @@ public final class VoteModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // The module ships DISABLED: a vote arrives through Votifier, and a server that has not installed it and
+        // listed itself on a voting site has nothing for this to do.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override
