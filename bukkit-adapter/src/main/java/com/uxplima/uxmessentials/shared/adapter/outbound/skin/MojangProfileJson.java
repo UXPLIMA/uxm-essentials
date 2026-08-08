@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.skin;
 
 import java.util.Optional;
 
@@ -6,11 +6,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Parses the two tiny Mojang JSON responses {@link MojangSkinService} fetches, isolated here so the service's
+ * Parses the two tiny Mojang JSON responses {@link MojangSkins} fetches, isolated here so the service's
  * orchestration stays free of gson and the parsing is testable on its own. Every method is fail-soft: a body
  * that does not parse, or that lacks the field being read, yields an empty {@link Optional} rather than
  * throwing, because a malformed or partial response is just another "no skin" the service caches as a miss.
@@ -19,14 +19,14 @@ import org.jspecify.annotations.NullMarked;
  * dependency.
  */
 @NullMarked
-final class MojangProfileJson {
+public final class MojangProfileJson {
 
     private static final String TEXTURES_PROPERTY = "textures";
 
     private MojangProfileJson() {}
 
     /** The {@code id} (undashed profile uuid) from a name→uuid response, or empty when absent/unparseable. */
-    static Optional<String> uuid(String body) {
+    public static Optional<String> uuid(String body) {
         return object(body)
                 .map(json -> json.get("id"))
                 .filter(JsonElement::isJsonPrimitive)
@@ -34,8 +34,8 @@ final class MojangProfileJson {
                 .filter(id -> !id.isBlank());
     }
 
-    /** The signed {@link NpcSkin} from a session-profile response, or empty when it carries no textures property. */
-    static Optional<NpcSkin> skin(String body) {
+    /** The signed {@link SkinTexture} from a session-profile response, or empty when it carries no textures property. */
+    public static Optional<SkinTexture> skin(String body) {
         Optional<JsonObject> root = object(body);
         if (root.isEmpty()) {
             return Optional.empty();
@@ -47,7 +47,7 @@ final class MojangProfileJson {
         return textureProperty(properties.getAsJsonArray());
     }
 
-    private static Optional<NpcSkin> textureProperty(JsonArray properties) {
+    private static Optional<SkinTexture> textureProperty(JsonArray properties) {
         for (JsonElement element : properties) {
             if (!element.isJsonObject()) {
                 continue;
@@ -56,7 +56,7 @@ final class MojangProfileJson {
             if (isTextures(property) && property.has("value")) {
                 String value = property.get("value").getAsString();
                 if (!value.isBlank()) {
-                    return Optional.of(new NpcSkin(value, signature(property)));
+                    return Optional.of(new SkinTexture(value, signature(property)));
                 }
             }
         }

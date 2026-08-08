@@ -31,6 +31,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsMet
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.MetaSource;
 import com.uxplima.uxmessentials.shared.adapter.outbound.scheduler.FoliaScheduler;
 import com.uxplima.uxmessentials.shared.adapter.outbound.sink.BukkitMessageSink;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MojangSkins;
 import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
@@ -65,6 +67,8 @@ final class KernelWiring {
 
     /** The config path for the server-default locale used when a viewer has no override and no client. */
     private static final String DEFAULT_LOCALE_PATH = "messages.default-locale";
+
+    private static final String SKIN_LOOKUP_PATH = "skins.mojang-lookup";
 
     private KernelWiring() {}
 
@@ -164,6 +168,12 @@ final class KernelWiring {
         // It starts empty and memory-only; PluginModule backs it with the database once persistence is open.
         CachingPlayerNameIndex nameIndex = new CachingPlayerNameIndex(scheduler, log);
 
+        // One skin fetch for every context that dresses something in a player's skin. It asks Mojang directly
+        // rather than through Bukkit's profile completion, which consults the session service only on an
+        // online-mode server and hands back a profile with no textures on a cracked one.
+        MojangSkins mojangSkins =
+                new MojangSkins(scheduler, log, new HttpClientFetcher(log), config.getBoolean(SKIN_LOOKUP_PATH, true));
+
         KernelPorts ports = new KernelPorts(
                 scheduler,
                 permissions,
@@ -175,7 +185,8 @@ final class KernelWiring {
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),
-                log);
+                log,
+                mojangSkins);
         return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex);
     }
 

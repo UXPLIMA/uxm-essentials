@@ -9,6 +9,8 @@ import java.util.OptionalLong;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpResponseView;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;

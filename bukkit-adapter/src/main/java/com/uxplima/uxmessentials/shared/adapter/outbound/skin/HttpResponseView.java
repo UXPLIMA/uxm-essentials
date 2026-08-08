@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.skin;
 
 import java.util.Objects;
 import java.util.Optional;

@@ -6,8 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
-import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.SkinTextures;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,10 +17,10 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 
 /**
- * Covers the {@link BukkitMojangProfileSource} fetch fail-soft: a blocking Mojang round-trip that fails (here the
- * MockBukkit profile cannot complete, exactly the shape of a misspelled name / rate-limit / outage on real Paper) must
- * be logged at debug (an operator signal that does not spam the default log) and still fall back to no skin so the
- * tablist renders on the native path.
+ * Covers the {@link BukkitMojangProfileSource}'s two reads. The fetch goes to the shared {@link SkinTextures}
+ * port rather than to Bukkit's profile completion, which is what makes a tablist skin resolve on an
+ * offline-mode server: completing a profile there consults no session service and yields no textures at all.
+ * Every failure still falls back to no skin so the tablist renders on the native path.
  */
 class BukkitMojangProfileSourceTest {
 
@@ -34,70 +36,68 @@ class BukkitMojangProfileSourceTest {
     }
 
     @Test
-    void aFailedFetchLogsAtDebugWithTheNameAndFallsBackToEmpty() {
-        RecordingLogger log = new RecordingLogger();
-        BukkitMojangProfileSource source = new BukkitMojangProfileSource(log);
+    void aFetchedTextureBecomesATabSkinWithoutTouchingBukkitProfiles() {
+        RecordingSkins skins = new RecordingSkins(Optional.of(new SkinTexture("dGV4dHVyZQ==", "sig=")));
+        BukkitMojangProfileSource source = new BukkitMojangProfileSource(skins);
 
-        Optional<TabSkin> result = source.fetchTexture("BadName");
+        Optional<TabSkin> result = source.fetchTexture("Notch");
 
-        assertThat(result).isEmpty();
-        // The failure is logged at debug — not warn — naming the offending name so an operator can grep for it.
-        assertThat(log.debugLines)
-                .anyMatch(line -> line.contains("tablist skin fetch failed") && line.contains("BadName"));
-        assertThat(log.warnLines).isEmpty();
+        assertThat(result).contains(new TabSkin("dGV4dHVyZQ==", "sig="));
+        assertThat(skins.asked).containsExactly("Notch");
     }
 
     @Test
-    void anOnlineNameWithNoLiveProfileResolvesEmptyWithoutLogging() {
-        // The online read is inline and never fetches, so a name with no live player simply yields empty and logs
-        // nothing — only the blocking fetch path is the one that can fail and must report.
-        RecordingLogger log = new RecordingLogger();
-        BukkitMojangProfileSource source = new BukkitMojangProfileSource(log);
+    void anUnsignedTextureIsCarriedThroughAsIs() {
+        RecordingSkins skins = new RecordingSkins(Optional.of(new SkinTexture("dGV4dHVyZQ==", null)));
+        BukkitMojangProfileSource source = new BukkitMojangProfileSource(skins);
 
-        Optional<TabSkin> result = source.onlineTexture("Nobody");
+        Optional<TabSkin> result = source.fetchTexture("Notch");
 
-        assertThat(result).isEmpty();
-        assertThat(log.debugLines).isEmpty();
+        assertThat(result).contains(new TabSkin("dGV4dHVyZQ==", null));
+    }
+
+    @Test
+    void aFetchThatResolvesNothingFallsBackToNoSkin() {
+        BukkitMojangProfileSource source = new BukkitMojangProfileSource(new RecordingSkins(Optional.empty()));
+
+        assertThat(source.fetchTexture("BadName")).isEmpty();
+    }
+
+    @Test
+    void anOnlineNameWithNoLivePlayerResolvesEmptyWithoutAsking() {
+        // The online read is inline and never fetches, so a name with no live player simply yields empty.
+        RecordingSkins skins = new RecordingSkins(Optional.of(new SkinTexture("dGV4dHVyZQ==", "sig=")));
+        BukkitMojangProfileSource source = new BukkitMojangProfileSource(skins);
+
+        assertThat(source.onlineTexture("Nobody")).isEmpty();
+        assertThat(skins.asked).isEmpty();
     }
 
     @Test
     void aFailedFetchNeverThrows() {
-        BukkitMojangProfileSource source = new BukkitMojangProfileSource(new RecordingLogger());
+        BukkitMojangProfileSource source = new BukkitMojangProfileSource(new RecordingSkins(Optional.empty()));
 
         assertThatCode(() -> source.fetchTexture("AnotherBadName")).doesNotThrowAnyException();
     }
 
-    /** A logger that captures formatted {@code debug} / {@code warn} lines so a test can assert what was reported where. */
-    private static final class RecordingLogger implements Logger {
-        private final List<String> debugLines = new ArrayList<>();
-        private final List<String> warnLines = new ArrayList<>();
+    /** A {@link SkinTextures} that answers with a canned result and records which names it was asked for. */
+    private static final class RecordingSkins implements SkinTextures {
+        private final Optional<SkinTexture> answer;
+        private final List<String> asked = new ArrayList<>();
 
-        @Override
-        public void info(String message, Object... args) {}
-
-        @Override
-        public void warn(String message, Object... args) {
-            warnLines.add(format(message, args));
+        private RecordingSkins(Optional<SkinTexture> answer) {
+            this.answer = answer;
         }
 
         @Override
-        public void error(String message, Throwable cause) {}
-
-        @Override
-        public void debug(String message, Object... args) {
-            debugLines.add(format(message, args));
+        public CompletableFuture<Optional<SkinTexture>> byName(String username) {
+            return CompletableFuture.completedFuture(fetchNow(username));
         }
 
-        private static String format(String message, Object... args) {
-            String out = message;
-            for (Object arg : args) {
-                int at = out.indexOf("{}");
-                if (at < 0) {
-                    break;
-                }
-                out = out.substring(0, at) + arg + out.substring(at + 2);
-            }
-            return out;
+        @Override
+        public Optional<SkinTexture> fetchNow(String username) {
+            asked.add(username);
+            return answer;
         }
     }
 }

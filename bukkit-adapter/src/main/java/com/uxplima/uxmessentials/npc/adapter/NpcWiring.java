@@ -18,9 +18,7 @@ import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionList
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
 import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
-import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
-import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
@@ -84,6 +82,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.teleport.BukkitDirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -169,14 +168,12 @@ public final class NpcWiring {
         NpcQuota quota = new NpcQuota(kernel.permissions(), settings.defaultLimit());
         NpcServices services = assemble(kernel, repository, renderer, notifier, quota);
         spawnStored(repository, renderer);
-        MojangSkinService mojangSkins =
-                new MojangSkinService(kernel.scheduler(), kernel.log(), new HttpClientFetcher(kernel.log()));
         MineSkinService mineSkins = new MineSkinService(
                 kernel.scheduler(),
                 kernel.log(),
                 new HttpClientFetcher(kernel.log(), MineSkinService.GENERATE_TIMEOUT),
                 settings.mineSkinApiKey());
-        SkinService skinService = new CompositeSkinService(mojangSkins, mineSkins);
+        SkinService skinService = new CompositeSkinService(kernel.skins(), mineSkins);
         NpcSkinByName skinByName =
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
         // The management GUI: an editor exposing every NPC property over the use cases, and a list — drawn through

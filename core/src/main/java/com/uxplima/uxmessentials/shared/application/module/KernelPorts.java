@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLocator;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.port.SkinTextures;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 
@@ -48,7 +49,8 @@ public record KernelPorts(
         WorldLookup worldLookup,
         PlayerLocator playerLocator,
         DomainEventPublisher events,
-        Logger log) {
+        Logger log,
+        SkinTextures skins) {
 
     public KernelPorts {
         Objects.requireNonNull(scheduler, "scheduler");
@@ -62,5 +64,37 @@ public record KernelPorts(
         Objects.requireNonNull(playerLocator, "playerLocator");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(skins, "skins");
+    }
+
+    /**
+     * The ports without a skin source, so nothing resolves a skin by name. The form tests use, and the form any
+     * caller uses that has no business dressing something in a player's skin.
+     */
+    public KernelPorts(
+            Scheduler scheduler,
+            Permissions permissions,
+            Cooldowns cooldowns,
+            Warmups warmups,
+            Messages messages,
+            MessageSink messageSink,
+            PlayerLookup playerLookup,
+            WorldLookup worldLookup,
+            PlayerLocator playerLocator,
+            DomainEventPublisher events,
+            Logger log) {
+        this(
+                scheduler,
+                permissions,
+                cooldowns,
+                warmups,
+                messages,
+                messageSink,
+                playerLookup,
+                worldLookup,
+                playerLocator,
+                events,
+                log,
+                SkinTextures.none());
     }
 }
