@@ -15,6 +15,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -71,6 +72,7 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
 import com.uxplima.uxmessentials.persistence.communication.AnnouncementStores;
+import com.uxplima.uxmessentials.persistence.lookup.PlayerNameRepositories;
 import com.uxplima.uxmessentials.persistence.menu.PlayerDataRepositories;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -135,6 +137,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PlayerDat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
@@ -152,6 +155,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
@@ -194,6 +198,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
+import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
@@ -232,7 +238,38 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PluginModule {
 
+    /**
+     * How many known player names the name index holds in memory when the config says nothing. Roughly 120 bytes
+     * an entry, and a name outside the window still resolves when its case matches exactly.
+     */
+    private static final int DEFAULT_NAME_INDEX_SIZE = 50_000;
+
     private PluginModule() {}
+
+    /**
+     * Seed the name index from the server's own user cache the first time it runs, so players who joined before
+     * this version resolve by name without having to join again. It only runs while the table is empty; from then
+     * on the join listener owns the index.
+     */
+    private static void backfillNameIndex(
+            JavaPlugin plugin,
+            PlayerNameRepository store,
+            PlayerNameIndex index,
+            com.uxplima.uxmessentials.shared.application.port.Logger log) {
+        if (store.count() > 0) {
+            return;
+        }
+        int seeded = 0;
+        for (OfflinePlayer known : plugin.getServer().getOfflinePlayers()) {
+            String name = known.getName();
+            if (name == null) {
+                continue;
+            }
+            index.record(known.getUniqueId(), name);
+            seeded++;
+        }
+        log.info("event=name_index_backfilled players={}", String.valueOf(seeded));
+    }
 
     /** Wires the plugin and returns the resources to close on disable. */
     public static CloseableResources wire(JavaPlugin plugin) {
@@ -263,6 +300,19 @@ public final class PluginModule {
         Persistence persistence = KernelWiring.openPersistence(plugin, config, kernelLog, registry);
         // The pool is closed last (pushed first), after every module has stopped and drained its writes.
         resources.onClose(persistence::close);
+
+        // The name index is where a typed name becomes an account, for every context. Backing it with the
+        // database here (rather than in KernelWiring) is what the wiring order allows: the kernel is built before
+        // persistence opens. The warm reads the database, so it goes to the async seam; the command path only
+        // ever touches the in-memory map the warm fills.
+        CachingPlayerNameIndex nameIndex = wiredKernel.nameIndex();
+        PlayerNameRepository nameStore = PlayerNameRepositories.jooq(persistence);
+        int nameIndexSize = config.getInt("lookup.name-index-size", DEFAULT_NAME_INDEX_SIZE);
+        kernel.scheduler().async(() -> {
+            nameIndex.backWith(nameStore, nameIndexSize);
+            backfillNameIndex(plugin, nameStore, nameIndex, kernelLog);
+        });
+        resources.addListener(new PlayerNameRecordingListener(nameIndex));
 
         // The cross-server bus is a kernel concern (one per backend), built before the modules so each context
         // that opts into sync registers its listener and wraps its repository through the Bus handle. The
