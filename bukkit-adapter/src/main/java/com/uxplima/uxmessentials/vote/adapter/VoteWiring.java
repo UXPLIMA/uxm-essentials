@@ -22,10 +22,10 @@ import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
 import com.uxplima.uxmessentials.persistence.vote.VoteRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VoteSync;
@@ -40,7 +40,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
-import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesMenu;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VoteJoinListener;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VotifierListener;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardApplier;
@@ -135,7 +135,8 @@ public final class VoteWiring {
             InProcessDomainEventPublisher events,
             Bus bus,
             ManagementGuiRegistry guiRegistry,
-            Menus menus) {
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -143,6 +144,7 @@ public final class VoteWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
         VoteRepository repository = VoteSync.repository(cachedRepository, bus.publisher());
@@ -168,10 +170,9 @@ public final class VoteWiring {
         VoteBroadcaster broadcaster = new BukkitVoteBroadcaster(
                 kernel.scheduler(), kernel.messages(), broadcastVisibility, broadcastConfig.display());
 
-        VoteSitesGuiView.GuiConfig guiCfg = loadGuiConfig(ctx.config());
-        GuiText guiText = new GuiText(kernel.messages());
-        VoteSitesGuiView sitesGuiView = new VoteSitesGuiView(
-                siteCatalog, repository, kernel.scheduler(), kernel.messages(), menus, guiText, guiCfg);
+        VoteSitesMenu.GuiConfig guiCfg = loadGuiConfig(ctx.config());
+        VoteSitesMenu sitesGuiView = new VoteSitesMenu(menus, kernel.messages(), siteCatalog, repository, guiCfg);
+        sitesGuiView.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         // The vote-site board is on the /uxmess gui hub only while gui.enabled is on, so the hub never shows an
         // icon for a screen /vote itself refuses to open.
         if (guiCfg.enabled()) {
@@ -408,7 +409,7 @@ public final class VoteWiring {
             List<String> voteLinks,
             VoteSiteCatalog siteCatalog,
             PdcReminderPreferences reminderPrefs,
-            VoteSitesGuiView sitesGuiView) {
+            VoteSitesMenu sitesGuiView) {
         Set<BroadcastChannel> channels = broadcastSettings.channels();
         HandleVote handleVote = new HandleVote(
                 repository,
@@ -503,15 +504,14 @@ public final class VoteWiring {
         return rules;
     }
 
-    private static VoteSitesGuiView.GuiConfig loadGuiConfig(ConfigStore config) {
+    private static VoteSitesMenu.GuiConfig loadGuiConfig(ConfigStore config) {
         boolean enabled = !"chat"
                 .equalsIgnoreCase(config.getString("gui.list-display", "gui").strip());
-        int rows = Math.max(1, Math.min(6, config.getInt("gui.rows", 3)));
-        Material votable = VoteSitesGuiView.GuiConfig.parseMaterial(
+        Material votable = VoteSitesMenu.GuiConfig.parseMaterial(
                 config.getString("gui.votable-material", "PAPER"), Material.PAPER);
-        Material cooldown = VoteSitesGuiView.GuiConfig.parseMaterial(
+        Material cooldown = VoteSitesMenu.GuiConfig.parseMaterial(
                 config.getString("gui.cooldown-material", "CLOCK"), Material.CLOCK);
-        return new VoteSitesGuiView.GuiConfig(enabled, rows, votable, cooldown);
+        return new VoteSitesMenu.GuiConfig(enabled, votable, cooldown);
     }
 
     /**

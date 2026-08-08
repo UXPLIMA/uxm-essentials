@@ -18,7 +18,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -32,7 +31,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
-import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesMenu;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
@@ -280,14 +279,12 @@ class VoteNextLastRemindCommandPathTest {
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
-        VoteSitesGuiView sitesGui = new VoteSitesGuiView(
+        VoteSitesMenu sitesGui = new VoteSitesMenu(
+                TestMenuEngine.create(messages, new SyncScheduler()).menus(),
+                messages,
                 catalog,
                 repository,
-                new SyncScheduler(),
-                messages,
-                TestMenuEngine.create(messages, new SyncScheduler()).menus(),
-                new GuiText(messages),
-                VoteSitesGuiView.GuiConfig.defaults());
+                VoteSitesMenu.GuiConfig.defaults());
         VotePartyStatus partyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         ShowVoteStreak showVoteStreak = new ShowVoteStreak(repository, notifier);

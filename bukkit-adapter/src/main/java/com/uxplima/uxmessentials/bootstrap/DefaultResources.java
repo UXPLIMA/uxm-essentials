@@ -92,6 +92,7 @@ final class DefaultResources {
             "modules/economy/gui/economy-bank-members.conf",
             "modules/economy/gui/economy-banks.conf",
             "modules/economy/gui/currency-picker.conf",
+            "modules/vote/gui/vote-sites.conf",
             "modules/economy/gui/economy-bulk.conf",
             "modules/economy/gui/economy-exchange.conf",
             "modules/economy/gui/economy-loan.conf",

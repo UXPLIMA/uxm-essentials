@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vote.gui;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -27,12 +28,11 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -43,7 +43,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
-import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesMenu;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
@@ -92,14 +92,14 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@link VoteSitesGuiView} rendered through the menu engine: the window is a holder-backed
+ * MockBukkit coverage of {@link VoteSitesMenu} rendered through the menu engine: the window is a holder-backed
  * engine list (a {@link MenuHolder} routed by the one menu listener), drawn slot-for-slot from the resolved site
  * entries with the votable/cooldown materials the config supplies, and a click on a votable site sends that site's
  * clickable vote link. Unknown/blank materials still fall back, a site with no URL or one on cooldown is a silent
  * no-op, and the {@code /vote sites} command path routes to the view (or falls back to chat links when the catalog
  * is empty). The scheduler is a synchronous double so the async→entity hops run inline.
  */
-class VoteSitesGuiViewTest {
+class VoteSitesMenuTest {
 
     private ServerMock server;
     private Plugin plugin;
@@ -134,7 +134,7 @@ class VoteSitesGuiViewTest {
         repository.setLastVotedAtSite(
                 player.getUniqueId(), "minecraft-mp", Instant.now().minus(Duration.ofHours(1)));
 
-        VoteSitesGuiView view = view(catalog, repository, VoteSitesGuiView.GuiConfig.defaults());
+        VoteSitesMenu view = view(catalog, repository, VoteSitesMenu.GuiConfig.defaults());
 
         assertThatCode(() -> view.open(player)).doesNotThrowAnyException();
         Inventory top = player.getOpenInventory().getTopInventory();
@@ -152,8 +152,8 @@ class VoteSitesGuiViewTest {
         FakeVoteRepository repository = new FakeVoteRepository();
         repository.setLastVotedAtSite(
                 player.getUniqueId(), "Cooling", Instant.now().minus(Duration.ofHours(1)));
-        VoteSitesGuiView.GuiConfig cfg =
-                new VoteSitesGuiView.GuiConfig(true, 3, Material.EMERALD_BLOCK, Material.REDSTONE_BLOCK);
+        VoteSitesMenu.GuiConfig cfg =
+                new VoteSitesMenu.GuiConfig(true, Material.EMERALD_BLOCK, Material.REDSTONE_BLOCK);
 
         view(catalog, repository, cfg).open(player);
 
@@ -161,16 +161,16 @@ class VoteSitesGuiViewTest {
         // Votable site renders with the configured votable material, the cooled-down one with the cooldown material.
         assertThat(top.getItem(0).getType()).isEqualTo(Material.EMERALD_BLOCK);
         assertThat(top.getItem(1).getType()).isEqualTo(Material.REDSTONE_BLOCK);
-        // The bottom-row corners carry the two ARROW nav buttons (two-row window: one content row plus the nav row).
-        assertThat(top.getItem(9).getType()).isEqualTo(Material.ARROW);
-        assertThat(top.getItem(17).getType()).isEqualTo(Material.ARROW);
+        // The bottom-row corners carry the two ARROW nav buttons the shipped spec puts there.
+        assertThat(top.getItem(18).getType()).isEqualTo(Material.ARROW);
+        assertThat(top.getItem(26).getType()).isEqualTo(Material.ARROW);
     }
 
     @Test
     void clickingAVotableSiteSendsTheClickableVoteLink() {
         VoteSiteCatalog catalog = catalogOf(
                 new VoteSiteSpec("PlanetMinecraft", Optional.of("https://pmc.example"), Duration.ofHours(24)));
-        view(catalog, new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults())
+        view(catalog, new FakeVoteRepository(), VoteSitesMenu.GuiConfig.defaults())
                 .open(player);
 
         fireClick(0); // the only content slot holds the votable site
@@ -186,7 +186,7 @@ class VoteSitesGuiViewTest {
         FakeVoteRepository repository = new FakeVoteRepository();
         repository.setLastVotedAtSite(
                 player.getUniqueId(), "Cooling", Instant.now().minus(Duration.ofHours(1)));
-        view(catalog, repository, VoteSitesGuiView.GuiConfig.defaults()).open(player);
+        view(catalog, repository, VoteSitesMenu.GuiConfig.defaults()).open(player);
 
         fireClick(0);
 
@@ -197,20 +197,20 @@ class VoteSitesGuiViewTest {
     @Test
     void openWithUnknownMaterialFallsBackToDefaultWithoutThrowing() {
         // parseMaterial with a garbage name falls back silently.
-        Material parsed = VoteSitesGuiView.GuiConfig.parseMaterial("OBVIOUSLY_INVALID_MATERIAL_XYZ", Material.PAPER);
+        Material parsed = VoteSitesMenu.GuiConfig.parseMaterial("OBVIOUSLY_INVALID_MATERIAL_XYZ", Material.PAPER);
         assertThat(parsed).isEqualTo(Material.PAPER);
 
-        VoteSitesGuiView.GuiConfig cfg = new VoteSitesGuiView.GuiConfig(true, 3, parsed, Material.CLOCK);
+        VoteSitesMenu.GuiConfig cfg = new VoteSitesMenu.GuiConfig(true, parsed, Material.CLOCK);
         VoteSiteCatalog catalog =
                 catalogOf(new VoteSiteSpec("TestSite", Optional.of("https://example.com"), Duration.ofHours(24)));
-        VoteSitesGuiView view = view(catalog, new FakeVoteRepository(), cfg);
+        VoteSitesMenu view = view(catalog, new FakeVoteRepository(), cfg);
 
         assertThatCode(() -> view.open(player)).doesNotThrowAnyException();
     }
 
     @Test
     void openWithBlankMaterialNameFallsBackToDefault() {
-        Material parsed = VoteSitesGuiView.GuiConfig.parseMaterial("", Material.CLOCK);
+        Material parsed = VoteSitesMenu.GuiConfig.parseMaterial("", Material.CLOCK);
         assertThat(parsed).isEqualTo(Material.CLOCK);
     }
 
@@ -218,7 +218,7 @@ class VoteSitesGuiViewTest {
     void openSiteWithNoUrlRendersWithoutClickLinkAndDoesNotThrow() {
         // A site with no URL must still render and not throw on click.
         VoteSiteCatalog catalog = catalogOf(new VoteSiteSpec("NoUrlSite", Optional.empty(), Duration.ofHours(24)));
-        VoteSitesGuiView view = view(catalog, new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults());
+        VoteSitesMenu view = view(catalog, new FakeVoteRepository(), VoteSitesMenu.GuiConfig.defaults());
 
         assertThatCode(() -> view.open(player)).doesNotThrowAnyException();
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
@@ -229,8 +229,8 @@ class VoteSitesGuiViewTest {
 
     @Test
     void openEmptyCatalogStillOpensWithoutThrowing() {
-        VoteSitesGuiView view =
-                view(VoteSiteCatalog.empty(), new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults());
+        VoteSitesMenu view =
+                view(VoteSiteCatalog.empty(), new FakeVoteRepository(), VoteSitesMenu.GuiConfig.defaults());
 
         assertThatCode(() -> view.open(player)).doesNotThrowAnyException();
     }
@@ -241,7 +241,7 @@ class VoteSitesGuiViewTest {
     void voteSitesCommandOpensGuiWhenCatalogIsNonEmpty() {
         VoteSiteCatalog catalog = catalogOf(
                 new VoteSiteSpec("PlanetMinecraft", Optional.of("https://planetminecraft.com"), Duration.ofHours(24)));
-        VoteSitesGuiView view = view(catalog, new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults());
+        VoteSitesMenu view = view(catalog, new FakeVoteRepository(), VoteSitesMenu.GuiConfig.defaults());
 
         VoteServices services = services(catalog, view, new FakeMessages());
         CommandDispatcher<CommandSourceStack> dispatcher = register(services, ListDisplayMode.GUI);
@@ -255,7 +255,7 @@ class VoteSitesGuiViewTest {
     void voteNoArgInGuiModeOpensGuiWhenCatalogIsNonEmpty() {
         VoteSiteCatalog catalog =
                 catalogOf(new VoteSiteSpec("TestSite", Optional.of("https://example.com"), Duration.ofHours(24)));
-        VoteSitesGuiView view = view(catalog, new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults());
+        VoteSitesMenu view = view(catalog, new FakeVoteRepository(), VoteSitesMenu.GuiConfig.defaults());
 
         FakeMessages messages = new FakeMessages();
         VoteServices services = services(catalog, view, messages);
@@ -268,8 +268,8 @@ class VoteSitesGuiViewTest {
 
     @Test
     void voteSitesCommandFallsBackToChatLinksWhenCatalogIsEmpty() {
-        VoteSitesGuiView view =
-                view(VoteSiteCatalog.empty(), new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults());
+        VoteSitesMenu view =
+                view(VoteSiteCatalog.empty(), new FakeVoteRepository(), VoteSitesMenu.GuiConfig.defaults());
 
         FakeMessages messages = new FakeMessages();
         VoteServices services = services(VoteSiteCatalog.empty(), view, messages);
@@ -285,7 +285,7 @@ class VoteSitesGuiViewTest {
     void voteNoArgInChatModeSendsLinksInsteadOfOpeningGui() {
         VoteSiteCatalog catalog =
                 catalogOf(new VoteSiteSpec("TestSite", Optional.of("https://example.com"), Duration.ofHours(24)));
-        VoteSitesGuiView view = view(catalog, new FakeVoteRepository(), VoteSitesGuiView.GuiConfig.defaults());
+        VoteSitesMenu view = view(catalog, new FakeVoteRepository(), VoteSitesMenu.GuiConfig.defaults());
 
         FakeMessages messages = new FakeMessages();
         VoteServices services = services(catalog, view, messages);
@@ -300,11 +300,14 @@ class VoteSitesGuiViewTest {
 
     // --- helpers ---
 
-    private VoteSitesGuiView view(
-            VoteSiteCatalog catalog, FakeVoteRepository repository, VoteSitesGuiView.GuiConfig cfg) {
-        Menus menus = engine.menus();
-        GuiText guiText = new GuiText(new FakeMessages());
-        return new VoteSitesGuiView(catalog, repository, new SyncScheduler(), new FakeMessages(), menus, guiText, cfg);
+    /**
+     * Build the board over the test engine and register its spec, the way vote wiring does. The spec resource is
+     * read from the classpath because the fixture points the data folder at a path that does not exist.
+     */
+    private VoteSitesMenu view(VoteSiteCatalog catalog, FakeVoteRepository repository, VoteSitesMenu.GuiConfig cfg) {
+        VoteSitesMenu menu = new VoteSitesMenu(engine.menus(), new FakeMessages(), catalog, repository, cfg);
+        menu.register(engine.bindings(), Path.of("nonexistent"), NOOP_LOG);
+        return menu;
     }
 
     private void fireClick(int slot) {
@@ -318,7 +321,7 @@ class VoteSitesGuiViewTest {
         return new VoteSiteCatalog(List.of(specs));
     }
 
-    private VoteServices services(VoteSiteCatalog catalog, VoteSitesGuiView view, FakeMessages messages) {
+    private VoteServices services(VoteSiteCatalog catalog, VoteSitesMenu view, FakeMessages messages) {
         Notifier notifier = new Notifier(messages, new NoSink());
         RewardSpec noOp = new RewardSpec(100, Optional.empty(), List.of(), List.of(), List.of(), List.of(), Set.of());
         PartyConfig party = new PartyConfig(noOp, 25, false, 0, PartyResetSchedule.NONE, List.of());
@@ -396,6 +399,20 @@ class VoteSitesGuiViewTest {
     }
 
     // --- fakes ---
+
+    private static final Logger NOOP_LOG = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
 
     private static final class FakeVoteRepository implements VoteRepository {
 

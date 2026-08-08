@@ -1012,7 +1012,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("tablist"))) {
             wireTablist(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
-            wireVote(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus);
+            wireVote(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
             wireDiscordlink(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
@@ -2208,7 +2208,8 @@ public final class PluginModule {
             ContextLinks links,
             Bus bus,
             ManagementGuiRegistry guiRegistry,
-            Menus menus) {
+            Menus menus,
+            MenuBindings menuBindings) {
         // vote builds its counter-cached jOOQ VoteRepository over persistence.dsl() (the vote_party counter and
         // vote_queue offline reward batches ship in the persistence V15 baseline, always applied), the console
         // reward dispatcher on the global region thread, and the online audience for the party rewards and
@@ -2220,7 +2221,8 @@ public final class PluginModule {
         // threshold are surfaced for the PAPI vote placeholder seam registered after all contexts have wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        VoteWiring.Wired wired = VoteWiring.wire(plugin, ctx, persistence, events, bus, guiRegistry, menus);
+        VoteWiring.Wired wired =
+                VoteWiring.wire(plugin, ctx, persistence, events, bus, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

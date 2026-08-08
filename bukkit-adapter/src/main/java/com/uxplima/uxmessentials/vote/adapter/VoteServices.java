@@ -5,7 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesMenu;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
@@ -59,7 +59,7 @@ public record VoteServices(
         HandleVote handleVote,
         ApplyQueuedRewards applyQueuedRewards,
         VoteLinks voteLinks,
-        VoteSitesGuiView voteSitesGui,
+        VoteSitesMenu voteSitesGui,
         VotePartyStatus votePartyStatus,
         ShowVoteTotals showVoteTotals,
         ShowVoteStreak showVoteStreak,
