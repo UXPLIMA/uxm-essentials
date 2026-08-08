@@ -13,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -125,7 +126,7 @@ class ResolveBiomeRtpTest {
         Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
         Scheduler scheduler = new InlineScheduler();
         Logger log = new NoopLogger();
-        PlayerNotifier notifier = new PlayerNotifier(new KeyMessages(), sink);
+        Notifier notifier = new Notifier(new KeyMessages(), sink);
         AsyncSafeLocationFinder finder = new AsyncSafeLocationFinder(chunkAccess, SafeSearchPolicy.permissive(), clock);
         BudgetedSafeSearch budgeted = new BudgetedSafeSearch(finder, scheduler, clock, Duration.ofMillis(1));
         BiomeTargetedSearch search = new BiomeTargetedSearch(

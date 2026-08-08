@@ -13,6 +13,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -20,7 +21,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
-import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
@@ -126,17 +126,17 @@ class VoteJoinListenerReminderTest {
             VoteRepository repository,
             VoteSiteCatalog catalog,
             ReminderPreferences prefs,
-            VoteNotifier notifier) {
+            Notifier notifier) {
         ApplyQueuedRewards applyQueued = new ApplyQueuedRewards(repository, (commands, name) -> {});
         VoteReminderEligibility eligibility = new VoteReminderEligibility(repository, catalog);
         return new VoteJoinListener(
                 applyQueued, repository, scheduler, true, true, Duration.ofSeconds(1), eligibility, prefs, notifier);
     }
 
-    /** A real {@link VoteNotifier} whose {@link Messages} echoes the key and whose sink records it. */
-    private static VoteNotifier notifier(RecordingSink sink) {
+    /** A real {@link Notifier} whose {@link Messages} echoes the key and whose sink records it. */
+    private static Notifier notifier(RecordingSink sink) {
         Messages messages = (viewer, key, placeholders) -> key.key();
-        return new VoteNotifier(messages, sink);
+        return new Notifier(messages, sink);
     }
 
     private static final class RecordingSink implements MessageSink {

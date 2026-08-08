@@ -126,7 +126,7 @@ class WorldGenerationGoldenTest {
     private com.uxplima.uxmessentials.worlds.application.SetWorldProperty setProperty() {
         return new com.uxplima.uxmessentials.worlds.application.SetWorldProperty(
                 repository,
-                new com.uxplima.uxmessentials.worlds.application.WorldNotifier(
+                new com.uxplima.uxmessentials.shared.application.message.Notifier(
                         new WorldEditorTestSupport.KeyMessages(), new WorldEditorTestSupport.SilentSink()),
                 new WorldEditorTestSupport.RecordingEvents(),
                 scheduler);

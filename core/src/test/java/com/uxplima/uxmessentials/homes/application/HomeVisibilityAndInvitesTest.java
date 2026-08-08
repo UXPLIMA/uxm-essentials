@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.homes.domain.event.HomeVisibilityChanged;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -245,14 +246,14 @@ class HomeVisibilityAndInvitesTest {
         private @Nullable MessageKey lastKey;
         private Map<String, String> lastPlaceholders = Map.of();
 
-        HomeNotifier notifier() {
+        Notifier notifier() {
             Messages messages = (viewer, key, placeholders) -> {
                 lastKey = key;
                 lastPlaceholders = placeholders;
                 return key.key();
             };
             MessageSink sink = (viewer, renderedText) -> {};
-            return new HomeNotifier(messages, sink);
+            return new Notifier(messages, sink);
         }
     }
 

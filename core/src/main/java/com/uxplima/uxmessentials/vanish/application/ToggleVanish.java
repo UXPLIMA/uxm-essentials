@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vanish.application;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
@@ -34,7 +35,7 @@ public final class ToggleVanish {
     private final VanishStore store;
     private final VanishView view;
     private final VanishLevelResolver levels;
-    private final VanishNotifier notifier;
+    private final Notifier notifier;
     private final VanishBuffs buffs;
     private final VanishBus bus;
 
@@ -42,7 +43,7 @@ public final class ToggleVanish {
             VanishStore store,
             VanishView view,
             VanishLevelResolver levels,
-            VanishNotifier notifier,
+            Notifier notifier,
             VanishBuffs buffs,
             VanishBus bus) {
         this.store = Objects.requireNonNull(store, "store");

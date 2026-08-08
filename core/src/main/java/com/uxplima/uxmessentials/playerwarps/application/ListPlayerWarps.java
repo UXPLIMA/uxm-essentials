@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -27,9 +28,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ListPlayerWarps {
 
     private final PlayerWarpRepository repository;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
 
-    public ListPlayerWarps(PlayerWarpRepository repository, PlayerWarpNotifier notifier) {
+    public ListPlayerWarps(PlayerWarpRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

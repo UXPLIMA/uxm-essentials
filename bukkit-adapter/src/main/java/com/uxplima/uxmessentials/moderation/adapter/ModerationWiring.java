@@ -51,7 +51,6 @@ import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.Lockdown;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
-import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
 import com.uxplima.uxmessentials.moderation.application.Punish;
@@ -100,6 +99,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -195,7 +195,7 @@ public final class ModerationWiring {
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
         // already kicked) never double-kicks; with the bus disabled this listener is never invoked.
         EnforceRemoteBan enforce = new EnforceRemoteBan(
-                repository, sanctions, new ModerationNotifier(kernel.messages(), kernel.messageSink()), clock);
+                repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         bus.registry().register(ModerationSync.listener(enforce::onRemoteBan));
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
@@ -312,7 +312,7 @@ public final class ModerationWiring {
             InMemoryCommandSpyStore commandSpyStore,
             SanctionSync sync,
             Clock clock) {
-        ModerationNotifier notifier = new ModerationNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         // The operator audit is wrapped so a successful punishment also emits a name-based Discord notice on the
         // same channel when discord-notify is on; disabled or bridge-absent, it is a no-op.
         ModerationAudit audit = new DiscordPunishmentAudit(

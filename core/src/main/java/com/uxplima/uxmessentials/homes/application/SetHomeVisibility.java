@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -24,12 +25,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class SetHomeVisibility {
 
     private final HomeRepository repository;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
-    public SetHomeVisibility(
-            HomeRepository repository, HomeNotifier notifier, DomainEventPublisher events, Clock clock) {
+    public SetHomeVisibility(HomeRepository repository, Notifier notifier, DomainEventPublisher events, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");

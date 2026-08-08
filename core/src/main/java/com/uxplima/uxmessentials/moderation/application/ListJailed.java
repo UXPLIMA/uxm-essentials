@@ -8,6 +8,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -28,10 +29,10 @@ public final class ListJailed {
 
     private final ModerationRepository repository;
     private final PlayerLookup players;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final Clock clock;
 
-    public ListJailed(ModerationRepository repository, PlayerLookup players, ModerationNotifier notifier, Clock clock) {
+    public ListJailed(ModerationRepository repository, PlayerLookup players, Notifier notifier, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

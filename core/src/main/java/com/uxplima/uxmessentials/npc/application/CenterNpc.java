@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.event.NpcMoved;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -27,10 +28,10 @@ public final class CenterNpc {
 
     private final NpcRepository repository;
     private final NpcView view;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
 
-    public CenterNpc(NpcRepository repository, NpcView view, NpcNotifier notifier, DomainEventPublisher events) {
+    public CenterNpc(NpcRepository repository, NpcView view, Notifier notifier, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

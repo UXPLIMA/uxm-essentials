@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -89,7 +90,7 @@ class ResolveRtpTest {
 
         Fixture() {
             TeleportSettings settings = new TeleportSettings(new EmptyConfig());
-            PlayerNotifier notifier = new PlayerNotifier(new KeyMessages(), new NoopSink());
+            Notifier notifier = new Notifier(new KeyMessages(), new NoopSink());
             TeleportEngine engine = new TeleportEngine(
                     new NoopCooldowns(),
                     new ImmediateWarmups(),

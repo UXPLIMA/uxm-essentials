@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -35,14 +36,14 @@ class HologramConvenienceTest {
     private FakeHologramRepository repository;
     private RecordingView view;
     private CapturingSink sink;
-    private HologramNotifier notifier;
+    private Notifier notifier;
 
     @BeforeEach
     void setUp() {
         repository = new FakeHologramRepository();
         view = new RecordingView();
         sink = new CapturingSink();
-        notifier = new HologramNotifier(new KeyMessages(), sink);
+        notifier = new Notifier(new KeyMessages(), sink);
     }
 
     private Hologram store(String name, double x, double y, double z, String... lines) {

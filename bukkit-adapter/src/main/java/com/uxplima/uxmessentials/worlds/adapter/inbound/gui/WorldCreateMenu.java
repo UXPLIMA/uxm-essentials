@@ -16,12 +16,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
@@ -65,7 +65,7 @@ public final class WorldCreateMenu {
     private final Menus menus;
     private final Scheduler scheduler;
     private final CreateWorld createWorld;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final TextInput textInput;
     private final BiConsumer<Player, PlayerRef> reopenList;
 
@@ -73,7 +73,7 @@ public final class WorldCreateMenu {
             Menus menus,
             Scheduler scheduler,
             CreateWorld createWorld,
-            WorldNotifier notifier,
+            Notifier notifier,
             TextInput textInput,
             BiConsumer<Player, PlayerRef> reopenList) {
         this.menus = Objects.requireNonNull(menus, "menus");

@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.event.HologramDeleted;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -23,11 +24,11 @@ public final class DeleteHologram {
 
     private final HologramRepository repository;
     private final HologramView view;
-    private final HologramNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
 
     public DeleteHologram(
-            HologramRepository repository, HologramView view, HologramNotifier notifier, DomainEventPublisher events) {
+            HologramRepository repository, HologramView view, Notifier notifier, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

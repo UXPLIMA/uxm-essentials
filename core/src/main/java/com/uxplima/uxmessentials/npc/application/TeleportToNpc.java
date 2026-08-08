@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.npc.application.port.NpcTeleporter;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -23,9 +24,9 @@ public final class TeleportToNpc {
 
     private final NpcRepository repository;
     private final NpcTeleporter teleporter;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
 
-    public TeleportToNpc(NpcRepository repository, NpcTeleporter teleporter, NpcNotifier notifier) {
+    public TeleportToNpc(NpcRepository repository, NpcTeleporter teleporter, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

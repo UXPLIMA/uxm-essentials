@@ -13,6 +13,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -37,7 +38,6 @@ import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
-import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
 import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
@@ -87,7 +87,7 @@ public final class VanishWiring {
         InMemoryVanishStore store = new InMemoryVanishStore();
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(plugin, kernel.scheduler(), levels);
-        VanishNotifier notifier = new VanishNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         VanishBuffs buffs = new BukkitVanishBuffs(
                 plugin.getServer(), kernel.scheduler(), config.nightVision(), config.allowFlight());
         VanishPickupPreferences pickup = new PdcVanishPickup(plugin.getServer(), config.pickupItems());

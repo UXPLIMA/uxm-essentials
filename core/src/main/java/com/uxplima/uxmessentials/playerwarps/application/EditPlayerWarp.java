@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.ReservedWarpNames;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpDescription;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -44,14 +45,14 @@ public final class EditPlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final WarpAuthorization authorization;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final PlayerWarpPasswordStore passwords;
     private final Clock clock;
 
     public EditPlayerWarp(
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             PlayerWarpPasswordStore passwords,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");

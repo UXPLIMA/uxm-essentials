@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -27,7 +28,6 @@ import com.uxplima.uxmessentials.warps.application.SetWarp;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpAccess;
 import com.uxplima.uxmessentials.warps.application.WarpInfo;
-import com.uxplima.uxmessentials.warps.application.WarpNotifier;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
@@ -106,7 +106,7 @@ public final class WarpsWiring {
         cached.all();
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
 
-        WarpNotifier notifier = new WarpNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WarpTeleportRegistry teleportRegistry = new WarpTeleportRegistry();
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
         var playerWarpHandle = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle();
@@ -236,7 +236,7 @@ public final class WarpsWiring {
     private static WarpServices assemble(
             KernelPorts kernel,
             WarpRepository repository,
-            WarpNotifier notifier,
+            Notifier notifier,
             WarpBrowseMenu browseMenu,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView editorView,
             com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx,

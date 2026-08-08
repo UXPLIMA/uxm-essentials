@@ -15,6 +15,7 @@ import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -22,7 +23,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
@@ -57,7 +57,7 @@ public final class BukkitWorldPregen implements WorldPregen {
     private final Scheduler scheduler;
     private final WorldEngine engine;
     private final Messages messages;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final WorldsSettings settings;
     private final Logger log;
 
@@ -68,7 +68,7 @@ public final class BukkitWorldPregen implements WorldPregen {
             Scheduler scheduler,
             WorldEngine engine,
             Messages messages,
-            WorldNotifier notifier,
+            Notifier notifier,
             WorldsSettings settings,
             Logger log) {
         this.gen = Objects.requireNonNull(gen, "gen");

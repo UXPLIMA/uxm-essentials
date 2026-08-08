@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -17,9 +18,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class SetPersonalTime {
 
     private final PlayerEffects effects;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public SetPersonalTime(PlayerEffects effects, PlayerStateNotifier notifier) {
+    public SetPersonalTime(PlayerEffects effects, Notifier notifier) {
         this.effects = Objects.requireNonNull(effects, "effects");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

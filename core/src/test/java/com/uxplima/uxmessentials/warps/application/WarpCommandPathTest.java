@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -49,7 +50,7 @@ class WarpCommandPathTest {
     private FakeWarpRepository repository;
     private RecordingTeleporter teleporter;
     private StubPermissions permissions;
-    private WarpNotifier notifier;
+    private Notifier notifier;
     private DomainEventPublisher events;
     private SetWarp setWarp;
     private PlayerRef alice;
@@ -60,7 +61,7 @@ class WarpCommandPathTest {
         repository = new FakeWarpRepository();
         teleporter = new RecordingTeleporter();
         permissions = new StubPermissions();
-        notifier = new WarpNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         events = new CapturingEvents();
         setWarp = new SetWarp(repository, notifier, events, Clock.system(ZoneOffset.UTC), List.of());
         alice = new PlayerRef(UUID.randomUUID(), "Alice");

@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,9 +19,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class SocialSpy {
 
     private final SocialSpyStore socialSpy;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
 
-    public SocialSpy(SocialSpyStore socialSpy, MessagingNotifier notifier) {
+    public SocialSpy(SocialSpyStore socialSpy, Notifier notifier) {
         this.socialSpy = Objects.requireNonNull(socialSpy, "socialSpy");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

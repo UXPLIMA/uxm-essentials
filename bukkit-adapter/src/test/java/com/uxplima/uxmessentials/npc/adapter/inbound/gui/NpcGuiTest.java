@@ -39,7 +39,6 @@ import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
-import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcQuota;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcAction;
@@ -84,6 +83,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditablePro
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -376,8 +376,8 @@ class NpcGuiTest {
         return menus;
     }
 
-    private NpcNotifier notifier() {
-        return new NpcNotifier(new KeyMessages(), new SilentSink());
+    private Notifier notifier() {
+        return new Notifier(new KeyMessages(), new SilentSink());
     }
 
     private EntityEditorLayout editorLayout(Path dir) throws Exception {
@@ -408,7 +408,7 @@ class NpcGuiTest {
     }
 
     private NpcServices assembleServices() {
-        NpcNotifier notifier = notifier();
+        Notifier notifier = notifier();
         NpcView view = new SilentView();
         DomainEventPublisher events = new SilentEvents();
         NpcQuota quota = new NpcQuota(new UnlimitedPermissions(), -1);

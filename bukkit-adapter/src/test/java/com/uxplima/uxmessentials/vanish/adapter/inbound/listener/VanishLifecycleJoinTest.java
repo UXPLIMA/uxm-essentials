@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -23,7 +24,6 @@ import com.uxplima.uxmessentials.vanish.application.JoinVanishReconciler;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
-import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
 import com.uxplima.uxmessentials.vanish.application.VanishSync;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
@@ -81,7 +81,7 @@ class VanishLifecycleJoinTest {
         network = new InMemoryNetworkVanishStore();
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
-        VanishNotifier notifier = new VanishNotifier(new KeyMessages(), new DiscardingSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new DiscardingSink());
         toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs(), VanishBus.disabled());
         setVanishLevel = new SetVanishLevel(store, view, levels, new NoopBuffs(), VanishBus.disabled());
     }

@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -50,7 +51,7 @@ public final class StaffRollback {
     private final ModerationRepository repository;
     private final Unban unban;
     private final Unmute unmute;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final Clock clock;
 
@@ -59,7 +60,7 @@ public final class StaffRollback {
             ModerationRepository repository,
             Unban unban,
             Unmute unmute,
-            ModerationNotifier notifier,
+            Notifier notifier,
             ModerationAudit audit,
             Clock clock) {
         this.history = Objects.requireNonNull(history, "history");

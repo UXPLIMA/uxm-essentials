@@ -179,8 +179,8 @@ class HomeIconGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
-        com.uxplima.uxmessentials.homes.application.HomeNotifier notifier =
-                new com.uxplima.uxmessentials.homes.application.HomeNotifier(new KeyMessages(), (v, t) -> {});
+        com.uxplima.uxmessentials.shared.application.message.Notifier notifier =
+                new com.uxplima.uxmessentials.shared.application.message.Notifier(new KeyMessages(), (v, t) -> {});
         HomeMenus homeMenus = new HomeMenus(
                 menus,
                 scheduler,

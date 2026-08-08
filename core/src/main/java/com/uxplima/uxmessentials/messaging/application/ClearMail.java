@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -17,9 +18,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class ClearMail {
 
     private final MailRepository mail;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
 
-    public ClearMail(MailRepository mail, MessagingNotifier notifier) {
+    public ClearMail(MailRepository mail, Notifier notifier) {
         this.mail = Objects.requireNonNull(mail, "mail");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

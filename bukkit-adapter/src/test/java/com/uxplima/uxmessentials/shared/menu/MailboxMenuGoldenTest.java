@@ -28,7 +28,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MailboxMenu;
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
-import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.domain.MailBox;
 import com.uxplima.uxmessentials.messaging.domain.MailId;
@@ -42,6 +41,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -100,7 +100,7 @@ class MailboxMenuGoldenTest {
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         mail = new FakeMail();
-        clearMail = new ClearMail(mail, new MessagingNotifier(new KeyMessages(), new NoopSink()));
+        clearMail = new ClearMail(mail, new Notifier(new KeyMessages(), new NoopSink()));
         Guis.install(plugin);
     }
 

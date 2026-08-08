@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.messaging.domain.LastConversation;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -35,7 +36,7 @@ public final class Reply {
     private final PlayerLookup players;
     private final VanishVisibility vanish;
     private final ReplyRoutingStore replyRouting;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
     private final Duration replyTtl;
     private final Clock clock;
 
@@ -45,7 +46,7 @@ public final class Reply {
             PlayerLookup players,
             VanishVisibility vanish,
             ReplyRoutingStore replyRouting,
-            MessagingNotifier notifier,
+            Notifier notifier,
             Duration replyTtl,
             Clock clock) {
         this.sendMessage = Objects.requireNonNull(sendMessage, "sendMessage");

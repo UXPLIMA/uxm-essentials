@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerMuted;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -36,7 +37,7 @@ public final class Mute {
 
     private final ModerationRepository repository;
     private final ModerationGuard guard;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final SanctionHistoryRecorder history;
@@ -48,7 +49,7 @@ public final class Mute {
     public Mute(
             ModerationRepository repository,
             ModerationGuard guard,
-            ModerationNotifier notifier,
+            Notifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
             SanctionHistoryRecorder history,

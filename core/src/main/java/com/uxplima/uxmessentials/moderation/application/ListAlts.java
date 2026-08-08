@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -22,9 +23,9 @@ public final class ListAlts {
 
     private final ModerationRepository repository;
     private final PlayerLookup players;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
 
-    public ListAlts(ModerationRepository repository, PlayerLookup players, ModerationNotifier notifier) {
+    public ListAlts(ModerationRepository repository, PlayerLookup players, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

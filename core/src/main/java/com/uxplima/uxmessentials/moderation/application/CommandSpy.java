@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.moderation.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.CommandSpyStore;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class CommandSpy {
 
     private final CommandSpyStore store;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
 
-    public CommandSpy(CommandSpyStore store, ModerationNotifier notifier) {
+    public CommandSpy(CommandSpyStore store, Notifier notifier) {
         this.store = Objects.requireNonNull(store, "store");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

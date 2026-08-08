@@ -29,7 +29,6 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptO
 import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
 import com.uxplima.uxmessentials.communication.application.ResolveConnectionMessage;
@@ -40,6 +39,7 @@ import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -200,7 +200,7 @@ class CommunicationAdapterTest {
                 "info",
                 InfoRegistry.of(List.of(InfoPage.of("info", List.of("a", "b", "c", "d", "e"), 2))),
                 new BukkitInfoSender(sink),
-                new CommunicationNotifier(sink, sink),
+                new Notifier(sink, sink),
                 sink);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(info.build());
@@ -226,7 +226,7 @@ class CommunicationAdapterTest {
                 "info",
                 InfoRegistry.of(List.of(InfoPage.of("info", List.of("a", "b", "c", "d", "e"), 2))),
                 new BukkitInfoSender(sink),
-                new CommunicationNotifier(sink, sink),
+                new Notifier(sink, sink),
                 sink);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(info.build());
@@ -244,7 +244,7 @@ class CommunicationAdapterTest {
                 "info",
                 InfoRegistry.of(List.of(InfoPage.of("info", List.of("one", "two"), 8))),
                 new BukkitInfoSender(sink),
-                new CommunicationNotifier(sink, sink),
+                new Notifier(sink, sink),
                 sink);
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(info.build());
@@ -344,7 +344,7 @@ class CommunicationAdapterTest {
     private final InMemoryAnnouncementStore commandAnnouncementStore = new InMemoryAnnouncementStore();
 
     private List<CommandRegistration> commands() {
-        CommunicationNotifier notifier = new CommunicationNotifier(sink, sink);
+        Notifier notifier = new Notifier(sink, sink);
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
         InfoRegistry registry = settings.infoRegistry();
         com.uxplima.uxmessentials.communication.application.MergeAnnouncements merge =

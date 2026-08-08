@@ -13,6 +13,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.Engine;
@@ -23,7 +24,6 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGridMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainMenu;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.junit.jupiter.api.AfterEach;
@@ -167,7 +167,7 @@ class WorldMainGoldenTest {
     private SetWorldProperty setProperty() {
         return new SetWorldProperty(
                 repository,
-                new WorldNotifier(new WorldEditorTestSupport.KeyMessages(), new WorldEditorTestSupport.SilentSink()),
+                new Notifier(new WorldEditorTestSupport.KeyMessages(), new WorldEditorTestSupport.SilentSink()),
                 new WorldEditorTestSupport.RecordingEvents(),
                 scheduler);
     }

@@ -8,6 +8,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.PunishmentTemplate;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 
@@ -24,9 +25,9 @@ public final class Punish {
     private final ResolveTemplate templates;
     private final Ban ban;
     private final TempBan tempBan;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
 
-    public Punish(ResolveTemplate templates, Ban ban, TempBan tempBan, ModerationNotifier notifier) {
+    public Punish(ResolveTemplate templates, Ban ban, TempBan tempBan, Notifier notifier) {
         this.templates = Objects.requireNonNull(templates, "templates");
         this.ban = Objects.requireNonNull(ban, "ban");
         this.tempBan = Objects.requireNonNull(tempBan, "tempBan");

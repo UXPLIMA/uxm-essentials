@@ -17,6 +17,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -31,7 +32,6 @@ import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishConnectionMesseng
 import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
-import com.uxplima.uxmessentials.vanish.application.VanishNotifier;
 import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
@@ -95,7 +95,7 @@ class VanishCommandTest {
                 store,
                 view,
                 levels,
-                new VanishNotifier(new KeyMessages(), new DiscardingSink()),
+                new Notifier(new KeyMessages(), new DiscardingSink()),
                 new NoopBuffs(),
                 VanishBus.disabled());
         ListVanished listVanished = new ListVanished(store, levels, NetworkVanishStore.empty());

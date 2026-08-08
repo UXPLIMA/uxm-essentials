@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vote.application;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.VotePartyCounter;
@@ -16,10 +17,10 @@ import com.uxplima.uxmessentials.vote.domain.VotePartyCounter;
 public final class VotePartyStatus {
 
     private final VoteRepository repository;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
     private final int baseThreshold;
 
-    public VotePartyStatus(VoteRepository repository, VoteNotifier notifier, int baseThreshold) {
+    public VotePartyStatus(VoteRepository repository, Notifier notifier, int baseThreshold) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         if (baseThreshold < 1) {

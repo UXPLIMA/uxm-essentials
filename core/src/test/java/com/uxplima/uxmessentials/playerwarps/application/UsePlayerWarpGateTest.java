@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -616,7 +617,7 @@ class UsePlayerWarpGateTest {
             return new UsePlayerWarp(
                     repository,
                     teleporter,
-                    new PlayerWarpNotifier(new KeyMessages(), new NoopSink()),
+                    new Notifier(new KeyMessages(), new NoopSink()),
                     safety,
                     permissions,
                     bans,

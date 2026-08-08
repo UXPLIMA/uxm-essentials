@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.DurationText;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
@@ -20,9 +21,9 @@ public final class ShowNextVote {
 
     private final VoteRepository repository;
     private final VoteSiteCatalog catalog;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
 
-    public ShowNextVote(VoteRepository repository, VoteSiteCatalog catalog, VoteNotifier notifier) {
+    public ShowNextVote(VoteRepository repository, VoteSiteCatalog catalog, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

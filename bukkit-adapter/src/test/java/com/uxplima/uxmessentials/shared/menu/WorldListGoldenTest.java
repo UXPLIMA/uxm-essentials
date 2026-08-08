@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -56,7 +57,6 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainMenu;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
@@ -208,7 +208,7 @@ class WorldListGoldenTest {
     /** A {@link WorldListMenu} wired off the same collaborators as the old view, over the engine façade. */
     private WorldListMenu listMenu(Menus menus, MenuBindings bindings) {
         WorldMainMenu mainMenu = new WorldMainMenu(menus, scheduler, repository, engine, (p, v) -> {});
-        WorldNotifier notifier = new WorldNotifier(new KeyMessages(), new SilentSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new SilentSink());
         CreateWorld createWorld =
                 new CreateWorld(repository, engine, notifier, new SilentEvents(), scheduler, Clock.systemUTC());
         WorldCreateMenu createMenu =
@@ -257,7 +257,7 @@ class WorldListGoldenTest {
     }
 
     private WorldTeleportService assembleTeleport() {
-        WorldNotifier notifier = new WorldNotifier(new KeyMessages(), new SilentSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new SilentSink());
         WorldAccessPolicy policy = new WorldAccessPolicy(new UnlimitedPermissions(), engine);
         return new WorldTeleportService(
                 repository,

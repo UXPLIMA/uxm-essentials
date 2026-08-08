@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vote.application;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 
@@ -13,9 +14,9 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 public final class SetPartyCount {
 
     private final VoteRepository repository;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
 
-    public SetPartyCount(VoteRepository repository, VoteNotifier notifier) {
+    public SetPartyCount(VoteRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

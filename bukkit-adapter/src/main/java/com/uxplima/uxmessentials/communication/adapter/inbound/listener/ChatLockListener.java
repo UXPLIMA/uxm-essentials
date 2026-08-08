@@ -11,8 +11,8 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>{@code AsyncChatEvent} fires off the main thread; this listener only reads the atomic flag and checks a
  * permission (both thread-safe) and cancels the event — it touches no other Bukkit API on the async thread.
- * The blocked-notice delivery hops back to the speaker's thread inside the {@link CommunicationNotifier}'s
+ * The blocked-notice delivery hops back to the speaker's thread inside the {@link Notifier}'s
  * sink, so the async-listener-no-Bukkit-API rule holds.
  */
 @NullMarked
@@ -32,9 +32,9 @@ public final class ChatLockListener implements Listener {
     private static final String BYPASS_PERMISSION = "uxmessentials.communication.chat.bypass";
 
     private final ChatLock lock;
-    private final CommunicationNotifier notifier;
+    private final Notifier notifier;
 
-    public ChatLockListener(ChatLock lock, CommunicationNotifier notifier) {
+    public ChatLockListener(ChatLock lock, Notifier notifier) {
         this.lock = Objects.requireNonNull(lock, "lock");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

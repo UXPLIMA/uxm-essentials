@@ -8,6 +8,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
 
@@ -20,9 +21,9 @@ import org.jspecify.annotations.Nullable;
 public final class ListNpcs {
 
     private final NpcRepository repository;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
 
-    public ListNpcs(NpcRepository repository, NpcNotifier notifier) {
+    public ListNpcs(NpcRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

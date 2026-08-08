@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -66,8 +67,8 @@ class TopVotersTest {
 
     // ---------- helpers ----------
 
-    private VoteNotifier notifier(CapturingSink capturingSink) {
-        return new VoteNotifier(new KeyMessages(), capturingSink);
+    private Notifier notifier(CapturingSink capturingSink) {
+        return new Notifier(new KeyMessages(), capturingSink);
     }
 
     private static final class FakeTopRepository implements VoteRepository {

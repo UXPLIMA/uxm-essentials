@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.PunishmentReport;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.StaffPunishmentCount;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -21,7 +22,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * history across every actor and renders a most-active-staff leaderboard; the per-staff view scans one staff
  * member's actions and renders their breakdown. Both fold an optional {@code days} window through the injected
  * {@link Clock}, hand the fetched rows to the pure {@link PunishmentStats} aggregation, and render the result
- * through the {@link ModerationNotifier} — the read is bounded ({@link #SCAN_LIMIT}) and the command runs it off
+ * through the {@link Notifier} — the read is bounded ({@link #SCAN_LIMIT}) and the command runs it off
  * the tick thread.
  *
  * <p>The all-time and windowed renderings use distinct catalog keys so the time frame is phrased in the catalog
@@ -34,11 +35,10 @@ public final class ReviewPunishmentStats {
 
     private final SanctionHistory history;
     private final PunishmentStats stats;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final Clock clock;
 
-    public ReviewPunishmentStats(
-            SanctionHistory history, PunishmentStats stats, ModerationNotifier notifier, Clock clock) {
+    public ReviewPunishmentStats(SanctionHistory history, PunishmentStats stats, Notifier notifier, Clock clock) {
         this.history = Objects.requireNonNull(history, "history");
         this.stats = Objects.requireNonNull(stats, "stats");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

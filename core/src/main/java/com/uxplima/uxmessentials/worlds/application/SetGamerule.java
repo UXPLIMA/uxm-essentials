@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -23,14 +24,14 @@ public final class SetGamerule {
 
     private final WorldRepository repository;
     private final GameRuleCatalog catalog;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
 
     public SetGamerule(
             WorldRepository repository,
             GameRuleCatalog catalog,
-            WorldNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Scheduler scheduler) {
         this.repository = Objects.requireNonNull(repository, "repository");

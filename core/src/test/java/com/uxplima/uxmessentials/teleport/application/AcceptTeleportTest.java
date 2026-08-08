@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -83,12 +84,12 @@ class AcceptTeleportTest {
     }
 
     private static AcceptTeleport accept(MessageSink sink) {
-        PlayerNotifier notifier = new PlayerNotifier(new KeyOnlyMessages(), sink);
+        Notifier notifier = new Notifier(new KeyOnlyMessages(), sink);
         return new AcceptTeleport(
                 new EmptyRegistry(), engine(notifier), notifier, new NoopEvents(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
-    private static TeleportEngine engine(PlayerNotifier notifier) {
+    private static TeleportEngine engine(Notifier notifier) {
         return new TeleportEngine(
                 new NoopCooldowns(),
                 new NoopWarmups(),

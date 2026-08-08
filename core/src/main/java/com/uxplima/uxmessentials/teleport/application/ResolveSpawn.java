@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -31,9 +32,9 @@ public final class ResolveSpawn {
     private final SpawnDirectory spawns;
     private final WorldLookup worlds;
     private final TeleportEngine engine;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
 
-    public ResolveSpawn(SpawnDirectory spawns, WorldLookup worlds, TeleportEngine engine, PlayerNotifier notifier) {
+    public ResolveSpawn(SpawnDirectory spawns, WorldLookup worlds, TeleportEngine engine, Notifier notifier) {
         this.spawns = Objects.requireNonNull(spawns, "spawns");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.engine = Objects.requireNonNull(engine, "engine");

@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -28,10 +29,9 @@ public final class FavouritePlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final WarpFavouriteStore favourites;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
 
-    public FavouritePlayerWarp(
-            PlayerWarpRepository repository, WarpFavouriteStore favourites, PlayerWarpNotifier notifier) {
+    public FavouritePlayerWarp(PlayerWarpRepository repository, WarpFavouriteStore favourites, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.favourites = Objects.requireNonNull(favourites, "favourites");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

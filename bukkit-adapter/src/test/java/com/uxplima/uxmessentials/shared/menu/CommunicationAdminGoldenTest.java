@@ -29,7 +29,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.adapter.inbound.gui.CommunicationAdminMenu;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
@@ -45,6 +44,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuLis
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -93,7 +93,7 @@ class CommunicationAdminGoldenTest {
     private ChatLock chatLock;
     private RecordingSink sink;
     private BukkitAnnouncerBroadcaster broadcaster;
-    private CommunicationNotifier notifier;
+    private Notifier notifier;
     private TextInput textInput;
     private final List<Announcement> announcements = new ArrayList<>();
 
@@ -107,7 +107,7 @@ class CommunicationAdminGoldenTest {
         scheduler = new SyncScheduler();
         chatLock = new ChatLock();
         sink = new RecordingSink();
-        notifier = new CommunicationNotifier(new KeyMessages(), sink);
+        notifier = new Notifier(new KeyMessages(), sink);
         broadcaster = new BukkitAnnouncerBroadcaster(
                 sink, new AlwaysReceives(), new ChannelBroadcaster(scheduler, display()), p -> null, scheduler);
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);

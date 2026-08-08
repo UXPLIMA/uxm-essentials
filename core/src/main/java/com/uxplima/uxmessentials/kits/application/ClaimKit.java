@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.event.KitClaimed;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -50,7 +51,7 @@ public final class ClaimKit {
     private final KitRepository repository;
     private final KitAccess access;
     private final KitGranter granter;
-    private final KitNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
     private final Optional<KitEconomy> economy;
@@ -61,7 +62,7 @@ public final class ClaimKit {
             KitRepository repository,
             KitAccess access,
             KitGranter granter,
-            KitNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
             Optional<KitEconomy> economy) {
@@ -72,7 +73,7 @@ public final class ClaimKit {
             KitRepository repository,
             KitAccess access,
             KitGranter granter,
-            KitNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
             Optional<KitEconomy> economy,

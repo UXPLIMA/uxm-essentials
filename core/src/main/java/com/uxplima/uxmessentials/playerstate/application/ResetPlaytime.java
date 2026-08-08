@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -21,9 +22,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ResetPlaytime {
 
     private final PlaytimeRepository repository;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public ResetPlaytime(PlaytimeRepository repository, PlayerStateNotifier notifier) {
+    public ResetPlaytime(PlaytimeRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

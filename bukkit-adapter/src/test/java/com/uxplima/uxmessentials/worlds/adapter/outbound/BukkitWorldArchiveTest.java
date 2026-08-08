@@ -30,6 +30,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -37,7 +38,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
@@ -80,7 +80,7 @@ class BukkitWorldArchiveTest {
     private final WorldTeleportService teleporter = recordingTeleporter();
     private final ForcedWorldEntryMarker marker = new ForcedWorldEntryMarker();
     private final RecordingMessages messages = new RecordingMessages();
-    private final WorldNotifier notifier = new WorldNotifier(messages, (viewer, text) -> {});
+    private final Notifier notifier = new Notifier(messages, (viewer, text) -> {});
     private final NoOpLogger log = new NoOpLogger();
 
     /** A {@code WorldTeleportService} mock whose {@code forced} call appends to {@link #forcedTeleports}. */

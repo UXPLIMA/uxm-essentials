@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -61,7 +62,7 @@ class VoteCommandPathTest {
     private RecordingApplier applier;
     private RecordingDispatcher dispatcher;
     private FakeAudience audience;
-    private VoteNotifier notifier;
+    private Notifier notifier;
     private RecordingBroadcaster broadcaster;
     private FakeThrottle throttle;
     private CapturingEvents events;
@@ -75,7 +76,7 @@ class VoteCommandPathTest {
         applier = new RecordingApplier();
         dispatcher = new RecordingDispatcher();
         audience = new FakeAudience();
-        notifier = new VoteNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         broadcaster = new RecordingBroadcaster();
         throttle = new FakeThrottle();
         events = new CapturingEvents();
@@ -636,7 +637,7 @@ class VoteCommandPathTest {
         CapturingSink sink = new CapturingSink();
         // Use a Messages implementation that embeds placeholder values in the delivery so we can
         // assert on the actual threshold and remaining figures rather than the raw key name.
-        VoteNotifier statusNotifier = new VoteNotifier(new PlaceholderEchoMessages(), sink);
+        Notifier statusNotifier = new Notifier(new PlaceholderEchoMessages(), sink);
         // baseThreshold=25; override=40 → effective=40, remaining=30
         VotePartyStatus status = new VotePartyStatus(repository, statusNotifier, 25);
         status.show(alice);

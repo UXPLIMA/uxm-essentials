@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -30,14 +31,14 @@ import com.uxplima.uxmessentials.warps.domain.event.WarpCreated;
 public final class SetWarp {
 
     private final WarpRepository repository;
-    private final WarpNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
     private final java.util.List<String> worldBlacklist;
 
     public SetWarp(
             WarpRepository repository,
-            WarpNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
             java.util.List<String> worldBlacklist) {

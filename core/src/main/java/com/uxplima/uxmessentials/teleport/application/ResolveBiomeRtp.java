@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -39,7 +40,7 @@ public final class ResolveBiomeRtp {
     private final TeleportSettings settings;
     private final TeleportEngine engine;
     private final BiomeTargetedSearch search;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
     private final RtpRadiusTier radiusTier;
 
@@ -50,7 +51,7 @@ public final class ResolveBiomeRtp {
             TeleportSettings settings,
             TeleportEngine engine,
             BiomeTargetedSearch search,
-            PlayerNotifier notifier,
+            Notifier notifier,
             Scheduler scheduler,
             RtpRadiusTier radiusTier) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");

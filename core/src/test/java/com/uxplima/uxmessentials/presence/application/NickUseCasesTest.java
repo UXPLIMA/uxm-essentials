@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -35,11 +36,11 @@ class NickUseCasesTest {
     }
 
     private SetNick setNick() {
-        return new SetNick(store, new PresenceNotifier(new KeyMessages(), sink));
+        return new SetNick(store, new Notifier(new KeyMessages(), sink));
     }
 
     private ClearNick clearNick() {
-        return new ClearNick(store, new PresenceNotifier(new KeyMessages(), sink));
+        return new ClearNick(store, new Notifier(new KeyMessages(), sink));
     }
 
     @Test

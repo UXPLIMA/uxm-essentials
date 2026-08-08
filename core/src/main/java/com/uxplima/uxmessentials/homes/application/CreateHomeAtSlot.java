@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -33,7 +34,7 @@ public final class CreateHomeAtSlot {
     private final HomeInviteRepository invites;
     private final HomeQuota quota;
     private final List<SethomeGuard> guards;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final HomeCharge charge;
     private final int unlimitedMaxSlots;
@@ -44,7 +45,7 @@ public final class CreateHomeAtSlot {
             HomeInviteRepository invites,
             HomeQuota quota,
             List<SethomeGuard> guards,
-            HomeNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             HomeCharge charge,
             int unlimitedMaxSlots,

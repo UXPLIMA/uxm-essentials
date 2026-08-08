@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.teleport.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
@@ -13,7 +14,6 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.PrewarmedSafeLocation
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
-import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
@@ -43,7 +43,7 @@ public final class TeleportServices {
     private final BiomeCatalog biomeCatalog;
     private final ResolveSpawn resolveSpawn;
     private final TeleportEngine engine;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
     private final TeleportSettings settings;
     private final WarmupTracker warmupTracker;
     private final InMemoryRequestRegistry requests;
@@ -116,7 +116,7 @@ public final class TeleportServices {
         return engine;
     }
 
-    public PlayerNotifier notifier() {
+    public Notifier notifier() {
         return notifier;
     }
 
@@ -181,7 +181,7 @@ public final class TeleportServices {
         private @org.jspecify.annotations.Nullable BiomeCatalog biomeCatalog;
         private @org.jspecify.annotations.Nullable ResolveSpawn resolveSpawn;
         private @org.jspecify.annotations.Nullable TeleportEngine engine;
-        private @org.jspecify.annotations.Nullable PlayerNotifier notifier;
+        private @org.jspecify.annotations.Nullable Notifier notifier;
         private @org.jspecify.annotations.Nullable TeleportSettings settings;
         private @org.jspecify.annotations.Nullable WarmupTracker warmupTracker;
         private @org.jspecify.annotations.Nullable InMemoryRequestRegistry requests;
@@ -238,7 +238,7 @@ public final class TeleportServices {
             return this;
         }
 
-        public Builder notifier(PlayerNotifier value) {
+        public Builder notifier(Notifier value) {
             this.notifier = value;
             return this;
         }

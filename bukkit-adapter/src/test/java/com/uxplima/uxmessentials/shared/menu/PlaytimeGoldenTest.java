@@ -29,7 +29,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
-import com.uxplima.uxmessentials.playerstate.application.PlayerStateNotifier;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
@@ -49,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -98,7 +98,7 @@ class PlaytimeGoldenTest {
         messages = new KeyMessages();
         guiText = new GuiText(messages);
         scheduler = new SyncScheduler();
-        PlayerStateNotifier notifier = new PlayerStateNotifier(new KeyMessages(), new NoopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new NoopSink());
         show = new ShowPlaytime(new EmptyRepo(), new EmptyInfo(), notifier, Clock.systemUTC());
     }
 

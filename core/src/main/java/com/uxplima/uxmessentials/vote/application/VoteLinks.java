@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class VoteLinks {
 
     private final List<String> links;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
 
-    public VoteLinks(List<String> links, VoteNotifier notifier) {
+    public VoteLinks(List<String> links, Notifier notifier) {
         this.links = List.copyOf(Objects.requireNonNull(links, "links"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

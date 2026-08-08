@@ -31,7 +31,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.KitAccess;
-import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
@@ -45,6 +44,7 @@ import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -237,7 +237,7 @@ class KitBrowseGoldenTest {
         Messages messages = new KeyMessages();
         Permissions permissions = new AllowAllPermissions();
         KitClaimStore claims = new NoClaims();
-        KitNotifier notifier = new KitNotifier(messages, (v, text) -> {});
+        Notifier notifier = new Notifier(messages, (v, text) -> {});
         KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
         ClaimKit claimKit = new ClaimKit(
                 repository, access, granter, notifier, new NoEvents(), Clock.systemUTC(), Optional.empty());

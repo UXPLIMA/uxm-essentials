@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.RewardSpec;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -45,7 +46,7 @@ public final class RatePlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final WarpRatingStore ratings;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final BayesianRating scoring;
     private final Clock clock;
     private final Optional<RatingRewards> rewards;
@@ -53,7 +54,7 @@ public final class RatePlayerWarp {
     public RatePlayerWarp(
             PlayerWarpRepository repository,
             WarpRatingStore ratings,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             BayesianRating scoring,
             Clock clock,
             Optional<RatingRewards> rewards) {

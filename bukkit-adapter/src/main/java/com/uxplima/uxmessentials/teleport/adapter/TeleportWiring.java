@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersCon
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
@@ -70,7 +71,6 @@ import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ClaimAwareProtectedLand;
 import com.uxplima.uxmessentials.teleport.application.HotspotBiasedSampler;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
-import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
@@ -152,7 +152,7 @@ public final class TeleportWiring {
         AtomicBoolean running = new AtomicBoolean(true);
 
         TeleportSettings settings = new TeleportSettings(config);
-        PlayerNotifier notifier = new PlayerNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WarmupTracker warmupTracker = new WarmupTracker();
         // The jail gate forwards to NEVER until the moderation context lands and rebinds it (soft couple).
         MutableJailGate jailGate = new MutableJailGate();
@@ -234,7 +234,7 @@ public final class TeleportWiring {
             Plugin plugin,
             KernelPorts kernel,
             TeleportSettings settings,
-            PlayerNotifier notifier,
+            Notifier notifier,
             WarmupTracker warmupTracker,
             MutableJailGate jailGate,
             CombatGate combatGate,

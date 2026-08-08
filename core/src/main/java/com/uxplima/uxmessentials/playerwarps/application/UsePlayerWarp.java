@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -75,7 +76,7 @@ public final class UsePlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final PlayerWarpTeleporter teleporter;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final WarpSafetyChecker safetyChecker;
     private final Permissions permissions;
     private final WarpBanStore banStore;
@@ -91,7 +92,7 @@ public final class UsePlayerWarp {
     public UsePlayerWarp(
             PlayerWarpRepository repository,
             PlayerWarpTeleporter teleporter,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             WarpSafetyChecker safetyChecker,
             Permissions permissions,
             WarpBanStore banStore,

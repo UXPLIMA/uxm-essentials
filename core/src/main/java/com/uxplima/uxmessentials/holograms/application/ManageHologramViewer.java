@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -28,9 +29,9 @@ public final class ManageHologramViewer {
 
     private final HologramRepository repository;
     private final HologramView view;
-    private final HologramNotifier notifier;
+    private final Notifier notifier;
 
-    public ManageHologramViewer(HologramRepository repository, HologramView view, HologramNotifier notifier) {
+    public ManageHologramViewer(HologramRepository repository, HologramView view, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

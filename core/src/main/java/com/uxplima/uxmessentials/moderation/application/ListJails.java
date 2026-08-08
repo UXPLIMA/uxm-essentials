@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,9 +19,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ListJails {
 
     private final JailDirectory directory;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
 
-    public ListJails(JailDirectory directory, ModerationNotifier notifier) {
+    public ListJails(JailDirectory directory, Notifier notifier) {
         this.directory = Objects.requireNonNull(directory, "directory");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

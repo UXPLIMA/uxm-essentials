@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.domain.Vote;
 
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.vote.domain.Vote;
 public final class GiveVote {
 
     private final HandleVote handleVote;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
 
-    public GiveVote(HandleVote handleVote, VoteNotifier notifier) {
+    public GiveVote(HandleVote handleVote, Notifier notifier) {
         this.handleVote = Objects.requireNonNull(handleVote, "handleVote");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

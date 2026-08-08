@@ -14,9 +14,9 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -31,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The online roster is enumerated on the global region thread (Folia forbids iterating
  * {@code Bukkit.getOnlinePlayers()} off it); the blank lines and the confirmations then flow through the
- * {@link MessageSink} / {@link CommunicationNotifier}, which hop to each viewer's region thread inside the sink, so
+ * {@link MessageSink} / {@link Notifier}, which hop to each viewer's region thread inside the sink, so
  * the fan-out never touches a Bukkit scheduler. The flushed players get a
  * {@link CommunicationMessageKey#CLEARCHAT_CLEARED} notice and the actor a
  * {@link CommunicationMessageKey#CLEARCHAT_BY} confirmation carrying their name.
@@ -44,11 +44,11 @@ public final class ClearChatCommand extends CommunicationCommandSupport implemen
     private static final int BLANK_LINES = 100;
     private static final String BLANK_LINE = "";
 
-    private final CommunicationNotifier notifier;
+    private final Notifier notifier;
     private final MessageSink sink;
     private final Scheduler scheduler;
 
-    public ClearChatCommand(Messages messages, CommunicationNotifier notifier, MessageSink sink, Scheduler scheduler) {
+    public ClearChatCommand(Messages messages, Notifier notifier, MessageSink sink, Scheduler scheduler) {
         super(messages);
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.sink = Objects.requireNonNull(sink, "sink");

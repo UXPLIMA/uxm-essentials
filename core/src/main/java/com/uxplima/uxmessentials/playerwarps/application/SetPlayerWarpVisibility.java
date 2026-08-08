@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -25,10 +26,10 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class SetPlayerWarpVisibility {
 
     private final PlayerWarpRepository repository;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final Clock clock;
 
-    public SetPlayerWarpVisibility(PlayerWarpRepository repository, PlayerWarpNotifier notifier, Clock clock) {
+    public SetPlayerWarpVisibility(PlayerWarpRepository repository, Notifier notifier, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");

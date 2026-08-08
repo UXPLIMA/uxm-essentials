@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -25,9 +26,9 @@ public final class ReviewStaffHistory {
 
     private final SanctionHistory history;
     private final PlayerLookup players;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
 
-    public ReviewStaffHistory(SanctionHistory history, PlayerLookup players, ModerationNotifier notifier) {
+    public ReviewStaffHistory(SanctionHistory history, PlayerLookup players, Notifier notifier) {
         this.history = Objects.requireNonNull(history, "history");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

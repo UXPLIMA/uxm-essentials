@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -52,7 +53,6 @@ import com.uxplima.uxmessentials.staff.application.ExitStaffMode;
 import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
-import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
@@ -117,7 +117,7 @@ public final class StaffWiring {
         // each other's captured pre-mode inventory. A single-server install runs on the default id unchanged.
         String serverId = NetworkConfig.from(ctx.config()).serverId();
         StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC(), serverId);
-        StaffNotifier notifier = new StaffNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
 
         // vanish is built (and the seams bound) before the capture, because the capture reads the pre-mode
         // vanish state through it so the player's vanish flag is part of the captured loadout.

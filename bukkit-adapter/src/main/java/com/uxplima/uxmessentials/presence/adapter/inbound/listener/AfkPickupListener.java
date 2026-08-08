@@ -13,9 +13,9 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
 
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
-import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -28,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
  * {@link EntityPickupItemEvent} filtered to a {@link Player} (the entity-side path other plugins may trigger).
  * The AFK flag is read from the {@link PresenceStore}'s {@code ConcurrentHashMap}, safe on the region thread the
  * pickup fires on. The first cancelled pickup of an AFK session tells the player once through the
- * {@link PresenceNotifier}; the notice is suppressed for the rest of that session so a player standing on a pile
+ * {@link Notifier}; the notice is suppressed for the rest of that session so a player standing on a pile
  * of drops is not spammed, and the per-player mark is dropped once they are no longer AFK so the next session
  * notifies afresh.
  */
@@ -36,10 +36,10 @@ import org.jspecify.annotations.NullMarked;
 public final class AfkPickupListener implements Listener {
 
     private final PresenceStore store;
-    private final PresenceNotifier notifier;
+    private final Notifier notifier;
     private final Set<UUID> notified = ConcurrentHashMap.newKeySet();
 
-    public AfkPickupListener(PresenceStore store, PresenceNotifier notifier) {
+    public AfkPickupListener(PresenceStore store, Notifier notifier) {
         this.store = Objects.requireNonNull(store, "store");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

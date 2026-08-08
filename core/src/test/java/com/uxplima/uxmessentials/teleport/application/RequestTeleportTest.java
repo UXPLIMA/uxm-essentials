@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -103,7 +104,7 @@ class RequestTeleportTest {
         return new RequestTeleport(
                 new NoopRegistry(),
                 flags,
-                new PlayerNotifier(new KeyOnlyMessages(), sink),
+                new Notifier(new KeyOnlyMessages(), sink),
                 new NoopEvents(),
                 new TeleportSettings(new MinimalConfig()),
                 jail,

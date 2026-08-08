@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -33,14 +34,14 @@ public final class CaptureBack {
 
     private final BackLocationStore store;
     private final TeleportEngine engine;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
     public CaptureBack(
             BackLocationStore store,
             TeleportEngine engine,
-            PlayerNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.store = Objects.requireNonNull(store, "store");

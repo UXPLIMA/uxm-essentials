@@ -9,6 +9,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
@@ -27,9 +28,9 @@ public final class NearbyHolograms {
     public static final int MAX_RADIUS = 256;
 
     private final HologramRepository repository;
-    private final HologramNotifier notifier;
+    private final Notifier notifier;
 
-    public NearbyHolograms(HologramRepository repository, HologramNotifier notifier) {
+    public NearbyHolograms(HologramRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

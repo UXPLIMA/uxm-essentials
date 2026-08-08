@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -38,8 +39,8 @@ class ToggleVanishTest {
     private final FakeLevels levels = new FakeLevels();
     private final RecordingBuffs buffs = new RecordingBuffs();
     private final RecordingBus bus = new RecordingBus();
-    private final ToggleVanish toggleVanish = new ToggleVanish(
-            store, view, levels, new VanishNotifier(new KeyMessages(), new DiscardingSink()), buffs, bus);
+    private final ToggleVanish toggleVanish =
+            new ToggleVanish(store, view, levels, new Notifier(new KeyMessages(), new DiscardingSink()), buffs, bus);
 
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Who");
 

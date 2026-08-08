@@ -31,7 +31,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.discordlink.adapter.inbound.gui.DiscordStatusView;
 import com.uxplima.uxmessentials.discordlink.application.BeginLink;
-import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
@@ -55,6 +54,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -99,7 +99,7 @@ class DiscordStatusGoldenTest {
     private BeginLink beginLink;
     private Unlink unlink;
     private LinkStatus linkStatus;
-    private DiscordLinkNotifier notifier;
+    private Notifier notifier;
 
     @BeforeEach
     void setUp() {
@@ -115,7 +115,7 @@ class DiscordStatusGoldenTest {
         beginLink = new BeginLink(store, clock, new Random(1), Duration.ofMinutes(10));
         unlink = new Unlink(store);
         linkStatus = new LinkStatus(store);
-        notifier = new DiscordLinkNotifier(new KeyMessages(), new NoopSink());
+        notifier = new Notifier(new KeyMessages(), new NoopSink());
     }
 
     @AfterEach

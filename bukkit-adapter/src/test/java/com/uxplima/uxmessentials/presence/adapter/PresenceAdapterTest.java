@@ -18,10 +18,10 @@ import com.uxplima.uxmessentials.presence.adapter.outbound.AfkSweep;
 import com.uxplima.uxmessentials.presence.adapter.outbound.InMemoryPresenceStore;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
-import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -50,7 +50,7 @@ class PresenceAdapterTest {
     private InlineScheduler scheduler;
     private InMemoryPresenceStore store;
     private RecordingEvents events;
-    private PresenceNotifier notifier;
+    private Notifier notifier;
     private FixedClock clock;
 
     @BeforeEach
@@ -61,7 +61,7 @@ class PresenceAdapterTest {
         clock = new FixedClock(Instant.parse("2026-05-30T12:00:00Z"));
         store = new InMemoryPresenceStore(clock, uuid -> false);
         events = new RecordingEvents();
-        notifier = new PresenceNotifier(new KeyMessages(), new DiscardingSink());
+        notifier = new Notifier(new KeyMessages(), new DiscardingSink());
     }
 
     @AfterEach

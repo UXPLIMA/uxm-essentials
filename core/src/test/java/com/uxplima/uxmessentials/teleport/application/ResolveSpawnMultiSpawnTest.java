@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -238,7 +239,7 @@ class ResolveSpawnMultiSpawnTest {
         Warmups warmups = (who, kind, onComplete, onCancel) -> new Warmups.CompletedWarmup(who);
         Messages messages = (viewer, key, placeholders) -> "";
         MessageSink sink = (viewer, rendered) -> {};
-        PlayerNotifier engineNotifier = new PlayerNotifier(messages, sink);
+        Notifier engineNotifier = new Notifier(messages, sink);
         return new TeleportEngine(
                 cooldowns,
                 warmups,
@@ -271,13 +272,13 @@ class ResolveSpawnMultiSpawnTest {
     private static final class RecordingNotifier {
         private @Nullable MessageKey lastKey;
 
-        PlayerNotifier notifier() {
+        Notifier notifier() {
             Messages messages = (viewer, key, placeholders) -> {
                 lastKey = key;
                 return "";
             };
             MessageSink sink = (viewer, rendered) -> {};
-            return new PlayerNotifier(messages, sink);
+            return new Notifier(messages, sink);
         }
     }
 }

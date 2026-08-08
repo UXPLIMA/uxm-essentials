@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcLimit;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.npc.domain.event.NpcCreated;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -31,7 +32,7 @@ public final class CreateNpc {
 
     private final NpcRepository repository;
     private final NpcView view;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
     private final NpcQuota quota;
@@ -39,7 +40,7 @@ public final class CreateNpc {
     public CreateNpc(
             NpcRepository repository,
             NpcView view,
-            NpcNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
             NpcQuota quota) {

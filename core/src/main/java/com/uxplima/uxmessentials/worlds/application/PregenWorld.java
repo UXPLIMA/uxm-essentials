@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -33,7 +34,7 @@ public final class PregenWorld {
     private final WorldEngine engine;
     private final WorldPregen pregen;
     private final WorldsSettings settings;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
 
     public PregenWorld(
@@ -41,7 +42,7 @@ public final class PregenWorld {
             WorldEngine engine,
             WorldPregen pregen,
             WorldsSettings settings,
-            WorldNotifier notifier,
+            Notifier notifier,
             Scheduler scheduler) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");

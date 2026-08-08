@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -31,9 +32,9 @@ public final class DescribeHologram {
     private static final String UNLIMITED = "unlimited";
 
     private final HologramRepository repository;
-    private final HologramNotifier notifier;
+    private final Notifier notifier;
 
-    public DescribeHologram(HologramRepository repository, HologramNotifier notifier) {
+    public DescribeHologram(HologramRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

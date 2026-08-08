@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -18,9 +19,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class Unignore {
 
     private final IgnoreStore ignores;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
 
-    public Unignore(IgnoreStore ignores, MessagingNotifier notifier) {
+    public Unignore(IgnoreStore ignores, Notifier notifier) {
         this.ignores = Objects.requireNonNull(ignores, "ignores");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

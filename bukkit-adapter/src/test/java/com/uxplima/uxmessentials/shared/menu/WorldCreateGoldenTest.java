@@ -14,6 +14,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -25,7 +26,6 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateDraft;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateMenu;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +151,7 @@ class WorldCreateGoldenTest {
     /** Wire the create screen over the engine with the given catalog, registering its spec so opens and clicks resolve. */
     private WorldCreateMenu menu(Messages messages) {
         Engine eng = WorldEditorTestSupport.engine(server, plugin, new GuiText(messages), scheduler);
-        WorldNotifier notifier = new WorldNotifier(messages, new WorldEditorTestSupport.SilentSink());
+        Notifier notifier = new Notifier(messages, new WorldEditorTestSupport.SilentSink());
         CreateWorld createWorld = new CreateWorld(
                 repository,
                 engine,

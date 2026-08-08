@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerstate.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -14,9 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ToggleGlow {
 
     private final PlayerEffects effects;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public ToggleGlow(PlayerEffects effects, PlayerStateNotifier notifier) {
+    public ToggleGlow(PlayerEffects effects, Notifier notifier) {
         this.effects = Objects.requireNonNull(effects, "effects");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

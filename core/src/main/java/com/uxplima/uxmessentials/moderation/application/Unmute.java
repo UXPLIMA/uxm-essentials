@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerUnmuted;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -23,7 +24,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class Unmute {
 
     private final ModerationRepository repository;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final SanctionHistoryRecorder history;
@@ -31,7 +32,7 @@ public final class Unmute {
 
     public Unmute(
             ModerationRepository repository,
-            ModerationNotifier notifier,
+            Notifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
             SanctionHistoryRecorder history,

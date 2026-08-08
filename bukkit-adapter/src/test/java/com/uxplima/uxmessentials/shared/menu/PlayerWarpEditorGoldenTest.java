@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.OwnedWarp;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
@@ -49,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -113,7 +113,7 @@ class PlayerWarpEditorGoldenTest {
         scheduler = new SyncScheduler();
         repository = new InMemoryPlayerWarpRepository();
 
-        PlayerWarpNotifier notifier = new PlayerWarpNotifier(messages, new SilentSink());
+        Notifier notifier = new Notifier(messages, new SilentSink());
         SetPlayerWarpVisibility visibility =
                 new SetPlayerWarpVisibility(repository, notifier, java.time.Clock.systemUTC());
         ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(

@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -26,9 +27,9 @@ public final class ListKits {
     private final KitRepository repository;
     private final Permissions permissions;
     private final KitClaimStore claims;
-    private final KitNotifier notifier;
+    private final Notifier notifier;
 
-    public ListKits(KitRepository repository, Permissions permissions, KitClaimStore claims, KitNotifier notifier) {
+    public ListKits(KitRepository repository, Permissions permissions, KitClaimStore claims, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.claims = Objects.requireNonNull(claims, "claims");

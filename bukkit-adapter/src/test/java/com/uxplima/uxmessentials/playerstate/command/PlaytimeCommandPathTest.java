@@ -24,7 +24,6 @@ import com.uxplima.uxmessentials.playerstate.application.Freeze;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
-import com.uxplima.uxmessentials.playerstate.application.PlayerStateNotifier;
 import com.uxplima.uxmessentials.playerstate.application.ResetPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
@@ -48,6 +47,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -86,7 +86,7 @@ class PlaytimeCommandPathTest {
     void setUp() {
         server = MockBukkit.mock();
         repo = new FakePlaytimeRepository();
-        PlayerStateNotifier notifier = new PlayerStateNotifier(new EchoMessages(), new BukkitMessageSink());
+        Notifier notifier = new Notifier(new EchoMessages(), new BukkitMessageSink());
         show = new ShowPlaytime(repo, new EmptyInfo(), notifier, Clock.systemUTC());
         ResetPlaytime reset = new ResetPlaytime(repo, notifier);
         PlayerStateServices services = new PlayerStateServices(
@@ -314,7 +314,7 @@ class PlaytimeCommandPathTest {
                 mock(ShowPosition.class),
                 mock(ShowPing.class),
                 show,
-                new ResetPlaytime(repo, new PlayerStateNotifier(new EchoMessages(), new BukkitMessageSink())),
+                new ResetPlaytime(repo, new Notifier(new EchoMessages(), new BukkitMessageSink())),
                 mock(ResetRest.class),
                 mock(PlayerLookup.class));
     }

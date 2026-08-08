@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerstate.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.ClearInventoryPreferences;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ToggleClearInventoryConfirm {
 
     private final ClearInventoryPreferences preferences;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public ToggleClearInventoryConfirm(ClearInventoryPreferences preferences, PlayerStateNotifier notifier) {
+    public ToggleClearInventoryConfirm(ClearInventoryPreferences preferences, Notifier notifier) {
         this.preferences = Objects.requireNonNull(preferences, "preferences");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

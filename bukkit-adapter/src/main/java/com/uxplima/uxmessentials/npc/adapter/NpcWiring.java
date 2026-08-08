@@ -42,7 +42,6 @@ import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcQuota;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
@@ -86,6 +85,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
@@ -165,7 +165,7 @@ public final class NpcWiring {
         bus.registry()
                 .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.listener(
                         cached, renderer, kernel.scheduler()));
-        NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         NpcQuota quota = new NpcQuota(kernel.permissions(), settings.defaultLimit());
         NpcServices services = assemble(kernel, repository, renderer, notifier, quota);
         spawnStored(repository, renderer);
@@ -278,7 +278,7 @@ public final class NpcWiring {
     }
 
     private static NpcServices assemble(
-            KernelPorts kernel, NpcRepository repository, NpcRenderer renderer, NpcNotifier notifier, NpcQuota quota) {
+            KernelPorts kernel, NpcRepository repository, NpcRenderer renderer, Notifier notifier, NpcQuota quota) {
         Clock clock = Clock.systemUTC();
         return new NpcServices(
                 new CreateNpc(repository, renderer, notifier, kernel.events(), clock, quota),

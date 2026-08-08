@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.domain.event.Fed;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -17,11 +18,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class Feed {
 
     private final PlayerEffects effects;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
-    public Feed(PlayerEffects effects, PlayerStateNotifier notifier, DomainEventPublisher events, Clock clock) {
+    public Feed(PlayerEffects effects, Notifier notifier, DomainEventPublisher events, Clock clock) {
         this.effects = Objects.requireNonNull(effects, "effects");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");

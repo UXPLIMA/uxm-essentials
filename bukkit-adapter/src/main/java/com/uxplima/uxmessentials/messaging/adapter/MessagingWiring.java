@@ -21,7 +21,6 @@ import com.uxplima.uxmessentials.messaging.application.ClearMail;
 import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
 import com.uxplima.uxmessentials.messaging.application.ListIgnores;
-import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.Reply;
@@ -49,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.IgnoreSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -151,7 +151,7 @@ public final class MessagingWiring {
             AfkStatus afk,
             VanishVisibility vanish,
             Clock clock) {
-        MessagingNotifier notifier = new MessagingNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
         SendMessage sendMessage = new SendMessage(
                 delivery,

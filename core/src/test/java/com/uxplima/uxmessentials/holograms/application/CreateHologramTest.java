@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.event.HologramCreated;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -45,7 +46,7 @@ class CreateHologramTest {
         create = new CreateHologram(
                 repository,
                 view,
-                new HologramNotifier(new HologramTestSupport.KeyMessages(), sink),
+                new Notifier(new HologramTestSupport.KeyMessages(), sink),
                 events,
                 Clock.fixed(Instant.ofEpochMilli(5_000), ZoneOffset.UTC));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");

@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -20,10 +21,10 @@ public final class Freeze {
 
     private final Sanctions sanctions;
     private final ModerationGuard guard;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
 
-    public Freeze(Sanctions sanctions, ModerationGuard guard, ModerationNotifier notifier, ModerationAudit audit) {
+    public Freeze(Sanctions sanctions, ModerationGuard guard, Notifier notifier, ModerationAudit audit) {
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

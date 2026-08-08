@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -62,7 +63,7 @@ class ListPendingRequestsTest {
     }
 
     private static ListPendingRequests listing(RequestRegistry registry, MessageSink sink) {
-        return new ListPendingRequests(registry, new PlayerNotifier(new KeyEchoMessages(), sink));
+        return new ListPendingRequests(registry, new Notifier(new KeyEchoMessages(), sink));
     }
 
     private static final class FakeRegistry implements RequestRegistry {

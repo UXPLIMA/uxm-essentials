@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.staff.application;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -43,14 +44,14 @@ public final class RecoverStaffLoadout {
     private final StaffLoadoutRepository loadoutRepository;
     private final StaffLoadoutCapture capture;
     private final StaffVanish vanish;
-    private final StaffNotifier notifier;
+    private final Notifier notifier;
 
     public RecoverStaffLoadout(
             StaffModeStore store,
             StaffLoadoutRepository loadoutRepository,
             StaffLoadoutCapture capture,
             StaffVanish vanish,
-            StaffNotifier notifier) {
+            Notifier notifier) {
         this.store = Objects.requireNonNull(store, "store");
         this.loadoutRepository = Objects.requireNonNull(loadoutRepository, "loadoutRepository");
         this.capture = Objects.requireNonNull(capture, "capture");

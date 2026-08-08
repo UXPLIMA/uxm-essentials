@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -27,9 +28,9 @@ public final class KitReset {
 
     private final KitRepository repository;
     private final KitClaimStore claims;
-    private final KitNotifier notifier;
+    private final Notifier notifier;
 
-    public KitReset(KitRepository repository, KitClaimStore claims, KitNotifier notifier) {
+    public KitReset(KitRepository repository, KitClaimStore claims, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.claims = Objects.requireNonNull(claims, "claims");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

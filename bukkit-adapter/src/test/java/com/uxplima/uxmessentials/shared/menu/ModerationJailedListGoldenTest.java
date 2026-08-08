@@ -31,7 +31,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationJailedMenu;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
-import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -54,6 +53,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -112,7 +112,7 @@ class ModerationJailedListGoldenTest {
         scheduler = new SyncScheduler();
         repository = new FakeRepository();
         sanctions = new RecordingSanctions();
-        ModerationNotifier notifier = new ModerationNotifier(new KeyMessages(), new SilentSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new SilentSink());
         unjail = new Unjail(repository, sanctions, notifier, new SilentAudit(), new SilentEvents(), Clock.systemUTC());
     }
 

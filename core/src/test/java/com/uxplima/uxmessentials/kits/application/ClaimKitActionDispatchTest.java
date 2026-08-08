@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -54,7 +55,7 @@ class ClaimKitActionDispatchTest {
     private FakeClaimStore claims;
     private RecordingGranter granter;
     private RecordingRunner runner;
-    private KitNotifier notifier;
+    private Notifier notifier;
     private PlayerRef alice;
 
     @BeforeEach
@@ -65,7 +66,7 @@ class ClaimKitActionDispatchTest {
         claims = new FakeClaimStore();
         granter = new RecordingGranter(transcript);
         runner = new RecordingRunner(transcript);
-        notifier = new KitNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
     }
 

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest;
@@ -17,9 +18,9 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportRequest;
 public final class ListPendingRequests {
 
     private final RequestRegistry requests;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
 
-    public ListPendingRequests(RequestRegistry requests, PlayerNotifier notifier) {
+    public ListPendingRequests(RequestRegistry requests, Notifier notifier) {
         this.requests = Objects.requireNonNull(requests, "requests");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

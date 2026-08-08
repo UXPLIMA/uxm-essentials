@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.playerstate.domain.event.Fed;
 import com.uxplima.uxmessentials.playerstate.domain.event.GodToggled;
 import com.uxplima.uxmessentials.playerstate.domain.event.Healed;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -57,7 +58,7 @@ class PlayerStateUseCasesTest {
     private RecordingReconciler reconciler;
     private RecordingEffects effects;
     private RecordingEvents events;
-    private PlayerStateNotifier notifier;
+    private Notifier notifier;
     private Clock clock;
     private PlayerRef alice;
     private PlayerRef bob;
@@ -68,7 +69,7 @@ class PlayerStateUseCasesTest {
         reconciler = new RecordingReconciler();
         effects = new RecordingEffects();
         events = new RecordingEvents();
-        notifier = new PlayerStateNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         clock = Clock.system(ZoneOffset.UTC);
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         bob = new PlayerRef(UUID.randomUUID(), "Bob");
@@ -198,7 +199,7 @@ class PlayerStateUseCasesTest {
     void nearClampsTheRadiusAndPushesTheRenderedScan() {
         FakeNearby nearby = new FakeNearby(List.of(new NearbyPlayers.Nearby(bob, 12)));
         CapturingSink sink = new CapturingSink();
-        ListNearby near = new ListNearby(nearby, new PlayerStateNotifier(new KeyMessages(), sink));
+        ListNearby near = new ListNearby(nearby, new Notifier(new KeyMessages(), sink));
 
         near.near(alice, 9_999_999); // void: the use case never blocks on a returned list, it pushes
 
@@ -213,7 +214,7 @@ class PlayerStateUseCasesTest {
     void nearPushesTheEmptyMessageWhenNobodyIsInRange() {
         FakeNearby nearby = new FakeNearby(List.of());
         CapturingSink sink = new CapturingSink();
-        ListNearby near = new ListNearby(nearby, new PlayerStateNotifier(new KeyMessages(), sink));
+        ListNearby near = new ListNearby(nearby, new Notifier(new KeyMessages(), sink));
 
         near.near(alice);
 
@@ -344,8 +345,7 @@ class PlayerStateUseCasesTest {
         FakeInfo offline = new FakeInfo(null, null, null);
         FakePlaytimeRepository repo = new FakePlaytimeRepository();
         var captured = new ArrayList<String>();
-        PlayerStateNotifier capturing =
-                new PlayerStateNotifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
+        Notifier capturing = new Notifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
 
         // An untracked player offline yields an all-zero summary, which the breakdown still renders (unlike the
         // old behaviour, which sent nothing when the Bukkit lifetime stat was unavailable).
@@ -359,8 +359,7 @@ class PlayerStateUseCasesTest {
         FakePlaytimeRepository repo = new FakePlaytimeRepository();
         repo.reset.clear();
         var captured = new ArrayList<String>();
-        PlayerStateNotifier capturing =
-                new PlayerStateNotifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
+        Notifier capturing = new Notifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
 
         new ResetPlaytime(repo, capturing).reset(alice);
 
@@ -372,8 +371,7 @@ class PlayerStateUseCasesTest {
     void resetAllPlaytimeWipesEveryLedgerAndConfirms() {
         FakePlaytimeRepository repo = new FakePlaytimeRepository();
         var captured = new ArrayList<String>();
-        PlayerStateNotifier capturing =
-                new PlayerStateNotifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
+        Notifier capturing = new Notifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
 
         new ResetPlaytime(repo, capturing).resetAll(alice);
 

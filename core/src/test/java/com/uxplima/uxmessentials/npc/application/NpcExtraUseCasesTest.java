@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -29,7 +30,7 @@ class NpcExtraUseCasesTest {
 
     private FakeNpcRepository repository;
     private RecordingView view;
-    private NpcNotifier notifier;
+    private Notifier notifier;
     private RecordingEvents events;
     private PlayerRef actor;
 
@@ -37,7 +38,7 @@ class NpcExtraUseCasesTest {
     void setUp() {
         repository = new FakeNpcRepository();
         view = new RecordingView();
-        notifier = new NpcNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         events = new RecordingEvents();
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
         repository.save(Npc.create(GUIDE, AT, null, Instant.ofEpochMilli(1_000)));

@@ -15,7 +15,6 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.KitAccess;
-import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
@@ -27,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PinnedEntr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -77,7 +77,7 @@ public final class KitBrowseMenu {
     private final Menus menus;
     private final Scheduler scheduler;
     private final ClaimKit claimKit;
-    private final KitNotifier notifier;
+    private final Notifier notifier;
     private final KitCategoryRepository categoryRepository;
     private final KitAccess access;
     private final KitPreviewView preview;
@@ -87,7 +87,7 @@ public final class KitBrowseMenu {
             Menus menus,
             Scheduler scheduler,
             ClaimKit claimKit,
-            KitNotifier notifier,
+            Notifier notifier,
             KitCategoryRepository categoryRepository,
             KitAccess access,
             KitPreviewView preview,

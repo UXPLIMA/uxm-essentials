@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpDeleted;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -37,14 +38,14 @@ public final class ArchivePlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final WarpAuthorization authorization;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
     public ArchivePlayerWarp(
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");

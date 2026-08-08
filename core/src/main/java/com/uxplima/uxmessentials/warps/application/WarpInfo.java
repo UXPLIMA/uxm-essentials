@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -25,9 +26,9 @@ import com.uxplima.uxmessentials.warps.domain.WarpName;
 public final class WarpInfo {
 
     private final WarpRepository repository;
-    private final WarpNotifier notifier;
+    private final Notifier notifier;
 
-    public WarpInfo(WarpRepository repository, WarpNotifier notifier) {
+    public WarpInfo(WarpRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

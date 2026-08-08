@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -65,8 +66,8 @@ class ShowVoteStreakTest {
 
     // ---------- helpers ----------
 
-    private VoteNotifier notifier(CapturingSink capturingSink) {
-        return new VoteNotifier(new PlaceholderEchoMessages(), capturingSink);
+    private Notifier notifier(CapturingSink capturingSink) {
+        return new Notifier(new PlaceholderEchoMessages(), capturingSink);
     }
 
     private static final class StreakRepository extends FakeVoteRepositoryBase {

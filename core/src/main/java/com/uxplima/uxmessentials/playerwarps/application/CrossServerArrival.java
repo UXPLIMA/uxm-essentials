@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -35,7 +36,7 @@ public final class CrossServerArrival {
     private final PlayerWarpRepository repository;
     private final PlayerWarpTeleporter teleporter;
     private final Optional<PlayerWarpEconomy> economy;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
     private final String localServerId;
     private final Duration arrivalDelay;
@@ -47,7 +48,7 @@ public final class CrossServerArrival {
             PlayerWarpRepository repository,
             PlayerWarpTeleporter teleporter,
             Optional<PlayerWarpEconomy> economy,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             Scheduler scheduler,
             String localServerId,
             Duration arrivalDelay,

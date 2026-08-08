@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.domain.event.ScoreboardVisibilityToggled;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -27,7 +28,7 @@ class ToggleScoreboardTest {
         FakeStore store = new FakeStore();
         CapturingSink sink = new CapturingSink();
         RecordingEvents events = new RecordingEvents();
-        ToggleScoreboard toggle = new ToggleScoreboard(store, new ScoreboardNotifier(new EchoMessages(), sink), events);
+        ToggleScoreboard toggle = new ToggleScoreboard(store, new Notifier(new EchoMessages(), sink), events);
 
         boolean hidden = toggle.toggle(ALICE);
 
@@ -42,7 +43,7 @@ class ToggleScoreboardTest {
         FakeStore store = new FakeStore();
         CapturingSink sink = new CapturingSink();
         RecordingEvents events = new RecordingEvents();
-        ToggleScoreboard toggle = new ToggleScoreboard(store, new ScoreboardNotifier(new EchoMessages(), sink), events);
+        ToggleScoreboard toggle = new ToggleScoreboard(store, new Notifier(new EchoMessages(), sink), events);
 
         toggle.toggle(ALICE); // hide
         boolean hidden = toggle.toggle(ALICE); // show again

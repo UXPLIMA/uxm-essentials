@@ -28,7 +28,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
 import com.uxplima.uxmessentials.kits.application.DelKit;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
-import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
@@ -39,6 +38,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -101,7 +101,7 @@ class KitCategorySelectorGoldenTest {
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
         kits = new RecordingRepository();
-        KitEditor editor = new KitEditor(kits, new KitNotifier(new KeyMessages(), new NoSink()));
+        KitEditor editor = new KitEditor(kits, new Notifier(new KeyMessages(), new NoSink()));
         KitCategoryRepository categories = new FixedCategories(List.of(PVP, MISC));
         // The selector reopens the per-kit settings panel after a pick; that panel renders through the engine now, so
         // it is built over the same engine and its spec registered. The assign assertions then see a menu-backed
@@ -112,7 +112,7 @@ class KitCategorySelectorGoldenTest {
                 new KeyMessages(),
                 org.mockito.Mockito.mock(TextInput.class),
                 editor,
-                new DelKit(kits, new KitNotifier(new KeyMessages(), new NoSink())),
+                new DelKit(kits, new Notifier(new KeyMessages(), new NoSink())),
                 new KitEditorView(new KeyMessages(), editor, scheduler),
                 (p, v) -> {});
         settingsView.register(engine.bindings(), dataFolder, NOOP);

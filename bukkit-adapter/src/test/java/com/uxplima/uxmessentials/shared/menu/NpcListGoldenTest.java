@@ -48,7 +48,6 @@ import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcQuota;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcAction;
@@ -89,6 +88,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHol
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -297,12 +297,12 @@ class NpcListGoldenTest {
     /** What one rendered slot looks like for comparison: its material and the plain-text of its display name. */
     private record Snapshot(Material material, String name) {}
 
-    private NpcNotifier notifier() {
-        return new NpcNotifier(new KeyMessages(), new SilentSink());
+    private Notifier notifier() {
+        return new Notifier(new KeyMessages(), new SilentSink());
     }
 
     private NpcServices assembleServices() {
-        NpcNotifier notifier = notifier();
+        Notifier notifier = notifier();
         NpcView view = new SilentView();
         DomainEventPublisher events = new SilentEvents();
         NpcQuota quota = new NpcQuota(new UnlimitedPermissions(), -1);

@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -21,9 +22,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class ListHologramPages {
 
     private final HologramRepository repository;
-    private final HologramNotifier notifier;
+    private final Notifier notifier;
 
-    public ListHologramPages(HologramRepository repository, HologramNotifier notifier) {
+    public ListHologramPages(HologramRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

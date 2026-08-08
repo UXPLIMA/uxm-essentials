@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -200,9 +201,9 @@ class VisitHomeTest {
         }
     }
 
-    private static HomeNotifier silentNotifier() {
+    private static Notifier silentNotifier() {
         Messages messages = (viewer, key, placeholders) -> key.key();
         MessageSink sink = (viewer, renderedText) -> {};
-        return new HomeNotifier(messages, sink);
+        return new Notifier(messages, sink);
     }
 }

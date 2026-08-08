@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -73,7 +74,7 @@ class MessagingCommandPathTest {
     private Reply reply;
 
     private SendMessage sendMessageWith(boolean offlineToMail) {
-        MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), senderNotices);
+        Notifier notifier = new Notifier(new KeyMessages(), senderNotices);
         return new SendMessage(
                 delivery,
                 ignores,
@@ -102,7 +103,7 @@ class MessagingCommandPathTest {
         senderNotices = new CapturingSink();
         events = new RecordingEvents();
         clock = new MutableClock(Instant.parse("2026-05-30T12:00:00Z"));
-        MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), new NoopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new NoopSink());
         sendMessage = sendMessageWith(false);
         reply = new Reply(
                 sendMessage,
@@ -193,7 +194,7 @@ class MessagingCommandPathTest {
 
     @Test
     void replyToAPartnerWithReplyRoutingOffDeclinesWithoutLeaking() {
-        MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), new NoopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new NoopSink());
         Reply gated = new Reply(
                 sendMessage,
                 conversations,
@@ -280,7 +281,7 @@ class MessagingCommandPathTest {
 
     @Test
     void aGlobalSpySeesEveryPrivateMessage() {
-        new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink())).toggle(spy);
+        new SocialSpy(socialSpy, new Notifier(new KeyMessages(), new NoopSink())).toggle(spy);
 
         sendMessage.send(alice, bob, hello);
         sendMessage.send(carol, dave, hello);
@@ -290,7 +291,7 @@ class MessagingCommandPathTest {
 
     @Test
     void aTargetedSpyOnlySeesConversationsItsTargetIsAPartyTo() {
-        SocialSpy spies = new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink()));
+        SocialSpy spies = new SocialSpy(socialSpy, new Notifier(new KeyMessages(), new NoopSink()));
         spies.watch(spy, bob); // watch Bob only
 
         sendMessage.send(alice, bob, hello); // Bob is the recipient — matches
@@ -302,7 +303,7 @@ class MessagingCommandPathTest {
 
     @Test
     void aTargetedSpyDoesNotSeeUnrelatedMessages() {
-        new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink())).watch(spy, bob);
+        new SocialSpy(socialSpy, new Notifier(new KeyMessages(), new NoopSink())).watch(spy, bob);
 
         sendMessage.send(carol, dave, hello); // Bob is not a party
 
@@ -311,7 +312,7 @@ class MessagingCommandPathTest {
 
     @Test
     void aSpyWhoIsAPartyToTheConversationDoesNotGetASpyLine() {
-        new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink())).toggle(spy);
+        new SocialSpy(socialSpy, new Notifier(new KeyMessages(), new NoopSink())).toggle(spy);
 
         sendMessage.send(spy, bob, hello); // the spy sends — must not also be spied
 
@@ -329,7 +330,7 @@ class MessagingCommandPathTest {
 
     @Test
     void watchTogglesATargetAndNotifies() {
-        SocialSpy spies = new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), senderNotices));
+        SocialSpy spies = new SocialSpy(socialSpy, new Notifier(new KeyMessages(), senderNotices));
 
         assertThat(spies.watch(spy, bob)).isTrue(); // added
         assertThat(senderNotices.keys).contains(MessagingMessageKey.SOCIALSPY_WATCHING.key());
@@ -339,7 +340,7 @@ class MessagingCommandPathTest {
 
     @Test
     void theGlobalToggleStillFlipsAndNotifies() {
-        SocialSpy spies = new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), senderNotices));
+        SocialSpy spies = new SocialSpy(socialSpy, new Notifier(new KeyMessages(), senderNotices));
 
         assertThat(spies.toggle(spy)).isTrue();
         assertThat(senderNotices.keys).contains(MessagingMessageKey.SOCIALSPY_ON.key());

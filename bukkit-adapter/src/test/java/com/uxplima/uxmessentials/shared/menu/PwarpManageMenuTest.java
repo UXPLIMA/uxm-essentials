@@ -31,7 +31,6 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManageMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
@@ -54,6 +53,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuTextPrompt;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -298,7 +298,7 @@ class PwarpManageMenuTest {
                 new PagedListSourceRegistry(),
                 prompt);
         server.getPluginManager().registerEvents(listener, plugin);
-        PlayerWarpNotifier notifier = new PlayerWarpNotifier(new KeyMessages(), noopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), noopSink());
         WarpAuthorization authorization = new WarpAuthorization(members);
         com.uxplima.uxmessentials.playerwarps.application.SponsorConfig sponsorConfig =
                 com.uxplima.uxmessentials.playerwarps.application.SponsorConfig.disabled();

@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.event.NpcCreated;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -29,12 +30,12 @@ public final class CopyNpc {
 
     private final NpcRepository repository;
     private final NpcView view;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
     public CopyNpc(
-            NpcRepository repository, NpcView view, NpcNotifier notifier, DomainEventPublisher events, Clock clock) {
+            NpcRepository repository, NpcView view, Notifier notifier, DomainEventPublisher events, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

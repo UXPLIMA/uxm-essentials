@@ -11,6 +11,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -24,16 +25,12 @@ public final class Seen {
 
     private final ModerationRepository repository;
     private final PlayerLookup players;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final boolean censorIp;
     private final Clock clock;
 
     public Seen(
-            ModerationRepository repository,
-            PlayerLookup players,
-            ModerationNotifier notifier,
-            boolean censorIp,
-            Clock clock) {
+            ModerationRepository repository, PlayerLookup players, Notifier notifier, boolean censorIp, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

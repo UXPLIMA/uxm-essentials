@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.messaging.application.port.ReplyRoutingStore;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ReplyToggle {
 
     private final ReplyRoutingStore replies;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
 
-    public ReplyToggle(ReplyRoutingStore replies, MessagingNotifier notifier) {
+    public ReplyToggle(ReplyRoutingStore replies, Notifier notifier) {
         this.replies = Objects.requireNonNull(replies, "replies");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

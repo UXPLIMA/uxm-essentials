@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -42,11 +43,10 @@ public final class EnforceRemoteBan {
 
     private final ModerationRepository repository;
     private final Sanctions sanctions;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final Clock clock;
 
-    public EnforceRemoteBan(
-            ModerationRepository repository, Sanctions sanctions, ModerationNotifier notifier, Clock clock) {
+    public EnforceRemoteBan(ModerationRepository repository, Sanctions sanctions, Notifier notifier, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

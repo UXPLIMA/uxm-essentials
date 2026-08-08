@@ -11,10 +11,10 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
-import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -69,10 +69,10 @@ class ModerationStaffFreezeTest {
         assertThat(sanctions.isFrozen(TARGET)).isFalse();
     }
 
-    private static ModerationNotifier notifier() {
+    private static Notifier notifier() {
         Messages messages = (viewer, key, placeholders) -> key.key();
         MessageSink sink = (viewer, renderedText) -> {};
-        return new ModerationNotifier(messages, sink);
+        return new Notifier(messages, sink);
     }
 
     /** A no-op audit — the FREEZE mapping does not depend on what the audit records. */

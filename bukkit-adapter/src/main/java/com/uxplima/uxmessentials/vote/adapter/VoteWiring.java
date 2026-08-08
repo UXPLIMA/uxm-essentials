@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VoteSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -69,7 +70,6 @@ import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
-import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
@@ -146,7 +146,7 @@ public final class VoteWiring {
         KernelPorts kernel = ctx.kernel();
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
         VoteRepository repository = VoteSync.repository(cachedRepository, bus.publisher());
-        VoteNotifier notifier = new VoteNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         BukkitRewardDispatcher dispatcher = new BukkitRewardDispatcher(kernel.scheduler());
         VoteAudience audience = new BukkitVoteAudience(kernel.scheduler());
         int offlineLimit = Math.max(0, ctx.config().getInt("offline-vote-limit", 0));
@@ -356,7 +356,7 @@ public final class VoteWiring {
             Scheduler scheduler,
             VoteReminderEligibility eligibility,
             PdcReminderPreferences reminderPrefs,
-            VoteNotifier notifier) {
+            Notifier notifier) {
         // This body runs on the global region tick. Only collect online player refs here — the PDC read
         // (entity thread) and the DB eligibility check (off-tick) must not happen on the global tick.
         for (Player online : Bukkit.getOnlinePlayers()) {
@@ -374,7 +374,7 @@ public final class VoteWiring {
             Scheduler scheduler,
             VoteReminderEligibility eligibility,
             PdcReminderPreferences reminderPrefs,
-            VoteNotifier notifier,
+            Notifier notifier,
             PlayerRef who) {
         scheduler.async(() -> {
             if (!eligibility.canVoteSomewhere(who, java.time.Instant.now())) {
@@ -398,7 +398,7 @@ public final class VoteWiring {
             VoteContext context,
             RewardEngine engine,
             VoteAudience audience,
-            VoteNotifier notifier,
+            Notifier notifier,
             VoteBroadcaster broadcaster,
             BroadcastSettings broadcastSettings,
             BroadcastThrottle broadcastThrottle,

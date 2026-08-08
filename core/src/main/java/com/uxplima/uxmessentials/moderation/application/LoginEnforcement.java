@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -26,17 +27,16 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>Pure: the connecting identity, address and now instant are passed in, and the decision is returned as a
  * value the listener applies; the listener owns the Bukkit {@code PlayerLoginEvent} disallow call. The reason
- * text is pre-rendered through the {@link ModerationNotifier} so the kick screen shows a localized message.
+ * text is pre-rendered through the {@link Notifier} so the kick screen shows a localized message.
  */
 public final class LoginEnforcement {
 
     private final ModerationRepository repository;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final Clock clock;
 
-    public LoginEnforcement(
-            ModerationRepository repository, ModerationNotifier notifier, ModerationAudit audit, Clock clock) {
+    public LoginEnforcement(ModerationRepository repository, Notifier notifier, ModerationAudit audit, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");

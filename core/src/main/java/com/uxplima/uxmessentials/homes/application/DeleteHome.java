@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -22,14 +23,11 @@ public final class DeleteHome {
 
     private final HomeRepository repository;
     private final HomeInviteRepository invites;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
 
     public DeleteHome(
-            HomeRepository repository,
-            HomeInviteRepository invites,
-            HomeNotifier notifier,
-            DomainEventPublisher events) {
+            HomeRepository repository, HomeInviteRepository invites, Notifier notifier, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

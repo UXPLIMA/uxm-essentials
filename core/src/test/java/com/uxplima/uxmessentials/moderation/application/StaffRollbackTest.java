@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingSink;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,7 @@ class StaffRollbackTest {
     private RecordingModerationAudit audit;
     private DomainEventPublisher events;
     private SanctionHistoryRecorder recorder;
-    private ModerationNotifier notifier;
+    private Notifier notifier;
     private RecordingSink sink;
     private Clock clock;
 

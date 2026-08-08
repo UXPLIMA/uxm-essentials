@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.playerstate.domain.PlayerStateSnapshot;
 import com.uxplima.uxmessentials.playerstate.domain.event.GodToggled;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -25,14 +26,14 @@ public final class ToggleGod {
 
     private final PlayerStateStore store;
     private final StateReconciler reconciler;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
     public ToggleGod(
             PlayerStateStore store,
             StateReconciler reconciler,
-            PlayerStateNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.store = Objects.requireNonNull(store, "store");

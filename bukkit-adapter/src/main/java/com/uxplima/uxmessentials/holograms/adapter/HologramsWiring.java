@@ -39,7 +39,6 @@ import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
-import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramAction;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
@@ -93,6 +92,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
@@ -218,7 +218,7 @@ public final class HologramsWiring {
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;
         events.subscribe(npcSubscriber);
-        HologramNotifier notifier = new HologramNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         HologramServices services = assemble(kernel, repository, renderer, notifier, npcLocator);
         spawnStored(repository, renderer);
         // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
@@ -363,7 +363,7 @@ public final class HologramsWiring {
             KernelPorts kernel,
             HologramRepository repository,
             HologramRenderer renderer,
-            HologramNotifier notifier,
+            Notifier notifier,
             LinkedNpcLocator npcLocator) {
         Clock clock = Clock.systemUTC();
         HologramTeleporter teleporter = new HologramTeleportAdapter(kernel.scheduler(), kernel.log());

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vote.application;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.vote.domain.VoteTally;
 public final class ShowVoteStreak {
 
     private final VoteRepository repository;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
 
-    public ShowVoteStreak(VoteRepository repository, VoteNotifier notifier) {
+    public ShowVoteStreak(VoteRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

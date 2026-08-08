@@ -13,6 +13,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -29,7 +30,6 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemorySpawnDirector
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
-import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -74,7 +74,7 @@ class TeleportCommandPathTest {
         Logger log = new NoopLogger();
         DomainEventPublisher events = new InProcessDomainEventPublisher(log);
         TeleportSettings settings = new TeleportSettings(new ZeroWaitConfig());
-        PlayerNotifier notifier = new PlayerNotifier(new KeyMessages(), new CapturingSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new CapturingSink());
         requests = new InMemoryRequestRegistry(true);
         VanillaFallbackSpawnDirectory spawns = new VanillaFallbackSpawnDirectory(new InMemorySpawnDirectory(), server);
         // MockBukkit stubs Entity#teleportAsync (UnimplementedOperationException), so the recording

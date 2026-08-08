@@ -30,7 +30,6 @@ import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
-import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramAction;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
@@ -81,6 +80,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditablePro
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -414,7 +414,7 @@ class HologramGuiTest {
     }
 
     private HologramServices assembleServices() {
-        HologramNotifier notifier = new HologramNotifier(new KeyMessages(), new SilentSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new SilentSink());
         HologramView view = new SilentView();
         DomainEventPublisher events = new SilentEvents();
         HologramTeleporter teleporter = (who, destination) -> teleportDestinations.add(destination);

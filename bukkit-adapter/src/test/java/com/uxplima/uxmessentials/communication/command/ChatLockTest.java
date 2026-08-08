@@ -15,8 +15,8 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatLockListener;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -47,7 +47,7 @@ class ChatLockTest {
         server = MockBukkit.mock();
         sink = new RecordingSink();
         lock = new ChatLock();
-        listener = new ChatLockListener(lock, new CommunicationNotifier(new KeyMessages(), sink));
+        listener = new ChatLockListener(lock, new Notifier(new KeyMessages(), sink));
     }
 
     @AfterEach

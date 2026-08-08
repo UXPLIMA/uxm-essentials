@@ -17,7 +17,6 @@ import com.uxplima.uxmessentials.scoreboard.adapter.inbound.listener.ScoreboardC
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.PdcScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderTask;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
-import com.uxplima.uxmessentials.scoreboard.application.ScoreboardNotifier;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -27,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -43,7 +43,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The context persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the display content
  * is config-authored. The renderer dogfoods uxmLib's {@link SidebarManager} (built over the server's
  * {@code ScoreboardManager}). The tablist header/footer is a separate module now, so this context owns only the
- * sidebar. The {@code /scoreboard} confirmations are {@code MessageKey}s through the {@link ScoreboardNotifier}; the
+ * sidebar. The {@code /scoreboard} confirmations are {@code MessageKey}s through the {@link Notifier}; the
  * sidebar content is raw operator MiniMessage, keeping the parity-checked keys and the unchecked operator content
  * apart. On stop the render timer is halted and every active board is restored so a disable or reload tears down
  * cleanly.
@@ -84,7 +84,7 @@ public final class ScoreboardWiring {
         AnimationRegistry animations = new AnimationRegistry(settings.animations());
         ScoreboardRenderer renderer =
                 new ScoreboardRenderer(sidebarManager(nameVisibility), visibility, settings::boards, animations);
-        ScoreboardNotifier notifier = new ScoreboardNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         ToggleScoreboard toggle = new ToggleScoreboard(visibility, notifier, kernel.events());
         ScoreboardRenderTask renderTask = new ScoreboardRenderTask(
                 kernel.scheduler(), renderer, animations, kernel.log(), settings::refreshInterval, running::get);

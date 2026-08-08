@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.npc.domain.event.NpcCreated;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
@@ -53,7 +54,7 @@ class CreateNpcTest {
         return new CreateNpc(
                 repository,
                 view,
-                new NpcNotifier(new NpcTestSupport.KeyMessages(), sink),
+                new Notifier(new NpcTestSupport.KeyMessages(), sink),
                 events,
                 Clock.fixed(Instant.ofEpochMilli(5_000), ZoneOffset.UTC),
                 quota);

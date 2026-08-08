@@ -16,6 +16,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -35,7 +36,6 @@ import com.uxplima.uxmessentials.warps.application.SetWarp;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpAccess;
 import com.uxplima.uxmessentials.warps.application.WarpInfo;
-import com.uxplima.uxmessentials.warps.application.WarpNotifier;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
@@ -144,7 +144,7 @@ class WarpRatingOffThreadReadTest {
     private WarpServices services() {
         Messages messages = new KeyMessages();
         RecordingSink sink = new RecordingSink();
-        WarpNotifier notifier = new WarpNotifier(messages, sink);
+        Notifier notifier = new Notifier(messages, sink);
         Permissions permissions = new AllowAllPermissions();
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         UseWarp useWarp =

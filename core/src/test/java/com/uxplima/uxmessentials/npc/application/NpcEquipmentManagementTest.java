@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -38,7 +39,7 @@ class NpcEquipmentManagementTest {
         repository = new FakeNpcRepository();
         view = new RecordingView();
         sink = new CapturingSink();
-        NpcNotifier notifier = new NpcNotifier(new NpcTestSupport.KeyMessages(), sink);
+        Notifier notifier = new Notifier(new NpcTestSupport.KeyMessages(), sink);
         equip = new SetNpcEquipment(repository, view, notifier);
         listEquip = new ListNpcEquipment(repository, notifier);
         actor = new PlayerRef(UUID.randomUUID(), "Operator");

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -14,9 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class MsgToggle {
 
     private final MessageToggleStore toggles;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
 
-    public MsgToggle(MessageToggleStore toggles, MessagingNotifier notifier) {
+    public MsgToggle(MessageToggleStore toggles, Notifier notifier) {
         this.toggles = Objects.requireNonNull(toggles, "toggles");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

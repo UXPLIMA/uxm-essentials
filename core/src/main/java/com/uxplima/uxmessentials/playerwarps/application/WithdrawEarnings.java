@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -33,13 +34,13 @@ public final class WithdrawEarnings {
 
     private final PlayerWarpRepository repository;
     private final WarpAuthorization authorization;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final Optional<PlayerWarpEconomy> economy;
 
     public WithdrawEarnings(
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             Optional<PlayerWarpEconomy> economy) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
