@@ -19,11 +19,11 @@ import org.jspecify.annotations.NullMarked;
  * adapter wiring ({@code SurvivalWiring}); this module stands up the identity, the enable gate, and the lifecycle
  * bookkeeping so the mechanics wire behind it.
  *
- * <p><b>Ships enabled by default.</b> The bundled config turns both mechanics on out of the box, so
- * {@link #enabled(ConfigStore)} defaults to {@code true} like the steady-state contexts; an operator flips
- * {@code modules.survival.enabled = false} to turn the whole feature off, or a per-mechanic {@code enabled = false}
- * to disable one. It persists nothing — the per-player toggle is a transient PDC stamp — so the module owns no Flyway
- * location.
+ * <p><b>Ships disabled by default.</b> These mechanics change how survival plays, and that is the operator's call
+ * rather than a fresh install's, so {@link #enabled(ConfigStore)} defaults to {@code false}. Flipping
+ * {@code modules.survival.enabled = true} brings the bundled mechanics with it; a per-mechanic
+ * {@code enabled = false} then drops any one of them. It persists nothing (the per-player toggle is a transient PDC
+ * stamp), so the module owns no Flyway location.
  *
  * <p>Like the poses context, the mechanic commands and listeners are contributed through the adapter wiring rather
  * than the declarative {@link #commands()} / {@link #listeners()} lists, so those return empty here; a disabled
@@ -69,9 +69,10 @@ public final class SurvivalModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // The module ships enabled: the bundled config turns tree-feller and veinminer on out of the box. The
-        // default here is true (the steady-state contexts default on); an operator opts out via modules.conf.
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // The module ships DISABLED. Its mechanics change how survival plays (a felled tree, an auto-picked drop,
+        // a swapped tool), and that is an operator's choice to make rather than something a fresh install does on
+        // its own. Turning it on turns the bundled mechanics on with it.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override

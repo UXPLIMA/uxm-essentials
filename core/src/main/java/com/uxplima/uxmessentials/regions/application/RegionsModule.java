@@ -17,11 +17,10 @@ import org.jspecify.annotations.NullMarked;
  * the adapter wiring probes for it and, when it is absent, binds a no-op {@code RegionService} so the module is
  * inert (the {@code /regions} command reports "WorldGuard not installed" and opens nothing).
  *
- * <p><b>Ships enabled by default.</b> Being enabled costs nothing on a server without WorldGuard — the module
- * registers one permission-gated command that immediately degrades — so {@link #enabled(ConfigStore)} defaults to
- * {@code true} like the steady-state contexts; an operator flips {@code modules.regions.enabled = false} to turn it
- * off. It persists nothing of its own (WorldGuard owns the region store), so the module declares no Flyway
- * location.
+ * <p><b>Ships disabled by default.</b> It is a GUI over WorldGuard's regions, so there is nothing to show on a
+ * server without WorldGuard and {@link #enabled(ConfigStore)} defaults to {@code false}; an operator running
+ * WorldGuard flips {@code modules.regions.enabled = true}. It persists nothing of its own (WorldGuard owns the
+ * region store), so the module declares no Flyway location.
  *
  * <p>The {@code /regions} command is Bukkit-facing and, together with the {@code RegionService} implementation
  * selection, lands in the adapter wiring once the module has started; the lifecycle bookkeeping here keeps
@@ -66,7 +65,9 @@ public final class RegionsModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // The module ships DISABLED: it is a GUI over WorldGuard's regions, so it has nothing to show on a server
+        // without WorldGuard installed.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override

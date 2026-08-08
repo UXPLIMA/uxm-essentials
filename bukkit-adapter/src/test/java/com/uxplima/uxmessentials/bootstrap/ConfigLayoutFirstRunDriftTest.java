@@ -44,7 +44,9 @@ class ConfigLayoutFirstRunDriftTest {
     void firstRunTreeSurfacesTheDiscordlinkHostConfig(@TempDir Path dir) {
         DefaultResources.writeInto(dir, java.util.logging.Logger.getLogger("t"), "test");
         ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
-        assertThat(store.getBoolean("modules.discordlink.enabled", false)).isTrue();
+        // discordlink ships off (it needs a bot token to do anything), so what this proves is that the module's own
+        // file is mounted at all: its switch reads back false rather than falling through to the fallback.
+        assertThat(store.getBoolean("modules.discordlink.enabled", true)).isFalse();
         assertThat(store.getInt("modules.discordlink.code-ttl-seconds", -1)).isEqualTo(600);
     }
 }

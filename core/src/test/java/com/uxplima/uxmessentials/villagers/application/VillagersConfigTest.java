@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the villagers module's typed config view: the module ships enabled with the common trade tools on by default
+ * Pins the villagers module's typed config view: the module ships disabled, and once turned on carries the common trade tools on by default
  * (infinite trading, the restock timer, the trade manager, click-to-trade, protection, and follow) while the niche or
  * disruptive features stay off (instant restock, disable-trades, bucket, and leash), the restock interval defaults to
  * ten minutes and is clamped to at least one second, and explicit overrides are read back.

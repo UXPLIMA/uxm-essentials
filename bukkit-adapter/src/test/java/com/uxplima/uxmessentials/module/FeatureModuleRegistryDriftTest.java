@@ -321,7 +321,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void scoreboardShipsEnabledAndPublishesItsSurface() {
+    void scoreboardShipsDisabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule scoreboard = registry.byId(ModuleId.of("scoreboard"))
                 .orElseThrow(() -> new AssertionError("scoreboard is not registered"));
@@ -331,18 +331,18 @@ class FeatureModuleRegistryDriftTest {
         // last.
         assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
 
-        // It ships ENABLED: a fresh install bundles an example board authored with built-in {tokens} (no PlaceholderAPI
-        // required), so with no modules.conf override it is on. Disabling exactly it removes only it while every
-        // steady-state sibling stays on.
+        // It ships DISABLED: a sidebar rewrites what every player sees and fights whatever HUD plugin a server
+        // already runs, so a fresh install stays quiet and an operator opts in. With no override it is absent from
+        // the enabled set; an explicit switch turns it on and leaves every sibling untouched.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("scoreboard", "teleport", "economy", "holograms", "playerwarps");
-        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.scoreboard.enabled", false))).stream()
+        assertThat(defaults).doesNotContain("scoreboard");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.scoreboard.enabled", true))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("scoreboard");
-        assertThat(off).contains("teleport", "holograms");
+        assertThat(on).contains("scoreboard", "teleport", "holograms");
 
         // Enabled, scoreboard contributes its single /scoreboard command and persists nothing (the display content
         // is config-authored and the per-player visibility bit is PDC-backed), so it declares no MigrationSet.
@@ -353,7 +353,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void tablistShipsEnabledAndPublishesNoCommandSurface() {
+    void tablistShipsDisabledAndPublishesNoCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule tablist = registry.byId(ModuleId.of("tablist"))
                 .orElseThrow(() -> new AssertionError("tablist is not registered"));
@@ -362,18 +362,18 @@ class FeatureModuleRegistryDriftTest {
         // enable, author, and refresh independently. It is registered next to scoreboard.
         assertThat(registry.byId(ModuleId.of("tablist"))).isPresent();
 
-        // It ships ENABLED (like scoreboard, with a bundled example header/footer using built-in {tokens}): with no
-        // modules.conf override it is on, and crucially scoreboard and tablist toggle independently — disabling exactly
-        // tablist leaves scoreboard's gate untouched and vice versa.
+        // Like scoreboard it ships DISABLED (a rewritten header/footer is a visual decision an operator makes), and
+        // crucially the two toggle independently: turning exactly tablist on leaves scoreboard's gate untouched.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("tablist", "scoreboard", "teleport", "economy", "holograms", "playerwarps");
-        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.tablist.enabled", false))).stream()
+        assertThat(defaults).doesNotContain("tablist", "scoreboard");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.tablist.enabled", true))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("tablist");
-        assertThat(off).contains("scoreboard", "teleport", "holograms");
+        assertThat(on).contains("tablist", "teleport", "holograms");
+        assertThat(on).doesNotContain("scoreboard");
 
         // The tablist is always-on for every viewer when enabled — there is no per-player visibility toggle — so it
         // publishes no command, and it persists nothing (the header/footer is config-authored), so it declares no
@@ -383,7 +383,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void voteShipsEnabledAndPublishesItsSurface() {
+    void voteShipsDisabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule vote =
                 registry.byId(ModuleId.of("vote")).orElseThrow(() -> new AssertionError("vote is not registered"));
@@ -392,17 +392,17 @@ class FeatureModuleRegistryDriftTest {
         // discordlink context now lands last, so vote must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
 
-        // It ships ENABLED (a steady-state feature, inert until rewards/links are authored): with no modules.conf
-        // override it is on, and disabling exactly vote removes only it while every sibling stays on.
+        // It ships DISABLED: nothing here can happen without Votifier and a vote site listing the server, so a fresh
+        // install carries the feature without offering /vote. Turning exactly it on adds only it.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("vote", "teleport", "economy", "holograms", "playerwarps");
-        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.vote.enabled", false))).stream()
+        assertThat(defaults).doesNotContain("vote");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.vote.enabled", true))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("vote");
-        assertThat(off).contains("teleport", "economy", "playerwarps");
+        assertThat(on).contains("vote", "teleport", "economy", "playerwarps");
 
         // Enabled, vote contributes exactly /vote and /voteparty (the /vote testreward action is a subcommand,
         // not a literal) and owns no extra Flyway location (its vote_party and vote_queue tables are in the
@@ -414,7 +414,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void discordlinkShipsEnabledAndPublishesItsSurface() {
+    void discordlinkShipsDisabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule discordlink = registry.byId(ModuleId.of("discordlink"))
                 .orElseThrow(() -> new AssertionError("discordlink is not registered"));
@@ -423,18 +423,18 @@ class FeatureModuleRegistryDriftTest {
         // The later nametags context now lands last, so discordlink must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
 
-        // It ships ENABLED (a steady-state feature): with no modules.conf override it is on, and disabling exactly
-        // discordlink removes only it while every sibling stays on.
+        // It ships DISABLED: linking accounts needs a Discord bot token, so the feature does nothing on an install
+        // that has not configured one. Turning exactly it on adds only it.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("discordlink", "teleport", "economy", "vote");
-        Set<String> off =
-                registry.enabledModules(new FixedConfig(Map.of("modules.discordlink.enabled", false))).stream()
-                        .map(m -> m.id().value())
-                        .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("discordlink");
-        assertThat(off).contains("teleport", "economy", "vote");
+        assertThat(defaults).doesNotContain("discordlink");
+        assertThat(defaults).contains("teleport", "economy");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.discordlink.enabled", true))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(on).contains("discordlink", "teleport", "economy");
+        assertThat(on).doesNotContain("vote");
 
         // Enabled, discordlink contributes exactly /discordlink and /discordunlink (/discordlink status is a
         // subcommand, not a literal) and owns no extra Flyway location (its discord_links and
@@ -447,7 +447,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void nametagsShipsEnabledAndPublishesNoCommandSurface() {
+    void nametagsShipsDisabledAndPublishesNoCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule nametags = registry.byId(ModuleId.of("nametags"))
                 .orElseThrow(() -> new AssertionError("nametags is not registered"));
@@ -456,19 +456,18 @@ class FeatureModuleRegistryDriftTest {
         // The later staff context now lands last, so nametags must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
 
-        // It now ships ENABLED: the bundled config carries a single plain-name format and hides the vanilla name under
-        // it through a shared scoreboard-team coordinator, so the default surface is one clean custom nametag. With no
-        // modules.conf override it is in the enabled set alongside its steady-state siblings; disabling exactly it
-        // removes only it while every sibling stays on.
+        // It ships DISABLED, with the rest of the HUD trio: a replacement above-head nametag hides the vanilla one and
+        // spawns a display entity per wearer, which is a look an operator chooses rather than inherits. Turning
+        // exactly it on adds only it.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("nametags", "teleport", "economy", "holograms", "playerwarps", "discordlink");
-        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.nametags.enabled", false))).stream()
+        assertThat(defaults).doesNotContain("nametags");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.nametags.enabled", true))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("nametags");
-        assertThat(off).contains("teleport", "holograms");
+        assertThat(on).contains("nametags", "teleport", "holograms");
 
         // The nametag is always-on for every wearer when enabled — there is no per-player visibility toggle — so it
         // publishes no command, and it persists nothing (the formats are config-authored), so it declares no
@@ -493,7 +492,7 @@ class FeatureModuleRegistryDriftTest {
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("staff", "teleport", "economy", "holograms", "playerwarps", "discordlink");
+        assertThat(defaults).contains("staff", "teleport", "economy", "holograms", "playerwarps");
         Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.staff.enabled", false))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
@@ -605,7 +604,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void survivalShipsEnabledAndPublishesNoDeclarativeCommandSurface() {
+    void survivalShipsDisabledAndPublishesNoDeclarativeCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule survival = registry.byId(ModuleId.of("survival"))
                 .orElseThrow(() -> new AssertionError("survival is not registered"));
@@ -614,17 +613,17 @@ class FeatureModuleRegistryDriftTest {
         // ranks context now lands last, so survival must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
 
-        // It ships ENABLED (a steady-state feature — both harvesting mechanics are on out of the box): with no
-        // modules.conf override it is on, and disabling exactly survival removes only it while every sibling stays on.
+        // It ships DISABLED: tree-feller and veinminer change how vanilla blocks break, which is a gameplay decision
+        // an operator makes rather than something an essentials install imposes. Turning exactly it on adds only it.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("survival", "teleport", "economy", "holograms", "poses");
-        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.survival.enabled", false))).stream()
+        assertThat(defaults).doesNotContain("survival");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "poses");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.survival.enabled", true))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("survival");
-        assertThat(off).contains("teleport", "holograms", "poses");
+        assertThat(on).contains("survival", "teleport", "holograms", "poses");
 
         // The /treefeller and /veinminer toggle commands and the BlockBreakEvent listeners are contributed through
         // the adapter wiring (gated per mechanic), not the declarative lists, so the module publishes no command
@@ -648,12 +647,12 @@ class FeatureModuleRegistryDriftTest {
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("ranks", "teleport", "economy", "holograms", "survival");
+        assertThat(defaults).contains("ranks", "teleport", "economy", "holograms");
         Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.ranks.enabled", false))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
         assertThat(off).doesNotContain("ranks");
-        assertThat(off).contains("teleport", "holograms", "survival");
+        assertThat(off).contains("teleport", "holograms");
 
         // The /rankup, /prestige and /ranks verbs are contributed through the adapter wiring in the later phases,
         // not the declarative lists, so the module publishes no command here, and its player_ranks table is in the
@@ -723,7 +722,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void villagersShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void villagersShipsDisabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule villagers = registry.byId(ModuleId.of("villagers"))
                 .orElseThrow(() -> new AssertionError("villagers is not registered"));
@@ -733,17 +732,17 @@ class FeatureModuleRegistryDriftTest {
         // be registered, not last.
         assertThat(registry.byId(ModuleId.of("villagers"))).isPresent();
 
-        // It ships ENABLED but inert (every trade-availability feature defaults off): with no modules.conf override it
-        // is on, and disabling exactly villagers removes only it while every sibling stays on.
+        // It ships DISABLED: every feature here rewrites how villager trading works, and a server that wants vanilla
+        // villagers should get vanilla villagers. Turning exactly it on adds only it.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("villagers", "teleport", "economy", "holograms", "trade");
-        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.villagers.enabled", false))).stream()
+        assertThat(defaults).doesNotContain("villagers");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "trade");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.villagers.enabled", true))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("villagers");
-        assertThat(off).contains("teleport", "holograms", "trade");
+        assertThat(on).contains("villagers", "teleport", "holograms", "trade");
 
         // The trade / interact listeners and the restock sweep are contributed through the adapter wiring (gated per
         // feature), not the declarative lists, so the module publishes no command here, and it persists nothing (the
@@ -753,7 +752,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void invrollbackShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void invrollbackShipsDisabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule invrollback = registry.byId(ModuleId.of("invrollback"))
                 .orElseThrow(() -> new AssertionError("invrollback is not registered"));
@@ -762,19 +761,18 @@ class FeatureModuleRegistryDriftTest {
         // later regions context now lands last, so invrollback must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("invrollback"))).isPresent();
 
-        // It ships ENABLED but inert (a steady-state feature — nothing is stored until a player dies or logs out):
-        // with no modules.conf override it is on, and disabling exactly invrollback removes only it while every
-        // sibling stays on.
+        // It ships DISABLED: every death and every logout would write an inventory snapshot to the database, a cost
+        // only a server whose staff actually restore inventories should pay. Turning exactly it on adds only it.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("invrollback", "teleport", "economy", "holograms", "villagers");
-        Set<String> off =
-                registry.enabledModules(new FixedConfig(Map.of("modules.invrollback.enabled", false))).stream()
-                        .map(m -> m.id().value())
-                        .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("invrollback");
-        assertThat(off).contains("teleport", "holograms", "villagers");
+        assertThat(defaults).doesNotContain("invrollback");
+        assertThat(defaults).contains("teleport", "economy", "holograms");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.invrollback.enabled", true))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(on).contains("invrollback", "teleport", "holograms");
+        assertThat(on).doesNotContain("villagers");
 
         // The death/logout capture listeners are contributed through the adapter wiring, not the declarative lists,
         // so the module publishes no command here, and its inv_snapshots table is in the persistence V79 baseline
@@ -784,7 +782,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void regionsShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void regionsShipsDisabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule regions = registry.byId(ModuleId.of("regions"))
                 .orElseThrow(() -> new AssertionError("regions is not registered"));
@@ -793,18 +791,18 @@ class FeatureModuleRegistryDriftTest {
         // servertweaks context now lands last, so regions must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("regions"))).isPresent();
 
-        // It ships ENABLED (being on costs nothing without WorldGuard — the module degrades to a "not installed"
-        // reply): with no modules.conf override it is on, and disabling exactly regions removes only it while every
-        // sibling stays on.
+        // It ships DISABLED: the whole module is a front end for WorldGuard, so on a server without it there is
+        // nothing to manage and /regions would only answer "not installed". Turning exactly it on adds only it.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("regions", "teleport", "economy", "holograms", "invrollback");
-        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.regions.enabled", false))).stream()
+        assertThat(defaults).doesNotContain("regions");
+        assertThat(defaults).contains("teleport", "economy", "holograms");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.regions.enabled", true))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(off).doesNotContain("regions");
-        assertThat(off).contains("teleport", "holograms", "invrollback");
+        assertThat(on).contains("regions", "teleport", "holograms");
+        assertThat(on).doesNotContain("invrollback");
 
         // The /regions command is Bukkit-facing and bound only when WorldGuard is present, so it is contributed
         // through the adapter wiring rather than the declarative list; the module publishes no command here, and it
@@ -829,13 +827,13 @@ class FeatureModuleRegistryDriftTest {
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).contains("servertweaks", "teleport", "economy", "holograms", "regions");
+        assertThat(defaults).contains("servertweaks", "teleport", "economy", "holograms");
         Set<String> off =
                 registry.enabledModules(new FixedConfig(Map.of("modules.servertweaks.enabled", false))).stream()
                         .map(m -> m.id().value())
                         .collect(Collectors.toSet());
         assertThat(off).doesNotContain("servertweaks");
-        assertThat(off).contains("teleport", "holograms", "regions");
+        assertThat(off).contains("teleport", "holograms");
 
         // The tweaks are Bukkit-facing side effects (a brand plugin-message on join, a Log4j2 console filter)
         // contributed through the adapter wiring, gated per tweak, not the declarative lists — so the module publishes

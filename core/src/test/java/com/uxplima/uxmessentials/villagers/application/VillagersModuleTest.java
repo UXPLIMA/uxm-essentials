@@ -9,8 +9,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the {@link VillagersModule} feature-module contract: it reports the {@code villagers} id, ships enabled by
- * default, honours an explicit {@code modules.villagers.enabled = false}, and contributes no declarative command,
+ * Pins the {@link VillagersModule} feature-module contract: it reports the {@code villagers} id, ships disabled by
+ * default, honours an explicit {@code modules.villagers.enabled = true}, and contributes no declarative command,
  * listener, or migration (those are adapter-wired). The registry-level wiring is covered by
  * {@code FeatureModuleRegistryDriftTest}.
  */
@@ -25,12 +25,13 @@ class VillagersModuleTest {
     }
 
     @Test
-    void shipsEnabledByDefaultAndHonoursAnExplicitOptOut() {
+    void shipsDisabledByDefaultAndHonoursAnExplicitOptIn() {
         VillagersModule module = new VillagersModule();
 
-        assertThat(module.enabled(new FixedConfig(Map.of()))).isTrue();
-        assertThat(module.enabled(new FixedConfig(Map.of("modules.villagers.enabled", false))))
-                .isFalse();
+        // What a villager trades and how often it restocks is an economy decision, left to the operator.
+        assertThat(module.enabled(new FixedConfig(Map.of()))).isFalse();
+        assertThat(module.enabled(new FixedConfig(Map.of("modules.villagers.enabled", true))))
+                .isTrue();
     }
 
     @Test

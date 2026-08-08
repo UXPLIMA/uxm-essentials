@@ -10,9 +10,10 @@ import org.jspecify.annotations.NullMarked;
  * The renderer sends a per-viewer packet text-display stack riding each wearer; that Bukkit-facing machinery lands
  * with the adapter wiring.
  *
- * <p><b>Ships enabled by default.</b> The bundled config ships a single plain-name format and the vanilla above-head
- * name is hidden under it through a shared scoreboard-team coordinator, so out of the box every wearer shows one clean
- * custom nametag; an operator edits the format or flips {@code modules.nametags.enabled = false} to turn it off.
+ * <p><b>Ships disabled by default.</b> An above-head name is a surface a dedicated nametag plugin also draws, and
+ * two of them fight over it. The bundled config is ready to go: a single plain-name format, with the vanilla name
+ * hidden under it through a shared scoreboard-team coordinator, so {@code modules.nametags.enabled = true} shows a
+ * clean custom nametag straight away.
  *
  * <p>The nametag is always-on for every eligible wearer when enabled, so this module supplies only its id: the shared
  * enable gate, the empty command/listener/migration surfaces, and the running/drain lifecycle come from

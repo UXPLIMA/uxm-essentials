@@ -18,6 +18,9 @@ import org.jspecify.annotations.NullMarked;
  * and the restock sweep land with the adapter wiring; this module stands up the identity, the enable gate, and the
  * lifecycle bookkeeping behind them.
  *
+ * <p><b>Ships disabled by default.</b> Turning it on changes what a villager trades and how often it restocks,
+ * an economy decision no fresh install should make for the operator.
+ *
  * <p><b>Ships enabled but inert.</b> {@link #enabled(ConfigStore)} defaults to {@code true} like the steady-state
  * contexts, but every sub-feature ships {@code false} in the bundled config, so a fresh install changes no villager
  * behaviour until an operator turns a feature on. It persists nothing — the per-villager last-restock stamp and the
@@ -67,9 +70,9 @@ public final class VillagersModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // The module ships enabled but inert: it is on by default (like the steady-state contexts), yet every
-        // sub-feature defaults off, so nothing about villager trading changes until an operator opts one in.
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // The module ships DISABLED: turning it on changes what a villager will trade and how often it restocks,
+        // which is an economy decision no fresh install should make for the operator.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override

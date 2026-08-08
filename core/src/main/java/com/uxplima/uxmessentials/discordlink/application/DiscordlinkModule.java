@@ -19,6 +19,9 @@ import org.jspecify.annotations.NullMarked;
  * arms the lifecycle bookkeeping, and the bukkit-side adapters (the Brigadier handlers and the jOOQ store over
  * {@code persistence.dsl()}) are constructed in the adapter wiring once the module has started.
  *
+ * <p><b>Ships disabled by default.</b> Linking needs the separate Discord jar and a bot token, so on a server
+ * with neither the commands would only ever report that the bridge is not configured.
+ *
  * <p>The {@code discord_links} and {@code discord_link_pending} tables ship in the persistence V16 baseline
  * ({@code db/migration}), which the persistence layer always applies, so the module declares no extra migration
  * location of its own; a disabled module still leaves the baseline tables in place but wires nothing over them.
@@ -61,7 +64,9 @@ public final class DiscordlinkModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // The module ships DISABLED: linking needs the separate Discord jar and a bot token, so on a server that
+        // has neither the commands would only ever answer that the bridge is not configured.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override

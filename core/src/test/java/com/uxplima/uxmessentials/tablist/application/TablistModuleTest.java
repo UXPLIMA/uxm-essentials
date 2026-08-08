@@ -17,15 +17,16 @@ class TablistModuleTest {
     }
 
     @Test
-    void shipsEnabledByDefault() {
+    void shipsDisabledByDefault() {
         TablistModule module = new TablistModule();
 
-        // With no override the module is on — a fresh install bundles an example header/footer (built-in {tokens}, no
-        // PlaceholderAPI required) so a new operator sees a working tab out of the box.
-        assertThat(module.enabled(new FixedConfig(Map.of()))).isTrue();
-        // An explicit disable in modules.conf turns it off.
-        assertThat(module.enabled(new FixedConfig(Map.of("modules.tablist.enabled", false))))
-                .isFalse();
+        // With no override the module is off: the tab list is a surface a dedicated tab plugin also draws, so a
+        // fresh install does not claim it.
+        assertThat(module.enabled(new FixedConfig(Map.of()))).isFalse();
+        // An explicit enable in modules.conf turns it on, and the bundled example header/footer renders straight
+        // away (built-in {tokens}, no PlaceholderAPI required).
+        assertThat(module.enabled(new FixedConfig(Map.of("modules.tablist.enabled", true))))
+                .isTrue();
     }
 
     @Test

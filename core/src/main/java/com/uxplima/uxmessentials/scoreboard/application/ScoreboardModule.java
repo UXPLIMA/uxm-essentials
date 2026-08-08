@@ -21,11 +21,11 @@ import org.jspecify.annotations.NullMarked;
  * interval; the render/join/quit machinery is Bukkit-facing and lands with the adapter wiring. The tablist
  * header/footer is a separate {@code tablist} context.
  *
- * <p><b>Ships enabled by default.</b> A fresh install bundles an example sidebar authored with the built-in
- * {@code {player}}/{@code {online}}/{@code {world}} tokens (no PlaceholderAPI required), so out of the box a new
- * operator sees a working board and brands or disables it from there. The
- * {@link #enabled(ConfigStore)} gate therefore defaults to {@code true} (like the steady-state
- * contexts). It persists nothing: the per-player "hidden" preference is PDC-backed
+ * <p><b>Ships disabled by default.</b> The sidebar is a surface a dedicated scoreboard plugin also draws, and two
+ * of them fight over the same slot, so {@link #enabled(ConfigStore)} defaults to {@code false}. A fresh install
+ * still bundles an example sidebar authored with the built-in {@code {player}}/{@code {online}}/{@code {world}}
+ * tokens (no PlaceholderAPI required), so {@code modules.scoreboard.enabled = true} shows a working board straight
+ * away, ready to brand. It persists nothing: the per-player "hidden" preference is PDC-backed
  * (survives relog) and the display content is config-authored, so the module owns no Flyway location.
  *
  * <p>The split between the plugin's own strings and operator content is owned here: the {@code /scoreboard}
@@ -77,9 +77,10 @@ public final class ScoreboardModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // The module ships ENABLED: a fresh install bundles an example sidebar (built-in {tokens}, no PlaceholderAPI
-        // required), so a new operator sees a working board out of the box and opts out via modules.conf if unwanted.
-        return config.getBoolean(configRoot() + ".enabled", true);
+        // The module ships DISABLED: a sidebar is a display surface most servers already own (a dedicated
+        // scoreboard plugin draws its own), and two of them fight over the same slot. A fresh install still bundles
+        // a working example board, so turning this on is one line and shows something immediately.
+        return config.getBoolean(configRoot() + ".enabled", false);
     }
 
     @Override
