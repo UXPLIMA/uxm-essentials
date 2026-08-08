@@ -20,7 +20,6 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -77,7 +76,7 @@ public final class LoanDashboardMenu {
             Scheduler scheduler,
             Messages messages,
             EconomyNotifier notifier,
-            GuiText guiText) {
+            CurrencyPickerMenu picker) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.loanService = Objects.requireNonNull(loanService, "loanService");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
@@ -85,8 +84,7 @@ public final class LoanDashboardMenu {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        Objects.requireNonNull(guiText, "guiText");
-        CurrencyPickerView picker = new CurrencyPickerView(menus, guiText, scheduler);
+        Objects.requireNonNull(picker, "picker");
         this.requestFlow =
                 new LoanRequestFlow(loanService, currencies, textInput, scheduler, notifier, picker, this::open);
     }

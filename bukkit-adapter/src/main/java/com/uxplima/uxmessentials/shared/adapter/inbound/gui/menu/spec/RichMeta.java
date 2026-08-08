@@ -17,7 +17,8 @@ import java.util.Optional;
  * {@code effect:amplifier:durationTicks}; a banner pattern is {@code pattern:dyecolor}; a colour is a
  * {@code #RRGGBB} hex, an {@code r,g,b} triple, or a named dye colour. {@code dynamicAmount}/{@code dynamicModelData}
  * carry a {@code %token%} the renderer resolves to a number on each draw, overriding the static
- * {@link ItemDecor#amount()}/{@link ItemDecor#modelData()}. The {@link DataComponents} block carries the common
+ * {@link ItemDecor#amount()}/{@link ItemDecor#modelData()}; {@code dynamicGlow} is the same idea for the enchant
+ * glow, resolved to a boolean so one list template can glint only the entry that is currently selected. The {@link DataComponents} block carries the common
  * native data-components (rarity, tooltip-style, the hide-tooltip/enchant-glint toggles, enchantability, attribute
  * modifiers, food, tool) the same fail-soft way.
  */
@@ -33,7 +34,8 @@ public record RichMeta(
         Optional<String> dynamicAmount,
         Optional<String> dynamicModelData,
         Optional<String> itemModel,
-        DataComponents components) {
+        DataComponents components,
+        Optional<String> dynamicGlow) {
 
     /** The empty rich meta — the default an item carries when it declares no extra native metadata. */
     public static final RichMeta NONE = new RichMeta(
@@ -48,7 +50,8 @@ public record RichMeta(
             Optional.empty(),
             Optional.empty(),
             Optional.empty(),
-            DataComponents.NONE);
+            DataComponents.NONE,
+            Optional.empty());
 
     public RichMeta {
         enchantments = List.copyOf(Objects.requireNonNull(enchantments, "enchantments"));
@@ -62,6 +65,40 @@ public record RichMeta(
         Objects.requireNonNull(dynamicModelData, "dynamicModelData");
         Objects.requireNonNull(itemModel, "itemModel");
         Objects.requireNonNull(components, "components");
+        Objects.requireNonNull(dynamicGlow, "dynamicGlow");
+    }
+
+    /**
+     * The twelve-argument form, retained so every existing call site keeps compiling unchanged: it carries no
+     * dynamic glow token. Only the loader builds the canonical form, when a spec's {@code glow} is a placeholder.
+     */
+    public RichMeta(
+            boolean unbreakable,
+            List<String> enchantments,
+            List<String> storedEnchantments,
+            Optional<String> leatherColor,
+            PotionSpec potion,
+            List<String> bannerPatterns,
+            Optional<TrimSpec> trim,
+            Optional<Integer> damage,
+            Optional<String> dynamicAmount,
+            Optional<String> dynamicModelData,
+            Optional<String> itemModel,
+            DataComponents components) {
+        this(
+                unbreakable,
+                enchantments,
+                storedEnchantments,
+                leatherColor,
+                potion,
+                bannerPatterns,
+                trim,
+                damage,
+                dynamicAmount,
+                dynamicModelData,
+                itemModel,
+                components,
+                Optional.empty());
     }
 
     /**

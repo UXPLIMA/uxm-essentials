@@ -160,15 +160,12 @@ class PlayerPickerViewTest {
         assertThat(menu.getItem(OFFLINE_BUTTON_SLOT).getType()).isEqualTo(Material.NAME_TAG);
     }
 
+    /** A picker registered against this test's engine; each test builds exactly one, so the ids are claimed once. */
     private PlayerPickerView view() {
-        return new PlayerPickerView(
-                engine.menus(),
-                new GuiText(new KeyMessages()),
-                new SyncScheduler(),
-                textInput,
-                server,
-                new KeyMessages(),
-                sink);
+        PlayerPickerView picker =
+                new PlayerPickerView(engine.menus(), new SyncScheduler(), textInput, server, new KeyMessages(), sink);
+        picker.register(engine.bindings(), java.nio.file.Path.of("nonexistent"), new NoopLogger());
+        return picker;
     }
 
     private static PlayerPickerView.Request request(

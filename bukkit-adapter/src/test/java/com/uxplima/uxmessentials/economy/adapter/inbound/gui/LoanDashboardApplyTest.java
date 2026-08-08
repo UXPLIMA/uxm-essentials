@@ -19,7 +19,6 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -136,7 +135,7 @@ class LoanDashboardApplyTest {
                 new SyncScheduler(),
                 new KeyMessages(),
                 new EconomyNotifier(new KeyMessages(), new NoopSink()),
-                new GuiText(new KeyMessages()));
+                mock(CurrencyPickerMenu.class));
     }
 
     private LoanRequestFlow flow() {
@@ -146,7 +145,7 @@ class LoanDashboardApplyTest {
                 mock(TextInput.class),
                 new SyncScheduler(),
                 new EconomyNotifier(new KeyMessages(), new NoopSink()),
-                mock(CurrencyPickerView.class),
+                mock(CurrencyPickerMenu.class),
                 p -> {});
     }
 

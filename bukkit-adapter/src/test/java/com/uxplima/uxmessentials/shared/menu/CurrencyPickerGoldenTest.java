@@ -10,25 +10,22 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.bukkit.Material;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
-import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -44,7 +41,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * The currency-picker golden test: the engine-rendered picker must draw the exact grid the original
- * {@code CurrencyPickerView} drew on uxmLib's {@code PaginatedGui}. The fixture is two currencies (the
+ * {@code CurrencyPickerMenu} drew on uxmLib's {@code PaginatedGui}. The fixture is two currencies (the
  * {@code SUNFLOWER}-iconed default "coins" and a {@code GOLD_INGOT}-iconed "rubies"), with "rubies" active, over the
  * picker's six-row layout (content slots 0..44, prev at 45, next at 53, gray-glass filler). Page 0 places one icon
  * per currency at content slots 0 and 1, with the two ARROW nav buttons at 45 and 53. The engine window is
@@ -77,10 +74,9 @@ class CurrencyPickerGoldenTest {
     private Plugin plugin;
     private PlayerMock player;
     private PlayerRef viewer;
-    private GuiText guiText;
     private Scheduler scheduler;
     private TestMenuEngine engine;
-    private CurrencyPickerView picker;
+    private CurrencyPickerMenu picker;
     private final List<Currency> picked = new ArrayList<>();
 
     @BeforeEach
@@ -89,11 +85,11 @@ class CurrencyPickerGoldenTest {
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
-        guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
-        picker = new CurrencyPickerView(engine.menus(), guiText, scheduler);
+        picker = new CurrencyPickerMenu(engine.menus(), new KeyMessages(), scheduler);
+        picker.register(engine.bindings(), java.nio.file.Path.of("nonexistent"), new NoopLogger());
     }
 
     @AfterEach
@@ -120,13 +116,12 @@ class CurrencyPickerGoldenTest {
         ItemStack coinsIcon = Objects.requireNonNull(inv.getItem(0), "coins icon"); // content slot 0 holds coins
         ItemStack rubiesIcon = Objects.requireNonNull(inv.getItem(1), "rubies icon"); // content slot 1 holds rubies
 
-        // "rubies" is the active currency, so its icon carries the glint enchant and hides it; "coins" carries neither.
-        assertThat(rubiesIcon.getEnchantments()).containsKey(Enchantment.UNBREAKING);
-        assertThat(Objects.requireNonNull(rubiesIcon.getItemMeta()).getItemFlags())
-                .contains(ItemFlag.HIDE_ENCHANTS);
-        assertThat(coinsIcon.getEnchantments()).isEmpty();
-        assertThat(Objects.requireNonNull(coinsIcon.getItemMeta()).getItemFlags())
-                .doesNotContain(ItemFlag.HIDE_ENCHANTS);
+        // "rubies" is the active currency, so its icon glints; "coins" does not. The spec drives the glint from the
+        // %currency_picker_active% token, which is the engine's glint override rather than the old hidden enchant.
+        assertThat(Objects.requireNonNull(rubiesIcon.getItemMeta()).getEnchantmentGlintOverride())
+                .isTrue();
+        assertThat(Objects.requireNonNull(coinsIcon.getItemMeta()).getEnchantmentGlintOverride())
+                .isFalse();
     }
 
     @Test
@@ -149,7 +144,7 @@ class CurrencyPickerGoldenTest {
     }
 
     /**
-     * The slot -> (material, plain name) map the bespoke {@code CurrencyPickerView} produced for this fixture: a
+     * The slot -> (material, plain name) map the bespoke {@code CurrencyPickerMenu} produced for this fixture: a
      * SUNFLOWER for the default "coins" at content slot 0 and a GOLD_INGOT for the active "rubies" at slot 1, each
      * named through the {@code eco.admin-gui.currency-name} key the test's {@code KeyMessages} returns verbatim, and
      * the two ARROW nav buttons at 45 and 53 with their previous/next catalog names. The gray-glass filler slots are
@@ -227,5 +222,19 @@ class CurrencyPickerGoldenTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+    /** A logger that drops everything; the spec loads from the classpath, so nothing here is worth printing. */
+    private static final class NoopLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

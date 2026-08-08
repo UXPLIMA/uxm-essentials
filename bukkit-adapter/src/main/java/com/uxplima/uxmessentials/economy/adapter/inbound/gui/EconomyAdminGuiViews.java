@@ -55,6 +55,7 @@ public final class EconomyAdminGuiViews {
             Scheduler scheduler,
             Server server,
             PlayerPickerView picker,
+            CurrencyPickerMenu currencyPicker,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput,
             PlayerLookup players,
             EconomyProvider economy,
@@ -63,7 +64,6 @@ public final class EconomyAdminGuiViews {
             EconomyNotifier notifier,
             TransactionsHistoryMenu historyView) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
-        CurrencyPickerView currencyPicker = new CurrencyPickerView(menus, guiText, scheduler);
         // Both child screens return to the hub; the hub is constructed last, so the back-callbacks read it
         // through a one-slot holder rather than a setter, keeping every cross-link constructor-injected.
         EconomyAdminMenu[] hubHolder = new EconomyAdminMenu[1];

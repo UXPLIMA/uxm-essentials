@@ -28,6 +28,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanDashboardMenu;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.LoanService;
@@ -270,8 +271,10 @@ class EconomyLoanGoldenTest {
         Menus menus = engine.menus();
         // The dashboard's close button rides the engine's generic close action, registered by the menu vocabulary.
         MenuVocabulary.registerActions(bindings, menus, false, NOOP);
+        CurrencyPickerMenu picker = new CurrencyPickerMenu(menus, new KeyMessages(), scheduler);
         LoanDashboardMenu menu = new LoanDashboardMenu(
-                menus, loanService, currencies, textInput, scheduler, new KeyMessages(), notifier, guiText);
+                menus, loanService, currencies, textInput, scheduler, new KeyMessages(), notifier, picker);
+        picker.register(bindings, specDir(), NOOP);
         menu.register(bindings, specDir(), NOOP);
         return menu;
     }

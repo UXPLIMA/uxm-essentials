@@ -37,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the {@code /bank} list menu with the menu engine and opens it. A paginated grid of one chest per shared
  * bank the viewer belongs to, showing the bank's name, id, balance, creator and member count. A left click opens that
  * bank's engine {@link BankActionsMenu} hub through the {@link BankNavigation} supplier; the create button
- * opens the still-bespoke {@link CurrencyPickerView} after prompting for a name, exactly as the old view did.
+ * opens the still-bespoke {@link CurrencyPickerMenu} after prompting for a name, exactly as the old view did.
  *
  * <p>The bank list is a repository read (no Bukkit call), but each bank is resolved by id, so {@link #open} runs the
  * read off the tick thread and hands the already-read banks in as the menu subject; the {@code economy:banks} list
@@ -59,7 +59,7 @@ public final class BankListMenu {
     private final BankService bankService;
     private final CurrencyRegistry currencies;
     private final TextInput textInput;
-    private final CurrencyPickerView currencyPicker;
+    private final CurrencyPickerMenu currencyPicker;
     private final Scheduler scheduler;
     private final Messages messages;
     private final Supplier<BankNavigation> navigation;
@@ -69,7 +69,7 @@ public final class BankListMenu {
             BankService bankService,
             CurrencyRegistry currencies,
             TextInput textInput,
-            CurrencyPickerView currencyPicker,
+            CurrencyPickerMenu currencyPicker,
             Scheduler scheduler,
             Messages messages,
             Supplier<BankNavigation> navigation) {

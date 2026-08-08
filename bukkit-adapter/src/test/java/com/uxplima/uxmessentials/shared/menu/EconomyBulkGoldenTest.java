@@ -25,7 +25,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EcoAdminOps;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyBulkMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyTargetMenu;
@@ -224,7 +224,8 @@ class EconomyBulkGoldenTest {
         EconomyProvider provider = mock(EconomyProvider.class);
         TransactionsHistoryMenu historyView = mock(TransactionsHistoryMenu.class);
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
-        CurrencyPickerView picker = new CurrencyPickerView(menus, guiText, scheduler);
+        CurrencyPickerMenu picker = new CurrencyPickerMenu(menus, new KeyMessages(), scheduler);
+        picker.register(bindings, specDir(), NOOP);
         EconomyTargetMenu target = new EconomyTargetMenu(
                 menus,
                 guiText,

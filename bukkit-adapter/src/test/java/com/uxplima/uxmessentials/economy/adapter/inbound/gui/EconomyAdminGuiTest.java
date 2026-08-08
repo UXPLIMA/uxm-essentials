@@ -99,6 +99,7 @@ class EconomyAdminGuiTest {
     private AnvilInput anvil;
     private com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput;
     private PlayerPickerView picker;
+    private @org.jspecify.annotations.Nullable CurrencyPickerMenu currencyPicker;
     private EconomyNotifier notifier;
     private TransactionsHistoryMenu historyView;
 
@@ -130,7 +131,8 @@ class EconomyAdminGuiTest {
                 .textInput();
         notifier = new EconomyNotifier(new KeyMessages(), new NoopSink());
         historyView = mock(TransactionsHistoryMenu.class);
-        picker = new PlayerPickerView(menus, guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        picker = new PlayerPickerView(menus, scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        picker.register(bindings, specDir(), NOOP);
     }
 
     @AfterEach
@@ -139,8 +141,16 @@ class EconomyAdminGuiTest {
         MockBukkit.unmock();
     }
 
-    private CurrencyPickerView picker() {
-        return new CurrencyPickerView(menus, guiText, scheduler);
+    /**
+     * The one currency picker for this test, registered on the shared bindings the first time it is asked for: its
+     * spec and binding ids can only be claimed once, exactly as in production wiring.
+     */
+    private CurrencyPickerMenu picker() {
+        if (currencyPicker == null) {
+            currencyPicker = new CurrencyPickerMenu(menus, new KeyMessages(), scheduler);
+            currencyPicker.register(bindings, specDir(), NOOP);
+        }
+        return currencyPicker;
     }
 
     /**
@@ -378,6 +388,7 @@ class EconomyAdminGuiTest {
                 scheduler,
                 server,
                 picker,
+                picker(),
                 textInput,
                 mock(PlayerLookup.class),
                 provider,

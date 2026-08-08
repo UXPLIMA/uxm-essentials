@@ -102,8 +102,8 @@ class EconomyAdminGoldenTest {
         anvil.install();
         Guis.install(plugin);
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
-        picker = new PlayerPickerView(
-                engine.menus(), guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        picker = new PlayerPickerView(engine.menus(), scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        picker.register(engine.bindings(), specDir(), NOOP);
         targetMenu = mock(EconomyTargetMenu.class);
         bulkMenu = mock(EconomyBulkMenu.class);
         historyView = mock(TransactionsHistoryMenu.class);

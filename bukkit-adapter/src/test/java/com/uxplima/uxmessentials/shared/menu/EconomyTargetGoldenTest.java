@@ -27,7 +27,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EcoAdminOps;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyTargetMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
@@ -248,6 +248,7 @@ class EconomyTargetGoldenTest {
     private EconomyTargetMenu wire(CurrencyRegistry currencies) {
         MenuBindings bindings = engine.bindings();
         Menus menus = engine.menus();
+        CurrencyPickerMenu picker = new CurrencyPickerMenu(menus, new KeyMessages(), scheduler);
         EconomyTargetMenu menu = new EconomyTargetMenu(
                 menus,
                 guiText,
@@ -259,8 +260,9 @@ class EconomyTargetGoldenTest {
                 currencies,
                 notifier,
                 historyView,
-                new CurrencyPickerView(menus, guiText, scheduler),
+                picker,
                 (p, v) -> {});
+        picker.register(bindings, specDir(), NOOP);
         menu.register(bindings, specDir(), NOOP);
         return menu;
     }

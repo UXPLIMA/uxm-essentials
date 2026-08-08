@@ -27,7 +27,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyExchangeMenu;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
@@ -218,15 +218,10 @@ class EconomyExchangeGoldenTest {
     private EconomyExchangeMenu wire(ExchangeRegistry registry) {
         MenuBindings bindings = engine.bindings();
         ExchangeService exchangeService = new ExchangeService(mock(WalletRepository.class), registry, true);
+        CurrencyPickerMenu picker = new CurrencyPickerMenu(engine.menus(), new KeyMessages(), scheduler);
         EconomyExchangeMenu menu = new EconomyExchangeMenu(
-                engine.menus(),
-                provider,
-                exchangeService,
-                scheduler,
-                notifier,
-                new KeyMessages(),
-                textInput,
-                new CurrencyPickerView(engine.menus(), guiText, scheduler));
+                engine.menus(), provider, exchangeService, scheduler, notifier, new KeyMessages(), textInput, picker);
+        picker.register(bindings, specDir(), NOOP);
         menu.register(bindings, specDir(), NOOP);
         return menu;
     }

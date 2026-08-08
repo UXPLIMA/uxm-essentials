@@ -865,11 +865,14 @@ public final class MenuSpecLoader {
      * {@code food{ nutrition=4, saturation=2.4, can-always-eat=true }},
      * {@code tool{ default-mining-speed=1.0, damage-per-block=2 }}. The {@code amount} and {@code model-data} values
      * may instead be a {@code %placeholder%} string, in which case the literal token is carried as the dynamic
-     * override (the renderer resolves it to a number each draw) and the static default is kept.
+     * override (the renderer resolves it to a number each draw) and the static default is kept. {@code glow} takes
+     * the same treatment, resolved to a boolean each draw.
      */
     private ItemDecor parseDecor(ConfigurationNode node) {
         ConfigurationNode amountNode = node.node("amount");
         ConfigurationNode modelNode = node.node("model-data");
+        ConfigurationNode glowNode = node.node("glow");
+        Optional<String> dynamicGlow = dynamicToken(glowNode);
         Optional<String> dynamicAmount = dynamicToken(amountNode);
         Optional<String> dynamicModel = dynamicToken(modelNode);
         int amount = dynamicAmount.isPresent() ? 1 : amountNode.getInt(1);
@@ -888,8 +891,10 @@ public final class MenuSpecLoader {
                 dynamicAmount,
                 dynamicModel,
                 optionalString(node.node("item-model")),
-                parseDataComponents(node));
-        return new ItemDecor(amount, model, node.node("glow").getBoolean(false), strings(node.node("flags")), meta);
+                parseDataComponents(node),
+                dynamicGlow);
+        boolean glow = dynamicGlow.isEmpty() && glowNode.getBoolean(false);
+        return new ItemDecor(amount, model, glow, strings(node.node("flags")), meta);
     }
 
     /** Read the native data-component sub-nodes; every value stays a string/int/double/bool token for the renderer. */

@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the per-player eco-admin manage screen with the menu engine and opens it. A five-row panel for one
  * target player: the target's head with their balance per currency, the Give / Take / Set / Reset action buttons,
  * a [History] link into the engine transaction-history list, and — when more than one currency is configured — a
- * [Currency] item that opens the shared paginated {@link CurrencyPickerView} to switch the active currency the four
+ * [Currency] item that opens the shared paginated {@link CurrencyPickerMenu} to switch the active currency the four
  * actions apply to. Give / Take / Set capture an amount through the shared input seam and run the matching
  * {@code EcoAdmin} op with {@code Money.of(active, amount)}; Reset is confirm-gated through the engine confirm
  * dialog before zeroing the balance.
@@ -68,7 +68,7 @@ public final class EconomyTargetMenu {
     private final CurrencyRegistry currencies;
     private final EconomyNotifier notifier;
     private final TransactionsHistoryMenu historyView;
-    private final CurrencyPickerView currencyPicker;
+    private final CurrencyPickerMenu currencyPicker;
     private final BiConsumer<Player, PlayerRef> onBack;
 
     public EconomyTargetMenu(
@@ -82,7 +82,7 @@ public final class EconomyTargetMenu {
             CurrencyRegistry currencies,
             EconomyNotifier notifier,
             TransactionsHistoryMenu historyView,
-            CurrencyPickerView currencyPicker,
+            CurrencyPickerMenu currencyPicker,
             BiConsumer<Player, PlayerRef> onBack) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");

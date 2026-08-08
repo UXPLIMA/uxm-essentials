@@ -91,7 +91,8 @@ class PlayerPickerGoldenTest {
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP_LOG);
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
-        picker = new PlayerPickerView(engine.menus(), guiText, scheduler, textInput, server, new KeyMessages(), SINK);
+        picker = new PlayerPickerView(engine.menus(), scheduler, textInput, server, new KeyMessages(), SINK);
+        picker.register(engine.bindings(), Path.of("nonexistent"), NOOP_LOG);
     }
 
     @AfterEach

@@ -808,6 +808,13 @@ public final class PluginModule {
         // here, on enable, before any menu can be clicked — the listener was constructed earlier (it installs before
         // the modules wire), so this late-init is what closes the ordering gap between the two.
         menuTextInputRef.set(textInput);
+        // The one shared target picker. It is infrastructure rather than a module's own screen (moderation's
+        // sanction flows and the /eco admin GUI both open it), so it is built and registered with the engine here,
+        // once, and handed to those modules through the links bag. Two instances would each try to claim the same
+        // spec and binding ids.
+        links.playerPicker = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView(
+                menus, kernel.scheduler(), textInput, plugin.getServer(), kernel.messages(), kernel.messageSink());
+        links.playerPicker.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
         // here with the data folder so every GUI-using context loads its layout the same way.
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
@@ -1476,6 +1483,7 @@ public final class PluginModule {
                 bus,
                 hooks,
                 textInput,
+                links.playerPicker,
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath());
@@ -1714,6 +1722,7 @@ public final class PluginModule {
                 guiText,
                 guiLayouts,
                 textInput,
+                Objects.requireNonNull(links.playerPicker, "playerPicker"),
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath());
@@ -2271,6 +2280,10 @@ public final class PluginModule {
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
+        // The shared target picker, built and registered at enable before any module wires; moderation and the
+        // economy admin GUI open it rather than each building one of their own.
+        private com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
+                playerPicker;
         private @org.jspecify.annotations.Nullable TeleportEngine teleportEngine;
         // The live economy provider and default currency, captured during economy wiring (which lands after
         // worlds). worlds resolves them lazily at fee-charge time, so a null here simply means "free worlds".

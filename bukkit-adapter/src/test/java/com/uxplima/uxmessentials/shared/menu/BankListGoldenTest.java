@@ -38,7 +38,7 @@ import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
 import com.uxplima.uxmessentials.economy.application.BankService;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
@@ -216,7 +216,8 @@ class BankListGoldenTest {
     /** A {@link BankListMenu} wired off the same collaborators as the old view, over the engine façade. */
     private BankListMenu listMenu(Menus menus, MenuBindings bindings) {
         Messages messages = new KeyMessages();
-        CurrencyPickerView picker = new CurrencyPickerView(menus, guiText, scheduler);
+        CurrencyPickerMenu picker = new CurrencyPickerMenu(menus, messages, scheduler);
+        picker.register(bindings, specDir(), NOOP);
         Supplier<BankNavigation> navigation = () -> Objects.requireNonNull(navigationHolder.get(), "navigation");
         BankListMenu listMenu = new BankListMenu(
                 menus, bankService, CurrencyRegistry.single(COINS), textInput, picker, scheduler, messages, navigation);

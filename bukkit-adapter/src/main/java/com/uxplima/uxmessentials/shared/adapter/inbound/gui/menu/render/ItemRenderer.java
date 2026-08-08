@@ -423,7 +423,7 @@ public final class ItemRenderer {
     /** Layer the spec's amount, glow, model data, item flags, and native rich meta onto the in-progress item. */
     private ItemBuilder applyDecor(ItemBuilder builder, ItemDecor decor, MenuContext ctx) {
         applyAmount(builder, decor, ctx);
-        builder.glow(decor.glow());
+        builder.glow(glowing(decor, ctx));
         applyModelData(builder, decor, ctx);
         ItemFlag[] flags = resolveFlags(decor.flagTokens());
         if (flags.length > 0) {
@@ -431,6 +431,20 @@ public final class ItemRenderer {
         }
         applyRichMeta(builder, decor.meta());
         return builder;
+    }
+
+    /**
+     * Whether the item glints: a {@code %token%} glow resolves through the placeholder path and counts as on for
+     * {@code true}/{@code yes}/{@code 1}, otherwise the static spec value stands. This is what lets one list
+     * template glint only the entry a screen considers selected.
+     */
+    private boolean glowing(ItemDecor decor, MenuContext ctx) {
+        Optional<String> token = decor.meta().dynamicGlow();
+        if (token.isEmpty()) {
+            return decor.glow();
+        }
+        String resolved = substitutePlaceholders(token.get(), ctx).strip();
+        return resolved.equalsIgnoreCase("true") || resolved.equalsIgnoreCase("yes") || resolved.equals("1");
     }
 
     /**

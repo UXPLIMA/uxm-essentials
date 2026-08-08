@@ -123,6 +123,8 @@ public final class EconomyWiring {
             Hooks hooks,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
                     textInput,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
+                    picker,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder) {
@@ -184,6 +186,7 @@ public final class EconomyWiring {
                 decoratedRepository,
                 pendingRepo,
                 textInput,
+                picker,
                 menus,
                 menuBindings,
                 dataFolder);
@@ -238,6 +241,8 @@ public final class EconomyWiring {
             PendingTransactionRepository pendingRepo,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
                     textInput,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
+                    picker,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder) {
@@ -252,6 +257,12 @@ public final class EconomyWiring {
                 settings.baltopExcludeBanned(),
                 settings.baltopMinBalance(),
                 new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitBannedLookup());
+        // One currency picker for the whole module: the loan request flow and both eco-admin screens open it, and
+        // its spec and binding ids can only be claimed once, so it is built and registered here and handed to both.
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu currencyPicker =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu(
+                        menus, kernel.messages(), kernel.scheduler());
+        currencyPicker.register(menuBindings, dataFolder, kernel.log());
         EconomyServices services = useCases(
                 plugin,
                 persistence,
@@ -263,6 +274,7 @@ public final class EconomyWiring {
                 snapshots,
                 ledger.telemetry(),
                 textInput,
+                currencyPicker,
                 menus,
                 menuBindings,
                 dataFolder);
@@ -271,18 +283,9 @@ public final class EconomyWiring {
         // module is wired with GUIs available); GuiRootBinding then opens it on bare /eco when the catalog gui flag
         // is on, and the .requires(economy.admin) gate is carried by the rebind.
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews adminGui = null;
-        if (textInput != null) {
+        if (textInput != null && picker != null) {
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
                     new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView picker =
-                    new com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView(
-                            menus,
-                            guiText,
-                            kernel.scheduler(),
-                            textInput,
-                            plugin.getServer(),
-                            kernel.messages(),
-                            kernel.messageSink());
             adminGui = com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews.create(
                     menus,
                     menuBindings,
@@ -293,6 +296,7 @@ public final class EconomyWiring {
                     kernel.scheduler(),
                     plugin.getServer(),
                     picker,
+                    currencyPicker,
                     textInput,
                     kernel.playerLookup(),
                     resolved,
@@ -467,6 +471,7 @@ public final class EconomyWiring {
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
                     textInput,
+            com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu currencyPicker,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder) {
@@ -532,11 +537,6 @@ public final class EconomyWiring {
         walletGuiView.register(menuBindings, dataFolder, kernel.log());
         // The exchange dashboard is an engine-rendered panel now: it registers its spec and bindings here once, then
         // opens through the Menus façade. Its source/target icons open the shared currency picker to switch each side.
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText exchangeGuiText =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
-        com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView exchangeCurrencyPicker =
-                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView(
-                        menus, exchangeGuiText, kernel.scheduler());
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyExchangeMenu exchangeView =
                 new com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyExchangeMenu(
                         menus,
@@ -546,7 +546,7 @@ public final class EconomyWiring {
                         notifier,
                         kernel.messages(),
                         input,
-                        exchangeCurrencyPicker);
+                        currencyPicker);
         exchangeView.register(menuBindings, dataFolder, kernel.log());
 
         com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore =
@@ -585,18 +585,13 @@ public final class EconomyWiring {
         java.util.function.Supplier<com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation> navigation =
                 () -> Objects.requireNonNull(navigationHolder.get(), "bank navigation not yet wired");
 
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText bankGuiText =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
-        com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView bankCurrencyPicker =
-                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView(
-                        menus, bankGuiText, kernel.scheduler());
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu bankListMenu =
                 new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu(
                         menus,
                         bankService,
                         currencies,
                         input,
-                        bankCurrencyPicker,
+                        currencyPicker,
                         kernel.scheduler(),
                         kernel.messages(),
                         navigation);
@@ -620,8 +615,6 @@ public final class EconomyWiring {
         // The loan dashboard is an engine-rendered panel now: it registers its spec and bindings here once, then
         // opens through the Menus façade. Its active-loan strip is the economy:loan-list source; the request button
         // hands off to the shared currency picker and the input seam.
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText loanGuiText =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanDashboardMenu loanGuiView =
                 new com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanDashboardMenu(
                         menus,
@@ -631,7 +624,7 @@ public final class EconomyWiring {
                         kernel.scheduler(),
                         kernel.messages(),
                         notifier,
-                        loanGuiText);
+                        currencyPicker);
         loanGuiView.register(menuBindings, dataFolder, kernel.log());
 
         return new EconomyServices(

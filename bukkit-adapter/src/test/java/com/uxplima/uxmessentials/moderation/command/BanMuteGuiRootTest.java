@@ -62,8 +62,9 @@ class BanMuteGuiRootTest {
                 plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
         com.uxplima.uxmessentials.shared.menu.TestMenuEngine engine =
                 com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(new KeyMessages(), scheduler);
-        PlayerPickerView picker = new PlayerPickerView(
-                engine.menus(), guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        PlayerPickerView picker =
+                new PlayerPickerView(engine.menus(), scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        picker.register(engine.bindings(), java.nio.file.Path.of("nonexistent"), new NoopLogger());
         DurationPickerView durations = new DurationPickerView(
                 engine.menus(), guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
         PunishmentConfirmView confirm = new PunishmentConfirmView(engine.menus(), scheduler, textInput);

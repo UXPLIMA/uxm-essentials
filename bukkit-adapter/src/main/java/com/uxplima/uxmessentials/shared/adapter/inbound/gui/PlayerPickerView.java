@@ -1,6 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 
-import java.util.ArrayList;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,21 +11,22 @@ import java.util.function.Function;
 import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.item.ItemBuilder;
-import com.uxplima.uxmlib.item.SkullData;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -61,21 +62,13 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PlayerPickerView {
 
-    private static final int PICKER_ROWS = 6;
-    private static final String INPUT_KEY = "picker.player-name";
-    private static final Material OFFLINE_BUTTON = Material.NAME_TAG;
-    private static final int OFFLINE_BUTTON_SLOT = 49;
-    private static final int PREV_SLOT = 45;
-    private static final int NEXT_SLOT = 53;
-    private static final Material NAV_ICON = Material.ARROW;
-    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
-    private static final List<Integer> CONTENT_SLOTS = contentSlots();
+    /** The engine spec id this menu registers and opens under. */
+    public static final String SPEC_ID = "player-picker";
 
-    // The bottom row's free slots, flanking the offline-name button, where optional footer buttons land.
-    private static final int[] FOOTER_SLOTS = {47, 51};
+    private static final String SPEC_RESOURCE = "modules/management/gui/player-picker.conf";
+    private static final String INPUT_KEY = "picker.player-name";
 
     private final Menus menus;
-    private final GuiText guiText;
     private final Scheduler scheduler;
     private final TextInput textInput;
     private final Server server;
@@ -83,20 +76,65 @@ public final class PlayerPickerView {
     private final MessageSink sink;
 
     public PlayerPickerView(
-            Menus menus,
-            GuiText guiText,
-            Scheduler scheduler,
-            TextInput textInput,
-            Server server,
-            Messages messages,
-            MessageSink sink) {
+            Menus menus, Scheduler scheduler, TextInput textInput, Server server, Messages messages, MessageSink sink) {
         this.menus = Objects.requireNonNull(menus, "menus");
-        this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.server = Objects.requireNonNull(server, "server");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
+    }
+
+    /**
+     * Register the bindings the spec names and the spec itself. Called once from bootstrap: the picker is shared
+     * infrastructure rather than a module's own screen, so one registration serves every caller.
+     */
+    public void register(MenuBindings bindings, Path dataFolder, Logger log) {
+        Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
+        bindings.list("picker:players", ctx -> ctx.subject(Session.class).roster());
+        bindings.placeholder("picker_title_key", ctx -> requestOf(ctx).title().key());
+        // The whole material token expands from one placeholder, so the skull prefix rides along with the uuid.
+        bindings.placeholder(
+                "picker_head_icon", ctx -> "skull:" + candidateOf(ctx).uuid());
+        bindings.placeholder(
+                "picker_head_name",
+                ctx -> text(
+                        ctx,
+                        GuiMessageKey.PLAYER_PICKER_HEAD_NAME,
+                        Map.of("player", candidateOf(ctx).name())));
+        bindings.placeholder("picker_head_lore", ctx -> text(ctx, GuiMessageKey.PLAYER_PICKER_HEAD_LORE, Map.of()));
+        registerFooter(bindings, "one", 0);
+        registerFooter(bindings, "two", 1);
+        bindings.action("picker:pick", ctx -> requestOf(ctx).onPick().accept(ctx.entry(PlayerRef.class)));
+        bindings.action("picker:offline", ctx -> promptOffline(ctx.player(), ctx.viewer(), requestOf(ctx)));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+    }
+
+    /**
+     * Register one footer button's placeholders, its shown-when condition and its click. The two buttons differ only
+     * in which of the caller's footers they read, so they are registered from one place rather than written twice.
+     */
+    private void registerFooter(MenuBindings bindings, String name, int index) {
+        bindings.condition(
+                "picker:has-footer-" + name, (ctx, args) -> footer(ctx, index).isPresent());
+        bindings.placeholder(
+                "picker_footer_" + name + "_icon",
+                ctx -> footer(ctx, index).map(button -> button.icon().name()).orElse(Material.AIR.name()));
+        bindings.placeholder(
+                "picker_footer_" + name + "_name",
+                ctx -> footer(ctx, index)
+                        .map(button -> text(ctx, button.label(), Map.of()))
+                        .orElse(""));
+        bindings.placeholder(
+                "picker_footer_" + name + "_lore",
+                ctx -> footer(ctx, index)
+                        .map(button -> text(ctx, button.lore(), Map.of()))
+                        .orElse(""));
+        bindings.action(
+                "picker:footer-" + name,
+                ctx -> footer(ctx, index).ifPresent(button -> button.onClick().accept(ctx.player())));
     }
 
     /**
@@ -115,52 +153,8 @@ public final class PlayerPickerView {
                     .filter(viewer::canSee)
                     .map(BukkitRefs::toRef)
                     .toList();
-            menus.openList(viewerRef, spec(viewerRef, request, roster));
+            menus.open(viewerRef, SPEC_ID, new Session(request, roster));
         });
-    }
-
-    /**
-     * Build the engine {@link EntityListSpec} for one open: the roster as the listed entities, the per-head icon renderer,
-     * an {@code onSelect} that runs the caller's {@code onPick}, and the offline-name button plus any footer buttons
-     * as the spec's fixed extra buttons. The geometry — six rows, content slots 0..44, prev/next at 45/53, the offline
-     * button at 49, footer buttons at 47/51, gray-glass filler — matches the old view slot-for-slot.
-     */
-    private EntityListSpec spec(PlayerRef viewerRef, Request request, List<PlayerRef> roster) {
-        return EntityListSpec.builder()
-                .title(guiText.text(viewerRef, request.title()))
-                .rows(PICKER_ROWS)
-                .contentSlots(CONTENT_SLOTS)
-                .navigation(PREV_SLOT, NEXT_SLOT, NAV_ICON)
-                .navNames(
-                        guiText.text(viewerRef, GuiMessageKey.PLAYER_PICKER_PREV),
-                        guiText.text(viewerRef, GuiMessageKey.PLAYER_PICKER_NEXT))
-                .filler(FILLER)
-                .entities(() -> List.<Object>copyOf(roster))
-                .iconRenderer((v, entity) -> head(v, (PlayerRef) entity))
-                .onSelect((player, entity) -> request.onPick().accept((PlayerRef) entity))
-                .extraButtons(extraButtons(viewerRef, request))
-                .build();
-    }
-
-    /** The offline-name anvil button plus the caller's optional footer buttons, each firing with the live viewer. */
-    private List<EntityListSpec.ExtraButton> extraButtons(PlayerRef viewerRef, Request request) {
-        List<EntityListSpec.ExtraButton> buttons = new ArrayList<>();
-        buttons.add(new EntityListSpec.ExtraButton(
-                OFFLINE_BUTTON_SLOT, offlineButton(viewerRef), p -> promptOffline(p, viewerRef, request)));
-        List<FooterButton> footers = request.footerButtons();
-        for (int i = 0; i < footers.size() && i < FOOTER_SLOTS.length; i++) {
-            FooterButton footer = footers.get(i);
-            buttons.add(
-                    new EntityListSpec.ExtraButton(FOOTER_SLOTS[i], footerIcon(viewerRef, footer), footer.onClick()));
-        }
-        return buttons;
-    }
-
-    private ItemStack footerIcon(PlayerRef viewer, FooterButton footer) {
-        return ItemBuilder.of(footer.icon())
-                .name(guiText.text(viewer, footer.label()))
-                .lore(List.of(guiText.text(viewer, footer.lore())))
-                .build();
     }
 
     /** Open the input prompt for a typed name; a submission flows through {@link #resolveTyped}. */
@@ -177,7 +171,7 @@ public final class PlayerPickerView {
      * Resolve the typed name through the caller's offline resolver off the tick thread (a profile lookup may block),
      * then act on the viewer's entity thread: an unresolved name replies with the unknown-player key and reopens, a
      * resolved name fires the pick callback. Package-private so the resolve branch is unit-tested without driving a
-     * live anvil — the sync test scheduler runs callbacks inline.
+     * live anvil: the sync test scheduler runs callbacks inline.
      */
     void resolveTyped(Player viewer, PlayerRef viewerRef, Request request, String input) {
         String name = input.strip();
@@ -195,26 +189,49 @@ public final class PlayerPickerView {
         });
     }
 
-    private ItemStack head(PlayerRef viewer, PlayerRef candidate) {
-        return ItemBuilder.of(Material.PLAYER_HEAD)
-                .name(guiText.text(viewer, GuiMessageKey.PLAYER_PICKER_HEAD_NAME, Map.of("player", candidate.name())))
-                .lore(List.of(guiText.text(viewer, GuiMessageKey.PLAYER_PICKER_HEAD_LORE)))
-                .skull(SkullData.ofUuid(candidate.uuid()))
-                .build();
+    private String text(MenuContext ctx, MessageKey key, Map<String, String> placeholders) {
+        return messages.resolve(ctx.viewer(), key, placeholders);
     }
 
-    private ItemStack offlineButton(PlayerRef viewer) {
-        return ItemBuilder.of(OFFLINE_BUTTON)
-                .name(guiText.text(viewer, GuiMessageKey.PLAYER_PICKER_CUSTOM))
-                .lore(List.of(guiText.text(viewer, GuiMessageKey.PLAYER_PICKER_CUSTOM_LORE)))
-                .build();
+    private static PlayerRef candidateOf(MenuContext ctx) {
+        return ctx.entry(PlayerRef.class);
     }
 
-    private static List<Integer> contentSlots() {
-        // The five upper rows hold heads; the bottom row carries the nav arrows and the offline button.
-        return java.util.stream.IntStream.range(0, (PICKER_ROWS - 1) * 9)
-                .boxed()
-                .toList();
+    private static Request requestOf(MenuContext ctx) {
+        return ctx.subject(Session.class).request();
+    }
+
+    private static Request requestOf(MenuActionContext ctx) {
+        return ctx.subject(Session.class).request();
+    }
+
+    /** The caller's footer button at {@code index}, or empty when this caller supplied fewer buttons. */
+    private static Optional<FooterButton> footer(MenuContext ctx, int index) {
+        return footer(requestOf(ctx), index);
+    }
+
+    private static Optional<FooterButton> footer(MenuActionContext ctx, int index) {
+        return footer(requestOf(ctx), index);
+    }
+
+    private static Optional<FooterButton> footer(Request request, int index) {
+        List<FooterButton> footers = request.footerButtons();
+        return index < footers.size() ? Optional.of(footers.get(index)) : Optional.empty();
+    }
+
+    /**
+     * The subject of one open picker: what the caller asked for and the roster snapshotted on the global thread, so
+     * the engine renders without touching the server's player list itself.
+     *
+     * @param request the opening screen's title, callbacks and footer buttons
+     * @param roster the online players the viewer may see, in server order
+     */
+    public record Session(Request request, List<PlayerRef> roster) {
+
+        public Session {
+            Objects.requireNonNull(request, "request");
+            roster = List.copyOf(Objects.requireNonNull(roster, "roster"));
+        }
     }
 
     /**

@@ -187,7 +187,12 @@ public final class MenuSpecWriter {
         RichMeta meta = decor.meta();
         writeAmount(node, decor, meta);
         writeModelData(node, decor, meta);
-        setIfTrue(node.node("glow"), decor.glow());
+        // A placeholder-driven glow is written back as its token, so an edit-and-save round trip keeps it dynamic.
+        if (meta.dynamicGlow().isPresent()) {
+            setIfPresent(node.node("glow"), meta.dynamicGlow().orElseThrow());
+        } else {
+            setIfTrue(node.node("glow"), decor.glow());
+        }
         writeStringsIfAny(node.node("flags"), decor.flagTokens());
         setIfTrue(node.node("unbreakable"), meta.unbreakable());
         writeStringsIfAny(node.node("enchantments"), meta.enchantments());

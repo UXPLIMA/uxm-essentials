@@ -26,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The request-a-new-loan flow split out of {@link LoanDashboardMenu}: pick a currency through the shared engine
- * {@link CurrencyPickerView}, then prompt for an amount and an installment count through the shared input seam, then
+ * {@link CurrencyPickerMenu}, then prompt for an amount and an installment count through the shared input seam, then
  * submit the loan. Every label resolves through a {@code MessageKey} in the viewer's locale. The {@code refresh}
  * callback reopens the dashboard once the flow finishes or aborts.
  */
@@ -38,7 +38,7 @@ final class LoanRequestFlow {
     private final TextInput textInput;
     private final Scheduler scheduler;
     private final EconomyNotifier notifier;
-    private final CurrencyPickerView picker;
+    private final CurrencyPickerMenu picker;
     private final Consumer<Player> refresh;
 
     LoanRequestFlow(
@@ -47,7 +47,7 @@ final class LoanRequestFlow {
             TextInput textInput,
             Scheduler scheduler,
             EconomyNotifier notifier,
-            CurrencyPickerView picker,
+            CurrencyPickerMenu picker,
             Consumer<Player> refresh) {
         this.loanService = Objects.requireNonNull(loanService, "loanService");
         this.currencies = Objects.requireNonNull(currencies, "currencies");

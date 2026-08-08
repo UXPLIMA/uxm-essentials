@@ -152,6 +152,7 @@ public final class ModerationWiring {
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
+            PlayerPickerView picker,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder) {
@@ -163,6 +164,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(picker, "picker");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
@@ -234,14 +236,6 @@ public final class ModerationWiring {
         // confirm screen, ending in the same audited use cases the raw subcommands take. The views stay generic:
         // the flow supplies the moderation TargetResolver as its offline-name resolver, the unknown-target reply,
         // and the SanctionDuration-backed validator for the timed verbs.
-        PlayerPickerView picker = new PlayerPickerView(
-                menus,
-                guiText,
-                kernel.scheduler(),
-                textInput,
-                plugin.getServer(),
-                kernel.messages(),
-                kernel.messageSink());
         DurationPickerView durationPicker = new DurationPickerView(
                 menus, guiText, kernel.scheduler(), textInput, kernel.messages(), kernel.messageSink());
         PunishmentConfirmView confirmView = new PunishmentConfirmView(menus, kernel.scheduler(), textInput);

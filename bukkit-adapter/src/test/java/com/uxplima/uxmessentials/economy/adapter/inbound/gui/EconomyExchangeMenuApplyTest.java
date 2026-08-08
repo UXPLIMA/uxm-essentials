@@ -105,7 +105,7 @@ class EconomyExchangeMenuApplyTest {
                 new EconomyNotifier(new KeyMessages(), new NoopSink()),
                 new KeyMessages(),
                 mock(TextInput.class),
-                mock(CurrencyPickerView.class));
+                mock(CurrencyPickerMenu.class));
     }
 
     private static final class KeyMessages implements Messages {

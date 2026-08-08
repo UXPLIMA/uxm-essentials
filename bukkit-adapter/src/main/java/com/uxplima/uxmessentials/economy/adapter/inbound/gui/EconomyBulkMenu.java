@@ -36,7 +36,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the server-wide eco-admin screen with the menu engine and opens it. A three-row panel reached from the
  * bare-/eco hub's [Server-wide] button: Give to All (an amount captured through the shared input seam, credited to
  * every online wallet) and Reset All (confirm-gated, zeroing every online balance), with — when more than one
- * currency is configured — a shared paginated {@link CurrencyPickerView} between them to switch the active currency.
+ * currency is configured — a shared paginated {@link CurrencyPickerMenu} between them to switch the active currency.
  * Both ops operate on the currently-online roster, the same scope the {@code /eco giveall|resetall} commands use.
  *
  * <p>The screen carries only the active currency as its {@link BulkSubject}, so each button's active-currency line
@@ -66,7 +66,7 @@ public final class EconomyBulkMenu {
     private final EcoAdminOps ops;
     private final CurrencyRegistry currencies;
     private final EconomyNotifier notifier;
-    private final CurrencyPickerView currencyPicker;
+    private final CurrencyPickerMenu currencyPicker;
     private final BiConsumer<Player, PlayerRef> onBack;
 
     public EconomyBulkMenu(
@@ -78,7 +78,7 @@ public final class EconomyBulkMenu {
             EcoAdminOps ops,
             CurrencyRegistry currencies,
             EconomyNotifier notifier,
-            CurrencyPickerView currencyPicker,
+            CurrencyPickerMenu currencyPicker,
             BiConsumer<Player, PlayerRef> onBack) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");

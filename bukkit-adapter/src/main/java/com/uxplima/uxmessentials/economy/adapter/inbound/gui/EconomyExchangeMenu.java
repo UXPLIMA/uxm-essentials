@@ -40,7 +40,7 @@ import org.jspecify.annotations.NullMarked;
  * opens and handed in as the {@link ExchangeSubject} the icons render from, exactly as the old view did; the
  * exchange itself runs off-tick as the {@code /exchange} command does.
  *
- * <p>Clicking the source or target opens the shared paginated {@link CurrencyPickerView}; choosing a currency
+ * <p>Clicking the source or target opens the shared paginated {@link CurrencyPickerMenu}; choosing a currency
  * re-opens this panel with that side switched (the subject carries the new source/target), replacing the old inline
  * cycling with the same picker the eco-admin screens use. The convert button captures an amount through the shared
  * input seam, then runs {@link ExchangeService#exchange}. When no rate is configured between the two currencies the
@@ -64,7 +64,7 @@ public final class EconomyExchangeMenu {
     private final EconomyNotifier notifier;
     private final Messages messages;
     private final TextInput textInput;
-    private final CurrencyPickerView currencyPicker;
+    private final CurrencyPickerMenu currencyPicker;
 
     public EconomyExchangeMenu(
             Menus menus,
@@ -74,7 +74,7 @@ public final class EconomyExchangeMenu {
             EconomyNotifier notifier,
             Messages messages,
             TextInput textInput,
-            CurrencyPickerView currencyPicker) {
+            CurrencyPickerMenu currencyPicker) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.economyProvider = Objects.requireNonNull(economyProvider, "economyProvider");
         this.exchangeService = Objects.requireNonNull(exchangeService, "exchangeService");
