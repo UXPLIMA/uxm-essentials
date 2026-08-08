@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.domain.MailBox;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -22,9 +23,9 @@ public final class ReadMail {
 
     private final MailRepository mail;
     private final MessageDelivery delivery;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
 
-    public ReadMail(MailRepository mail, MessageDelivery delivery, MessagingNotifier notifier) {
+    public ReadMail(MailRepository mail, MessageDelivery delivery, Notifier notifier) {
         this.mail = Objects.requireNonNull(mail, "mail");
         this.delivery = Objects.requireNonNull(delivery, "delivery");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

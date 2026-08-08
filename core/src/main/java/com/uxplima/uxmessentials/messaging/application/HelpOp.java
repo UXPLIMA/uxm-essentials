@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.messaging.application.port.StaffAudience;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.messaging.domain.event.HelpOpRaised;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -29,7 +30,7 @@ public final class HelpOp {
     private final StaffAudience staff;
     private final MessageDelivery delivery;
     private final MutePolicy mute;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
@@ -37,7 +38,7 @@ public final class HelpOp {
             StaffAudience staff,
             MessageDelivery delivery,
             MutePolicy mute,
-            MessagingNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.staff = Objects.requireNonNull(staff, "staff");

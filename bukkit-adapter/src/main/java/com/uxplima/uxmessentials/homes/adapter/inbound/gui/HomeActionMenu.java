@@ -14,7 +14,6 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
-import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
@@ -32,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuCon
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -66,7 +66,7 @@ public final class HomeActionMenu {
 
     private final Menus menus;
     private final Messages messages;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final Permissions permissions;
     private final Scheduler scheduler;
     private final TeleportHome teleportHome;
@@ -355,7 +355,7 @@ public final class HomeActionMenu {
     public record Collaborators(
             Menus menus,
             Messages messages,
-            HomeNotifier notifier,
+            Notifier notifier,
             Permissions permissions,
             Scheduler scheduler,
             TeleportHome teleportHome,

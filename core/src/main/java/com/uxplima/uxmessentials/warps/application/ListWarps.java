@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
@@ -24,9 +25,9 @@ public final class ListWarps {
 
     private final WarpRepository repository;
     private final Permissions permissions;
-    private final WarpNotifier notifier;
+    private final Notifier notifier;
 
-    public ListWarps(WarpRepository repository, Permissions permissions, WarpNotifier notifier) {
+    public ListWarps(WarpRepository repository, Permissions permissions, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

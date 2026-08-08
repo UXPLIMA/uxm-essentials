@@ -12,7 +12,6 @@ import java.util.UUID;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenus.ActionMenuOpener;
-import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
@@ -25,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -64,7 +64,7 @@ public final class HomeInvitesMenu {
     private final InviteToHome inviteToHome;
     private final UninviteFromHome uninviteFromHome;
     private final PlayerLookup players;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final TextInput textInput;
     private final ActionMenuOpener actionMenu;
 
@@ -76,7 +76,7 @@ public final class HomeInvitesMenu {
             InviteToHome inviteToHome,
             UninviteFromHome uninviteFromHome,
             PlayerLookup players,
-            HomeNotifier notifier,
+            Notifier notifier,
             TextInput textInput,
             ActionMenuOpener actionMenu) {
         this.menus = Objects.requireNonNull(menus, "menus");

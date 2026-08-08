@@ -7,6 +7,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,10 +19,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ReviewWarns {
 
     private final ModerationRepository repository;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final Clock clock;
 
-    public ReviewWarns(ModerationRepository repository, ModerationNotifier notifier, Clock clock) {
+    public ReviewWarns(ModerationRepository repository, Notifier notifier, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");

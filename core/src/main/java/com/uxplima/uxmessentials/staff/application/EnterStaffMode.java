@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.staff.application;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -50,7 +51,7 @@ public final class EnterStaffMode {
     private final StaffLoadoutRepository loadoutRepository;
     private final StaffLoadoutCapture capture;
     private final StaffVanish vanish;
-    private final StaffNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final RecoverStaffLoadout recover;
     private final String modeName;
@@ -61,7 +62,7 @@ public final class EnterStaffMode {
             StaffLoadoutRepository loadoutRepository,
             StaffLoadoutCapture capture,
             StaffVanish vanish,
-            StaffNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             RecoverStaffLoadout recover,
             String modeName,

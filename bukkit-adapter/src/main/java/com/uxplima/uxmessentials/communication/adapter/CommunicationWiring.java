@@ -32,7 +32,6 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderE
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.application.MergeAnnouncements;
 import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
@@ -53,6 +52,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -74,7 +74,7 @@ import org.jspecify.annotations.NullMarked;
  * counters are transient, and the announcer schedule and info pages are config-authored. The operator content is
  * read once into {@link CommunicationSettings} and rendered through MiniMessage; the plugin's own
  * {@code /broadcasttoggle} confirmation and missing-page error are {@code MessageKey}s through the
- * {@link CommunicationNotifier}, keeping the parity-checked keys and the unchecked operator content apart.
+ * {@link Notifier}, keeping the parity-checked keys and the unchecked operator content apart.
  */
 @NullMarked
 public final class CommunicationWiring {
@@ -109,7 +109,7 @@ public final class CommunicationWiring {
         BroadcastOptOutStore optOutStore = new PdcBroadcastOptOutStore(plugin);
         RandomSource random = new ThreadLocalRandomSource();
         BukkitInfoSender infoSender = new BukkitInfoSender(kernel.messageSink());
-        CommunicationNotifier notifier = new CommunicationNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         InfoRegistry registry = settings.infoRegistry();
         ChatLock chatLock = new ChatLock();
 
@@ -223,7 +223,7 @@ public final class CommunicationWiring {
             Supplier<AnnouncerConfig> mergedConfig,
             BroadcastOptOutStore optOutStore,
             RandomSource random,
-            CommunicationNotifier notifier) {
+            Notifier notifier) {
         ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random);
         return new CommunicationServices(
                 // The connection policies still read straight off the live settings; only the announcer source
@@ -244,7 +244,7 @@ public final class CommunicationWiring {
             BukkitInfoSender infoSender,
             CommunicationSettings settings,
             ChatLock chatLock,
-            CommunicationNotifier notifier,
+            Notifier notifier,
             ChannelBroadcaster channelBroadcaster,
             BroadcastOptOutStore optOutStore,
             Scheduler scheduler,

@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -28,13 +29,13 @@ public final class ManageWhitelist {
     private final PlayerWarpRepository repository;
     private final WarpAuthorization authorization;
     private final WarpWhitelistStore whitelist;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
 
     public ManageWhitelist(
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
             WarpWhitelistStore whitelist,
-            PlayerWarpNotifier notifier) {
+            Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.whitelist = Objects.requireNonNull(whitelist, "whitelist");

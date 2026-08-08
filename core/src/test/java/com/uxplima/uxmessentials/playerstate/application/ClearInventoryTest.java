@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,7 +43,7 @@ class ClearInventoryTest {
 
     private RecordingEffects effects;
     private CapturingSink sink;
-    private PlayerStateNotifier notifier;
+    private Notifier notifier;
     private RecordingPreferences preferences;
     private Clock clock;
     private PlayerRef alice;
@@ -52,7 +53,7 @@ class ClearInventoryTest {
     void setUp() {
         effects = new RecordingEffects();
         sink = new CapturingSink();
-        notifier = new PlayerStateNotifier(new KeyMessages(), sink);
+        notifier = new Notifier(new KeyMessages(), sink);
         preferences = new RecordingPreferences();
         clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
         alice = new PlayerRef(UUID.randomUUID(), "Alice");

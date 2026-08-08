@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -43,7 +44,7 @@ class UseWarpTest {
     private RecordingTeleporter teleporter;
     private RecordingPermissions permissions;
     private CapturingSink sink;
-    private WarpNotifier notifier;
+    private Notifier notifier;
     private PlayerRef actor;
     private PlayerRef recipient;
 
@@ -53,7 +54,7 @@ class UseWarpTest {
         teleporter = new RecordingTeleporter();
         permissions = new RecordingPermissions();
         sink = new CapturingSink();
-        notifier = new WarpNotifier(new KeyMessages(), sink);
+        notifier = new Notifier(new KeyMessages(), sink);
         actor = new PlayerRef(UUID.randomUUID(), "Staff");
         recipient = new PlayerRef(UUID.randomUUID(), "Target");
     }

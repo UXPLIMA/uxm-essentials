@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -24,10 +25,10 @@ public final class BackupWorld {
 
     private final WorldRepository repository;
     private final WorldArchive archive;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
 
-    public BackupWorld(WorldRepository repository, WorldArchive archive, WorldNotifier notifier, Scheduler scheduler) {
+    public BackupWorld(WorldRepository repository, WorldArchive archive, Notifier notifier, Scheduler scheduler) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.archive = Objects.requireNonNull(archive, "archive");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -42,7 +43,7 @@ class HologramNpcLinkTest {
         view = new RecordingView();
         sink = new CapturingSink();
         npcs = new FakeNpcLocator();
-        HologramNotifier notifier = new HologramNotifier(new HologramTestSupport.KeyMessages(), sink);
+        Notifier notifier = new Notifier(new HologramTestSupport.KeyMessages(), sink);
         link = new LinkHologramToNpc(repository, view, notifier, npcs);
         unlink = new UnlinkHologramFromNpc(repository, view, notifier);
         actor = new PlayerRef(UUID.randomUUID(), "Operator");

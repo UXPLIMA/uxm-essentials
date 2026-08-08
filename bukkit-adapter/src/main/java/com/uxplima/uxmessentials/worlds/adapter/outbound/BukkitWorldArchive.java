@@ -21,12 +21,12 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
@@ -77,7 +77,7 @@ public final class BukkitWorldArchive implements WorldArchive {
     private final WorldTeleportService teleporter;
     private final ForcedWorldEntryMarker marker;
     private final WorldsSettings settings;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final Logger log;
     private final Path dataFolder;
 
@@ -90,7 +90,7 @@ public final class BukkitWorldArchive implements WorldArchive {
             WorldTeleportService teleporter,
             ForcedWorldEntryMarker marker,
             WorldsSettings settings,
-            WorldNotifier notifier,
+            Notifier notifier,
             Logger log,
             Path dataFolder) {
         this.server = Objects.requireNonNull(server, "server");

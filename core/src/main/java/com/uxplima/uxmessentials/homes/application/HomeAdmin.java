@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -35,7 +36,7 @@ public final class HomeAdmin {
     private final HomeRepository repository;
     private final HomeInviteRepository invites;
     private final HomeTeleporter teleporter;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
@@ -43,7 +44,7 @@ public final class HomeAdmin {
             HomeRepository repository,
             HomeInviteRepository invites,
             HomeTeleporter teleporter,
-            HomeNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");

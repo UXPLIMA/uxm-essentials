@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -27,9 +28,9 @@ public final class SetNpcSkin {
 
     private final NpcRepository repository;
     private final NpcView view;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
 
-    public SetNpcSkin(NpcRepository repository, NpcView view, NpcNotifier notifier) {
+    public SetNpcSkin(NpcRepository repository, NpcView view, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

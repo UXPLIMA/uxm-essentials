@@ -35,7 +35,6 @@ import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
-import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
 import com.uxplima.uxmessentials.presence.application.SetNick;
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -51,6 +50,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -116,7 +116,7 @@ class PresenceSettingsGoldenTest {
             }
         };
         store = new InMemoryPresenceStore(clock, vanished::contains);
-        PresenceNotifier notifier = new PresenceNotifier(new KeyMessages(), new NoopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new NoopSink());
         DomainEventPublisher events = new NoopEvents();
         MarkAfk markAfk = new MarkAfk(store, List::of, notifier, events, clock);
         services = new PresenceServices(

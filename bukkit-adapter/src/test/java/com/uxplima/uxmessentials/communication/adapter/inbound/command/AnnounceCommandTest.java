@@ -23,13 +23,13 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerB
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.port.RandomSource;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -229,7 +229,7 @@ class AnnounceCommandTest {
                 broadcaster,
                 new BroadcastOptOut(
                         optOutStore,
-                        new CommunicationNotifier(new EchoMessagesSink(), new EchoMessagesSink()),
+                        new Notifier(new EchoMessagesSink(), new EchoMessagesSink()),
                         new NoEvents(),
                         Clock.systemUTC()),
                 new AnnouncerTask(
@@ -250,7 +250,7 @@ class AnnounceCommandTest {
 
     private CommandDispatcher<CommandSourceStack> dispatcher() {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        CommunicationNotifier notifier = new CommunicationNotifier(new EchoMessagesSink(), new EchoMessagesSink());
+        Notifier notifier = new Notifier(new EchoMessagesSink(), new EchoMessagesSink());
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
         AnnouncerTask announcer = new AnnouncerTask(
                 scheduler,

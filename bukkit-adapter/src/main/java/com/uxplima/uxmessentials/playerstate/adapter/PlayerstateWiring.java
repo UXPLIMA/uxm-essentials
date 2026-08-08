@@ -40,7 +40,6 @@ import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
-import com.uxplima.uxmessentials.playerstate.application.PlayerStateNotifier;
 import com.uxplima.uxmessentials.playerstate.application.ResetPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
@@ -72,6 +71,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -119,7 +119,7 @@ public final class PlayerstateWiring {
         InventoryViewer inventoryViewer = new BukkitInventoryViewer(invseeView, enderseeView, offlineView);
         NearbyPlayers nearby = new BukkitNearbyPlayers(kernel.scheduler());
         PlayerInfo info = new BukkitPlayerInfo();
-        PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         ClearInventoryPreferences clearPrefs = new PdcClearInventoryPreferences();
 
         Ports ports = new Ports(
@@ -166,7 +166,7 @@ public final class PlayerstateWiring {
         StateReconciler reconciler = ports.reconciler();
         PlayerEffects effects = ports.effects();
         InventoryViewer inventoryViewer = ports.inventoryViewer();
-        PlayerStateNotifier notifier = ports.notifier();
+        Notifier notifier = ports.notifier();
         return new PlayerStateServices(
                 new ToggleGod(store, reconciler, notifier, events, clock),
                 new ToggleFly(store, reconciler, notifier, events, clock),
@@ -206,7 +206,7 @@ public final class PlayerstateWiring {
             InventoryViewer inventoryViewer,
             NearbyPlayers nearby,
             PlayerInfo info,
-            PlayerStateNotifier notifier,
+            Notifier notifier,
             ClearInventoryPreferences clearPreferences,
             PlaytimeRepository playtimeRepository) {}
 

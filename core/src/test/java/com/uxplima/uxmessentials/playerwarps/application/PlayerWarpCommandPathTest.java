@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -59,7 +60,7 @@ class PlayerWarpCommandPathTest {
 
     private FakePlayerWarpRepository repository;
     private RecordingTeleporter teleporter;
-    private PlayerWarpNotifier notifier;
+    private Notifier notifier;
     private DomainEventPublisher events;
     private PlayerRef alice;
     private PlayerRef bob;
@@ -68,7 +69,7 @@ class PlayerWarpCommandPathTest {
     void setUp() {
         repository = new FakePlayerWarpRepository();
         teleporter = new RecordingTeleporter();
-        notifier = new PlayerWarpNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         events = new CapturingEvents();
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         bob = new PlayerRef(UUID.randomUUID(), "Bob");
@@ -238,7 +239,7 @@ class PlayerWarpCommandPathTest {
         setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
         visibility().setPublic(alice, PlayerWarpName.of("base"));
         RecordingSink sink = new RecordingSink();
-        PlayerWarpNotifier recording = new PlayerWarpNotifier(new KeyMessages(), sink);
+        Notifier recording = new Notifier(new KeyMessages(), sink);
 
         new ListPlayerWarps(repository, recording).publicOf(bob, alice, "Alice");
 

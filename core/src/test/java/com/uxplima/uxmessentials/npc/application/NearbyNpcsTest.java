@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -30,7 +31,7 @@ class NearbyNpcsTest {
     void setUp() {
         repository = new FakeNpcRepository();
         sink = new CapturingSink();
-        nearby = new NearbyNpcs(repository, new NpcNotifier(new NpcTestSupport.KeyMessages(), sink));
+        nearby = new NearbyNpcs(repository, new Notifier(new NpcTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 

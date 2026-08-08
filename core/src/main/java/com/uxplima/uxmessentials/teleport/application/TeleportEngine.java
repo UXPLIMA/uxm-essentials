@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -53,7 +54,7 @@ public final class TeleportEngine {
     private final Cooldowns cooldowns;
     private final Warmups warmups;
     private final TeleportExecutor executor;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final TeleportSettings settings;
     private final JailGate jail;
@@ -65,7 +66,7 @@ public final class TeleportEngine {
             Cooldowns cooldowns,
             Warmups warmups,
             TeleportExecutor executor,
-            PlayerNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail) {
@@ -76,7 +77,7 @@ public final class TeleportEngine {
             Cooldowns cooldowns,
             Warmups warmups,
             TeleportExecutor executor,
-            PlayerNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail,
@@ -98,7 +99,7 @@ public final class TeleportEngine {
             Cooldowns cooldowns,
             Warmups warmups,
             TeleportExecutor executor,
-            PlayerNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail,
@@ -111,7 +112,7 @@ public final class TeleportEngine {
             Cooldowns cooldowns,
             Warmups warmups,
             TeleportExecutor executor,
-            PlayerNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail,

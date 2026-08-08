@@ -9,6 +9,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
@@ -27,9 +28,9 @@ public final class NearbyNpcs {
     public static final int MAX_RADIUS = 256;
 
     private final NpcRepository repository;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
 
-    public NearbyNpcs(NpcRepository repository, NpcNotifier notifier) {
+    public NearbyNpcs(NpcRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

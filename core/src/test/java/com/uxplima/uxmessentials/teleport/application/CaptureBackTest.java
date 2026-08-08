@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -194,8 +195,8 @@ class CaptureBackTest {
     private static final class CapturingNotifier {
         private final List<String> keys = new ArrayList<>();
 
-        PlayerNotifier notifier() {
-            return new PlayerNotifier(new RecordingMessages(keys), new NoopSink());
+        Notifier notifier() {
+            return new Notifier(new RecordingMessages(keys), new NoopSink());
         }
     }
 

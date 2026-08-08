@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -27,7 +28,7 @@ public final class Kick {
 
     private final Sanctions sanctions;
     private final ModerationGuard guard;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final SanctionHistoryRecorder history;
     private final SanctionBroadcast broadcast;
@@ -35,7 +36,7 @@ public final class Kick {
     public Kick(
             Sanctions sanctions,
             ModerationGuard guard,
-            ModerationNotifier notifier,
+            Notifier notifier,
             ModerationAudit audit,
             SanctionHistoryRecorder history,
             SanctionBroadcast broadcast) {

@@ -11,6 +11,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -27,10 +28,10 @@ public final class ShowPlaytime {
 
     private final PlaytimeRepository repository;
     private final PlayerInfo info;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
     private final Clock clock;
 
-    public ShowPlaytime(PlaytimeRepository repository, PlayerInfo info, PlayerStateNotifier notifier, Clock clock) {
+    public ShowPlaytime(PlaytimeRepository repository, PlayerInfo info, Notifier notifier, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.info = Objects.requireNonNull(info, "info");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

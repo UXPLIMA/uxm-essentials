@@ -23,6 +23,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -33,7 +34,6 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
@@ -221,7 +221,7 @@ class WorldAccessListenerTest {
 
     private WorldAccessListener listener() {
         WorldAccessPolicy policy = new WorldAccessPolicy(permissions, engine);
-        WorldNotifier notifier = mock(WorldNotifier.class);
+        Notifier notifier = mock(Notifier.class);
         WorldTeleportService teleportService = mock(WorldTeleportService.class);
         return new WorldAccessListener(
                 repository,
@@ -242,7 +242,7 @@ class WorldAccessListenerTest {
     /** A listener wired with a caller-supplied teleport mock so the redirect hand-off can be verified. */
     private WorldAccessListener joinListener(WorldTeleportService teleportService, boolean redirectOnRestrictedJoin) {
         WorldAccessPolicy policy = new WorldAccessPolicy(permissions, engine);
-        WorldNotifier notifier = mock(WorldNotifier.class);
+        Notifier notifier = mock(Notifier.class);
         return new WorldAccessListener(
                 repository,
                 policy,

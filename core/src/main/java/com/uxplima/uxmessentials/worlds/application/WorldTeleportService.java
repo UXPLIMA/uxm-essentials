@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -47,7 +48,7 @@ public final class WorldTeleportService {
     private final WorldEntryFee entryFee;
     private final Permissions permissions;
     private final DomainEventPublisher events;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
 
     public WorldTeleportService(
@@ -58,7 +59,7 @@ public final class WorldTeleportService {
             WorldEntryFee entryFee,
             Permissions permissions,
             DomainEventPublisher events,
-            WorldNotifier notifier,
+            Notifier notifier,
             Scheduler scheduler) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");

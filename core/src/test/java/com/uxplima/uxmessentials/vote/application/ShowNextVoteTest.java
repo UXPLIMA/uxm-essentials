@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -124,12 +125,12 @@ class ShowNextVoteTest {
         }
     }
 
-    /** Captures keys and per-key placeholder maps from VoteNotifier deliveries. */
+    /** Captures keys and per-key placeholder maps from Notifier deliveries. */
     static final class CapturingNotifier {
         final List<VoteMessageKey> keys = new ArrayList<>();
         final List<Map<String, String>> placeholdersList = new ArrayList<>();
 
-        VoteNotifier voteNotifier() {
+        Notifier voteNotifier() {
             Messages messages = (viewer, key, placeholders) -> {
                 if (key instanceof VoteMessageKey vk) {
                     keys.add(vk);
@@ -138,7 +139,7 @@ class ShowNextVoteTest {
                 return key.key();
             };
             MessageSink sink = (viewer, text) -> {};
-            return new VoteNotifier(messages, sink);
+            return new Notifier(messages, sink);
         }
 
         @Nullable String placeholderFor(VoteMessageKey key, String placeholder) {

@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingBroadcast;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingSink;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,7 @@ class SilentBroadcastAndCapTest {
     private ModerationFakes.RecordingEvents events;
     private RecordingBroadcast broadcast;
     private RecordingSink sink;
-    private ModerationNotifier notifier;
+    private Notifier notifier;
     private ModerationGuard guard;
     private SanctionHistoryRecorder history;
     private Clock clock;

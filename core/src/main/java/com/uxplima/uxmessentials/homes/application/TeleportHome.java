@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -24,11 +25,10 @@ public final class TeleportHome {
 
     private final HomeRepository repository;
     private final HomeTeleporter teleporter;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final HomeCharge charge;
 
-    public TeleportHome(
-            HomeRepository repository, HomeTeleporter teleporter, HomeNotifier notifier, HomeCharge charge) {
+    public TeleportHome(HomeRepository repository, HomeTeleporter teleporter, Notifier notifier, HomeCharge charge) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

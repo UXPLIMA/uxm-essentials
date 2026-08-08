@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.moderation.domain.event.JailLocationRemoved;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -22,14 +23,14 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class DelJail {
 
     private final JailLocationStore store;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final Clock clock;
 
     public DelJail(
             JailLocationStore store,
-            ModerationNotifier notifier,
+            Notifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
             Clock clock) {

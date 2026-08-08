@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -159,8 +160,8 @@ class SanctionHistoryReviewTest {
     private static final class CapturingNotifier {
         private final List<String> keys = new ArrayList<>();
 
-        ModerationNotifier notifier() {
-            return new ModerationNotifier(new RecordingMessages(keys), new NoopSink());
+        Notifier notifier() {
+            return new Notifier(new RecordingMessages(keys), new NoopSink());
         }
     }
 

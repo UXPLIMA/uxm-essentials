@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -22,9 +23,9 @@ public final class ListNearby {
     public static final int MAX_RADIUS = 5_000;
 
     private final NearbyPlayers nearby;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public ListNearby(NearbyPlayers nearby, PlayerStateNotifier notifier) {
+    public ListNearby(NearbyPlayers nearby, Notifier notifier) {
         this.nearby = Objects.requireNonNull(nearby, "nearby");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -290,13 +291,13 @@ class WorldTeleportServiceTest {
         }
     }
 
-    /** Captures the message keys the service emits, in order, through a real {@link WorldNotifier}. */
+    /** Captures the message keys the service emits, in order, through a real {@link Notifier}. */
     private static final class CapturingNotifier {
         final List<MessageKey> keys = new ArrayList<>();
 
-        WorldNotifier notifier() {
+        Notifier notifier() {
             MessageSink sink = (v, text) -> {};
-            return new WorldNotifier(new RecordingMessages(keys), sink);
+            return new Notifier(new RecordingMessages(keys), sink);
         }
     }
 

@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -16,10 +17,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ClearWarns {
 
     private final ModerationRepository repository;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
 
-    public ClearWarns(ModerationRepository repository, ModerationNotifier notifier, ModerationAudit audit) {
+    public ClearWarns(ModerationRepository repository, Notifier notifier, ModerationAudit audit) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");

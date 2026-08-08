@@ -34,7 +34,6 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpPeopl
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
@@ -55,6 +54,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuTextPrompt;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -275,7 +275,7 @@ class PwarpPeopleMenuTest {
                 new PagedListSourceRegistry(),
                 prompt);
         server.getPluginManager().registerEvents(listener, plugin);
-        PlayerWarpNotifier notifier = new PlayerWarpNotifier(new KeyMessages(), noopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), noopSink());
         menu = new PlayerWarpPeopleMenu(
                 menus,
                 scheduler,

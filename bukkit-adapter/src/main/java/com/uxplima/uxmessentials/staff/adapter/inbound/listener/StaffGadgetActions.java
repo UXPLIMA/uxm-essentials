@@ -9,6 +9,7 @@ import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffGadget;
@@ -16,7 +17,6 @@ import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
-import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffFreeze;
 import com.uxplima.uxmessentials.staff.application.port.StaffTeleport;
 import com.uxplima.uxmessentials.staff.application.port.StaffVanish;
@@ -44,7 +44,7 @@ public final class StaffGadgetActions {
     private final StaffPlayerMenu playerMenu;
     private final Scheduler scheduler;
     private final Server server;
-    private final StaffNotifier notifier;
+    private final Notifier notifier;
 
     public StaffGadgetActions(
             StaffVanish vanish,
@@ -55,7 +55,7 @@ public final class StaffGadgetActions {
             StaffPlayerMenu playerMenu,
             Scheduler scheduler,
             Server server,
-            StaffNotifier notifier) {
+            Notifier notifier) {
         this.vanish = Objects.requireNonNull(vanish, "vanish");
         this.freeze = Objects.requireNonNull(freeze, "freeze");
         this.teleport = Objects.requireNonNull(teleport, "teleport");

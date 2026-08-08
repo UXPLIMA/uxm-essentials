@@ -16,7 +16,6 @@ import java.util.UUID;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleport;
 import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleportStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
@@ -34,6 +33,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -139,7 +139,7 @@ class BukkitCrossServerTeleportTest {
                 connector,
                 new InlineScheduler(),
                 Optional.of(economy),
-                new PlayerWarpNotifier(new KeyMessages(), sink),
+                new Notifier(new KeyMessages(), sink),
                 LOCAL,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }

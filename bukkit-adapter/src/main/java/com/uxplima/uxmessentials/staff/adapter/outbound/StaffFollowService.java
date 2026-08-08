@@ -12,12 +12,12 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
-import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -45,7 +45,7 @@ public final class StaffFollowService {
 
     private final Server server;
     private final Scheduler scheduler;
-    private final StaffNotifier notifier;
+    private final Notifier notifier;
     private final Logger log;
     private final Predicate<UUID> inStaffMode;
     private final ConcurrentHashMap<UUID, PlayerRef> sessions = new ConcurrentHashMap<>();
@@ -54,7 +54,7 @@ public final class StaffFollowService {
     public StaffFollowService(
             Server server,
             Scheduler scheduler,
-            StaffNotifier notifier,
+            Notifier notifier,
             Logger log,
             Predicate<UUID> inStaffMode,
             int intervalTicks) {

@@ -13,8 +13,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
@@ -33,9 +33,9 @@ public final class ToggleChatCommand extends CommunicationCommandSupport impleme
     private static final String PERMISSION = "uxmessentials.communication.togglechat";
 
     private final ChatLock lock;
-    private final CommunicationNotifier notifier;
+    private final Notifier notifier;
 
-    public ToggleChatCommand(ChatLock lock, CommunicationNotifier notifier, Messages messages) {
+    public ToggleChatCommand(ChatLock lock, Notifier notifier, Messages messages) {
         super(messages);
         this.lock = Objects.requireNonNull(lock, "lock");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

@@ -33,7 +33,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.DelKit;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
-import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
@@ -48,6 +47,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -103,7 +103,7 @@ class KitManagerCreateButtonTest {
 
         Messages messages = new KeyMessages();
         MessageSink sink = (viewer, text) -> {};
-        KitNotifier notifier = new KitNotifier(messages, sink);
+        Notifier notifier = new Notifier(messages, sink);
         repository = new RecordingRepository();
         scheduler = new SyncScheduler();
         guiText = new GuiText(messages);

@@ -14,7 +14,6 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAct
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -71,7 +71,7 @@ public final class CommunicationAdminMenu {
     private final BukkitAnnouncerBroadcaster broadcaster;
     private final String broadcastPrefix;
     private final Supplier<AnnouncerConfig> announcerConfig;
-    private final CommunicationNotifier notifier;
+    private final Notifier notifier;
     private final MessageSink sink;
     private final TextInput textInput;
 
@@ -84,7 +84,7 @@ public final class CommunicationAdminMenu {
             BukkitAnnouncerBroadcaster broadcaster,
             String broadcastPrefix,
             Supplier<AnnouncerConfig> announcerConfig,
-            CommunicationNotifier notifier,
+            Notifier notifier,
             MessageSink sink,
             TextInput textInput) {
         this.menus = Objects.requireNonNull(menus, "menus");
@@ -151,7 +151,7 @@ public final class CommunicationAdminMenu {
 
     /**
      * Flush online players' chat exactly as {@code /clearchat} does — a screenful of blank lines (skipping the
-     * exempt) through the {@link MessageSink}, then the cleared/by notices through the {@link CommunicationNotifier},
+     * exempt) through the {@link MessageSink}, then the cleared/by notices through the {@link Notifier},
      * each hopping to the viewer's region thread inside the sink. Package-private so the golden test can drive it.
      */
     void doClearChat(Player actor) {

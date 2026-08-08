@@ -32,7 +32,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionMenu;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
-import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
@@ -54,6 +53,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -221,7 +221,7 @@ class HomeActionGoldenTest {
     }
 
     private HomeActionMenu menu(Menus menus) {
-        HomeNotifier notifier = new HomeNotifier(new KeyMessages(), (v, t) -> {});
+        Notifier notifier = new Notifier(new KeyMessages(), (v, t) -> {});
         DomainEventPublisher events = new SilentEvents();
         Clock clock = Clock.systemUTC();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);

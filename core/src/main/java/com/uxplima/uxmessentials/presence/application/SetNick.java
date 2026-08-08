@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -20,9 +21,9 @@ public final class SetNick {
     private static final Pattern ALLOWED = Pattern.compile("[A-Za-z0-9_]+");
 
     private final NickStore store;
-    private final PresenceNotifier notifier;
+    private final Notifier notifier;
 
-    public SetNick(NickStore store, PresenceNotifier notifier) {
+    public SetNick(NickStore store, Notifier notifier) {
         this.store = Objects.requireNonNull(store, "store");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

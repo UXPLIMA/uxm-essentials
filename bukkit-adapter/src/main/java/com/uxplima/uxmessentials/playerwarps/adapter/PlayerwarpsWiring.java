@@ -48,7 +48,6 @@ import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
@@ -93,6 +92,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -171,7 +171,7 @@ public final class PlayerwarpsWiring {
         PlayerWarpRepository repository =
                 com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerWarpSync.repository(
                         cached, bus.publisher());
-        PlayerWarpNotifier notifier = new PlayerWarpNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry registry = teleportRegistry != null
                 ? teleportRegistry
                 : new com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry();
@@ -509,7 +509,7 @@ public final class PlayerwarpsWiring {
             Persistence persistence,
             PlayerWarpRepository repository,
             PlayerWarpTeleporter teleporter,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             Optional<PlayerWarpEconomy> economy,
             String localServerId) {
         if (!ctx.config().getBoolean("cross-server.enabled", false)) {
@@ -767,7 +767,7 @@ public final class PlayerwarpsWiring {
             TransferPlayerWarp transferPlayerWarp,
             BuySponsorship buySponsorship,
             SponsorConfig sponsorConfig,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             PlayerWarpListMenu listMenu,

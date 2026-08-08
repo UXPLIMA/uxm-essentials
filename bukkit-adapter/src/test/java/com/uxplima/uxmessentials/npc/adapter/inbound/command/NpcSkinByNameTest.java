@@ -13,7 +13,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.NpcView;
@@ -22,6 +21,7 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -58,7 +58,7 @@ class NpcSkinByNameTest {
         sink = new CapturingSink();
         skins = new FakeSkinService();
         scheduler = new BridgingScheduler();
-        NpcNotifier notifier = new NpcNotifier(new KeyMessages(), sink);
+        Notifier notifier = new Notifier(new KeyMessages(), sink);
         SetNpcSkin setSkin = new SetNpcSkin(repository, view, notifier);
         flow = new NpcSkinByName(skins, setSkin, repository, notifier, scheduler);
         actor = new PlayerRef(UUID.randomUUID(), "Operator");

@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -20,9 +21,9 @@ public final class ReviewBanHistory {
     static final int PAGE_LIMIT = 20;
 
     private final SanctionHistory history;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
 
-    public ReviewBanHistory(SanctionHistory history, ModerationNotifier notifier) {
+    public ReviewBanHistory(SanctionHistory history, Notifier notifier) {
         this.history = Objects.requireNonNull(history, "history");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

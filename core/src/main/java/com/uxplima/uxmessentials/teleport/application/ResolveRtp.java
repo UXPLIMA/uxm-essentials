@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.teleport.application;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -31,14 +32,14 @@ public final class ResolveRtp {
     private final SafeLocationQueue queue;
     private final WorldLookup worlds;
     private final TeleportEngine engine;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
     private final TeleportSettings settings;
 
     public ResolveRtp(
             SafeLocationQueue queue,
             WorldLookup worlds,
             TeleportEngine engine,
-            PlayerNotifier notifier,
+            Notifier notifier,
             TeleportSettings settings) {
         this.queue = Objects.requireNonNull(queue, "queue");
         this.worlds = Objects.requireNonNull(worlds, "worlds");

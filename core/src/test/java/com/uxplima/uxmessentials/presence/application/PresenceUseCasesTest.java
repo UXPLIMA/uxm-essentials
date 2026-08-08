@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.presence.domain.PlayerPresence;
 import com.uxplima.uxmessentials.presence.domain.event.ReturnedFromAfk;
 import com.uxplima.uxmessentials.presence.domain.event.WentAfk;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -38,7 +39,7 @@ class PresenceUseCasesTest {
     private FakeStore store;
     private FakeAudience audience;
     private RecordingEvents events;
-    private PresenceNotifier notifier;
+    private Notifier notifier;
     private Clock clock;
     private PlayerRef alice;
     private PlayerRef bob;
@@ -48,7 +49,7 @@ class PresenceUseCasesTest {
         store = new FakeStore();
         audience = new FakeAudience();
         events = new RecordingEvents();
-        notifier = new PresenceNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         clock = Clock.system(ZoneOffset.UTC);
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         bob = new PlayerRef(UUID.randomUUID(), "Bob");

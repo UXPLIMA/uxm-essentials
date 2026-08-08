@@ -29,9 +29,9 @@ import org.jspecify.annotations.NullMarked;
  * {@code dry-run} literal are equivalent. The handler returns control to the tick thread immediately and
  * hands the import to the bounded executor off-tick — it never blocks the caller.
  *
- * <p>This node lives in the bootstrap command surface (operator-facing, like the {@code /uxmess} root) so
- * its diagnostic acknowledgements are plain operator text; the player-facing {@code MigrationMessageKey}
- * catalogue backs the same surface for an in-game admin. The importer runs only here, on the command —
+ * <p>This node lives in the bootstrap command surface (operator-facing, like the {@code /uxmess} root), so
+ * its acknowledgements are plain operator text rather than catalogue keys: an import is run from the console
+ * or by an admin reading a diagnostic, never by a player. The importer runs only here, on the command;
  * nothing fires it at plugin enable.
  */
 @NullMarked

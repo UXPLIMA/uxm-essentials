@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.presence.domain.event.ReturnedFromAfk;
 import com.uxplima.uxmessentials.presence.domain.event.WentAfk;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -28,14 +29,14 @@ public final class MarkAfk {
 
     private final PresenceStore store;
     private final PresenceAudience audience;
-    private final PresenceNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
     public MarkAfk(
             PresenceStore store,
             PresenceAudience audience,
-            PresenceNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.store = Objects.requireNonNull(store, "store");

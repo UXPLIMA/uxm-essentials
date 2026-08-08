@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -28,7 +29,7 @@ public final class RelocateHome {
 
     private final HomeRepository repository;
     private final List<SethomeGuard> guards;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final HomeCharge charge;
     private final Clock clock;
@@ -36,7 +37,7 @@ public final class RelocateHome {
     public RelocateHome(
             HomeRepository repository,
             List<SethomeGuard> guards,
-            HomeNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             HomeCharge charge,
             Clock clock) {

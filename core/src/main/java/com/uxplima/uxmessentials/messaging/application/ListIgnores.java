@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreEntry;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreList;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,9 +19,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ListIgnores {
 
     private final IgnoreStore ignores;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
 
-    public ListIgnores(IgnoreStore ignores, MessagingNotifier notifier) {
+    public ListIgnores(IgnoreStore ignores, Notifier notifier) {
         this.ignores = Objects.requireNonNull(ignores, "ignores");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

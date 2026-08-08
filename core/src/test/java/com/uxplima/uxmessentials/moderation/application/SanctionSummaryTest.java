@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -88,8 +89,8 @@ class SanctionSummaryTest {
         private final List<String> keys = new ArrayList<>();
         private final List<Map<String, String>> placeholders = new ArrayList<>();
 
-        ModerationNotifier notifier() {
-            return new ModerationNotifier(new RecordingMessages(keys, placeholders), new NoopSink());
+        Notifier notifier() {
+            return new Notifier(new RecordingMessages(keys, placeholders), new NoopSink());
         }
 
         Map<String, String> last(String key) {

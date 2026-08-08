@@ -148,8 +148,8 @@ class StaffListCommandTest {
         var vanish = new FakeVanish();
         var capture = new com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture(
                 settings, gadgetItems, vanish);
-        var notifier =
-                new com.uxplima.uxmessentials.staff.application.StaffNotifier(new KeyMessages(), new RecordingSink());
+        var notifier = new com.uxplima.uxmessentials.shared.application.message.Notifier(
+                new KeyMessages(), new RecordingSink());
         var recover = new com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout(
                 store, repository, capture, vanish, notifier);
         var enter = new com.uxplima.uxmessentials.staff.application.EnterStaffMode(

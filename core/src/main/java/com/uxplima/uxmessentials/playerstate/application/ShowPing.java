@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ShowPing {
 
     private final PlayerInfo info;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public ShowPing(PlayerInfo info, PlayerStateNotifier notifier) {
+    public ShowPing(PlayerInfo info, Notifier notifier) {
         this.info = Objects.requireNonNull(info, "info");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

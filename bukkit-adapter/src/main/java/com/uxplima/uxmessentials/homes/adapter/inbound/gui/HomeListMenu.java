@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
-import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuCon
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -64,7 +64,7 @@ public final class HomeListMenu {
 
     private final Menus menus;
     private final Messages messages;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
     private final Permissions permissions;
     private final Scheduler scheduler;
     private final ListHomes listHomes;
@@ -80,7 +80,7 @@ public final class HomeListMenu {
     public HomeListMenu(
             Menus menus,
             Messages messages,
-            HomeNotifier notifier,
+            Notifier notifier,
             Permissions permissions,
             Scheduler scheduler,
             ListHomes listHomes,

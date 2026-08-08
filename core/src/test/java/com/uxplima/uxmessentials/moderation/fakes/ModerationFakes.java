@@ -8,12 +8,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -34,14 +34,14 @@ public final class ModerationFakes {
 
     private ModerationFakes() {}
 
-    /** A {@link ModerationNotifier} over the key-echoing messages and a no-op sink. */
-    public static ModerationNotifier notifier() {
-        return new ModerationNotifier(new KeyMessages(), new NoopSink());
+    /** A {@link Notifier} over the key-echoing messages and a no-op sink. */
+    public static Notifier notifier() {
+        return new Notifier(new KeyMessages(), new NoopSink());
     }
 
-    /** A {@link ModerationNotifier} backed by a {@link RecordingSink}, so a test can assert who was told what. */
-    public static ModerationNotifier recordingNotifier(RecordingSink sink) {
-        return new ModerationNotifier(new KeyMessages(), sink);
+    /** A {@link Notifier} backed by a {@link RecordingSink}, so a test can assert who was told what. */
+    public static Notifier recordingNotifier(RecordingSink sink) {
+        return new Notifier(new KeyMessages(), sink);
     }
 
     /** A capturing {@link SanctionBroadcast} exposing every announced key + placeholder map. */

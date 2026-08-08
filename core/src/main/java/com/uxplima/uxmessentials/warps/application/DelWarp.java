@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.warps.application;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -21,10 +22,10 @@ import com.uxplima.uxmessentials.warps.domain.event.WarpDeleted;
 public final class DelWarp {
 
     private final WarpRepository repository;
-    private final WarpNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
 
-    public DelWarp(WarpRepository repository, WarpNotifier notifier, DomainEventPublisher events) {
+    public DelWarp(WarpRepository repository, Notifier notifier, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");

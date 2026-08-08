@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -124,8 +125,8 @@ class ReviewPunishmentStatsTest {
         private final List<String> keys = new ArrayList<>();
         private Map<String, String> lastPlaceholders = Map.of();
 
-        ModerationNotifier notifier() {
-            return new ModerationNotifier(new RecordingMessages(keys, this), new NoopSink());
+        Notifier notifier() {
+            return new Notifier(new RecordingMessages(keys, this), new NoopSink());
         }
     }
 

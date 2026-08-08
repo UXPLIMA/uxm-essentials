@@ -28,7 +28,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.IgnoreListMenu;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
-import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
 import com.uxplima.uxmessentials.messaging.application.Unignore;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreEntry;
@@ -43,6 +42,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -97,7 +97,7 @@ class IgnoreMenuGoldenTest {
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         ignores = new FakeIgnores();
-        MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), new NoopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new NoopSink());
         ignore = new Ignore(ignores, notifier);
         unignore = new Unignore(ignores, notifier);
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);

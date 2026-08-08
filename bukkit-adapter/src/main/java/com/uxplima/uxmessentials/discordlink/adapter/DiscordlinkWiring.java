@@ -13,7 +13,6 @@ import com.uxplima.uxmessentials.discordlink.adapter.inbound.gui.DiscordStatusVi
 import com.uxplima.uxmessentials.discordlink.adapter.outbound.ConfirmLinkService;
 import com.uxplima.uxmessentials.discordlink.application.BeginLink;
 import com.uxplima.uxmessentials.discordlink.application.ConfirmLink;
-import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
 import com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -61,7 +61,7 @@ public final class DiscordlinkWiring {
         ConfirmLink confirmLink = new ConfirmLink(store, clock);
         Unlink unlink = new Unlink(store);
         LinkStatus linkStatus = new LinkStatus(store);
-        DiscordLinkNotifier notifier = new DiscordLinkNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         DiscordLinkServices services =
                 new DiscordLinkServices(beginLink, confirmLink, unlink, linkStatus, notifier, bridge);
         // The link-status panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout

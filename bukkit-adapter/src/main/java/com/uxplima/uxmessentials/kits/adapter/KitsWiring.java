@@ -38,7 +38,6 @@ import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.DelKit;
 import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
-import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitReset;
 import com.uxplima.uxmessentials.kits.application.ListKits;
 import com.uxplima.uxmessentials.kits.application.ShowKit;
@@ -58,6 +57,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -126,7 +126,7 @@ public final class KitsWiring {
         KitUnlockStore unlocks = new PdcKitUnlocks(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log());
-        KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
         GuiLayout previewLayout = guiLayouts.load(
                 "kits",
@@ -260,7 +260,7 @@ public final class KitsWiring {
             KitClaimStore claims,
             KitGranter granter,
             KitActionRunner actionRunner,
-            KitNotifier notifier,
+            Notifier notifier,
             Optional<KitEconomy> economy,
             KitEditor kitEditor,
             DelKit delKit,

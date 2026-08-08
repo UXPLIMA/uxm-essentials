@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.kits.domain.KitSchedule;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -58,7 +59,7 @@ class ClaimKitTest {
     private FakeCooldowns cooldowns;
     private FakeClaimStore claims;
     private RecordingGranter granter;
-    private KitNotifier notifier;
+    private Notifier notifier;
     private DomainEventPublisher events;
     private FakeStockStore stock;
     private FakeUnlockStore unlocks;
@@ -72,7 +73,7 @@ class ClaimKitTest {
         cooldowns = new FakeCooldowns();
         claims = new FakeClaimStore();
         granter = new RecordingGranter();
-        notifier = new KitNotifier(new KeyMessages(), new CapturingSink());
+        notifier = new Notifier(new KeyMessages(), new CapturingSink());
         events = new CapturingEvents();
         stock = new FakeStockStore();
         unlocks = new FakeUnlockStore();

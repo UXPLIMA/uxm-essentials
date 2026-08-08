@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -35,14 +36,14 @@ public final class ManageMembers {
     private final PlayerWarpRepository repository;
     private final WarpAuthorization authorization;
     private final WarpMemberStore members;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final Clock clock;
 
     public ManageMembers(
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
             WarpMemberStore members,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");

@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.presence.adapter.outbound.PdcNickStore;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
-import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
 import com.uxplima.uxmessentials.presence.application.SetNick;
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
@@ -38,6 +37,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -88,7 +88,7 @@ public final class PresenceWiring {
 
         InMemoryPresenceStore store = new InMemoryPresenceStore(clock, vanishLookup);
         PresenceAudience audience = new BukkitPresenceAudience();
-        PresenceNotifier notifier = new PresenceNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         NickStore nicks = new PdcNickStore(plugin, kernel.scheduler());
 
         PresenceServices services = assemble(kernel, store, audience, notifier, nicks);
@@ -134,7 +134,7 @@ public final class PresenceWiring {
             PresenceSettings settings,
             PresenceServices services,
             InMemoryPresenceStore store,
-            PresenceNotifier notifier) {
+            Notifier notifier) {
         List<Listener> listeners = new ArrayList<>();
         listeners.add(new PresenceActivityListener(
                 services.clearAfk(), kernel.scheduler(), settings.activityPolicy(), settings.moveThresholdBlocks()));
@@ -149,11 +149,7 @@ public final class PresenceWiring {
     }
 
     private static PresenceServices assemble(
-            KernelPorts kernel,
-            PresenceStore store,
-            PresenceAudience audience,
-            PresenceNotifier notifier,
-            NickStore nicks) {
+            KernelPorts kernel, PresenceStore store, PresenceAudience audience, Notifier notifier, NickStore nicks) {
         var events = kernel.events();
         Clock clock = Clock.systemUTC();
         MarkAfk markAfk = new MarkAfk(store, audience, notifier, events, clock);

@@ -28,7 +28,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.gui.ScoreboardSettingsView;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
-import com.uxplima.uxmessentials.scoreboard.application.ScoreboardNotifier;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -44,6 +43,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -97,7 +97,7 @@ class ScoreboardSettingsGoldenTest {
         guiText = new GuiText(messages);
         scheduler = new SyncScheduler();
         visibility = new InMemoryVisibility();
-        ScoreboardNotifier notifier = new ScoreboardNotifier(new KeyMessages(), new NoopSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new NoopSink());
         toggle = new ToggleScoreboard(visibility, notifier, new NoopEvents());
     }
 

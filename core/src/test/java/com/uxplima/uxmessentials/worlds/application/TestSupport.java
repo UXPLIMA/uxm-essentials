@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -14,23 +15,23 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 final class TestSupport {
     private TestSupport() {}
 
-    static WorldNotifier notifier() {
+    static Notifier notifier() {
         Messages messages = (v, key, ph) -> key.key();
         MessageSink sink = (v, text) -> {};
-        return new WorldNotifier(messages, sink);
+        return new Notifier(messages, sink);
     }
 
-    /** A {@link WorldNotifier} that records, in order, every message key it is asked to send. */
+    /** A {@link Notifier} that records, in order, every message key it is asked to send. */
     static final class CapturingNotifier {
         final List<MessageKey> keys = new ArrayList<>();
 
-        WorldNotifier notifier() {
+        Notifier notifier() {
             Messages messages = (v, key, ph) -> {
                 keys.add(key);
                 return key.key();
             };
             MessageSink sink = (v, text) -> {};
-            return new WorldNotifier(messages, sink);
+            return new Notifier(messages, sink);
         }
     }
 

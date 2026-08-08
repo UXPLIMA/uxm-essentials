@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -16,9 +17,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class UninviteFromHome {
 
     private final HomeInviteRepository invites;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
 
-    public UninviteFromHome(HomeInviteRepository invites, HomeNotifier notifier) {
+    public UninviteFromHome(HomeInviteRepository invites, Notifier notifier) {
         this.invites = Objects.requireNonNull(invites, "invites");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

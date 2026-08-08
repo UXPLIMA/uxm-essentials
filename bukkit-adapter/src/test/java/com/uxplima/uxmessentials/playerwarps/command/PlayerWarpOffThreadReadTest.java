@@ -28,7 +28,6 @@ import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
@@ -64,6 +63,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -180,7 +180,7 @@ class PlayerWarpOffThreadReadTest {
     }
 
     private PlayerWarpServices services() {
-        PlayerWarpNotifier notifier = new PlayerWarpNotifier(new KeyMessages(), sink);
+        Notifier notifier = new Notifier(new KeyMessages(), sink);
         Permissions permissions = new AllowAllPermissions();
         Messages messages = new KeyMessages();
         SetPlayerWarp setPlayerWarp = new SetPlayerWarp(
@@ -300,7 +300,7 @@ class PlayerWarpOffThreadReadTest {
     }
 
     /** A minimal browse menu over a stub read model, wired so the services holder is complete; unopened by this test. */
-    private PlayerWarpBrowseMenu browseView(Messages messages, Permissions permissions, PlayerWarpNotifier notifier) {
+    private PlayerWarpBrowseMenu browseView(Messages messages, Permissions permissions, Notifier notifier) {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
         MenuRenderer renderer =

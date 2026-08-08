@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.messaging.domain.event.MailDelivered;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -37,7 +38,7 @@ public final class SendMail {
     private final IgnoreStore ignores;
     private final MessageDelivery delivery;
     private final MutePolicy mute;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
@@ -46,7 +47,7 @@ public final class SendMail {
             IgnoreStore ignores,
             MessageDelivery delivery,
             MutePolicy mute,
-            MessagingNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.mail = Objects.requireNonNull(mail, "mail");

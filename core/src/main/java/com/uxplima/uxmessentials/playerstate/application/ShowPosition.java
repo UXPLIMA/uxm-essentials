@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
@@ -17,9 +18,9 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 public final class ShowPosition {
 
     private final PlayerInfo info;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public ShowPosition(PlayerInfo info, PlayerStateNotifier notifier) {
+    public ShowPosition(PlayerInfo info, Notifier notifier) {
         this.info = Objects.requireNonNull(info, "info");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

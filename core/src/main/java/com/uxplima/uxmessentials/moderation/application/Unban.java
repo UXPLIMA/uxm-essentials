@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -20,13 +21,13 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class Unban {
 
     private final ModerationRepository repository;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final SanctionHistoryRecorder history;
 
     public Unban(
             ModerationRepository repository,
-            ModerationNotifier notifier,
+            Notifier notifier,
             ModerationAudit audit,
             SanctionHistoryRecorder history) {
         this.repository = Objects.requireNonNull(repository, "repository");

@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -15,7 +16,6 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffFreeze;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
 import com.uxplima.uxmessentials.staff.application.port.StaffTeleport;
@@ -142,13 +142,13 @@ final class StaffAdapterFakes {
     }
 
     /** A notifier over echoing ports, so a test could read the keys sent (unused assertions aside). */
-    static StaffNotifier notifier() {
-        return new StaffNotifier(new EchoMessages(), new SilentSink());
+    static Notifier notifier() {
+        return new Notifier(new EchoMessages(), new SilentSink());
     }
 
     /** A notifier whose delivered, rendered lines a test can read (key plus folded placeholders). */
-    static StaffNotifier notifier(StaffKeySink sink) {
-        return new StaffNotifier(new EchoMessages(), sink);
+    static Notifier notifier(StaffKeySink sink) {
+        return new Notifier(new EchoMessages(), sink);
     }
 
     /** An event publisher that collects what it published. */

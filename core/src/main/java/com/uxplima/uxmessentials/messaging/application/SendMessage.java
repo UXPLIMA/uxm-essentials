@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.messaging.domain.event.PrivateMessageSent;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -67,7 +68,7 @@ public final class SendMessage {
     private final AfkStatus afk;
     private final MailRepository mail;
     private final boolean offlineToMail;
-    private final MessagingNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
@@ -81,7 +82,7 @@ public final class SendMessage {
             AfkStatus afk,
             MailRepository mail,
             boolean offlineToMail,
-            MessagingNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.delivery = Objects.requireNonNull(delivery, "delivery");

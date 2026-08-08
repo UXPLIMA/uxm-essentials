@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -60,8 +61,8 @@ class ListJailsTest {
         assertThat(sink.keys()).containsExactly(ModerationMessageKey.JAILS_EMPTY.key());
     }
 
-    private static ModerationNotifier notifier(RecordingSink sink) {
-        return new ModerationNotifier(new RecordingMessages(sink), sink);
+    private static Notifier notifier(RecordingSink sink) {
+        return new Notifier(new RecordingMessages(sink), sink);
     }
 
     /** A directory that returns its configured names already sorted, the way the production port contracts. */

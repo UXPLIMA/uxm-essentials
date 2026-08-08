@@ -13,12 +13,12 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
@@ -45,7 +45,7 @@ public final class WorldAccessListener implements Listener {
     private final WorldEngine engine;
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final ForcedWorldEntryMarker forcedEntries;
     private final boolean redirectOnRestrictedJoin;
 
@@ -56,7 +56,7 @@ public final class WorldAccessListener implements Listener {
             WorldEngine engine,
             DomainEventPublisher events,
             Scheduler scheduler,
-            WorldNotifier notifier,
+            Notifier notifier,
             ForcedWorldEntryMarker forcedEntries,
             boolean redirectOnRestrictedJoin) {
         this.repository = Objects.requireNonNull(repository, "repository");

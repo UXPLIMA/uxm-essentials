@@ -7,13 +7,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
  * The async {@code /npc skin <name>} flows that resolve a skin off-thread — {@code name:<username>} (a Mojang
  * lookup) and {@code url:<image-url>} (a MineSkin generate) — kept Bukkit-free so the orchestration is
  * unit-testable: it touches only the application ports, the {@link SkinService}, the {@link Scheduler}, and the
- * {@link NpcNotifier}, with no {@code org.bukkit} type, so a test drives it with fakes and asserts the
+ * {@link Notifier}, with no {@code org.bukkit} type, so a test drives it with fakes and asserts the
  * message/apply sequence without a live server.
  *
  * <p>Both flows share one shape: reject up front when no NPC exists under the name (so a typo never triggers a
@@ -38,14 +38,14 @@ public final class NpcSkinByName {
     private final SkinService skinService;
     private final SetNpcSkin setSkin;
     private final NpcRepository repository;
-    private final NpcNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
 
     public NpcSkinByName(
             SkinService skinService,
             SetNpcSkin setSkin,
             NpcRepository repository,
-            NpcNotifier notifier,
+            Notifier notifier,
             Scheduler scheduler) {
         this.skinService = Objects.requireNonNull(skinService, "skinService");
         this.setSkin = Objects.requireNonNull(setSkin, "setSkin");

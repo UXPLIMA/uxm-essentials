@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.presence.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.presence.application.port.NickStore;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -14,9 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ClearNick {
 
     private final NickStore store;
-    private final PresenceNotifier notifier;
+    private final Notifier notifier;
 
-    public ClearNick(NickStore store, PresenceNotifier notifier) {
+    public ClearNick(NickStore store, Notifier notifier) {
         this.store = Objects.requireNonNull(store, "store");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

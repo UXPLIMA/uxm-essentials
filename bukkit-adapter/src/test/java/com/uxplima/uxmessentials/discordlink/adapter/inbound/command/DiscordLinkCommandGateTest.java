@@ -20,7 +20,6 @@ import com.uxplima.uxmessentials.discordlink.adapter.DiscordLinkServices;
 import com.uxplima.uxmessentials.discordlink.adapter.inbound.gui.DiscordStatusView;
 import com.uxplima.uxmessentials.discordlink.application.BeginLink;
 import com.uxplima.uxmessentials.discordlink.application.ConfirmLink;
-import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
 import com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge;
@@ -30,6 +29,7 @@ import com.uxplima.uxmessentials.discordlink.domain.DiscordId;
 import com.uxplima.uxmessentials.discordlink.domain.LinkCode;
 import com.uxplima.uxmessentials.discordlink.domain.PendingLink;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -92,7 +92,7 @@ class DiscordLinkCommandGateTest {
     }
 
     private DiscordLinkCommand command(DiscordBridge bridge) {
-        DiscordLinkNotifier notifier = new DiscordLinkNotifier(new KeyMessages(), sink);
+        Notifier notifier = new Notifier(new KeyMessages(), sink);
         DiscordLinkServices services = new DiscordLinkServices(
                 beginLink,
                 new ConfirmLink(store, Clock.systemUTC()),

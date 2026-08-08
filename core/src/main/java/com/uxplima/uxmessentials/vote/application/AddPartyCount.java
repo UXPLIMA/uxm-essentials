@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -21,13 +22,13 @@ public final class AddPartyCount {
 
     private final VoteRepository repository;
     private final PartyService partyService;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
 
     public AddPartyCount(
             VoteRepository repository,
             RewardApplier applier,
             VoteAudience audience,
-            VoteNotifier notifier,
+            Notifier notifier,
             VoteBroadcaster broadcaster,
             Set<BroadcastChannel> channels,
             DomainEventPublisher events,

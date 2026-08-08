@@ -2,10 +2,10 @@ package com.uxplima.uxmessentials.vaults.application;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -13,19 +13,17 @@ import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 
 /**
- * Renders the vaults context's player-facing feedback by resolving a {@link VaultsMessageKey} in the viewer's
- * locale and delivering it through the {@link MessageSink}. Every command path that tells the player something
- * — the vault opened, the listing of owned vaults, a quota rejection, the admin override notice — goes through
- * one of these methods, so there is no inline player-facing text anywhere in the context.
+ * Names the vaults context's player-facing feedback: one method per thing the player can be told (the vault
+ * opened, the listing of owned vaults, a quota rejection, the admin override notice), each resolving a
+ * {@link VaultsMessageKey} through the shared {@link Notifier}. Naming them here is what keeps inline
+ * player-facing text out of the context.
  */
 public final class VaultNotifier {
 
-    private final Messages messages;
-    private final MessageSink sink;
+    private final Notifier notifier;
 
     public VaultNotifier(Messages messages, MessageSink sink) {
-        this.messages = Objects.requireNonNull(messages, "messages");
-        this.sink = Objects.requireNonNull(sink, "sink");
+        this.notifier = new Notifier(messages, sink);
     }
 
     /** Tell {@code viewer} the vault at {@code index} opened. */
@@ -140,6 +138,6 @@ public final class VaultNotifier {
     }
 
     private void send(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        sink.deliver(viewer, messages.resolve(viewer, key, placeholders));
+        notifier.send(viewer, key, placeholders);
     }
 }

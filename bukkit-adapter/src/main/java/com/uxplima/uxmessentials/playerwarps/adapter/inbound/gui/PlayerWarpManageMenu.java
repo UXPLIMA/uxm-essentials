@@ -14,7 +14,6 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
@@ -36,6 +35,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuCon
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -86,7 +86,7 @@ public final class PlayerWarpManageMenu {
     private final BuySponsorship buySponsorship;
     private final PlayerLookup players;
     private final Messages messages;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final BiConsumer<PlayerRef, PlayerWarpName> openView;
     private final BiConsumer<PlayerRef, PlayerWarpName> openMembers;
     private final BiConsumer<PlayerRef, PlayerWarpName> openWhitelist;
@@ -107,7 +107,7 @@ public final class PlayerWarpManageMenu {
             BuySponsorship buySponsorship,
             PlayerLookup players,
             Messages messages,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             SponsorConfig sponsorConfig,
             BiConsumer<PlayerRef, PlayerWarpName> openView,
             BiConsumer<PlayerRef, PlayerWarpName> openMembers,

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -38,7 +39,7 @@ class ManageHologramBlacklistTest {
         view = new RecordingView();
         sink = new CapturingSink();
         blacklist = new ManageHologramBlacklist(
-                repository, view, new HologramNotifier(new HologramTestSupport.KeyMessages(), sink));
+                repository, view, new Notifier(new HologramTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
         target = new PlayerRef(UUID.randomUUID(), "Banned");
     }

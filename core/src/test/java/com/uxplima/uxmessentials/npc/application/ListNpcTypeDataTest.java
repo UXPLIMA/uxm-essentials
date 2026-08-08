@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepositor
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -32,7 +33,7 @@ class ListNpcTypeDataTest {
     void setUp() {
         repository = new FakeNpcRepository();
         sink = new CapturingSink();
-        listData = new ListNpcTypeData(repository, new NpcNotifier(new NpcTestSupport.KeyMessages(), sink));
+        listData = new ListNpcTypeData(repository, new Notifier(new NpcTestSupport.KeyMessages(), sink));
         viewer = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 

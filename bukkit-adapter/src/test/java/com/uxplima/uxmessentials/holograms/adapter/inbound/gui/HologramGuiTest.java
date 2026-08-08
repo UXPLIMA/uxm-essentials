@@ -30,7 +30,6 @@ import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
-import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramAction;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
@@ -58,7 +57,6 @@ import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.TeleportToHologram;
 import com.uxplima.uxmessentials.holograms.application.UnlinkHologramFromNpc;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
-import com.uxplima.uxmessentials.holograms.application.port.HologramTeleporter;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Appearance;
@@ -81,6 +79,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditablePro
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.DirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -414,10 +414,10 @@ class HologramGuiTest {
     }
 
     private HologramServices assembleServices() {
-        HologramNotifier notifier = new HologramNotifier(new KeyMessages(), new SilentSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new SilentSink());
         HologramView view = new SilentView();
         DomainEventPublisher events = new SilentEvents();
-        HologramTeleporter teleporter = (who, destination) -> teleportDestinations.add(destination);
+        DirectTeleporter teleporter = (who, destination) -> teleportDestinations.add(destination);
         LinkedNpcLocator npc = name -> Optional.of(AT);
         return new HologramServices(
                 new CreateHologram(repository, view, notifier, events, Clock.systemUTC()),

@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.homes.domain.event.HomeRenamed;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -142,13 +143,13 @@ class RenameHomeTest {
     private static final class CapturingNotifier {
         private @Nullable MessageKey lastKey;
 
-        HomeNotifier notifier() {
+        Notifier notifier() {
             Messages messages = (viewer, key, placeholders) -> {
                 lastKey = key;
                 return key.key();
             };
             MessageSink sink = (viewer, renderedText) -> {};
-            return new HomeNotifier(messages, sink);
+            return new Notifier(messages, sink);
         }
     }
 }

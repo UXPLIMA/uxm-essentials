@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.npc.application.NpcTestSupport.RecordingView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -35,7 +36,7 @@ class SetNpcTypeDataTest {
         repository = new FakeNpcRepository();
         view = new RecordingView();
         sink = new CapturingSink();
-        setData = new SetNpcTypeData(repository, view, new NpcNotifier(new NpcTestSupport.KeyMessages(), sink));
+        setData = new SetNpcTypeData(repository, view, new Notifier(new NpcTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 

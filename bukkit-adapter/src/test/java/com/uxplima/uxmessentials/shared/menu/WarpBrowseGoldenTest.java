@@ -29,6 +29,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -38,7 +39,6 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpBrowseMenu;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpAccess;
-import com.uxplima.uxmessentials.warps.application.WarpNotifier;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
@@ -228,7 +228,7 @@ class WarpBrowseGoldenTest {
         engine.bindings().action("close", ctx -> ctx.player().closeInventory());
         engine.installListener(plugin);
         Permissions permissions = new AllowAllPermissions();
-        WarpNotifier notifier = new WarpNotifier(new KeyMessages(), (v, text) -> {});
+        Notifier notifier = new Notifier(new KeyMessages(), (v, text) -> {});
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         UseWarp useWarp =
                 new UseWarp(repository, access, teleporter, notifier, position -> true, permissions, scheduler);

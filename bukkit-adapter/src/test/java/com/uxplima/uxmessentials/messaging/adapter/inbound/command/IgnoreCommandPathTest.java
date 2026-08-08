@@ -26,7 +26,6 @@ import com.uxplima.uxmessentials.messaging.application.ClearMail;
 import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
 import com.uxplima.uxmessentials.messaging.application.ListIgnores;
-import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.Reply;
@@ -61,6 +60,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -185,7 +185,7 @@ class IgnoreCommandPathTest {
 
     private MessagingServices services() {
         Messages messages = new KeyMessages();
-        MessagingNotifier notifier = new MessagingNotifier(messages, sink);
+        Notifier notifier = new Notifier(messages, sink);
         MessageDelivery delivery = new NoDelivery();
         MutePolicy mute = MutePolicy.NEVER;
         InMemorySocialSpyStore spies = new InMemorySocialSpyStore();

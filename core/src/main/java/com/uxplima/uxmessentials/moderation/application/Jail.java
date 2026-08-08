@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerJailed;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -36,7 +37,7 @@ public final class Jail {
     private final JailDirectory jails;
     private final Sanctions sanctions;
     private final ModerationGuard guard;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final Clock clock;
@@ -46,7 +47,7 @@ public final class Jail {
             JailDirectory jails,
             Sanctions sanctions,
             ModerationGuard guard,
-            ModerationNotifier notifier,
+            Notifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
             Clock clock) {

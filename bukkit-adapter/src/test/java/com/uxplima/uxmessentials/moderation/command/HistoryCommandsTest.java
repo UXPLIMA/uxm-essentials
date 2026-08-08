@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.command.HistoryComma
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.StaffHistoryCommand;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
 import com.uxplima.uxmessentials.moderation.application.CheckMute;
-import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.ReviewSanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewStaffHistory;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
@@ -38,6 +37,7 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -88,7 +88,7 @@ class HistoryCommandsTest {
         repository = new FakeRepository();
         targets = new FakeTargets();
         lookup = new FakeLookup();
-        ModerationNotifier notifier = new ModerationNotifier(messages, sink);
+        Notifier notifier = new Notifier(messages, sink);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         services = mock(ModerationServices.class);
         lenient().when(services.targets()).thenReturn(targets);

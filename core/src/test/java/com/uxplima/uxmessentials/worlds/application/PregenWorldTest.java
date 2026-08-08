@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -191,14 +192,14 @@ class PregenWorldTest {
         }
     }
 
-    /** Captures the keys and last placeholder map the service emits, in order, through a real {@link WorldNotifier}. */
+    /** Captures the keys and last placeholder map the service emits, in order, through a real {@link Notifier}. */
     private static final class CapturingNotifier {
         final List<MessageKey> keys = new ArrayList<>();
         Map<String, String> last = Map.of();
 
-        WorldNotifier notifier() {
+        Notifier notifier() {
             MessageSink sink = (v, text) -> {};
-            return new WorldNotifier(new RecordingMessages(this), sink);
+            return new Notifier(new RecordingMessages(this), sink);
         }
     }
 

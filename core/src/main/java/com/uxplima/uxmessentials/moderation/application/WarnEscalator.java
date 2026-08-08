@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationStep;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -32,10 +33,9 @@ public final class WarnEscalator {
     private final TempBan tempBan;
     private final Ban ban;
     private final Kick kick;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
 
-    public WarnEscalator(
-            WarnEscalation ladder, Mute mute, TempBan tempBan, Ban ban, Kick kick, ModerationNotifier notifier) {
+    public WarnEscalator(WarnEscalation ladder, Mute mute, TempBan tempBan, Ban ban, Kick kick, Notifier notifier) {
         this.ladder = Objects.requireNonNull(ladder, "ladder");
         this.mute = Objects.requireNonNull(mute, "mute");
         this.tempBan = Objects.requireNonNull(tempBan, "tempBan");

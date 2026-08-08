@@ -28,7 +28,6 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEdito
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
@@ -50,6 +49,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -223,7 +223,7 @@ class PlayerWarpListGoldenTest {
     /** A {@link PlayerWarpListMenu} wired off the same collaborators as the old view, over the engine façade. */
     private PlayerWarpListMenu listMenu(Menus menus) {
         Messages messages = new KeyMessages();
-        PlayerWarpNotifier notifier = new PlayerWarpNotifier(messages, new SilentSink());
+        Notifier notifier = new Notifier(messages, new SilentSink());
         Permissions permissions = new ManagePermissions(() -> managePerm);
         SetPlayerWarp setPlayerWarp = new SetPlayerWarp(
                 repository,

@@ -99,8 +99,7 @@ class MuteBlocksMessageTest {
                 com.uxplima.uxmessentials.messaging.application.port.AfkStatus.NEVER,
                 new NoopMail(),
                 false,
-                new com.uxplima.uxmessentials.messaging.application.MessagingNotifier(
-                        new KeyMessages(), new NoopSink()),
+                new com.uxplima.uxmessentials.shared.application.message.Notifier(new KeyMessages(), new NoopSink()),
                 new NoopEvents(),
                 Clock.fixed(T0, ZoneOffset.UTC));
     }

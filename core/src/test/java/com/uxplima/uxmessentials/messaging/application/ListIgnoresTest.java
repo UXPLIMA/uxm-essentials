@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreList;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreScope;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -38,7 +39,7 @@ class ListIgnoresTest {
     void setUp() {
         ignores = new FakeIgnoreStore();
         recorder = new RecordingNotifier();
-        listIgnores = new ListIgnores(ignores, new MessagingNotifier(recorder, new NoopSink()));
+        listIgnores = new ListIgnores(ignores, new Notifier(recorder, new NoopSink()));
     }
 
     @Test

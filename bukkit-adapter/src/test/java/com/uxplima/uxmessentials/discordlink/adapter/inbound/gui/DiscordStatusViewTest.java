@@ -25,7 +25,6 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.discordlink.application.BeginLink;
-import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
 import com.uxplima.uxmessentials.discordlink.application.port.DiscordLinkStore;
@@ -46,6 +45,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -87,7 +87,7 @@ class DiscordStatusViewTest {
     private BeginLink beginLink;
     private Unlink unlink;
     private LinkStatus linkStatus;
-    private DiscordLinkNotifier notifier;
+    private Notifier notifier;
     private RecordingSink sink;
 
     @BeforeEach
@@ -104,7 +104,7 @@ class DiscordStatusViewTest {
         unlink = new Unlink(store);
         linkStatus = new LinkStatus(store);
         sink = new RecordingSink();
-        notifier = new DiscordLinkNotifier(new KeyMessages(), sink);
+        notifier = new Notifier(new KeyMessages(), sink);
     }
 
     @AfterEach

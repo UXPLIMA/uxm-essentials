@@ -14,8 +14,8 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
@@ -38,10 +38,10 @@ public final class MeCommand extends CommunicationCommandSupport implements Comm
     private static final String PERMISSION = "uxmessentials.communication.me";
     private static final String ACTION_ARG = "action";
 
-    private final CommunicationNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
 
-    public MeCommand(Messages messages, CommunicationNotifier notifier, Scheduler scheduler) {
+    public MeCommand(Messages messages, Notifier notifier, Scheduler scheduler) {
         super(messages);
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");

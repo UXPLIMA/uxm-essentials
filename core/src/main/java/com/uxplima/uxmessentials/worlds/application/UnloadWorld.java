@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -17,12 +18,12 @@ import com.uxplima.uxmessentials.worlds.domain.event.WorldUnloaded;
 public final class UnloadWorld {
 
     private final WorldEngine engine;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final BooleanSupplier protectDefault;
 
     public UnloadWorld(
-            WorldEngine engine, WorldNotifier notifier, DomainEventPublisher events, BooleanSupplier protectDefault) {
+            WorldEngine engine, Notifier notifier, DomainEventPublisher events, BooleanSupplier protectDefault) {
         this.engine = Objects.requireNonNull(engine, "engine");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");

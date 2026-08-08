@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.Sponsorship;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -47,7 +48,7 @@ public final class BuySponsorship {
     private final PlayerWarpRepository repository;
     private final WarpAuthorization authorization;
     private final Optional<PlayerWarpEconomy> economy;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final SponsorConfig config;
     private final Clock clock;
 
@@ -55,7 +56,7 @@ public final class BuySponsorship {
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
             Optional<PlayerWarpEconomy> economy,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             SponsorConfig config,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");

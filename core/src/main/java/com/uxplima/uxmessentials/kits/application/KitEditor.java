@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -28,9 +29,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class KitEditor {
 
     private final KitRepository repository;
-    private final KitNotifier notifier;
+    private final Notifier notifier;
 
-    public KitEditor(KitRepository repository, KitNotifier notifier) {
+    public KitEditor(KitRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

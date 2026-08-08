@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -36,8 +37,7 @@ class RemoveHologramActionTest {
     void setUp() {
         repository = new FakeHologramRepository();
         sink = new CapturingSink();
-        remove =
-                new RemoveHologramAction(repository, new HologramNotifier(new HologramTestSupport.KeyMessages(), sink));
+        remove = new RemoveHologramAction(repository, new Notifier(new HologramTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 

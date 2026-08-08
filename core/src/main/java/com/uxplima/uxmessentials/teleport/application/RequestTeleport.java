@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -32,7 +33,7 @@ public final class RequestTeleport {
 
     private final RequestRegistry requests;
     private final TeleportFlags flags;
-    private final PlayerNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final TeleportSettings settings;
     private final JailGate jail;
@@ -42,7 +43,7 @@ public final class RequestTeleport {
     public RequestTeleport(
             RequestRegistry requests,
             TeleportFlags flags,
-            PlayerNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail,
@@ -53,7 +54,7 @@ public final class RequestTeleport {
     public RequestTeleport(
             RequestRegistry requests,
             TeleportFlags flags,
-            PlayerNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail,

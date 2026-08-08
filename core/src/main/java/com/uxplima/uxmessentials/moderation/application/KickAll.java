@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,10 +19,10 @@ public final class KickAll {
 
     private final Sanctions sanctions;
     private final ModerationGuard guard;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final ModerationAudit audit;
 
-    public KickAll(Sanctions sanctions, ModerationGuard guard, ModerationNotifier notifier, ModerationAudit audit) {
+    public KickAll(Sanctions sanctions, ModerationGuard guard, Notifier notifier, ModerationAudit audit) {
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

@@ -12,11 +12,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
-import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
@@ -52,7 +52,7 @@ public final class VoteJoinListener implements Listener {
     private final @Nullable VoteReminderEligibility eligibility;
 
     private final @Nullable ReminderPreferences reminderPreferences;
-    private final @Nullable VoteNotifier notifier;
+    private final @Nullable Notifier notifier;
 
     /**
      * Legacy constructor — queue drain only, no reminders (equivalent to
@@ -80,7 +80,7 @@ public final class VoteJoinListener implements Listener {
             Duration loginDelay,
             @Nullable VoteReminderEligibility eligibility,
             @Nullable ReminderPreferences reminderPreferences,
-            @Nullable VoteNotifier notifier) {
+            @Nullable Notifier notifier) {
         this.applyQueuedRewards = Objects.requireNonNull(applyQueuedRewards, "applyQueuedRewards");
         this.repository = repository != null ? repository : NoopRepository.INSTANCE;
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -111,7 +111,7 @@ public final class VoteJoinListener implements Listener {
         }
         VoteReminderEligibility elig = eligibility;
         ReminderPreferences prefs = reminderPreferences;
-        VoteNotifier note = notifier;
+        Notifier note = notifier;
 
         // One-shot reminder after loginDelay. The eligibility check hits the DB off-tick; the PDC opt-in
         // read and the send then hop to the player's entity thread, guarded against a logout in between.

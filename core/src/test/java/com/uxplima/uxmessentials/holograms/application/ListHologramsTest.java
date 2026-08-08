@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.holograms.application.HologramTestSupport.FakeH
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -30,7 +31,7 @@ class ListHologramsTest {
     void setUp() {
         repository = new FakeHologramRepository();
         sink = new CapturingSink();
-        list = new ListHolograms(repository, new HologramNotifier(new HologramTestSupport.KeyMessages(), sink));
+        list = new ListHolograms(repository, new Notifier(new HologramTestSupport.KeyMessages(), sink));
         viewer = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 

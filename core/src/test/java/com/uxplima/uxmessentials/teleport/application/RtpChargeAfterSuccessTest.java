@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -147,7 +148,7 @@ class RtpChargeAfterSuccessTest {
             this.fee = new FakeFee(affordable);
             this.executor = new FakeExecutor(lands);
             TeleportSettings settings = new TeleportSettings(new CostConfig(COST));
-            PlayerNotifier notifier = new PlayerNotifier(new NoopMessages(), new NoopSink());
+            Notifier notifier = new Notifier(new NoopMessages(), new NoopSink());
             TeleportEngine engine = new TeleportEngine(
                     cooldowns,
                     new ImmediateWarmups(),

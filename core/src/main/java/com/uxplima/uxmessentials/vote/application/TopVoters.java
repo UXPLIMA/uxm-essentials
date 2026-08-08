@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
@@ -27,10 +28,10 @@ import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 public final class TopVoters {
 
     private final VoteRepository repository;
-    private final VoteNotifier notifier;
+    private final Notifier notifier;
     private final int limit;
 
-    public TopVoters(VoteRepository repository, VoteNotifier notifier, int limit) {
+    public TopVoters(VoteRepository repository, Notifier notifier, int limit) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         if (limit < 1) {

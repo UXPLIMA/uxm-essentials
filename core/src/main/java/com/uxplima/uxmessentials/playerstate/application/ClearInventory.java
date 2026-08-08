@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.playerstate.application.port.ClearInventoryPreferences;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -29,13 +30,13 @@ public final class ClearInventory {
     static final Duration CONFIRM_WINDOW = Duration.ofSeconds(15);
 
     private final PlayerEffects effects;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
     private final ClearInventoryPreferences preferences;
     private final Clock clock;
     private final ConcurrentHashMap<UUID, Instant> pendingUntil = new ConcurrentHashMap<>();
 
     public ClearInventory(
-            PlayerEffects effects, PlayerStateNotifier notifier, ClearInventoryPreferences preferences, Clock clock) {
+            PlayerEffects effects, Notifier notifier, ClearInventoryPreferences preferences, Clock clock) {
         this.effects = Objects.requireNonNull(effects, "effects");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.preferences = Objects.requireNonNull(preferences, "preferences");

@@ -29,7 +29,6 @@ import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
-import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
@@ -64,6 +63,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersCon
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
@@ -160,7 +160,7 @@ public final class HomesWiring {
         bus.registry().register(HomeSync.listener(cached));
         HomeRepository repository = HomeSync.repository(cached, bus.publisher());
         HomeInviteRepository invites = HomeRepositories.homeInviteRepository(persistence);
-        HomeNotifier notifier = new HomeNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx), limitMode(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
         HomeServices services = assemble(
@@ -191,7 +191,7 @@ public final class HomesWiring {
             ModuleContext ctx,
             HomeRepository repository,
             HomeInviteRepository invites,
-            HomeNotifier notifier,
+            Notifier notifier,
             HomeQuota quota,
             HomeTeleporter teleporter,
             Optional<HomeEconomy> homeEconomy,
@@ -304,7 +304,7 @@ public final class HomesWiring {
     private static HomeActionMenu buildActionMenu(
             Menus menus,
             KernelPorts kernel,
-            HomeNotifier notifier,
+            Notifier notifier,
             TeleportHome teleportHome,
             DeleteHome deleteHome,
             RelocateHome relocateHome,

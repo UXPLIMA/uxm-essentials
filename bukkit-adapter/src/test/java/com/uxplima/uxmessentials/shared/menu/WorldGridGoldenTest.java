@@ -16,6 +16,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.Engine;
@@ -23,7 +24,6 @@ import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.FakeReposito
 import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.RecordingEvents;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGridMenu;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
@@ -144,7 +144,7 @@ class WorldGridGoldenTest {
     private SetWorldProperty setProperty() {
         return new SetWorldProperty(
                 repository,
-                new WorldNotifier(new WorldEditorTestSupport.KeyMessages(), new WorldEditorTestSupport.SilentSink()),
+                new Notifier(new WorldEditorTestSupport.KeyMessages(), new WorldEditorTestSupport.SilentSink()),
                 events,
                 scheduler);
     }

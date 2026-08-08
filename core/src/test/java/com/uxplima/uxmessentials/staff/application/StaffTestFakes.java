@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -53,9 +54,9 @@ final class StaffTestFakes {
                 false);
     }
 
-    /** A {@link StaffNotifier} wired over collecting message ports, so tests can read what was sent. */
-    StaffNotifier notifier() {
-        return new StaffNotifier(new EchoMessages(), new CollectingSink(sentKeys));
+    /** A {@link Notifier} wired over collecting message ports, so tests can read what was sent. */
+    Notifier notifier() {
+        return new Notifier(new EchoMessages(), new CollectingSink(sentKeys));
     }
 
     final List<MessageKey> sentKeys = new ArrayList<>();

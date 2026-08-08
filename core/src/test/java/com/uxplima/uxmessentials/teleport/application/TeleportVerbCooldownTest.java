@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -85,7 +86,7 @@ class TeleportVerbCooldownTest {
                 cooldowns,
                 new ImmediateWarmups(),
                 new RecordingExecutor(),
-                new PlayerNotifier(new NoopMessages(), new NoopSink()),
+                new Notifier(new NoopMessages(), new NoopSink()),
                 new NoopEvents(),
                 new TeleportSettings(config),
                 JailGate.NEVER);

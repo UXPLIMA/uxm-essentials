@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.worlds.application;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -22,12 +23,12 @@ import com.uxplima.uxmessentials.worlds.domain.event.WorldUnregistered;
 public final class UnregisterWorld {
 
     private final WorldRepository repository;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
 
     public UnregisterWorld(
-            WorldRepository repository, WorldNotifier notifier, DomainEventPublisher events, Scheduler scheduler) {
+            WorldRepository repository, Notifier notifier, DomainEventPublisher events, Scheduler scheduler) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");

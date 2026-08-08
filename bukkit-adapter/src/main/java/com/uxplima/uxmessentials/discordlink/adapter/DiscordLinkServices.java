@@ -4,10 +4,10 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.discordlink.application.BeginLink;
 import com.uxplima.uxmessentials.discordlink.application.ConfirmLink;
-import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
 import com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -29,7 +29,7 @@ public record DiscordLinkServices(
         ConfirmLink confirmLink,
         Unlink unlink,
         LinkStatus linkStatus,
-        DiscordLinkNotifier notifier,
+        Notifier notifier,
         DiscordBridge bridge) {
 
     public DiscordLinkServices {

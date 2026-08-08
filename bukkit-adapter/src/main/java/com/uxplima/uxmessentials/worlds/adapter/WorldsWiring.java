@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -74,7 +75,6 @@ import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
 import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
 import com.uxplima.uxmessentials.worlds.application.WorldInfo;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
@@ -131,7 +131,7 @@ public final class WorldsWiring {
         CachedWorldRepository repository = WorldRepositories.cachedConcrete(persistence);
         repository.all(); // warm the in-memory snapshot once on enable (tick-safe reads thereafter)
 
-        WorldNotifier notifier = new WorldNotifier(kernel.messages(), kernel.messageSink());
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WorldsSettings settings = new WorldsSettings(ctx.config());
         WorldGeneratorResolver resolver = new WorldGeneratorResolver(
                 settings.flatLayers(), settings.voidBiome(), settings.flatBiome(), kernel.log());
@@ -328,7 +328,7 @@ public final class WorldsWiring {
             KernelPorts kernel,
             Scheduler scheduler,
             com.uxplima.uxmessentials.worlds.application.port.WorldRepository repository,
-            WorldNotifier notifier,
+            Notifier notifier,
             BukkitWorldEngine engine,
             InMemoryPendingDeletionRegistry pending,
             WorldsSettings settings,

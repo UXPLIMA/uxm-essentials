@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.domain.event.BroadcastOptOutToggled;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -20,12 +21,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class BroadcastOptOut {
 
     private final BroadcastOptOutStore store;
-    private final CommunicationNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
 
-    public BroadcastOptOut(
-            BroadcastOptOutStore store, CommunicationNotifier notifier, DomainEventPublisher events, Clock clock) {
+    public BroadcastOptOut(BroadcastOptOutStore store, Notifier notifier, DomainEventPublisher events, Clock clock) {
         this.store = Objects.requireNonNull(store, "store");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");

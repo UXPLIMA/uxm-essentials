@@ -9,7 +9,6 @@ import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.port.CrossServerTeleport;
 import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleport;
@@ -17,6 +16,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleportSto
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
@@ -42,7 +42,7 @@ public final class BukkitCrossServerTeleport implements CrossServerTeleport {
     private final ServerConnector connector;
     private final Scheduler scheduler;
     private final Optional<PlayerWarpEconomy> economy;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final String localServerId;
     private final Clock clock;
 
@@ -51,7 +51,7 @@ public final class BukkitCrossServerTeleport implements CrossServerTeleport {
             ServerConnector connector,
             Scheduler scheduler,
             Optional<PlayerWarpEconomy> economy,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             String localServerId,
             Clock clock) {
         this.store = Objects.requireNonNull(store, "store");

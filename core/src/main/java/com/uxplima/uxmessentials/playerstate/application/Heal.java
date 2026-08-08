@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.domain.event.Healed;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -18,17 +19,13 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class Heal {
 
     private final PlayerEffects effects;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
     private final boolean removeEffects;
 
     public Heal(
-            PlayerEffects effects,
-            PlayerStateNotifier notifier,
-            DomainEventPublisher events,
-            Clock clock,
-            boolean removeEffects) {
+            PlayerEffects effects, Notifier notifier, DomainEventPublisher events, Clock clock, boolean removeEffects) {
         this.effects = Objects.requireNonNull(effects, "effects");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");

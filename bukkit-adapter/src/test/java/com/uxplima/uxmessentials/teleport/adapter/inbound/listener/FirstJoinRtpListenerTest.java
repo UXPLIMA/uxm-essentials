@@ -13,6 +13,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -26,7 +27,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
@@ -65,7 +65,7 @@ class FirstJoinRtpListenerTest {
         queue = new FakeQueue();
         executor = new RecordingExecutor();
         TeleportSettings settings = new TeleportSettings(new EmptyConfig());
-        PlayerNotifier notifier = new PlayerNotifier(new NoopMessages(), new NoopSink());
+        Notifier notifier = new Notifier(new NoopMessages(), new NoopSink());
         TeleportEngine engine = new TeleportEngine(
                 new NoopCooldowns(),
                 new ImmediateWarmups(),

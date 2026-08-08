@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.event.HologramDeleted;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -40,8 +41,8 @@ class DeleteHologramTest {
         view = new RecordingView();
         events = new RecordingEvents();
         sink = new CapturingSink();
-        delete = new DeleteHologram(
-                repository, view, new HologramNotifier(new HologramTestSupport.KeyMessages(), sink), events);
+        delete =
+                new DeleteHologram(repository, view, new Notifier(new HologramTestSupport.KeyMessages(), sink), events);
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 

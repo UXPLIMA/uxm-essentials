@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.staff.application;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -47,7 +48,7 @@ public final class ExitStaffMode {
     private final StaffLoadoutRepository loadoutRepository;
     private final StaffLoadoutCapture capture;
     private final StaffVanish vanish;
-    private final StaffNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
 
     public ExitStaffMode(
@@ -55,7 +56,7 @@ public final class ExitStaffMode {
             StaffLoadoutRepository loadoutRepository,
             StaffLoadoutCapture capture,
             StaffVanish vanish,
-            StaffNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events) {
         this.store = Objects.requireNonNull(store, "store");
         this.loadoutRepository = Objects.requireNonNull(loadoutRepository, "loadoutRepository");

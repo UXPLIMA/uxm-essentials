@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -33,7 +34,7 @@ public final class UseWarp {
     private final WarpRepository repository;
     private final WarpAccess access;
     private final WarpTeleporter teleporter;
-    private final WarpNotifier notifier;
+    private final Notifier notifier;
     private final WarpSafetyChecker safetyChecker;
     private final Permissions permissions;
     private final Scheduler scheduler;
@@ -42,7 +43,7 @@ public final class UseWarp {
             WarpRepository repository,
             WarpAccess access,
             WarpTeleporter teleporter,
-            WarpNotifier notifier,
+            Notifier notifier,
             WarpSafetyChecker safetyChecker,
             Permissions permissions,
             Scheduler scheduler) {

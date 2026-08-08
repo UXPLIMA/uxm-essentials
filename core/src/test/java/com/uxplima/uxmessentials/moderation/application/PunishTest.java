@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctions;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 
@@ -94,7 +95,7 @@ class PunishTest {
         assertThat(history.appended).isEmpty();
     }
 
-    private Punish punish(ModerationNotifier notifier, PunishmentTemplate template) {
+    private Punish punish(Notifier notifier, PunishmentTemplate template) {
         RecordingModerationAudit audit = new RecordingModerationAudit();
         SanctionHistoryRecorder recorder = new SanctionHistoryRecorder(history, CLOCK);
         SanctionDurationLimit limit = new SanctionDurationLimit(ModerationFakes.exempt());

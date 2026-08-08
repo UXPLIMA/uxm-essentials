@@ -19,6 +19,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
@@ -26,7 +27,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
-import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,7 +63,7 @@ class RtpCommandTest {
         sink = new CapturingSink();
         when(services.resolveRtp()).thenReturn(resolveRtp);
         when(services.worlds()).thenReturn(worlds);
-        when(services.notifier()).thenReturn(new PlayerNotifier(new KeyMessages(), sink));
+        when(services.notifier()).thenReturn(new Notifier(new KeyMessages(), sink));
         command = new RtpCommand(services, new KeyMessages(), mock(RtpMenu.class), true);
     }
 

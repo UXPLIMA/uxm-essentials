@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -21,9 +22,9 @@ public final class InviteToHome {
 
     private final HomeRepository repository;
     private final HomeInviteRepository invites;
-    private final HomeNotifier notifier;
+    private final Notifier notifier;
 
-    public InviteToHome(HomeRepository repository, HomeInviteRepository invites, HomeNotifier notifier) {
+    public InviteToHome(HomeRepository repository, HomeInviteRepository invites, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

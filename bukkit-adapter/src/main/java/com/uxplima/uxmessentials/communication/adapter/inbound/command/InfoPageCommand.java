@@ -15,12 +15,12 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
-import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.InfoPageView;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.application.ShowInfoPage;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -51,14 +51,10 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
     private final String command;
     private final InfoRegistry registry;
     private final BukkitInfoSender infoSender;
-    private final CommunicationNotifier notifier;
+    private final Notifier notifier;
 
     public InfoPageCommand(
-            String command,
-            InfoRegistry registry,
-            BukkitInfoSender infoSender,
-            CommunicationNotifier notifier,
-            Messages messages) {
+            String command, InfoRegistry registry, BukkitInfoSender infoSender, Notifier notifier, Messages messages) {
         super(messages);
         this.command = Objects.requireNonNull(command, "command");
         this.registry = Objects.requireNonNull(registry, "registry");

@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -31,7 +32,7 @@ public final class RestoreWorld {
     private final WorldEngine engine;
     private final WorldArchive archive;
     private final PendingRestoreRegistry pending;
-    private final WorldNotifier notifier;
+    private final Notifier notifier;
     private final Scheduler scheduler;
 
     public RestoreWorld(
@@ -39,7 +40,7 @@ public final class RestoreWorld {
             WorldEngine engine,
             WorldArchive archive,
             PendingRestoreRegistry pending,
-            WorldNotifier notifier,
+            Notifier notifier,
             Scheduler scheduler) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");

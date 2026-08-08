@@ -5,15 +5,14 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Pairs the {@link Messages} resolution port with the {@link MessageSink} delivery port so an economy use
- * case sends a {@link MessageKey} to a viewer in one call. Resolution happens in the viewer's locale and
- * delivery hops to the viewer's region thread, silently no-opping when they are offline. Mirrors the
- * homes/warps notifiers rather than sharing one, keeping each context's send surface its own.
+ * The shared {@link Notifier} plus the money formatting an economy message needs, so an economy use case
+ * sends a {@link MessageKey} and renders a {@link Money} placeholder through one collaborator.
  *
  * <p>It also owns the configured {@link AmountFormat}, so every economy use case renders a {@link Money}
  * placeholder through {@link #amount(Money)} and the operator's {@code economy.amount-format} choice applies
@@ -22,8 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public final class EconomyNotifier {
 
-    private final Messages messages;
-    private final MessageSink sink;
+    private final Notifier notifier;
     private final AmountFormat amountFormat;
 
     public EconomyNotifier(Messages messages, MessageSink sink) {
@@ -31,22 +29,18 @@ public final class EconomyNotifier {
     }
 
     public EconomyNotifier(Messages messages, MessageSink sink, AmountFormat amountFormat) {
-        this.messages = Objects.requireNonNull(messages, "messages");
-        this.sink = Objects.requireNonNull(sink, "sink");
+        this.notifier = new Notifier(messages, sink);
         this.amountFormat = Objects.requireNonNull(amountFormat, "amountFormat");
     }
 
     /** Resolve {@code key} for {@code viewer} with {@code placeholders} and deliver it. */
     public void send(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        Objects.requireNonNull(viewer, "viewer");
-        Objects.requireNonNull(key, "key");
-        Objects.requireNonNull(placeholders, "placeholders");
-        sink.deliver(viewer, messages.resolve(viewer, key, placeholders));
+        notifier.send(viewer, key, placeholders);
     }
 
     /** Resolve and deliver {@code key} with no placeholders. */
     public void send(PlayerRef viewer, MessageKey key) {
-        send(viewer, key, Map.of());
+        notifier.send(viewer, key);
     }
 
     /** Render {@code money} with its symbol in the configured {@link AmountFormat} — the {@code {amount}} value. */

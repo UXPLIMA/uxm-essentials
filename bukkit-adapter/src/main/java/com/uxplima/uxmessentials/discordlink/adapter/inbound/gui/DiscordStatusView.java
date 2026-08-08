@@ -11,7 +11,6 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.discordlink.application.BeginLink;
-import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -36,7 +36,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /uxmess gui} hub): a {@link SettingsPanelView} of two buttons read FRESH each open — a read-only status
  * line showing the viewer's current binding, and a state-dependent action. When the viewer is not linked the
  * action runs the {@link BeginLink} use case (exactly what {@code /discordlink} does), telling them the generated
- * code through the same {@link DiscordLinkNotifier} chat messages; when they are linked the action runs the
+ * code through the same {@link Notifier} chat messages; when they are linked the action runs the
  * {@link Unlink} use case behind a confirm (exactly what {@code /discordunlink} does).
  *
  * <p>The panel holds no domain logic of its own. Linking is code-based — the redemption itself happens in Discord
@@ -56,7 +56,7 @@ public final class DiscordStatusView {
     private final BeginLink beginLink;
     private final Unlink unlink;
     private final LinkStatus linkStatus;
-    private final DiscordLinkNotifier notifier;
+    private final Notifier notifier;
     private final Messages messages;
     private final GuiText guiText;
     private final Scheduler scheduler;
@@ -71,7 +71,7 @@ public final class DiscordStatusView {
             BeginLink beginLink,
             Unlink unlink,
             LinkStatus linkStatus,
-            DiscordLinkNotifier notifier,
+            Notifier notifier,
             DiscordBridge bridge,
             Menus menus) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");

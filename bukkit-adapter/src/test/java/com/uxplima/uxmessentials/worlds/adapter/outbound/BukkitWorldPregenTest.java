@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -22,7 +23,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
@@ -57,7 +57,7 @@ class BukkitWorldPregenTest {
         MockBukkit.mock();
         scheduler = new CapturingScheduler();
         sink = new RecordingSink();
-        WorldNotifier notifier = new WorldNotifier(new StubMessages(), sink);
+        Notifier notifier = new Notifier(new StubMessages(), sink);
         WorldsSettings settings = new WorldsSettings(new MapConfig());
         pregen = new BukkitWorldPregen(
                 new ImmediateGenSource(),

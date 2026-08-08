@@ -12,7 +12,6 @@ import java.util.function.BiConsumer;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
@@ -31,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAct
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -75,7 +75,7 @@ public final class PlayerWarpViewMenu {
     private final FavouritePlayerWarp favouritePlayerWarp;
     private final RatePlayerWarp ratePlayerWarp;
     private final Messages messages;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final BiConsumer<Player, PlayerRef> openBrowse;
     private final BiConsumer<PlayerRef, PlayerWarpName> openManage;
 
@@ -89,7 +89,7 @@ public final class PlayerWarpViewMenu {
             FavouritePlayerWarp favouritePlayerWarp,
             RatePlayerWarp ratePlayerWarp,
             Messages messages,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             BiConsumer<Player, PlayerRef> openBrowse,
             BiConsumer<PlayerRef, PlayerWarpName> openManage) {
         this.menus = Objects.requireNonNull(menus, "menus");

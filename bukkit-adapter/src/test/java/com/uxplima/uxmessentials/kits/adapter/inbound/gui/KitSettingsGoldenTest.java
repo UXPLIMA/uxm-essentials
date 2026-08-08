@@ -28,7 +28,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.kits.application.DelKit;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
-import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
@@ -40,6 +39,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -130,7 +130,7 @@ class KitSettingsGoldenTest {
         engine.installListener(plugin);
         repository = new RecordingRepository(List.of(PVP));
         backTarget = new AtomicReference<>();
-        KitNotifier notifier = new KitNotifier(new KeyMessages(), new NoSink());
+        Notifier notifier = new Notifier(new KeyMessages(), new NoSink());
         KitEditor kitEditor = new KitEditor(repository, notifier);
         DelKit delKit = new DelKit(repository, notifier);
         KitEditorView editorView = new KitEditorView(new KeyMessages(), kitEditor, scheduler);

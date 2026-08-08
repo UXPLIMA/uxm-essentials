@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.InventoryViewer;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,9 +19,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class OpenContainer {
 
     private final InventoryViewer viewer;
-    private final PlayerStateNotifier notifier;
+    private final Notifier notifier;
 
-    public OpenContainer(InventoryViewer viewer, PlayerStateNotifier notifier) {
+    public OpenContainer(InventoryViewer viewer, Notifier notifier) {
         this.viewer = Objects.requireNonNull(viewer, "viewer");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }

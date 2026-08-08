@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -105,7 +106,7 @@ class TeleportEngineTest {
                 cooldowns,
                 warmups,
                 executor,
-                new PlayerNotifier(new NoopMessages(), new NoopSink()),
+                new Notifier(new NoopMessages(), new NoopSink()),
                 new NoopEvents(),
                 new TeleportSettings(new PhaseConfig(phase)),
                 com.uxplima.uxmessentials.teleport.application.port.JailGate.NEVER);

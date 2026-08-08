@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -118,7 +119,7 @@ class CombatGateTest {
                 new NoCooldowns(),
                 new ImmediateWarmups(),
                 executor,
-                new PlayerNotifier(new KeyOnlyMessages(), sink),
+                new Notifier(new KeyOnlyMessages(), sink),
                 new NoopEvents(),
                 new TeleportSettings(new MinimalConfig()),
                 JailGate.NEVER,
@@ -129,7 +130,7 @@ class CombatGateTest {
         return new RequestTeleport(
                 new NoopRegistry(),
                 new OpenFlags(),
-                new PlayerNotifier(new KeyOnlyMessages(), sink),
+                new Notifier(new KeyOnlyMessages(), sink),
                 new NoopEvents(),
                 new TeleportSettings(new MinimalConfig()),
                 JailGate.NEVER,

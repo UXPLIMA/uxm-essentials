@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpLimit;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.ReservedWarpNames;
 import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpCreated;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -37,7 +38,7 @@ public final class SetPlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final PlayerWarpQuota quota;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
     private final java.util.List<String> worldBlacklist;
@@ -45,7 +46,7 @@ public final class SetPlayerWarp {
     public SetPlayerWarp(
             PlayerWarpRepository repository,
             PlayerWarpQuota quota,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
             java.util.List<String> worldBlacklist) {

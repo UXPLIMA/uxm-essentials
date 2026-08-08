@@ -15,7 +15,6 @@ import java.util.function.BiConsumer;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
@@ -33,6 +32,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -80,7 +80,7 @@ public final class PlayerWarpPeopleMenu {
     private final ManageWhitelist manageWhitelist;
     private final ManageBans manageBans;
     private final Messages messages;
-    private final PlayerWarpNotifier notifier;
+    private final Notifier notifier;
     private final BiConsumer<PlayerRef, PlayerWarpName> openManage;
 
     public PlayerWarpPeopleMenu(
@@ -95,7 +95,7 @@ public final class PlayerWarpPeopleMenu {
             ManageWhitelist manageWhitelist,
             ManageBans manageBans,
             Messages messages,
-            PlayerWarpNotifier notifier,
+            Notifier notifier,
             BiConsumer<PlayerRef, PlayerWarpName> openManage) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");

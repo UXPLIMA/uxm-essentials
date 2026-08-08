@@ -30,7 +30,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
 import com.uxplima.uxmessentials.kits.application.DelKit;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
-import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
@@ -46,6 +45,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -188,7 +188,7 @@ class KitManagerGoldenTest {
     /** A {@link KitManagerMenu} wired off the same collaborators as the old view, over the engine façade. */
     private KitManagerMenu managerMenu(Menus menus, MenuBindings bindings) {
         Messages messages = new KeyMessages();
-        KitNotifier notifier = new KitNotifier(messages, new NoSink());
+        Notifier notifier = new Notifier(messages, new NoSink());
         KitEditor kitEditor = new KitEditor(repository, notifier);
         // The per-kit settings panel renders through the engine now: build it over the same engine and register its
         // spec, so a manager kit click opens that menu-backed window.

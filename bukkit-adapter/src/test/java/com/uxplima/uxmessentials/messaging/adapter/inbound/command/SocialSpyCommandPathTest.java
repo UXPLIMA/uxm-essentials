@@ -30,7 +30,6 @@ import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
 import com.uxplima.uxmessentials.messaging.application.ListIgnores;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
-import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.Reply;
@@ -50,6 +49,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -178,7 +178,7 @@ class SocialSpyCommandPathTest {
 
     private SendMessage sendMessage() {
         Messages messages = new KeyMessages();
-        MessagingNotifier notifier = new MessagingNotifier(messages, sink);
+        Notifier notifier = new Notifier(messages, sink);
         return new SendMessage(
                 delivery,
                 new NoIgnores(),
@@ -196,7 +196,7 @@ class SocialSpyCommandPathTest {
 
     private MessagingServices services() {
         Messages messages = new KeyMessages();
-        MessagingNotifier notifier = new MessagingNotifier(messages, sink);
+        Notifier notifier = new Notifier(messages, sink);
         BukkitMessageDelivery realDelivery = new BukkitMessageDelivery(messages, sink);
         MutePolicy mute = MutePolicy.NEVER;
         PlayerLookup players = new CapturingLookup(server);

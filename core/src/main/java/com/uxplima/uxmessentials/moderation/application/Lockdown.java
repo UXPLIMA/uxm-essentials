@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -19,15 +20,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class Lockdown {
 
     private final ModerationRepository repository;
-    private final ModerationNotifier notifier;
+    private final Notifier notifier;
     private final SanctionBroadcast broadcast;
     private final ModerationAudit audit;
 
     public Lockdown(
-            ModerationRepository repository,
-            ModerationNotifier notifier,
-            SanctionBroadcast broadcast,
-            ModerationAudit audit) {
+            ModerationRepository repository, Notifier notifier, SanctionBroadcast broadcast, ModerationAudit audit) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");

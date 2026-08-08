@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpEarnings;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -559,7 +560,7 @@ final class PlayerWarpTestSupport {
         }
     }
 
-    static PlayerWarpNotifier notifier(Sink sink) {
-        return new PlayerWarpNotifier(new KeyMessages(), sink);
+    static Notifier notifier(Sink sink) {
+        return new Notifier(new KeyMessages(), sink);
     }
 }

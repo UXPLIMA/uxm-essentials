@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -17,9 +18,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ListHolograms {
 
     private final HologramRepository repository;
-    private final HologramNotifier notifier;
+    private final Notifier notifier;
 
-    public ListHolograms(HologramRepository repository, HologramNotifier notifier) {
+    public ListHolograms(HologramRepository repository, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
