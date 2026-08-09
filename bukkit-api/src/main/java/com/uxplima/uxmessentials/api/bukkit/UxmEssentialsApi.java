@@ -3,6 +3,9 @@ package com.uxplima.uxmessentials.api.bukkit;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
@@ -73,6 +76,19 @@ public interface UxmEssentialsApi {
 
     /** The menu registration surface: custom actions, requirements, placeholders, list sources and icons. */
     MenuApi menus();
+
+    /**
+     * What uxmEssentials can be asked to do, attributed to {@code plugin}.
+     *
+     * <p>The plugin is required because every write is attributable: its name is what the audit log records, so an
+     * operator asking who moved a balance gets an answer. Pass your own {@code JavaPlugin}.
+     *
+     * <pre>{@code
+     * api.actions(this).economy().ifPresent(economy ->
+     *     economy.deposit(playerId, new BigDecimal("50")));
+     * }</pre>
+     */
+    UxmActions actions(Plugin plugin);
 
     /**
      * Reading a player's homes, or empty when the homes module is switched off.

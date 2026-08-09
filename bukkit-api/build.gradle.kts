@@ -9,4 +9,6 @@ dependencies {
     api(project(":api"))
     compileOnly(libs.paper.api)
     compileOnly(libs.jspecify)
+    // The front door hands out its write surface against a Plugin, so the tests need Paper on their classpath too.
+    testImplementation(libs.paper.api)
 }

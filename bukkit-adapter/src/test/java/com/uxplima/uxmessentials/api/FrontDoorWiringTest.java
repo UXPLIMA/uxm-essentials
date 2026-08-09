@@ -14,7 +14,9 @@ import java.util.function.Function;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuClick;
@@ -97,6 +99,15 @@ class FrontDoorWiringTest {
     }
 
     @Test
+    void aContextThatNeverWiredOffersNoWritesEither() {
+        UxmActions actions = api(new ToggleConfig(true), "homes").actions(plugin("MyPlugin"));
+
+        assertThat(actions.economy())
+                .as("a disabled module registers no write surface, so a consumer takes its own path instead")
+                .isEmpty();
+    }
+
+    @Test
     void aSurfaceRegisteredAfterTheFrontDoorWasBuiltIsStillVisible() {
         // The front door is published to other plugins before any context has wired, so the registry it holds is
         // filled afterwards. A snapshot taken at construction time would answer empty forever.
@@ -123,6 +134,13 @@ class FrontDoorWiringTest {
     @Test
     void versionIsWhateverTheWiringWasGiven() {
         assertThat(api(new ToggleConfig(true), "homes").version()).isEqualTo("1.2.3");
+    }
+
+    /** A plugin handle that knows only its name, which is all the front door reads off it. */
+    private static Plugin plugin(String name) {
+        Plugin plugin = org.mockito.Mockito.mock(Plugin.class);
+        org.mockito.Mockito.when(plugin.getName()).thenReturn(name);
+        return plugin;
     }
 
     private static UxmEssentialsApi api(ToggleConfig config, String moduleId) {

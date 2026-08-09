@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
@@ -105,6 +108,11 @@ class FrontDoorTest {
         @Override
         public MenuApi menus() {
             throw new UnsupportedOperationException("the front-door test does not exercise the menu surface");
+        }
+
+        @Override
+        public UxmActions actions(Plugin plugin) {
+            throw new UnsupportedOperationException("this test never writes anything");
         }
 
         @Override

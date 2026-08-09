@@ -1,3 +1,57 @@
+interface com.uxplima.uxmessentials.api.action.UxmActions
+  Optional economy()
+interface com.uxplima.uxmessentials.api.action.UxmEconomyActions
+  CompletableFuture deposit(UUID, BigDecimal)
+  CompletableFuture deposit(UUID, BigDecimal, String)
+  CompletableFuture set(UUID, BigDecimal)
+  CompletableFuture set(UUID, BigDecimal, String)
+  CompletableFuture transfer(UUID, UUID, BigDecimal)
+  CompletableFuture transfer(UUID, UUID, BigDecimal, String)
+  CompletableFuture withdraw(UUID, BigDecimal)
+  CompletableFuture withdraw(UUID, BigDecimal, String)
+record com.uxplima.uxmessentials.api.action.UxmFailure
+  <init>(String, String)
+  String code()
+  String message()
+  String toString()
+  boolean equals(Object)
+  boolean is(String)
+  com.uxplima.uxmessentials.api.action.UxmFailure of(String, String)
+  int hashCode()
+  String ALREADY_EXISTS
+  String ALREADY_IN_STATE
+  String CANCELLED
+  String FAILED
+  String INSUFFICIENT_FUNDS
+  String NOT_FOUND
+  String PLAYER_OFFLINE
+  String REFUSED
+record com.uxplima.uxmessentials.api.action.UxmOutcome
+  <init>(Optional)
+  Optional failure()
+  String toString()
+  boolean equals(Object)
+  boolean succeeded()
+  com.uxplima.uxmessentials.api.action.UxmFailure failureOrThrow()
+  com.uxplima.uxmessentials.api.action.UxmOutcome failed(String, String)
+  com.uxplima.uxmessentials.api.action.UxmOutcome failed(com.uxplima.uxmessentials.api.action.UxmFailure)
+  com.uxplima.uxmessentials.api.action.UxmOutcome ok()
+  int hashCode()
+  void ifFailed(Consumer)
+class com.uxplima.uxmessentials.api.action.UxmResult
+  Object valueOrThrow()
+  Optional failure()
+  Optional value()
+  String toString()
+  boolean equals(Object)
+  boolean succeeded()
+  com.uxplima.uxmessentials.api.action.UxmFailure failureOrThrow()
+  com.uxplima.uxmessentials.api.action.UxmOutcome asOutcome()
+  com.uxplima.uxmessentials.api.action.UxmResult failed(String, String)
+  com.uxplima.uxmessentials.api.action.UxmResult failed(com.uxplima.uxmessentials.api.action.UxmFailure)
+  com.uxplima.uxmessentials.api.action.UxmResult ok(Object)
+  int hashCode()
+  void ifFailed(Consumer)
 class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
   void uninstall()
@@ -19,6 +73,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional worlds()
   String version()
   boolean isModuleEnabled(String)
+  com.uxplima.uxmessentials.api.action.UxmActions actions(Plugin)
   com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi get()
   com.uxplima.uxmessentials.api.bukkit.menu.MenuApi menus()
   void whenReady(Consumer)

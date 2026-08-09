@@ -19,6 +19,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
@@ -171,6 +172,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLif
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitEventBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
@@ -426,12 +428,16 @@ public final class PluginModule {
         // each enabled context wires: the front door has to be up early enough for a consumer that enables before us,
         // and the contexts only exist once the modules have wired.
         QueryContexts queries = QueryContexts.empty();
+        // The write surfaces, filled the same way. Separate from the read ones because a consumer holding a query
+        // surface must not be able to reach a write through it, which is the promise the documentation makes.
+        ActionContexts actions = ActionContexts.empty();
         UxmEssentialsApi devApi = new UxmEssentialsApiImpl(
                 plugin.getPluginMeta().getVersion(),
                 registry,
                 () -> config,
                 new EngineMenuApi(menuBindings, menuItemRenderer, runtimeIcons),
-                queries);
+                queries,
+                actions);
         plugin.getServer()
                 .getServicesManager()
                 .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);
@@ -684,6 +690,7 @@ public final class PluginModule {
                 config,
                 kernel,
                 queries,
+                actions,
                 persistence,
                 resources,
                 log,
@@ -849,6 +856,7 @@ public final class PluginModule {
             ConfigStore config,
             KernelPorts kernel,
             QueryContexts queries,
+            ActionContexts actions,
             Persistence persistence,
             CloseableResources resources,
             Logger log,
@@ -861,7 +869,7 @@ public final class PluginModule {
             AtomicReference<TextInput> menuTextInputRef) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
-        ContextLinks links = new ContextLinks(queries);
+        ContextLinks links = new ContextLinks(queries, actions);
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -1660,6 +1668,15 @@ public final class PluginModule {
                         wired.snapshots(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        links.actions.register(
+                UxmEconomyActions.class,
+                source -> new com.uxplima.uxmessentials.economy.adapter.outbound.api.EconomyActions(
+                        wired.admin(),
+                        wired.provider(),
+                        wired.currencies(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler(),
+                        source));
         // Publish a balance leaderboard source for the holograms module (wired later): the lock-free baltop
         // snapshot, mapped into ranked name/score rows. The composition root is the only place that may bridge
         // the two contexts, so the provider is a lambda here rather than a class in either context.
@@ -2569,9 +2586,14 @@ public final class PluginModule {
         // rather than created here, because the API front door is published to other plugins before any context
         // wires and has to hold the same instance the contexts fill.
         private final com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries;
+        // The published write surfaces, held for the same reason and filled the same way.
+        private final com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions;
 
-        private ContextLinks(com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries) {
+        private ContextLinks(
+                com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries,
+                com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions) {
             this.queries = queries;
+            this.actions = actions;
         }
         // Built once and shared by the scoreboard and nametags wirings (in either registry order): the nametags
         // presenter hides a wearer's vanilla name through it, the scoreboard SidebarManager re-applies the hide-team

@@ -404,7 +404,8 @@ public final class EconomyWiring {
                 loanRepaymentTask,
                 maintenanceTask,
                 bankInterestTask,
-                services.walletView());
+                services.walletView(),
+                services.ecoAdmin());
     }
 
     /**
@@ -682,6 +683,7 @@ public final class EconomyWiring {
      * @param defaultCurrency the default currency the {@code balance}/{@code baltop_position} placeholders read
      * @param amountFormat the operator-selected amount format the {@code balance_formatted} placeholder uses
      * @param walletView the wallet dashboard the {@code /wallet} command and the management hub both open
+     * @param admin the eco-admin use case, which is also what a published API write runs
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -704,7 +706,8 @@ public final class EconomyWiring {
             @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask,
-            WalletPanelMenu walletView) {
+            WalletPanelMenu walletView,
+            EcoAdmin admin) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -724,6 +727,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(amountFormat, "amountFormat");
             Objects.requireNonNull(maintenanceTask, "maintenanceTask");
             Objects.requireNonNull(bankInterestTask, "bankInterestTask");
+            Objects.requireNonNull(admin, "admin");
             Objects.requireNonNull(walletView, "walletView");
         }
 

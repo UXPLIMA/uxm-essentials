@@ -4,6 +4,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
@@ -21,6 +24,7 @@ import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -41,9 +45,10 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     private final Supplier<ConfigStore> config;
     private final MenuApi menus;
     private final QueryContexts queries;
+    private final ActionContexts actions;
 
     public UxmEssentialsApiImpl(String version, ModuleRegistry modules, Supplier<ConfigStore> config, MenuApi menus) {
-        this(version, modules, config, menus, QueryContexts.empty());
+        this(version, modules, config, menus, QueryContexts.empty(), ActionContexts.empty());
     }
 
     public UxmEssentialsApiImpl(
@@ -52,11 +57,22 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
             Supplier<ConfigStore> config,
             MenuApi menus,
             QueryContexts queries) {
+        this(version, modules, config, menus, queries, ActionContexts.empty());
+    }
+
+    public UxmEssentialsApiImpl(
+            String version,
+            ModuleRegistry modules,
+            Supplier<ConfigStore> config,
+            MenuApi menus,
+            QueryContexts queries,
+            ActionContexts actions) {
         this.version = Objects.requireNonNull(version, "version");
         this.modules = Objects.requireNonNull(modules, "modules");
         this.config = Objects.requireNonNull(config, "config");
         this.menus = Objects.requireNonNull(menus, "menus");
         this.queries = Objects.requireNonNull(queries, "queries");
+        this.actions = Objects.requireNonNull(actions, "actions");
     }
 
     @Override
@@ -76,6 +92,12 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public MenuApi menus() {
         return menus;
+    }
+
+    @Override
+    public UxmActions actions(Plugin plugin) {
+        Objects.requireNonNull(plugin, "plugin");
+        return new UxmActionsImpl(plugin.getName(), actions);
     }
 
     @Override
