@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.warps.domain;
 
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 
 /**
@@ -35,16 +37,20 @@ public enum WarpError {
     WRONG_PASSWORD(WarpsMessageKey.WARP_WRONG_PASSWORD),
 
     /** The warp cannot be created in this world because it is blacklisted. */
-    WORLD_BLACKLISTED(WarpsMessageKey.WARP_WORLD_BLACKLISTED);
+    WORLD_BLACKLISTED(WarpsMessageKey.WARP_WORLD_BLACKLISTED),
+    /** Another plugin refused the action through the developer API. Nothing was written. */
+    VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 
-    private final WarpsMessageKey messageKey;
+    // Typed as the MessageKey interface rather than this context's own enum: a veto is refused for the same reason
+    // in every context, so it renders one shared key rather than twenty near-identical ones.
+    private final MessageKey messageKey;
 
-    WarpError(WarpsMessageKey messageKey) {
+    WarpError(MessageKey messageKey) {
         this.messageKey = messageKey;
     }
 
     /** The catalog key the adapter renders for this failure. */
-    public WarpsMessageKey messageKey() {
+    public MessageKey messageKey() {
         return messageKey;
     }
 }

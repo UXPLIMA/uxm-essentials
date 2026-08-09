@@ -12,8 +12,10 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpLimit;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.ReservedWarpNames;
 import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpCreated;
+import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpCreating;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -40,9 +42,11 @@ public final class SetPlayerWarp {
     private final PlayerWarpQuota quota;
     private final Notifier notifier;
     private final DomainEventPublisher events;
+    private final DomainGate gate;
     private final Clock clock;
     private final java.util.List<String> worldBlacklist;
 
+    /** The use case with nothing outside the plugin able to refuse a warp. The form the pure tests use. */
     public SetPlayerWarp(
             PlayerWarpRepository repository,
             PlayerWarpQuota quota,
@@ -50,10 +54,22 @@ public final class SetPlayerWarp {
             DomainEventPublisher events,
             Clock clock,
             java.util.List<String> worldBlacklist) {
+        this(repository, quota, notifier, events, DomainGate.allowAll(), clock, worldBlacklist);
+    }
+
+    public SetPlayerWarp(
+            PlayerWarpRepository repository,
+            PlayerWarpQuota quota,
+            Notifier notifier,
+            DomainEventPublisher events,
+            DomainGate gate,
+            Clock clock,
+            java.util.List<String> worldBlacklist) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.quota = Objects.requireNonNull(quota, "quota");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.gate = Objects.requireNonNull(gate, "gate");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
     }
@@ -107,6 +123,12 @@ public final class SetPlayerWarp {
             notifier.send(
                     owner, PlayerWarpError.LIMIT_REACHED.messageKey(), Map.of("limit", Integer.toString(limit.cap())));
             return Result.err(PlayerWarpError.LIMIT_REACHED);
+        }
+        // Past the owner's quota and with nothing written yet. Only the create is asked about: re-anchoring keeps
+        // the warp that already exists, which whoever cared already saw created.
+        if (!gate.allows(new PlayerWarpCreating(owner, name, at))) {
+            notifier.send(owner, PlayerWarpError.VETOED.messageKey(), Map.of("warp", name.value()));
+            return Result.err(PlayerWarpError.VETOED);
         }
         repository.save(PlayerWarp.create(owner, ownerName, name, at, clock.instant()));
         events.publish(new PlayerWarpCreated(owner, name, at));

@@ -84,6 +84,30 @@ public interface Warmups {
         boolean isCancelled();
     }
 
+    /**
+     * A handle for a warmup that never began because something outside the plugin refused the action.
+     *
+     * <p>It reports itself as cancelled rather than complete, which is what it is: nothing counted down and nothing
+     * will run. A caller that already handles a move-cancelled warmup therefore handles this too.
+     */
+    final class RefusedWarmup implements WarmupHandle {
+
+        @Override
+        public void cancel() {
+            // Already refused; there is nothing in flight to stop.
+        }
+
+        @Override
+        public boolean isComplete() {
+            return false;
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return true;
+        }
+    }
+
     /** A handle for the zero-duration case, already complete and never cancellable. */
     final class CompletedWarmup implements WarmupHandle {
 

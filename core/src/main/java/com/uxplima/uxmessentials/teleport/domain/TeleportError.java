@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.teleport.domain;
 
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 
 /**
@@ -65,16 +67,21 @@ public enum TeleportError {
     JAILED(TeleportMessageKey.JAILED),
 
     /** An installed combat plugin has the mover tagged, so they may not teleport out of the fight. */
-    COMBAT_TAGGED(TeleportMessageKey.COMBAT_TAGGED);
+    COMBAT_TAGGED(TeleportMessageKey.COMBAT_TAGGED),
 
-    private final TeleportMessageKey messageKey;
+    /** Another plugin refused the teleport through the developer API. Nothing moved. */
+    VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 
-    TeleportError(TeleportMessageKey messageKey) {
+    // Typed as the MessageKey interface rather than this context's own enum: a veto is refused for the same reason
+    // in every context, so it renders one shared key rather than twenty near-identical ones.
+    private final MessageKey messageKey;
+
+    TeleportError(MessageKey messageKey) {
         this.messageKey = messageKey;
     }
 
     /** The catalog key the adapter renders for this failure. */
-    public TeleportMessageKey messageKey() {
+    public MessageKey messageKey() {
         return messageKey;
     }
 }

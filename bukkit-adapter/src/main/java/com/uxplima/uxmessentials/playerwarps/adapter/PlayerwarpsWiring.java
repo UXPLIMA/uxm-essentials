@@ -232,10 +232,11 @@ public final class PlayerwarpsWiring {
                 quota,
                 notifier,
                 kernel.events(),
+                kernel.gate(),
                 Clock.systemUTC(),
                 ctx.config().getStringList("world-blacklist", List.of()));
-        ArchivePlayerWarp archivePlayerWarp =
-                new ArchivePlayerWarp(repository, warpAuthorization, notifier, kernel.events(), Clock.systemUTC());
+        ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(
+                repository, warpAuthorization, notifier, kernel.events(), kernel.gate(), Clock.systemUTC());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier, Clock.systemUTC());
         // The rate verb tallies the per-vote star rows and writes the Bayesian rollup back through the repository;
         // the favourite verb toggles the star store and recomputes favourite_count. Both are any-viewer writes, so

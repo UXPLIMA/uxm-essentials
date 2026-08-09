@@ -123,6 +123,54 @@ class ArchivePlayerWarpTest {
     }
 
     @Test
+    void aVetoedHardDeleteKeepsTheWarpAndPublishesNothing() {
+        ArchivePlayerWarp refusing = new ArchivePlayerWarp(
+                repository,
+                new WarpAuthorization(members),
+                PlayerWarpTestSupport.notifier(sink),
+                events,
+                proposal -> false,
+                PlayerWarpTestSupport.CLOCK);
+
+        Result<Unit, PlayerWarpError> result = refusing.hardDelete(owner, HUB);
+
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.VETOED);
+        assertThat(repository.deleted).isEmpty();
+        assertThat(repository.findByName(HUB)).isPresent();
+        assertThat(events.published).isEmpty();
+    }
+
+    @Test
+    void archivingIsNotSomethingAnotherPluginCanRefuse() {
+        // The owner can restore it themselves, so there is nothing to protect: only the irreversible path asks.
+        ArchivePlayerWarp refusing = new ArchivePlayerWarp(
+                repository,
+                new WarpAuthorization(members),
+                PlayerWarpTestSupport.notifier(sink),
+                events,
+                proposal -> false,
+                PlayerWarpTestSupport.CLOCK);
+
+        assertThat(refusing.archive(owner, HUB).isOk()).isTrue();
+        assertThat(repository.stored("hub").status()).isEqualTo(WarpStatus.ARCHIVED);
+    }
+
+    @Test
+    void staffHardDeleteByIdIsNotRefusable() {
+        // Staff clearing an abusive warp must not be blockable by whatever else happens to be installed.
+        ArchivePlayerWarp refusing = new ArchivePlayerWarp(
+                repository,
+                new WarpAuthorization(members),
+                PlayerWarpTestSupport.notifier(sink),
+                events,
+                proposal -> false,
+                PlayerWarpTestSupport.CLOCK);
+
+        assertThat(refusing.adminHardDelete(warp.id().orElseThrow()).isOk()).isTrue();
+        assertThat(repository.findByName(HUB)).isEmpty();
+    }
+
+    @Test
     void aCoOwnerMayNotArchiveOrHardDelete() {
         assertThat(archive.archive(coOwner, HUB).errorOrThrow()).isEqualTo(PlayerWarpError.NO_PERMISSION);
         assertThat(archive.hardDelete(coOwner, HUB).errorOrThrow()).isEqualTo(PlayerWarpError.NO_PERMISSION);

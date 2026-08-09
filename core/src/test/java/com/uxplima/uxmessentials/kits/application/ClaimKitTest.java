@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -179,6 +180,21 @@ class ClaimKitTest {
     }
 
     @Test
+    void aVetoedClaimGrantsNothingChargesNothingAndLeavesTheKitClaimable() {
+        repository.save(priced("crate", new BigDecimal("250")));
+        RecordingEconomy economy = new RecordingEconomy(true);
+
+        Result<Unit, KitError> refused =
+                claimKit(Optional.of(economy), proposal -> false).claim(alice, KitId.of("crate"));
+        claimKit(Optional.of(economy)).claim(alice, KitId.of("crate")); // the same claim, nobody refusing
+
+        assertThat(refused.errorOrThrow()).isEqualTo(KitError.VETOED);
+        assertThat(granter.grants).isEqualTo(1); // only the retry
+        assertThat(economy.charged).isEqualByComparingTo("250"); // the refused claim cost nothing
+        assertThat(cooldowns.stamped).containsExactly("kit.crate");
+    }
+
+    @Test
     void anUnlockOnceKitChargesOnTheFirstClaimAndIsFreeThereafter() {
         repository.save(priced("forge", new BigDecimal("400")).withUnlockOnce(true));
         RecordingEconomy economy = new RecordingEconomy(true);
@@ -295,9 +311,22 @@ class ClaimKitTest {
     }
 
     private ClaimKit claimKit(Optional<KitEconomy> economy) {
+        return claimKit(economy, DomainGate.allowAll());
+    }
+
+    private ClaimKit claimKit(Optional<KitEconomy> economy, DomainGate gate) {
         KitAccess access = new KitAccess(
                 permissions, cooldowns, claims, economy, Optional.empty(), Optional.of(stock), Optional.of(unlocks));
-        return new ClaimKit(repository, access, granter, notifier, events, Clock.system(ZoneOffset.UTC), economy);
+        return new ClaimKit(
+                repository,
+                access,
+                granter,
+                notifier,
+                events,
+                Clock.system(ZoneOffset.UTC),
+                economy,
+                Optional.empty(),
+                gate);
     }
 
     private static KitDefinition repeatable(String id, Duration cooldown) {

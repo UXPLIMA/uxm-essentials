@@ -184,6 +184,7 @@ public final class WarpsWiring {
                 repository,
                 notifier,
                 kernel.events(),
+                kernel.gate(),
                 Clock.systemUTC(),
                 ctx.config().getStringList("world-blacklist", List.of()));
         // The admin warp manager renders through the always-on menu engine. The create flow that opens a fresh warp's
@@ -252,9 +253,10 @@ public final class WarpsWiring {
                         repository,
                         notifier,
                         kernel.events(),
+                        kernel.gate(),
                         clock,
                         ctx.config().getStringList("world-blacklist", List.of())),
-                new DelWarp(repository, notifier, kernel.events()),
+                new DelWarp(repository, notifier, kernel.events(), kernel.gate()),
                 new ListWarps(repository, kernel.permissions(), notifier),
                 new WarpInfo(repository, notifier),
                 new MoveWarp(repository, notifier),

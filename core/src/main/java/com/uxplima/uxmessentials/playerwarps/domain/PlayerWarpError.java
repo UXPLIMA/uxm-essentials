@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.playerwarps.domain;
 
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 
 /**
  * The modelled failures a player-warp operation can produce. Each value carries the
@@ -88,16 +90,20 @@ public enum PlayerWarpError {
     SPONSOR_LIMIT(PlayerwarpsMessageKey.PWARP_SPONSOR_LIMIT),
 
     /** {@code /pwarp sponsor} refused because every sponsor slot is currently taken. */
-    SPONSOR_FULL(PlayerwarpsMessageKey.PWARP_SPONSOR_FULL);
+    SPONSOR_FULL(PlayerwarpsMessageKey.PWARP_SPONSOR_FULL),
+    /** Another plugin refused the action through the developer API. Nothing was written. */
+    VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 
-    private final PlayerwarpsMessageKey messageKey;
+    // Typed as the MessageKey interface rather than this context's own enum: a veto is refused for the same reason
+    // in every context, so it renders one shared key rather than twenty near-identical ones.
+    private final MessageKey messageKey;
 
-    PlayerWarpError(PlayerwarpsMessageKey messageKey) {
+    PlayerWarpError(MessageKey messageKey) {
         this.messageKey = messageKey;
     }
 
     /** The catalog key the adapter renders for this failure. */
-    public PlayerwarpsMessageKey messageKey() {
+    public MessageKey messageKey() {
         return messageKey;
     }
 }

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound.api;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmBackLocationCaptureEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmPlayerPreTeleportEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmPlayerTeleportEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestAcceptEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestCancelEvent;
@@ -18,12 +19,14 @@ import com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.Region;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.VetoRegistry;
 import com.uxplima.uxmessentials.teleport.domain.BackCause;
 import com.uxplima.uxmessentials.teleport.domain.RequestDirection;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelReason;
 import com.uxplima.uxmessentials.teleport.domain.event.BackLocationCaptured;
 import com.uxplima.uxmessentials.teleport.domain.event.PlayerTeleported;
+import com.uxplima.uxmessentials.teleport.domain.event.PlayerTeleporting;
 import com.uxplima.uxmessentials.teleport.domain.event.TeleportRequestAccepted;
 import com.uxplima.uxmessentials.teleport.domain.event.TeleportRequestCancelled;
 import com.uxplima.uxmessentials.teleport.domain.event.TeleportRequestDenied;
@@ -134,6 +137,19 @@ public final class TeleportEventBridges {
                         fact.target().uuid(),
                         fact.target().name()),
                 fact -> Region.entity(fact.requester()));
+    }
+
+    /** The one teleport action worth refusing: the move itself, whatever asked for it. */
+    public static void registerVetoes(VetoRegistry registry) {
+        Objects.requireNonNull(registry, "registry");
+        registry.register(
+                PlayerTeleporting.class,
+                UxmPlayerPreTeleportEvent.getHandlerList(),
+                proposal -> new UxmPlayerPreTeleportEvent(
+                        proposal.player().uuid(),
+                        proposal.player().name(),
+                        kind(proposal.kind()),
+                        ApiValues.location(proposal.to())));
     }
 
     // Exhaustive switches rather than valueOf on the name: a new domain constant then stops this compiling until

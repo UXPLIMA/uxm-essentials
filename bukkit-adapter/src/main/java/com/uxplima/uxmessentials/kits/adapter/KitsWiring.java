@@ -282,7 +282,15 @@ public final class KitsWiring {
         // operator authors a window in; the event timestamp uses clock.instant(), which is zone-independent.
         Clock clock = Clock.system(ZoneId.systemDefault());
         ClaimKit claimKit = new ClaimKit(
-                repository, access, granter, notifier, kernel.events(), clock, economy, Optional.of(actionRunner));
+                repository,
+                access,
+                granter,
+                notifier,
+                kernel.events(),
+                clock,
+                economy,
+                Optional.of(actionRunner),
+                kernel.gate());
         KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler(), previewLayout);
         // The read-only /kit browse menu now renders through the always-on menu engine. It claims through the same
         // ClaimKit path the command drives and resolves its tiles off the warm kit/category sets, so the engine

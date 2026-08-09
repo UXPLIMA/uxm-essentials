@@ -13,13 +13,26 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.api.bukkit.event.UxmCancellableEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreCreateEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreDeleteEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreRelocateEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.kit.UxmKitPreClaimEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpPreCreateEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpPreDeleteEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmPlayerPreTeleportEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpPreCreateEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpPreDeleteEvent;
+import com.uxplima.uxmessentials.api.view.UxmTeleportKind;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.homes.domain.event.HomeCreating;
 import com.uxplima.uxmessentials.homes.domain.event.HomeDeleting;
 import com.uxplima.uxmessentials.homes.domain.event.HomeRelocating;
+import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.kits.domain.event.KitClaiming;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpCreating;
+import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpDeleting;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitDomainGate;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.VetoRegistry;
@@ -29,6 +42,11 @@ import com.uxplima.uxmessentials.shared.domain.DomainProposal;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.event.PlayerTeleporting;
+import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmessentials.warps.domain.event.WarpCreating;
+import com.uxplima.uxmessentials.warps.domain.event.WarpDeleting;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -103,6 +121,49 @@ class BukkitDomainGateTest {
         assertThat(asked)
                 .containsExactly(
                         UxmHomePreCreateEvent.class, UxmHomePreDeleteEvent.class, UxmHomePreRelocateEvent.class);
+    }
+
+    @Test
+    void everyVetoableOperationInEveryContextReachesItsOwnEvent() {
+        // One test rather than one per context: what matters is that the mapping exists and is not crossed with a
+        // neighbour's, which is exactly the mistake a hand-written registry invites.
+        List<Class<?>> asked = new ArrayList<>();
+        Consumer<UxmCancellableEvent> record = event -> asked.add(event.getClass());
+        listenFor(UxmPlayerPreTeleportEvent.class, record::accept);
+        listenFor(UxmWarpPreCreateEvent.class, record::accept);
+        listenFor(UxmWarpPreDeleteEvent.class, record::accept);
+        listenFor(UxmPlayerWarpPreCreateEvent.class, record::accept);
+        listenFor(UxmPlayerWarpPreDeleteEvent.class, record::accept);
+        listenFor(UxmKitPreClaimEvent.class, record::accept);
+
+        gate.allows(new PlayerTeleporting(OWNER, TeleportKind.HOME, SOMEWHERE));
+        gate.allows(new WarpCreating(WarpName.of("shop"), OWNER, SOMEWHERE));
+        gate.allows(new WarpDeleting(WarpName.of("shop"), OWNER));
+        gate.allows(new PlayerWarpCreating(OWNER, PlayerWarpName.of("base"), SOMEWHERE));
+        gate.allows(new PlayerWarpDeleting(OWNER, PlayerWarpName.of("base")));
+        gate.allows(new KitClaiming(KitId.of("starter"), OWNER, OWNER));
+
+        assertThat(asked)
+                .containsExactly(
+                        UxmPlayerPreTeleportEvent.class,
+                        UxmWarpPreCreateEvent.class,
+                        UxmWarpPreDeleteEvent.class,
+                        UxmPlayerWarpPreCreateEvent.class,
+                        UxmPlayerWarpPreDeleteEvent.class,
+                        UxmKitPreClaimEvent.class);
+    }
+
+    @Test
+    void aPreEventCarriesTheDetailAListenerNeedsToDecide() {
+        List<UxmPlayerPreTeleportEvent> seen = new ArrayList<>();
+        listenFor(UxmPlayerPreTeleportEvent.class, seen::add);
+
+        gate.allows(new PlayerTeleporting(OWNER, TeleportKind.WARP, SOMEWHERE));
+
+        assertThat(seen).hasSize(1);
+        assertThat(seen.get(0).getKind()).isEqualTo(UxmTeleportKind.WARP);
+        assertThat(seen.get(0).getDestination().world()).isEqualTo("world");
+        assertThat(seen.get(0).getPlayerId()).isEqualTo(OWNER.uuid());
     }
 
     @Test

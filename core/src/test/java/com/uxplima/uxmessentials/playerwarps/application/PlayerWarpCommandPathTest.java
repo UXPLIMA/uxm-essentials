@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -86,6 +87,43 @@ class PlayerWarpCommandPathTest {
         assertThat(stored.owner().uuid()).isEqualTo(alice.uuid());
         assertThat(stored.ownerName()).isEqualTo("Alice");
         assertThat(stored.id()).isPresent();
+    }
+
+    @Test
+    void aVetoedSetPwarpWritesNothingAndDoesNotSpendTheOwnersQuota() {
+        List<DomainEvent> published = new ArrayList<>();
+        SetPlayerWarp refusing = new SetPlayerWarp(
+                repository,
+                new PlayerWarpQuota(new StubPermissions(10), 10),
+                notifier,
+                published::add,
+                proposal -> false,
+                Clock.system(ZoneOffset.UTC),
+                List.of());
+
+        Result<Unit, PlayerWarpError> result = refusing.set(alice, "Alice", PlayerWarpName.of("base"), at(10, 64, 20));
+
+        assertThat(result.errorOrThrow()).isEqualTo(PlayerWarpError.VETOED);
+        assertThat(repository.existsByName(PlayerWarpName.of("base"))).isFalse();
+        assertThat(repository.ownedBy(alice)).isEmpty();
+        assertThat(published).isEmpty();
+    }
+
+    @Test
+    void reanchoringAnOwnedWarpIsNotSomethingAnotherPluginCanRefuse() {
+        // The warp already exists and keeps its identity; whoever cared about it was asked when it was created.
+        setWarp(10).set(alice, "Alice", PlayerWarpName.of("base"), at(0, 0, 0));
+
+        Result<Unit, PlayerWarpError> moved =
+                setWarp(10, proposal -> false).set(alice, "Alice", PlayerWarpName.of("base"), at(100, 70, 100));
+
+        assertThat(moved.isOk()).isTrue();
+        assertThat(repository
+                        .findByName(PlayerWarpName.of("base"))
+                        .orElseThrow()
+                        .location()
+                        .blockX())
+                .isEqualTo(100);
     }
 
     @Test
@@ -269,8 +307,12 @@ class PlayerWarpCommandPathTest {
     }
 
     private SetPlayerWarp setWarp(int limit) {
+        return setWarp(limit, DomainGate.allowAll());
+    }
+
+    private SetPlayerWarp setWarp(int limit, DomainGate gate) {
         PlayerWarpQuota quota = new PlayerWarpQuota(new StubPermissions(limit), limit);
-        return new SetPlayerWarp(repository, quota, notifier, events, Clock.system(ZoneOffset.UTC), List.of());
+        return new SetPlayerWarp(repository, quota, notifier, events, gate, Clock.system(ZoneOffset.UTC), List.of());
     }
 
     private UsePlayerWarp usePwarp() {

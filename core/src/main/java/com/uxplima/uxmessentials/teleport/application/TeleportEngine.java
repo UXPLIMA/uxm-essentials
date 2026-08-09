@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelReason;
+import com.uxplima.uxmessentials.teleport.domain.event.PlayerTeleporting;
 import com.uxplima.uxmessentials.teleport.domain.event.WarmupCancelled;
 
 /**
@@ -56,6 +58,7 @@ public final class TeleportEngine {
     private final TeleportExecutor executor;
     private final Notifier notifier;
     private final DomainEventPublisher events;
+    private final DomainGate gate;
     private final TeleportSettings settings;
     private final JailGate jail;
     private final CombatGate combat;
@@ -108,6 +111,7 @@ public final class TeleportEngine {
         this(cooldowns, warmups, executor, notifier, events, settings, jail, CombatGate.NEVER, fee, grace);
     }
 
+    /** The engine with nothing outside the plugin able to refuse a teleport. The form the pure tests use. */
     public TeleportEngine(
             Cooldowns cooldowns,
             Warmups warmups,
@@ -119,6 +123,21 @@ public final class TeleportEngine {
             CombatGate combat,
             TeleportFee fee,
             ArrivalGrace grace) {
+        this(cooldowns, warmups, executor, notifier, events, settings, jail, combat, fee, grace, DomainGate.allowAll());
+    }
+
+    public TeleportEngine(
+            Cooldowns cooldowns,
+            Warmups warmups,
+            TeleportExecutor executor,
+            Notifier notifier,
+            DomainEventPublisher events,
+            TeleportSettings settings,
+            JailGate jail,
+            CombatGate combat,
+            TeleportFee fee,
+            ArrivalGrace grace,
+            DomainGate gate) {
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.warmups = Objects.requireNonNull(warmups, "warmups");
         this.executor = Objects.requireNonNull(executor, "executor");
@@ -129,6 +148,7 @@ public final class TeleportEngine {
         this.combat = Objects.requireNonNull(combat, "combat");
         this.fee = Objects.requireNonNull(fee, "fee");
         this.grace = Objects.requireNonNull(grace, "grace");
+        this.gate = Objects.requireNonNull(gate, "gate");
     }
 
     /**
@@ -153,12 +173,16 @@ public final class TeleportEngine {
             notifier.send(mover, TeleportMessageKey.COMBAT_TAGGED);
             return Result.err(TeleportError.COMBAT_TAGGED);
         }
-        Result<Unit, Duration> gate = cooldowns.check(mover, cooldownKind(kind, destination));
-        if (gate.isErr()) {
-            notifyCooldown(mover, gate.errorOrThrow());
+        Result<Unit, Duration> waiting = cooldowns.check(mover, cooldownKind(kind, destination));
+        if (waiting.isErr()) {
+            notifyCooldown(mover, waiting.errorOrThrow());
             return Result.err(TeleportError.ON_COOLDOWN);
         }
-        beginGatedWarmup(mover, destination, kind);
+        if (beginGatedWarmup(mover, destination, kind).isCancelled()) {
+            // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
+            // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
+            return Result.err(TeleportError.VETOED);
+        }
         return Result.ok();
     }
 
@@ -192,9 +216,9 @@ public final class TeleportEngine {
             notifier.send(who, TeleportMessageKey.COMBAT_TAGGED);
             return Result.err(TeleportError.COMBAT_TAGGED);
         }
-        Result<Unit, Duration> gate = cooldowns.check(who, randomCooldownKind());
-        if (gate.isErr()) {
-            notifyCooldown(who, gate.errorOrThrow());
+        Result<Unit, Duration> waiting = cooldowns.check(who, randomCooldownKind());
+        if (waiting.isErr()) {
+            notifyCooldown(who, waiting.errorOrThrow());
             return Result.err(TeleportError.ON_COOLDOWN);
         }
         BigDecimal cost = settings.rtpCost();
@@ -237,6 +261,13 @@ public final class TeleportEngine {
 
     private WarmupHandle beginWarmup(
             PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {
+        // The one choke point every voluntary teleport passes through, which is why the veto question lives here
+        // rather than at each of the half-dozen entry points. Before the warmup, so a refused teleport does not
+        // make the player stand still first.
+        if (!gate.allows(new PlayerTeleporting(mover, kind, destination.position()))) {
+            notifier.send(mover, TeleportError.VETOED.messageKey());
+            return new Warmups.RefusedWarmup();
+        }
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);

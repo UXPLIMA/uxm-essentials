@@ -156,6 +156,39 @@ class WarpCommandPathTest {
     }
 
     @Test
+    void aVetoedSetwarpWritesNothing() {
+        SetWarp refusing =
+                new SetWarp(repository, notifier, events, proposal -> false, Clock.system(ZoneOffset.UTC), List.of());
+
+        Result<Unit, WarpError> result = refusing.set(operator, WarpName.of("shop"), at(10, 64, 20));
+
+        assertThat(result.errorOrThrow()).isEqualTo(WarpError.VETOED);
+        assertThat(repository.exists(WarpName.of("shop"))).isFalse();
+    }
+
+    @Test
+    void aVetoedDelwarpLeavesTheWarpInPlace() {
+        setWarp.set(operator, WarpName.of("shop"), at(0, 64, 0));
+        DelWarp refusing = new DelWarp(repository, notifier, events, proposal -> false);
+
+        Result<Unit, WarpError> result = refusing.delete(operator, WarpName.of("shop"));
+
+        assertThat(result.errorOrThrow()).isEqualTo(WarpError.VETOED);
+        assertThat(repository.exists(WarpName.of("shop"))).isTrue();
+    }
+
+    @Test
+    void aMissingWarpIsRejectedBeforeAnybodyIsAskedAboutDeletingIt() {
+        // Order matters for the published event: a listener should never be handed a delete for a warp that was
+        // not there, and should never be able to turn "no such warp" into "blocked".
+        DelWarp refusing = new DelWarp(repository, notifier, events, proposal -> false);
+
+        Result<Unit, WarpError> result = refusing.delete(operator, WarpName.of("ghost"));
+
+        assertThat(result.errorOrThrow()).isEqualTo(WarpError.NOT_FOUND);
+    }
+
+    @Test
     void listFiltersToWarpsThePlayerMayUse() {
         setWarp.set(operator, WarpName.of("shop"), at(0, 0, 0));
         setWarp.set(operator, WarpName.of("pvp"), at(1, 1, 1));

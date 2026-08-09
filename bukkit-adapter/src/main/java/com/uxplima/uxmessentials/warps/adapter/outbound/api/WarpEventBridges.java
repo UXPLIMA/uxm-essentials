@@ -4,11 +4,16 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpCreateEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpDeleteEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpPreCreateEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpPreDeleteEvent;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.Region;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.VetoRegistry;
 import com.uxplima.uxmessentials.warps.domain.event.WarpCreated;
+import com.uxplima.uxmessentials.warps.domain.event.WarpCreating;
 import com.uxplima.uxmessentials.warps.domain.event.WarpDeleted;
+import com.uxplima.uxmessentials.warps.domain.event.WarpDeleting;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,5 +46,25 @@ public final class WarpEventBridges {
                         fact.removedBy().name(),
                         fact.name().value()),
                 fact -> Region.entity(fact.removedBy()));
+    }
+
+    /** The two warp actions worth refusing: bringing one into existence, and taking it away. */
+    public static void registerVetoes(VetoRegistry registry) {
+        Objects.requireNonNull(registry, "registry");
+        registry.register(
+                WarpCreating.class,
+                UxmWarpPreCreateEvent.getHandlerList(),
+                proposal -> new UxmWarpPreCreateEvent(
+                        proposal.owner().uuid(),
+                        proposal.owner().name(),
+                        proposal.name().value(),
+                        ApiValues.location(proposal.location())));
+        registry.register(
+                WarpDeleting.class,
+                UxmWarpPreDeleteEvent.getHandlerList(),
+                proposal -> new UxmWarpPreDeleteEvent(
+                        proposal.actor().uuid(),
+                        proposal.actor().name(),
+                        proposal.name().value()));
     }
 }

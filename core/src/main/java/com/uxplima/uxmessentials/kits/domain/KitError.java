@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.kits.domain;
 
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 
 /**
  * The modelled failures a kit operation can produce. Each value carries the {@link KitsMessageKey} the
@@ -44,16 +46,20 @@ public enum KitError {
     CANCELLED(KitsMessageKey.KIT_CLAIM_CANCELLED),
 
     /** The recipient's inventory could not hold the kit and its {@code on-full} policy is {@code DENY}. */
-    INVENTORY_FULL(KitsMessageKey.KIT_INVENTORY_FULL);
+    INVENTORY_FULL(KitsMessageKey.KIT_INVENTORY_FULL),
+    /** Another plugin refused the action through the developer API. Nothing was written. */
+    VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 
-    private final KitsMessageKey messageKey;
+    // Typed as the MessageKey interface rather than this context's own enum: a veto is refused for the same reason
+    // in every context, so it renders one shared key rather than twenty near-identical ones.
+    private final MessageKey messageKey;
 
-    KitError(KitsMessageKey messageKey) {
+    KitError(MessageKey messageKey) {
         this.messageKey = messageKey;
     }
 
     /** The catalog key the adapter renders for this failure. */
-    public KitsMessageKey messageKey() {
+    public MessageKey messageKey() {
         return messageKey;
     }
 }

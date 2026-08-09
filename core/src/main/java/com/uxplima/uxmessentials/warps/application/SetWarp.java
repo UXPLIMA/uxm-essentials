@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -17,6 +18,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import com.uxplima.uxmessentials.warps.domain.WarpError;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.warps.domain.event.WarpCreated;
+import com.uxplima.uxmessentials.warps.domain.event.WarpCreating;
 
 /**
  * {@code /setwarp <name>}: create a server-wide warp at the staff member's current position, or re-anchor
@@ -33,18 +35,31 @@ public final class SetWarp {
     private final WarpRepository repository;
     private final Notifier notifier;
     private final DomainEventPublisher events;
+    private final DomainGate gate;
     private final Clock clock;
     private final java.util.List<String> worldBlacklist;
 
+    /** The use case with nothing outside the plugin able to refuse a warp. The form the pure tests use. */
     public SetWarp(
             WarpRepository repository,
             Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
             java.util.List<String> worldBlacklist) {
+        this(repository, notifier, events, DomainGate.allowAll(), clock, worldBlacklist);
+    }
+
+    public SetWarp(
+            WarpRepository repository,
+            Notifier notifier,
+            DomainEventPublisher events,
+            DomainGate gate,
+            Clock clock,
+            java.util.List<String> worldBlacklist) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.gate = Objects.requireNonNull(gate, "gate");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
     }
@@ -79,6 +94,12 @@ public final class SetWarp {
 
     private Result<Unit, WarpError> create(
             PlayerRef owner, WarpName name, Position at, WarpCost cost, Optional<String> requiredPermission) {
+        // Everything warps itself would refuse has passed by here, and nothing is written yet. Only the create is
+        // asked about: re-anchoring keeps the warp that already exists, which whoever cared already saw created.
+        if (!gate.allows(new WarpCreating(name, owner, at))) {
+            notifier.send(owner, WarpError.VETOED.messageKey(), Map.of("warp", name.value()));
+            return Result.err(WarpError.VETOED);
+        }
         Warp warp = Warp.create(name, at, owner, clock.instant(), cost, requiredPermission);
         repository.save(warp);
         events.publish(new WarpCreated(name, owner, at));

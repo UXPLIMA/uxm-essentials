@@ -13,8 +13,10 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpDeleted;
+import com.uxplima.uxmessentials.playerwarps.domain.event.PlayerWarpDeleting;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -40,18 +42,31 @@ public final class ArchivePlayerWarp {
     private final WarpAuthorization authorization;
     private final Notifier notifier;
     private final DomainEventPublisher events;
+    private final DomainGate gate;
     private final Clock clock;
 
+    /** The use case with nothing outside the plugin able to refuse a delete. The form the pure tests use. */
     public ArchivePlayerWarp(
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
             Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
+        this(repository, authorization, notifier, events, DomainGate.allowAll(), clock);
+    }
+
+    public ArchivePlayerWarp(
+            PlayerWarpRepository repository,
+            WarpAuthorization authorization,
+            Notifier notifier,
+            DomainEventPublisher events,
+            DomainGate gate,
+            Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.gate = Objects.requireNonNull(gate, "gate");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -79,6 +94,12 @@ public final class ArchivePlayerWarp {
      */
     public Result<Unit, PlayerWarpError> hardDelete(PlayerRef actor, PlayerWarpName name) {
         return gated(actor, name, warp -> {
+            // Asked only on the irreversible path. Archiving is undoable, so refusing it would be refusing something
+            // the owner can put back themselves.
+            if (!gate.allows(new PlayerWarpDeleting(warp.owner(), name))) {
+                notifier.send(actor, PlayerWarpError.VETOED.messageKey(), Map.of("warp", name.value()));
+                return Result.err(PlayerWarpError.VETOED);
+            }
             repository.deleteById(warp.id().orElseThrow());
             events.publish(new PlayerWarpDeleted(warp.owner(), name));
             notifier.send(actor, PlayerwarpsMessageKey.PWARP_DELETED, Map.of("warp", name.value()));
@@ -107,6 +128,9 @@ public final class ArchivePlayerWarp {
      * {@code PlayerWarpDeleted}, skipping the per-warp role gate (spec invariant 5, the irreversible path). The
      * command places this behind the {@code admin} node and a confirm step; a missing id is
      * {@link PlayerWarpError#NOT_FOUND}.
+     *
+     * <p>No third-party plugin can refuse this one. Staff clearing an abusive warp must not be blockable by whatever
+     * else is installed, and the operator already confirmed it; the owner path is where the veto question belongs.
      */
     public Result<Unit, PlayerWarpError> adminHardDelete(PlayerWarpId id) {
         Objects.requireNonNull(id, "id");

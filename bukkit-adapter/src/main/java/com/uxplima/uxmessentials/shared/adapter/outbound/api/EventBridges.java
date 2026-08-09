@@ -68,5 +68,9 @@ public final class EventBridges {
     public static void installAllVetoes(VetoRegistry registry) {
         Objects.requireNonNull(registry, "registry");
         HomeVetoBridges.register(registry);
+        TeleportEventBridges.registerVetoes(registry);
+        WarpEventBridges.registerVetoes(registry);
+        PlayerWarpEventBridges.registerVetoes(registry);
+        KitEventBridges.registerVetoes(registry);
     }
 }

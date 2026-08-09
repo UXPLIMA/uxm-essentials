@@ -16,8 +16,10 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.event.KitClaimed;
+import com.uxplima.uxmessentials.kits.domain.event.KitClaiming;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -56,6 +58,7 @@ public final class ClaimKit {
     private final Clock clock;
     private final Optional<KitEconomy> economy;
     private final Optional<KitActionRunner> actions;
+    private final DomainGate gate;
 
     /** Wire the claim path with no action runner — a kit's claim/deny actions are then recorded but not run. */
     public ClaimKit(
@@ -69,6 +72,7 @@ public final class ClaimKit {
         this(repository, access, granter, notifier, events, clock, economy, Optional.empty());
     }
 
+    /** The use case with nothing outside the plugin able to refuse a claim. The form the pure tests use. */
     public ClaimKit(
             KitRepository repository,
             KitAccess access,
@@ -78,6 +82,19 @@ public final class ClaimKit {
             Clock clock,
             Optional<KitEconomy> economy,
             Optional<KitActionRunner> actions) {
+        this(repository, access, granter, notifier, events, clock, economy, actions, DomainGate.allowAll());
+    }
+
+    public ClaimKit(
+            KitRepository repository,
+            KitAccess access,
+            KitGranter granter,
+            Notifier notifier,
+            DomainEventPublisher events,
+            Clock clock,
+            Optional<KitEconomy> economy,
+            Optional<KitActionRunner> actions,
+            DomainGate gate) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.granter = Objects.requireNonNull(granter, "granter");
@@ -86,6 +103,7 @@ public final class ClaimKit {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.actions = Objects.requireNonNull(actions, "actions");
+        this.gate = Objects.requireNonNull(gate, "gate");
     }
 
     /** Claim the kit {@code id} for {@code who} themselves. */
@@ -120,6 +138,12 @@ public final class ClaimKit {
         if (deniesForFullInventory(recipient, granted)) {
             deny(actor, recipient, kit, KitError.INVENTORY_FULL);
             return Result.err(KitError.INVENTORY_FULL);
+        }
+        // Before the charge and before a single item is placed, so a refused claim costs neither money nor a
+        // cooldown and leaves the recipient's inventory exactly as it was.
+        if (!gate.allows(new KitClaiming(kit.id(), recipient, actor))) {
+            deny(actor, recipient, kit, KitError.VETOED);
+            return Result.err(KitError.VETOED);
         }
         Result<Unit, KitError> charged = access.reserveAndCharge(recipient, kit);
         if (charged.isErr()) {

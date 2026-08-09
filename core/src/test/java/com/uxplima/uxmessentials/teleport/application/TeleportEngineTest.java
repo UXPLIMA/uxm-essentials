@@ -14,20 +14,25 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.DomainProposal;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
+import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import com.uxplima.uxmessentials.teleport.domain.CooldownStartPhase;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.event.PlayerTeleporting;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -100,8 +105,67 @@ class TeleportEngineTest {
         assertThat(cooldowns.stamps).isEqualTo(1);
     }
 
+    @Test
+    void aVetoedTeleportNeverBeginsTheWarmupAndNeverHops() {
+        FakeCooldowns cooldowns = new FakeCooldowns(null);
+        ImmediateWarmups warmups = new ImmediateWarmups();
+        RecordingExecutor executor = new RecordingExecutor();
+        TeleportEngine engine = engine(cooldowns, warmups, executor, CooldownStartPhase.TELEPORT, proposal -> false);
+
+        Result<Unit, TeleportError> result = engine.launch(MOVER, DEST, TeleportKind.SPAWN);
+
+        assertThat(result.errorOrThrow()).isEqualTo(TeleportError.VETOED);
+        assertThat(warmups.begun)
+                .as("a refused teleport must not make the player stand still first")
+                .isZero();
+        assertThat(executor.hops).isZero();
+        assertThat(cooldowns.stamps).isZero();
+    }
+
+    @Test
+    void everyVoluntaryEntryPointPassesThroughTheSameVeto() {
+        // The point of gating inside the shared warmup rather than at each command: a plugin that refuses
+        // teleports refuses all of them, including the ones added after it was written.
+        RecordingGate gate = new RecordingGate();
+        TeleportEngine engine =
+                engine(new FakeCooldowns(null), new ImmediateWarmups(), new RecordingExecutor(), phaseAny(), gate);
+
+        engine.launch(MOVER, DEST, TeleportKind.HOME);
+        engine.beginGatedWarmup(MOVER, DEST, TeleportKind.WARP);
+        engine.launchRandom(MOVER, DEST);
+
+        assertThat(gate.kinds).containsExactly(TeleportKind.HOME, TeleportKind.WARP, TeleportKind.RANDOM);
+    }
+
+    @Test
+    void aRespawnLandingIsNotSomethingAPluginCanRefuse() {
+        // arriveRandomImmediately serves respawn and first join. There is nowhere to leave the player if it is
+        // refused, so it deliberately bypasses the veto rather than offering one that cannot be honoured.
+        RecordingGate gate = new RecordingGate();
+        RecordingExecutor executor = new RecordingExecutor();
+        TeleportEngine engine = engine(new FakeCooldowns(null), new ImmediateWarmups(), executor, phaseAny(), gate);
+
+        engine.arriveRandomImmediately(MOVER, DEST);
+
+        assertThat(gate.kinds).isEmpty();
+        assertThat(executor.hops).isEqualTo(1);
+    }
+
+    private static CooldownStartPhase phaseAny() {
+        return CooldownStartPhase.TELEPORT;
+    }
+
     private static TeleportEngine engine(
             Cooldowns cooldowns, Warmups warmups, TeleportExecutor executor, CooldownStartPhase phase) {
+        return engine(cooldowns, warmups, executor, phase, DomainGate.allowAll());
+    }
+
+    private static TeleportEngine engine(
+            Cooldowns cooldowns,
+            Warmups warmups,
+            TeleportExecutor executor,
+            CooldownStartPhase phase,
+            DomainGate gate) {
         return new TeleportEngine(
                 cooldowns,
                 warmups,
@@ -109,7 +173,24 @@ class TeleportEngineTest {
                 new Notifier(new NoopMessages(), new NoopSink()),
                 new NoopEvents(),
                 new TeleportSettings(new PhaseConfig(phase)),
-                com.uxplima.uxmessentials.teleport.application.port.JailGate.NEVER);
+                com.uxplima.uxmessentials.teleport.application.port.JailGate.NEVER,
+                com.uxplima.uxmessentials.teleport.application.port.CombatGate.NEVER,
+                TeleportFee.FREE,
+                ArrivalGrace.NONE,
+                gate);
+    }
+
+    /** Allows everything, but remembers what it was asked about. */
+    private static final class RecordingGate implements DomainGate {
+        private final List<TeleportKind> kinds = new ArrayList<>();
+
+        @Override
+        public boolean allows(DomainProposal proposal) {
+            if (proposal instanceof PlayerTeleporting teleporting) {
+                kinds.add(teleporting.kind());
+            }
+            return true;
+        }
     }
 
     /** A minimal {@link ConfigStore} that drives only the cooldown-start-phase the engine reads. */
