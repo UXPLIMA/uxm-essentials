@@ -197,6 +197,51 @@ class MenuContentRegionTest {
         assertThat(provider.readBack.get(2)).isNull();
     }
 
+    @Test
+    void aProjectionRegionIsRepaintedWhenTheMenuIsRedrawn() {
+        RecordingProvider provider = new RecordingProvider(Arrays.asList(diamond(), null, null));
+        register(provider, false);
+        open();
+        provider.painted.set(0, new ItemStack(Material.EMERALD));
+
+        engine.menus().redraw(viewer, SPEC_ID);
+
+        assertThat(player.getOpenInventory().getTopInventory().getItem(10).getType())
+                .isEqualTo(Material.EMERALD);
+    }
+
+    @Test
+    void aRegionTheViewerFillsIsLeftAloneWhenTheMenuIsRedrawn() {
+        RecordingProvider provider = new RecordingProvider(Arrays.asList(diamond(), null, null));
+        provider.repaints = false;
+        register(provider, true);
+        open();
+        Inventory top = player.getOpenInventory().getTopInventory();
+        // What the viewer did to the window since it opened: one stack put down, the painted one taken away.
+        top.setItem(11, new ItemStack(Material.EMERALD));
+        top.setItem(10, null);
+
+        engine.menus().redraw(viewer, SPEC_ID);
+
+        // Neither move is undone: a repaint here would mint back the taken stack and wipe the placed one.
+        assertThat(top.getItem(10)).isNull();
+        assertThat(top.getItem(11).getType()).isEqualTo(Material.EMERALD);
+    }
+
+    @Test
+    void aRedrawSkipsAWindowTheViewerHasSinceClosed() {
+        RecordingProvider provider = new RecordingProvider(Arrays.asList(diamond(), null, null));
+        register(provider, false);
+        open();
+        player.closeInventory();
+        int renderedWhileOpen = provider.renders;
+
+        engine.menus().redraw(viewer, SPEC_ID);
+
+        // Nothing was drawn: there is no window of this menu left to draw into.
+        assertThat(provider.renders).isEqualTo(renderedWhileOpen);
+    }
+
     // --- helpers ---
 
     /** Register {@code provider} under the fixture region id, then the spec that names it. */
@@ -279,6 +324,8 @@ class MenuContentRegionTest {
         private final List<ContentClick.Kind> allowedKinds = new ArrayList<>();
         private final List<ItemStack> readBack = new ArrayList<>();
         private boolean allowEverything;
+        private boolean repaints = true;
+        private int renders;
 
         private RecordingProvider(List<ItemStack> painted) {
             this.painted = new ArrayList<>(painted);
@@ -286,7 +333,13 @@ class MenuContentRegionTest {
 
         @Override
         public List<ItemStack> render(MenuContext ctx, ContentRegionSpec region) {
+            renders++;
             return painted;
+        }
+
+        @Override
+        public boolean repaintsOnRedraw() {
+            return repaints;
         }
 
         @Override

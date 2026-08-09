@@ -495,6 +495,54 @@ public final class Menus {
         return inventory.getHolder() instanceof MenuHolder menu ? Optional.of(menu.specId()) : Optional.empty();
     }
 
+    /**
+     * Redraw in place the menu {@code viewer} has open, when it is the one registered under {@code specId} — the seam
+     * a feature whose window shows live state reaches for when that state changes (the far side of a trade staking an
+     * item, say). It hops to the viewer's own entity thread and does nothing at all when they have since closed the
+     * window or moved to another menu, so a stale update can never paint over an unrelated screen. The redraw reuses
+     * the open window: no second {@code openInventory}, no new holder, and a content region the viewer physically
+     * fills is left untouched.
+     */
+    public void redraw(PlayerRef viewer, String specId) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(specId, "specId");
+        scheduler.onEntity(viewer, () -> {
+            Player live = Bukkit.getPlayer(viewer.uuid());
+            if (live == null || !live.isOnline()) {
+                return;
+            }
+            openWindow(viewer, specId)
+                    .map(Inventory::getHolder)
+                    .filter(MenuHolder.class::isInstance)
+                    .map(MenuHolder.class::cast)
+                    .ifPresent(this::reRender);
+        });
+    }
+
+    /**
+     * The live window {@code viewer} has open when it is the menu registered under {@code specId}, else empty — how a
+     * feature reads or clears the slots of its own {@code content {}} region without keeping a window reference of its
+     * own. It is a plain read of the viewer's open inventory, so it must be called on their entity thread (where
+     * touching a live inventory is legal), which is where every content-region callback already runs.
+     */
+    public Optional<Inventory> openWindow(PlayerRef viewer, String specId) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(specId, "specId");
+        Player live = Bukkit.getPlayer(viewer.uuid());
+        if (live == null || !live.isOnline()) {
+            return Optional.empty();
+        }
+        // A player looking at no window at all has nothing to read here, so the absent case is answered rather than
+        // dereferenced.
+        Inventory top = live.getOpenInventory().getTopInventory();
+        if (top == null) {
+            return Optional.empty();
+        }
+        return top.getHolder() instanceof MenuHolder holder && holder.specId().equals(specId)
+                ? Optional.of(top)
+                : Optional.empty();
+    }
+
     /** Read the open menu's id, its 1-based page (the context page is 0-based), row count and typed arguments. */
     private static OpenMenuInfo openMenuInfo(MenuHolder holder) {
         return new OpenMenuInfo(
@@ -1425,7 +1473,12 @@ public final class Menus {
             }
             holder.clearClickMap();
             renderer.populate(
-                    holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
+                    holder.getInventory(),
+                    holder.spec(),
+                    holder.ctx(),
+                    holder::recordSlot,
+                    holder.resolvedLists(),
+                    false);
             if (holder.spec().bottomInventory()) {
                 // Re-paint the bottom too, but do not re-snapshot — the viewer's real items were captured on open and
                 // are held on the holder until close; populateBottom clears and redraws only the menu tiles.

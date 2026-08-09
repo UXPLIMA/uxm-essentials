@@ -34,6 +34,19 @@ public interface ContentProvider {
     List<@Nullable ItemStack> render(MenuContext ctx, ContentRegionSpec region);
 
     /**
+     * Whether this region is repainted from {@link #render} every time the menu is redrawn, or filled once when the
+     * window opens and then left to the viewer. A region that projects something the feature owns (the mirrored half
+     * of a trade, a read-only inventory view) repaints, so a change to the model shows up. A region the viewer
+     * physically fills must not: between the moment a stack is placed and the moment the feature reads the region
+     * back, a redraw painted from the model would wipe what was just put down, and a redraw painted from a model the
+     * viewer has already emptied would mint it back. For such a region the window itself is the truth until it is
+     * read back, so the engine leaves its slots alone after the first paint.
+     */
+    default boolean repaintsOnRedraw() {
+        return true;
+    }
+
+    /**
      * Whether {@code click} may go through, i.e. whether vanilla should be allowed to perform that one movement.
      * Only ever asked for an {@code editable} region, and asked per click, so a provider can allow taking an item
      * out while refusing to put one in. The default refuses everything: a region is inert until its feature says

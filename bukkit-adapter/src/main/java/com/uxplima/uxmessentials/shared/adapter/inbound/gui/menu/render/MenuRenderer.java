@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -193,6 +194,24 @@ public final class MenuRenderer {
             MenuContext ctx,
             BiConsumer<Integer, RenderedSlot> clickSink,
             Map<String, List<?>> resolvedLists) {
+        populate(inv, spec, ctx, clickSink, resolvedLists, true);
+    }
+
+    /**
+     * The same fill, told whether this is the window's first paint or a redraw of one the viewer is already looking
+     * at. Everything a spec declares is drawn identically either way; the flag only reaches the content regions, where
+     * a region the viewer physically fills ({@link ContentProvider#repaintsOnRedraw()} {@code false}) is painted once
+     * on the first pass and then left alone, because on a redraw the window holds items the model has not been told
+     * about yet. Every caller that opens or previews a window passes {@code true}; the two redraw paths pass
+     * {@code false}.
+     */
+    public void populate(
+            Inventory inv,
+            MenuSpec spec,
+            MenuContext ctx,
+            BiConsumer<Integer, RenderedSlot> clickSink,
+            Map<String, List<?>> resolvedLists,
+            boolean initialPaint) {
         Objects.requireNonNull(inv, "inv");
         Objects.requireNonNull(spec, "spec");
         Objects.requireNonNull(ctx, "ctx");
@@ -203,12 +222,39 @@ public final class MenuRenderer {
         for (MenuItemSpec item : spec.items().values()) {
             (item.list().isPresent() ? listItems : staticItems).add(item);
         }
+        Map<Integer, @Nullable ItemStack> held = initialPaint ? Map.of() : holdViewerFilledRegions(inv, spec);
         MenuContext staticCtx = pagedAwareStaticCtx(ctx, listItems, resolvedLists);
         Map<Integer, MenuItemSpec> placed = populateStatic(inv, staticItems, staticCtx, clickSink);
         for (MenuItemSpec listItem : listItems) {
             populateList(inv, listItem, ctx, staticCtx, placed, clickSink, resolvedLists);
         }
-        populateContent(inv, spec, ctx);
+        populateContent(inv, spec, ctx, initialPaint);
+        held.forEach(inv::setItem);
+    }
+
+    /**
+     * Take aside what sits in the slots of every region the viewer physically fills, so a redraw can put it back
+     * exactly as it was. The chrome underneath such a region (a window-wide filler is the usual thing) is redrawn on
+     * every pass and would otherwise paint over the stacks a player has placed but the feature has not yet read back.
+     * Empty slots are held too — as null entries — because a slot the viewer has just emptied must stay empty rather
+     * than get a filler tile the feature would later read back as an item. Only ever called for a redraw, and only for
+     * a region whose provider opts out of repainting, so an ordinary menu allocates nothing here.
+     */
+    private Map<Integer, @Nullable ItemStack> holdViewerFilledRegions(Inventory inv, MenuSpec spec) {
+        Map<Integer, @Nullable ItemStack> held = new HashMap<>();
+        for (ContentRegionSpec region : spec.contents().values()) {
+            ContentProvider provider =
+                    contents == null ? null : contents.get(region.id()).orElse(null);
+            if (provider == null || provider.repaintsOnRedraw()) {
+                continue;
+            }
+            for (int slot : region.slots().slots()) {
+                if (fits(inv, slot)) {
+                    held.put(slot, inv.getItem(slot));
+                }
+            }
+        }
+        return held;
     }
 
     /**
@@ -217,17 +263,24 @@ public final class MenuRenderer {
      * cleared first, so a region whose provider is missing — or whose feature has nothing to show right now — leaves
      * genuinely empty slots rather than a stale tile the viewer could try to take. The engine records no click
      * routing for them: a click there is resolved against the region itself, not the spec's items.
+     *
+     * <p>A region whose provider does not repaint on a redraw is skipped entirely once the window is up — not even
+     * cleared — because on a redraw its slots hold the viewer's own stacks, which only the feature's read-back may
+     * dispose of.
      */
-    private void populateContent(Inventory inv, MenuSpec spec, MenuContext ctx) {
+    private void populateContent(Inventory inv, MenuSpec spec, MenuContext ctx, boolean initialPaint) {
         for (ContentRegionSpec region : spec.contents().values()) {
+            ContentProvider provider =
+                    contents == null ? null : contents.get(region.id()).orElse(null);
+            if (!initialPaint && provider != null && !provider.repaintsOnRedraw()) {
+                continue;
+            }
             List<Integer> slots = region.slots().slots();
             for (int slot : slots) {
                 if (fits(inv, slot)) {
                     inv.setItem(slot, null);
                 }
             }
-            ContentProvider provider =
-                    contents == null ? null : contents.get(region.id()).orElse(null);
             if (provider == null) {
                 continue;
             }

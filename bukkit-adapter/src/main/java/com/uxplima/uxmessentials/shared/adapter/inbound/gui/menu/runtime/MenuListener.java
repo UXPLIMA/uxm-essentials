@@ -1762,7 +1762,7 @@ public final class MenuListener implements Listener {
     private void repaint(MenuHolder holder) {
         holder.clearClickMap();
         renderer.populate(
-                holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
+                holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists(), false);
         if (holder.spec().bottomInventory()) {
             Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
             if (live != null) {
