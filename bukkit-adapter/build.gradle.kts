@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":persistence-adapter"))
     implementation(project(":migration"))
     api(project(":api"))
+    api(project(":bukkit-api"))
 
     // The Mojang-mapped dev bundle supplies the Paper API *and* the server internals (net.minecraft,
     // org.bukkit.craftbukkit) the offline-inventory adapter needs; it replaces the plain paper-api
@@ -236,6 +237,11 @@ tasks.shadowJar {
         // jOOQ tables/records and the repository/transaction/cache bases must survive even before a
         // consuming context references them, so keep the whole module out of dead-code elimination.
         exclude(project(":persistence-adapter"))
+        // The API modules are the published surface: their classes exist for consumers this jar's call graph
+        // cannot see, so the minimizer would strip every one production code never calls and a third-party
+        // plugin would meet NoClassDefFoundError at load. Keep both modules whole.
+        exclude(project(":api"))
+        exclude(project(":bukkit-api"))
     }
 }
 

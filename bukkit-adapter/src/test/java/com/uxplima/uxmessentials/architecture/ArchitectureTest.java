@@ -94,6 +94,23 @@ class ArchitectureTest {
             .resideInAnyPackage("net.milkbowl.vault..", "me.lokka30.treasury..")
             .allowEmptyShould(true);
 
+    // The published API artifacts are a compatibility promise: once a signature ships, third-party plugins
+    // compile against it and it is frozen. That promise is only keepable if the API cannot reach an internal
+    // type, because a leaked domain record or engine class would be frozen too, by accident, and every later
+    // refactor of it would break somebody's build. So the boundary is a fence rather than a convention: the
+    // api packages may name JDK types, Bukkit types and each other, and nothing else of ours.
+    @ArchTest
+    static final ArchRule apiModulesDoNotDependOnInternals = noClasses()
+            .that()
+            .resideInAPackage("com.uxplima.uxmessentials.api..")
+            .should()
+            .dependOnClassesThat(JavaClass.Predicates.resideInAPackage("com.uxplima.uxmessentials..")
+                    .and(DescribedPredicate.not(
+                            JavaClass.Predicates.resideInAPackage("com.uxplima.uxmessentials.api.."))))
+            .because("the published API must expose only JDK types, Bukkit types and its own interfaces; "
+                    + "reaching an internal type would freeze that type's shape forever")
+            .allowEmptyShould(true);
+
     // The menu engine's spec model and evaluation are the pure core: plain JUnit can exercise them
     // without a server. Keeping them free of Bukkit / Paper / NMS is what makes that possible.
     @ArchTest

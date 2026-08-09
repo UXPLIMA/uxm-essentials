@@ -22,6 +22,7 @@ rootProject.name = "uxmEssentials"
 
 include(
     ":api",
+    ":bukkit-api",
     ":core",
     ":bukkit-adapter",
     ":persistence-adapter",
