@@ -86,6 +86,13 @@ class FrontDoorWiringTest {
         assertThat(api.kits()).isEmpty();
         assertThat(api.vaults()).isEmpty();
         assertThat(api.moderation()).isEmpty();
+        assertThat(api.presence()).isEmpty();
+        assertThat(api.vanish()).isEmpty();
+        assertThat(api.playtime()).isEmpty();
+        assertThat(api.worlds()).isEmpty();
+        assertThat(api.teleport()).isEmpty();
+        assertThat(api.vote()).isEmpty();
+        assertThat(api.messaging()).isEmpty();
     }
 
     @Test

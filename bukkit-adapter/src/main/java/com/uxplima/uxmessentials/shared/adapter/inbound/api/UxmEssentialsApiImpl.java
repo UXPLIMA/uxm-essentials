@@ -9,10 +9,17 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
+import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
+import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -103,5 +110,40 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmModerationQuery> moderation() {
         return queries.find(UxmModerationQuery.class);
+    }
+
+    @Override
+    public Optional<UxmPresenceQuery> presence() {
+        return queries.find(UxmPresenceQuery.class);
+    }
+
+    @Override
+    public Optional<UxmVanishQuery> vanish() {
+        return queries.find(UxmVanishQuery.class);
+    }
+
+    @Override
+    public Optional<UxmPlaytimeQuery> playtime() {
+        return queries.find(UxmPlaytimeQuery.class);
+    }
+
+    @Override
+    public Optional<UxmWorldsQuery> worlds() {
+        return queries.find(UxmWorldsQuery.class);
+    }
+
+    @Override
+    public Optional<UxmTeleportQuery> teleport() {
+        return queries.find(UxmTeleportQuery.class);
+    }
+
+    @Override
+    public Optional<UxmVoteQuery> vote() {
+        return queries.find(UxmVoteQuery.class);
+    }
+
+    @Override
+    public Optional<UxmMessagingQuery> messaging() {
+        return queries.find(UxmMessagingQuery.class);
     }
 }

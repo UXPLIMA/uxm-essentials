@@ -10,10 +10,17 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
+import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
+import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -131,6 +138,41 @@ class FrontDoorTest {
 
         @Override
         public Optional<UxmModerationQuery> moderation() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmPresenceQuery> presence() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmVanishQuery> vanish() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmPlaytimeQuery> playtime() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmWorldsQuery> worlds() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmTeleportQuery> teleport() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmVoteQuery> vote() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmMessagingQuery> messaging() {
             return Optional.empty();
         }
     }

@@ -7,10 +7,17 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
+import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
+import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -91,6 +98,27 @@ public interface UxmEssentialsApi {
 
     /** Reading punishments and history, or empty when the moderation module is switched off. */
     Optional<UxmModerationQuery> moderation();
+
+    /** Reading who is away from their keyboard, or empty when the presence module is switched off. */
+    Optional<UxmPresenceQuery> presence();
+
+    /** Reading who is hidden and from whom, or empty when the vanish module is switched off. */
+    Optional<UxmVanishQuery> vanish();
+
+    /** Reading how long players have been on the server, or empty when the player-state module is switched off. */
+    Optional<UxmPlaytimeQuery> playtime();
+
+    /** Reading the managed worlds and their entry rules, or empty when the worlds module is switched off. */
+    Optional<UxmWorldsQuery> worlds();
+
+    /** Reading teleport requests and return points, or empty when the teleport module is switched off. */
+    Optional<UxmTeleportQuery> teleport();
+
+    /** Reading vote counts and party progress, or empty when the vote module is switched off. */
+    Optional<UxmVoteQuery> vote();
+
+    /** Reading mail, ignores and the messaging switches, or empty when the messaging module is switched off. */
+    Optional<UxmMessagingQuery> messaging();
 
     /** The API, or {@code null} when uxmEssentials is absent, still loading, or shutting down. */
     static @Nullable UxmEssentialsApi get() {

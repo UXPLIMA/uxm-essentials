@@ -304,7 +304,10 @@ public final class WorldsWiring {
                 },
                 resolver,
                 worldsPlaceholders,
-                reopenList);
+                reopenList,
+                repository,
+                engine,
+                policy);
     }
 
     /** Close a stop-time handle, logging any failure rather than stranding the rest of the teardown. */
@@ -396,6 +399,8 @@ public final class WorldsWiring {
      * uxmEssentials:void|flat} worlds loaded from server.properties. The placeholder seam is registered onto
      * the shared placeholder contexts so the {@code worlds_*} tokens resolve while the module is enabled. The
      * open-world-list seam opens the engine-rendered {@code /world gui} world picker the management hub also opens.
+     * The register, the engine and the entry gate are handed back so bootstrap can build the published worlds query
+     * over the very same three the commands run on.
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -404,7 +409,10 @@ public final class WorldsWiring {
             Runnable stop,
             WorldGeneratorResolver generatorResolver,
             WorldsPlaceholders worldsPlaceholders,
-            BiConsumer<Player, PlayerRef> openWorldList) {
+            BiConsumer<Player, PlayerRef> openWorldList,
+            com.uxplima.uxmessentials.worlds.application.port.WorldRepository repository,
+            com.uxplima.uxmessentials.worlds.application.port.WorldEngine engine,
+            WorldAccessPolicy accessPolicy) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
@@ -413,6 +421,9 @@ public final class WorldsWiring {
             Objects.requireNonNull(generatorResolver, "generatorResolver");
             Objects.requireNonNull(worldsPlaceholders, "worldsPlaceholders");
             Objects.requireNonNull(openWorldList, "openWorldList");
+            Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(engine, "engine");
+            Objects.requireNonNull(accessPolicy, "accessPolicy");
         }
     }
 }

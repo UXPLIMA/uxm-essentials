@@ -25,10 +25,17 @@ import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
+import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
+import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
 import com.uxplima.uxmessentials.bootstrap.command.GuiSubcommand;
@@ -76,6 +83,7 @@ import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
 import com.uxplima.uxmessentials.messaging.adapter.MutableAfkStatus;
 import com.uxplima.uxmessentials.messaging.adapter.MutableMutePolicy;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.PresenceAfkStatus;
+import com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingQueries;
 import com.uxplima.uxmessentials.migration.MigrationModule;
 import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
@@ -91,11 +99,13 @@ import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlaytimeQueries;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.api.PlayerWarpQueries;
 import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
+import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceQueries;
 import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
@@ -230,19 +240,23 @@ import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportQueries;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.trade.adapter.TradeWiring;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.vanish.adapter.VanishWiring;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.api.VanishQueries;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.api.VaultQueries;
 import com.uxplima.uxmessentials.villagers.adapter.VillagersWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
+import com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteQueries;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpQueries;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldQueries;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmlib.advancement.Toasts;
 import com.uxplima.uxmlib.gui.Guis;
@@ -1446,6 +1460,12 @@ public final class PluginModule {
                 wired.services().requests(),
                 wired.services().flags(),
                 java.time.Clock.systemUTC()));
+        links.queries.register(
+                UxmTeleportQuery.class,
+                new TeleportQueries(
+                        wired.services().requests(),
+                        wired.services().backStore(),
+                        ctx.kernel().playerLookup()));
         // Captured for staff (wired last), which binds its COMPASS gadget and /stafflist to this admin engine.
         links.staffTeleport = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.TeleportSeam(
                 wired.services().engine());
@@ -1502,6 +1522,14 @@ public final class PluginModule {
         // back through that hook, so the resolver must be reachable first.
         resources.worldGeneratorResolver(wired.generatorResolver());
         links.placeholders.worlds(wired.worldsPlaceholders());
+        links.queries.register(
+                UxmWorldsQuery.class,
+                new WorldQueries(
+                        wired.repository(),
+                        wired.engine(),
+                        wired.accessPolicy(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         wired.startReconcile().run();
         resources.onClose(wired.stop());
         // Open the same /world gui world picker from the management hub, gated by the existing world-gui node.
@@ -1755,6 +1783,9 @@ public final class PluginModule {
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.placeholders.playerstate(new StorePlayerstatePlaceholders(wired.store(), wired.info()));
+        links.queries.register(
+                UxmPlaytimeQuery.class,
+                new PlaytimeQueries(playtimeRepository, ctx.kernel().scheduler(), java.time.Clock.systemUTC()));
         // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
         links.staffOpenContainer = wired.services().openContainer();
         // Captured so presence (wired later) rebinds the playtime sampler's AFK seam to its live store, so the
@@ -1809,6 +1840,15 @@ public final class PluginModule {
         // The messaging PAPI seam reads the same mail/conversation/toggle/socialspy/ignore stores the messaging
         // commands hold, so a placeholder matches the player's in-game mail count and toggle state.
         links.placeholders.messaging(wired.placeholders());
+        links.queries.register(
+                UxmMessagingQuery.class,
+                new MessagingQueries(
+                        wired.stores().mail(),
+                        wired.stores().ignores(),
+                        wired.stores().toggles(),
+                        wired.stores().socialSpy(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Register two /uxmess gui hub entries — the settings panel and the mailbox — gated by the messaging GUI
         // node. The ignore-list opens from /ignore with no args; it is not a hub entry of its own.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
@@ -2013,6 +2053,10 @@ public final class PluginModule {
         links.vanishStore = wired.vanishStore();
         links.vanishToggle = wired.toggleVanish();
         links.vanishLevelResolver = wired.levels();
+        links.queries.register(
+                UxmVanishQuery.class,
+                new VanishQueries(
+                        wired.vanishStore(), wired.levels(), ctx.kernel().playerLookup()));
         // Captured for staff (wired last), which binds its VANISH gadget and vanish-on-enter to the one authority.
         links.staffVanishSeam =
                 new com.uxplima.uxmessentials.staff.adapter.StaffWiring.VanishSeam(wired.toggleVanish());
@@ -2045,6 +2089,7 @@ public final class PluginModule {
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
+        links.queries.register(UxmPresenceQuery.class, new PresenceQueries(wired.store()));
         bindAfk(links, new PresenceAfkStatus(wired.store()));
         // Rebind the playtime sampler's AFK seam (captured during the earlier playerstate wiring) to the live
         // presence store, so the sampler splits each player's seconds into active vs AFK. When playerstate is
@@ -2399,6 +2444,9 @@ public final class PluginModule {
                 .orElse(uuid.toString().toLowerCase(java.util.Locale.ROOT));
         links.placeholders.vote(
                 new RepositoryVotePlaceholders(wired.repository(), wired.partyThreshold(), nameResolver));
+        links.queries.register(
+                UxmVoteQuery.class,
+                new VoteQueries(wired.repository(), lookup, ctx.kernel().scheduler(), wired.partyThreshold()));
     }
 
     private static void wireDiscordlink(

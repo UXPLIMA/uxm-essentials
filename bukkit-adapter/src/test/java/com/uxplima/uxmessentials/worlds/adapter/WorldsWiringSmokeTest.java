@@ -112,7 +112,16 @@ class WorldsWiringSmokeTest {
                 portalListener());
 
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), listeners, () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
+                List.of(),
+                listeners,
+                () -> {},
+                () -> {},
+                resolver(),
+                placeholders(),
+                (player, viewer) -> {},
+                new NoOpRepository(),
+                mock(WorldEngine.class),
+                mock(WorldAccessPolicy.class));
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
@@ -164,7 +173,16 @@ class WorldsWiringSmokeTest {
     @Test
     void runningTheStopHookDoesNotThrow() {
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
+                List.of(),
+                List.of(),
+                () -> {},
+                () -> {},
+                resolver(),
+                placeholders(),
+                (player, viewer) -> {},
+                new NoOpRepository(),
+                mock(WorldEngine.class),
+                mock(WorldAccessPolicy.class));
 
         assertThatNoException().isThrownBy(() -> wired.stop().run());
     }
@@ -172,7 +190,16 @@ class WorldsWiringSmokeTest {
     @Test
     void wiredExposesAWorldsPlaceholderSeam() {
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
+                List.of(),
+                List.of(),
+                () -> {},
+                () -> {},
+                resolver(),
+                placeholders(),
+                (player, viewer) -> {},
+                new NoOpRepository(),
+                mock(WorldEngine.class),
+                mock(WorldAccessPolicy.class));
 
         assertThat(wired.worldsPlaceholders()).isNotNull();
     }
@@ -227,7 +254,16 @@ class WorldsWiringSmokeTest {
     @Test
     void wiredExposesAGeneratorResolverThatResolvesTheVoidId() {
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
+                List.of(),
+                List.of(),
+                () -> {},
+                () -> {},
+                resolver(),
+                placeholders(),
+                (player, viewer) -> {},
+                new NoOpRepository(),
+                mock(WorldEngine.class),
+                mock(WorldAccessPolicy.class));
 
         assertThat(wired.generatorResolver()).isNotNull();
         assertThat(wired.generatorResolver().resolve("void")).isPresent();

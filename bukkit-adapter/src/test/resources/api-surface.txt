@@ -5,10 +5,17 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional economy()
   Optional homes()
   Optional kits()
+  Optional messaging()
   Optional moderation()
   Optional playerWarps()
+  Optional playtime()
+  Optional presence()
+  Optional teleport()
+  Optional vanish()
   Optional vaults()
+  Optional vote()
   Optional warps()
+  Optional worlds()
   String version()
   boolean isModuleEnabled(String)
   com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi get()
@@ -634,6 +641,13 @@ interface com.uxplima.uxmessentials.api.query.UxmKitsQuery
   CompletableFuture cooldownRemaining(UUID, String)
   List list()
   Optional get(String)
+interface com.uxplima.uxmessentials.api.query.UxmMessagingQuery
+  CompletableFuture ignoreList(UUID)
+  CompletableFuture ignores(UUID, UUID)
+  CompletableFuture mailbox(UUID)
+  CompletableFuture unreadMail(UUID)
+  boolean acceptsMessages(UUID)
+  boolean isSocialSpying(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmModerationQuery
   CompletableFuture ban(UUID)
   CompletableFuture history(UUID, int)
@@ -646,23 +660,56 @@ interface com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery
   CompletableFuture limit(UUID)
   CompletableFuture listPublic(int, int)
   CompletableFuture ownedBy(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery
+  CompletableFuture of(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmPresenceQuery
+  List afk()
+  Optional of(UUID)
+  boolean isAfk(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmTeleportQuery
+  List pendingFor(UUID)
+  Optional backPoint(UUID)
+  Optional outgoingFrom(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmVanishQuery
+  Set vanished()
+  boolean canSee(UUID, UUID)
+  boolean isVanished(UUID)
+  int levelOf(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmVaultsQuery
   CompletableFuture count(UUID)
   CompletableFuture get(UUID, int)
   CompletableFuture limit(UUID)
   CompletableFuture list(UUID)
   CompletableFuture rows(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmVoteQuery
+  CompletableFuture party()
+  CompletableFuture queuedRewards(UUID)
+  CompletableFuture top(com.uxplima.uxmessentials.api.view.UxmVotePeriod, int)
+  CompletableFuture totals(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmWarpsQuery
   CompletableFuture averageRating(String)
   CompletableFuture exists(String)
   CompletableFuture get(String)
   CompletableFuture list()
   CompletableFuture visibleTo(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmWorldsQuery
+  CompletableFuture access(UUID, String)
+  CompletableFuture get(String)
+  CompletableFuture list()
+  boolean isLoaded(String)
 enum com.uxplima.uxmessentials.api.view.UxmBackCause
   com.uxplima.uxmessentials.api.view.UxmBackCause valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmBackCause[] values()
   com.uxplima.uxmessentials.api.view.UxmBackCause DEATH
   com.uxplima.uxmessentials.api.view.UxmBackCause TELEPORT
+record com.uxplima.uxmessentials.api.view.UxmBackPoint
+  <init>(com.uxplima.uxmessentials.api.view.UxmLocation, com.uxplima.uxmessentials.api.view.UxmBackCause, Instant)
+  Instant capturedAt()
+  String toString()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmBackCause cause()
+  com.uxplima.uxmessentials.api.view.UxmLocation location()
+  int hashCode()
 record com.uxplima.uxmessentials.api.view.UxmBaltopEntry
   <init>(int, UUID, String, com.uxplima.uxmessentials.api.view.UxmMoney)
   String playerName()
@@ -692,6 +739,19 @@ record com.uxplima.uxmessentials.api.view.UxmHome
   int hashCode()
   int slot()
   int slotNumber()
+record com.uxplima.uxmessentials.api.view.UxmIgnore
+  <init>(UUID, com.uxplima.uxmessentials.api.view.UxmIgnoreScope)
+  String toString()
+  UUID playerId()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmIgnoreScope scope()
+  int hashCode()
+enum com.uxplima.uxmessentials.api.view.UxmIgnoreScope
+  com.uxplima.uxmessentials.api.view.UxmIgnoreScope valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmIgnoreScope[] values()
+  com.uxplima.uxmessentials.api.view.UxmIgnoreScope ALL
+  com.uxplima.uxmessentials.api.view.UxmIgnoreScope MAIL
+  com.uxplima.uxmessentials.api.view.UxmIgnoreScope MESSAGES
 record com.uxplima.uxmessentials.api.view.UxmIssuer
   <init>(Optional, String)
   Optional uuid()
@@ -729,6 +789,19 @@ record com.uxplima.uxmessentials.api.view.UxmLocation
   float pitch()
   float yaw()
   int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmMail
+  <init>(long, UUID, Optional, String, String, Instant, boolean)
+  Instant sentAt()
+  Optional senderId()
+  String body()
+  String senderName()
+  String toString()
+  UUID recipientId()
+  boolean equals(Object)
+  boolean fromPlayer()
+  boolean read()
+  int hashCode()
+  long id()
 record com.uxplima.uxmessentials.api.view.UxmMoney
   <init>(String, BigDecimal)
   BigDecimal amount()
@@ -779,6 +852,21 @@ enum com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus
   com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus ACTIVE
   com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus ARCHIVED
   com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus SUSPENDED
+record com.uxplima.uxmessentials.api.view.UxmPlaytime
+  <init>(Duration, Duration, Duration, Duration, Duration, Duration, Duration, Duration)
+  Duration monthActive()
+  Duration monthAfk()
+  Duration todayActive()
+  Duration todayAfk()
+  Duration totalActive()
+  Duration totalAfk()
+  Duration totalConnected()
+  Duration weekActive()
+  Duration weekAfk()
+  String toString()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmPlaytime empty()
+  int hashCode()
 enum com.uxplima.uxmessentials.api.view.UxmPoseType
   com.uxplima.uxmessentials.api.view.UxmPoseType valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmPoseType[] values()
@@ -788,6 +876,15 @@ enum com.uxplima.uxmessentials.api.view.UxmPoseType
   com.uxplima.uxmessentials.api.view.UxmPoseType PLAYER_SIT
   com.uxplima.uxmessentials.api.view.UxmPoseType SIT
   com.uxplima.uxmessentials.api.view.UxmPoseType SPIN
+record com.uxplima.uxmessentials.api.view.UxmPresence
+  <init>(UUID, boolean, Optional, Instant)
+  Instant lastActivity()
+  Optional afkReason()
+  String toString()
+  UUID playerId()
+  boolean afk()
+  boolean equals(Object)
+  int hashCode()
 enum com.uxplima.uxmessentials.api.view.UxmPurgeCategory
   com.uxplima.uxmessentials.api.view.UxmPurgeCategory valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmPurgeCategory[] values()
@@ -854,6 +951,19 @@ enum com.uxplima.uxmessentials.api.view.UxmTeleportKind
   com.uxplima.uxmessentials.api.view.UxmTeleportKind RESPAWN
   com.uxplima.uxmessentials.api.view.UxmTeleportKind SPAWN
   com.uxplima.uxmessentials.api.view.UxmTeleportKind WARP
+record com.uxplima.uxmessentials.api.view.UxmTeleportRequest
+  <init>(UUID, String, UUID, String, com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection, Instant)
+  Instant expiresAt()
+  String requesterName()
+  String targetName()
+  String toString()
+  UUID anchorId()
+  UUID moverId()
+  UUID requesterId()
+  UUID targetId()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection direction()
+  int hashCode()
 enum com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection
   com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection[] values()
@@ -869,6 +979,43 @@ record com.uxplima.uxmessentials.api.view.UxmVault
   boolean equals(Object)
   int hashCode()
   int index()
+record com.uxplima.uxmessentials.api.view.UxmVoteParty
+  <init>(int, int)
+  String toString()
+  boolean equals(Object)
+  int count()
+  int hashCode()
+  int remaining()
+  int threshold()
+enum com.uxplima.uxmessentials.api.view.UxmVotePeriod
+  com.uxplima.uxmessentials.api.view.UxmVotePeriod valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmVotePeriod[] values()
+  com.uxplima.uxmessentials.api.view.UxmVotePeriod ALL_TIME
+  com.uxplima.uxmessentials.api.view.UxmVotePeriod DAILY
+  com.uxplima.uxmessentials.api.view.UxmVotePeriod MONTHLY
+  com.uxplima.uxmessentials.api.view.UxmVotePeriod WEEKLY
+record com.uxplima.uxmessentials.api.view.UxmVoteRank
+  <init>(int, UUID, String, long)
+  String playerName()
+  String toString()
+  UUID playerId()
+  boolean equals(Object)
+  int hashCode()
+  int rank()
+  long votes()
+record com.uxplima.uxmessentials.api.view.UxmVoteTotals
+  <init>(long, long, long, long, long, long)
+  String toString()
+  boolean equals(Object)
+  boolean hasVoted()
+  com.uxplima.uxmessentials.api.view.UxmVoteTotals empty()
+  int hashCode()
+  long allTime()
+  long bestStreak()
+  long currentStreak()
+  long daily()
+  long monthly()
+  long weekly()
 enum com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason[] values()
@@ -904,6 +1051,20 @@ record com.uxplima.uxmessentials.api.view.UxmWarp
   com.uxplima.uxmessentials.api.view.UxmLocation location()
   int hashCode()
   long visitors()
+record com.uxplima.uxmessentials.api.view.UxmWorld
+  <init>(String, Optional, String, String, Optional, boolean, boolean, int)
+  Optional alias()
+  Optional seed()
+  String displayName()
+  String environment()
+  String generation()
+  String name()
+  String toString()
+  boolean autoLoad()
+  boolean equals(Object)
+  boolean loaded()
+  int hashCode()
+  int playerCount()
 enum com.uxplima.uxmessentials.api.view.UxmWorldAccess
   com.uxplima.uxmessentials.api.view.UxmWorldAccess valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmWorldAccess[] values()

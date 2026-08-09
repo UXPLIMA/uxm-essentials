@@ -209,8 +209,11 @@ public final class MessagingWiring {
                 new InMemorySocialSpyStore());
     }
 
-    /** The constructed stores, held so the wiring's stop hook can drain the transient ones. */
-    record Stores(
+    /**
+     * The constructed stores, held so the wiring's stop hook can drain the transient ones and so bootstrap can
+     * build the published messaging query over the very same mail, ignore and toggle stores the commands use.
+     */
+    public record Stores(
             MailRepository mail,
             IgnoreStore ignores,
             InMemoryConversationStore conversations,
