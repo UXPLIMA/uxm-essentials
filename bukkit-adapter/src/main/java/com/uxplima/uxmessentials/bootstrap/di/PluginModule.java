@@ -147,6 +147,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLif
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitEventBridge;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
@@ -398,7 +401,20 @@ public final class PluginModule {
                 .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);
         UxmApiHolder.install(devApi);
         resources.onClose(UxmApiHolder::uninstall);
-        kernel.log().info("event=dev_api_registered version={}", devApi.version());
+        // Every domain fact the plugin publishes becomes a Bukkit event for whoever is listening. One subscriber for
+        // all twenty contexts, and it costs a map lookup when nobody is listening, which is the ordinary case.
+        EventBridgeRegistry bridgeRegistry = new EventBridgeRegistry();
+        EventBridges.installAll(bridgeRegistry);
+        BukkitEventBridge bridge = new BukkitEventBridge(
+                bridgeRegistry, kernel.scheduler(), plugin.getServer().getPluginManager(), kernel.log());
+        InProcessDomainEventPublisher publishedEvents = (InProcessDomainEventPublisher) kernel.events();
+        publishedEvents.subscribe(bridge);
+        resources.onClose(() -> publishedEvents.unsubscribe(bridge));
+        kernel.log()
+                .info(
+                        "event=dev_api_registered version={} bridged_events={}",
+                        devApi.version(),
+                        String.valueOf(bridgeRegistry.bridged().size()));
         // The editor renderer is the typed-property capability the same engine grows: a property editor is a
         // MenuHolder window the one listener routes and the one shutdown tears down, so the renderer is threaded into
         // both the listener (it repaints an editor after a property click) and the façade (it opens one). The façade
