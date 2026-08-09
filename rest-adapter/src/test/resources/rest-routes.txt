@@ -1,4 +1,5 @@
 GET /api/v1/status [read]
+GET /api/v1/events [events]
 GET /api/v1/economy/currencies [read]
 GET /api/v1/economy/top [read]
 GET /api/v1/players/{uuid}/balance [read]

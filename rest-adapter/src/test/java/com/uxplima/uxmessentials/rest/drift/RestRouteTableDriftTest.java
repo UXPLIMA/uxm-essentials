@@ -65,10 +65,21 @@ class RestRouteTableDriftTest {
         });
     }
 
+    /** Every GET reads, and reading needs the read scope. The stream is the one GET that is not a read. */
     @Test
     void everyReadingRouteIsAGetAndAsksOnlyForTheReadScope() {
         assertThat(Routes.build(mock(UxmEssentialsApi.class), NO_WRITES).routes())
                 .filteredOn(route -> route.method().equals("GET"))
+                .filteredOn(route -> !route.path().source().equals(Routes.EVENTS))
                 .allSatisfy(route -> assertThat(route.scope()).isEqualTo(Scopes.READ));
+    }
+
+    /** The stream is the only thing the events scope opens, and it opens nothing else. */
+    @Test
+    void theEventsScopeBelongsToTheStreamAndNothingElse() {
+        assertThat(Routes.build(mock(UxmEssentialsApi.class), NO_WRITES).routes())
+                .filteredOn(route -> route.scope().equals(Scopes.EVENTS))
+                .singleElement()
+                .satisfies(route -> assertThat(route.path().source()).isEqualTo(Routes.EVENTS));
     }
 }

@@ -22,6 +22,10 @@ import java.util.logging.Logger;
  * loop never waits on one. Nothing here runs on a server thread: the handler behind a route calls the published
  * API, which hops to whatever thread owns the work and hands back a future.
  *
+ * <p>One path is not a request at all. A connection that asks to become a WebSocket is routed and authenticated
+ * exactly like any other, and then, instead of an answer, the socket is handed to whatever {@link Upgrade} was
+ * installed and stays open for as long as that keeps it.
+ *
  * <p>Closing is ordinary. The socket closes first, which wakes the accept loop out of {@code accept()} with the
  * exception it is expecting, and the executor is then given a moment to finish whatever it was already answering.
  */
@@ -37,12 +41,14 @@ public final class RestServer implements AutoCloseable {
     private final ExecutorService connections;
     private final Router router;
     private final RequestFilter filter;
+    private final Upgrade upgrade;
     private final Logger log;
 
-    private RestServer(ServerSocket socket, Router router, RequestFilter filter, Logger log) {
+    private RestServer(ServerSocket socket, Router router, RequestFilter filter, Upgrade upgrade, Logger log) {
         this.socket = socket;
         this.router = router;
         this.filter = filter;
+        this.upgrade = upgrade;
         this.log = log;
         this.connections = Executors.newVirtualThreadPerTaskExecutor();
     }
@@ -54,14 +60,26 @@ public final class RestServer implements AutoCloseable {
      */
     public static RestServer start(String bind, int port, Router router, RequestFilter filter, Logger log)
             throws IOException {
+        return start(bind, port, router, filter, Upgrade.none(), log);
+    }
+
+    /**
+     * Bind {@code bind:port} and start answering, with a path that becomes a WebSocket.
+     *
+     * @param upgrade what takes over a connection asking to be upgraded
+     */
+    public static RestServer start(
+            String bind, int port, Router router, RequestFilter filter, Upgrade upgrade, Logger log)
+            throws IOException {
         Objects.requireNonNull(bind, "bind");
         Objects.requireNonNull(router, "router");
         Objects.requireNonNull(filter, "filter");
+        Objects.requireNonNull(upgrade, "upgrade");
         Objects.requireNonNull(log, "log");
         ServerSocket socket = new ServerSocket();
         socket.setReuseAddress(true);
         socket.bind(new InetSocketAddress(InetAddress.getByName(bind), port));
-        RestServer server = new RestServer(socket, router, filter, log);
+        RestServer server = new RestServer(socket, router, filter, upgrade, log);
         server.connections.execute(server::acceptLoop);
         return server;
     }
@@ -89,9 +107,19 @@ public final class RestServer implements AutoCloseable {
             open.setSoTimeout(READ_TIMEOUT_MILLIS);
             InputStream in = open.getInputStream();
             OutputStream out = open.getOutputStream();
-            HttpResponse response = answer(in);
-            out.write(response.toBytes());
-            out.flush();
+
+            HttpRequest request;
+            try {
+                request = RequestReader.read(in);
+            } catch (HttpException refused) {
+                answer(out, Json.error(refused.status(), "bad-request", String.valueOf(refused.getMessage())));
+                return;
+            }
+            if (upgrade.handles(request)) {
+                upgrade(request, open, out);
+                return;
+            }
+            answer(out, dispatch(router, filter, request, log));
         } catch (IOException gone) {
             // The client hung up or timed out. There is nobody left to tell, and a stack trace per dropped
             // connection would be the loudest thing in the log.
@@ -99,15 +127,36 @@ public final class RestServer implements AutoCloseable {
         }
     }
 
-    /** Read, filter, route, run: the four things that happen to a request, each able to end it. */
-    private HttpResponse answer(InputStream in) throws IOException {
-        HttpRequest request;
-        try {
-            request = RequestReader.read(in);
-        } catch (HttpException refused) {
-            return Json.error(refused.status(), "bad-request", String.valueOf(refused.getMessage()));
+    /**
+     * Hand a connection over, once it has been routed and authenticated like any other request.
+     *
+     * <p>The route lookup and the filter are not skipped for an upgrade. A stream is a way of reading the server,
+     * so it needs a token with the scope for it, and putting the endpoint in the route table is what makes that
+     * true rather than a promise in a comment.
+     */
+    private void upgrade(HttpRequest request, Socket open, OutputStream out) throws IOException {
+        Optional<Router.Match> match = router.find(request);
+        if (match.isEmpty()) {
+            answer(out, Json.error(HttpStatus.NOT_FOUND, "no-route", "nothing answers " + request.path()));
+            return;
         }
-        return dispatch(router, filter, request, log);
+        RequestFilter.Decision decision = filter.before(request, match.get().route());
+        if (decision.refusal().isPresent()) {
+            answer(out, decision.refusal().get());
+            return;
+        }
+        upgrade.take(request, decision.caller(), open).ifPresent(refusal -> {
+            try {
+                answer(out, refusal);
+            } catch (IOException gone) {
+                log.log(Level.FINE, "the connection ended before the upgrade could be refused", gone);
+            }
+        });
+    }
+
+    private static void answer(OutputStream out, HttpResponse response) throws IOException {
+        out.write(response.toBytes());
+        out.flush();
     }
 
     /**
@@ -164,6 +213,40 @@ public final class RestServer implements AutoCloseable {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             connections.shutdownNow();
+        }
+    }
+
+    /**
+     * What takes a connection over instead of answering it.
+     *
+     * <p>One implementation, for the event stream, and the interface exists so the HTTP layer does not have to know
+     * what a WebSocket is: this file's job ends at "routed, authenticated, and no longer mine".
+     */
+    public interface Upgrade {
+
+        /** Whether this would take that request, asked before the route is looked up. */
+        boolean handles(HttpRequest request);
+
+        /**
+         * Take the connection, and keep it for as long as it lives.
+         *
+         * @return a response to send instead, when the request could not be upgraded after all
+         */
+        Optional<HttpResponse> take(HttpRequest request, String caller, Socket socket) throws IOException;
+
+        /** An upgrade nothing matches, for a listener serving requests and nothing else. */
+        static Upgrade none() {
+            return new Upgrade() {
+                @Override
+                public boolean handles(HttpRequest request) {
+                    return false;
+                }
+
+                @Override
+                public Optional<HttpResponse> take(HttpRequest request, String caller, Socket socket) {
+                    throw new IllegalStateException("this listener upgrades nothing");
+                }
+            };
         }
     }
 

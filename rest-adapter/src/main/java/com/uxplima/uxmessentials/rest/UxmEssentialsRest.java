@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.rest.auth.AuthFilter;
 import com.uxplima.uxmessentials.rest.auth.RateLimiter;
 import com.uxplima.uxmessentials.rest.auth.TokenStore;
 import com.uxplima.uxmessentials.rest.http.RestServer;
+import com.uxplima.uxmessentials.rest.socket.EventStream;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurateException;
@@ -40,6 +41,7 @@ import org.spongepowered.configurate.ConfigurateException;
 public final class UxmEssentialsRest extends JavaPlugin {
 
     private @Nullable RestServer server;
+    private @Nullable EventStream events;
 
     @Override
     public void onEnable() {
@@ -64,6 +66,10 @@ public final class UxmEssentialsRest extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (events != null) {
+            events.close();
+            events = null;
+        }
         if (server != null) {
             server.close();
             server = null;
@@ -72,17 +78,20 @@ public final class UxmEssentialsRest extends JavaPlugin {
 
     private void start(RestConfig config, UxmEssentialsApi api, TokenStore tokens) {
         AuthFilter filter = new AuthFilter(tokens, new RateLimiter(config.requestsPerMinute(), Clock.systemUTC()));
+        EventStream stream = new EventStream(Routes.EVENTS, getLogger());
         try {
             server = RestServer.start(
                     config.bind(),
                     config.port(),
                     Routes.build(api, caller -> api.actions(this, caller)),
                     filter,
+                    stream,
                     getLogger());
         } catch (IOException failure) {
             getLogger().log(Level.SEVERE, "could not listen on " + config.bind() + ":" + config.port(), failure);
             return;
         }
+        events = stream;
         getLogger()
                 .info("REST API listening on " + config.bind() + ":" + config.port()
                         + ". Make a token with /uxmapi token create <label>.");

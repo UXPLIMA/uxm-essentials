@@ -10,6 +10,9 @@ package com.uxplima.uxmessentials.rest.http;
  */
 public final class HttpStatus {
 
+    /** The connection is now a WebSocket and the rest of it is frames rather than requests. */
+    public static final int SWITCHING_PROTOCOLS = 101;
+
     /** The request was understood and answered, whether or not the operation it asked for went ahead. */
     public static final int OK = 200;
 
@@ -31,6 +34,9 @@ public final class HttpStatus {
     /** The body is longer than the listener will read. */
     public static final int PAYLOAD_TOO_LARGE = 413;
 
+    /** The path is a WebSocket endpoint and the request was an ordinary one. */
+    public static final int UPGRADE_REQUIRED = 426;
+
     /** The token is over its per-minute limit. */
     public static final int TOO_MANY_REQUESTS = 429;
 
@@ -51,6 +57,7 @@ public final class HttpStatus {
     /** The reason phrase for {@code status}, or a neutral one for anything not listed. */
     public static String reason(int status) {
         return switch (status) {
+            case SWITCHING_PROTOCOLS -> "Switching Protocols";
             case OK -> "OK";
             case BAD_REQUEST -> "Bad Request";
             case UNAUTHORIZED -> "Unauthorized";
@@ -58,6 +65,7 @@ public final class HttpStatus {
             case NOT_FOUND -> "Not Found";
             case METHOD_NOT_ALLOWED -> "Method Not Allowed";
             case PAYLOAD_TOO_LARGE -> "Payload Too Large";
+            case UPGRADE_REQUIRED -> "Upgrade Required";
             case TOO_MANY_REQUESTS -> "Too Many Requests";
             case INTERNAL_ERROR -> "Internal Server Error";
             case NOT_IMPLEMENTED -> "Not Implemented";

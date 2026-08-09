@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.rest.auth.Scopes;
 import com.uxplima.uxmessentials.rest.http.HttpResponse;
+import com.uxplima.uxmessentials.rest.http.HttpStatus;
 import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
@@ -43,6 +44,9 @@ public final class Routes {
     /** The version in every path, so a second one can exist beside the first rather than instead of it. */
     public static final String PREFIX = "/api/v1";
 
+    /** The one path that is a WebSocket rather than a request. */
+    public static final String EVENTS = PREFIX + "/events";
+
     private Routes() {}
 
     /**
@@ -60,6 +64,7 @@ public final class Routes {
         Objects.requireNonNull(actions, "actions");
         return new Router()
                 .add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)))
+                .add(Route.of("GET", EVENTS, Scopes.EVENTS, request -> upgradeRequired()))
                 .addAll(EconomyRoutes.of(api, actions))
                 .addAll(HomesRoutes.of(api, actions))
                 .addAll(KitsRoutes.of(api, actions))
@@ -74,6 +79,17 @@ public final class Routes {
                 .addAll(VoteRoutes.of(api, actions))
                 .addAll(WarpsRoutes.of(api, actions))
                 .addAll(WorldsRoutes.of(api, actions));
+    }
+
+    /**
+     * The event stream is in the table so it is routed and authenticated like everything else, but a request that
+     * reaches this handler is one that never asked to be upgraded, and the only useful answer is to say so.
+     */
+    private static HttpResponse upgradeRequired() {
+        return Json.error(
+                HttpStatus.UPGRADE_REQUIRED,
+                "upgrade-required",
+                "this path is a WebSocket endpoint: connect with ws:// rather than http://");
     }
 
     /**
