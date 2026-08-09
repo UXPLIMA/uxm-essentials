@@ -1,0 +1,704 @@
+class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
+  void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
+  void uninstall()
+interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
+  String version()
+  boolean isModuleEnabled(String)
+  com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi get()
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuApi menus()
+  void whenReady(Consumer)
+abstract class com.uxplima.uxmessentials.api.bukkit.event.UxmCancellableEvent extends org.bukkit.event.Event
+  <init>()
+  boolean isCancelled()
+  void setCancelled(boolean)
+abstract class com.uxplima.uxmessentials.api.bukkit.event.UxmEvent extends org.bukkit.event.Event
+  <init>()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmCancellableEvent
+  <init>(UUID, String)
+  OfflinePlayer getOfflinePlayer()
+  String getPlayerName()
+  UUID getPlayerId()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
+  <init>(UUID, String)
+  OfflinePlayer getOfflinePlayer()
+  Player getPlayer()
+  String getPlayerName()
+  UUID getPlayerId()
+class com.uxplima.uxmessentials.api.bukkit.event.communication.UxmAnnouncerReloadEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
+  <init>(int, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getAt()
+  int getLineCount()
+class com.uxplima.uxmessentials.api.bukkit.event.communication.UxmBroadcastOptOutEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, boolean, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getAt()
+  boolean isOptedOut()
+class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankDepositEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmEconomyEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney)
+  String getBankId()
+  com.uxplima.uxmessentials.api.view.UxmMoney getAmount()
+  com.uxplima.uxmessentials.api.view.UxmMoney getBankBalance()
+class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankWithdrawEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmEconomyEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String)
+class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmLoanDisburseEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmEconomyEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmMoney)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getLoanId()
+  com.uxplima.uxmessentials.api.view.UxmMoney getPrincipal()
+class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmLoanRepayEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmEconomyEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getLoanId()
+  com.uxplima.uxmessentials.api.view.UxmMoney getPaid()
+  com.uxplima.uxmessentials.api.view.UxmMoney getRemaining()
+class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmWalletCreditEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmEconomyEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney, UUID, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getOccurredAt()
+  UUID getTransactionId()
+  com.uxplima.uxmessentials.api.view.UxmMoney getAmount()
+  com.uxplima.uxmessentials.api.view.UxmMoney getBalance()
+class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmWalletDebitEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmEconomyEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney, UUID, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getOccurredAt()
+  UUID getTransactionId()
+  com.uxplima.uxmessentials.api.view.UxmMoney getAmount()
+  com.uxplima.uxmessentials.api.view.UxmMoney getBalance()
+class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmWalletRejectEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmEconomyEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmEconomyRejection, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getOccurredAt()
+  com.uxplima.uxmessentials.api.view.UxmEconomyRejection getReason()
+  com.uxplima.uxmessentials.api.view.UxmMoney getAvailable()
+  com.uxplima.uxmessentials.api.view.UxmMoney getRequested()
+class com.uxplima.uxmessentials.api.bukkit.event.hologram.UxmHologramCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.hologram.UxmHologramEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.hologram.UxmHologramDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.hologram.UxmHologramEvent
+  <init>(UUID, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.hologram.UxmHologramEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String)
+  String getHologramName()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeEvent
+  <init>(UUID, String, int, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeEvent
+  <init>(UUID, String, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, int)
+  int getSlot()
+  int getSlotNumber()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeIconChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeEvent
+  <init>(UUID, String, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeLimitReachedEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, int, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  int getCurrentCount()
+  int getLimit()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreEvent
+  <init>(UUID, String, int, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreEvent
+  <init>(UUID, String, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent
+  <init>(UUID, String, int)
+  int getSlot()
+  int getSlotNumber()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreRelocateEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreEvent
+  <init>(UUID, String, int, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeRelocateEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeEvent
+  <init>(UUID, String, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeRenameEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeEvent
+  <init>(UUID, String, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeVisibilityChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeEvent
+  <init>(UUID, String, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.itemworld.UxmEntityPurgeEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmPurgeScope, com.uxplima.uxmessentials.api.view.UxmPurgeCategory, int, Optional, int, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getAt()
+  Optional getEntityType()
+  String getWorldName()
+  com.uxplima.uxmessentials.api.view.UxmPurgeCategory getCategory()
+  com.uxplima.uxmessentials.api.view.UxmPurgeScope getScope()
+  int getRadius()
+  int getRemoved()
+class com.uxplima.uxmessentials.api.bukkit.event.itemworld.UxmMobSpawnEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, String, int, int, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getAt()
+  String getEntityType()
+  String getWorldName()
+  int getRequested()
+  int getSpawned()
+class com.uxplima.uxmessentials.api.bukkit.event.kit.UxmKitClaimEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, UUID, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getAt()
+  String getActorName()
+  String getKitId()
+  UUID getActorId()
+  boolean isSelfClaimed()
+class com.uxplima.uxmessentials.api.bukkit.event.kit.UxmKitPreClaimEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent
+  <init>(UUID, String, String, UUID, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getActorName()
+  String getKitId()
+  UUID getActorId()
+  boolean isSelfClaimed()
+class com.uxplima.uxmessentials.api.bukkit.event.messaging.UxmHelpOpEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getRaisedAt()
+  String getMessage()
+class com.uxplima.uxmessentials.api.bukkit.event.messaging.UxmMailDeliverEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, Optional, String, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getSentAt()
+  Optional getSenderId()
+  String getMessage()
+  String getSenderName()
+class com.uxplima.uxmessentials.api.bukkit.event.messaging.UxmPrivateMessageEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, UUID, String, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getSentAt()
+  Player getRecipient()
+  String getMessage()
+  String getRecipientName()
+  UUID getRecipientId()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmAltDetectedEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
+  <init>(UUID, String, List, boolean)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  List getMatched()
+  String getIp()
+  UUID getPlayerId()
+  boolean isKicked()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmIpBanEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
+  <init>(String, Optional, Optional, Optional, com.uxplima.uxmessentials.api.view.UxmIssuer, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getIssuedAt()
+  Optional getReason()
+  Optional getTarget()
+  Optional getUntil()
+  String getIp()
+  com.uxplima.uxmessentials.api.view.UxmIssuer getIssuer()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmJailLocationDefineEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmJailLocationEvent
+  <init>(UUID, String, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmJailLocationEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, Instant)
+  Instant getAt()
+  String getJail()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmJailLocationRemoveEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmJailLocationEvent
+  <init>(UUID, String, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmModerationEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, Instant)
+  Instant getAt()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerJailEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmModerationEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Optional, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Optional getReason()
+  Optional getUntil()
+  String getJail()
+  com.uxplima.uxmessentials.api.view.UxmIssuer getIssuer()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerMuteEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmModerationEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Optional, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Optional getReason()
+  Optional getUntil()
+  com.uxplima.uxmessentials.api.view.UxmIssuer getIssuer()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerTempbanEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmModerationEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Instant, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getUntil()
+  Optional getReason()
+  com.uxplima.uxmessentials.api.view.UxmIssuer getIssuer()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerUnjailEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmModerationEvent
+  <init>(UUID, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerUnmuteEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmModerationEvent
+  <init>(UUID, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerWarnEvent extends com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmModerationEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Optional, int, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Optional getExpiresAt()
+  Optional getReason()
+  com.uxplima.uxmessentials.api.view.UxmIssuer getIssuer()
+  int getTotalWarnings()
+class com.uxplima.uxmessentials.api.bukkit.event.npc.UxmNpcCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.npc.UxmNpcEvent
+  <init>(String, UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.npc.UxmNpcDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.npc.UxmNpcEvent
+  <init>(String, UUID, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.npc.UxmNpcEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
+  <init>(String, UUID, String)
+  Player getActor()
+  String getActorName()
+  String getNpcName()
+  UUID getActorId()
+class com.uxplima.uxmessentials.api.bukkit.event.npc.UxmNpcMoveEvent extends com.uxplima.uxmessentials.api.bukkit.event.npc.UxmNpcEvent
+  <init>(String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerFeedEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerStateEvent
+  <init>(UUID, String, UUID, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerFlyToggleEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerStateEvent
+  <init>(UUID, String, UUID, String, boolean, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  boolean isEnabled()
+class com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerGameModeChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerStateEvent
+  <init>(UUID, String, UUID, String, GameMode, Instant)
+  GameMode getMode()
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerGodToggleEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerStateEvent
+  <init>(UUID, String, UUID, String, boolean, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  boolean isEnabled()
+class com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerHealEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerStateEvent
+  <init>(UUID, String, UUID, String, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerSpeedChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerStateEvent
+  <init>(UUID, String, UUID, String, com.uxplima.uxmessentials.api.view.UxmSpeedKind, double, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmSpeedKind getKind()
+  double getScale()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.playerstate.UxmPlayerStateEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, UUID, String, Instant)
+  Instant getAt()
+  Player getActor()
+  String getActorName()
+  UUID getActorId()
+  boolean isSelfInflicted()
+class com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpEvent
+  <init>(UUID, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String)
+  String getWarpName()
+class com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpPreCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getWarpName()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpPreDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent
+  <init>(UUID, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getWarpName()
+class com.uxplima.uxmessentials.api.bukkit.event.pose.UxmPoseEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, boolean, com.uxplima.uxmessentials.api.view.UxmPoseType, com.uxplima.uxmessentials.api.view.UxmLocation, Optional, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getStartedAt()
+  Optional getTargetId()
+  boolean isStarted()
+  com.uxplima.uxmessentials.api.view.UxmLocation getReturnLocation()
+  com.uxplima.uxmessentials.api.view.UxmPoseType getType()
+class com.uxplima.uxmessentials.api.bukkit.event.presence.UxmAfkEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, boolean, Optional, boolean, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getAt()
+  Optional getReason()
+  boolean isAfk()
+  boolean isAutomatic()
+class com.uxplima.uxmessentials.api.bukkit.event.scoreboard.UxmScoreboardVisibilityEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, boolean)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  boolean isHidden()
+class com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffChatEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getMessage()
+class com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffModeEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, boolean)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  boolean isEntered()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmBackLocationCaptureEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation, com.uxplima.uxmessentials.api.view.UxmBackCause)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmBackCause getCause()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmPlayerPreTeleportEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmTeleportKind, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getDestination()
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind getKind()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmPlayerTeleportEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmTeleportKind, com.uxplima.uxmessentials.api.view.UxmLocation, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getFrom()
+  com.uxplima.uxmessentials.api.view.UxmLocation getTo()
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind getKind()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String)
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestAcceptEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestEvent
+  <init>(UUID, UUID, String, UUID, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestCancelEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestEvent
+  <init>(UUID, UUID, String, UUID, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestDenyEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestEvent
+  <init>(UUID, UUID, String, UUID, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportEvent
+  <init>(UUID, UUID, String, UUID, String)
+  Player getTarget()
+  String getRequesterName()
+  String getTargetName()
+  UUID getRequestId()
+  UUID getRequesterId()
+  UUID getTargetId()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestExpireEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestEvent
+  <init>(UUID, UUID, String, UUID, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestSendEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestEvent
+  <init>(UUID, UUID, String, UUID, String, com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getExpiresAt()
+  com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection getDirection()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmWarmupCancelEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmTeleportKind, com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind getKind()
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason getReason()
+class com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmWarmupStartEvent extends com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportEvent
+  <init>(UUID, String, com.uxplima.uxmessentials.api.view.UxmTeleportKind, com.uxplima.uxmessentials.api.view.UxmLocation, Duration)
+  Duration getDuration()
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getOrigin()
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind getKind()
+class com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultContentsChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultEvent
+  <init>(UUID, String, int, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, int, Instant)
+  Instant getAt()
+  int getIndex()
+class com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultOpenEvent extends com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultEvent
+  <init>(UUID, String, UUID, String, int, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Player getViewer()
+  String getViewerName()
+  UUID getViewerId()
+  boolean isOwnVault()
+class com.uxplima.uxmessentials.api.bukkit.event.vote.UxmVotePartyEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
+  <init>(int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  int getThreshold()
+class com.uxplima.uxmessentials.api.bukkit.event.vote.UxmVoteReceiveEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getService()
+class com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpEvent
+  <init>(UUID, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String)
+  String getWarpName()
+class com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpPreCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent
+  <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getWarpName()
+  com.uxplima.uxmessentials.api.view.UxmLocation getLocation()
+class com.uxplima.uxmessentials.api.bukkit.event.warp.UxmWarpPreDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent
+  <init>(UUID, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getWarpName()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldAdoptEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldCreateEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldDeleteEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEntryDeniedEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String, UUID, String, com.uxplima.uxmessentials.api.view.UxmWorldAccess)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Player getPlayer()
+  String getPlayerName()
+  UUID getPlayerId()
+  com.uxplima.uxmessentials.api.view.UxmWorldAccess getReason()
+abstract class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
+  <init>(String)
+  String getWorldName()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldImportEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldLoadEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldSettingChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String, String, Optional)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Optional getSettingValue()
+  String getSettingKey()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldUnloadEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldUnregisterEvent extends com.uxplima.uxmessentials.api.bukkit.event.world.UxmWorldEvent
+  <init>(String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+interface com.uxplima.uxmessentials.api.bukkit.menu.MenuApi
+  ItemStack buildItem(String, String, List, Player)
+  void registerAction(String, Consumer)
+  void registerIconProvider(com.uxplima.uxmessentials.api.bukkit.menu.MenuIconProvider)
+  void registerListSource(String, Function)
+  void registerPlaceholder(String, Function)
+  void registerRequirement(String, BiPredicate)
+interface com.uxplima.uxmessentials.api.bukkit.menu.MenuClick
+  Map args()
+  Player player()
+  String arg()
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind kind()
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuView view()
+enum com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind valueOf(String)
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind[] values()
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind CONTROL_DROP
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind DOUBLE_CLICK
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind DROP
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind LEFT
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind MIDDLE
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind RIGHT
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind SHIFT_LEFT
+  com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind SHIFT_RIGHT
+interface com.uxplima.uxmessentials.api.bukkit.menu.MenuIconProvider
+  Optional icon(String, com.uxplima.uxmessentials.api.bukkit.menu.MenuView)
+interface com.uxplima.uxmessentials.api.bukkit.menu.MenuView
+  Map arguments()
+  Optional entry(Class)
+  Optional subject(Class)
+  String viewerName()
+  UUID executorId()
+  UUID viewerId()
+  int page()
+  int pageCount()
+interface com.uxplima.uxmessentials.api.link.DiscordBridgePresence
+interface com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome confirm(String, String)
+record com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome
+  <init>(com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result, String)
+  Optional playerNameIfLinked()
+  String playerName()
+  String toString()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome failure(com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result)
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome linked(String)
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result result()
+  int hashCode()
+enum com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result valueOf(String)
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result[] values()
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result ALREADY_LINKED
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result EXPIRED
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result INVALID
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result LINKED
+  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result NO_CODE
+enum com.uxplima.uxmessentials.api.view.UxmBackCause
+  com.uxplima.uxmessentials.api.view.UxmBackCause valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmBackCause[] values()
+  com.uxplima.uxmessentials.api.view.UxmBackCause DEATH
+  com.uxplima.uxmessentials.api.view.UxmBackCause TELEPORT
+enum com.uxplima.uxmessentials.api.view.UxmEconomyRejection
+  com.uxplima.uxmessentials.api.view.UxmEconomyRejection valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmEconomyRejection[] values()
+  com.uxplima.uxmessentials.api.view.UxmEconomyRejection BALANCE_MAX_EXCEEDED
+  com.uxplima.uxmessentials.api.view.UxmEconomyRejection INSUFFICIENT_FUNDS
+record com.uxplima.uxmessentials.api.view.UxmIssuer
+  <init>(Optional, String)
+  Optional uuid()
+  String name()
+  String toString()
+  boolean equals(Object)
+  boolean isConsole()
+  int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmLocation
+  <init>(String, double, double, double)
+  <init>(String, double, double, double, float, float)
+  String toString()
+  String world()
+  boolean equals(Object)
+  double x()
+  double y()
+  double z()
+  float pitch()
+  float yaw()
+  int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmMoney
+  <init>(String, BigDecimal)
+  BigDecimal amount()
+  String currency()
+  String toString()
+  boolean equals(Object)
+  int hashCode()
+enum com.uxplima.uxmessentials.api.view.UxmPoseType
+  com.uxplima.uxmessentials.api.view.UxmPoseType valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmPoseType[] values()
+  com.uxplima.uxmessentials.api.view.UxmPoseType BELLYFLOP
+  com.uxplima.uxmessentials.api.view.UxmPoseType CRAWL
+  com.uxplima.uxmessentials.api.view.UxmPoseType LAY
+  com.uxplima.uxmessentials.api.view.UxmPoseType PLAYER_SIT
+  com.uxplima.uxmessentials.api.view.UxmPoseType SIT
+  com.uxplima.uxmessentials.api.view.UxmPoseType SPIN
+enum com.uxplima.uxmessentials.api.view.UxmPurgeCategory
+  com.uxplima.uxmessentials.api.view.UxmPurgeCategory valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmPurgeCategory[] values()
+  com.uxplima.uxmessentials.api.view.UxmPurgeCategory ALL_ENTITIES
+  com.uxplima.uxmessentials.api.view.UxmPurgeCategory MONSTERS
+  com.uxplima.uxmessentials.api.view.UxmPurgeCategory NAMED_TYPE
+enum com.uxplima.uxmessentials.api.view.UxmPurgeScope
+  com.uxplima.uxmessentials.api.view.UxmPurgeScope valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmPurgeScope[] values()
+  com.uxplima.uxmessentials.api.view.UxmPurgeScope RADIUS
+  com.uxplima.uxmessentials.api.view.UxmPurgeScope WORLD
+enum com.uxplima.uxmessentials.api.view.UxmSpeedKind
+  com.uxplima.uxmessentials.api.view.UxmSpeedKind valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmSpeedKind[] values()
+  com.uxplima.uxmessentials.api.view.UxmSpeedKind FLY
+  com.uxplima.uxmessentials.api.view.UxmSpeedKind WALK
+enum com.uxplima.uxmessentials.api.view.UxmTeleportKind
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind[] values()
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind ADMIN
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind BACK
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind HOME
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind POSITIONAL
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind RANDOM
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind REQUEST
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind RESPAWN
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind SPAWN
+  com.uxplima.uxmessentials.api.view.UxmTeleportKind WARP
+enum com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection
+  com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection[] values()
+  com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection TO_REQUESTER
+  com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection TO_TARGET
+enum com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason[] values()
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason ABORTED
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason DAMAGED
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason INTERACTED
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason MOVED
+  com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason ROTATED
+enum com.uxplima.uxmessentials.api.view.UxmWorldAccess
+  com.uxplima.uxmessentials.api.view.UxmWorldAccess valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmWorldAccess[] values()
+  com.uxplima.uxmessentials.api.view.UxmWorldAccess ALLOWED
+  com.uxplima.uxmessentials.api.view.UxmWorldAccess DENIED_FULL
+  com.uxplima.uxmessentials.api.view.UxmWorldAccess DENIED_PERMISSION
