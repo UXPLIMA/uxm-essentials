@@ -1043,7 +1043,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("ranks"))) {
             wireRanks(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
-            wireTrade(ctx, persistence, resources, textInput, links, bus);
+            wireTrade(plugin, ctx, persistence, resources, textInput, links, bus, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("security"))) {
             wireSecurity(plugin, ctx, persistence, resources, links, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
@@ -1173,12 +1173,15 @@ public final class PluginModule {
     }
 
     private static void wireTrade(
+            JavaPlugin plugin,
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
             TextInput textInput,
             ContextLinks links,
-            Bus bus) {
+            Bus bus,
+            Menus menus,
+            MenuBindings menuBindings) {
         // trade persists nothing same-server: a live trade is transient in-memory state (the TradeSessions registry and
         // its per-trade TradeExchange), and the config is read once into an immutable snapshot. The window view and its
         // click/drag/close/quit listener stand up here; Phase 3 adds the money row over the shared TextInput seam and
@@ -1191,7 +1194,15 @@ public final class PluginModule {
         @org.jspecify.annotations.Nullable TradeEconomy economy = provider != null && currency != null
                 ? new ProviderTradeEconomy(provider, currency, ctx.kernel().log(), receipts(ctx))
                 : null;
-        TradeWiring.Wired wired = TradeWiring.wire(ctx, textInput, economy, persistence, bus);
+        TradeWiring.Wired wired = TradeWiring.wire(
+                ctx,
+                textInput,
+                economy,
+                persistence,
+                bus,
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::closeAll);

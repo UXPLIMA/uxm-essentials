@@ -8,32 +8,29 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
-
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.adapter.outbound.TradeItemBytes;
 import com.uxplima.uxmessentials.trade.application.CrossServerTrade;
-import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeSignal;
 import com.uxplima.uxmessentials.trade.application.TradeSignalType;
 import com.uxplima.uxmessentials.trade.application.port.TradeBus;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Drives the player-facing half of a cross-server trade: the rendezvous over the bus and each side's own solo offer
  * window. A {@code /trade} to a player on another backend sends an {@code INVITE}; the target's backend opens a window
  * and answers {@code ACCEPT}; the sender's backend then opens its own. Each participant stakes items in their own
- * six-row window ({@link TradeLayout}, items-only in v1) and confirms; confirming reads the live window and escrows the
- * side through the {@link CrossServerTrade} coordinator, which runs the two-phase commit and delivers the counterpart's
+ * {@link CrossTradeWindow} (items-only in v1) and confirms; confirming reads the live window and escrows the side
+ * through the {@link CrossServerTrade} coordinator, which runs the two-phase commit and delivers the counterpart's
  * goods. A close before confirming returns the items and aborts both sides; every player/inventory touch hops to the
  * player's region through the injected {@link Scheduler}, so the flow is Folia-safe.
  */
@@ -48,7 +45,7 @@ public final class CrossServerTradeView {
     private final Scheduler scheduler;
     private final CrossServerTrade coordinator;
     private final TradeBus bus;
-    private final TradeLayout layout;
+    private final CrossTradeWindow window;
     private final ConcurrentHashMap<UUID, CrossTradeHolder> sessions = new ConcurrentHashMap<>();
 
     public CrossServerTradeView(
@@ -57,25 +54,33 @@ public final class CrossServerTradeView {
             Scheduler scheduler,
             CrossServerTrade coordinator,
             TradeBus bus,
-            TradeConfig config) {
+            CrossTradeWindow window) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.bus = Objects.requireNonNull(bus, "bus");
-        // The cross-server window is items-only in v1: no money and no experience are staked here, so both control
-        // groups are off and their slots fall back to divider filler (see CrossServerTradeView's class doc).
-        this.layout = new TradeLayout(Objects.requireNonNull(config, "config").slotsPerSide(), List.of(), false);
+        this.window = Objects.requireNonNull(window, "window");
     }
 
-    /** The window listener bound to this view — the wiring registers it. */
+    /** Register the window's spec and its bindings; the wiring calls this once, before the first invite. */
+    public void register(MenuBindings bindings) {
+        window.register(bindings, this);
+    }
+
+    /** The lifecycle listener bound to this view — the wiring registers it. */
     public CrossServerTradeListener newListener() {
-        return new CrossServerTradeListener(this, layout);
+        return new CrossServerTradeListener(this);
     }
 
     /** Whether {@code player} is already in a cross-server trade — the {@code /trade} busy check reads it. */
     public boolean isTrading(UUID player) {
         return sessions.containsKey(player);
+    }
+
+    /** The open window {@code player} is staking into, or {@code null} when they are not in a cross-server trade. */
+    @Nullable CrossTradeHolder session(UUID player) {
+        return sessions.get(player);
     }
 
     /** Send a cross-server trade request to a player named {@code targetName} on another backend. */
@@ -129,29 +134,22 @@ public final class CrossServerTradeView {
     }
 
     private void onAbort(TradeSignal signal) {
-        CrossTradeHolder holder = sessions.remove(signal.to().uuid());
-        if (holder != null && holder.beginEscrow()) {
-            returnAndClose(holder);
-            notify(holder.local(), TradeMessageKey.TRADE_CANCELLED, Map.of());
+        CrossTradeHolder holder = sessions.get(signal.to().uuid());
+        if (holder != null) {
+            // The peer already gave up, so this side is only returned and closed; telling them again would be noise.
+            abort(holder, false);
         }
     }
 
     private void open(TradeId tradeId, PlayerRef local, PlayerRef remote, String remoteServer) {
         CrossTradeHolder holder = new CrossTradeHolder(tradeId, local, remote, remoteServer);
         sessions.put(local.uuid(), holder);
-        scheduler.onEntity(local, () -> {
-            Player live = Bukkit.getPlayer(local.uuid());
-            if (live == null || !live.isOnline()) {
-                sessions.remove(local.uuid());
-                return;
-            }
-            Inventory inv = Bukkit.createInventory(holder, TradeLayout.SIZE, title(local, remote));
-            holder.attach(inv);
-            layout.seedFrame(inv);
-            layout.renderMirror(inv, null);
-            layout.renderControls(inv, messages, local, false, false);
-            live.openInventory(inv);
-        });
+        window.open(holder);
+    }
+
+    /** Whether the local player may still move items in their window: only until the side is escrowed or returned. */
+    boolean acceptsItems(CrossTradeHolder holder) {
+        return !holder.escrowed();
     }
 
     /** A confirm click — read the live window, escrow the items, and close; the coordinator settles from here. */
@@ -160,11 +158,13 @@ public final class CrossServerTradeView {
             return;
         }
         sessions.remove(holder.local().uuid());
-        Inventory inv = holder.inventoryOrNull();
-        List<ItemStack> staked = inv == null ? List.of() : TradeItemCodec.stacks(layout.readOffer(inv));
-        if (inv != null) {
-            layout.clearOffer(inv);
-        }
+        List<ItemStack> staked = window.live(holder.local())
+                .map(inv -> {
+                    List<ItemStack> read = TradeItemCodec.stacks(window.readOffer(inv));
+                    window.clearOffer(inv);
+                    return read;
+                })
+                .orElse(List.of());
         closeWindow(holder);
         notify(
                 holder.local(),
@@ -177,16 +177,36 @@ public final class CrossServerTradeView {
     }
 
     /**
-     * A window closed before confirming — return the staked items and abort the other side. The escrow gate wins here
-     * only when no confirm ran first (matching {@link #onAbort}): a plain close is the real abort and takes this path
-     * exactly once, while a confirm-driven close loses the gate (confirm already claimed it) and does nothing, so it
-     * never fires a spurious {@code ABORT} that would tear the counterpart down.
+     * A window closed before confirming — return what was staked in it and abort the other side. The escrow gate wins
+     * here only when no confirm ran first: a plain close is the real abort and takes this path exactly once, while
+     * the close a confirm causes loses the gate (the confirm already claimed it) and does nothing, so it never fires
+     * a spurious {@code ABORT} that would tear the counterpart down. The items come from the window itself rather
+     * than from any snapshot, so a stack placed in the closing tick is still returned.
      */
-    void onClose(CrossTradeHolder holder) {
-        if (holder.beginEscrow()) {
-            sessions.remove(holder.local().uuid());
-            returnItems(holder);
-            notify(holder.local(), TradeMessageKey.TRADE_CANCELLED, Map.of());
+    void onWindowClosed(CrossTradeHolder holder, List<@Nullable ItemStack> contents) {
+        if (!holder.beginEscrow()) {
+            return;
+        }
+        sessions.remove(holder.local().uuid());
+        deliver(holder.local(), TradeItemCodec.stacks(contents.toArray(new ItemStack[0])));
+        notify(holder.local(), TradeMessageKey.TRADE_CANCELLED, Map.of());
+        bus.send(new TradeSignal(
+                holder.tradeId(), TradeSignalType.ABORT, holder.local(), holder.remote(), bus.localServer()));
+    }
+
+    /**
+     * End this side from outside its window — the peer aborted, the player quit, or the module is stopping — by
+     * reading whatever is still staked back out of the live window and returning it. {@code tellPeer} is false only
+     * when the peer is the one who aborted, since they need no telling.
+     */
+    private void abort(CrossTradeHolder holder, boolean tellPeer) {
+        if (!holder.beginEscrow()) {
+            return;
+        }
+        sessions.remove(holder.local().uuid());
+        returnAndClose(holder);
+        notify(holder.local(), TradeMessageKey.TRADE_CANCELLED, Map.of());
+        if (tellPeer) {
             bus.send(new TradeSignal(
                     holder.tradeId(), TradeSignalType.ABORT, holder.local(), holder.remote(), bus.localServer()));
         }
@@ -196,11 +216,11 @@ public final class CrossServerTradeView {
      * Drain every open cross-server trade window on module stop or reload: return each side's still-staked items to the
      * player and signal the peer to abort, exactly as a plain close does. Mirrors the same-server {@code TradeView.closeAll}
      * so a disable or {@code /uxmess reload trade} never drops the transient window's items. Snapshots the open holders
-     * first because {@link #onClose} removes from {@link #sessions} as it drains each.
+     * first because each abort removes from {@link #sessions} as it drains.
      */
     public void flushAll() {
         for (CrossTradeHolder holder : List.copyOf(sessions.values())) {
-            onClose(holder);
+            abort(holder, true);
         }
     }
 
@@ -208,31 +228,45 @@ public final class CrossServerTradeView {
     public void onQuit(Player quitter) {
         CrossTradeHolder holder = sessions.get(quitter.getUniqueId());
         if (holder != null) {
-            onClose(holder);
+            abort(holder, true);
         }
     }
 
+    /** Empty the live window into the player's hands and shut it, on their own region thread. */
     private void returnAndClose(CrossTradeHolder holder) {
-        returnItems(holder);
-        closeWindow(holder);
-    }
-
-    private void returnItems(CrossTradeHolder holder) {
         PlayerRef viewer = holder.local();
         scheduler.onEntity(viewer, () -> {
-            Inventory inv = holder.inventoryOrNull();
+            List<ItemStack> staked = window.live(viewer)
+                    .map(inv -> {
+                        List<ItemStack> read = TradeItemCodec.stacks(window.readOffer(inv));
+                        window.clearOffer(inv);
+                        return read;
+                    })
+                    .orElse(List.of());
+            deliverNow(viewer, staked);
             Player live = Bukkit.getPlayer(viewer.uuid());
-            if (inv == null || live == null || !live.isOnline()) {
-                return;
+            if (live != null && live.isOnline()) {
+                live.closeInventory();
             }
-            for (ItemStack stack : TradeItemCodec.stacks(layout.readOffer(inv))) {
-                live.getInventory()
-                        .addItem(stack)
-                        .values()
-                        .forEach(extra -> live.getWorld().dropItemNaturally(live.getLocation(), extra));
-            }
-            layout.clearOffer(inv);
         });
+    }
+
+    /** Hand {@code stacks} to {@code viewer} on their own region thread, dropping any overflow at their feet. */
+    private void deliver(PlayerRef viewer, List<ItemStack> stacks) {
+        scheduler.onEntity(viewer, () -> deliverNow(viewer, stacks));
+    }
+
+    private void deliverNow(PlayerRef viewer, List<ItemStack> stacks) {
+        Player live = Bukkit.getPlayer(viewer.uuid());
+        if (live == null || !live.isOnline() || stacks.isEmpty()) {
+            return;
+        }
+        for (ItemStack stack : stacks) {
+            live.getInventory()
+                    .addItem(stack)
+                    .values()
+                    .forEach(extra -> live.getWorld().dropItemNaturally(live.getLocation(), extra));
+        }
     }
 
     private void closeWindow(CrossTradeHolder holder) {
@@ -243,11 +277,6 @@ public final class CrossServerTradeView {
                 live.closeInventory();
             }
         });
-    }
-
-    private Component title(PlayerRef viewer, PlayerRef other) {
-        return StyledText.render(
-                messages.resolve(viewer, TradeMessageKey.TRADE_WINDOW_TITLE, Map.of("player", other.name())));
     }
 
     private void notify(PlayerRef who, TradeMessageKey key, Map<String, String> placeholders) {

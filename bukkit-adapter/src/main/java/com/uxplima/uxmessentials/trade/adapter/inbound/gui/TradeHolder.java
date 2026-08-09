@@ -2,32 +2,28 @@ package com.uxplima.uxmessentials.trade.adapter.inbound.gui;
 
 import java.util.Objects;
 
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
-
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link InventoryHolder} that tags one participant's view of a trade window, so {@link TradeListener} can
- * recognise a click, drag, or close as belonging to a trade (and never to a vanilla container the player happens to
- * have open) and route it to the shared exchange. The holder carries which trade it belongs to ({@link #tradeId}),
- * which {@link TradeSide} this view renders, and who is looking at it — enough for the listener and view to reach the
- * one shared {@link TradeExchange} and re-render or settle it.
+ * One participant's side of a trade, carried as the subject of their trade window. It says which trade the window
+ * belongs to ({@link #tradeId}), which {@link TradeSide} it renders and edits, who is looking at it, and who they are
+ * trading with — enough for every binding on that window (a placeholder, a button's state, a click, the content
+ * region's rules) to reach the one shared {@link TradeExchange} and act on the right half of it.
  *
- * <p>The holder is created first and the menu is built against it; {@link #attach} then stores the built inventory so
- * {@link #getInventory()} can answer it, the way Bukkit's holder contract expects.
+ * <p>The window itself is the menu engine's; this holder never owns one. It is created when the trade opens and
+ * outlives a re-open of the window (the money prompt closes and reopens it), so the one piece of per-viewer screen
+ * state that must survive that round trip — which currency the money button is showing — lives here.
  */
 @NullMarked
-final class TradeHolder implements InventoryHolder {
+final class TradeHolder {
 
     private final TradeId tradeId;
     private final TradeSide side;
     private final PlayerRef viewer;
-    private @Nullable Inventory inventory;
+    private final PlayerRef counterpart;
 
     /**
      * Which allowed currency the single money button currently shows for this viewer. Our economy is multi-currency but
@@ -36,10 +32,11 @@ final class TradeHolder implements InventoryHolder {
      */
     private int selectedCurrency;
 
-    TradeHolder(TradeId tradeId, TradeSide side, PlayerRef viewer) {
+    TradeHolder(TradeId tradeId, TradeSide side, PlayerRef viewer, PlayerRef counterpart) {
         this.tradeId = Objects.requireNonNull(tradeId, "tradeId");
         this.side = Objects.requireNonNull(side, "side");
         this.viewer = Objects.requireNonNull(viewer, "viewer");
+        this.counterpart = Objects.requireNonNull(counterpart, "counterpart");
     }
 
     /** The trade this view belongs to; the listener resolves the shared exchange from it. */
@@ -57,6 +54,11 @@ final class TradeHolder implements InventoryHolder {
         return viewer;
     }
 
+    /** The player on the other side of this trade — whom the window's title names. */
+    PlayerRef counterpart() {
+        return counterpart;
+    }
+
     /** The index of the currency the money button currently shows for this viewer. */
     int selectedCurrency() {
         return selectedCurrency;
@@ -67,24 +69,5 @@ final class TradeHolder implements InventoryHolder {
         if (count > 1) {
             selectedCurrency = Math.floorMod(selectedCurrency + 1, count);
         }
-    }
-
-    /** Store the built menu so the holder contract can answer {@link #getInventory()}. */
-    void attach(Inventory built) {
-        this.inventory = Objects.requireNonNull(built, "built");
-    }
-
-    /** The built menu, or {@code null} when the window was never opened (the player was offline at open). */
-    @Nullable Inventory inventoryOrNull() {
-        return inventory;
-    }
-
-    @Override
-    public Inventory getInventory() {
-        Inventory built = inventory;
-        if (built == null) {
-            throw new IllegalStateException("trade inventory not attached yet");
-        }
-        return built;
     }
 }

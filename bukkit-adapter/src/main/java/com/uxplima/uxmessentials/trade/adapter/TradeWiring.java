@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.trade.adapter;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -15,16 +16,20 @@ import com.uxplima.uxmessentials.persistence.trade.TradeRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.trade.adapter.inbound.command.TradeCommand;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView;
+import com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeWindow;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeExperiencePrompt;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeMoneyPrompt;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeSessions;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView;
+import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeWindow;
 import com.uxplima.uxmessentials.trade.adapter.inbound.listener.TradeReconcileListener;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeExperience;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeItemDelivery;
@@ -75,10 +80,16 @@ public final class TradeWiring {
             TextInput textInput,
             @Nullable TradeEconomy economy,
             @Nullable Persistence persistence,
-            Bus bus) {
+            Bus bus,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
         TradeConfig config = TradeConfig.from(ctx.config());
         KernelPorts kernel = ctx.kernel();
         TradeSessions sessions = new TradeSessions();
@@ -101,18 +112,27 @@ public final class TradeWiring {
                 onSubmit,
                 onCancel);
         TradeAudit audit = new LoggingTradeAudit(new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL)));
+        // The window's chrome comes from modules/trade/gui/trade.conf; the currencies it may cycle through are the
+        // module's allowed list, and an empty list is what turns the money button off on an install with no economy.
+        TradeWindow window = new TradeWindow(
+                kernel.messages(),
+                menus,
+                moneyEnabled ? config.currenciesAllowed() : List.of(),
+                dataFolder,
+                kernel.log());
         TradeView view = new TradeView(
                 kernel.messages(),
                 kernel.messageSink(),
                 kernel.scheduler(),
                 config,
                 sessions,
+                window,
                 moneyPrompt,
                 experiencePrompt,
                 settlement,
                 experience,
-                moneyEnabled,
                 audit);
+        view.register(menuBindings);
         // The request/accept flow: a per-request expiry book and a per-player cooldown, both driven by the same clock,
         // gate /trade and open the window through the view once the target accepts. The clock is UTC so a request's
         // lifetime is independent of the host's zone (mirrors the moderation context).
@@ -125,7 +145,8 @@ public final class TradeWiring {
         listeners.add(view.newListener());
         @Nullable CrossServerTradeView crossView = null;
         if (config.crossServer() && persistence != null) {
-            crossView = buildCrossServer(ctx, config, economy, persistence, bus, clock, listeners);
+            crossView = buildCrossServer(
+                    ctx, config, economy, persistence, bus, clock, listeners, menus, menuBindings, dataFolder);
         }
         TradeCommand command =
                 new TradeCommand(requests, cooldown, config, sessions, view::open, kernel.messages(), crossView);
@@ -146,7 +167,10 @@ public final class TradeWiring {
             Persistence persistence,
             Bus bus,
             Clock clock,
-            List<Listener> listeners) {
+            List<Listener> listeners,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder) {
         KernelPorts kernel = ctx.kernel();
         TradeEscrowStore escrows = TradeRepositories.escrowStore(persistence);
         TradeItemDelivery delivery = new BukkitTradeItemDelivery(kernel.scheduler());
@@ -155,7 +179,13 @@ public final class TradeWiring {
         CrossServerTrade coordinator =
                 new CrossServerTrade(escrows, escrowEconomy, tradeBus, delivery, clock, kernel.log());
         CrossServerTradeView crossView = new CrossServerTradeView(
-                kernel.messages(), kernel.messageSink(), kernel.scheduler(), coordinator, tradeBus, config);
+                kernel.messages(),
+                kernel.messageSink(),
+                kernel.scheduler(),
+                coordinator,
+                tradeBus,
+                new CrossTradeWindow(kernel.messages(), menus, dataFolder, kernel.log()));
+        crossView.register(menuBindings);
         java.util.function.Consumer<TradeSignal> route = signal -> {
             coordinator.onSignal(signal);
             crossViewOnSignal(crossView, signal);

@@ -1789,10 +1789,9 @@ public final class MenuListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        InventoryHolder open =
-                event.getPlayer().getOpenInventory().getTopInventory().getHolder();
-        if (open instanceof MenuHolder holder) {
-            readBackContent(holder, event.getPlayer().getOpenInventory().getTopInventory());
+        Inventory top = event.getPlayer().getOpenInventory().getTopInventory();
+        if (top != null && top.getHolder() instanceof MenuHolder holder) {
+            readBackContent(holder, top);
             closeMenu(holder);
             restoreBottomNow(holder, event.getPlayer());
         }

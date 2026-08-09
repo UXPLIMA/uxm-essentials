@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeSettlement;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
@@ -45,7 +46,7 @@ class TradeExperienceTest {
 
     private ServerMock server;
     private Plugin plugin;
-    private TradeLayout layout;
+    private TradeWindow window;
     private TradeSessions sessions;
     private TradeView view;
     private RecordingExperience experience;
@@ -54,22 +55,26 @@ class TradeExperienceTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 20, 60, false);
-        layout = new TradeLayout(config.slotsPerSide(), List.of());
+        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 60, false);
+        KeyMessages messages = new KeyMessages();
+        TestMenuEngine engine = TestMenuEngine.create(messages, new SyncScheduler());
+        window = TradeWindows.sameServer(messages, engine.menus(), List.of());
         sessions = new TradeSessions();
         experience = new RecordingExperience();
         view = new TradeView(
-                new KeyMessages(),
+                messages,
                 new NoopSink(),
                 new SyncScheduler(),
                 config,
                 sessions,
+                window,
                 (p, v, c, s, x) -> {},
                 (p, v, s, x) -> {},
                 new TradeSettlement(new NoopEconomy(), experience),
                 experience,
-                false,
                 receipt -> {});
+        view.register(engine.bindings());
+        engine.installListener(plugin);
         server.getPluginManager().registerEvents(view.newListener(), plugin);
     }
 
@@ -153,13 +158,15 @@ class TradeExperienceTest {
     }
 
     private void place(PlayerMock player, int slot, ItemStack stack) {
-        TradeHolder holder = holder(player);
-        holder.getInventory().setItem(layout.editableSlot(slot), stack);
-        view.syncOffer(holder);
+        player.getOpenInventory().getTopInventory().setItem(window.offerSlot(slot), stack);
+        view.syncOffer(holder(player));
     }
 
     private TradeHolder holder(PlayerMock player) {
-        return (TradeHolder) player.getOpenInventory().getTopInventory().getHolder();
+        TradeExchange exchange = exchangeOf(player);
+        return exchange.participant(TradeSide.INITIATOR).uuid().equals(player.getUniqueId())
+                ? exchange.holder(TradeSide.INITIATOR)
+                : exchange.holder(TradeSide.PARTNER);
     }
 
     private TradeExchange exchangeOf(PlayerMock player) {

@@ -17,12 +17,14 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeReceipt;
 import com.uxplima.uxmessentials.trade.application.TradeSettlement;
 import com.uxplima.uxmessentials.trade.application.port.TradeAudit;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
+import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,8 +62,8 @@ class TradeAuditTest {
         place(fixture, alice, new ItemStack(Material.DIAMOND, 3));
         place(fixture, bob, new ItemStack(Material.EMERALD, 2));
 
-        fixture.view.confirm(holder(alice));
-        fixture.view.confirm(holder(bob));
+        fixture.view.confirm(holder(fixture, alice));
+        fixture.view.confirm(holder(fixture, bob));
 
         assertThat(fixture.audit.receipts).hasSize(1);
         TradeReceipt receipt = fixture.audit.receipts.get(0);
@@ -80,8 +82,8 @@ class TradeAuditTest {
         place(fixture, alice, new ItemStack(Material.DIAMOND, 3));
         place(fixture, bob, new ItemStack(Material.EMERALD, 2));
 
-        fixture.view.confirm(holder(alice));
-        fixture.view.confirm(holder(bob));
+        fixture.view.confirm(holder(fixture, alice));
+        fixture.view.confirm(holder(fixture, bob));
 
         // The swap still ran…
         assertThat(fixture.sessions.isTrading(alice.getUniqueId())).isFalse();
@@ -92,37 +94,43 @@ class TradeAuditTest {
     private Fixture fixture(boolean auditEnabled) {
         TradeSessions sessions = new TradeSessions();
         RecordingAudit audit = new RecordingAudit();
-        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 12, 60, auditEnabled);
-        TradeLayout layout = new TradeLayout(config.slotsPerSide(), List.of());
+        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 60, auditEnabled);
+        KeyMessages messages = new KeyMessages();
+        TestMenuEngine engine = TestMenuEngine.create(messages, new SyncScheduler());
+        TradeWindow window = TradeWindows.sameServer(messages, engine.menus(), List.of());
         TradeExperience experience = new NoopExperience();
         TradeView view = new TradeView(
-                new KeyMessages(),
+                messages,
                 new NoopSink(),
                 new SyncScheduler(),
                 config,
                 sessions,
+                window,
                 (p, v, c, s, x) -> {},
                 (p, v, s, x) -> {},
                 new TradeSettlement(new NoopEconomy(), experience),
                 experience,
-                false,
                 audit);
+        view.register(engine.bindings());
+        engine.installListener(plugin);
         server.getPluginManager().registerEvents(view.newListener(), plugin);
-        return new Fixture(sessions, layout, view, audit);
+        return new Fixture(sessions, window, view, audit);
     }
 
     private void place(Fixture fixture, PlayerMock player, ItemStack stack) {
-        TradeHolder holder = holder(player);
-        holder.getInventory().setItem(fixture.layout.editableSlot(0), stack);
-        fixture.view.syncOffer(holder);
+        player.getOpenInventory().getTopInventory().setItem(fixture.window.offerSlot(0), stack);
+        fixture.view.syncOffer(holder(fixture, player));
     }
 
-    private TradeHolder holder(PlayerMock player) {
-        return (TradeHolder) player.getOpenInventory().getTopInventory().getHolder();
+    private TradeHolder holder(Fixture fixture, PlayerMock player) {
+        TradeExchange exchange = java.util.Objects.requireNonNull(fixture.sessions.find(player.getUniqueId()));
+        return exchange.participant(TradeSide.INITIATOR).uuid().equals(player.getUniqueId())
+                ? exchange.holder(TradeSide.INITIATOR)
+                : exchange.holder(TradeSide.PARTNER);
     }
 
     /** One test's collaborators over a shared session — kept local so each test picks its own audit setting. */
-    private record Fixture(TradeSessions sessions, TradeLayout layout, TradeView view, RecordingAudit audit) {}
+    private record Fixture(TradeSessions sessions, TradeWindow window, TradeView view, RecordingAudit audit) {}
 
     /** Captures every completed-trade receipt so the test can assert emission (or silence). */
     private static final class RecordingAudit implements TradeAudit {

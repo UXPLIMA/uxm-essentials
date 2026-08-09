@@ -28,8 +28,8 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.trade.application.CrossServerTrade;
-import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeEscrow;
 import com.uxplima.uxmessentials.trade.application.TradeSignal;
 import com.uxplima.uxmessentials.trade.application.TradeSignalType;
@@ -64,7 +64,7 @@ class CrossServerTradeWindowTest {
 
     private ServerMock server;
     private Plugin plugin;
-    private TradeLayout layout;
+    private CrossTradeWindow window;
     private CapturingBus bus;
     private CrossServerTradeView view;
 
@@ -72,14 +72,16 @@ class CrossServerTradeWindowTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, true, 12, 60, false);
-        layout = new TradeLayout(config.slotsPerSide(), List.of());
+        KeyMessages messages = new KeyMessages();
+        TestMenuEngine engine = TestMenuEngine.create(messages, new SyncScheduler());
+        window = TradeWindows.crossServer(messages, engine.menus());
         bus = new CapturingBus();
         Clock clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
         CrossServerTrade coordinator = new CrossServerTrade(
                 new FakeEscrowStore(), new PermissiveEconomy(), bus, new FakeDelivery(), clock, new SilentLogger());
-        view = new CrossServerTradeView(
-                new KeyMessages(), new NoopSink(), new SyncScheduler(), coordinator, bus, config);
+        view = new CrossServerTradeView(messages, new NoopSink(), new SyncScheduler(), coordinator, bus, window);
+        view.register(engine.bindings());
+        engine.installListener(plugin);
         server.getPluginManager().registerEvents(view.newListener(), plugin);
     }
 
@@ -109,7 +111,7 @@ class CrossServerTradeWindowTest {
         // Confirm wins the single-winner escrow gate; the window then closes, and Bukkit fires that close into the
         // listener. That confirming close must be silent — no ABORT — or every confirm would tear the peer down.
         view.confirm(holder);
-        view.onClose(holder);
+        view.onWindowClosed(holder, List.of());
 
         assertThat(bus.signalsOfType(TradeSignalType.ABORT)).isEmpty();
     }
@@ -139,11 +141,11 @@ class CrossServerTradeWindowTest {
     }
 
     private void stake(PlayerMock player, ItemStack stack) {
-        holderOf(player).getInventory().setItem(layout.editableSlot(0), stack);
+        player.getOpenInventory().getTopInventory().setItem(window.offerSlot(0), stack);
     }
 
     private CrossTradeHolder holderOf(PlayerMock player) {
-        return (CrossTradeHolder) player.getOpenInventory().getTopInventory().getHolder();
+        return java.util.Objects.requireNonNull(view.session(player.getUniqueId()));
     }
 
     private static int amount(PlayerMock player, Material material) {

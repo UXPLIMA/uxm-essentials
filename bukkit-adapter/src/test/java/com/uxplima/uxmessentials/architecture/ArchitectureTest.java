@@ -184,12 +184,11 @@ class ArchitectureTest {
     //     inventory or ender chest that the viewer edits and that reconciles back on close. InvseeCommand,
     //     BukkitInventoryViewer and the staff PlayerstateStaffInspector drive those mirrors through the
     //     OpenContainer / InventoryViewer use cases.
-    //   - trade TradeView / TradeHolder are the two-player trade window: a genuine dual item container each
-    //     participant places real stacks into, driven over a shared TradeSession.
     //   - villagers VillagerManagerView / VillagerManagerHolder are the trade-manager window: staff drag real buy/sell
     //     stacks into its rows as trade templates and it reads them back into the villager's recipes on close, so its
     //     editable slots let items move and it is a genuine item-capture editor, not a spec menu. (The 2FA keypad
-    //     migrated onto the engine, so it is no longer here.)
+    //     and both trade windows migrated onto the engine, so they are no longer here — the trade windows are now
+    //     spec chrome around two declared content regions.)
     // Every spec-driven MENU instead renders through the engine (the Menus facade); the engine's own MenuHolder,
     // Menus and EditorRefresh live inside ..gui.menu.. and are exempt by package. A new bespoke createInventory /
     // InventoryHolder GUI appearing anywhere else fails this fence until it is migrated onto the engine, rather
@@ -203,9 +202,9 @@ class ArchitectureTest {
             .should(buildsOrOpensARawBukkitInventory())
             .because("spec-driven menus must render through the engine (the Menus facade); only the engine itself "
                     + "and the genuine inventory leaves — the itemworld Workstation, the playerstate "
-                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them, the local and "
-                    + "cross-server trade windows, the vanish silent-container mirror, and the invrollback snapshot "
-                    + "preview — may create or open a raw Bukkit inventory");
+                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them, the vanish "
+                    + "silent-container mirror, and the invrollback snapshot preview — may create or open a raw "
+                    + "Bukkit inventory");
 
     /**
      * Builds the condition matching either raw-Bukkit-GUI signature: implementing
@@ -242,9 +241,9 @@ class ArchitectureTest {
      * fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the itemworld
      * {@code Workstation} opens vanilla game containers, the itemworld {@code ShulkerBoxView} / {@code ShulkerBoxHolder}
      * open a held shulker box as an editable item container, the playerstate invsee / endersee / offline classes are
-     * inventory mirrors (and the use cases driving them), the trade {@code TradeView} / {@code TradeHolder} are the
-     * two-player trade window, the vanish {@code VanishSilentContainerListener} mirrors a container silently for a
-     * vanished opener, and the invrollback {@code SnapshotPreviewView} / {@code SnapshotPreviewHolder} are the
+     * inventory mirrors (and the use cases driving them), the vanish {@code VanishSilentContainerListener} mirrors a
+     * container silently for a vanished opener, and the invrollback {@code SnapshotPreviewView} /
+     * {@code SnapshotPreviewHolder} are the
      * read-only preview of a stored inventory snapshot. Every spec-driven menu renders through the engine instead, so
      * this allow-list must stay exactly these leaves.
      *
@@ -270,10 +269,6 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineHolder",
                 "com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer",
                 "com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector",
-                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView",
-                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeHolder",
-                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView",
-                "com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossTradeHolder",
                 "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener",
                 "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView",
                 "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerHolder",

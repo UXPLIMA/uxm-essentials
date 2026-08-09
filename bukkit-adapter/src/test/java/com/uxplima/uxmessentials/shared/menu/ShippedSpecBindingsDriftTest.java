@@ -33,6 +33,11 @@ class ShippedSpecBindingsDriftTest {
 
     /** Action ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_ACTIONS = Set.of(
+            "trade:confirm",
+            "trade:money",
+            "trade:money-cycle",
+            "trade:experience",
+            "trade:cross-confirm",
             "warp:set-sound",
             "warp:custom-sound",
             "warp:remove-sound",
@@ -320,6 +325,11 @@ class ShippedSpecBindingsDriftTest {
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of(
+            "trade:money-enabled",
+            "trade:confirmed",
+            "trade:awaiting",
+            "trade:partner-confirmed",
+            "trade:partner-awaiting",
             "perm",
             "has-prev",
             "has-next",
@@ -348,6 +358,13 @@ class ShippedSpecBindingsDriftTest {
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
+            "trade_title",
+            "trade_cross_title",
+            "trade_money_name",
+            "trade_money_lore",
+            "trade_experience_lore",
+            "trade_partner_money_lore",
+            "trade_partner_experience_lore",
             "sound",
             "sound_material",
             "vault_icon",
@@ -727,6 +744,12 @@ class ShippedSpecBindingsDriftTest {
      */
     private static final Set<String> EXPECTED_PAGED_LISTS = Set.of("playerwarps:browse");
 
+    /**
+     * Content-region ids any shipped spec may hand a block of slots to. A region whose provider is not registered
+     * would open a hole into a live inventory, so the same allowlist discipline applies as to the other four.
+     */
+    private static final Set<String> EXPECTED_CONTENTS = Set.of("trade:offer", "trade:mirror", "trade:cross-offer");
+
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {
         Path modulesDir = repoRoot().resolve("bukkit-adapter/src/main/resources/modules");
@@ -745,6 +768,7 @@ class ShippedSpecBindingsDriftTest {
                 id,
                 (ctx, request) ->
                         com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult.of(List.of(), 0)));
+        EXPECTED_CONTENTS.forEach(id -> bindings.content(id, (ctx, region) -> List.of()));
 
         assertThat(bindings.validate(specs))
                 .as("shipped menu specs reference binding ids not registered in production wiring; register them "

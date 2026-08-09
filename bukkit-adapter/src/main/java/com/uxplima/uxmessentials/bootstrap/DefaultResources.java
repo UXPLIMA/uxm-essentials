@@ -76,6 +76,8 @@ final class DefaultResources {
             "modules/security/gui/pin-create.conf",
             "modules/commandcontrol/config.conf",
             "modules/trade/config.conf",
+            "modules/trade/gui/trade.conf",
+            "modules/trade/gui/trade-cross.conf",
             "modules/villagers/config.conf",
             "modules/invrollback/config.conf",
             "modules/regions/config.conf",

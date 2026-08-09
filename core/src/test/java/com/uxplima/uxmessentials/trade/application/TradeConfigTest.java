@@ -26,7 +26,6 @@ class TradeConfigTest {
         assertThat(config.hasDistanceLimit()).isFalse();
         assertThat(config.cooldownSeconds()).isEqualTo(5);
         assertThat(config.crossServer()).isFalse();
-        assertThat(config.slotsPerSide()).isEqualTo(20);
         assertThat(config.requestExpirySeconds()).isEqualTo(60);
         assertThat(config.audit()).isTrue();
     }
@@ -46,8 +45,6 @@ class TradeConfigTest {
                 10,
                 "cross-server",
                 true,
-                "slots-per-side",
-                16,
                 "request-expiry-seconds",
                 30,
                 "audit",
@@ -60,7 +57,6 @@ class TradeConfigTest {
         assertThat(config.hasDistanceLimit()).isTrue();
         assertThat(config.cooldownSeconds()).isEqualTo(10);
         assertThat(config.crossServer()).isTrue();
-        assertThat(config.slotsPerSide()).isEqualTo(16);
         assertThat(config.requestExpirySeconds()).isEqualTo(30);
         assertThat(config.audit()).isFalse();
     }
@@ -69,14 +65,6 @@ class TradeConfigTest {
     void aNegativeCooldownIsRejected() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> TradeConfig.from(new FixedConfig(Map.of("cooldown-seconds", -1))));
-    }
-
-    @Test
-    void anOutOfRangeSlotCountIsRejected() {
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> TradeConfig.from(new FixedConfig(Map.of("slots-per-side", 0))));
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> TradeConfig.from(new FixedConfig(Map.of("slots-per-side", 99))));
     }
 
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */

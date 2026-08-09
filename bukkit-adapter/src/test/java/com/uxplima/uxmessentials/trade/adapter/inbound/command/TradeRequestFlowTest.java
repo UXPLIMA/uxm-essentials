@@ -19,8 +19,10 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeSessions;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView;
+import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeWindows;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeCooldown;
 import com.uxplima.uxmessentials.trade.application.TradeRequests;
@@ -59,18 +61,22 @@ class TradeRequestFlowTest {
         sessions = new TradeSessions();
         TradeConfig viewConfig = config(0, 0);
         TradeExperience experience = new NoopExperience();
+        KeyMessages messages = new KeyMessages();
+        TestMenuEngine engine = TestMenuEngine.create(messages, new SyncScheduler());
         view = new TradeView(
-                new KeyMessages(),
+                messages,
                 new NoopSink(),
                 new SyncScheduler(),
                 viewConfig,
                 sessions,
+                TradeWindows.sameServer(messages, engine.menus(), List.of()),
                 (p, v, c, s, x) -> {},
                 (p, v, s, x) -> {},
                 new TradeSettlement(new NoopEconomy(), experience),
                 experience,
-                false,
                 receipt -> {});
+        view.register(engine.bindings());
+        engine.installListener(plugin);
         server.getPluginManager().registerEvents(view.newListener(), plugin);
         // A default wiring so the request/cooldown fields are always initialised; each test re-wires with its own
         // config (distance, cooldown) as needed.
@@ -179,7 +185,7 @@ class TradeRequestFlowTest {
     }
 
     private static TradeConfig config(int distance, int cooldownSeconds) {
-        return new TradeConfig(true, List.of("coins"), List.of(), distance, cooldownSeconds, false, 12, 60, false);
+        return new TradeConfig(true, List.of("coins"), List.of(), distance, cooldownSeconds, false, 60, false);
     }
 
     /** Resolves any key to its plain key string; these tests assert on registry and session state, not on chat. */

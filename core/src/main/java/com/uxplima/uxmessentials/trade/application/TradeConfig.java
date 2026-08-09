@@ -25,8 +25,6 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *     default 5; 0 disables the cooldown)
  * @param crossServer whether players on different backend servers may trade over the bus ({@code cross-server},
  *     default {@code false} — it needs a proxy and the bus configured)
- * @param slotsPerSide how many item slots each participant gets in the trade window ({@code slots-per-side},
- *     default 20, the full five-row item grid of the AxTrade-style window)
  * @param requestExpirySeconds how long a {@code /trade} request stays acceptable before it expires, in seconds
  *     ({@code request-expiry-seconds}, default 60)
  * @param audit whether a completed trade emits an audit line on the shared audit channel ({@code audit},
@@ -39,7 +37,6 @@ public record TradeConfig(
         int requestDistance,
         int cooldownSeconds,
         boolean crossServer,
-        int slotsPerSide,
         int requestExpirySeconds,
         boolean audit) {
 
@@ -52,15 +49,6 @@ public record TradeConfig(
     /** The default lifetime of a pending {@code /trade} request, in seconds. */
     private static final int DEFAULT_REQUEST_EXPIRY_SECONDS = 60;
 
-    /** The default item slots per side, the full five-row item grid of the AxTrade-style window (four columns each). */
-    private static final int DEFAULT_SLOTS_PER_SIDE = 20;
-
-    /**
-     * The largest per-side slot count the window can host: the item grid spans the five rows below the control row,
-     * four columns per side, so twenty slots each.
-     */
-    private static final int MAX_SLOTS_PER_SIDE = 20;
-
     public TradeConfig {
         Objects.requireNonNull(currenciesAllowed, "currenciesAllowed");
         Objects.requireNonNull(itemBlacklist, "itemBlacklist");
@@ -68,10 +56,6 @@ public record TradeConfig(
         itemBlacklist = List.copyOf(itemBlacklist);
         if (cooldownSeconds < 0) {
             throw new IllegalArgumentException("cooldown-seconds must not be negative: " + cooldownSeconds);
-        }
-        if (slotsPerSide < 1 || slotsPerSide > MAX_SLOTS_PER_SIDE) {
-            throw new IllegalArgumentException(
-                    "slots-per-side must be between 1 and " + MAX_SLOTS_PER_SIDE + ": " + slotsPerSide);
         }
         if (requestExpirySeconds < 1) {
             throw new IllegalArgumentException("request-expiry-seconds must be at least 1: " + requestExpirySeconds);
@@ -88,7 +72,6 @@ public record TradeConfig(
                 config.getInt("request-distance", 0),
                 config.getInt("cooldown-seconds", DEFAULT_COOLDOWN_SECONDS),
                 config.getBoolean("cross-server", false),
-                config.getInt("slots-per-side", DEFAULT_SLOTS_PER_SIDE),
                 config.getInt("request-expiry-seconds", DEFAULT_REQUEST_EXPIRY_SECONDS),
                 config.getBoolean("audit", true));
     }
