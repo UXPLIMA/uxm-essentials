@@ -5,7 +5,9 @@ import java.util.logging.Logger;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 
+import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmWalletDebitEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeCreateEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomePreCreateEvent;
@@ -20,9 +22,23 @@ import com.uxplima.uxmessentials.api.view.UxmLocation;
 public final class UxmHooksListener implements Listener {
 
     private final Logger log;
+    private final UxmHooksQueries queries;
 
     public UxmHooksListener(Logger log) {
         this.log = log;
+        this.queries = new UxmHooksQueries(log);
+    }
+
+    /**
+     * Ask about a player as they arrive. {@code get()} answers null while uxmEssentials is absent or still
+     * enabling, which is the whole of the guard a consumer needs: no dependency entry, no load-order assumption.
+     */
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        UxmEssentialsApi api = UxmEssentialsApi.get();
+        if (api != null) {
+            queries.describe(api, event.getPlayer().getUniqueId());
+        }
     }
 
     /**
