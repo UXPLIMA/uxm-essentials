@@ -1,9 +1,10 @@
 # uxmEssentials sample consumer
 
 A complete, compiling example of a plugin that hooks into uxmEssentials: one veto listener, two notification
-listeners, the front door, and the query surface read the way it is meant to be read (no `join()` on the tick
-thread, a feature check per module, independent reads started together). Copy it, rename it, delete what you do not
-need.
+listeners, the front door, the query surface read the way it is meant to be read (no `join()` on the tick thread,
+a feature check per module, independent reads started together), and the action surface written the way it is meant
+to be written (taken with the calling plugin so every write is attributed, branched on a failure code rather than
+on a message, chained rather than joined). Copy it, rename it, delete what you do not need.
 
 ```bash
 ./gradlew build
