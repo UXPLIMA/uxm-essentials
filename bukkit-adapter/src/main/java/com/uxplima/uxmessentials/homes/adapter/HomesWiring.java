@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.listener.HomesJoinListener;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
+import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeApiWrites;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
@@ -183,7 +184,8 @@ public final class HomesWiring {
                 List.of(joinWarmer),
                 repository,
                 quota,
-                services.homeList());
+                services.homeList(),
+                services.apiWrites());
     }
 
     private static HomeServices assemble(
@@ -226,6 +228,24 @@ public final class HomesWiring {
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
         SetHomeVisibility setHomeVisibility = new SetHomeVisibility(repository, notifier, kernel.events(), clock);
         DeleteHome deleteHome = new DeleteHome(repository, invites, notifier, kernel.events(), kernel.gate());
+        // The published API runs the same use cases with one collaborator swapped: a charge gate with no economy
+        // behind it, so a plugin setting a home for a player never takes that player's money.
+        HomeCharge freeCharge = new HomeCharge(kernel.permissions(), Optional.empty(), HomeChargeSettings.allFree());
+        HomeApiWrites apiWrites = new HomeApiWrites(
+                new CreateHomeAtSlot(
+                        repository,
+                        invites,
+                        quota,
+                        guards,
+                        notifier,
+                        kernel.events(),
+                        kernel.gate(),
+                        freeCharge,
+                        unlimitedMax,
+                        clock),
+                new RelocateHome(repository, guards, notifier, kernel.events(), kernel.gate(), freeCharge, clock),
+                renameHome,
+                deleteHome);
         TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier, charge);
         ListHomes listHomes = new ListHomes(repository);
         ListHomeInvites listHomeInvites = new ListHomeInvites(invites);
@@ -302,7 +322,14 @@ public final class HomesWiring {
         listHolder[0] = listView;
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, kernel.events(), clock);
         return new HomeServices(
-                listView, homeAdmin, visitHome, inviteToHome, uninviteFromHome, kernel.playerLookup(), repository);
+                listView,
+                homeAdmin,
+                visitHome,
+                inviteToHome,
+                uninviteFromHome,
+                kernel.playerLookup(),
+                repository,
+                apiWrites);
     }
 
     /**
@@ -454,7 +481,8 @@ public final class HomesWiring {
             List<Listener> listeners,
             HomeRepository repository,
             HomeQuota quota,
-            HomeListMenu listView) {
+            HomeListMenu listView,
+            HomeApiWrites apiWrites) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -462,6 +490,7 @@ public final class HomesWiring {
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(quota, "quota");
             Objects.requireNonNull(listView, "listView");
+            Objects.requireNonNull(apiWrites, "apiWrites");
         }
     }
 }

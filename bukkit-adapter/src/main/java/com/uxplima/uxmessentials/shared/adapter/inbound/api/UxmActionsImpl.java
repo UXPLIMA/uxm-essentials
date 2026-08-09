@@ -5,6 +5,9 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
+import com.uxplima.uxmessentials.api.action.UxmHomeActions;
+import com.uxplima.uxmessentials.api.action.UxmKitActions;
+import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import org.jspecify.annotations.NullMarked;
 
@@ -28,5 +31,20 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmEconomyActions> economy() {
         return contexts.find(UxmEconomyActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmHomeActions> homes() {
+        return contexts.find(UxmHomeActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmWarpActions> warps() {
+        return contexts.find(UxmWarpActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmKitActions> kits() {
+        return contexts.find(UxmKitActions.class, source);
     }
 }

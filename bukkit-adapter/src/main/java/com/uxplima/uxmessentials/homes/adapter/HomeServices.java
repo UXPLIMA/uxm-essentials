@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.homes.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListMenu;
+import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeApiWrites;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
@@ -27,6 +28,7 @@ import org.jspecify.annotations.NullMarked;
  * @param uninviteFromHome the {@code /uninvite} use case
  * @param players name → ref resolution for the admin form and the visit/invite targets (offline-capable)
  * @param repository the home store, held only so the PlaceholderAPI seam can read it without blocking
+ * @param apiWrites the free-of-charge use cases the published developer API runs
  */
 @NullMarked
 public record HomeServices(
@@ -36,7 +38,8 @@ public record HomeServices(
         InviteToHome inviteToHome,
         UninviteFromHome uninviteFromHome,
         PlayerLookup players,
-        HomeRepository repository) {
+        HomeRepository repository,
+        HomeApiWrites apiWrites) {
 
     public HomeServices {
         Objects.requireNonNull(homeList, "homeList");
@@ -46,5 +49,6 @@ public record HomeServices(
         Objects.requireNonNull(uninviteFromHome, "uninviteFromHome");
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(repository, "repository");
+        Objects.requireNonNull(apiWrites, "apiWrites");
     }
 }

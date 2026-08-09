@@ -27,13 +27,17 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommand;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListMenu;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
+import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeApiWrites;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
+import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
+import com.uxplima.uxmessentials.homes.application.RelocateHome;
+import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.application.VisitHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
@@ -549,7 +553,30 @@ class HomeCommandPathTest {
                 (viewer, home) -> {});
         listView.register(bindings, Path.of("nonexistent"), NOOP_LOG);
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, events, clock);
-        return new HomeServices(listView, homeAdmin, visitHome, inviteToHome, uninviteFromHome, lookup, repository);
+        return new HomeServices(
+                listView,
+                homeAdmin,
+                visitHome,
+                inviteToHome,
+                uninviteFromHome,
+                lookup,
+                repository,
+                new HomeApiWrites(
+                        new CreateHomeAtSlot(
+                                repository,
+                                invites,
+                                quota,
+                                List.of(),
+                                notifier,
+                                events,
+                                DomainGate.allowAll(),
+                                freeCharge(),
+                                1000,
+                                clock),
+                        new RelocateHome(
+                                repository, List.of(), notifier, events, DomainGate.allowAll(), freeCharge(), clock),
+                        new RenameHome(repository, notifier, events, clock),
+                        new DeleteHome(repository, invites, notifier, events, DomainGate.allowAll())));
     }
 
     /**

@@ -252,7 +252,9 @@ public final class KitsWiring {
                 access,
                 services.listKits(),
                 services.kitMenu(),
-                () -> {});
+                () -> {},
+                granter,
+                services.claimKit());
     }
 
     private static KitServices assemble(
@@ -352,7 +354,9 @@ public final class KitsWiring {
             KitAccess access,
             ListKits listKits,
             KitBrowseMenu kitMenu,
-            Runnable stopAction) {
+            Runnable stopAction,
+            KitGranter granter,
+            ClaimKit claimKit) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -363,6 +367,8 @@ public final class KitsWiring {
             Objects.requireNonNull(listKits, "listKits");
             Objects.requireNonNull(kitMenu, "kitMenu");
             Objects.requireNonNull(stopAction, "stopAction");
+            Objects.requireNonNull(granter, "granter");
+            Objects.requireNonNull(claimKit, "claimKit");
         }
 
         /**

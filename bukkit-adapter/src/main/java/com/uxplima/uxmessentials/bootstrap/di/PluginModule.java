@@ -20,6 +20,9 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
+import com.uxplima.uxmessentials.api.action.UxmHomeActions;
+import com.uxplima.uxmessentials.api.action.UxmKitActions;
+import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
@@ -1593,6 +1596,14 @@ public final class PluginModule {
                         wired.quota(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        links.actions.register(
+                UxmHomeActions.class,
+                source -> new com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeActions(
+                        wired.apiWrites(),
+                        wired.repository(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().worldLookup(),
+                        ctx.kernel().scheduler()));
         // Open the same /home slot-grid menu from the management hub, gated by the existing home-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "homes",
@@ -1725,6 +1736,16 @@ public final class PluginModule {
                         wired.listWarps(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        links.actions.register(
+                UxmWarpActions.class,
+                source -> new com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpActions(
+                        wired.setWarp(),
+                        wired.moveWarp(),
+                        wired.delWarp(),
+                        wired.repository(),
+                        ctx.kernel().worldLookup(),
+                        ctx.kernel().scheduler(),
+                        source));
         // Open the same /warp list browse menu from the management hub, resolving the viewer's visible warps
         // through the identical ListWarps filter the command uses, gated by the existing warp-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
@@ -1761,6 +1782,14 @@ public final class PluginModule {
                 new KitQueries(
                         wired.repository(),
                         wired.access(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
+        links.actions.register(
+                UxmKitActions.class,
+                source -> new com.uxplima.uxmessentials.kits.adapter.outbound.api.KitActions(
+                        wired.repository(),
+                        wired.granter(),
+                        wired.claimKit(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
         // Open the same /kit browse menu from the management hub, resolving the viewer's available kits through

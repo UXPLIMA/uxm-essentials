@@ -88,7 +88,8 @@ public final class HomeQueries implements UxmHomesQuery {
         return ApiValues.subject(players, playerId);
     }
 
-    private static UxmHome view(Home home) {
+    /** A home as the API publishes it; shared with the write surface, which answers with what it just wrote. */
+    static UxmHome view(Home home) {
         return new UxmHome(
                 home.owner().uuid(),
                 home.slot().index(),

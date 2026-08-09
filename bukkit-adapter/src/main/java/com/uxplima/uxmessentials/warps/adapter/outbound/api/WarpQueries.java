@@ -83,7 +83,8 @@ public final class WarpQueries implements UxmWarpsQuery {
                 scheduler, () -> parse(name).map(repository::averageRating).orElse(0.0));
     }
 
-    private static Optional<WarpName> parse(String name) {
+    /** A name as the domain sees it, or empty when nothing could be called that; shared with the write surface. */
+    static Optional<WarpName> parse(String name) {
         try {
             return Optional.of(WarpName.of(name));
         } catch (IllegalArgumentException rejected) {
@@ -91,7 +92,8 @@ public final class WarpQueries implements UxmWarpsQuery {
         }
     }
 
-    private static UxmWarp view(Warp warp) {
+    /** A warp as the API publishes it; shared with the write surface, which answers with what it just wrote. */
+    static UxmWarp view(Warp warp) {
         return new UxmWarp(
                 warp.name().value(),
                 ApiValues.location(warp.location()),

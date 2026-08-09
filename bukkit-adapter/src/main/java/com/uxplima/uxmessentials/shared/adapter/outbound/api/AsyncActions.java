@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.api;
 
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -24,5 +26,33 @@ public final class AsyncActions {
     /** Run {@code write} on a worker thread and complete the returned future with its result. */
     public static <T> CompletableFuture<T> perform(Scheduler scheduler, Supplier<T> write) {
         return AsyncQueries.supply(scheduler, write);
+    }
+
+    /**
+     * Run {@code write} on the thread that owns {@code who} and complete the returned future with its result.
+     *
+     * <p>For a write that touches the live player: their inventory, their flight, their position. On Folia that is
+     * the only thread allowed to, and on Paper it is the tick thread either way.
+     *
+     * <p>The retired path matters here in a way it does not for a read. A player who leaves between the call and
+     * the hop would otherwise leave the future hanging forever, and a consumer chaining off it would simply stop.
+     */
+    public static <T> CompletableFuture<T> onPlayer(Scheduler scheduler, PlayerRef who, Supplier<T> write, T gone) {
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(write, "write");
+        Objects.requireNonNull(gone, "gone");
+        CompletableFuture<T> answer = new CompletableFuture<>();
+        scheduler.onEntity(
+                who,
+                () -> {
+                    try {
+                        answer.complete(write.get());
+                    } catch (RuntimeException failure) {
+                        answer.completeExceptionally(failure);
+                    }
+                },
+                () -> answer.complete(gone));
+        return answer;
     }
 }

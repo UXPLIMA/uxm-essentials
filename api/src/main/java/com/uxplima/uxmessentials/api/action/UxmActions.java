@@ -21,4 +21,13 @@ public interface UxmActions {
 
     /** Moving money, or empty when the economy module is switched off. */
     Optional<UxmEconomyActions> economy();
+
+    /** Setting and removing homes, or empty when the homes module is switched off. */
+    Optional<UxmHomeActions> homes();
+
+    /** Creating and removing warps, or empty when the warps module is switched off. */
+    Optional<UxmWarpActions> warps();
+
+    /** Handing out kits, or empty when the kits module is switched off. */
+    Optional<UxmKitActions> kits();
 }

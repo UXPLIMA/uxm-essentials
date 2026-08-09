@@ -235,7 +235,10 @@ public final class WarpsWiring {
                 playerWarpHandle,
                 playerWarpGoTo,
                 teleportRegistry,
-                teleportRegistry::clear);
+                teleportRegistry::clear,
+                services.setWarp(),
+                services.moveWarp(),
+                services.delWarp());
     }
 
     private static WarpServices assemble(
@@ -293,7 +296,10 @@ public final class WarpsWiring {
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle playerWarpHandle,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle playerWarpGoTo,
             WarpTeleportRegistry teleportRegistry,
-            Runnable stopAction) {
+            Runnable stopAction,
+            SetWarp setWarp,
+            MoveWarp moveWarp,
+            DelWarp delWarp) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -303,6 +309,9 @@ public final class WarpsWiring {
             Objects.requireNonNull(warpMenu, "warpMenu");
             Objects.requireNonNull(playerWarpHandle, "playerWarpHandle");
             Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
+            Objects.requireNonNull(setWarp, "setWarp");
+            Objects.requireNonNull(moveWarp, "moveWarp");
+            Objects.requireNonNull(delWarp, "delWarp");
             Objects.requireNonNull(teleportRegistry, "teleportRegistry");
             Objects.requireNonNull(stopAction, "stopAction");
         }
