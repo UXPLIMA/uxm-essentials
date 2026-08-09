@@ -163,6 +163,11 @@ dependencies {
     "jmhImplementation"(project(":core"))
     "jmhImplementation"(project(":persistence-adapter"))
     "jmhImplementation"(libs.bundles.db)
+    // The developer-API benchmark measures the bridge and the veto gate, so it needs the published event classes
+    // and Paper itself. Paper is a real dependency here rather than compileOnly: the benchmark runs outside a
+    // server and still has to load HandlerList.
+    "jmhImplementation"(project(":bukkit-api"))
+    "jmhImplementation"(libs.paper.api)
 }
 
 tasks.processResources {
