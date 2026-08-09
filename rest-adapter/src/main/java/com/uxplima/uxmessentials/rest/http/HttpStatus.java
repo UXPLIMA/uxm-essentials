@@ -40,6 +40,9 @@ public final class HttpStatus {
     /** A request shape this listener does not read, such as a chunked body. */
     public static final int NOT_IMPLEMENTED = 501;
 
+    /** The server was asked and did not answer in time. */
+    public static final int GATEWAY_TIMEOUT = 504;
+
     /** The module behind the route is switched off, which is a different thing from the route being wrong. */
     public static final int SERVICE_UNAVAILABLE = 503;
 
@@ -58,6 +61,7 @@ public final class HttpStatus {
             case TOO_MANY_REQUESTS -> "Too Many Requests";
             case INTERNAL_ERROR -> "Internal Server Error";
             case NOT_IMPLEMENTED -> "Not Implemented";
+            case GATEWAY_TIMEOUT -> "Gateway Timeout";
             case SERVICE_UNAVAILABLE -> "Service Unavailable";
             default -> "Status";
         };

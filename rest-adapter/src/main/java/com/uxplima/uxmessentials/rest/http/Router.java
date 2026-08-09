@@ -23,6 +23,12 @@ public final class Router {
         return this;
     }
 
+    /** Add every route in {@code more}, which is how a context contributes its whole table at once. */
+    public Router addAll(List<Route> more) {
+        more.forEach(this::add);
+        return this;
+    }
+
     /** Every route, in the order they were added. */
     public List<Route> routes() {
         return List.copyOf(routes);

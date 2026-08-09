@@ -51,6 +51,16 @@ public record RestRequest(HttpRequest http, Map<String, String> parameters, Stri
         }
     }
 
+    /** The named path parameter as a whole number, or {@code 400} when it is not one. */
+    public int intParameter(String name) {
+        String raw = parameter(name);
+        try {
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException notANumber) {
+            throw new HttpException(HttpStatus.BAD_REQUEST, name + " is not a number: " + raw);
+        }
+    }
+
     /** A query parameter read as a positive integer, or {@code fallback} when it was not sent. */
     public int intQuery(String name, int fallback) {
         Optional<String> raw = http.queryParam(name);

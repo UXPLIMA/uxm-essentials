@@ -7,16 +7,33 @@ import java.util.Objects;
 import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.rest.auth.Scopes;
+import com.uxplima.uxmessentials.rest.http.HttpResponse;
 import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
+import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
+import com.uxplima.uxmessentials.rest.route.HomesRoutes;
+import com.uxplima.uxmessentials.rest.route.KitsRoutes;
+import com.uxplima.uxmessentials.rest.route.MessagingRoutes;
+import com.uxplima.uxmessentials.rest.route.ModerationRoutes;
+import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
+import com.uxplima.uxmessentials.rest.route.PlayersRoutes;
+import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
+import com.uxplima.uxmessentials.rest.route.VaultsRoutes;
+import com.uxplima.uxmessentials.rest.route.VoteRoutes;
+import com.uxplima.uxmessentials.rest.route.WarpsRoutes;
+import com.uxplima.uxmessentials.rest.route.WorldsRoutes;
 
 /**
  * The route table: every path this listener answers, in one place.
  *
- * <p>Assembled rather than discovered. A table somebody can read top to bottom is the only way to answer "what
- * does this expose" without running it, and it is what the golden-file guard pins so a route cannot disappear in
- * a refactor without the diff saying so.
+ * <p>Assembled rather than discovered. A table somebody can read top to bottom is the only way to answer "what does
+ * this expose" without running it, and it is what the golden-file guard pins so a route cannot appear or disappear
+ * without the diff saying so.
+ *
+ * <p>Each context contributes its own list. The order they are added in is the order a path is matched in, which
+ * matters only where a literal segment and a parameter could both take it; no two contexts share a prefix, so
+ * within this file the order is alphabetical rather than significant.
  */
 public final class Routes {
 
@@ -28,16 +45,29 @@ public final class Routes {
     /** Build the table against a live API. */
     public static Router build(UxmEssentialsApi api) {
         Objects.requireNonNull(api, "api");
-        return new Router().add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)));
+        return new Router()
+                .add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)))
+                .addAll(EconomyRoutes.of(api))
+                .addAll(HomesRoutes.of(api))
+                .addAll(KitsRoutes.of(api))
+                .addAll(MessagingRoutes.of(api))
+                .addAll(ModerationRoutes.of(api))
+                .addAll(PlayersRoutes.of(api))
+                .addAll(PlayerWarpsRoutes.of(api))
+                .addAll(TeleportRoutes.of(api))
+                .addAll(VaultsRoutes.of(api))
+                .addAll(VoteRoutes.of(api))
+                .addAll(WarpsRoutes.of(api))
+                .addAll(WorldsRoutes.of(api));
     }
 
     /**
      * What is running and what is on.
      *
-     * <p>The modules are reported from the published surfaces themselves rather than from a list of names kept
-     * here, so a module that gains or loses a surface cannot leave this answering yesterday's truth.
+     * <p>The modules are reported from the published surfaces themselves rather than from a list of names kept here,
+     * so a module that gains or loses a surface cannot leave this answering yesterday's truth.
      */
-    private static com.uxplima.uxmessentials.rest.http.HttpResponse status(UxmEssentialsApi api) {
+    private static HttpResponse status(UxmEssentialsApi api) {
         JsonObject payload = Json.object();
         payload.addProperty("version", api.version());
         payload.addProperty("api", "v1");

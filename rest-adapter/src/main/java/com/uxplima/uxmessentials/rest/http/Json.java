@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.rest.http;
 import java.util.Objects;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
@@ -22,7 +23,14 @@ import com.google.gson.JsonSyntaxException;
  */
 public final class Json {
 
-    private static final Gson GSON = new Gson();
+    /**
+     * Configured to write nulls, which Gson does not do by default.
+     *
+     * <p>That default would quietly drop every absent value from an answer, so a home with no label and a home
+     * whose label failed to load would look identical, and a consumer would have to check whether each key was
+     * there before reading it. A stable shape is worth the handful of extra bytes.
+     */
+    private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
     private Json() {}
 

@@ -107,6 +107,16 @@ public final class RestServer implements AutoCloseable {
         } catch (HttpException refused) {
             return Json.error(refused.status(), "bad-request", String.valueOf(refused.getMessage()));
         }
+        return dispatch(router, filter, request, log);
+    }
+
+    /**
+     * Find the route for a request that has already been read, ask the filter, and run it.
+     *
+     * <p>Public because it is the whole of what happens to a request once it is off the wire, and a test that
+     * exercises a route should go through the same code a socket does rather than a second copy of it.
+     */
+    public static HttpResponse dispatch(Router router, RequestFilter filter, HttpRequest request, Logger log) {
         try {
             Optional<Router.Match> match = router.find(request);
             if (match.isEmpty()) {
@@ -134,6 +144,7 @@ public final class RestServer implements AutoCloseable {
             case HttpStatus.NOT_IMPLEMENTED -> "not-implemented";
             case HttpStatus.PAYLOAD_TOO_LARGE -> "too-large";
             case HttpStatus.SERVICE_UNAVAILABLE -> "module-off";
+            case HttpStatus.GATEWAY_TIMEOUT -> "timed-out";
             default -> "bad-request";
         };
     }

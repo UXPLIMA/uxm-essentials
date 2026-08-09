@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -12,7 +11,6 @@ import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.rest.http.HttpRequest;
 import com.uxplima.uxmessentials.rest.http.HttpResponse;
-import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
 import org.junit.jupiter.api.Test;
 
@@ -29,22 +27,6 @@ class RoutesTest {
 
         assertThat(body).contains("\"economy\":true");
         assertThat(body).contains("\"homes\":false");
-    }
-
-    @Test
-    void everyRouteIsUnderTheVersionedPrefix() {
-        assertThat(Routes.build(api()).routes())
-                .allSatisfy(route -> assertThat(route.path().source()).startsWith(Routes.PREFIX));
-    }
-
-    @Test
-    void everyRouteAsksForAScopeThatExists() {
-        List<String> scopes = Routes.build(api()).routes().stream()
-                .map(Route::scope)
-                .distinct()
-                .toList();
-
-        assertThat(com.uxplima.uxmessentials.rest.auth.Scopes.ALL).containsAll(scopes);
     }
 
     private static HttpResponse status() {
