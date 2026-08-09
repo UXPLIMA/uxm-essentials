@@ -1,0 +1,22 @@
+name: uxmEssentials-rest
+version: '${version}'
+main: com.uxplima.uxmessentials.rest.UxmEssentialsRest
+loader: com.uxplima.uxmessentials.rest.UxmRestLoader
+api-version: '1.21'
+authors: ['UXPLIMA']
+description: 'Optional REST and WebSocket API for uxmEssentials: read and write everything the developer API publishes, over HTTP. Dormant until enabled in config/rest.conf.'
+website: 'https://github.com/UXPLIMA/uxmEssentials'
+
+# Folia: the listener owns its own threads and never touches a region-owned object directly. Every call into the
+# host goes through the published API, which hops to the thread that owns the work by itself.
+folia-supported: true
+
+# This add-on consumes the host plugin's published API classes, so it needs the host's classloader joined: the
+# front door it looks up must resolve to the same class object the host registered. load: AFTER means the host is
+# enabled (and the API registered) before the listener binds.
+dependencies:
+  server:
+    uxmEssentials:
+      load: AFTER
+      required: true
+      join-classpath: true

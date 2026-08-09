@@ -30,4 +30,5 @@ include(
     ":velocity-adapter",
     ":discord-adapter",
     ":redis-adapter",
+    ":rest-adapter",
 )
