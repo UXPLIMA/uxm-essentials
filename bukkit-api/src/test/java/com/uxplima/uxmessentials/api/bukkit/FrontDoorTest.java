@@ -116,6 +116,11 @@ class FrontDoorTest {
         }
 
         @Override
+        public UxmActions actions(Plugin plugin, String actingFor) {
+            throw new UnsupportedOperationException("this test never writes anything");
+        }
+
+        @Override
         public Optional<UxmHomesQuery> homes() {
             return Optional.empty();
         }

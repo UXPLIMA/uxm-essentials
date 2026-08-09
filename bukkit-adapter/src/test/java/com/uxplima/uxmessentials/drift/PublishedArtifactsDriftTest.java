@@ -31,7 +31,8 @@ class PublishedArtifactsDriftTest {
             "migration",
             "velocity-adapter",
             "discord-adapter",
-            "redis-adapter");
+            "redis-adapter",
+            "rest-adapter");
 
     private static final String CONVENTION = "uxmessentials.publish-conventions";
 

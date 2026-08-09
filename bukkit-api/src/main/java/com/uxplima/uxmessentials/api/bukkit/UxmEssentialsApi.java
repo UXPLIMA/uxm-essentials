@@ -91,6 +91,24 @@ public interface UxmEssentialsApi {
     UxmActions actions(Plugin plugin);
 
     /**
+     * The same write surface, attributed to {@code plugin} acting on behalf of {@code actingFor}.
+     *
+     * <p>For a plugin that is a door rather than an actor: a web panel, a Discord bot, a bridge to another server.
+     * Its own name is not the useful half of the answer to "who did this", and this lets it say which of its own
+     * callers asked. The audit trail records {@code YourPlugin/whoever}, so one bridge's users stay told apart.
+     *
+     * <pre>{@code
+     * api.actions(this, ticket.requestedBy()).economy().ifPresent(economy ->
+     *     economy.deposit(playerId, new BigDecimal("50")));
+     * }</pre>
+     *
+     * @param actingFor who your plugin is acting for, in whatever terms your users would recognise
+     * @throws IllegalArgumentException when {@code actingFor} is blank, since an attribution nobody can read is
+     *     worse than no second half at all
+     */
+    UxmActions actions(Plugin plugin, String actingFor);
+
+    /**
      * Reading a player's homes, or empty when the homes module is switched off.
      *
      * <p>Empty means the module is off, which is not the same thing as a player having no homes and is worth telling

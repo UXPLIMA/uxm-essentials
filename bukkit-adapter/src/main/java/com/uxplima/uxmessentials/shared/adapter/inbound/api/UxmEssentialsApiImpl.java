@@ -101,6 +101,17 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     }
 
     @Override
+    public UxmActions actions(Plugin plugin, String actingFor) {
+        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(actingFor, "actingFor");
+        String behalf = actingFor.trim();
+        if (behalf.isEmpty()) {
+            throw new IllegalArgumentException("actingFor must not be blank");
+        }
+        return new UxmActionsImpl(plugin.getName() + "/" + behalf, actions);
+    }
+
+    @Override
     public Optional<UxmHomesQuery> homes() {
         return queries.find(UxmHomesQuery.class);
     }

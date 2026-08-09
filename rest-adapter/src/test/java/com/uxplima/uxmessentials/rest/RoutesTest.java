@@ -12,9 +12,15 @@ import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.rest.http.HttpRequest;
 import com.uxplima.uxmessentials.rest.http.HttpResponse;
 import com.uxplima.uxmessentials.rest.http.Router;
+import com.uxplima.uxmessentials.rest.route.ActionsFor;
 import org.junit.jupiter.api.Test;
 
 class RoutesTest {
+
+    /** Building the table never touches the action surface; only serving a write does. */
+    private static final ActionsFor NO_WRITES = caller -> {
+        throw new AssertionError("building the table asked for the action surface");
+    };
 
     @Test
     void statusReportsTheRunningVersion() {
@@ -30,7 +36,7 @@ class RoutesTest {
     }
 
     private static HttpResponse status() {
-        Router router = Routes.build(api());
+        Router router = Routes.build(api(), NO_WRITES);
         HttpRequest request = new HttpRequest("GET", Routes.PREFIX + "/status", Map.of(), Map.of(), "");
         Router.Match match = router.find(request).orElseThrow();
         return match.route().handler().handle(match.request());

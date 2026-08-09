@@ -11,14 +11,17 @@ import com.uxplima.uxmessentials.rest.http.HttpResponse;
 import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
+import com.uxplima.uxmessentials.rest.route.ActionsFor;
 import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
 import com.uxplima.uxmessentials.rest.route.HomesRoutes;
 import com.uxplima.uxmessentials.rest.route.KitsRoutes;
 import com.uxplima.uxmessentials.rest.route.MessagingRoutes;
 import com.uxplima.uxmessentials.rest.route.ModerationRoutes;
+import com.uxplima.uxmessentials.rest.route.PlayerStateRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
-import com.uxplima.uxmessentials.rest.route.PlayersRoutes;
+import com.uxplima.uxmessentials.rest.route.PresenceRoutes;
 import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
+import com.uxplima.uxmessentials.rest.route.VanishRoutes;
 import com.uxplima.uxmessentials.rest.route.VaultsRoutes;
 import com.uxplima.uxmessentials.rest.route.VoteRoutes;
 import com.uxplima.uxmessentials.rest.route.WarpsRoutes;
@@ -42,23 +45,35 @@ public final class Routes {
 
     private Routes() {}
 
-    /** Build the table against a live API. */
-    public static Router build(UxmEssentialsApi api) {
+    /**
+     * Build the table against a live API.
+     *
+     * <p>Reads go through {@code api} directly; writes go through {@code actions}, which hands each request an action
+     * surface named after the token that made it, so the audit trail says who asked rather than only which jar.
+     *
+     * <p>Two contexts take no {@code actions}: player warps and vaults publish a query surface and no action surface,
+     * so over HTTP they are readable and nothing more. That is the published API's shape showing through rather than
+     * a decision taken here.
+     */
+    public static Router build(UxmEssentialsApi api, ActionsFor actions) {
         Objects.requireNonNull(api, "api");
+        Objects.requireNonNull(actions, "actions");
         return new Router()
                 .add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)))
-                .addAll(EconomyRoutes.of(api))
-                .addAll(HomesRoutes.of(api))
-                .addAll(KitsRoutes.of(api))
-                .addAll(MessagingRoutes.of(api))
-                .addAll(ModerationRoutes.of(api))
-                .addAll(PlayersRoutes.of(api))
+                .addAll(EconomyRoutes.of(api, actions))
+                .addAll(HomesRoutes.of(api, actions))
+                .addAll(KitsRoutes.of(api, actions))
+                .addAll(MessagingRoutes.of(api, actions))
+                .addAll(ModerationRoutes.of(api, actions))
+                .addAll(PlayerStateRoutes.of(api, actions))
                 .addAll(PlayerWarpsRoutes.of(api))
-                .addAll(TeleportRoutes.of(api))
+                .addAll(PresenceRoutes.of(api, actions))
+                .addAll(TeleportRoutes.of(api, actions))
+                .addAll(VanishRoutes.of(api, actions))
                 .addAll(VaultsRoutes.of(api))
-                .addAll(VoteRoutes.of(api))
-                .addAll(WarpsRoutes.of(api))
-                .addAll(WorldsRoutes.of(api));
+                .addAll(VoteRoutes.of(api, actions))
+                .addAll(WarpsRoutes.of(api, actions))
+                .addAll(WorldsRoutes.of(api, actions));
     }
 
     /**

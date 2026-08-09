@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 import com.google.gson.JsonObject;
+import com.uxplima.uxmessentials.api.action.UxmVoteActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.view.UxmVotePeriod;
@@ -19,7 +20,7 @@ import com.uxplima.uxmessentials.rest.http.RestRequest;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.view.Views;
 
-/** Reading votes: one player's totals, the leaderboard, and how close the party is. */
+/** Votes: one player's totals, the leaderboard, the party, and crediting a vote. */
 public final class VoteRoutes {
 
     /** The most leaderboard rows one request can ask for. */
@@ -27,11 +28,13 @@ public final class VoteRoutes {
 
     private VoteRoutes() {}
 
-    public static List<Route> of(UxmEssentialsApi api) {
+    public static List<Route> of(UxmEssentialsApi api, ActionsFor actions) {
         return List.of(
                 Route.of("GET", PREFIX + "/vote/top", Scopes.READ, request -> top(api, request)),
                 Route.of("GET", PREFIX + "/vote/party", Scopes.READ, request -> party(api)),
-                Route.of("GET", PREFIX + "/players/{uuid}/votes", Scopes.READ, request -> votes(api, request)));
+                Route.of("GET", PREFIX + "/players/{uuid}/votes", Scopes.READ, request -> votes(api, request)),
+                Route.of("POST", PREFIX + "/players/{uuid}/votes", Scopes.WRITE, request -> giveVote(actions, request)),
+                Route.of("POST", PREFIX + "/vote/party", Scopes.WRITE, request -> addPartyProgress(actions, request)));
     }
 
     private static HttpResponse votes(UxmEssentialsApi api, RestRequest request) {
@@ -65,5 +68,26 @@ public final class VoteRoutes {
 
     private static UxmVoteQuery voteOf(UxmEssentialsApi api) {
         return Reads.module(api.vote(), "vote");
+    }
+
+    /**
+     * Credit votes, the way a vote site's callback would.
+     *
+     * <p>{@code amount} defaults to one, because one call meaning one vote is what every vote listener does.
+     */
+    private static HttpResponse giveVote(ActionsFor actions, RestRequest request) {
+        UxmVoteActions vote = writes(actions, request);
+        return Writes.outcome(
+                vote.giveVote(request.uuidParameter("uuid"), Body.of(request).integer("amount", 1)));
+    }
+
+    /** Push the party along without crediting anybody, for an event that is not a vote. */
+    private static HttpResponse addPartyProgress(ActionsFor actions, RestRequest request) {
+        return Writes.outcome(
+                writes(actions, request).addPartyProgress(Body.of(request).integer("votes", 1)));
+    }
+
+    private static UxmVoteActions writes(ActionsFor actions, RestRequest request) {
+        return Reads.module(actions.actingFor(request.caller()).vote(), "vote");
     }
 }

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.gson.JsonObject;
+import com.uxplima.uxmessentials.api.action.UxmWorldsActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
 import com.uxplima.uxmessentials.api.view.UxmWorldAccess;
@@ -18,16 +19,18 @@ import com.uxplima.uxmessentials.rest.http.RestRequest;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.view.Views;
 
-/** Reading the managed worlds, and whether one player may enter one. */
+/** The managed worlds: what they are, who may enter one, and loading or unloading one. */
 public final class WorldsRoutes {
 
     private WorldsRoutes() {}
 
-    public static List<Route> of(UxmEssentialsApi api) {
+    public static List<Route> of(UxmEssentialsApi api, ActionsFor actions) {
         return List.of(
                 Route.of("GET", PREFIX + "/worlds", Scopes.READ, request -> worlds(api)),
                 Route.of("GET", PREFIX + "/worlds/{name}", Scopes.READ, request -> world(api, request)),
-                Route.of("GET", PREFIX + "/worlds/{name}/access", Scopes.READ, request -> access(api, request)));
+                Route.of("GET", PREFIX + "/worlds/{name}/access", Scopes.READ, request -> access(api, request)),
+                Route.of("POST", PREFIX + "/worlds/{name}/load", Scopes.WRITE, request -> load(actions, request)),
+                Route.of("POST", PREFIX + "/worlds/{name}/unload", Scopes.WRITE, request -> unload(actions, request)));
     }
 
     private static HttpResponse worlds(UxmEssentialsApi api) {
@@ -61,5 +64,23 @@ public final class WorldsRoutes {
 
     private static UxmWorldsQuery worldsOf(UxmEssentialsApi api) {
         return Reads.module(api.worlds(), "worlds");
+    }
+
+    private static HttpResponse load(ActionsFor actions, RestRequest request) {
+        return Writes.outcome(writes(actions, request).load(request.parameter("name")));
+    }
+
+    /**
+     * Unload a world, saving it first unless told not to.
+     *
+     * <p>Saving is the default because the other way round is the sort of default that costs somebody a build.
+     */
+    private static HttpResponse unload(ActionsFor actions, RestRequest request) {
+        return Writes.outcome(writes(actions, request)
+                .unload(request.parameter("name"), Body.of(request).flag("save", true)));
+    }
+
+    private static UxmWorldsActions writes(ActionsFor actions, RestRequest request) {
+        return Reads.module(actions.actingFor(request.caller()).worlds(), "worlds");
     }
 }

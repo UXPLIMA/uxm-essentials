@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.view.UxmKit;
@@ -22,7 +23,7 @@ import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.view.Views;
 
 /**
- * Reading the kit catalogue, and what one player can do with it.
+ * The kit catalogue, what one player can do with it, and handing kits out.
  *
  * <p>The per-player answer is every kit with its state attached rather than only the claimable ones, because a menu
  * showing "Miner: 4h 12m" needs the kits a player cannot claim yet just as much as the ones they can.
@@ -31,11 +32,45 @@ public final class KitsRoutes {
 
     private KitsRoutes() {}
 
-    public static List<Route> of(UxmEssentialsApi api) {
+    public static List<Route> of(UxmEssentialsApi api, ActionsFor actions) {
         return List.of(
                 Route.of("GET", PREFIX + "/kits", Scopes.READ, request -> kits(api)),
                 Route.of("GET", PREFIX + "/kits/{id}", Scopes.READ, request -> kit(api, request)),
-                Route.of("GET", PREFIX + "/players/{uuid}/kits", Scopes.READ, request -> forPlayer(api, request)));
+                Route.of("GET", PREFIX + "/players/{uuid}/kits", Scopes.READ, request -> forPlayer(api, request)),
+                Route.of(
+                        "POST",
+                        PREFIX + "/players/{uuid}/kits/{id}/give",
+                        Scopes.WRITE,
+                        request -> give(actions, request)),
+                Route.of(
+                        "POST",
+                        PREFIX + "/players/{uuid}/kits/{id}/claim",
+                        Scopes.WRITE,
+                        request -> claim(actions, request)));
+    }
+
+    /**
+     * Hand a kit over, ignoring cooldowns, costs and permissions.
+     *
+     * <p>What a reward system wants: the decision to give it was made somewhere else, and the kit is only the
+     * shape of the reward.
+     */
+    private static HttpResponse give(ActionsFor actions, RestRequest request) {
+        return Writes.outcome(writes(actions, request).give(request.uuidParameter("uuid"), request.parameter("id")));
+    }
+
+    /**
+     * Claim a kit as the player would, cooldown, cost, permission and all.
+     *
+     * <p>What a panel's "claim" button wants: the same rules that apply in game, applied here too, so a player
+     * cannot use a web page to get around a cooldown.
+     */
+    private static HttpResponse claim(ActionsFor actions, RestRequest request) {
+        return Writes.outcome(writes(actions, request).claim(request.uuidParameter("uuid"), request.parameter("id")));
+    }
+
+    private static UxmKitActions writes(ActionsFor actions, RestRequest request) {
+        return Reads.module(actions.actingFor(request.caller()).kits(), "kits");
     }
 
     private static HttpResponse kits(UxmEssentialsApi api) {

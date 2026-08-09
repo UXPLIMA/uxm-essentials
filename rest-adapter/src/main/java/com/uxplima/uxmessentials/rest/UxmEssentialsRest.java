@@ -31,6 +31,10 @@ import org.spongepowered.configurate.ConfigurateException;
  *
  * <p>Everything it serves comes through the published developer API. It holds no reference into the host beyond
  * that interface, which is why it can be updated, removed, or left behind a version without the host noticing.
+ *
+ * <p>Writes are attributed per token rather than per jar. Every request builds its action surface with the label of
+ * the token that made it, so a ban placed over HTTP reads as {@code uxmEssentials-rest/panel} in the audit log and
+ * an operator can tell one caller from another.
  */
 @NullMarked
 public final class UxmEssentialsRest extends JavaPlugin {
@@ -69,7 +73,12 @@ public final class UxmEssentialsRest extends JavaPlugin {
     private void start(RestConfig config, UxmEssentialsApi api, TokenStore tokens) {
         AuthFilter filter = new AuthFilter(tokens, new RateLimiter(config.requestsPerMinute(), Clock.systemUTC()));
         try {
-            server = RestServer.start(config.bind(), config.port(), Routes.build(api), filter, getLogger());
+            server = RestServer.start(
+                    config.bind(),
+                    config.port(),
+                    Routes.build(api, caller -> api.actions(this, caller)),
+                    filter,
+                    getLogger());
         } catch (IOException failure) {
             getLogger().log(Level.SEVERE, "could not listen on " + config.bind() + ":" + config.port(), failure);
             return;

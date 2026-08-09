@@ -143,6 +143,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   String version()
   boolean isModuleEnabled(String)
   com.uxplima.uxmessentials.api.action.UxmActions actions(Plugin)
+  com.uxplima.uxmessentials.api.action.UxmActions actions(Plugin, String)
   com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi get()
   com.uxplima.uxmessentials.api.bukkit.menu.MenuApi menus()
   void whenReady(Consumer)

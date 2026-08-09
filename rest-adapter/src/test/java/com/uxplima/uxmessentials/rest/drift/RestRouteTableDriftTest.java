@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.rest.Routes;
 import com.uxplima.uxmessentials.rest.auth.Scopes;
 import com.uxplima.uxmessentials.rest.http.Route;
+import com.uxplima.uxmessentials.rest.route.ActionsFor;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,6 +27,11 @@ import org.junit.jupiter.api.Test;
  */
 class RestRouteTableDriftTest {
 
+    /** Building the table never touches the action surface; only serving a write does. */
+    private static final ActionsFor NO_WRITES = caller -> {
+        throw new AssertionError("building the table asked for the action surface");
+    };
+
     private static final Path GOLDEN = Path.of("src", "test", "resources", "rest-routes.txt");
 
     /** Where the table as it actually is gets written, so refreshing the golden file is a copy rather than typing. */
@@ -35,7 +41,7 @@ class RestRouteTableDriftTest {
     void theRouteTableIsWhatTheGoldenFileSays() throws IOException {
         String actual = String.join(
                 System.lineSeparator(),
-                Routes.build(mock(UxmEssentialsApi.class)).routes().stream()
+                Routes.build(mock(UxmEssentialsApi.class), NO_WRITES).routes().stream()
                         .map(Route::describe)
                         .toList());
 
@@ -49,7 +55,8 @@ class RestRouteTableDriftTest {
 
     @Test
     void everyRouteIsUnderTheVersionedPrefixAndAsksForARealScope() {
-        List<Route> routes = Routes.build(mock(UxmEssentialsApi.class)).routes();
+        List<Route> routes =
+                Routes.build(mock(UxmEssentialsApi.class), NO_WRITES).routes();
 
         assertThat(routes).isNotEmpty();
         assertThat(routes).allSatisfy(route -> {
@@ -60,7 +67,7 @@ class RestRouteTableDriftTest {
 
     @Test
     void everyReadingRouteIsAGetAndAsksOnlyForTheReadScope() {
-        assertThat(Routes.build(mock(UxmEssentialsApi.class)).routes())
+        assertThat(Routes.build(mock(UxmEssentialsApi.class), NO_WRITES).routes())
                 .filteredOn(route -> route.method().equals("GET"))
                 .allSatisfy(route -> assertThat(route.scope()).isEqualTo(Scopes.READ));
     }

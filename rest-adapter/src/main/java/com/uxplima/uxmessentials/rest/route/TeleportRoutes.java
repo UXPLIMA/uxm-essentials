@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.rest.auth.Scopes;
@@ -16,19 +17,25 @@ import com.uxplima.uxmessentials.rest.http.RestRequest;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.view.Views;
 
-/** Reading teleport requests and where {@code /back} would take somebody. */
+/** Teleport requests, where {@code /back} would take somebody, and moving a player. */
 public final class TeleportRoutes {
 
     private TeleportRoutes() {}
 
-    public static List<Route> of(UxmEssentialsApi api) {
+    public static List<Route> of(UxmEssentialsApi api, ActionsFor actions) {
         return List.of(
                 Route.of(
                         "GET",
                         PREFIX + "/players/{uuid}/teleport-requests",
                         Scopes.READ,
                         request -> requests(api, request)),
-                Route.of("GET", PREFIX + "/players/{uuid}/back", Scopes.READ, request -> back(api, request)));
+                Route.of("GET", PREFIX + "/players/{uuid}/back", Scopes.READ, request -> back(api, request)),
+                Route.of(
+                        "POST",
+                        PREFIX + "/players/{uuid}/teleport",
+                        Scopes.WRITE,
+                        request -> teleport(actions, request)),
+                Route.of("POST", PREFIX + "/players/{uuid}/back", Scopes.WRITE, request -> goBack(actions, request)));
     }
 
     /** Both directions in one answer, since a player has at most one outgoing request and any number waiting. */
@@ -53,5 +60,20 @@ public final class TeleportRoutes {
 
     private static UxmTeleportQuery teleportOf(UxmEssentialsApi api) {
         return Reads.module(api.teleport(), "teleport");
+    }
+
+    /** Move a player somewhere. The world has to be loaded, and the player has to be online. */
+    private static HttpResponse teleport(ActionsFor actions, RestRequest request) {
+        return Writes.outcome(writes(actions, request)
+                .teleport(request.uuidParameter("uuid"), Body.of(request).location("location")));
+    }
+
+    /** Send a player back where they were, which is what {@code /back} does and refuses the same way. */
+    private static HttpResponse goBack(ActionsFor actions, RestRequest request) {
+        return Writes.outcome(writes(actions, request).back(request.uuidParameter("uuid")));
+    }
+
+    private static UxmTeleportActions writes(ActionsFor actions, RestRequest request) {
+        return Reads.module(actions.actingFor(request.caller()).teleport(), "teleport");
     }
 }
