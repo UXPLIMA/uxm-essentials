@@ -33,4 +33,16 @@ public interface UxmActions {
 
     /** Handing down and lifting punishments, or empty when the moderation module is switched off. */
     Optional<UxmModerationActions> moderation();
+
+    /** Setting the flags a player carries, or empty when the playerstate module is switched off. */
+    Optional<UxmPlayerStateActions> playerState();
+
+    /** Marking a player away, or empty when the presence module is switched off. */
+    Optional<UxmPresenceActions> presence();
+
+    /** Hiding a player, or empty when the vanish module is switched off. */
+    Optional<UxmVanishActions> vanish();
+
+    /** Moving a player, or empty when the teleport module is switched off. */
+    Optional<UxmTeleportActions> teleport();
 }

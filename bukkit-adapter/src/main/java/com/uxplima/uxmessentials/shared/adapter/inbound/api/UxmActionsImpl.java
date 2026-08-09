@@ -8,6 +8,10 @@ import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.action.UxmModerationActions;
+import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
+import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
+import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
+import com.uxplima.uxmessentials.api.action.UxmVanishActions;
 import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import org.jspecify.annotations.NullMarked;
@@ -52,5 +56,25 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmModerationActions> moderation() {
         return contexts.find(UxmModerationActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmPlayerStateActions> playerState() {
+        return contexts.find(UxmPlayerStateActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmPresenceActions> presence() {
+        return contexts.find(UxmPresenceActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmVanishActions> vanish() {
+        return contexts.find(UxmVanishActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmTeleportActions> teleport() {
+        return contexts.find(UxmTeleportActions.class, source);
     }
 }

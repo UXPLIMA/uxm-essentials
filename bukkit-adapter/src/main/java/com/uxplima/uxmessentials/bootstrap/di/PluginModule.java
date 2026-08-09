@@ -1479,6 +1479,16 @@ public final class PluginModule {
                         wired.services().requests(),
                         wired.services().backStore(),
                         ctx.kernel().playerLookup()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmTeleportActions.class,
+                source -> new com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportActions(
+                        wired.services().executor(),
+                        wired.services().captureBack(),
+                        wired.services().settings(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().worldLookup(),
+                        ctx.kernel().permissions(),
+                        ctx.kernel().scheduler()));
         // Captured for staff (wired last), which binds its COMPASS gadget and /stafflist to this admin engine.
         links.staffTeleport = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.TeleportSeam(
                 wired.services().engine());
@@ -1837,6 +1847,15 @@ public final class PluginModule {
         links.queries.register(
                 UxmPlayerStateQuery.class,
                 new PlayerStateQueries(wired.store(), ctx.kernel().playerLookup()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmPlayerStateActions.class,
+                source -> new com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlayerStateActions(
+                        com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlayerStateApiWrites.of(
+                                wired.services()),
+                        wired.store(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler(),
+                        source));
         // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
         links.staffOpenContainer = wired.services().openContainer();
         // Captured so presence (wired later) rebinds the playtime sampler's AFK seam to its live store, so the
@@ -2115,6 +2134,12 @@ public final class PluginModule {
                 UxmVanishQuery.class,
                 new VanishQueries(
                         wired.vanishStore(), wired.levels(), ctx.kernel().playerLookup()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmVanishActions.class,
+                source -> new com.uxplima.uxmessentials.vanish.adapter.outbound.api.VanishActions(
+                        wired.toggleVanish(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Captured for staff (wired last), which binds its VANISH gadget and vanish-on-enter to the one authority.
         links.staffVanishSeam =
                 new com.uxplima.uxmessentials.staff.adapter.StaffWiring.VanishSeam(wired.toggleVanish());
@@ -2148,6 +2173,13 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
         links.queries.register(UxmPresenceQuery.class, new PresenceQueries(wired.store()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmPresenceActions.class,
+                source -> new com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceActions(
+                        wired.services().markAfk(),
+                        wired.store(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         bindAfk(links, new PresenceAfkStatus(wired.store()));
         // Rebind the playtime sampler's AFK seam (captured during the earlier playerstate wiring) to the live
         // presence store, so the sampler splits each player's seconds into active vs AFK. When playerstate is

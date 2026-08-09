@@ -3,6 +3,10 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional homes()
   Optional kits()
   Optional moderation()
+  Optional playerState()
+  Optional presence()
+  Optional teleport()
+  Optional vanish()
   Optional warps()
 interface com.uxplima.uxmessentials.api.action.UxmEconomyActions
   CompletableFuture deposit(UUID, BigDecimal)
@@ -68,6 +72,17 @@ record com.uxplima.uxmessentials.api.action.UxmOutcome
   com.uxplima.uxmessentials.api.action.UxmOutcome ok()
   int hashCode()
   void ifFailed(Consumer)
+interface com.uxplima.uxmessentials.api.action.UxmPlayerStateActions
+  CompletableFuture feed(UUID)
+  CompletableFuture heal(UUID)
+  CompletableFuture setFlySpeed(UUID, float)
+  CompletableFuture setFlying(UUID, boolean)
+  CompletableFuture setGameMode(UUID, com.uxplima.uxmessentials.api.view.UxmGameMode)
+  CompletableFuture setGodMode(UUID, boolean)
+  CompletableFuture setWalkSpeed(UUID, float)
+interface com.uxplima.uxmessentials.api.action.UxmPresenceActions
+  CompletableFuture setAfk(UUID, String)
+  CompletableFuture setAfk(UUID, boolean)
 class com.uxplima.uxmessentials.api.action.UxmResult
   Object valueOrThrow()
   Optional failure()
@@ -82,6 +97,11 @@ class com.uxplima.uxmessentials.api.action.UxmResult
   com.uxplima.uxmessentials.api.action.UxmResult ok(Object)
   int hashCode()
   void ifFailed(Consumer)
+interface com.uxplima.uxmessentials.api.action.UxmTeleportActions
+  CompletableFuture back(UUID)
+  CompletableFuture teleport(UUID, com.uxplima.uxmessentials.api.view.UxmLocation)
+interface com.uxplima.uxmessentials.api.action.UxmVanishActions
+  CompletableFuture setVanished(UUID, boolean)
 interface com.uxplima.uxmessentials.api.action.UxmWarpActions
   CompletableFuture create(String, com.uxplima.uxmessentials.api.view.UxmLocation)
   CompletableFuture delete(String)
