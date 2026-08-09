@@ -2,7 +2,10 @@ class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
   void uninstall()
 interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
+  Optional economy()
   Optional homes()
+  Optional playerWarps()
+  Optional warps()
   String version()
   boolean isModuleEnabled(String)
   com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi get()
@@ -610,16 +613,44 @@ enum com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result INVALID
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result LINKED
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result NO_CODE
+interface com.uxplima.uxmessentials.api.query.UxmEconomyQuery
+  CompletableFuture balance(UUID)
+  CompletableFuture balance(UUID, String)
+  CompletableFuture balances(UUID)
+  CompletableFuture top(String, int)
+  CompletableFuture top(int)
+  List currencies()
 interface com.uxplima.uxmessentials.api.query.UxmHomesQuery
   CompletableFuture count(UUID)
   CompletableFuture get(UUID, int)
   CompletableFuture limit(UUID)
   CompletableFuture list(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery
+  CompletableFuture count(UUID)
+  CompletableFuture get(String)
+  CompletableFuture limit(UUID)
+  CompletableFuture listPublic(int, int)
+  CompletableFuture ownedBy(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmWarpsQuery
+  CompletableFuture averageRating(String)
+  CompletableFuture exists(String)
+  CompletableFuture get(String)
+  CompletableFuture list()
+  CompletableFuture visibleTo(UUID)
 enum com.uxplima.uxmessentials.api.view.UxmBackCause
   com.uxplima.uxmessentials.api.view.UxmBackCause valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmBackCause[] values()
   com.uxplima.uxmessentials.api.view.UxmBackCause DEATH
   com.uxplima.uxmessentials.api.view.UxmBackCause TELEPORT
+record com.uxplima.uxmessentials.api.view.UxmBaltopEntry
+  <init>(int, UUID, String, com.uxplima.uxmessentials.api.view.UxmMoney)
+  String playerName()
+  String toString()
+  UUID playerId()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmMoney balance()
+  int hashCode()
+  int rank()
 enum com.uxplima.uxmessentials.api.view.UxmEconomyRejection
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection[] values()
@@ -667,6 +698,49 @@ record com.uxplima.uxmessentials.api.view.UxmMoney
   String toString()
   boolean equals(Object)
   int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmPlayerWarp
+  <init>(long, String, Optional, UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation, Optional, Optional, Optional, Optional, com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess, boolean, com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus, Optional, double, int, long, int, int, Optional, Optional, Instant, Instant)
+  Instant createdAt()
+  Instant updatedAt()
+  Optional category()
+  Optional description()
+  Optional displayName()
+  Optional icon()
+  Optional price()
+  Optional rentPaidUntil()
+  Optional serverId()
+  Optional sponsoredUntil()
+  String label()
+  String name()
+  String ownerName()
+  String toString()
+  UUID ownerId()
+  boolean equals(Object)
+  boolean isSponsored()
+  boolean passwordProtected()
+  com.uxplima.uxmessentials.api.view.UxmLocation location()
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess access()
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus status()
+  double averageRating()
+  int favourites()
+  int hashCode()
+  int ratingCount()
+  int uniqueVisitors()
+  long id()
+  long visits()
+enum com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess[] values()
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess PASSWORD
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess PRIVATE
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess PUBLIC
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess WHITELIST
+enum com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus[] values()
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus ACTIVE
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus ARCHIVED
+  com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus SUSPENDED
 enum com.uxplima.uxmessentials.api.view.UxmPoseType
   com.uxplima.uxmessentials.api.view.UxmPoseType valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmPoseType[] values()
@@ -717,6 +791,24 @@ enum com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason INTERACTED
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason MOVED
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason ROTATED
+record com.uxplima.uxmessentials.api.view.UxmWarp
+  <init>(String, com.uxplima.uxmessentials.api.view.UxmLocation, UUID, String, Instant, Optional, Optional, long, boolean, boolean, Optional, Optional)
+  Instant createdAt()
+  Optional category()
+  Optional cost()
+  Optional icon()
+  Optional requiredPermission()
+  String name()
+  String ownerName()
+  String toString()
+  UUID ownerId()
+  boolean equals(Object)
+  boolean isFree()
+  boolean locked()
+  boolean passwordProtected()
+  com.uxplima.uxmessentials.api.view.UxmLocation location()
+  int hashCode()
+  long visitors()
 enum com.uxplima.uxmessentials.api.view.UxmWorldAccess
   com.uxplima.uxmessentials.api.view.UxmWorldAccess valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmWorldAccess[] values()

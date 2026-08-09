@@ -444,6 +444,7 @@ public final class PlayerwarpsWiring {
                 PlayerWarpCommands.all(services, kernel.messages()),
                 List.of(joinWarmer),
                 repository,
+                browse,
                 quota,
                 rentSweep,
                 sponsorSweep);
@@ -858,6 +859,7 @@ public final class PlayerwarpsWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             PlayerWarpRepository repository,
+            PlayerWarpBrowse browse,
             PlayerWarpQuota quota,
             @org.jspecify.annotations.Nullable RentSweep rentSweep,
             @org.jspecify.annotations.Nullable SponsorExpirySweep sponsorSweep) {
@@ -866,6 +868,7 @@ public final class PlayerwarpsWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(browse, "browse");
             Objects.requireNonNull(quota, "quota");
         }
 

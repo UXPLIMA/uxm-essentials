@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -95,6 +98,21 @@ class FrontDoorTest {
 
         @Override
         public Optional<UxmHomesQuery> homes() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmWarpsQuery> warps() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmPlayerWarpsQuery> playerWarps() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmEconomyQuery> economy() {
             return Optional.empty();
         }
     }

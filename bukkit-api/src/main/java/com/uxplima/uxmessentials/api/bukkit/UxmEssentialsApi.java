@@ -4,7 +4,10 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -67,6 +70,15 @@ public interface UxmEssentialsApi {
      * apart: one is a server that will never answer, the other is a player who has not set one yet.
      */
     Optional<UxmHomesQuery> homes();
+
+    /** Reading the server's warps, or empty when the warps module is switched off. */
+    Optional<UxmWarpsQuery> warps();
+
+    /** Reading the warps players own, or empty when the player-warps module is switched off. */
+    Optional<UxmPlayerWarpsQuery> playerWarps();
+
+    /** Reading balances and the leaderboard, or empty when the economy module is switched off. */
+    Optional<UxmEconomyQuery> economy();
 
     /** The API, or {@code null} when uxmEssentials is absent, still loading, or shutting down. */
     static @Nullable UxmEssentialsApi get() {

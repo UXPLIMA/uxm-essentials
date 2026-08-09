@@ -228,6 +228,7 @@ public final class WarpsWiring {
         return new Wired(
                 commands,
                 listeners,
+                repository,
                 services.listWarps(),
                 services.warpMenu(),
                 editorView,
@@ -284,6 +285,7 @@ public final class WarpsWiring {
     public record Wired(
             List<CommandRegistration> commands,
             List<org.bukkit.event.Listener> listeners,
+            WarpRepository repository,
             ListWarps listWarps,
             WarpBrowseMenu warpMenu,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
@@ -296,6 +298,7 @@ public final class WarpsWiring {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(listWarps, "listWarps");
             Objects.requireNonNull(warpMenu, "warpMenu");
             Objects.requireNonNull(playerWarpHandle, "playerWarpHandle");

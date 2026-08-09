@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.homes.adapter.outbound.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,11 +19,10 @@ import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.query.QueryDoubles;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,13 +41,13 @@ class HomeQueriesTest {
 
     private FakeHomeRepository repository;
     private FakePermissions permissions;
-    private RecordingScheduler scheduler;
+    private QueryDoubles.InlineScheduler scheduler;
 
     @BeforeEach
     void setUp() {
         repository = new FakeHomeRepository();
         permissions = new FakePermissions();
-        scheduler = new RecordingScheduler();
+        scheduler = new QueryDoubles.InlineScheduler();
     }
 
     @Test
@@ -59,7 +57,7 @@ class HomeQueriesTest {
         queries().get(OWNER_ID, 0).join();
         queries().limit(OWNER_ID).join();
 
-        assertThat(scheduler.asyncCalls).isEqualTo(4);
+        assertThat(scheduler.asyncCalls()).isEqualTo(4);
         assertThat(repository.touchedOnTheCallingThread).isFalse();
     }
 
@@ -159,51 +157,19 @@ class HomeQueriesTest {
         HomeQueries queries = queries();
 
         assertThatThrownBy(() -> queries.get(OWNER_ID, -1).join()).isInstanceOf(IllegalArgumentException.class);
-        assertThat(scheduler.asyncCalls).isZero();
+        assertThat(scheduler.asyncCalls()).isZero();
     }
 
     private HomeQueries queries() {
         return new HomeQueries(
                 repository,
                 new HomeQuota(permissions, 3, Permissions.QuotaReduction.MAX),
-                new NamedLookup(),
+                new QueryDoubles.MapLookup().with(OWNER),
                 scheduler);
     }
 
     private static Home home(int slot) {
         return Home.create(OWNER, HomeSlot.of(slot), new Position(WORLD, slot, 64, slot, 0f, 0f), WHEN);
-    }
-
-    /** Runs the read straight away, on the calling thread, and records that it was asked to move it off one. */
-    private static final class RecordingScheduler implements Scheduler {
-
-        private int asyncCalls;
-
-        @Override
-        public void onGlobal(Runnable task) {
-            throw new AssertionError("a published query must not schedule tick-thread work");
-        }
-
-        @Override
-        public void onRegion(Position position, Runnable task) {
-            throw new AssertionError("a published query must not schedule tick-thread work");
-        }
-
-        @Override
-        public void onEntity(PlayerRef player, Runnable task) {
-            throw new AssertionError("a published query must not schedule tick-thread work");
-        }
-
-        @Override
-        public void async(Runnable task) {
-            asyncCalls++;
-            task.run();
-        }
-
-        @Override
-        public void asyncAfter(Duration delay, Runnable task) {
-            throw new AssertionError("a published query must not delay its read");
-        }
     }
 
     private static final class FakeHomeRepository implements HomeRepository {
@@ -277,25 +243,6 @@ class HomeQueriesTest {
         public QuotaResult resolveQuota(
                 PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
             return quota;
-        }
-    }
-
-    /** Names the one player it knows and nobody else, so the stranger path is exercised. */
-    private static final class NamedLookup implements PlayerLookup {
-
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return OWNER.name().equals(name) ? Optional.of(OWNER) : Optional.empty();
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return OWNER_ID.equals(uuid) ? Optional.of(OWNER) : Optional.empty();
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return false;
         }
     }
 }

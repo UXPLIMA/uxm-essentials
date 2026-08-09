@@ -6,7 +6,10 @@ import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -67,5 +70,20 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmHomesQuery> homes() {
         return queries.find(UxmHomesQuery.class);
+    }
+
+    @Override
+    public Optional<UxmWarpsQuery> warps() {
+        return queries.find(UxmWarpsQuery.class);
+    }
+
+    @Override
+    public Optional<UxmPlayerWarpsQuery> playerWarps() {
+        return queries.find(UxmPlayerWarpsQuery.class);
+    }
+
+    @Override
+    public Optional<UxmEconomyQuery> economy() {
+        return queries.find(UxmEconomyQuery.class);
     }
 }

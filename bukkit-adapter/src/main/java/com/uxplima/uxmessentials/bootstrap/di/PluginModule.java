@@ -22,7 +22,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
+import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
 import com.uxplima.uxmessentials.bootstrap.command.GuiSubcommand;
@@ -49,6 +52,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderRankEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderSurvivalSales;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderTradeEconomy;
+import com.uxplima.uxmessentials.economy.adapter.outbound.api.EconomyQueries;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -84,6 +88,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.api.PlayerWarpQueries;
 import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
@@ -228,6 +233,7 @@ import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.villagers.adapter.VillagersWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
+import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpQueries;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
@@ -1610,6 +1616,14 @@ public final class PluginModule {
         links.npcEconomy = wired.npcEconomy();
         links.placeholders.economy(new ProviderEconomyPlaceholders(
                 wired.provider(), wired.defaultCurrency(), wired.amountFormat(), BalTop.MAX_PAGE_SIZE));
+        links.queries.register(
+                UxmEconomyQuery.class,
+                new EconomyQueries(
+                        wired.provider(),
+                        wired.currencies(),
+                        wired.snapshots(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Publish a balance leaderboard source for the holograms module (wired later): the lock-free baltop
         // snapshot, mapped into ranked name/score rows. The composition root is the only place that may bridge
         // the two contexts, so the provider is a lambda here rather than a class in either context.
@@ -1651,6 +1665,13 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         links.placeholders.warps(new RepositoryWarpsPlaceholders(wired.listWarps()));
+        links.queries.register(
+                UxmWarpsQuery.class,
+                new WarpQueries(
+                        wired.repository(),
+                        wired.listWarps(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Open the same /warp list browse menu from the management hub, resolving the viewer's visible warps
         // through the identical ListWarps filter the command uses, gated by the existing warp-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
@@ -2151,6 +2172,14 @@ public final class PluginModule {
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands
         // hold, so a placeholder matches what /setpwarp enforces and the /pwarps list shows.
         links.placeholders.playerwarps(new RepositoryPlayerwarpsPlaceholders(wired.repository(), wired.quota()));
+        links.queries.register(
+                UxmPlayerWarpsQuery.class,
+                new PlayerWarpQueries(
+                        wired.repository(),
+                        wired.browse(),
+                        wired.quota(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Arm the rent sweep when the rent sub-group is on (a no-op otherwise), and halt it on disable/reload so no
         // orphaned off-tick task survives.
         wired.startBackgroundWork();

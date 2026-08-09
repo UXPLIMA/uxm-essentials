@@ -75,9 +75,14 @@ class FrontDoorWiringTest {
 
     @Test
     void aContextThatNeverWiredAnswersEmptyRatherThanNull() {
-        assertThat(api(new ToggleConfig(true), "homes").homes())
+        UxmEssentialsApi api = api(new ToggleConfig(true), "homes");
+
+        assertThat(api.homes())
                 .as("a disabled module registers no surface, and absent is the answer a consumer can act on")
                 .isEmpty();
+        assertThat(api.warps()).isEmpty();
+        assertThat(api.playerWarps()).isEmpty();
+        assertThat(api.economy()).isEmpty();
     }
 
     @Test
