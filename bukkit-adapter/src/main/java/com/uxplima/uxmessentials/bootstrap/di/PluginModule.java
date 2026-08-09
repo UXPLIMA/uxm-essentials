@@ -357,7 +357,8 @@ public final class PluginModule {
                 menuBindings.placeholders(),
                 IconProviders.full(plugin.getServer(), kernel.log(), hooks.capability(HeadQuery.class))
                         .withRuntime(runtimeIcons));
-        MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions());
+        MenuRenderer menuRenderer =
+                new MenuRenderer(menuItemRenderer, menuBindings.conditions(), menuBindings.contents());
         // The public dev-API: another plugin loads MenuApi from the ServicesManager to register its own actions
         // (which cover custom buttons), requirements, placeholders, list sources and icon providers into these very
         // bindings, and to build a menu-styled item through this same renderer. Registered at Normal so a menu that
@@ -442,7 +443,8 @@ public final class PluginModule {
                 menuClickCooldownMs,
                 System::currentTimeMillis,
                 menuBindings.pagedLists(),
-                menuTextPrompt);
+                menuTextPrompt,
+                menuBindings.contents());
         menuListener.install();
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —

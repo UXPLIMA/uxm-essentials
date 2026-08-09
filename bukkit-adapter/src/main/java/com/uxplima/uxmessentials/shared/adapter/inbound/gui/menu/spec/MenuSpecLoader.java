@@ -156,10 +156,35 @@ public final class MenuSpecLoader {
                     chestOnly,
                     // The optional `bedrock {}` native CustomForm override — absent → empty, so a menu without it
                     // keeps the automatic Bedrock degradation unchanged.
-                    parseBedrock(root.node("bedrock")));
+                    parseBedrock(root.node("bedrock")),
+                    // The optional `content {}` block — the slot regions a feature's provider owns. Absent → empty,
+                    // so a menu the engine draws entirely from its own items is unchanged.
+                    parseContent(root.node("content"), slotCeiling));
         } catch (IllegalArgumentException invalid) {
             throw new MenuSpecException("invalid menu in " + origin + ": " + invalid.getMessage(), invalid);
         }
+    }
+
+    /**
+     * Parse the optional {@code content {}} block: one child per region, keyed by the id its provider is registered
+     * under, each declaring the {@code slots} it owns and whether it is {@code editable}. A region with no slots is
+     * a spec error, since the whole point of the block is the slots it names; a menu with no block at all parses to
+     * an empty map and is drawn and routed entirely from its own items, as every menu was before the block existed.
+     */
+    private Map<String, ContentRegionSpec> parseContent(ConfigurationNode node, int slotCeiling) {
+        if (node.virtual() || node.isNull()) {
+            return Map.of();
+        }
+        Map<String, ContentRegionSpec> regions = new LinkedHashMap<>();
+        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
+                node.childrenMap().entrySet()) {
+            String id = String.valueOf(entry.getKey());
+            ConfigurationNode child = entry.getValue();
+            SlotSet slots = SlotSet.parse(strings(child.node("slots")), slotCeiling);
+            regions.put(
+                    id, new ContentRegionSpec(id, slots, child.node("editable").getBoolean(false)));
+        }
+        return regions;
     }
 
     /**

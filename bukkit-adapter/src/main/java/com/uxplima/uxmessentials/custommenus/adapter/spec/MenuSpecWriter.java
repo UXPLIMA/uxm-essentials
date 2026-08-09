@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFor
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ContentRegionSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDragSpec;
@@ -107,7 +108,21 @@ public final class MenuSpecWriter {
         writeRefsIfAny(root.node("close-actions"), spec.closeActions());
         writePlaceholders(root.node("placeholders"), spec.placeholders());
         spec.bedrock().ifPresent(bedrock -> setQuiet(() -> writeBedrock(root.node("bedrock"), bedrock)));
+        writeContent(root.node("content"), spec.contents());
         writeItems(root, spec.items());
+    }
+
+    /**
+     * Emit the {@code content {}} block a menu hands to a feature's providers, so a spec that carries one survives a
+     * round trip through the editor. A menu with no region writes nothing, as before this block existed.
+     */
+    private void writeContent(CommentedConfigurationNode node, Map<String, ContentRegionSpec> contents)
+            throws SerializationException {
+        for (ContentRegionSpec region : contents.values()) {
+            CommentedConfigurationNode child = node.node(region.id());
+            child.node("slots").set(slotTokens(region.slots()));
+            setIfTrue(child.node("editable"), region.editable());
+        }
     }
 
     /** Emit the refresh block only when it says something — an enabled refresh or a stashed non-zero interval. */

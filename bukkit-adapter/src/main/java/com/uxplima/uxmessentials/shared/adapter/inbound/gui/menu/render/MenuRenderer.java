@@ -15,12 +15,15 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ContentProviderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.BottomSlots;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PriorityLayering;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentProvider;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ActionArguments;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.PagedListView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ContentRegionSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
@@ -28,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Lays a whole menu spec into an open inventory for one viewer. Static items are collapsed through
@@ -50,9 +54,23 @@ public final class MenuRenderer {
     private final ItemRenderer itemRenderer;
     private final ConditionRegistry conditions;
 
+    /**
+     * The providers that fill a menu's {@code content {}} regions. Null on an engine wired without any — every
+     * spec-only test fixture — in which case a region (if a spec even declares one) is left empty, exactly what an
+     * unregistered provider gets. Only production wiring, which holds the feature-populated registry, passes it.
+     */
+    @Nullable private final ContentProviderRegistry contents;
+
     public MenuRenderer(ItemRenderer itemRenderer, ConditionRegistry conditions) {
+        this(itemRenderer, conditions, null);
+    }
+
+    /** The canonical constructor, carrying the content-region providers a menu's live-item slots are filled by. */
+    public MenuRenderer(
+            ItemRenderer itemRenderer, ConditionRegistry conditions, @Nullable ContentProviderRegistry contents) {
         this.itemRenderer = Objects.requireNonNull(itemRenderer, "itemRenderer");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
+        this.contents = contents;
     }
 
     /**
@@ -189,6 +207,37 @@ public final class MenuRenderer {
         Map<Integer, MenuItemSpec> placed = populateStatic(inv, staticItems, staticCtx, clickSink);
         for (MenuItemSpec listItem : listItems) {
             populateList(inv, listItem, ctx, staticCtx, placed, clickSink, resolvedLists);
+        }
+        populateContent(inv, spec, ctx);
+    }
+
+    /**
+     * Fill each of {@code spec}'s content regions from its registered provider, last so a region always wins the
+     * slots it declares over the chrome (a full-window filler is the usual thing underneath it). The slots are
+     * cleared first, so a region whose provider is missing — or whose feature has nothing to show right now — leaves
+     * genuinely empty slots rather than a stale tile the viewer could try to take. The engine records no click
+     * routing for them: a click there is resolved against the region itself, not the spec's items.
+     */
+    private void populateContent(Inventory inv, MenuSpec spec, MenuContext ctx) {
+        for (ContentRegionSpec region : spec.contents().values()) {
+            List<Integer> slots = region.slots().slots();
+            for (int slot : slots) {
+                if (fits(inv, slot)) {
+                    inv.setItem(slot, null);
+                }
+            }
+            ContentProvider provider =
+                    contents == null ? null : contents.get(region.id()).orElse(null);
+            if (provider == null) {
+                continue;
+            }
+            List<@Nullable ItemStack> painted = provider.render(ctx, region);
+            for (int index = 0; index < slots.size() && index < painted.size(); index++) {
+                int slot = slots.get(index);
+                if (fits(inv, slot)) {
+                    inv.setItem(slot, painted.get(index));
+                }
+            }
         }
     }
 

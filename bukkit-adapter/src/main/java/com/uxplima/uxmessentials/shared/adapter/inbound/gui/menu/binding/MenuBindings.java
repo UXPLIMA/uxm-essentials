@@ -19,8 +19,10 @@ import java.util.regex.Pattern;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentProvider;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ContentRegionSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListControlSyntax;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
@@ -50,6 +52,8 @@ public final class MenuBindings {
     private final ListSourceRegistry lists = new ListSourceRegistry();
 
     private final PagedListSourceRegistry pagedLists = new PagedListSourceRegistry();
+
+    private final ContentProviderRegistry contents = new ContentProviderRegistry();
 
     public void action(String id, Consumer<MenuActionContext> handler) {
         actions.register(id, handler);
@@ -84,6 +88,14 @@ public final class MenuBindings {
                     "cannot register paged list source '" + id + "': already registered as a list source");
         }
         pagedLists.register(id, handler);
+    }
+
+    /**
+     * Register the provider behind a menu's {@code content {}} region: what fills those slots, which movements the
+     * viewer may make in them, and what happens to what is left when the window closes.
+     */
+    public void content(String id, ContentProvider provider) {
+        contents.register(id, provider);
     }
 
     public Optional<Consumer<MenuActionContext>> action(String id) {
@@ -137,6 +149,14 @@ public final class MenuBindings {
     }
 
     /**
+     * The content-provider registry, handed to the renderer and click listener so a region resolves to the very
+     * provider this façade registered. A region whose id is absent here stays empty and refuses every click.
+     */
+    public ContentProviderRegistry contents() {
+        return contents;
+    }
+
+    /**
      * The id catalog the in-game editor's pickers render from — the sorted action / condition / placeholder /
      * list-source ids these four registries currently hold. A picker reads this one export, so it offers exactly the
      * bindings that are wired. Built on demand from the live registries, so a feature that registered late is included.
@@ -175,6 +195,12 @@ public final class MenuBindings {
             collectItemMissing(spec, entry.getKey(), entry.getValue(), placeholderKnown, missing);
         }
         collectListControlMissing(spec, missing);
+        for (ContentRegionSpec region : spec.contents().values()) {
+            if (!contents.has(region.id())) {
+                missing.add(
+                        "menu '" + spec.title() + "' content region '" + region.id() + "' has no registered provider");
+            }
+        }
     }
 
     /**

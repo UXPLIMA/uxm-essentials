@@ -41,6 +41,11 @@ import java.util.Optional;
  * Bukkit-side façade reads — so this model stays pure and plain-JUnit testable. A menu that leaves it {@code false} —
  * the default — is redirected to a form for a Bedrock viewer and renders exactly as before for a Java one.
  *
+ * <p>The {@code contents} map is the menu's {@code content {}} block: the slot regions the engine hands to a
+ * feature's {@code ContentProvider} instead of drawing itself, keyed by the provider id each region names. Empty for
+ * every menu that declares no block, which is every menu drawn entirely from its own items, so such a menu renders
+ * and routes clicks exactly as before this block existed.
+ *
  * <p>The {@code bedrock} block is the menu's optional {@code bedrock {}} native CustomForm: when present, a Bedrock
  * viewer opening the menu (and not opted out by {@code chestOnly}) gets that explicit form — the form-native
  * dropdown/slider/toggle/multi-input widgets the automatic SimpleForm degradation cannot express — instead of the
@@ -61,7 +66,8 @@ public record MenuSpec(
         long clickCooldownMs,
         boolean bottomInventory,
         boolean chestOnly,
-        Optional<BedrockFormSpec> bedrock) {
+        Optional<BedrockFormSpec> bedrock,
+        Map<String, ContentRegionSpec> contents) {
 
     public MenuSpec {
         Objects.requireNonNull(title, "title");
@@ -79,7 +85,55 @@ public record MenuSpec(
             throw new IllegalArgumentException("clickCooldownMs must be >= 0: " + clickCooldownMs);
         }
         Objects.requireNonNull(bedrock, "bedrock");
+        contents = Map.copyOf(Objects.requireNonNull(contents, "contents"));
         checkSlotsFit(items, rows, bottomInventory);
+        checkRegionsFit(contents, rows, bottomInventory);
+    }
+
+    /**
+     * The thirteen-argument shape that carries a Bedrock block but no content region, kept so every existing
+     * {@code new MenuSpec(...)} call site compiles unchanged. It delegates to the canonical constructor with no
+     * regions, i.e. a menu the engine draws and routes entirely from its own items.
+     */
+    public MenuSpec(
+            String title,
+            int rows,
+            RefreshSpec refresh,
+            List<Ref> openRequirement,
+            List<Ref> openActions,
+            List<Ref> closeActions,
+            Map<String, MenuItemSpec> items,
+            Optional<String> inventoryType,
+            Map<String, String> placeholders,
+            long clickCooldownMs,
+            boolean bottomInventory,
+            boolean chestOnly,
+            Optional<BedrockFormSpec> bedrock) {
+        this(
+                title,
+                rows,
+                refresh,
+                openRequirement,
+                openActions,
+                closeActions,
+                items,
+                inventoryType,
+                placeholders,
+                clickCooldownMs,
+                bottomInventory,
+                chestOnly,
+                bedrock,
+                Map.of());
+    }
+
+    /** The content region covering {@code slot}, or empty when the slot is ordinary chrome. */
+    public Optional<ContentRegionSpec> regionAt(int slot) {
+        for (ContentRegionSpec region : contents.values()) {
+            if (region.covers(slot)) {
+                return Optional.of(region);
+            }
+        }
+        return Optional.empty();
     }
 
     /**
@@ -237,6 +291,18 @@ public record MenuSpec(
      * main slots plus the 9 hotbar slots shown below the chest top.
      */
     private static final int BOTTOM_SLOTS = 36;
+
+    private static void checkRegionsFit(Map<String, ContentRegionSpec> contents, int rows, boolean bottomInventory) {
+        int capacity = rows * 9 + (bottomInventory ? BOTTOM_SLOTS : 0);
+        for (ContentRegionSpec region : contents.values()) {
+            for (int slot : region.slots().slots()) {
+                if (slot >= capacity) {
+                    throw new IllegalArgumentException(
+                            "content region '" + region.id() + "' slot " + slot + " exceeds capacity " + capacity);
+                }
+            }
+        }
+    }
 
     private static void checkSlotsFit(Map<String, MenuItemSpec> items, int rows, boolean bottomInventory) {
         int capacity = rows * 9 + (bottomInventory ? BOTTOM_SLOTS : 0);

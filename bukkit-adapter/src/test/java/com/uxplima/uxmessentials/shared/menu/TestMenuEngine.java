@@ -39,7 +39,7 @@ public final class TestMenuEngine {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
-        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions(), bindings.contents());
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
         return new TestMenuEngine(bindings, renderer, menus, scheduler);
     }
@@ -56,8 +56,20 @@ public final class TestMenuEngine {
 
     /** Build the click listener over {@code plugin} and register it so a dispatched click is routed. */
     public void installListener(Plugin plugin) {
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                scheduler,
+                plugin,
+                null,
+                null,
+                null,
+                0L,
+                System::currentTimeMillis,
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry(),
+                null,
+                bindings.contents());
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
     }
 }
