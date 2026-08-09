@@ -49,8 +49,13 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  */
 public final class Ban {
 
-    /** The far-future span that makes a tempban effectively permanent without overflowing the stored expiry. */
-    static final Duration PERMANENT_SPAN = Duration.ofDays(365_000L);
+    /**
+     * The far-future span that makes a tempban effectively permanent without overflowing the stored expiry.
+     *
+     * <p>Public because it is the only way to tell the two apart after the fact: a ban stored with this span is a
+     * permanent one, and anything reporting bans outward (the published API, for one) has to say so.
+     */
+    public static final Duration PERMANENT_SPAN = Duration.ofDays(365_000L);
 
     private static final String PERMANENT_LABEL = "permanent";
 

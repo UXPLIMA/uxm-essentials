@@ -1969,6 +1969,13 @@ public final class PluginModule {
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler(),
                         wired.clock()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmModerationActions.class,
+                source -> new com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationActions(
+                        wired.apiWrites(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler(),
+                        source));
         // Register the moderation management GUI on the /uxmess gui hub, gated by the moderation GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "moderation",

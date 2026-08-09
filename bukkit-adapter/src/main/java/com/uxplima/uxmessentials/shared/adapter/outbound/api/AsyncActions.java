@@ -29,6 +29,27 @@ public final class AsyncActions {
     }
 
     /**
+     * Run {@code write} on the server's own thread and complete the returned future with its result.
+     *
+     * <p>For a write that reaches past the database into the running server: disconnecting a player, telling
+     * everybody what happened. A worker thread may not do either, and the caller still gets a future rather than
+     * having to know which thread it was on when it asked.
+     */
+    public static <T> CompletableFuture<T> onServer(Scheduler scheduler, Supplier<T> write) {
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(write, "write");
+        CompletableFuture<T> answer = new CompletableFuture<>();
+        scheduler.onGlobal(() -> {
+            try {
+                answer.complete(write.get());
+            } catch (RuntimeException failure) {
+                answer.completeExceptionally(failure);
+            }
+        });
+        return answer;
+    }
+
+    /**
      * Run {@code write} on the thread that owns {@code who} and complete the returned future with its result.
      *
      * <p>For a write that touches the live player: their inventory, their flight, their position. On Folia that is

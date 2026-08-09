@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.api.view.UxmSanctionAction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionKind;
 import com.uxplima.uxmessentials.api.view.UxmSanctionRecord;
 import com.uxplima.uxmessentials.api.view.UxmWarn;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
@@ -93,6 +94,18 @@ class ModerationQueriesTest {
         assertThat(ban.reason()).contains("griefing");
         assertThat(ban.expiresAt()).contains(NOW.plus(Duration.ofDays(3)));
         assertThat(ban.isPermanent()).isFalse();
+    }
+
+    @Test
+    void aPermanentBanIsPublishedWithNoExpiryAtAll() {
+        // A permanent ban has no state of its own: it is stored as a span so far out nobody will see it lapse.
+        // Published as a date, every consumer would have to know that trick to tell it from a very long tempban.
+        repository.tempban = new TempbanState.Active(NOW.plus(Ban.PERMANENT_SPAN), STAFF, Optional.empty(), NOW);
+
+        UxmSanction ban = queries().ban(TARGET).join().orElseThrow();
+
+        assertThat(ban.isPermanent()).isTrue();
+        assertThat(ban.expiresAt()).isEmpty();
     }
 
     @Test

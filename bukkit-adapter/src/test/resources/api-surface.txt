@@ -2,6 +2,7 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional economy()
   Optional homes()
   Optional kits()
+  Optional moderation()
   Optional warps()
 interface com.uxplima.uxmessentials.api.action.UxmEconomyActions
   CompletableFuture deposit(UUID, BigDecimal)
@@ -37,6 +38,24 @@ interface com.uxplima.uxmessentials.api.action.UxmHomeActions
 interface com.uxplima.uxmessentials.api.action.UxmKitActions
   CompletableFuture claim(UUID, String)
   CompletableFuture give(UUID, String)
+interface com.uxplima.uxmessentials.api.action.UxmModerationActions
+  CompletableFuture ban(UUID)
+  CompletableFuture ban(UUID, String)
+  CompletableFuture jail(UUID, String, Duration, String)
+  CompletableFuture jail(UUID, String, String)
+  CompletableFuture kick(UUID)
+  CompletableFuture kick(UUID, String)
+  CompletableFuture mute(UUID)
+  CompletableFuture mute(UUID, String)
+  CompletableFuture tempBan(UUID, Duration)
+  CompletableFuture tempBan(UUID, Duration, String)
+  CompletableFuture tempMute(UUID, Duration)
+  CompletableFuture tempMute(UUID, Duration, String)
+  CompletableFuture unban(UUID)
+  CompletableFuture unjail(UUID)
+  CompletableFuture unmute(UUID)
+  CompletableFuture warn(UUID, String)
+  com.uxplima.uxmessentials.api.action.UxmModerationActions silently()
 record com.uxplima.uxmessentials.api.action.UxmOutcome
   <init>(Optional)
   Optional failure()

@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
+import com.uxplima.uxmessentials.api.action.UxmModerationActions;
 import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import org.jspecify.annotations.NullMarked;
@@ -46,5 +47,10 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmKitActions> kits() {
         return contexts.find(UxmKitActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmModerationActions> moderation() {
+        return contexts.find(UxmModerationActions.class, source);
     }
 }

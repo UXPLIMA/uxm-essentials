@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyS
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetResolver;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWrites;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
@@ -291,7 +292,17 @@ public final class ModerationWiring {
                 repository,
                 sanctionHistory,
                 clock,
-                guiViews);
+                guiViews,
+                new ModerationApiWrites(
+                        services.ban(),
+                        services.tempBan(),
+                        services.unban(),
+                        services.mute(),
+                        services.unmute(),
+                        services.kick(),
+                        services.warn(),
+                        services.jail(),
+                        services.unjail()));
     }
 
     private static ModerationServices assemble(
@@ -492,6 +503,7 @@ public final class ModerationWiring {
      * @param tempBan the tempban use case, lent to security so a verification lockout is an ordinary ban
      * @param clock the clock the placeholder seam gates active ban/mute reads against
      * @param guiViews the management GUI views, whose active-punishments list the {@code /uxmess gui} hub opens
+     * @param apiWrites the nine punishment use cases the published API runs, the very ones behind the commands
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -505,7 +517,8 @@ public final class ModerationWiring {
             ModerationRepository repository,
             SanctionHistory sanctionHistory,
             Clock clock,
-            ModerationGuiViews guiViews) {
+            ModerationGuiViews guiViews,
+            ModerationApiWrites apiWrites) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -520,6 +533,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(sanctionHistory, "sanctionHistory");
             Objects.requireNonNull(clock, "clock");
             Objects.requireNonNull(guiViews, "guiViews");
+            Objects.requireNonNull(apiWrites, "apiWrites");
         }
 
         /** Drop the session-scoped freeze and commandspy sets. Called on module stop. */

@@ -30,4 +30,7 @@ public interface UxmActions {
 
     /** Handing out kits, or empty when the kits module is switched off. */
     Optional<UxmKitActions> kits();
+
+    /** Handing down and lifting punishments, or empty when the moderation module is switched off. */
+    Optional<UxmModerationActions> moderation();
 }

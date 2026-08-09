@@ -104,6 +104,12 @@ class ActionCoverageDriftTest {
     void everyActionAnswersRatherThanBlocks() {
         for (Class<?> actions : publishedActions()) {
             for (Method method : actions.getDeclaredMethods()) {
+                if (method.getReturnType().equals(actions)) {
+                    // A method answering with its own surface picks a variation of it rather than writing
+                    // anything: nothing has reached the database by the time it returns, so there is nothing to
+                    // wait for. Every verb reached through it is still held to the rule below.
+                    continue;
+                }
                 assertThat(method.getReturnType())
                         .as(
                                 "%s.%s must return a CompletableFuture: a write reaches the database, and a consumer "

@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.api.view.UxmSanctionAction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionKind;
 import com.uxplima.uxmessentials.api.view.UxmSanctionRecord;
 import com.uxplima.uxmessentials.api.view.UxmWarn;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -73,13 +74,7 @@ public final class ModerationQueries implements UxmModerationQuery {
             if (!(state instanceof TempbanState.Active active) || !state.isActiveAt(now)) {
                 return Optional.empty();
             }
-            return Optional.of(new UxmSanction(
-                    UxmSanctionKind.BAN,
-                    playerId,
-                    issuer(active.issuer()),
-                    active.reason(),
-                    active.issuedAt(),
-                    Optional.of(active.until())));
+            return Optional.of(view(playerId, active));
         });
     }
 
@@ -92,25 +87,7 @@ public final class ModerationQueries implements UxmModerationQuery {
             if (!state.isActiveAt(now)) {
                 return Optional.empty();
             }
-            return switch (state) {
-                case MuteState.Permanent permanent ->
-                    Optional.of(new UxmSanction(
-                            UxmSanctionKind.MUTE,
-                            playerId,
-                            issuer(permanent.issuer()),
-                            permanent.reason(),
-                            permanent.issuedAt(),
-                            Optional.empty()));
-                case MuteState.Timed timed ->
-                    Optional.of(new UxmSanction(
-                            UxmSanctionKind.MUTE,
-                            playerId,
-                            issuer(timed.issuer()),
-                            timed.reason(),
-                            timed.issuedAt(),
-                            Optional.of(timed.until())));
-                case MuteState.None ignored -> Optional.empty();
-            };
+            return view(playerId, state);
         });
     }
 
@@ -123,15 +100,7 @@ public final class ModerationQueries implements UxmModerationQuery {
             if (!(state instanceof JailState.Active active) || !state.isActiveAt(now)) {
                 return Optional.empty();
             }
-            // An online-only sentence has no wall-clock expiry to publish: it counts down while the player is
-            // logged in, so there is no instant at which it will have lapsed on its own.
-            return Optional.of(new UxmSanction(
-                    UxmSanctionKind.JAIL,
-                    playerId,
-                    issuer(active.issuer()),
-                    active.reason(),
-                    active.issuedAt(),
-                    active.until()));
+            return Optional.of(view(playerId, active));
         });
     }
 
@@ -162,8 +131,57 @@ public final class ModerationQueries implements UxmModerationQuery {
         return ApiValues.subject(players, playerId);
     }
 
-    private static UxmWarn view(Warn warn) {
+    static UxmWarn view(Warn warn) {
         return new UxmWarn(issuer(warn.issuer()), warn.reason(), warn.issuedAt(), warn.expiresAt());
+    }
+
+    /** A ban as the API publishes it. Shared with the write side, so a ban reads the same however it was laid down. */
+    static UxmSanction view(UUID playerId, TempbanState.Active ban) {
+        // A permanent ban has no state of its own: it is stored as a span so far out that nobody will see it
+        // lapse. Published, that has to be an absent expiry, or every consumer would have to know the trick to
+        // tell a permanent ban from a ban ending in the year 3026.
+        boolean permanent = !ban.until().isBefore(ban.issuedAt().plus(Ban.PERMANENT_SPAN));
+        return new UxmSanction(
+                UxmSanctionKind.BAN,
+                playerId,
+                issuer(ban.issuer()),
+                ban.reason(),
+                ban.issuedAt(),
+                permanent ? Optional.empty() : Optional.of(ban.until()));
+    }
+
+    /** A mute as the API publishes it, or empty for the state that means "not muted". */
+    static Optional<UxmSanction> view(UUID playerId, MuteState mute) {
+        return switch (mute) {
+            case MuteState.Permanent permanent ->
+                Optional.of(new UxmSanction(
+                        UxmSanctionKind.MUTE,
+                        playerId,
+                        issuer(permanent.issuer()),
+                        permanent.reason(),
+                        permanent.issuedAt(),
+                        Optional.empty()));
+            case MuteState.Timed timed ->
+                Optional.of(new UxmSanction(
+                        UxmSanctionKind.MUTE,
+                        playerId,
+                        issuer(timed.issuer()),
+                        timed.reason(),
+                        timed.issuedAt(),
+                        Optional.of(timed.until())));
+            case MuteState.None ignored -> Optional.empty();
+        };
+    }
+
+    /** A jail sentence as the API publishes it; an online-only sentence has no wall-clock expiry to publish. */
+    static UxmSanction view(UUID playerId, JailState.Active sentence) {
+        return new UxmSanction(
+                UxmSanctionKind.JAIL,
+                playerId,
+                issuer(sentence.issuer()),
+                sentence.reason(),
+                sentence.issuedAt(),
+                sentence.until());
     }
 
     private static UxmSanctionRecord view(SanctionHistoryEntry entry) {
