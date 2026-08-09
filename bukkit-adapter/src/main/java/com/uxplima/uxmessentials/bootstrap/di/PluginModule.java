@@ -22,6 +22,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
+import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
 import com.uxplima.uxmessentials.bootstrap.command.GuiSubcommand;
@@ -56,6 +57,7 @@ import com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.homes.adapter.outbound.RepositoryHomeRespawnLocator;
+import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeQueries;
 import com.uxplima.uxmessentials.homes.application.HomeRespawnLocator;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.invrollback.adapter.InvrollbackWiring;
@@ -150,6 +152,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitEventBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
@@ -391,11 +394,16 @@ public final class PluginModule {
         // consumer that enables after us, and the static holder for one that enables before us or wants its
         // registrations restored after a reload. The holder is withdrawn on disable so a consumer asking during
         // shutdown gets null rather than a façade over a torn-down engine.
+        // The read surfaces the API hands out. Created here, before the front door is published, and filled later as
+        // each enabled context wires: the front door has to be up early enough for a consumer that enables before us,
+        // and the contexts only exist once the modules have wired.
+        QueryContexts queries = QueryContexts.empty();
         UxmEssentialsApi devApi = new UxmEssentialsApiImpl(
                 plugin.getPluginMeta().getVersion(),
                 registry,
                 () -> config,
-                new EngineMenuApi(menuBindings, menuItemRenderer, runtimeIcons));
+                new EngineMenuApi(menuBindings, menuItemRenderer, runtimeIcons),
+                queries);
         plugin.getServer()
                 .getServicesManager()
                 .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);
@@ -647,6 +655,7 @@ public final class PluginModule {
                 registry,
                 config,
                 kernel,
+                queries,
                 persistence,
                 resources,
                 log,
@@ -811,6 +820,7 @@ public final class PluginModule {
             ModuleRegistry registry,
             ConfigStore config,
             KernelPorts kernel,
+            QueryContexts queries,
             Persistence persistence,
             CloseableResources resources,
             Logger log,
@@ -823,7 +833,7 @@ public final class PluginModule {
             AtomicReference<TextInput> menuTextInputRef) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
-        ContextLinks links = new ContextLinks();
+        ContextLinks links = new ContextLinks(queries);
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -1526,6 +1536,13 @@ public final class PluginModule {
         // When teleport is disabled its holder is absent and this bind is a no-op.
         bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository()));
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
+        links.queries.register(
+                UxmHomesQuery.class,
+                new HomeQueries(
+                        wired.repository(),
+                        wired.quota(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Open the same /home slot-grid menu from the management hub, gated by the existing home-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "homes",
@@ -2436,6 +2453,15 @@ public final class PluginModule {
                 securityLockoutBan;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
+        // The published read surfaces, filled the same way and for the same reason: a context that never wires
+        // registers nothing, so the developer API answers "that module is off" rather than "no data". Handed in
+        // rather than created here, because the API front door is published to other plugins before any context
+        // wires and has to hold the same instance the contexts fill.
+        private final com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries;
+
+        private ContextLinks(com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries) {
+            this.queries = queries;
+        }
         // Built once and shared by the scoreboard and nametags wirings (in either registry order): the nametags
         // presenter hides a wearer's vanilla name through it, the scoreboard SidebarManager re-applies the hide-team
         // after every board switch through it. Inert until a nametags hide call marks a player, so it costs nothing

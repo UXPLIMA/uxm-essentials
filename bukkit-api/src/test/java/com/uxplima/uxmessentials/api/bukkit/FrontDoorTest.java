@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -89,6 +91,11 @@ class FrontDoorTest {
         @Override
         public MenuApi menus() {
             throw new UnsupportedOperationException("the front-door test does not exercise the menu surface");
+        }
+
+        @Override
+        public Optional<UxmHomesQuery> homes() {
+            return Optional.empty();
         }
     }
 }

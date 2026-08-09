@@ -1,9 +1,13 @@
 package com.uxplima.uxmessentials.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -16,7 +20,10 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuClick;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuIconProvider;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuView;
+import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.view.UxmHome;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
@@ -64,6 +71,37 @@ class FrontDoorWiringTest {
         // casing gets false rather than the IllegalArgumentException a ModuleId round-trip would have thrown.
         assertThat(api(new ToggleConfig(true), "homes").isModuleEnabled("Homes"))
                 .isFalse();
+    }
+
+    @Test
+    void aContextThatNeverWiredAnswersEmptyRatherThanNull() {
+        assertThat(api(new ToggleConfig(true), "homes").homes())
+                .as("a disabled module registers no surface, and absent is the answer a consumer can act on")
+                .isEmpty();
+    }
+
+    @Test
+    void aSurfaceRegisteredAfterTheFrontDoorWasBuiltIsStillVisible() {
+        // The front door is published to other plugins before any context has wired, so the registry it holds is
+        // filled afterwards. A snapshot taken at construction time would answer empty forever.
+        QueryContexts queries = QueryContexts.empty();
+        UxmEssentialsApi api = new UxmEssentialsApiImpl(
+                "1.2.3", new ListModuleRegistry(), () -> new ToggleConfig(true), new UnusedMenus(), queries);
+        assertThat(api.homes()).isEmpty();
+
+        UxmHomesQuery surface = new UnusedHomes();
+        queries.register(UxmHomesQuery.class, surface);
+
+        assertThat(api.homes()).containsSame(surface);
+    }
+
+    @Test
+    void aContextCannotRegisterItsSurfaceTwice() {
+        QueryContexts queries = QueryContexts.empty().register(UxmHomesQuery.class, new UnusedHomes());
+
+        assertThatThrownBy(() -> queries.register(UxmHomesQuery.class, new UnusedHomes()))
+                .as("two registrations mean two wirings of one context, which is a bootstrap bug worth failing loudly")
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -164,6 +202,29 @@ class FrontDoorWiringTest {
         @Override
         public ItemStack buildItem(String material, String name, List<String> lore, Player viewer) {
             throw new UnsupportedOperationException();
+        }
+    }
+
+    /** Stands in for the homes surface where only its identity matters. */
+    private static final class UnusedHomes implements UxmHomesQuery {
+        @Override
+        public CompletableFuture<List<UxmHome>> list(UUID playerId) {
+            throw new AssertionError("this test never asks the surface anything");
+        }
+
+        @Override
+        public CompletableFuture<Optional<UxmHome>> get(UUID playerId, int slot) {
+            throw new AssertionError("this test never asks the surface anything");
+        }
+
+        @Override
+        public CompletableFuture<Integer> count(UUID playerId) {
+            throw new AssertionError("this test never asks the surface anything");
+        }
+
+        @Override
+        public CompletableFuture<Optional<Integer>> limit(UUID playerId) {
+            throw new AssertionError("this test never asks the surface anything");
         }
     }
 }

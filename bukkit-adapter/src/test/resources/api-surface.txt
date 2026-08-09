@@ -2,6 +2,7 @@ class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
   void uninstall()
 interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
+  Optional homes()
   String version()
   boolean isModuleEnabled(String)
   com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi get()
@@ -609,6 +610,11 @@ enum com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result INVALID
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result LINKED
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result NO_CODE
+interface com.uxplima.uxmessentials.api.query.UxmHomesQuery
+  CompletableFuture count(UUID)
+  CompletableFuture get(UUID, int)
+  CompletableFuture limit(UUID)
+  CompletableFuture list(UUID)
 enum com.uxplima.uxmessentials.api.view.UxmBackCause
   com.uxplima.uxmessentials.api.view.UxmBackCause valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmBackCause[] values()
@@ -619,6 +625,21 @@ enum com.uxplima.uxmessentials.api.view.UxmEconomyRejection
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection[] values()
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection BALANCE_MAX_EXCEEDED
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection INSUFFICIENT_FUNDS
+record com.uxplima.uxmessentials.api.view.UxmHome
+  <init>(UUID, int, com.uxplima.uxmessentials.api.view.UxmLocation, Optional, Optional, boolean, Instant, Instant)
+  Instant createdAt()
+  Instant updatedAt()
+  Optional icon()
+  Optional label()
+  String displayName()
+  String toString()
+  UUID ownerId()
+  boolean equals(Object)
+  boolean isPublic()
+  com.uxplima.uxmessentials.api.view.UxmLocation location()
+  int hashCode()
+  int slot()
+  int slotNumber()
 record com.uxplima.uxmessentials.api.view.UxmIssuer
   <init>(Optional, String)
   Optional uuid()

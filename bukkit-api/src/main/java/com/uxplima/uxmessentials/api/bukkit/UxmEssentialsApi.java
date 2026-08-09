@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.api.bukkit;
 
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -57,6 +59,14 @@ public interface UxmEssentialsApi {
 
     /** The menu registration surface: custom actions, requirements, placeholders, list sources and icons. */
     MenuApi menus();
+
+    /**
+     * Reading a player's homes, or empty when the homes module is switched off.
+     *
+     * <p>Empty means the module is off, which is not the same thing as a player having no homes and is worth telling
+     * apart: one is a server that will never answer, the other is a player who has not set one yet.
+     */
+    Optional<UxmHomesQuery> homes();
 
     /** The API, or {@code null} when uxmEssentials is absent, still loading, or shutting down. */
     static @Nullable UxmEssentialsApi get() {
