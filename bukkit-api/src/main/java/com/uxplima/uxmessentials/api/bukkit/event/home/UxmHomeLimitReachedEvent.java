@@ -4,7 +4,7 @@ import java.util.UUID;
 
 import org.bukkit.event.HandlerList;
 
-import com.uxplima.uxmessentials.api.bukkit.event.UxmEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>It carries no slot, because the home that would have used one was never made.
  */
 @NullMarked
-public final class UxmHomeLimitReachedEvent extends UxmEvent {
+public final class UxmHomeLimitReachedEvent extends UxmPlayerEvent {
 
     private static final HandlerList HANDLERS = new HandlerList();
 

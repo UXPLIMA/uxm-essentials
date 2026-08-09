@@ -2,8 +2,27 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.api;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.communication.adapter.outbound.api.CommunicationEventBridges;
+import com.uxplima.uxmessentials.economy.adapter.outbound.api.EconomyEventBridges;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.api.HologramEventBridges;
 import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeEventBridges;
 import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeVetoBridges;
+import com.uxplima.uxmessentials.itemworld.adapter.outbound.api.ItemWorldEventBridges;
+import com.uxplima.uxmessentials.kits.adapter.outbound.api.KitEventBridges;
+import com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingEventBridges;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationEventBridges;
+import com.uxplima.uxmessentials.npc.adapter.outbound.api.NpcEventBridges;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlayerStateEventBridges;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.api.PlayerWarpEventBridges;
+import com.uxplima.uxmessentials.poses.adapter.outbound.api.PoseEventBridges;
+import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceEventBridges;
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardEventBridges;
+import com.uxplima.uxmessentials.staff.adapter.outbound.api.StaffEventBridges;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportEventBridges;
+import com.uxplima.uxmessentials.vaults.adapter.outbound.api.VaultEventBridges;
+import com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteEventBridges;
+import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpEventBridges;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldEventBridges;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -24,6 +43,25 @@ public final class EventBridges {
     public static void installAll(EventBridgeRegistry registry) {
         Objects.requireNonNull(registry, "registry");
         HomeEventBridges.register(registry);
+        WarpEventBridges.register(registry);
+        PlayerWarpEventBridges.register(registry);
+        TeleportEventBridges.register(registry);
+        EconomyEventBridges.register(registry);
+        ModerationEventBridges.register(registry);
+        PlayerStateEventBridges.register(registry);
+        VaultEventBridges.register(registry);
+        KitEventBridges.register(registry);
+        MessagingEventBridges.register(registry);
+        PresenceEventBridges.register(registry);
+        CommunicationEventBridges.register(registry);
+        StaffEventBridges.register(registry);
+        ScoreboardEventBridges.register(registry);
+        PoseEventBridges.register(registry);
+        VoteEventBridges.register(registry);
+        ItemWorldEventBridges.register(registry);
+        HologramEventBridges.register(registry);
+        NpcEventBridges.register(registry);
+        WorldEventBridges.register(registry);
     }
 
     /** Install every context's veto mappings into {@code registry}, in context order. */

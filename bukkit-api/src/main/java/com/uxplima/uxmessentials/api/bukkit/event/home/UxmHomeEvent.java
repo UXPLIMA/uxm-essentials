@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.api.bukkit.event.home;
 
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.api.bukkit.event.UxmEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
  * else's home acts as them.
  */
 @NullMarked
-public abstract class UxmHomeEvent extends UxmEvent {
+public abstract class UxmHomeEvent extends UxmPlayerEvent {
 
     private final int slot;
 

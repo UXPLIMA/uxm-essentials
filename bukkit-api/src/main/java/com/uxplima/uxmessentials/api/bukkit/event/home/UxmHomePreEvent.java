@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.api.bukkit.event.home;
 
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.api.bukkit.event.UxmCancellableEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerCancellableEvent;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -12,7 +12,7 @@ import org.jspecify.annotations.NullMarked;
  * refusal costs the player nothing and leaves no half-done state behind.
  */
 @NullMarked
-public abstract class UxmHomePreEvent extends UxmCancellableEvent {
+public abstract class UxmHomePreEvent extends UxmPlayerCancellableEvent {
 
     private final int slot;
 

@@ -1,10 +1,6 @@
 package com.uxplima.uxmessentials.api.bukkit.event;
 
-import java.util.Objects;
-import java.util.UUID;
-
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 
@@ -30,39 +26,19 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Only actions worth vetoing have a pre-event. Everything uxmEssentials does also publishes a notification
  * {@link UxmEvent} after the fact, which is what to listen to when you want to observe rather than block.
+ *
+ * <p>Most vetoable actions are one player's and extend {@link UxmPlayerCancellableEvent}, which names them.
  */
 @NullMarked
 public abstract class UxmCancellableEvent extends Event implements Cancellable {
 
-    private final UUID subjectId;
-    private final String subjectName;
     private boolean cancelled;
 
-    protected UxmCancellableEvent(UUID subjectId, String subjectName) {
+    protected UxmCancellableEvent() {
         // Whichever thread the use case is on is the thread you get, because the answer is needed before it can go
         // any further. In practice that is an async one; the flag simply tells the truth about it rather than
         // asserting a thread the caller never promised.
         super(!Bukkit.isPrimaryThread());
-        this.subjectId = Objects.requireNonNull(subjectId, "subjectId");
-        this.subjectName = Objects.requireNonNull(subjectName, "subjectName");
-    }
-
-    /** The id of the player whose action this is. Always present, online or not. */
-    public UUID getPlayerId() {
-        return subjectId;
-    }
-
-    /** The name of the player whose action this is, as uxmEssentials last knew it. */
-    public String getPlayerName() {
-        return subjectName;
-    }
-
-    /**
-     * The player whose action this is, as an offline handle. There is deliberately no live {@code Player} accessor:
-     * this event is fired off the tick thread, where acting on a live player is unsafe.
-     */
-    public OfflinePlayer getOfflinePlayer() {
-        return Bukkit.getOfflinePlayer(subjectId);
     }
 
     @Override
