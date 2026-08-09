@@ -26,7 +26,13 @@ import org.jspecify.annotations.NullMarked;
  * providers and placeholders identically to a menu icon. {@link #registerIconProvider} appends to the same live
  * {@link IconProviderRegistry} the composition-root renderer's chain consults, so a custom material-spec prefix
  * registered here resolves on the very next render.
+ *
+ * @deprecated Together with the {@link MenuApi} it implements. The published surface is served by
+ *     {@code EngineMenuApi}, which writes into these same registries.
  */
+@Deprecated(forRemoval = true, since = "0.6.0")
+// This class exists to implement the interface it is deprecated alongside; the warning is the point, not a finding.
+@SuppressWarnings("removal")
 @NullMarked
 public final class MenuApiImpl implements MenuApi {
 

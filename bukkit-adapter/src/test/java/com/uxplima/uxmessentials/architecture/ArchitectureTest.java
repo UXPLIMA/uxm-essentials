@@ -103,6 +103,9 @@ class ArchitectureTest {
     static final ArchRule apiModulesDoNotDependOnInternals = noClasses()
             .that()
             .resideInAPackage("com.uxplima.uxmessentials.api..")
+            // The API's own tests live in this package tree and drive the implementation behind the boundary on
+            // purpose; only what actually ships in the artifacts is fenced.
+            .and(areProductionClasses())
             .should()
             .dependOnClassesThat(JavaClass.Predicates.resideInAPackage("com.uxplima.uxmessentials..")
                     .and(DescribedPredicate.not(
@@ -143,13 +146,20 @@ class ArchitectureTest {
     // (action). A feature wires behaviour by reading those contexts, so they are public by contract even
     // though they live alongside the runtime. Everything else under render/ and runtime/ — the holder, the
     // click listener, the refresh task — is the engine's private machinery and stays off-limits outside it.
-    // Two packages are exempt for the same reason they are everywhere else: bootstrap is the composition
-    // root that constructs the engine (it is not a feature), and the engine's own tests under
-    // shared.menu.. legitimately exercise render/runtime directly.
+    // Three packages are exempt for the same reason they are everywhere else: bootstrap is the composition
+    // root that constructs the engine (it is not a feature), the engine's own tests under shared.menu..
+    // legitimately exercise render/runtime directly, and shared.adapter.inbound.api is the developer-API
+    // boundary — its whole job is to translate the engine's runtime contexts into the published MenuView /
+    // MenuClick interfaces, which it cannot do without naming the contexts it wraps. That translation is what
+    // keeps every other consumer, inside the plugin or outside it, off the internals.
     @ArchTest
     static final ArchRule menuInternalsAreNotUsedOutsideTheEngine = noClasses()
             .that()
-            .resideOutsideOfPackages("..gui.menu..", "..bootstrap..", "com.uxplima.uxmessentials.shared.menu..")
+            .resideOutsideOfPackages(
+                    "..gui.menu..",
+                    "..bootstrap..",
+                    "com.uxplima.uxmessentials.shared.menu..",
+                    "com.uxplima.uxmessentials.shared.adapter.inbound.api..")
             .and(areProductionClasses())
             .should()
             .dependOnClassesThat(menuInternals())

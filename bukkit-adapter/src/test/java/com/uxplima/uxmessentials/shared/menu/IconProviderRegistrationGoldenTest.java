@@ -12,14 +12,13 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 
+import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApi;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
@@ -66,7 +65,7 @@ class IconProviderRegistrationGoldenTest {
         // proves it reaches the already-built renderer through the live registry reference.
         ItemRenderer itemRenderer = new ItemRenderer(
                 guiText, bindings.placeholders(), IconProviders.defaults().withRuntime(runtimeIcons));
-        MenuApi api = new MenuApiImpl(bindings, itemRenderer, runtimeIcons);
+        MenuApi api = new EngineMenuApi(bindings, itemRenderer, runtimeIcons);
         server.getServicesManager().register(MenuApi.class, api, plugin, ServicePriority.Normal);
     }
 
@@ -125,8 +124,7 @@ class IconProviderRegistrationGoldenTest {
                 }
                 """.formatted(quote(material)));
         MenuItemSpec item = spec.items().get("icon");
-        MenuContext ctx = MenuContext.of(new PlayerRef(player.getUniqueId(), player.getName()), null, 0);
-        return api().buildItem(item, ctx);
+        return api().buildItem(item.material(), item.name(), item.lore(), player);
     }
 
     /** HOCON-quote a value so a colon-bearing material like {@code skull:steve} is read as one string. */

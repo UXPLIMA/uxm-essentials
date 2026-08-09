@@ -53,6 +53,15 @@ public final class MenuActionContext {
         return ctx.viewer();
     }
 
+    /**
+     * The per-open context this click happened in. Most bindings read the delegating accessors below instead; the
+     * whole context is exposed for the developer-API boundary, which hands a click handler the same view a render
+     * handler sees.
+     */
+    public MenuContext context() {
+        return ctx;
+    }
+
     public Player player() {
         return player;
     }

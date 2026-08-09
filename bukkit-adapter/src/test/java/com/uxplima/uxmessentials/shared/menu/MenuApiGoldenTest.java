@@ -22,16 +22,15 @@ import org.bukkit.plugin.ServicePriority;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApi;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
@@ -49,8 +48,8 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The end-to-end proof for the public {@link MenuApi} registration façade. A real {@link MenuBindings} + {@link
- * ItemRenderer} are wrapped in a {@link MenuApiImpl} and registered in the {@link ServerMock}'s services manager,
+ * The end-to-end proof for the published {@link MenuApi} registration façade. A real {@link MenuBindings} + {@link
+ * ItemRenderer} are wrapped in an {@link EngineMenuApi} and registered in the {@link ServerMock}'s services manager,
  * exactly as bootstrap does; every case loads the façade back through {@code getServicesManager().load(MenuApi.class)}
  * and drives it, so this exercises the same seam another plugin would use.
  *
@@ -90,7 +89,7 @@ class MenuApiGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
 
         // Register the façade exactly as bootstrap does, so every test loads it back the way a consumer would.
-        MenuApi api = new MenuApiImpl(bindings, itemRenderer, runtimeIcons);
+        MenuApi api = new EngineMenuApi(bindings, itemRenderer, runtimeIcons);
         server.getServicesManager().register(MenuApi.class, api, plugin, ServicePriority.Normal);
     }
 
@@ -202,9 +201,8 @@ class MenuApiGoldenTest {
                 }
                 """);
         MenuItemSpec item = spec.items().get("icon");
-        MenuContext ctx = MenuContext.of(new PlayerRef(player.getUniqueId(), player.getName()), null, 0);
 
-        ItemStack built = api().buildItem(item, ctx);
+        ItemStack built = api().buildItem(item.material(), item.name(), item.lore(), player);
 
         assertThat(built.getType()).as("buildItem honours the spec's material").isEqualTo(Material.EMERALD);
         assertThat(plainName(built)).as("buildItem resolves the spec's name").isEqualTo("Shiny");

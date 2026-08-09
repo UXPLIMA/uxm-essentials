@@ -19,6 +19,8 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
+import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
@@ -90,6 +92,8 @@ import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
 import com.uxplima.uxmessentials.security.adapter.outbound.ModerationLockoutBan;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.servertweaks.adapter.ServerTweaksWiring;
+import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
+import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
@@ -272,6 +276,19 @@ public final class PluginModule {
         log.info("event=name_index_backfilled players={}", String.valueOf(seeded));
     }
 
+    /**
+     * Keeps the pre-0.6.0 {@code MenuApi} service registered, so a plugin that already loads it keeps working while
+     * the published {@code UxmEssentialsApi.menus()} surface takes over. Both write into the same bindings, so a
+     * duplicate id still throws across the two.
+     */
+    // The whole point of this method is to use the deprecated surface one last time, in one place.
+    @SuppressWarnings("removal")
+    private static void registerLegacyMenuApi(
+            JavaPlugin plugin, MenuBindings bindings, ItemRenderer renderer, IconProviderRegistry icons) {
+        MenuApi legacy = new MenuApiImpl(bindings, renderer, icons);
+        plugin.getServer().getServicesManager().register(MenuApi.class, legacy, plugin, ServicePriority.Normal);
+    }
+
     /** Wires the plugin and returns the resources to close on disable. */
     public static CloseableResources wire(JavaPlugin plugin) {
         Logger log = plugin.getLogger();
@@ -365,9 +382,23 @@ public final class PluginModule {
         // bindings, and to build a menu-styled item through this same renderer. Registered at Normal so a menu that
         // names a custom id resolves it after the owning plugin has enabled and re-validated (via /uxmess reload or
         // /menu reload). Paper clears the ServicesManager on disable, so no explicit teardown is needed here.
-        MenuApi menuApi = new MenuApiImpl(menuBindings, menuItemRenderer, runtimeIcons);
-        plugin.getServer().getServicesManager().register(MenuApi.class, menuApi, plugin, ServicePriority.Normal);
+        registerLegacyMenuApi(plugin, menuBindings, menuItemRenderer, runtimeIcons);
         kernel.log().info("event=menu_api_registered");
+        // The front door of the published developer API. Both halves are registered: the ServicesManager entry for a
+        // consumer that enables after us, and the static holder for one that enables before us or wants its
+        // registrations restored after a reload. The holder is withdrawn on disable so a consumer asking during
+        // shutdown gets null rather than a façade over a torn-down engine.
+        UxmEssentialsApi devApi = new UxmEssentialsApiImpl(
+                plugin.getPluginMeta().getVersion(),
+                registry,
+                () -> config,
+                new EngineMenuApi(menuBindings, menuItemRenderer, runtimeIcons));
+        plugin.getServer()
+                .getServicesManager()
+                .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);
+        UxmApiHolder.install(devApi);
+        resources.onClose(UxmApiHolder::uninstall);
+        kernel.log().info("event=dev_api_registered version={}", devApi.version());
         // The editor renderer is the typed-property capability the same engine grows: a property editor is a
         // MenuHolder window the one listener routes and the one shutdown tears down, so the renderer is threaded into
         // both the listener (it repaints an editor after a property click) and the façade (it opens one). The façade

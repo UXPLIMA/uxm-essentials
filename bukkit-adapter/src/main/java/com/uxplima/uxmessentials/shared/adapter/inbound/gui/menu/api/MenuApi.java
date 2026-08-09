@@ -47,7 +47,14 @@ import org.jspecify.annotations.NullMarked;
  * clicks the menu on, which on Folia is that entity's region rather than a single main thread. A handler may read
  * its context and act on the viewing player inline, but any world or cross-entity work it triggers must be
  * scheduled onto the owning region, never run inline against another region's state.
+ *
+ * @deprecated Superseded by {@link com.uxplima.uxmessentials.api.bukkit.menu.MenuApi}, which is published as a Maven
+ *     artifact and names only Bukkit and JDK types. This interface hands out the engine's own runtime contexts and
+ *     spec model, so every internal change to them is a breaking change for whoever compiled against it. Both
+ *     surfaces write into the same registries, so a migration can be done one registration at a time: load
+ *     {@code UxmEssentialsApi} instead of this service and call {@code api.menus()}.
  */
+@Deprecated(forRemoval = true, since = "0.6.0")
 @NullMarked
 public interface MenuApi {
 

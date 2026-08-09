@@ -1,0 +1,169 @@
+package com.uxplima.uxmessentials.api;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+
+import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
+import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.bukkit.menu.MenuClick;
+import com.uxplima.uxmessentials.api.bukkit.menu.MenuIconProvider;
+import com.uxplima.uxmessentials.api.bukkit.menu.MenuView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl;
+import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
+import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
+import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
+import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
+import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
+import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.module.ModuleId;
+import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import org.junit.jupiter.api.Test;
+
+/**
+ * What the front door answers once it is wired to the real registry.
+ *
+ * <p>The module question is the one worth pinning: a consumer decides whether to hook economy or homes by asking it,
+ * and it has to reflect the operator's <em>current</em> configuration rather than whatever was true when the plugin
+ * enabled. The API therefore reads the configuration through a supplier, and the last case here is what proves that:
+ * flipping the config after wiring changes the answer.
+ */
+class FrontDoorWiringTest {
+
+    @Test
+    void anEnabledModuleAnswersTrueAndADisabledOneFalse() {
+        ToggleConfig config = new ToggleConfig(true);
+        UxmEssentialsApi api = api(config, "homes");
+
+        assertThat(api.isModuleEnabled("homes")).isTrue();
+
+        config.enabled = false;
+        assertThat(api.isModuleEnabled("homes"))
+                .as("the answer follows the live config, not a snapshot taken at wiring time")
+                .isFalse();
+    }
+
+    @Test
+    void anUnknownModuleIdIsFalseRatherThanAnException() {
+        assertThat(api(new ToggleConfig(true), "homes").isModuleEnabled("nosuchmodule"))
+                .as("a consumer feature-detecting a module we do not ship gets an answer, not a stack trace")
+                .isFalse();
+    }
+
+    @Test
+    void anIdThatCouldNeverBeAModuleIsAlsoJustFalse() {
+        // Module ids are lowercase by construction, so "Homes" can never name one. A consumer that guessed the
+        // casing gets false rather than the IllegalArgumentException a ModuleId round-trip would have thrown.
+        assertThat(api(new ToggleConfig(true), "homes").isModuleEnabled("Homes"))
+                .isFalse();
+    }
+
+    @Test
+    void versionIsWhateverTheWiringWasGiven() {
+        assertThat(api(new ToggleConfig(true), "homes").version()).isEqualTo("1.2.3");
+    }
+
+    private static UxmEssentialsApi api(ToggleConfig config, String moduleId) {
+        ModuleRegistry registry = new ListModuleRegistry().register(new ToggleModule(ModuleId.of(moduleId)));
+        return new UxmEssentialsApiImpl("1.2.3", registry, () -> config, new UnusedMenus());
+    }
+
+    /** A module whose gate simply reads the flag on the config handed to it, so a test can flip it mid-run. */
+    private record ToggleModule(ModuleId id) implements FeatureModule {
+        @Override
+        public String configRoot() {
+            return id.configRoot();
+        }
+
+        @Override
+        public boolean enabled(ConfigStore config) {
+            return config.getBoolean(configRoot() + ".enabled", false);
+        }
+
+        @Override
+        public List<CommandSpec> commands() {
+            return List.of();
+        }
+
+        @Override
+        public List<ListenerFactory> listeners() {
+            return List.of();
+        }
+
+        @Override
+        public List<MigrationSet> migrations() {
+            return List.of();
+        }
+
+        @Override
+        public void start(ModuleContext ctx) {}
+
+        @Override
+        public void stop() {}
+    }
+
+    /** Answers every boolean with the one flag under test, so flipping it flips the module gate. */
+    private static final class ToggleConfig implements ConfigStore {
+        private boolean enabled;
+
+        private ToggleConfig(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        @Override
+        public boolean getBoolean(String path, boolean fallback) {
+            return enabled;
+        }
+
+        @Override
+        public String getString(String path, String fallback) {
+            return fallback;
+        }
+
+        @Override
+        public int getInt(String path, int fallback) {
+            return fallback;
+        }
+    }
+
+    /** The front door hands the menu surface straight through; this test never calls it. */
+    private static final class UnusedMenus implements MenuApi {
+        @Override
+        public void registerAction(String id, Consumer<MenuClick> handler) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void registerRequirement(String id, BiPredicate<MenuView, Map<String, String>> handler) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void registerPlaceholder(String id, Function<MenuView, String> handler) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void registerListSource(String id, Function<MenuView, List<?>> handler) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void registerIconProvider(MenuIconProvider provider) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ItemStack buildItem(String material, String name, List<String> lore, Player viewer) {
+            throw new UnsupportedOperationException();
+        }
+    }
+}
