@@ -1050,9 +1050,9 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
             wireCommandControl(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
-            wireVillagers(plugin, ctx, resources);
+            wireVillagers(plugin, ctx, resources, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
-            wireInvrollback(ctx, persistence, resources, menus);
+            wireInvrollback(plugin, ctx, persistence, resources, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("regions"))) {
             wireRegions(plugin, ctx, resources, guiRegistry, menus, textInput, guiLayouts);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
@@ -1093,32 +1093,49 @@ public final class PluginModule {
     }
 
     private static void wireInvrollback(
-            ModuleContext ctx, Persistence persistence, CloseableResources resources, Menus menus) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            Menus menus,
+            MenuBindings menuBindings) {
         // invrollback builds its jOOQ SnapshotRepository over persistence.dsl() and registers the death/logout
         // capture listener, the read-only snapshot-preview listener, and the /invrestore staff command. A capture
         // reads the player's inventory on the tick thread, serializes it there, and hops the DB write off the tick
         // thread through the Scheduler.async port (Folia-safe); the table is bounded per player at write time
         // (deleteBeyondCount) and by age on a scheduled off-tick sweep (deleteOlderThan). /invrestore opens the
-        // engine-backed snapshot list; selecting one previews it (a sanctioned raw-inventory leaf) and a restore
+        // engine-backed snapshot list; selecting one previews it (a spec whose items sit in a read-only content
+        // region) and a restore
         // safety-snapshots the pre-restore inventory before overwriting the target's live inventory. The only runtime
         // state is the repeating retention sweep, cancelled through the Wired stop hook so a disable/reload strands no
         // scheduled work; a disabled module wires none of this.
-        InvrollbackWiring.Wired wired = InvrollbackWiring.wire(ctx, persistence, menus);
+        InvrollbackWiring.Wired wired = InvrollbackWiring.wire(
+                ctx, persistence, menus, menuBindings, plugin.getDataFolder().toPath());
         wired.listeners().forEach(resources::addListener);
         wired.commands().forEach(resources::addCommand);
         resources.onClose(wired.stop());
     }
 
-    private static void wireVillagers(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireVillagers(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            Menus menus,
+            MenuBindings menuBindings) {
         // villagers persists nothing relational: the last-restock stamp, the disable flag, and the manager's custom
         // recipe set are all PDC state on the villager entity, and the config is read once into an immutable snapshot.
         // Each feature wires only when its config switch is on — the trade listener under infinite/instant restock, the
-        // restock sweep under the restock timer, the /villager manager command + its GUI listener + the load-time
-        // recipe reapply under trade-manager, and the click-to-trade listener under click-to-trade — while the
+        // restock sweep under the restock timer, the /villager manager command + its menu-engine window + the
+        // load-time recipe reapply under trade-manager, and the click-to-trade listener under click-to-trade, while the
         // disable-trades listener always registers so it can honour the per-villager flag the manager sets. The sweep's
         // repeating task is cancelled and any open manager window drained on module stop through the Wired stop hook so
         // a disable strands no scheduled work and loses no edit.
-        VillagersWiring.Wired wired = VillagersWiring.wire(ctx, plugin.getServer());
+        VillagersWiring.Wired wired = VillagersWiring.wire(
+                ctx,
+                plugin.getServer(),
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath());
         wired.listeners().forEach(resources::addListener);
         wired.commands().forEach(resources::addCommand);
         resources.onClose(wired.stop());

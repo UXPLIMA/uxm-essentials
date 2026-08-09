@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.invrollback.adapter;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -9,8 +10,8 @@ import org.bukkit.event.Listener;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.command.InvrestoreCommand;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotExporter;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotListView;
-import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewListener;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewWindow;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotRestorer;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotTeleporter;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.listener.SnapshotCaptureListener;
@@ -25,6 +26,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -48,10 +50,13 @@ public final class InvrollbackWiring {
     private InvrollbackWiring() {}
 
     /** Build the invrollback adapters and use cases from {@code ctx}, {@code persistence} and {@code menus}. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence, Menus menus) {
+    public static Wired wire(
+            ModuleContext ctx, Persistence persistence, Menus menus, MenuBindings menuBindings, Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
         InvrollbackConfig config = InvrollbackConfig.from(ctx.config());
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -73,8 +78,15 @@ public final class InvrollbackWiring {
         SnapshotTeleporter teleporter =
                 new SnapshotTeleporter(kernel.scheduler(), kernel.messages(), kernel.messageSink(), kernel.log());
         SnapshotExporter exporter = new SnapshotExporter(kernel.scheduler(), kernel.messages(), kernel.messageSink());
-        SnapshotPreviewView preview =
-                new SnapshotPreviewView(kernel.messages(), kernel.scheduler(), clock, restorer, teleporter, exporter);
+        SnapshotPreviewView preview = new SnapshotPreviewView(
+                kernel.messages(),
+                kernel.scheduler(),
+                clock,
+                new SnapshotPreviewWindow(menus, dataFolder, kernel.log()),
+                restorer,
+                teleporter,
+                exporter);
+        preview.register(menuBindings);
         SnapshotListView listView = new SnapshotListView(
                 menus,
                 new GuiText(kernel.messages()),
@@ -99,10 +111,7 @@ public final class InvrollbackWiring {
         SnapshotPruneSweep sweep = new SnapshotPruneSweep(prune, kernel.scheduler(), clock, retentionOn);
         AutoCloseable sweepHandle = sweep.start();
 
-        return new Wired(
-                List.of(captureListener, new SnapshotPreviewListener(preview)),
-                List.of(command),
-                () -> close(sweepHandle, kernel));
+        return new Wired(List.of(captureListener), List.of(command), () -> close(sweepHandle, kernel));
     }
 
     /** Cancel the repeating retention sweep on module stop; a failure to close is logged, never rethrown. */

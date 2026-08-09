@@ -26,6 +26,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotExporter;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotListView;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView;
+import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewWindow;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotRestorer;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotTeleporter;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
@@ -88,8 +89,16 @@ class InvrestoreCommandTest {
         SnapshotRestorer restorer = new SnapshotRestorer(restore, scheduler, messages, noopSink(), CLOCK);
         SnapshotTeleporter teleporter = new SnapshotTeleporter(scheduler, messages, noopSink(), noopLog());
         SnapshotExporter exporter = new SnapshotExporter(scheduler, messages, noopSink());
-        SnapshotPreviewView preview =
-                new SnapshotPreviewView(messages, scheduler, CLOCK, restorer, teleporter, exporter);
+        SnapshotPreviewView preview = new SnapshotPreviewView(
+                messages,
+                scheduler,
+                CLOCK,
+                new SnapshotPreviewWindow(
+                        menus, java.nio.file.Path.of("no-such-data-folder"), TestMenuEngine.SILENT_LOG),
+                restorer,
+                teleporter,
+                exporter);
+        preview.register(engine.bindings());
         SnapshotListView listView =
                 new SnapshotListView(menus, guiText, scheduler, messages, noopSink(), repository, preview, CLOCK);
         command = new InvrestoreCommand(

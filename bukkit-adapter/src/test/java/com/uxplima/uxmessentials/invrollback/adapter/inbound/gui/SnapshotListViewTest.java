@@ -81,8 +81,16 @@ class SnapshotListViewTest {
         SnapshotRestorer restorer = new SnapshotRestorer(restore, scheduler, messages, noopSink(), CLOCK);
         SnapshotTeleporter teleporter = new SnapshotTeleporter(scheduler, messages, noopSink(), noopLog());
         SnapshotExporter exporter = new SnapshotExporter(scheduler, messages, noopSink());
-        SnapshotPreviewView preview =
-                new SnapshotPreviewView(messages, scheduler, CLOCK, restorer, teleporter, exporter);
+        SnapshotPreviewView preview = new SnapshotPreviewView(
+                messages,
+                scheduler,
+                CLOCK,
+                new SnapshotPreviewWindow(
+                        menus, java.nio.file.Path.of("no-such-data-folder"), TestMenuEngine.SILENT_LOG),
+                restorer,
+                teleporter,
+                exporter);
+        preview.register(engine.bindings());
         listView = new SnapshotListView(menus, guiText, scheduler, messages, noopSink(), repository, preview, CLOCK);
     }
 
@@ -116,10 +124,11 @@ class SnapshotListViewTest {
         fireClick(0);
 
         Inventory preview = staff.getOpenInventory().getTopInventory();
-        assertThat(preview.getHolder()).isInstanceOf(SnapshotPreviewHolder.class);
-        // The previewed snapshot's diamond is mirrored into the first slot; the restore button sits in the bottom row.
+        assertThat(preview.getHolder()).isInstanceOf(MenuHolder.class);
+        // The previewed snapshot's diamond is mirrored into the first slot of the read-only content region; the
+        // restore button sits where the bundled spec places it, in the middle of the control row.
         assertThat(preview.getItem(0).getType()).isEqualTo(Material.DIAMOND);
-        assertThat(preview.getItem(SnapshotPreviewView.RESTORE_SLOT).getType()).isEqualTo(Material.LIME_WOOL);
+        assertThat(preview.getItem(49).getType()).isEqualTo(Material.LIME_WOOL);
     }
 
     private void fireClick(int slot) {

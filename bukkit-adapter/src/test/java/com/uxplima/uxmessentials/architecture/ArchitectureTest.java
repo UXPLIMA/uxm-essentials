@@ -179,11 +179,15 @@ class ArchitectureTest {
     //   - itemworld ShulkerBoxView / ShulkerBoxHolder open a shulker box the player right-clicks in hand as an
     //     editable 27-slot container and write the edits back into the box item on close — an item container, not
     //     a menu.
-    //   - villagers VillagerManagerView / VillagerManagerHolder are the trade-manager window: staff drag real buy/sell
-    //     stacks into its rows as trade templates and it reads them back into the villager's recipes on close, so its
-    //     editable slots let items move and it is a genuine item-capture editor, not a spec menu. (The 2FA keypad,
-    //     both trade windows and the playerstate invsee/endersee mirrors migrated onto the engine, so they are no
-    //     longer here — each is now spec chrome around a declared content region.)
+    //   - kits KitEditorView / KitEditorHolder and KitPreviewView / KitPreviewHolder are the kit item grids: a bare
+    //     run of slots holding the kit's stacks, with no chrome at all, and the preview sizes itself to however many
+    //     items the kit happens to hold. There is nothing for a spec file to theme, and a spec would fix the height
+    //     the preview needs to vary, so both stay raw deliberately.
+    //   - vanish VanishSilentContainerListener re-opens the very container the vanished player clicked, without
+    //     touching its state, so there is no window of ours to describe.
+    // (The 2FA keypad, both trade windows, the playerstate invsee/endersee mirrors, the invrollback snapshot preview
+    // and the villagers trade manager all migrated onto the engine, so they are no longer here — each is now spec
+    // chrome around a declared content region.)
     // Every spec-driven MENU instead renders through the engine (the Menus facade); the engine's own MenuHolder,
     // Menus and EditorRefresh live inside ..gui.menu.. and are exempt by package. A new bespoke createInventory /
     // InventoryHolder GUI appearing anywhere else fails this fence until it is migrated onto the engine, rather
@@ -197,8 +201,8 @@ class ArchitectureTest {
             .should(buildsOrOpensARawBukkitInventory())
             .because("spec-driven menus must render through the engine (the Menus facade); only the engine itself "
                     + "and the genuine inventory leaves — the itemworld Workstation and shulker-box view, the kits "
-                    + "item grids, the villagers trade-manager, the vanish silent-container mirror, and the "
-                    + "invrollback snapshot preview — may create or open a raw Bukkit inventory");
+                    + "item grids, and the vanish silent-container mirror — may create or open a raw Bukkit "
+                    + "inventory");
 
     /**
      * Builds the condition matching either raw-Bukkit-GUI signature: implementing
@@ -234,11 +238,10 @@ class ArchitectureTest {
      * The non-menu inventory leaves allowed to create or open a raw Bukkit inventory outside the engine, named by
      * fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the itemworld
      * {@code Workstation} opens vanilla game containers, the itemworld {@code ShulkerBoxView} / {@code ShulkerBoxHolder}
-     * open a held shulker box as an editable item container, the vanish {@code VanishSilentContainerListener}
-     * mirrors a container silently for a vanished opener, and the invrollback {@code SnapshotPreviewView} /
-     * {@code SnapshotPreviewHolder} are the
-     * read-only preview of a stored inventory snapshot. Every spec-driven menu renders through the engine instead, so
-     * this allow-list must stay exactly these leaves.
+     * open a held shulker box as an editable item container, the kits {@code KitEditorView} / {@code KitPreviewView}
+     * and their holders are bare item grids with no chrome to theme, and the vanish
+     * {@code VanishSilentContainerListener} mirrors a container silently for a vanished opener. Every spec-driven menu
+     * renders through the engine instead, so this allow-list must stay exactly these leaves.
      *
      * <p>A leaf's nested members carry the same signature (a holder built as a private inner class, a view's nested
      * record), so the match is on the top-level enclosing class, not the exact nested name — mirroring the uxmLib
@@ -253,11 +256,7 @@ class ArchitectureTest {
                 "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorHolder",
                 "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView",
                 "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewHolder",
-                "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener",
-                "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView",
-                "com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerHolder",
-                "com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewView",
-                "com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreviewHolder");
+                "com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener");
         return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
             String fullName = javaClass.getFullName();
             int nested = fullName.indexOf('$');

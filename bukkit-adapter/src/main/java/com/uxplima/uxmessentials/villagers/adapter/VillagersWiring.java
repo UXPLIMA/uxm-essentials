@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.villagers.adapter;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,13 +11,15 @@ import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.command.VillagerCommand;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.command.VillagerProtectToggle;
-import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView;
+import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerWindow;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.ClickToTradeListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.DisableTradesListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerBucketListener;
@@ -41,7 +44,7 @@ import org.jspecify.annotations.Nullable;
  * restock sweep the plugin registers. Each feature wires only when its config switch is on: the
  * {@link VillagerTradeListener} lands only when infinite trading or instant restock is enabled; the
  * {@link VillagerRestockSweep} schedules a task only when the restock timer is enabled; the trade manager (the
- * {@code /villager manager} command, its GUI listener, and the load-time recipe reapply) wires only when
+ * {@code /villager manager} command, its window, and the load-time recipe reapply) wires only when
  * {@code trade-manager} is on; and the {@link ClickToTradeListener} lands only when {@code click-to-trade} is on. The
  * {@link DisableTradesListener} always registers when the module is on, because it also honours the per-villager
  * disable flag the manager sets — with the global switch off and no flag it is an inert no-op. The
@@ -81,10 +84,17 @@ public final class VillagersWiring {
      *
      * @param ctx the module context carrying the scoped config and kernel ports
      * @param server the server the restock sweep enumerates villagers across on the global region thread
+     * @param menus the menu engine the trade-manager window is registered with and opened through
+     * @param menuBindings the binding registry the trade-manager spec's buttons and item region resolve against
+     * @param dataFolder the plugin data folder an operator's own copy of the trade-manager spec is read from
      */
-    public static Wired wire(ModuleContext ctx, Server server) {
+    public static Wired wire(
+            ModuleContext ctx, Server server, Menus menus, MenuBindings menuBindings, Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
         VillagersConfig config = VillagersConfig.from(ctx.config());
         PdcVillagerFlags flags = new PdcVillagerFlags();
@@ -105,8 +115,10 @@ public final class VillagersWiring {
 
         VillagerManagerView managerView = null;
         if (config.tradeManager().enabled()) {
-            managerView = new VillagerManagerView(guiText, kernel.scheduler(), flags, recipeStore);
-            listeners.add(new VillagerManagerListener(managerView));
+            VillagerManagerWindow window =
+                    new VillagerManagerWindow(kernel.messages(), menus, dataFolder, kernel.log());
+            managerView = new VillagerManagerView(kernel.scheduler(), flags, recipeStore, window);
+            window.register(menuBindings, managerView);
             listeners.add(new VillagerRecipeReapplyListener(recipeStore));
         }
         if (config.clickToTrade().enabled()) {

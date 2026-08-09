@@ -321,7 +321,16 @@ class ShippedSpecBindingsDriftTest {
             "economy:loan-request",
             "economy:exchange-source",
             "economy:exchange-target",
-            "economy:exchange-convert");
+            "economy:exchange-convert",
+            "invrollback:teleport",
+            "invrollback:restore",
+            "invrollback:export",
+            "villagers:toggle-trading",
+            "villagers:remove-1",
+            "villagers:remove-2",
+            "villagers:remove-3",
+            "villagers:remove-4",
+            "villagers:remove-5");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of(
@@ -354,7 +363,9 @@ class ShippedSpecBindingsDriftTest {
             "economy:exchange-no-rate",
             "warps:browse-has-parent",
             "warps:editor-server-warp",
-            "kits:browse-has-parent");
+            "kits:browse-has-parent",
+            "villagers:trading-enabled",
+            "villagers:trading-disabled");
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
@@ -366,6 +377,9 @@ class ShippedSpecBindingsDriftTest {
             "trade_partner_money_lore",
             "trade_partner_experience_lore",
             "invsee_title",
+            "invrollback_preview_title",
+            "invrollback_info_lore",
+            "villagers_manager_title",
             "endersee_title",
             "sound",
             "sound_material",
@@ -750,8 +764,14 @@ class ShippedSpecBindingsDriftTest {
      * Content-region ids any shipped spec may hand a block of slots to. A region whose provider is not registered
      * would open a hole into a live inventory, so the same allowlist discipline applies as to the other four.
      */
-    private static final Set<String> EXPECTED_CONTENTS =
-            Set.of("trade:offer", "trade:mirror", "trade:cross-offer", "playerstate:invsee", "playerstate:endersee");
+    private static final Set<String> EXPECTED_CONTENTS = Set.of(
+            "trade:offer",
+            "trade:mirror",
+            "trade:cross-offer",
+            "playerstate:invsee",
+            "playerstate:endersee",
+            "invrollback:snapshot",
+            "villagers:trades");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {
