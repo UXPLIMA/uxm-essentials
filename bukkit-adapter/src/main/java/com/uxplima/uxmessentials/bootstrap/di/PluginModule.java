@@ -1553,6 +1553,10 @@ public final class PluginModule {
                         wired.accessPolicy(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmWorldsActions.class,
+                source -> new com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldActions(
+                        wired.apiWrites(), ctx.kernel().scheduler(), source));
         wired.startReconcile().run();
         resources.onClose(wired.stop());
         // Open the same /world gui world picker from the management hub, gated by the existing world-gui node.
@@ -1919,6 +1923,13 @@ public final class PluginModule {
                         wired.stores().socialSpy(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmMessagingActions.class,
+                source -> new com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingActions(
+                        wired.apiWrites(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler(),
+                        source));
         // Register two /uxmess gui hub entries — the settings panel and the mailbox — gated by the messaging GUI
         // node. The ignore-list opens from /ignore with no args; it is not a hub entry of its own.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
@@ -2537,6 +2548,10 @@ public final class PluginModule {
         links.queries.register(
                 UxmVoteQuery.class,
                 new VoteQueries(wired.repository(), lookup, ctx.kernel().scheduler(), wired.partyThreshold()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmVoteActions.class,
+                source -> new com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteActions(
+                        wired.apiWrites(), lookup, ctx.kernel().scheduler(), source));
     }
 
     private static void wireDiscordlink(

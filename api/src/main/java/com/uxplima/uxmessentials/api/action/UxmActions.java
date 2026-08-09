@@ -45,4 +45,13 @@ public interface UxmActions {
 
     /** Moving a player, or empty when the teleport module is switched off. */
     Optional<UxmTeleportActions> teleport();
+
+    /** Loading and unloading worlds, or empty when the worlds module is switched off. */
+    Optional<UxmWorldsActions> worlds();
+
+    /** Crediting votes, or empty when the vote module is switched off. */
+    Optional<UxmVoteActions> vote();
+
+    /** Sending messages and mail, or empty when the messaging module is switched off. */
+    Optional<UxmMessagingActions> messaging();
 }

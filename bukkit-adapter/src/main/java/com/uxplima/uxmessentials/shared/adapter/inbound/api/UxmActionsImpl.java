@@ -7,12 +7,15 @@ import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
+import com.uxplima.uxmessentials.api.action.UxmMessagingActions;
 import com.uxplima.uxmessentials.api.action.UxmModerationActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
 import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
 import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.action.UxmVanishActions;
+import com.uxplima.uxmessentials.api.action.UxmVoteActions;
 import com.uxplima.uxmessentials.api.action.UxmWarpActions;
+import com.uxplima.uxmessentials.api.action.UxmWorldsActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import org.jspecify.annotations.NullMarked;
 
@@ -76,5 +79,20 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmTeleportActions> teleport() {
         return contexts.find(UxmTeleportActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmWorldsActions> worlds() {
+        return contexts.find(UxmWorldsActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmVoteActions> vote() {
+        return contexts.find(UxmVoteActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmMessagingActions> messaging() {
+        return contexts.find(UxmMessagingActions.class, source);
     }
 }

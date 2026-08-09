@@ -55,6 +55,7 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingRestoreR
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldArchiver;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldAutoUnloadSweep;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldApiWrites;
 import com.uxplima.uxmessentials.worlds.application.ApplyWorldSettingsOnLoad;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
@@ -307,7 +308,8 @@ public final class WorldsWiring {
                 reopenList,
                 repository,
                 engine,
-                policy);
+                policy,
+                WorldApiWrites.of(services));
     }
 
     /** Close a stop-time handle, logging any failure rather than stranding the rest of the teardown. */
@@ -412,7 +414,8 @@ public final class WorldsWiring {
             BiConsumer<Player, PlayerRef> openWorldList,
             com.uxplima.uxmessentials.worlds.application.port.WorldRepository repository,
             com.uxplima.uxmessentials.worlds.application.port.WorldEngine engine,
-            WorldAccessPolicy accessPolicy) {
+            WorldAccessPolicy accessPolicy,
+            WorldApiWrites apiWrites) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
@@ -424,6 +427,7 @@ public final class WorldsWiring {
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(engine, "engine");
             Objects.requireNonNull(accessPolicy, "accessPolicy");
+            Objects.requireNonNull(apiWrites, "apiWrites");
         }
     }
 }

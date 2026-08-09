@@ -53,6 +53,7 @@ import com.uxplima.uxmessentials.vote.adapter.outbound.PdcBroadcastVisibility;
 import com.uxplima.uxmessentials.vote.adapter.outbound.PdcReminderPreferences;
 import com.uxplima.uxmessentials.vote.adapter.outbound.VoteDiscordNotifier;
 import com.uxplima.uxmessentials.vote.adapter.outbound.VoteDiscordSettings;
+import com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteApiWrites;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
@@ -284,7 +285,8 @@ public final class VoteWiring {
                 partyPublisher,
                 reminderTask,
                 discord.notifier(),
-                discord.topVoterTask());
+                discord.topVoterTask(),
+                VoteApiWrites.of(services));
     }
 
     /**
@@ -630,7 +632,8 @@ public final class VoteWiring {
             Consumer<DomainEvent> partyPublisher,
             @Nullable AutoCloseable reminderTask,
             @Nullable VoteDiscordNotifier discordNotifier,
-            @Nullable AutoCloseable discordTopVoterTask) {
+            @Nullable AutoCloseable discordTopVoterTask,
+            VoteApiWrites apiWrites) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -643,6 +646,7 @@ public final class VoteWiring {
             Objects.requireNonNull(eventBus, "eventBus");
             Objects.requireNonNull(partyEffects, "partyEffects");
             Objects.requireNonNull(partyPublisher, "partyPublisher");
+            Objects.requireNonNull(apiWrites, "apiWrites");
         }
 
         /** Self-register the reflective Votifier handler behind its plugin-present guard. */

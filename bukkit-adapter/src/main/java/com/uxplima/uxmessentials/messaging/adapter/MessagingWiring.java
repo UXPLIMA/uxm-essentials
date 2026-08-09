@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemorySocialSpySto
 import com.uxplima.uxmessentials.messaging.adapter.outbound.MailExpirySweep;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.PdcMessageToggleStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.PdcReplyRoutingStore;
+import com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingApiWrites;
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
 import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
@@ -140,7 +141,8 @@ public final class MessagingWiring {
                 kernel.log());
         List<CommandRegistration> commands =
                 MessagingCommands.all(services, kernel.messages(), kernel.messageSink(), views);
-        return new Wired(commands, sweep, stores, mutePolicy, afkStatus, running, views);
+        return new Wired(
+                commands, sweep, stores, mutePolicy, afkStatus, running, views, MessagingApiWrites.of(services));
     }
 
     private static MessagingServices assemble(
@@ -241,7 +243,8 @@ public final class MessagingWiring {
             MutableMutePolicy mutePolicy,
             MutableAfkStatus afkStatus,
             AtomicBoolean running,
-            MessagingGuiViews guiViews) {
+            MessagingGuiViews guiViews,
+            MessagingApiWrites apiWrites) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -251,6 +254,7 @@ public final class MessagingWiring {
             Objects.requireNonNull(afkStatus, "afkStatus");
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(guiViews, "guiViews");
+            Objects.requireNonNull(apiWrites, "apiWrites");
         }
 
         /** Arm the mail-expiry sweep. */

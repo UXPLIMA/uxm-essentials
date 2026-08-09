@@ -2,12 +2,15 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional economy()
   Optional homes()
   Optional kits()
+  Optional messaging()
   Optional moderation()
   Optional playerState()
   Optional presence()
   Optional teleport()
   Optional vanish()
+  Optional vote()
   Optional warps()
+  Optional worlds()
 interface com.uxplima.uxmessentials.api.action.UxmEconomyActions
   CompletableFuture deposit(UUID, BigDecimal)
   CompletableFuture deposit(UUID, BigDecimal, String)
@@ -42,6 +45,10 @@ interface com.uxplima.uxmessentials.api.action.UxmHomeActions
 interface com.uxplima.uxmessentials.api.action.UxmKitActions
   CompletableFuture claim(UUID, String)
   CompletableFuture give(UUID, String)
+interface com.uxplima.uxmessentials.api.action.UxmMessagingActions
+  CompletableFuture sendMail(UUID, String)
+  CompletableFuture sendMail(UUID, UUID, String)
+  CompletableFuture sendMessage(UUID, UUID, String)
 interface com.uxplima.uxmessentials.api.action.UxmModerationActions
   CompletableFuture ban(UUID)
   CompletableFuture ban(UUID, String)
@@ -102,10 +109,18 @@ interface com.uxplima.uxmessentials.api.action.UxmTeleportActions
   CompletableFuture teleport(UUID, com.uxplima.uxmessentials.api.view.UxmLocation)
 interface com.uxplima.uxmessentials.api.action.UxmVanishActions
   CompletableFuture setVanished(UUID, boolean)
+interface com.uxplima.uxmessentials.api.action.UxmVoteActions
+  CompletableFuture addPartyProgress(int)
+  CompletableFuture giveVote(UUID)
+  CompletableFuture giveVote(UUID, int)
 interface com.uxplima.uxmessentials.api.action.UxmWarpActions
   CompletableFuture create(String, com.uxplima.uxmessentials.api.view.UxmLocation)
   CompletableFuture delete(String)
   CompletableFuture move(String, com.uxplima.uxmessentials.api.view.UxmLocation)
+interface com.uxplima.uxmessentials.api.action.UxmWorldsActions
+  CompletableFuture load(String)
+  CompletableFuture unload(String)
+  CompletableFuture unload(String, boolean)
 class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
   void uninstall()

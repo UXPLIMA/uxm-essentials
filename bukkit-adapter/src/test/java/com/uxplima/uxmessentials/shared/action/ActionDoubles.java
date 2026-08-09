@@ -50,6 +50,7 @@ public final class ActionDoubles {
 
         private int asyncCalls;
         private int entityCalls;
+        private int globalCalls;
         private final List<UUID> retired = new ArrayList<>();
 
         /** Marks this player as gone, so a hop scheduled for them runs the retired path instead. */
@@ -68,8 +69,14 @@ public final class ActionDoubles {
             return entityCalls;
         }
 
+        /** How many pieces of work went to the server's own thread. */
+        public int globalCalls() {
+            return globalCalls;
+        }
+
         @Override
         public void onGlobal(Runnable task) {
+            globalCalls++;
             task.run();
         }
 

@@ -71,15 +71,34 @@ public final class SendMail {
         return persist(sender, recipient, body);
     }
 
+    /**
+     * Leave {@code body} as mail from the server itself, under {@code senderName}.
+     *
+     * <p>The path a plugin's mail takes. Nothing here can refuse it: there is no mute that applies to the server
+     * and no way for a player to ignore it, so unlike {@link #send} it neither gates nor confirms, and the mail
+     * lands whatever the recipient has turned off.
+     */
+    public void sendFromSystem(String senderName, PlayerRef recipient, MessageBody body) {
+        Objects.requireNonNull(senderName, "senderName");
+        Objects.requireNonNull(recipient, "recipient");
+        Objects.requireNonNull(body, "body");
+        deposit(recipient, MailSender.system(senderName), body);
+    }
+
     private Result<Unit, MessagingError> persist(PlayerRef sender, PlayerRef recipient, MessageBody body) {
         confirm(sender, recipient);
         if (ignores.load(recipient).blocks(sender, IgnoreChannel.MAIL)) {
             return Result.ok(); // silently dropped; the sender already saw a sent confirmation
         }
-        MailItem stored = mail.append(MailItem.compose(recipient, MailSender.player(sender), body, clock.instant()));
+        deposit(recipient, MailSender.player(sender), body);
+        return Result.ok();
+    }
+
+    /** Store the item, announce it, and tell the recipient if they are here to be told. */
+    private void deposit(PlayerRef recipient, MailSender from, MessageBody body) {
+        MailItem stored = mail.append(MailItem.compose(recipient, from, body, clock.instant()));
         events.publish(new MailDelivered(recipient, stored.sender(), body, stored.sentAt()));
         delivery.notifyNewMail(recipient, stored);
-        return Result.ok();
     }
 
     private void confirm(PlayerRef sender, PlayerRef recipient) {

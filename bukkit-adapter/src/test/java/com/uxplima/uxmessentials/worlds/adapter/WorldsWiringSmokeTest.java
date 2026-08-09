@@ -121,7 +121,8 @@ class WorldsWiringSmokeTest {
                 (player, viewer) -> {},
                 new NoOpRepository(),
                 mock(WorldEngine.class),
-                mock(WorldAccessPolicy.class));
+                mock(WorldAccessPolicy.class),
+                apiWrites());
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
@@ -182,7 +183,8 @@ class WorldsWiringSmokeTest {
                 (player, viewer) -> {},
                 new NoOpRepository(),
                 mock(WorldEngine.class),
-                mock(WorldAccessPolicy.class));
+                mock(WorldAccessPolicy.class),
+                apiWrites());
 
         assertThatNoException().isThrownBy(() -> wired.stop().run());
     }
@@ -199,7 +201,8 @@ class WorldsWiringSmokeTest {
                 (player, viewer) -> {},
                 new NoOpRepository(),
                 mock(WorldEngine.class),
-                mock(WorldAccessPolicy.class));
+                mock(WorldAccessPolicy.class),
+                apiWrites());
 
         assertThat(wired.worldsPlaceholders()).isNotNull();
     }
@@ -263,7 +266,8 @@ class WorldsWiringSmokeTest {
                 (player, viewer) -> {},
                 new NoOpRepository(),
                 mock(WorldEngine.class),
-                mock(WorldAccessPolicy.class));
+                mock(WorldAccessPolicy.class),
+                apiWrites());
 
         assertThat(wired.generatorResolver()).isNotNull();
         assertThat(wired.generatorResolver().resolve("void")).isPresent();
@@ -290,6 +294,13 @@ class WorldsWiringSmokeTest {
     @AfterAll
     static void stopServer() {
         MockBukkit.unmock();
+    }
+
+    /** The published load/unload pair, mocked: this smoke test only checks what the record carries. */
+    private static com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldApiWrites apiWrites() {
+        return new com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldApiWrites(
+                mock(com.uxplima.uxmessentials.worlds.application.LoadWorld.class),
+                mock(com.uxplima.uxmessentials.worlds.application.UnloadWorld.class));
     }
 
     private static WorldGeneratorResolver resolver() {
