@@ -9,18 +9,23 @@ import java.util.List;
 import java.util.Map;
 
 import org.bukkit.Material;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +40,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * {@code PlayerInventory} while the menu is open.
  *
  * <p>The scheduler is a synchronous double so the entity-bound open and the close write-back run inline, and the
- * close is dispatched as a real {@link InventoryCloseEvent} through the same {@link InvseeListener} a live close
+ * close is dispatched as a real {@link InventoryCloseEvent} through the menu engine's own listener, as a live close
  * routes through. The conservation assertion is the dupe guard: the total item count across the target plus the
  * menu copy is the same before and after the edit, so an item moved inside the menu is moved, not cloned.
  */
@@ -43,16 +48,23 @@ class InvseeViewPathTest {
 
     private ServerMock server;
     private Plugin plugin;
+    private MirrorWindow window;
     private InvseeView view;
-    private InvseeListener listener;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        view = new InvseeView(new KeyMessages(), new SyncScheduler());
-        listener = new InvseeListener(view);
-        server.getPluginManager().registerEvents(listener, plugin);
+        TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
+        window = new MirrorWindow(
+                new KeyMessages(),
+                engine.menus(),
+                new SyncScheduler(),
+                java.nio.file.Path.of("no-such-data-folder"),
+                TestMenuEngine.SILENT_LOG);
+        window.register(engine.bindings());
+        engine.installListener(plugin);
+        view = new InvseeView(new SyncScheduler(), window);
     }
 
     @AfterEach
@@ -123,7 +135,7 @@ class InvseeViewPathTest {
         target.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 5));
         PlayerMock viewer = grantModify(server.addPlayer("Staff"));
         RecordingScheduler recording = new RecordingScheduler();
-        InvseeView recordingView = new InvseeView(new KeyMessages(), recording);
+        InvseeView recordingView = new InvseeView(recording, window);
 
         recordingView.open(ref(viewer), ref(target));
 
@@ -150,6 +162,42 @@ class InvseeViewPathTest {
         server.getPluginManager().callEvent(new InventoryCloseEvent(viewer.getOpenInventory()));
 
         assertThat(target.getInventory().getItem(0).getAmount()).isEqualTo(4);
+    }
+
+    @Test
+    void withoutModifyEveryMovementInTheMirrorIsCancelledWhileTheFillerIsNeverMovableAtAll() {
+        PlayerMock target = server.addPlayer("Target");
+        target.getInventory().setItem(0, new ItemStack(Material.GOLD_INGOT, 4));
+        PlayerMock watcher = server.addPlayer("Watcher"); // no modify node
+        view.open(ref(watcher), ref(target));
+
+        // A viewer without the modify node may look but not touch: putting a stack into the mirrored region is
+        // refused, so nothing they do can reach the target through the close write-back.
+        watcher.setItemOnCursor(new ItemStack(Material.DIAMOND));
+        assertThat(click(watcher, 0).isCancelled()).isTrue();
+
+        // The same click by a viewer who does hold the node goes through, so the refusal above is the missing
+        // permission rather than the window cancelling everything.
+        PlayerMock staff = grantModify(server.addPlayer("Staff"));
+        view.open(ref(staff), ref(target));
+        staff.setItemOnCursor(new ItemStack(Material.DIAMOND));
+        assertThat(click(staff, 0).isCancelled()).isFalse();
+
+        // The filler past the offhand slot maps to nothing a player carries, so it stays chrome for everyone: a
+        // click that could carry one of those panes out of the window would be minting an item.
+        assertThat(click(staff, 53).isCancelled()).isTrue();
+    }
+
+    /** Dispatch a left click with the viewer's cursor onto {@code slot} of their open window. */
+    private InventoryClickEvent click(PlayerMock viewer, int slot) {
+        InventoryClickEvent event = new InventoryClickEvent(
+                viewer.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER,
+                slot,
+                ClickType.LEFT,
+                InventoryAction.PLACE_ALL);
+        server.getPluginManager().callEvent(event);
+        return event;
     }
 
     private PlayerMock grantModify(PlayerMock player) {

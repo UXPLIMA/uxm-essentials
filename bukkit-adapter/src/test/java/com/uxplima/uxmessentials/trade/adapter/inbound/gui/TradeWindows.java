@@ -4,8 +4,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 
 /**
  * Builds the two trade windows over a test engine, the way production wiring does but off a data folder that holds
@@ -20,25 +20,10 @@ public final class TradeWindows {
     private TradeWindows() {}
 
     public static TradeWindow sameServer(Messages messages, Menus menus, List<String> currencies) {
-        return new TradeWindow(messages, menus, currencies, NO_OVERRIDES, SILENT);
+        return new TradeWindow(messages, menus, currencies, NO_OVERRIDES, TestMenuEngine.SILENT_LOG);
     }
 
     public static CrossTradeWindow crossServer(Messages messages, Menus menus) {
-        return new CrossTradeWindow(messages, menus, NO_OVERRIDES, SILENT);
+        return new CrossTradeWindow(messages, menus, NO_OVERRIDES, TestMenuEngine.SILENT_LOG);
     }
-
-    /** A logger that says nothing; the spec loads cleanly here, so there is nothing for it to report. */
-    public static final Logger SILENT = new Logger() {
-        @Override
-        public void info(String message, Object... args) {}
-
-        @Override
-        public void warn(String message, Object... args) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-
-        @Override
-        public void debug(String message, Object... args) {}
-    };
 }

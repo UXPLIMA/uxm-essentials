@@ -7,6 +7,7 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentClick;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentProvider;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ContentRegionSpec;
 import org.jspecify.annotations.NullMarked;
@@ -32,7 +33,7 @@ final class CrossTradeOfferContent implements ContentProvider {
 
     @Override
     public List<@Nullable ItemStack> render(MenuContext ctx, ContentRegionSpec region) {
-        return TradeRegions.copies(null, size);
+        return ContentRegions.copies(null, size);
     }
 
     @Override

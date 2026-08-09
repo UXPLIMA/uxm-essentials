@@ -9,11 +9,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.NoFlyWorldListener;
@@ -98,12 +96,14 @@ public final class PlayerstateWiring {
             ModuleContext ctx,
             PlaytimeRepository playtimeRepository,
             GuiLayouts guiLayouts,
-            Menus menus) {
+            Menus menus,
+            MirrorWindow mirrorWindow) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(playtimeRepository, "playtimeRepository");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(mirrorWindow, "mirrorWindow");
         KernelPorts kernel = ctx.kernel();
         ConfigStore config = ctx.config();
         Clock clock = Clock.systemUTC();
@@ -111,11 +111,10 @@ public final class PlayerstateWiring {
         PlayerStateStore store = new InMemoryPlayerStateStore();
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler());
-        InvseeView invseeView = new InvseeView(kernel.messages(), kernel.scheduler());
-        EnderseeView enderseeView = new EnderseeView(kernel.messages(), kernel.scheduler());
+        InvseeView invseeView = new InvseeView(kernel.scheduler(), mirrorWindow);
+        EnderseeView enderseeView = new EnderseeView(kernel.scheduler(), mirrorWindow);
         OfflinePlayerStorage offlineStorage = new NmsOfflinePlayerStorage(kernel.log());
-        OfflineContainerView offlineView =
-                new OfflineContainerView(kernel.messages(), kernel.scheduler(), offlineStorage);
+        OfflineContainerView offlineView = new OfflineContainerView(kernel.scheduler(), offlineStorage, mirrorWindow);
         InventoryViewer inventoryViewer = new BukkitInventoryViewer(invseeView, enderseeView, offlineView);
         NearbyPlayers nearby = new BukkitNearbyPlayers(kernel.scheduler());
         PlayerInfo info = new BukkitPlayerInfo();
@@ -149,9 +148,6 @@ public final class PlayerstateWiring {
                 PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView);
         List<Listener> listeners = List.of(
                 new PlayerStateListener(store, reconciler),
-                new InvseeListener(invseeView),
-                new EnderseeListener(enderseeView),
-                new OfflineContainerListener(offlineView),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
                 new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
         return new Wired(

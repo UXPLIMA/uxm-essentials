@@ -11,6 +11,7 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
@@ -46,7 +47,7 @@ public final class CrossTradeWindow {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
         this.spec = MenuSpecs.loadOrBundled(SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, log);
-        this.offerSlots = TradeRegions.slots(spec, OFFER_REGION, SPEC_RESOURCE);
+        this.offerSlots = ContentRegions.slots(spec, OFFER_REGION, SPEC_RESOURCE);
     }
 
     /** How many item slots this side may stake. */
@@ -86,12 +87,12 @@ public final class CrossTradeWindow {
 
     /** Read the staked items out of a live window, as a positional array of copies. */
     @Nullable ItemStack[] readOffer(Inventory inv) {
-        return TradeRegions.read(inv, offerSlots);
+        return ContentRegions.read(inv, offerSlots);
     }
 
     /** Empty the staked region — the originals leave the window, so nothing is returned twice. */
     void clearOffer(Inventory inv) {
-        TradeRegions.clear(inv, offerSlots);
+        ContentRegions.clear(inv, offerSlots);
     }
 
     /** The side of the trade the context's window renders; every binding here is about one holder. */

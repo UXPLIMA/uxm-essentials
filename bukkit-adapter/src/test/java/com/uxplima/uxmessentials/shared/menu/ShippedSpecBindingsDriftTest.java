@@ -365,6 +365,8 @@ class ShippedSpecBindingsDriftTest {
             "trade_experience_lore",
             "trade_partner_money_lore",
             "trade_partner_experience_lore",
+            "invsee_title",
+            "endersee_title",
             "sound",
             "sound_material",
             "vault_icon",
@@ -748,7 +750,8 @@ class ShippedSpecBindingsDriftTest {
      * Content-region ids any shipped spec may hand a block of slots to. A region whose provider is not registered
      * would open a hole into a live inventory, so the same allowlist discipline applies as to the other four.
      */
-    private static final Set<String> EXPECTED_CONTENTS = Set.of("trade:offer", "trade:mirror", "trade:cross-offer");
+    private static final Set<String> EXPECTED_CONTENTS =
+            Set.of("trade:offer", "trade:mirror", "trade:cross-offer", "playerstate:invsee", "playerstate:endersee");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

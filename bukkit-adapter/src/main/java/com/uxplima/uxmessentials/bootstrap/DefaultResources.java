@@ -45,6 +45,8 @@ final class DefaultResources {
             "modules/economy/currencies.conf",
             "modules/kits/config.conf",
             "modules/playerstate/config.conf",
+            "modules/playerstate/gui/invsee.conf",
+            "modules/playerstate/gui/endersee.conf",
             "modules/messaging/config.conf",
             "modules/presence/config.conf",
             "modules/vanish/config.conf",

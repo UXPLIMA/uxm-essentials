@@ -14,13 +14,14 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,24 +38,31 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * hopped to for the GUI, and the close write-back lands on the subject's thread.
  *
  * <p>The scheduler is a synchronous double so the entity-bound open and the close write-back run inline, and the
- * close is dispatched as a real {@link InventoryCloseEvent} through the same {@link EnderseeListener} a live close
- * routes through. The conservation assertion is the dupe guard: the total item count across the target plus the
+ * close is dispatched as a real {@link InventoryCloseEvent} through the menu engine's own listener, the way a live
+ * close routes. The conservation assertion is the dupe guard: the total item count across the target plus the
  * menu copy is the same before and after the edit, so an item moved inside the menu is moved, not cloned.
  */
 class EnderseeViewPathTest {
 
     private ServerMock server;
     private Plugin plugin;
+    private MirrorWindow window;
     private EnderseeView view;
-    private EnderseeListener listener;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        view = new EnderseeView(new KeyMessages(), new SyncScheduler());
-        listener = new EnderseeListener(view);
-        server.getPluginManager().registerEvents(listener, plugin);
+        TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
+        window = new MirrorWindow(
+                new KeyMessages(),
+                engine.menus(),
+                new SyncScheduler(),
+                java.nio.file.Path.of("no-such-data-folder"),
+                TestMenuEngine.SILENT_LOG);
+        window.register(engine.bindings());
+        engine.installListener(plugin);
+        view = new EnderseeView(new SyncScheduler(), window);
     }
 
     @AfterEach
@@ -108,10 +116,9 @@ class EnderseeViewPathTest {
         target.getEnderChest().setItem(0, new ItemStack(Material.DIAMOND, 5));
         PlayerMock viewer = server.addPlayer("Staff");
         RecordingScheduler recording = new RecordingScheduler();
-        EnderseeView recordingView = new EnderseeView(new KeyMessages(), recording);
-        // The close write-back must route through the same view the menu was opened against, so register a listener
-        // bound to the recording view for this case (the @BeforeEach listener wraps the synchronous field view).
-        server.getPluginManager().registerEvents(new EnderseeListener(recordingView), plugin);
+        // The window each view opens carries its own write-back, so the engine's single listener routes this close
+        // back to the recording view without a second listener registration.
+        EnderseeView recordingView = new EnderseeView(recording, window);
 
         recordingView.open(ref(viewer), ref(target));
 

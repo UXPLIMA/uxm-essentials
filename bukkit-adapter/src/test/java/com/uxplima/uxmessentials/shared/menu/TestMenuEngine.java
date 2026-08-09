@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 
@@ -43,6 +44,24 @@ public final class TestMenuEngine {
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
         return new TestMenuEngine(bindings, renderer, menus, scheduler);
     }
+
+    /**
+     * A logger for a fixture that loads a shipped spec off the classpath. Those specs parse cleanly, so there is
+     * nothing for it to report; a fixture whose spec did fail to load would rather see the assertion than a log line.
+     */
+    public static final Logger SILENT_LOG = new Logger() {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    };
 
     /** The façade a feature opens specs through. */
     public Menus menus() {

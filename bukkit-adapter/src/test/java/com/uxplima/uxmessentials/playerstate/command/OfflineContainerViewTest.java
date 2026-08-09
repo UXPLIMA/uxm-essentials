@@ -13,7 +13,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflineInventory;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage;
@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,8 +49,16 @@ class OfflineContainerViewTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         storage = new FakeOfflineStorage();
-        view = new OfflineContainerView(new KeyMessages(), new SyncScheduler(), storage);
-        server.getPluginManager().registerEvents(new OfflineContainerListener(view), plugin);
+        TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
+        MirrorWindow window = new MirrorWindow(
+                new KeyMessages(),
+                engine.menus(),
+                new SyncScheduler(),
+                java.nio.file.Path.of("no-such-data-folder"),
+                TestMenuEngine.SILENT_LOG);
+        window.register(engine.bindings());
+        engine.installListener(plugin);
+        view = new OfflineContainerView(new SyncScheduler(), storage, window);
     }
 
     @AfterEach

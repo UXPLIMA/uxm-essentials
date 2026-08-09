@@ -77,6 +77,7 @@ import com.uxplima.uxmessentials.persistence.menu.PlayerDataRepositories;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
@@ -936,7 +937,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
-            wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts, menus);
+            wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(
                     plugin,
@@ -1618,13 +1619,22 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            Menus menus) {
+            Menus menus,
+            MenuBindings menuBindings) {
         // playerstate's only durable state is the per-day playtime ledger behind /playtime, built over
         // persistence.dsl(); the per-player snapshot map stays transient in-memory and all live-player
         // reconciliation routes through the kernel Scheduler port onto the owning region thread. The AFK-aware
         // playtime sampler is armed below and stopped on module disable, leaving no orphaned tick.
         PlaytimeRepository playtimeRepository = PlaytimeRepositories.jooq(persistence);
-        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus);
+        MirrorWindow mirrorWindow = new MirrorWindow(
+                ctx.kernel().messages(),
+                menus,
+                ctx.kernel().scheduler(),
+                plugin.getDataFolder().toPath(),
+                ctx.kernel().log());
+        mirrorWindow.register(menuBindings);
+        PlayerstateWiring.Wired wired =
+                PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus, mirrorWindow);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

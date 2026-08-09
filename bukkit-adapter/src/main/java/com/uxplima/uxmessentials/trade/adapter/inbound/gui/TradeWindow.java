@@ -14,6 +14,7 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
@@ -61,8 +62,8 @@ public final class TradeWindow {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.currencies = List.copyOf(Objects.requireNonNull(currencies, "currencies"));
         this.spec = MenuSpecs.loadOrBundled(SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, log);
-        this.offerSlots = TradeRegions.slots(spec, OFFER_REGION, SPEC_RESOURCE);
-        this.mirrorSlots = TradeRegions.slots(spec, MIRROR_REGION, SPEC_RESOURCE);
+        this.offerSlots = ContentRegions.slots(spec, OFFER_REGION, SPEC_RESOURCE);
+        this.mirrorSlots = ContentRegions.slots(spec, MIRROR_REGION, SPEC_RESOURCE);
         if (offerSlots.size() != mirrorSlots.size()) {
             throw new IllegalStateException(SPEC_RESOURCE + ": the '" + OFFER_REGION + "' and '" + MIRROR_REGION
                     + "' regions must declare the same number of slots, so that every staked item has a slot the "
@@ -169,17 +170,17 @@ public final class TradeWindow {
 
     /** Read the viewer's own offer out of their live window, as a positional array of copies. */
     @Nullable ItemStack[] readOffer(Inventory inv) {
-        return TradeRegions.read(inv, offerSlots);
+        return ContentRegions.read(inv, offerSlots);
     }
 
     /** Empty the viewer's offer region — the offered originals leave the window, so nothing is returned twice. */
     void clearOffer(Inventory inv) {
-        TradeRegions.clear(inv, offerSlots);
+        ContentRegions.clear(inv, offerSlots);
     }
 
     /** {@code offer} as the region-ordered list the content providers paint from. */
     List<@Nullable ItemStack> painted(@Nullable ItemStack @Nullable [] offer) {
-        return TradeRegions.copies(offer, perSide());
+        return ContentRegions.copies(offer, perSide());
     }
 
     private String ownMoneyLore(MenuContext ctx, TradeView view) {
