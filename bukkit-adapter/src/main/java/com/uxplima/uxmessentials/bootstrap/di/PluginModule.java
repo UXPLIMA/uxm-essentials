@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
@@ -99,6 +100,7 @@ import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlayerStateQueries;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlaytimeQueries;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
@@ -1786,6 +1788,9 @@ public final class PluginModule {
         links.queries.register(
                 UxmPlaytimeQuery.class,
                 new PlaytimeQueries(playtimeRepository, ctx.kernel().scheduler(), java.time.Clock.systemUTC()));
+        links.queries.register(
+                UxmPlayerStateQuery.class,
+                new PlayerStateQueries(wired.store(), ctx.kernel().playerLookup()));
         // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
         links.staffOpenContainer = wired.services().openContainer();
         // Captured so presence (wired later) rebinds the playtime sampler's AFK seam to its live store, so the

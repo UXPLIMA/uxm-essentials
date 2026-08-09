@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.economy.adapter.outbound.api;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -93,6 +94,25 @@ public final class EconomyQueries implements UxmEconomyQuery {
     }
 
     @Override
+    public CompletableFuture<Boolean> canAfford(UUID playerId, BigDecimal amount) {
+        Objects.requireNonNull(playerId, "playerId");
+        requireNotNegative(amount);
+        return AsyncQueries.supply(scheduler, () -> holds(playerId, currencies.defaultCurrency(), amount));
+    }
+
+    @Override
+    public CompletableFuture<Boolean> canAfford(UUID playerId, BigDecimal amount, String currency) {
+        Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(currency, "currency");
+        requireNotNegative(amount);
+        return AsyncQueries.supply(
+                scheduler,
+                () -> find(currency)
+                        .map(found -> holds(playerId, found, amount))
+                        .orElse(false));
+    }
+
+    @Override
     public CompletableFuture<List<UxmBaltopEntry>> top(int limit) {
         return top(currencies.defaultCurrency(), limit);
     }
@@ -125,11 +145,22 @@ public final class EconomyQueries implements UxmEconomyQuery {
         return provider.balance(ApiValues.subject(players, playerId), currency);
     }
 
+    private boolean holds(UUID playerId, Currency currency, BigDecimal amount) {
+        return read(playerId, currency).amount().compareTo(amount) >= 0;
+    }
+
     private Optional<Currency> find(String currency) {
         try {
             return currencies.find(CurrencyId.of(currency));
         } catch (IllegalArgumentException rejected) {
             return Optional.empty();
+        }
+    }
+
+    private static void requireNotNegative(BigDecimal amount) {
+        Objects.requireNonNull(amount, "amount");
+        if (amount.signum() < 0) {
+            throw new IllegalArgumentException("amount must not be negative: " + amount);
         }
     }
 

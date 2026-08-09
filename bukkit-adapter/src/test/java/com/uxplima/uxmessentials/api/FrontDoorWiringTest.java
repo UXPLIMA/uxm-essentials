@@ -89,6 +89,7 @@ class FrontDoorWiringTest {
         assertThat(api.presence()).isEmpty();
         assertThat(api.vanish()).isEmpty();
         assertThat(api.playtime()).isEmpty();
+        assertThat(api.playerState()).isEmpty();
         assertThat(api.worlds()).isEmpty();
         assertThat(api.teleport()).isEmpty();
         assertThat(api.vote()).isEmpty();

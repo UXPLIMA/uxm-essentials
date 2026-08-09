@@ -107,6 +107,59 @@ class EconomyQueriesTest {
     }
 
     @Test
+    void affordingIsTrueAtExactlyThePriceAndFalseAPennyShort() {
+        provider.set(ALICE, COINS, "10.00");
+
+        assertThat(queries().canAfford(ALICE.uuid(), new BigDecimal("10.00")).join())
+                .as("the plugin charges a player who holds exactly the price, so the check has to agree")
+                .isTrue();
+        assertThat(queries().canAfford(ALICE.uuid(), new BigDecimal("10.01")).join())
+                .isFalse();
+    }
+
+    @Test
+    void affordingIsAskedOfTheNamedCurrencyAndFalseForOneNobodyConfigured() {
+        provider.set(ALICE, COINS, "500.00");
+        provider.set(ALICE, GEMS, "2");
+
+        assertThat(queries()
+                        .canAfford(ALICE.uuid(), new BigDecimal("3"), "gems")
+                        .join())
+                .as("a rich player is still short on gems, so the currency must not fall back to the default")
+                .isFalse();
+        assertThat(queries()
+                        .canAfford(ALICE.uuid(), new BigDecimal("1"), "gems")
+                        .join())
+                .isTrue();
+        assertThat(queries()
+                        .canAfford(ALICE.uuid(), BigDecimal.ZERO, "doubloons")
+                        .join())
+                .as("nobody holds what does not exist, not even nothing of it")
+                .isFalse();
+    }
+
+    @Test
+    void affordingNothingIsTrueForAPlayerWithNothing() {
+        assertThat(queries().canAfford(BOB.uuid(), BigDecimal.ZERO).join()).isTrue();
+    }
+
+    @Test
+    void aNegativePriceIsRefusedRatherThanAnsweredTrue() {
+        assertThatThrownBy(() -> queries().canAfford(ALICE.uuid(), new BigDecimal("-1")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> queries().canAfford(ALICE.uuid(), new BigDecimal("-1"), "coins"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void everyAffordabilityCheckRunsOffTheCallingThread() {
+        queries().canAfford(ALICE.uuid(), BigDecimal.ONE).join();
+        queries().canAfford(ALICE.uuid(), BigDecimal.ONE, "coins").join();
+
+        assertThat(scheduler.asyncCalls()).isEqualTo(2);
+    }
+
+    @Test
     void theLeaderboardIsRankedFromOne() {
         provider.set(ALICE, COINS, "100.00");
         provider.set(BOB, COINS, "250.00");

@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
@@ -107,6 +108,9 @@ public interface UxmEssentialsApi {
 
     /** Reading how long players have been on the server, or empty when the player-state module is switched off. */
     Optional<UxmPlaytimeQuery> playtime();
+
+    /** Reading the switches held for an online player, or empty when the player-state module is switched off. */
+    Optional<UxmPlayerStateQuery> playerState();
 
     /** Reading the managed worlds and their entry rules, or empty when the worlds module is switched off. */
     Optional<UxmWorldsQuery> worlds();

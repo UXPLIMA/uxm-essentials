@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.api.query;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,6 +33,17 @@ public interface UxmEconomyQuery {
 
     /** What this player holds in every configured currency, in the order {@link #currencies()} lists them. */
     CompletableFuture<List<UxmMoney>> balances(UUID playerId);
+
+    /**
+     * Whether this player holds at least {@code amount} in the default currency. The same comparison the plugin
+     * makes before charging, so a consumer that checks first and then asks uxmEssentials to charge agrees with it.
+     *
+     * @throws IllegalArgumentException when {@code amount} is negative
+     */
+    CompletableFuture<Boolean> canAfford(UUID playerId, BigDecimal amount);
+
+    /** The same in one currency; {@code false} for an unknown currency id, since nobody holds what does not exist. */
+    CompletableFuture<Boolean> canAfford(UUID playerId, BigDecimal amount, String currency);
 
     /** The richest players in the default currency, ranked, at most {@code limit} of them. */
     CompletableFuture<List<UxmBaltopEntry>> top(int limit);

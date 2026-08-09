@@ -7,6 +7,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional kits()
   Optional messaging()
   Optional moderation()
+  Optional playerState()
   Optional playerWarps()
   Optional playtime()
   Optional presence()
@@ -627,6 +628,8 @@ interface com.uxplima.uxmessentials.api.query.UxmEconomyQuery
   CompletableFuture balance(UUID)
   CompletableFuture balance(UUID, String)
   CompletableFuture balances(UUID)
+  CompletableFuture canAfford(UUID, BigDecimal)
+  CompletableFuture canAfford(UUID, BigDecimal, String)
   CompletableFuture top(String, int)
   CompletableFuture top(int)
   List currencies()
@@ -654,6 +657,8 @@ interface com.uxplima.uxmessentials.api.query.UxmModerationQuery
   CompletableFuture jail(UUID)
   CompletableFuture mute(UUID)
   CompletableFuture warns(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery
+  Optional of(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery
   CompletableFuture count(UUID)
   CompletableFuture get(String)
@@ -724,6 +729,13 @@ enum com.uxplima.uxmessentials.api.view.UxmEconomyRejection
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection[] values()
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection BALANCE_MAX_EXCEEDED
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection INSUFFICIENT_FUNDS
+enum com.uxplima.uxmessentials.api.view.UxmGameMode
+  com.uxplima.uxmessentials.api.view.UxmGameMode valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmGameMode[] values()
+  com.uxplima.uxmessentials.api.view.UxmGameMode ADVENTURE
+  com.uxplima.uxmessentials.api.view.UxmGameMode CREATIVE
+  com.uxplima.uxmessentials.api.view.UxmGameMode SPECTATOR
+  com.uxplima.uxmessentials.api.view.UxmGameMode SURVIVAL
 record com.uxplima.uxmessentials.api.view.UxmHome
   <init>(UUID, int, com.uxplima.uxmessentials.api.view.UxmLocation, Optional, Optional, boolean, Instant, Instant)
   Instant createdAt()
@@ -808,6 +820,17 @@ record com.uxplima.uxmessentials.api.view.UxmMoney
   String currency()
   String toString()
   boolean equals(Object)
+  int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmPlayerState
+  <init>(UUID, boolean, boolean, Optional, float, float)
+  Optional gameMode()
+  String toString()
+  UUID playerId()
+  boolean equals(Object)
+  boolean flying()
+  boolean godMode()
+  float flySpeed()
+  float walkSpeed()
   int hashCode()
 record com.uxplima.uxmessentials.api.view.UxmPlayerWarp
   <init>(long, String, Optional, UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation, Optional, Optional, Optional, Optional, com.uxplima.uxmessentials.api.view.UxmPlayerWarpAccess, boolean, com.uxplima.uxmessentials.api.view.UxmPlayerWarpStatus, Optional, double, int, long, int, int, Optional, Optional, Instant, Instant)

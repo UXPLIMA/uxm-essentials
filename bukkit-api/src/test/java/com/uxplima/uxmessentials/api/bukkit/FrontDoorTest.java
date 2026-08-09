@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
@@ -153,6 +154,11 @@ class FrontDoorTest {
 
         @Override
         public Optional<UxmPlaytimeQuery> playtime() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmPlayerStateQuery> playerState() {
             return Optional.empty();
         }
 
