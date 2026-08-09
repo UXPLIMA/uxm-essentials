@@ -54,6 +54,7 @@ import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimServic
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -180,7 +181,16 @@ class HomeListGoldenTest {
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3, Permissions.QuotaReduction.MAX);
         HomeInviteRepository invites = new NoInvites();
         CreateHomeAtSlot create = new CreateHomeAtSlot(
-                repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock);
+                repository,
+                invites,
+                quota,
+                List.of(),
+                notifier,
+                events,
+                DomainGate.allowAll(),
+                freeCharge(),
+                1000,
+                clock);
         return new HomeListMenu(
                 menus,
                 messages,

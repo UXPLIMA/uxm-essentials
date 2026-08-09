@@ -45,7 +45,12 @@ public enum SharedMessageKey implements MessageKey {
     HELP_NO_MATCH("help.no-match"),
     HELP_FOOTER("help.footer"),
     HELP_FOOTER_PREV("help.footer-prev"),
-    HELP_FOOTER_NEXT("help.footer-next");
+    HELP_FOOTER_NEXT("help.footer-next"),
+
+    // What a player is told when another plugin refused an action through the developer API's veto events. One key
+    // for every context rather than one per context: this line only has to say that something outside uxmEssentials
+    // said no, and the plugin that said no is the one that knows why and can send its own reason.
+    COMMON_ACTION_VETOED("common.action-vetoed");
 
     private final String key;
 

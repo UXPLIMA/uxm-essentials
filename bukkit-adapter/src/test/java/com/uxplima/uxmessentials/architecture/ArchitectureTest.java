@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.architecture;
 
 import static com.tngtech.archunit.lang.conditions.ArchConditions.callMethodWhere;
 import static com.tngtech.archunit.lang.conditions.ArchConditions.implement;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import java.util.List;
@@ -13,6 +14,8 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.DomainProposal;
 
 /**
  * Compiler-backstop architecture fences. They run as ordinary JUnit 5 tests on every {@code check}.
@@ -112,6 +115,24 @@ class ArchitectureTest {
                             JavaClass.Predicates.resideInAPackage("com.uxplima.uxmessentials.api.."))))
             .because("the published API must expose only JDK types, Bukkit types and its own interfaces; "
                     + "reaching an internal type would freeze that type's shape forever")
+            .allowEmptyShould(true);
+
+    // A fact and a proposal are both values: everything they are is in their components, two of them with the same
+    // components are the same thing, and neither has behaviour to hide. Records say all of that in the declaration,
+    // so a class here is a sign somebody is about to give an event mutable state or identity it should not have.
+    // The sealed per-context interfaces in between are exempt because they are the grouping, not the value.
+    @ArchTest
+    static final ArchRule domainFactsAndProposalsAreRecords = classes()
+            .that()
+            .areAssignableTo(DomainEvent.class)
+            .or(JavaClass.Predicates.assignableTo(DomainProposal.class))
+            .and(areProductionClasses())
+            .and()
+            .areNotInterfaces()
+            .should()
+            .beRecords()
+            .because("a domain fact and a domain proposal are values, and a value with an identity is a bug "
+                    + "waiting for somebody to mutate it")
             .allowEmptyShould(true);
 
     // The menu engine's spec model and evaluation are the pure core: plain JUnit can exercise them

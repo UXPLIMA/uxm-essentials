@@ -10,6 +10,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitDomainGate;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.VetoRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.ConfigurateConfigStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.cooldown.PdcCooldowns;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
@@ -171,6 +174,11 @@ final class KernelWiring {
         // One skin fetch for every context that dresses something in a player's skin. It asks Mojang directly
         // rather than through Bukkit's profile completion, which consults the session service only on an
         // online-mode server and hands back a profile with no textures on a cracked one.
+        // What the rest of the server is allowed to refuse. Built here rather than alongside the notification bridge
+        // because a use case asks the gate through the kernel, so it has to exist before any module is wired.
+        VetoRegistry vetoes = new VetoRegistry();
+        EventBridges.installAllVetoes(vetoes);
+
         MojangSkins mojangSkins =
                 new MojangSkins(scheduler, log, new HttpClientFetcher(log), config.getBoolean(SKIN_LOOKUP_PATH, true));
 
@@ -186,7 +194,8 @@ final class KernelWiring {
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),
                 log,
-                mojangSkins);
+                mojangSkins,
+                new BukkitDomainGate(vetoes, plugin.getServer().getPluginManager(), log));
         return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex);
     }
 

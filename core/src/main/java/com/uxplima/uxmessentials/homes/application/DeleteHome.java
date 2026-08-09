@@ -8,8 +8,10 @@ import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.homes.domain.event.HomeDeleting;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -25,13 +27,19 @@ public final class DeleteHome {
     private final HomeInviteRepository invites;
     private final Notifier notifier;
     private final DomainEventPublisher events;
+    private final DomainGate gate;
 
     public DeleteHome(
-            HomeRepository repository, HomeInviteRepository invites, Notifier notifier, DomainEventPublisher events) {
+            HomeRepository repository,
+            HomeInviteRepository invites,
+            Notifier notifier,
+            DomainEventPublisher events,
+            DomainGate gate) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.gate = Objects.requireNonNull(gate, "gate");
     }
 
     /** Delete {@code owner}'s home in {@code slot}, or reject when the slot is empty. */
@@ -44,6 +52,11 @@ public final class DeleteHome {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
+        }
+        // The home is known to exist and be deletable; asking here means a refusal costs nothing to undo.
+        if (!gate.allows(new HomeDeleting(owner, slot))) {
+            notifier.send(owner, HomeError.VETOED.messageKey(), slotPlaceholder(slot));
+            return Result.err(HomeError.VETOED);
         }
         repository.deleteSlot(owner, slot);
         invites.removeAll(owner, slot);

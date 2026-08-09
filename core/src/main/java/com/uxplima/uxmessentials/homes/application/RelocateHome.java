@@ -10,8 +10,10 @@ import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.homes.domain.event.HomeRelocating;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -31,6 +33,7 @@ public final class RelocateHome {
     private final List<SethomeGuard> guards;
     private final Notifier notifier;
     private final DomainEventPublisher events;
+    private final DomainGate gate;
     private final HomeCharge charge;
     private final Clock clock;
 
@@ -39,12 +42,14 @@ public final class RelocateHome {
             List<SethomeGuard> guards,
             Notifier notifier,
             DomainEventPublisher events,
+            DomainGate gate,
             HomeCharge charge,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.gate = Objects.requireNonNull(gate, "gate");
         this.charge = Objects.requireNonNull(charge, "charge");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -68,6 +73,11 @@ public final class RelocateHome {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
+        }
+        // Asked once our own rules have passed and before the charge, so a refused move costs the player nothing.
+        if (!gate.allows(new HomeRelocating(owner, slot, at))) {
+            notifier.send(owner, HomeError.VETOED.messageKey(), slotPlaceholder(slot));
+            return Result.err(HomeError.VETOED);
         }
         // Aggregate transition succeeded; apply the economy charge before committing to storage.
         Result<Unit, HomeError> charged = charge.charge(owner, HomeChargeKind.RELOCATE);

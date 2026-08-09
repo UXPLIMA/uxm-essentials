@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
  * @param worldLookup world identity resolution by name or uid
  * @param playerLocator a player's current position
  * @param events the in-process domain-event publisher
+ * @param gate whether whatever is outside the plugin allows an action a use case is about to take
  * @param log operator-facing diagnostics
  */
 public record KernelPorts(
@@ -50,7 +52,8 @@ public record KernelPorts(
         PlayerLocator playerLocator,
         DomainEventPublisher events,
         Logger log,
-        SkinTextures skins) {
+        SkinTextures skins,
+        DomainGate gate) {
 
     public KernelPorts {
         Objects.requireNonNull(scheduler, "scheduler");
@@ -65,6 +68,40 @@ public record KernelPorts(
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(skins, "skins");
+        Objects.requireNonNull(gate, "gate");
+    }
+
+    /**
+     * The ports with nothing outside the plugin able to refuse an action. The form every caller uses that is not
+     * bootstrap: only the plugin's own wiring has a Bukkit event bus to put the question to.
+     */
+    public KernelPorts(
+            Scheduler scheduler,
+            Permissions permissions,
+            Cooldowns cooldowns,
+            Warmups warmups,
+            Messages messages,
+            MessageSink messageSink,
+            PlayerLookup playerLookup,
+            WorldLookup worldLookup,
+            PlayerLocator playerLocator,
+            DomainEventPublisher events,
+            Logger log,
+            SkinTextures skins) {
+        this(
+                scheduler,
+                permissions,
+                cooldowns,
+                warmups,
+                messages,
+                messageSink,
+                playerLookup,
+                worldLookup,
+                playerLocator,
+                events,
+                log,
+                skins,
+                DomainGate.allowAll());
     }
 
     /**

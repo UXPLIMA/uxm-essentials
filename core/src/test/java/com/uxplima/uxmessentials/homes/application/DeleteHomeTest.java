@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -51,7 +52,22 @@ class DeleteHomeTest {
     void setUp() {
         repository = new FakeHomeRepository();
         invites = new FakeInviteRepository();
-        deleteHome = new DeleteHome(repository, invites, silentNotifier(), new RecordingPublisher());
+        deleteHome =
+                new DeleteHome(repository, invites, silentNotifier(), new RecordingPublisher(), DomainGate.allowAll());
+    }
+
+    @Test
+    void aVetoedDeleteKeepsTheHomeAndItsInvites() {
+        repository.save(Home.create(OWNER, SLOT, Position.of(WORLD, 1, 64, 1), Instant.EPOCH));
+        invites.addInvite(OWNER, SLOT, UUID.randomUUID());
+        DeleteHome vetoed =
+                new DeleteHome(repository, invites, silentNotifier(), new RecordingPublisher(), proposal -> false);
+
+        Result<Unit, HomeError> result = vetoed.delete(OWNER, SLOT);
+
+        assertThat(result.errorOrThrow()).isEqualTo(HomeError.VETOED);
+        assertThat(repository.findSlot(OWNER, SLOT)).isPresent();
+        assertThat(invites.removeAllCalls).isEmpty();
     }
 
     @Test

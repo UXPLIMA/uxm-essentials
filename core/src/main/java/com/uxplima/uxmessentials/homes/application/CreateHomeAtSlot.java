@@ -12,8 +12,10 @@ import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.homes.domain.event.HomeCreating;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -36,6 +38,7 @@ public final class CreateHomeAtSlot {
     private final List<SethomeGuard> guards;
     private final Notifier notifier;
     private final DomainEventPublisher events;
+    private final DomainGate gate;
     private final HomeCharge charge;
     private final int unlimitedMaxSlots;
     private final Clock clock;
@@ -47,6 +50,7 @@ public final class CreateHomeAtSlot {
             List<SethomeGuard> guards,
             Notifier notifier,
             DomainEventPublisher events,
+            DomainGate gate,
             HomeCharge charge,
             int unlimitedMaxSlots,
             Clock clock) {
@@ -56,6 +60,7 @@ public final class CreateHomeAtSlot {
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.gate = Objects.requireNonNull(gate, "gate");
         this.charge = Objects.requireNonNull(charge, "charge");
         if (unlimitedMaxSlots < 0) {
             throw new IllegalArgumentException("unlimitedMaxSlots must not be negative: " + unlimitedMaxSlots);
@@ -80,6 +85,12 @@ public final class CreateHomeAtSlot {
         Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, limit, max, clock.instant());
         if (outcome.isErr()) {
             return reject(set, limit, outcome.errorOrThrow());
+        }
+        // Everything uxmEssentials itself would refuse has now passed, so this is the point to ask whether anybody
+        // outside the plugin refuses it. Before the charge, so a vetoed create never takes the player's money.
+        if (!gate.allows(new HomeCreating(owner, slot, at))) {
+            notifier.send(owner, HomeError.VETOED.messageKey(), placeholders(slot));
+            return Result.err(HomeError.VETOED);
         }
         // Aggregate transition succeeded; apply the economy charge before committing to storage.
         Result<Unit, HomeError> charged = charge.charge(owner, HomeChargeKind.CREATE);

@@ -178,6 +178,9 @@ public final class TeleportArrivalHud {
         return new ArrivalMessage(type, message, fadeIn, stay, fadeOut, duration);
     }
 
+    // Named immutable because the message-lookup path takes its accessor as a MessageKey, and a key has to be one.
+    // It already is: six components, all of them strings and ints.
+    @com.google.errorprone.annotations.Immutable
     private record ArrivalMessage(
             String type, String message, int fadeInMs, int stayMs, int fadeOutMs, int durationSecs) {}
 }

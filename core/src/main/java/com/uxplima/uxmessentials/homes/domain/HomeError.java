@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.homes.domain;
 
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 
 /**
  * The modelled failures a home operation can produce. Each value carries the {@link HomesMessageKey} the
@@ -32,16 +34,21 @@ public enum HomeError {
     CANNOT_AFFORD(HomesMessageKey.HOME_CANNOT_AFFORD),
 
     /** A visit to another owner's home that is neither public nor extended an invite to the actor. */
-    NOT_ACCESSIBLE(HomesMessageKey.HOME_NOT_ACCESSIBLE);
+    NOT_ACCESSIBLE(HomesMessageKey.HOME_NOT_ACCESSIBLE),
 
-    private final HomesMessageKey messageKey;
+    /** Another plugin refused the action through the developer API. Nothing was written. */
+    VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 
-    HomeError(HomesMessageKey messageKey) {
+    // Typed as the MessageKey interface rather than the context's own enum: a veto is refused for the same reason
+    // in every context, so it renders one shared key rather than twenty near-identical ones.
+    private final MessageKey messageKey;
+
+    HomeError(MessageKey messageKey) {
         this.messageKey = messageKey;
     }
 
     /** The catalog key the adapter renders for this failure. */
-    public HomesMessageKey messageKey() {
+    public MessageKey messageKey() {
         return messageKey;
     }
 }

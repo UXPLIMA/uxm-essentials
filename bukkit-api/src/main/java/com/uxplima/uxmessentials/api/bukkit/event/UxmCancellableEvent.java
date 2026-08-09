@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The base of every uxmEssentials pre-event: an action that has not happened yet, and that you may cancel.
  *
- * <h2>These are asynchronous, and that is deliberate</h2>
+ * <h2>Treat these as asynchronous</h2>
  * uxmEssentials runs its use cases off the tick thread, because they hit the database. The veto question therefore
  * reaches you on that thread, and two rules follow. Breaking either breaks the server rather than us:
  *
@@ -39,7 +39,10 @@ public abstract class UxmCancellableEvent extends Event implements Cancellable {
     private boolean cancelled;
 
     protected UxmCancellableEvent(UUID subjectId, String subjectName) {
-        super(true); // asynchronous: fired from the use case's own thread, off the tick
+        // Whichever thread the use case is on is the thread you get, because the answer is needed before it can go
+        // any further. In practice that is an async one; the flag simply tells the truth about it rather than
+        // asserting a thread the caller never promised.
+        super(!Bukkit.isPrimaryThread());
         this.subjectId = Objects.requireNonNull(subjectId, "subjectId");
         this.subjectName = Objects.requireNonNull(subjectName, "subjectName");
     }

@@ -21,6 +21,10 @@ java {
 dependencies {
     "compileOnly"(libs.jspecify)
     "testCompileOnly"(libs.jspecify)
+    // Error Prone's own annotations, so a type can declare itself immutable where the checker cannot see it.
+    // compileOnly: they are @Retention(CLASS) markers the compiler reads and nothing needs at runtime.
+    "compileOnly"(libs.errorprone.annotations)
+    "testCompileOnly"(libs.errorprone.annotations)
     "errorprone"(libs.errorprone.core)
     "errorprone"(libs.nullaway)
 

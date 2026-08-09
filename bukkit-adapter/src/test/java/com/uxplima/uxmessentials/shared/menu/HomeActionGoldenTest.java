@@ -55,6 +55,7 @@ import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimServic
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -232,8 +233,8 @@ class HomeActionGoldenTest {
                 new AllowAllPermissions(),
                 scheduler,
                 new TeleportHome(repository, teleporter, notifier, freeCharge()),
-                new DeleteHome(repository, new NoInvites(), notifier, events),
-                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
+                new DeleteHome(repository, new NoInvites(), notifier, events, DomainGate.allowAll()),
+                new RelocateHome(repository, List.of(), notifier, events, DomainGate.allowAll(), freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
                 new SetHomeVisibility(repository, notifier, events, clock),
                 repository,

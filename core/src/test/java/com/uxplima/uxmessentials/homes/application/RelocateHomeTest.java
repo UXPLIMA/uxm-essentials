@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.homes.domain.event.HomeRelocated;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -98,9 +99,32 @@ class RelocateHomeTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void aVetoedRelocateLeavesTheHomeWhereItWas() {
+        repository.save(Home.create(OWNER, HomeSlot.of(0), at(1, 64, 1), CLOCK.instant()));
+        RelocateHome vetoed = new RelocateHome(
+                repository,
+                List.of(),
+                notifier.notifier(),
+                events,
+                proposal -> false,
+                new HomeCharge(stubPermissions(), Optional.empty(), HomeChargeSettings.allFree()),
+                CLOCK);
+
+        Result<Unit, HomeError> result = vetoed.relocate(OWNER, HomeSlot.of(0), at(10, 65, 10));
+
+        assertThat(result.errorOrThrow()).isEqualTo(HomeError.VETOED);
+        assertThat(events.published).isEmpty();
+        assertThat(repository.findSlot(OWNER, HomeSlot.of(0)))
+                .isPresent()
+                .get()
+                .extracting(home -> home.location().blockX())
+                .isEqualTo(1);
+    }
+
     private RelocateHome useCase(List<SethomeGuard> guards) {
         HomeCharge charge = new HomeCharge(stubPermissions(), Optional.empty(), HomeChargeSettings.allFree());
-        return new RelocateHome(repository, guards, notifier.notifier(), events, charge, CLOCK);
+        return new RelocateHome(repository, guards, notifier.notifier(), events, DomainGate.allowAll(), charge, CLOCK);
     }
 
     private static Permissions stubPermissions() {

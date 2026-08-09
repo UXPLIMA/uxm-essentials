@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -24,13 +25,17 @@ import com.uxplima.uxmessentials.homes.domain.HomeCost;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.homes.domain.event.HomeCreating;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.DomainProposal;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -138,14 +143,74 @@ class CreateHomeAtSlotTest {
         assertThat(notifier.lastKey).isEqualTo(HomesMessageKey.HOME_CANNOT_AFFORD);
     }
 
+    @Test
+    void aVetoedCreateSavesNothingAndTellsThePlayerItWasBlocked() {
+        permissions.cap = 3;
+
+        Result<Unit, HomeError> result =
+                useCase(List.of(), freeCharge(), proposal -> false).create(OWNER, HomeSlot.of(0), at(1, 2, 3));
+
+        assertThat(result.errorOrThrow()).isEqualTo(HomeError.VETOED);
+        assertThat(repository.findSlot(OWNER, HomeSlot.of(0))).isEmpty();
+        assertThat(events.published).isEmpty();
+        assertThat(notifier.lastKey).isEqualTo(SharedMessageKey.COMMON_ACTION_VETOED);
+    }
+
+    @Test
+    void theGateIsAskedAboutTheHomeThatWouldBeCreated() {
+        permissions.cap = 3;
+        List<DomainProposal> asked = new ArrayList<>();
+
+        useCase(List.of(), freeCharge(), proposal -> {
+                    asked.add(proposal);
+                    return true;
+                })
+                .create(OWNER, HomeSlot.of(2), at(1, 2, 3));
+
+        assertThat(asked).containsExactly(new HomeCreating(OWNER, HomeSlot.of(2), at(1, 2, 3)));
+    }
+
+    @Test
+    void theGateIsAskedBeforeTheOwnerIsCharged() {
+        // The order matters the other way round from what it might look like: asking first means a refused create
+        // never has to be refunded, which is the one ordering that cannot leave the owner out of pocket.
+        permissions.cap = 3;
+        HomeCost cost = HomeCost.of(new BigDecimal("50.00"));
+        HomeCharge charge = new HomeCharge(
+                permissions, Optional.of(new AlwaysFailEconomy()), new HomeChargeSettings(cost, cost, cost));
+        List<DomainProposal> asked = new ArrayList<>();
+
+        Result<Unit, HomeError> result = useCase(List.of(), charge, proposal -> {
+                    asked.add(proposal);
+                    return true;
+                })
+                .create(OWNER, HomeSlot.of(0), at(1, 2, 3));
+
+        assertThat(result.errorOrThrow()).isEqualTo(HomeError.CANNOT_AFFORD);
+        assertThat(asked).hasSize(1);
+    }
+
     private CreateHomeAtSlot useCase(List<SethomeGuard> guards) {
         return useCase(guards, freeCharge());
     }
 
     private CreateHomeAtSlot useCase(List<SethomeGuard> guards, HomeCharge charge) {
+        return useCase(guards, charge, DomainGate.allowAll());
+    }
+
+    private CreateHomeAtSlot useCase(List<SethomeGuard> guards, HomeCharge charge, DomainGate gate) {
         HomeQuota quota = new HomeQuota(permissions, 0, Permissions.QuotaReduction.MAX);
         return new CreateHomeAtSlot(
-                repository, invites, quota, guards, notifier.notifier(), events, charge, UNLIMITED_MAX_SLOTS, CLOCK);
+                repository,
+                invites,
+                quota,
+                guards,
+                notifier.notifier(),
+                events,
+                gate,
+                charge,
+                UNLIMITED_MAX_SLOTS,
+                CLOCK);
     }
 
     private HomeCharge freeCharge() {

@@ -210,12 +210,22 @@ public final class HomesWiring {
         List<SethomeGuard> guards = buildGuards(ctx);
         HomeCharge charge = buildCharge(ctx, kernel, homeEconomy);
         CreateHomeAtSlot createHome = new CreateHomeAtSlot(
-                repository, invites, quota, guards, notifier, kernel.events(), charge, unlimitedMax, clock);
-        RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), charge, clock);
+                repository,
+                invites,
+                quota,
+                guards,
+                notifier,
+                kernel.events(),
+                kernel.gate(),
+                charge,
+                unlimitedMax,
+                clock);
+        RelocateHome relocateHome =
+                new RelocateHome(repository, guards, notifier, kernel.events(), kernel.gate(), charge, clock);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
         SetHomeVisibility setHomeVisibility = new SetHomeVisibility(repository, notifier, kernel.events(), clock);
-        DeleteHome deleteHome = new DeleteHome(repository, invites, notifier, kernel.events());
+        DeleteHome deleteHome = new DeleteHome(repository, invites, notifier, kernel.events(), kernel.gate());
         TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier, charge);
         ListHomes listHomes = new ListHomes(repository);
         ListHomeInvites listHomeInvites = new ListHomeInvites(invites);
