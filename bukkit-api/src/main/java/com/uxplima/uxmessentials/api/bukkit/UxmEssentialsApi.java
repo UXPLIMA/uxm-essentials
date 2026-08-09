@@ -33,9 +33,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Events</h2>
  * Listening needs nothing from this interface: the event classes under {@code com.uxplima.uxmessentials.api.bukkit
- * .event} are ordinary Bukkit events you register a listener for. Each context has a cancellable
- * {@code Uxm<Context>Pre<Action>Event}, fired asynchronously before the action happens, and a notification
- * {@code Uxm<Context><Action>Event}, delivered on a tick thread after it has.
+ * .event} are ordinary Bukkit events you register a listener for. Everything the plugin does publishes a
+ * notification {@code Uxm<Thing><Action>Event}, delivered on the tick thread that owns its subject once the action
+ * has happened. The operations that can be refused with nothing half-done also publish a cancellable
+ * {@code Uxm<Thing>Pre<Action>Event} beforehand, fired on whichever thread the operation is on; there are nine of
+ * them, and they are listed in the developer documentation.
  *
  * <h2>Disabled modules</h2>
  * A disabled module fires no events and answers no queries. Ask {@link #isModuleEnabled(String)} rather than
