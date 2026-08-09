@@ -4,7 +4,10 @@ class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
 interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional economy()
   Optional homes()
+  Optional kits()
+  Optional moderation()
   Optional playerWarps()
+  Optional vaults()
   Optional warps()
   String version()
   boolean isModuleEnabled(String)
@@ -625,12 +628,30 @@ interface com.uxplima.uxmessentials.api.query.UxmHomesQuery
   CompletableFuture get(UUID, int)
   CompletableFuture limit(UUID)
   CompletableFuture list(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmKitsQuery
+  CompletableFuture canClaim(UUID, String)
+  CompletableFuture claimableBy(UUID)
+  CompletableFuture cooldownRemaining(UUID, String)
+  List list()
+  Optional get(String)
+interface com.uxplima.uxmessentials.api.query.UxmModerationQuery
+  CompletableFuture ban(UUID)
+  CompletableFuture history(UUID, int)
+  CompletableFuture jail(UUID)
+  CompletableFuture mute(UUID)
+  CompletableFuture warns(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery
   CompletableFuture count(UUID)
   CompletableFuture get(String)
   CompletableFuture limit(UUID)
   CompletableFuture listPublic(int, int)
   CompletableFuture ownedBy(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmVaultsQuery
+  CompletableFuture count(UUID)
+  CompletableFuture get(UUID, int)
+  CompletableFuture limit(UUID)
+  CompletableFuture list(UUID)
+  CompletableFuture rows(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmWarpsQuery
   CompletableFuture averageRating(String)
   CompletableFuture exists(String)
@@ -679,6 +700,23 @@ record com.uxplima.uxmessentials.api.view.UxmIssuer
   boolean equals(Object)
   boolean isConsole()
   int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmKit
+  <init>(String, String, Duration, boolean, boolean, Optional, Optional, Optional, int, boolean, Optional)
+  Duration cooldown()
+  Optional category()
+  Optional cost()
+  Optional permissionNode()
+  Optional stockLimit()
+  String displayName()
+  String id()
+  String toString()
+  boolean equals(Object)
+  boolean firstJoin()
+  boolean isFree()
+  boolean oneTime()
+  boolean requiresPermission()
+  int hashCode()
+  int itemCount()
 record com.uxplima.uxmessentials.api.view.UxmLocation
   <init>(String, double, double, double)
   <init>(String, double, double, double, float, float)
@@ -761,6 +799,44 @@ enum com.uxplima.uxmessentials.api.view.UxmPurgeScope
   com.uxplima.uxmessentials.api.view.UxmPurgeScope[] values()
   com.uxplima.uxmessentials.api.view.UxmPurgeScope RADIUS
   com.uxplima.uxmessentials.api.view.UxmPurgeScope WORLD
+record com.uxplima.uxmessentials.api.view.UxmSanction
+  <init>(com.uxplima.uxmessentials.api.view.UxmSanctionKind, UUID, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Instant, Optional)
+  Instant issuedAt()
+  Optional expiresAt()
+  Optional reason()
+  String toString()
+  UUID playerId()
+  boolean equals(Object)
+  boolean isPermanent()
+  com.uxplima.uxmessentials.api.view.UxmIssuer issuer()
+  com.uxplima.uxmessentials.api.view.UxmSanctionKind kind()
+  int hashCode()
+enum com.uxplima.uxmessentials.api.view.UxmSanctionAction
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction[] values()
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction BAN
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction KICK
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction MUTE
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction UNBAN
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction UNMUTE
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction WARN
+enum com.uxplima.uxmessentials.api.view.UxmSanctionKind
+  com.uxplima.uxmessentials.api.view.UxmSanctionKind valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmSanctionKind[] values()
+  com.uxplima.uxmessentials.api.view.UxmSanctionKind BAN
+  com.uxplima.uxmessentials.api.view.UxmSanctionKind JAIL
+  com.uxplima.uxmessentials.api.view.UxmSanctionKind MUTE
+record com.uxplima.uxmessentials.api.view.UxmSanctionRecord
+  <init>(com.uxplima.uxmessentials.api.view.UxmSanctionAction, UUID, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Instant, Optional)
+  Instant at()
+  Optional expiry()
+  Optional reason()
+  String toString()
+  UUID playerId()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmIssuer actor()
+  com.uxplima.uxmessentials.api.view.UxmSanctionAction action()
+  int hashCode()
 enum com.uxplima.uxmessentials.api.view.UxmSpeedKind
   com.uxplima.uxmessentials.api.view.UxmSpeedKind valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmSpeedKind[] values()
@@ -783,6 +859,16 @@ enum com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection
   com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection[] values()
   com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection TO_REQUESTER
   com.uxplima.uxmessentials.api.view.UxmTeleportRequestDirection TO_TARGET
+record com.uxplima.uxmessentials.api.view.UxmVault
+  <init>(UUID, int, Optional, Optional)
+  Optional displayName()
+  Optional icon()
+  String label()
+  String toString()
+  UUID ownerId()
+  boolean equals(Object)
+  int hashCode()
+  int index()
 enum com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason[] values()
@@ -791,6 +877,15 @@ enum com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason INTERACTED
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason MOVED
   com.uxplima.uxmessentials.api.view.UxmWarmupCancelReason ROTATED
+record com.uxplima.uxmessentials.api.view.UxmWarn
+  <init>(com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Instant, Optional)
+  Instant issuedAt()
+  Optional expiresAt()
+  Optional reason()
+  String toString()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmIssuer issuer()
+  int hashCode()
 record com.uxplima.uxmessentials.api.view.UxmWarp
   <init>(String, com.uxplima.uxmessentials.api.view.UxmLocation, UUID, String, Instant, Optional, Optional, long, boolean, boolean, Optional, Optional)
   Instant createdAt()

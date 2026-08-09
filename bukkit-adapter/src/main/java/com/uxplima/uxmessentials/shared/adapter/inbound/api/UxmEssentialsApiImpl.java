@@ -8,7 +8,10 @@ import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
@@ -85,5 +88,20 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmEconomyQuery> economy() {
         return queries.find(UxmEconomyQuery.class);
+    }
+
+    @Override
+    public Optional<UxmKitsQuery> kits() {
+        return queries.find(UxmKitsQuery.class);
+    }
+
+    @Override
+    public Optional<UxmVaultsQuery> vaults() {
+        return queries.find(UxmVaultsQuery.class);
+    }
+
+    @Override
+    public Optional<UxmModerationQuery> moderation() {
+        return queries.find(UxmModerationQuery.class);
     }
 }

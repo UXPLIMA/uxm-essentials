@@ -83,6 +83,9 @@ class FrontDoorWiringTest {
         assertThat(api.warps()).isEmpty();
         assertThat(api.playerWarps()).isEmpty();
         assertThat(api.economy()).isEmpty();
+        assertThat(api.kits()).isEmpty();
+        assertThat(api.vaults()).isEmpty();
+        assertThat(api.moderation()).isEmpty();
     }
 
     @Test

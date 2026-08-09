@@ -289,6 +289,7 @@ public final class ModerationWiring {
                 services.freeze(),
                 services.tempBan(),
                 repository,
+                sanctionHistory,
                 clock,
                 guiViews);
     }
@@ -502,6 +503,7 @@ public final class ModerationWiring {
             Freeze freeze,
             TempBan tempBan,
             ModerationRepository repository,
+            SanctionHistory sanctionHistory,
             Clock clock,
             ModerationGuiViews guiViews) {
 
@@ -515,6 +517,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(freeze, "freeze");
             Objects.requireNonNull(tempBan, "tempBan");
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(sanctionHistory, "sanctionHistory");
             Objects.requireNonNull(clock, "clock");
             Objects.requireNonNull(guiViews, "guiViews");
         }

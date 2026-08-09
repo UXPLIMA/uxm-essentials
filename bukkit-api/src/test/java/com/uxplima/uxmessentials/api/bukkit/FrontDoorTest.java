@@ -9,7 +9,10 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -113,6 +116,21 @@ class FrontDoorTest {
 
         @Override
         public Optional<UxmEconomyQuery> economy() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmKitsQuery> kits() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmVaultsQuery> vaults() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmModerationQuery> moderation() {
             return Optional.empty();
         }
     }

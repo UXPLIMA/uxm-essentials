@@ -24,7 +24,10 @@ import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
@@ -67,6 +70,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.invrollback.adapter.InvrollbackWiring;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
+import com.uxplima.uxmessentials.kits.adapter.outbound.api.KitQueries;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
 import com.uxplima.uxmessentials.messaging.adapter.MutableAfkStatus;
@@ -77,6 +81,7 @@ import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationQueries;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
 import com.uxplima.uxmessentials.persistence.communication.AnnouncementStores;
@@ -230,6 +235,7 @@ import com.uxplima.uxmessentials.trade.adapter.TradeWiring;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.vanish.adapter.VanishWiring;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
+import com.uxplima.uxmessentials.vaults.adapter.outbound.api.VaultQueries;
 import com.uxplima.uxmessentials.villagers.adapter.VillagersWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
@@ -1703,6 +1709,13 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         links.placeholders.kits(new KitAccessPlaceholders(wired.repository(), wired.access(), wired.listKits()));
+        links.queries.register(
+                UxmKitsQuery.class,
+                new KitQueries(
+                        wired.repository(),
+                        wired.access(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Open the same /kit browse menu from the management hub, resolving the viewer's available kits through
         // the identical ListKits filter the command uses, gated by the existing kit-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
@@ -1857,6 +1870,14 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.placeholders.moderation(new GateModerationPlaceholders(
                 wired.mutePolicy(), wired.jailGate(), wired.repository(), wired.sanctions(), wired.clock()));
+        links.queries.register(
+                UxmModerationQuery.class,
+                new ModerationQueries(
+                        wired.repository(),
+                        wired.sanctionHistory(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler(),
+                        wired.clock()));
         // Register the moderation management GUI on the /uxmess gui hub, gated by the moderation GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "moderation",
@@ -1927,6 +1948,14 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.placeholders.vaults(
                 new RepositoryVaultsPlaceholders(wired.repository(), wired.amountQuota(), wired.sizeQuota()));
+        links.queries.register(
+                UxmVaultsQuery.class,
+                new VaultQueries(
+                        wired.repository(),
+                        wired.amountQuota(),
+                        wired.sizeQuota(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Open the same /vault selector from the management hub, gated by the existing vault-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "vaults",

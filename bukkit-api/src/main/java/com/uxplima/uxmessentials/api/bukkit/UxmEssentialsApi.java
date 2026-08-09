@@ -6,7 +6,10 @@ import java.util.function.Consumer;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
+import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -79,6 +82,15 @@ public interface UxmEssentialsApi {
 
     /** Reading balances and the leaderboard, or empty when the economy module is switched off. */
     Optional<UxmEconomyQuery> economy();
+
+    /** Reading the kit catalogue and what a player may claim, or empty when the kits module is switched off. */
+    Optional<UxmKitsQuery> kits();
+
+    /** Reading a player's vaults, or empty when the vaults module is switched off. */
+    Optional<UxmVaultsQuery> vaults();
+
+    /** Reading punishments and history, or empty when the moderation module is switched off. */
+    Optional<UxmModerationQuery> moderation();
 
     /** The API, or {@code null} when uxmEssentials is absent, still loading, or shutting down. */
     static @Nullable UxmEssentialsApi get() {
