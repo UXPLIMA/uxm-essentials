@@ -1,4 +1,7 @@
-plugins { id("uxmessentials.java-conventions") }
+plugins {
+    id("uxmessentials.java-conventions")
+    id("uxmessentials.publish-conventions")
+}
 
 dependencies {
     compileOnly(libs.jspecify)

@@ -95,6 +95,37 @@ jobs:
             uxmEssentials/discord-adapter/build/libs/uxmEssentials-discord-*.jar
             uxmEssentials/redis-adapter/build/libs/uxmEssentials-redis-*.jar
 
+      # The developer API artifacts go to a Maven repository that is just a branch of this repository, served over
+      # raw.githubusercontent. Nothing has to be configured for that URL to work, which is the whole point: the
+      # uxmLib coordinate was broken for two months because the build consumed the library through includeBuild and
+      # never once resolved what had been published. Files are copied over the existing tree rather than replacing
+      # it, so every earlier version stays resolvable.
+      - name: Publish the API artifacts to the maven branch
+        working-directory: uxmEssentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ./gradlew publishAllPublicationsToLocalRepoRepository
+          tmp="$(mktemp -d)"
+          git init -q "$tmp"
+          git -C "$tmp" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git -C "$tmp" fetch -q --depth 1 origin maven; then
+            git -C "$tmp" checkout -q -B maven FETCH_HEAD
+          else
+            git -C "$tmp" checkout -q --orphan maven
+          fi
+          cp -r build/maven-repo/. "$tmp/"
+          git -C "$tmp" add -A
+          if git -C "$tmp" diff --cached --quiet; then
+            echo "the maven branch already carries ${TAG#v}, leaving it alone"
+          else
+            git -C "$tmp" -c user.name='uxplima-ci' -c user.email='ci@uxplima.com' \
+              commit -q -m "publish the developer api ${TAG#v}"
+            git -C "$tmp" push -q origin maven
+          fi
+
       # The same four jars onto the four Modrinth projects, straight through the v2 API. No publishing action sits
       # in between on purpose: they resolve the game versions against a list of their own, and this plugin targets
       # the 26.x line, which is exactly the kind of version such a list is last to learn.

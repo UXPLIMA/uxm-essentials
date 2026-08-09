@@ -1,4 +1,7 @@
-plugins { id("uxmessentials.java-conventions") }
+plugins {
+    id("uxmessentials.java-conventions")
+    id("uxmessentials.publish-conventions")
+}
 
 dependencies {
     // The pure API travels with this artifact so a consumer needs a single coordinate: the event classes
