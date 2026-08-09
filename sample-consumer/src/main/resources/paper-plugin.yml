@@ -1,0 +1,9 @@
+name: UxmHooks
+version: '1.0.0'
+main: com.example.uxmhooks.UxmHooksPlugin
+api-version: '1.21'
+authors: ['UXPLIMA']
+description: 'Example plugin showing how to listen to and veto uxmEssentials operations.'
+
+# No dependency entry on purpose. UxmEssentialsApi.whenReady handles both load orders, and Bukkit delivers events
+# from a plugin that loaded later just the same, so declaring one would only make this plugin harder to install.

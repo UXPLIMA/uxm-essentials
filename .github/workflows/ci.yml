@@ -54,6 +54,23 @@ jobs:
           :discord-adapter:shadowJar
           :redis-adapter:shadowJar
 
+      # The developer API is only real if somebody outside this build can resolve and compile against it. Nothing
+      # else in CI would notice a broken coordinate, a POM that forgot its dependency, or a type that moved out of
+      # the published packages, because every module here consumes the API as a project dependency. So the sample
+      # consumer is built as its own Gradle build, against the artifacts this very commit publishes. uxmLib was
+      # broken at its published coordinate for two months for exactly this reason.
+      - name: Publish the API to a local repository
+        working-directory: uxmEssentials
+        run: ./gradlew publishAllPublicationsToLocalRepoRepository
+
+      - name: Compile the sample consumer against the published artifacts
+        working-directory: uxmEssentials
+        env:
+          REPO: file://${{ github.workspace }}/uxmEssentials/build/maven-repo
+        run: |
+          version=$(./gradlew -q printVersion)
+          ./gradlew -p sample-consumer build showResolvedApi -PuxmRepo="$REPO" -PuxmVersion="$version"
+
       - name: Upload the test reports
         if: failure()
         uses: actions/upload-artifact@v4

@@ -18,3 +18,10 @@ allprojects {
         maven("https://repo.opencollab.dev/main/")                  // Floodgate/Cumulus Bedrock-form API
     }
 }
+
+// The one place the version number lives, readable from a shell. The release workflow and the sample-consumer
+// job both need it, and parsing it out of this file with sed is how that kind of thing goes wrong quietly.
+tasks.register("printVersion") {
+    val current = version.toString()
+    doLast { println(current) }
+}
