@@ -157,7 +157,8 @@ public final class AnnouncementEditorView {
         EntityListLayout listLayout = guiLayouts.loadEntityList(
                 MODULE,
                 LIST_LAYOUT,
-                EntityListLayout.withCreate(Material.PAPER, DEFAULT_CREATE_SLOT, Material.LIME_DYE));
+                EntityListLayout.withCreate(Material.PAPER, DEFAULT_CREATE_SLOT, Material.LIME_DYE)
+                        .withAction(SETTINGS_BUTTON_SLOT, Material.COMPARATOR));
         EntityEditorLayout settingsLayout = guiLayouts.loadEntityEditor(
                 MODULE, SETTINGS_LAYOUT, EntityEditorLayout.codeDefault(SETTINGS_PROPERTY_SLOTS, SETTINGS_BACK_SLOT));
         this.settings = EntityEditorView.builder()
@@ -185,11 +186,7 @@ public final class AnnouncementEditorView {
                 .iconRenderer(this::listIcon)
                 .onSelect((player, announcement) -> editor.open(player, BukkitRefs.toRef(player), announcement))
                 .onCreate(CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_CREATE, this::promptCreate)
-                .onAction(
-                        SETTINGS_BUTTON_SLOT,
-                        Material.COMPARATOR,
-                        CommunicationMessageKey.ANNOUNCE_SETTINGS_BUTTON,
-                        this::openSettings)
+                .onAction(CommunicationMessageKey.ANNOUNCE_SETTINGS_BUTTON, this::openSettings)
                 .build();
     }
 

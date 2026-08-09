@@ -3,13 +3,11 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalInt;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -42,9 +40,9 @@ import org.jspecify.annotations.Nullable;
  * {@link java.util.concurrent.atomic.AtomicReference} snapshot), so the imperative icon renderer reads only that and
  * never touches Bukkit on a background thread.
  *
- * <p>A caller may also wire one optional <em>action button</em> at a fixed slot — a non-entity control such as a
- * settings opener — through {@code onAction}. It is drawn over the filler at its slot and its click runs the
- * supplied handler; the list stays the same paginated entity browser otherwise.
+ * <p>A caller may also wire one optional <em>action button</em>: a non-entity control such as a settings opener,
+ * through {@code onAction}. It is drawn over the filler at the slot and with the material the layout names, and its
+ * click runs the supplied handler; the list stays the same paginated entity browser otherwise.
  *
  * @param <T> the managed entity type
  */
@@ -63,8 +61,6 @@ public final class EntityListView<T> {
     private final BiFunction<PlayerRef, T, ItemStack> iconRenderer;
     private final BiConsumer<Player, T> onSelect;
     private final @Nullable Consumer<Player> onCreate;
-    private final OptionalInt actionSlot;
-    private final Material actionIcon;
     private final @Nullable MessageKey actionName;
     private final @Nullable Consumer<Player> onAction;
 
@@ -82,8 +78,6 @@ public final class EntityListView<T> {
         this.iconRenderer = Objects.requireNonNull(builder.iconRenderer, "iconRenderer");
         this.onSelect = Objects.requireNonNull(builder.onSelect, "onSelect");
         this.onCreate = builder.onCreate;
-        this.actionSlot = builder.actionSlot;
-        this.actionIcon = builder.actionIcon;
         this.actionName = builder.actionName;
         this.onAction = builder.onAction;
     }
@@ -130,8 +124,9 @@ public final class EntityListView<T> {
             spec.onCreate(
                     layout.createSlot().getAsInt(), layout.createIcon(), guiText.text(viewer, createName), onCreate);
         }
-        if (onAction != null && actionName != null && actionSlot.isPresent()) {
-            spec.onAction(actionSlot.getAsInt(), actionIcon, guiText.text(viewer, actionName), onAction);
+        if (onAction != null && actionName != null && layout.actionSlot().isPresent()) {
+            spec.onAction(
+                    layout.actionSlot().getAsInt(), layout.actionIcon(), guiText.text(viewer, actionName), onAction);
         }
         return spec.build();
     }
@@ -173,8 +168,6 @@ public final class EntityListView<T> {
         private @Nullable BiFunction<PlayerRef, T, ItemStack> iconRenderer;
         private @Nullable BiConsumer<Player, T> onSelect;
         private @Nullable Consumer<Player> onCreate;
-        private OptionalInt actionSlot = OptionalInt.empty();
-        private Material actionIcon = Material.COMPARATOR;
         private @Nullable MessageKey actionName;
         private @Nullable Consumer<Player> onAction;
 
@@ -245,12 +238,11 @@ public final class EntityListView<T> {
         }
 
         /**
-         * Wire one optional action button at {@code slot}: a non-entity control (e.g. a settings opener) drawn over
-         * the filler with {@code icon} and {@code name}, whose click runs {@code onAction}.
+         * Wire the optional action button: a non-entity control (e.g. a settings opener) drawn over the filler under
+         * {@code name}, whose click runs {@code onAction}. The layout supplies its slot and material, so a list whose
+         * layout names no {@code action-slot} shows no such button.
          */
-        public Builder<T> onAction(int slot, Material icon, MessageKey name, Consumer<Player> onAction) {
-            this.actionSlot = OptionalInt.of(slot);
-            this.actionIcon = Objects.requireNonNull(icon, "icon");
+        public Builder<T> onAction(MessageKey name, Consumer<Player> onAction) {
             this.actionName = Objects.requireNonNull(name, "name");
             this.onAction = Objects.requireNonNull(onAction, "onAction");
             return this;

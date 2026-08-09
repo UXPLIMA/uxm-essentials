@@ -217,8 +217,9 @@ public final class GuiLayouts {
 
     /**
      * Resolve a shared-framework {@link EntityListLayout} (the paginated management list), falling back to the
-     * code default when no conf parses. Reads the {@link GuiLayout} geometry plus the list's own {@code filler}
-     * and optional {@code create-slot}/{@code create-icon}.
+     * code default when no conf parses. Reads the {@link GuiLayout} geometry plus the list's own {@code filler},
+     * its optional {@code create-slot}/{@code create-icon}, and the optional {@code action-slot}/{@code action-icon}
+     * of the one side control a caller may wire.
      */
     public EntityListLayout loadEntityList(String module, String name, EntityListLayout codeDefault) {
         ConfigurationNode root = root(module, name);
@@ -229,7 +230,9 @@ public final class GuiLayouts {
         Material filler = material(root.node("filler").getString(), codeDefault.filler());
         java.util.OptionalInt createSlot = optionalSlot(root.node("create-slot"), codeDefault.createSlot());
         Material createIcon = material(root.node("create-icon").getString(), codeDefault.createIcon());
-        return new EntityListLayout(base, filler, createSlot, createIcon);
+        java.util.OptionalInt actionSlot = optionalSlot(root.node("action-slot"), codeDefault.actionSlot());
+        Material actionIcon = material(root.node("action-icon").getString(), codeDefault.actionIcon());
+        return new EntityListLayout(base, filler, createSlot, createIcon, actionSlot, actionIcon);
     }
 
     /**

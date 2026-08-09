@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
@@ -49,13 +50,21 @@ import org.jspecify.annotations.NullMarked;
  * command and no listener, and holds no runtime state — so there is nothing to tear down on stop.
  *
  * <p>The region-list panel is opened through the menu engine's paginated list, so the context creates no raw
- * inventory. The list page size comes from the module config, applied here as the layout's content-slot count.
+ * inventory. Its three panels (the browser, the flag editor and the roster) read their geometry from
+ * {@code modules/regions/gui/*.conf}, falling back to the code defaults below when a file is absent; the list page
+ * size from the module config is what the shipped browser conf's content-slot count starts from.
  */
 @NullMarked
 public final class RegionsWiring {
 
+    /** The folder the three panel layouts are read from: {@code modules/regions/gui/<name>.conf}. */
+    private static final String MODULE = "regions";
+
     /** The full five content rows of a six-row chest; the nav row (slots 45..53) carries the prev/next buttons. */
     private static final int LIST_ROWS = 6;
+
+    /** The bottom-row slot the flag editor's "members and owners" button sits in, clear of the nav arrows. */
+    private static final int MEMBERS_BUTTON_SLOT = 53;
 
     private static final int PREV_SLOT = 48;
     private static final int NEXT_SLOT = 50;
@@ -76,12 +85,18 @@ public final class RegionsWiring {
 
     /** Build the regions adapters and the {@code /regions} command from the injected ports, menu engine and input seam. */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, ManagementGuiRegistry guiRegistry, Menus menus, TextInput textInput) {
+            Plugin plugin,
+            ModuleContext ctx,
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            TextInput textInput,
+            GuiLayouts guiLayouts) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         RegionsConfig config = RegionsConfig.from(ctx.config());
         GuiText guiText = new GuiText(kernel.messages());
@@ -94,7 +109,8 @@ public final class RegionsWiring {
                 kernel.messageSink(),
                 service,
                 kernel.playerLookup(),
-                EntityListLayout.paginatedDefault(Material.PLAYER_HEAD));
+                guiLayouts.loadEntityList(
+                        MODULE, "region-roster", EntityListLayout.paginatedDefault(Material.PLAYER_HEAD)));
         RegionFlagEditorView flagEditor = new RegionFlagEditorView(
                 menus,
                 guiText,
@@ -104,7 +120,11 @@ public final class RegionsWiring {
                 service,
                 textInput::prompt,
                 config.editableFlags(),
-                EntityListLayout.paginatedDefault(REGION_ICON),
+                guiLayouts.loadEntityList(
+                        MODULE,
+                        "region-flags",
+                        EntityListLayout.paginatedDefault(REGION_ICON)
+                                .withAction(MEMBERS_BUTTON_SLOT, Material.PLAYER_HEAD)),
                 openRosterOnClick(kernel, rosterView));
         RegionListView listView = new RegionListView(
                 menus,
@@ -113,7 +133,7 @@ public final class RegionsWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 service,
-                listLayout(config.listPageSize()),
+                guiLayouts.loadEntityList(MODULE, "region-list", listLayout(config.listPageSize())),
                 openEditorOnClick(kernel, flagEditor));
         RegionsCommand command = new RegionsCommand(
                 service,

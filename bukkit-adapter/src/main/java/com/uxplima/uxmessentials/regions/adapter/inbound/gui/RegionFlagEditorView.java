@@ -64,9 +64,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class RegionFlagEditorView {
 
-    /** The bottom-row slot the "members &amp; owners" button sits in, clear of the nav arrows at slots 48 and 50. */
-    private static final int MEMBERS_BUTTON_SLOT = 53;
-
     /** The filler and glass materials the choice picker paints its background with. */
     private static final Material PICKER_FILLER = Material.BLACK_STAINED_GLASS_PANE;
 
@@ -156,11 +153,7 @@ public final class RegionFlagEditorView {
                 .entities(() -> rows)
                 .iconRenderer(this::icon)
                 .onSelect((clicker, row) -> select(region, clicker, row))
-                .onAction(
-                        MEMBERS_BUTTON_SLOT,
-                        Material.PLAYER_HEAD,
-                        RegionsMessageKey.REGIONS_MEMBERS_ACTION,
-                        clicker -> onManageMembers.accept(clicker, region))
+                .onAction(RegionsMessageKey.REGIONS_MEMBERS_ACTION, clicker -> onManageMembers.accept(clicker, region))
                 .build()
                 .open(viewer, staff);
     }

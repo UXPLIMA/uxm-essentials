@@ -90,7 +90,8 @@ class RegionFlagEditorViewTest {
                 service,
                 prompt,
                 List.of(), // no allow-list: every registered flag shows
-                EntityListLayout.paginatedDefault(Material.GRAY_DYE),
+                // the members button sits where the shipped regions/gui/region-flags.conf puts it
+                EntityListLayout.paginatedDefault(Material.GRAY_DYE).withAction(53, Material.PLAYER_HEAD),
                 (clicker, region) -> manageMembersFor.add(region.id()));
     }
 

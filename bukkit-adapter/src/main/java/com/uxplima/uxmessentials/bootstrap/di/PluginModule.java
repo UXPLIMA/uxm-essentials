@@ -1051,7 +1051,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
             wireInvrollback(ctx, persistence, resources, menus);
         } else if (module.id().equals(ModuleId.of("regions"))) {
-            wireRegions(plugin, ctx, resources, guiRegistry, menus, textInput);
+            wireRegions(plugin, ctx, resources, guiRegistry, menus, textInput, guiLayouts);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources);
         }
@@ -1076,7 +1076,8 @@ public final class PluginModule {
             CloseableResources resources,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            TextInput textInput) {
+            TextInput textInput,
+            GuiLayouts guiLayouts) {
         // regions manages WorldGuard regions behind a SOFT dependency. The wiring probes for the WorldGuard plugin and
         // binds either the reflective WorldGuardRegionService (WG present) or the NoWorldGuardRegionService no-op (WG
         // absent); the /regions command consults RegionService.available() and, on the no-op, replies "WorldGuard not
@@ -1084,7 +1085,7 @@ public final class PluginModule {
         // shared menu engine's paginated list (no raw inventory), reading the region set + each region's priority and
         // roster counts off the tick thread on the global region thread. The context persists nothing and holds no
         // runtime state, so there is no stop hook. A disabled module wires none of this.
-        RegionsWiring.Wired wired = RegionsWiring.wire(plugin, ctx, guiRegistry, menus, textInput);
+        RegionsWiring.Wired wired = RegionsWiring.wire(plugin, ctx, guiRegistry, menus, textInput, guiLayouts);
         wired.commands().forEach(resources::addCommand);
     }
 
