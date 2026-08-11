@@ -38,6 +38,12 @@ public interface RegionService {
     /** The region {@code id} in {@code world}, or empty when no region carries that id. */
     Optional<RegionRef> region(WorldRef world, String id);
 
+    /**
+     * Every region covering {@code position}, highest priority first, which is the order that decides an overlap.
+     * Empty when nothing covers the point, when the world is unknown, or when WorldGuard is absent.
+     */
+    List<RegionRef> regionsAt(Position position);
+
     /** The region's currently-set flags as rendered name/value pairs; empty when it sets none or is gone. */
     List<FlagValue> flags(RegionRef region);
 

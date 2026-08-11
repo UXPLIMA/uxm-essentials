@@ -2,12 +2,14 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional discordLink()
   Optional economy()
   Optional homes()
+  Optional invRollback()
   Optional kits()
   Optional messaging()
   Optional moderation()
   Optional playerState()
   Optional presence()
   Optional ranks()
+  Optional security()
   Optional teleport()
   Optional vanish()
   Optional vote()
@@ -46,6 +48,8 @@ interface com.uxplima.uxmessentials.api.action.UxmHomeActions
   CompletableFuture relocate(UUID, int, com.uxplima.uxmessentials.api.view.UxmLocation)
   CompletableFuture rename(UUID, int, String)
   CompletableFuture set(UUID, int, com.uxplima.uxmessentials.api.view.UxmLocation)
+interface com.uxplima.uxmessentials.api.action.UxmInvRollbackActions
+  CompletableFuture restore(UUID, UUID)
 interface com.uxplima.uxmessentials.api.action.UxmKitActions
   CompletableFuture claim(UUID, String)
   CompletableFuture give(UUID, String)
@@ -112,6 +116,9 @@ class com.uxplima.uxmessentials.api.action.UxmResult
   com.uxplima.uxmessentials.api.action.UxmResult ok(Object)
   int hashCode()
   void ifFailed(Consumer)
+interface com.uxplima.uxmessentials.api.action.UxmSecurityActions
+  CompletableFuture clearLockout(UUID)
+  CompletableFuture forceVerification(UUID)
 interface com.uxplima.uxmessentials.api.action.UxmTeleportActions
   CompletableFuture back(UUID)
   CompletableFuture teleport(UUID, com.uxplima.uxmessentials.api.view.UxmLocation)
@@ -136,6 +143,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional discordLink()
   Optional economy()
   Optional homes()
+  Optional invRollback()
   Optional kits()
   Optional messaging()
   Optional moderation()
@@ -144,6 +152,8 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional playtime()
   Optional presence()
   Optional ranks()
+  Optional regions()
+  Optional security()
   Optional teleport()
   Optional trade()
   Optional vanish()
@@ -315,6 +325,13 @@ class com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeVisibilityChangeEve
   <init>(UUID, String, int)
   HandlerList getHandlerList()
   HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.invrollback.UxmInventoryRestoreEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, UUID, com.uxplima.uxmessentials.api.view.UxmSnapshotCause, Instant)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Instant getTakenAt()
+  UUID getSnapshotId()
+  com.uxplima.uxmessentials.api.view.UxmSnapshotCause getCause()
 class com.uxplima.uxmessentials.api.bukkit.event.itemworld.UxmEntityPurgeEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
   <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmPurgeScope, com.uxplima.uxmessentials.api.view.UxmPurgeCategory, int, Optional, int, Instant)
   HandlerList getHandlerList()
@@ -565,6 +582,21 @@ class com.uxplima.uxmessentials.api.bukkit.event.scoreboard.UxmScoreboardVisibil
   HandlerList getHandlerList()
   HandlerList getHandlers()
   boolean isHidden()
+class com.uxplima.uxmessentials.api.bukkit.event.security.UxmSecurityLockoutEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, Duration, boolean)
+  Duration getLockout()
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  boolean isBanned()
+class com.uxplima.uxmessentials.api.bukkit.event.security.UxmVerificationFailEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  int getRemainingAttempts()
+class com.uxplima.uxmessentials.api.bukkit.event.security.UxmVerificationPassEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
 class com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffChatEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
   <init>(UUID, String, String)
   HandlerList getHandlerList()
@@ -831,6 +863,8 @@ interface com.uxplima.uxmessentials.api.query.UxmHomesQuery
   CompletableFuture get(UUID, int)
   CompletableFuture limit(UUID)
   CompletableFuture list(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery
+  CompletableFuture of(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmKitsQuery
   CompletableFuture canClaim(UUID, String)
   CompletableFuture claimableBy(UUID)
@@ -868,6 +902,14 @@ interface com.uxplima.uxmessentials.api.query.UxmRanksQuery
   CompletableFuture canRankUp(UUID)
   CompletableFuture standingOf(UUID)
   List ladder()
+interface com.uxplima.uxmessentials.api.query.UxmRegionsQuery
+  CompletableFuture at(com.uxplima.uxmessentials.api.view.UxmLocation)
+  CompletableFuture in(String)
+  CompletableFuture region(String, String)
+  boolean available()
+interface com.uxplima.uxmessentials.api.query.UxmSecurityQuery
+  CompletableFuture of(UUID)
+  boolean isLockedOut(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmTeleportQuery
   List pendingFor(UUID)
   Optional backPoint(UUID)
@@ -1146,6 +1188,25 @@ record com.uxplima.uxmessentials.api.view.UxmRankStanding
   com.uxplima.uxmessentials.api.view.UxmRank rank()
   int hashCode()
   int prestige()
+record com.uxplima.uxmessentials.api.view.UxmRegion
+  <init>(String, String, int, List, List, List)
+  List flags()
+  List members()
+  List owners()
+  Optional flag(String)
+  String id()
+  String toString()
+  String world()
+  boolean equals(Object)
+  int hashCode()
+  int priority()
+record com.uxplima.uxmessentials.api.view.UxmRegionFlag
+  <init>(String, String)
+  String name()
+  String toString()
+  String value()
+  boolean equals(Object)
+  int hashCode()
 record com.uxplima.uxmessentials.api.view.UxmSanction
   <init>(com.uxplima.uxmessentials.api.view.UxmSanctionKind, UUID, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Instant, Optional)
   Instant issuedAt()
@@ -1184,6 +1245,32 @@ record com.uxplima.uxmessentials.api.view.UxmSanctionRecord
   com.uxplima.uxmessentials.api.view.UxmIssuer actor()
   com.uxplima.uxmessentials.api.view.UxmSanctionAction action()
   int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmSecurityStatus
+  <init>(UUID, boolean, boolean, Optional, boolean)
+  Optional enrolledAt()
+  String toString()
+  UUID playerId()
+  boolean enrolled()
+  boolean equals(Object)
+  boolean lockedOut()
+  boolean pinSet()
+  boolean totpEnabled()
+  int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmSnapshot
+  <init>(UUID, UUID, com.uxplima.uxmessentials.api.view.UxmSnapshotCause, Instant)
+  Instant takenAt()
+  String toString()
+  UUID id()
+  UUID ownerId()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmSnapshotCause cause()
+  int hashCode()
+enum com.uxplima.uxmessentials.api.view.UxmSnapshotCause
+  com.uxplima.uxmessentials.api.view.UxmSnapshotCause valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmSnapshotCause[] values()
+  com.uxplima.uxmessentials.api.view.UxmSnapshotCause DEATH
+  com.uxplima.uxmessentials.api.view.UxmSnapshotCause LOGOUT
+  com.uxplima.uxmessentials.api.view.UxmSnapshotCause RESTORE
 enum com.uxplima.uxmessentials.api.view.UxmSpeedKind
   com.uxplima.uxmessentials.api.view.UxmSpeedKind valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmSpeedKind[] values()

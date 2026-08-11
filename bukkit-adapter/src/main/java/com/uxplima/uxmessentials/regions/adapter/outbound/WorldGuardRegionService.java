@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.regions.domain.FlagValue;
 import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.regions.domain.RegionServiceException;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -104,6 +105,37 @@ public final class WorldGuardRegionService implements RegionService {
         } catch (ReflectiveOperationException | RuntimeException failure) {
             degrade(failure);
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public List<RegionRef> regionsAt(Position position) {
+        Objects.requireNonNull(position, "position");
+        if (!available()) {
+            return List.of();
+        }
+        try {
+            World bukkit = server.getWorld(position.world().uid());
+            if (bukkit == null) {
+                return List.of();
+            }
+            Object covering = WorldGuardReflection.applicableRegions(
+                    WorldGuardReflection.createQuery(),
+                    WorldGuardReflection.adapt(BukkitRefs.toLocation(bukkit, position)));
+            if (!(covering instanceof Iterable<?> regions)) {
+                return List.of();
+            }
+            // The set already comes back in WorldGuard's own priority order, which is the order an overlap is
+            // resolved in, so it is passed on rather than re-sorted here.
+            List<RegionRef> refs = new ArrayList<>();
+            for (Object region : regions) {
+                Object id = region.getClass().getMethod("getId").invoke(region);
+                refs.add(new RegionRef(position.world(), String.valueOf(id)));
+            }
+            return List.copyOf(refs);
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            degrade(failure);
+            return List.of();
         }
     }
 

@@ -465,6 +465,11 @@ class RegionsCommandTest {
         }
 
         @Override
+        public List<RegionRef> regionsAt(Position position) {
+            return List.of();
+        }
+
+        @Override
         public List<FlagValue> flags(RegionRef region) {
             return List.of();
         }

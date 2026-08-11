@@ -44,6 +44,12 @@ public final class NoWorldGuardRegionService implements RegionService {
     }
 
     @Override
+    public List<RegionRef> regionsAt(Position position) {
+        Objects.requireNonNull(position, "position");
+        return List.of();
+    }
+
+    @Override
     public List<FlagValue> flags(RegionRef region) {
         Objects.requireNonNull(region, "region");
         return List.of();

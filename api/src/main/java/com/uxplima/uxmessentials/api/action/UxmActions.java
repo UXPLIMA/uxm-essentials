@@ -55,6 +55,12 @@ public interface UxmActions {
     /** Changing a Discord binding, or empty when the discordlink module is switched off. */
     Optional<UxmDiscordLinkActions> discordLink();
 
+    /** Putting a stored inventory back, or empty when the invrollback module is switched off. */
+    Optional<UxmInvRollbackActions> invRollback();
+
+    /** Forcing a verification or clearing a lockout, or empty when the security module is switched off. */
+    Optional<UxmSecurityActions> security();
+
     /** Crediting votes, or empty when the vote module is switched off. */
     Optional<UxmVoteActions> vote();
 

@@ -186,6 +186,7 @@ public final class SecurityWiring {
                 holdingArea,
                 proxy,
                 ipTokens,
+                kernel.events(),
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
@@ -293,7 +294,10 @@ public final class SecurityWiring {
                 brands,
                 ownTeleports,
                 holdingArea,
-                handoff);
+                handoff,
+                repository,
+                forceReverification,
+                clock);
     }
 
     /**
@@ -329,7 +333,10 @@ public final class SecurityWiring {
             ClientBrandRegistry brands,
             FreezeTeleports ownTeleports,
             FreezeHoldingArea holdingArea,
-            LoginPluginHandoff handoff) {
+            LoginPluginHandoff handoff,
+            TwoFactorRepository repository,
+            ForceReverification forceReverification,
+            Clock clock) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -345,6 +352,9 @@ public final class SecurityWiring {
             Objects.requireNonNull(ownTeleports, "ownTeleports");
             Objects.requireNonNull(holdingArea, "holdingArea");
             Objects.requireNonNull(handoff, "handoff");
+            Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(forceReverification, "forceReverification");
+            Objects.requireNonNull(clock, "clock");
         }
 
         /** Drop every pending secret, freeze, lockout and re-auth window, close every keypad, and forget every brand. */

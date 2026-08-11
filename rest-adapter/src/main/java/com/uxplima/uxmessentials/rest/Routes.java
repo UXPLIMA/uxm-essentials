@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.rest.route.ActionsFor;
 import com.uxplima.uxmessentials.rest.route.DiscordLinkRoutes;
 import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
 import com.uxplima.uxmessentials.rest.route.HomesRoutes;
+import com.uxplima.uxmessentials.rest.route.InvRollbackRoutes;
 import com.uxplima.uxmessentials.rest.route.KitsRoutes;
 import com.uxplima.uxmessentials.rest.route.MessagingRoutes;
 import com.uxplima.uxmessentials.rest.route.ModerationRoutes;
@@ -23,6 +24,8 @@ import com.uxplima.uxmessentials.rest.route.PlayerStateRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
 import com.uxplima.uxmessentials.rest.route.PresenceRoutes;
 import com.uxplima.uxmessentials.rest.route.RanksRoutes;
+import com.uxplima.uxmessentials.rest.route.RegionsRoutes;
+import com.uxplima.uxmessentials.rest.route.SecurityRoutes;
 import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
 import com.uxplima.uxmessentials.rest.route.TradeRoutes;
 import com.uxplima.uxmessentials.rest.route.VanishRoutes;
@@ -71,6 +74,7 @@ public final class Routes {
                 .addAll(DiscordLinkRoutes.of(api, actions))
                 .addAll(EconomyRoutes.of(api, actions))
                 .addAll(HomesRoutes.of(api, actions))
+                .addAll(InvRollbackRoutes.of(api, actions))
                 .addAll(KitsRoutes.of(api, actions))
                 .addAll(MessagingRoutes.of(api, actions))
                 .addAll(ModerationRoutes.of(api, actions))
@@ -78,6 +82,8 @@ public final class Routes {
                 .addAll(PlayerWarpsRoutes.of(api))
                 .addAll(PresenceRoutes.of(api, actions))
                 .addAll(RanksRoutes.of(api, actions))
+                .addAll(RegionsRoutes.of(api))
+                .addAll(SecurityRoutes.of(api, actions))
                 .addAll(TeleportRoutes.of(api, actions))
                 .addAll(TradeRoutes.of(api))
                 .addAll(VanishRoutes.of(api, actions))
@@ -135,6 +141,9 @@ public final class Routes {
         present.put("ranks", api.ranks().isPresent());
         present.put("trade", api.trade().isPresent());
         present.put("discordlink", api.discordLink().isPresent());
+        present.put("regions", api.regions().isPresent());
+        present.put("invrollback", api.invRollback().isPresent());
+        present.put("security", api.security().isPresent());
         return present;
     }
 }

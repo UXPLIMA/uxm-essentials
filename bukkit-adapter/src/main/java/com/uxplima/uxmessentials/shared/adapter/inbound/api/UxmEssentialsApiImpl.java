@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
@@ -20,6 +21,8 @@ import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
+import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
+import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
@@ -182,6 +185,21 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmRanksQuery> ranks() {
         return queries.find(UxmRanksQuery.class);
+    }
+
+    @Override
+    public Optional<UxmSecurityQuery> security() {
+        return queries.find(UxmSecurityQuery.class);
+    }
+
+    @Override
+    public Optional<UxmInvRollbackQuery> invRollback() {
+        return queries.find(UxmInvRollbackQuery.class);
+    }
+
+    @Override
+    public Optional<UxmRegionsQuery> regions() {
+        return queries.find(UxmRegionsQuery.class);
     }
 
     @Override

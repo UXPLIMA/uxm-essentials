@@ -78,6 +78,20 @@ public final class AttemptLimiter {
         failures.remove(Objects.requireNonNull(playerId, "playerId"));
     }
 
+    /**
+     * Lift an active lockout and the failure budget behind it for one account.
+     *
+     * <p>What staff do for a player who locked themselves out. A lockout the operator chose to write to the ban
+     * list is a ban as well, and lifting the window here does not lift that.
+     *
+     * @return whether a lockout was actually lifted, so a caller can tell that from a no-op
+     */
+    public boolean clearLockout(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        failures.remove(playerId);
+        return lockedUntil.remove(playerId) != null;
+    }
+
     /** Drop every counter and lockout, called on module stop so no limiter state survives a disable. */
     public void clearAll() {
         failures.clear();

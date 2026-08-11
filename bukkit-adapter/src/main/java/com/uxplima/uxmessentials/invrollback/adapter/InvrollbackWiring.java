@@ -73,8 +73,8 @@ public final class InvrollbackWiring {
                 config.includeEnderchest());
 
         RestoreSnapshot restore = new RestoreSnapshot(repository, capture);
-        SnapshotRestorer restorer =
-                new SnapshotRestorer(restore, kernel.scheduler(), kernel.messages(), kernel.messageSink(), clock);
+        SnapshotRestorer restorer = new SnapshotRestorer(
+                restore, kernel.scheduler(), kernel.messages(), kernel.messageSink(), clock, kernel.events());
         SnapshotTeleporter teleporter =
                 new SnapshotTeleporter(kernel.scheduler(), kernel.messages(), kernel.messageSink(), kernel.log());
         SnapshotExporter exporter = new SnapshotExporter(kernel.scheduler(), kernel.messages(), kernel.messageSink());
@@ -111,7 +111,8 @@ public final class InvrollbackWiring {
         SnapshotPruneSweep sweep = new SnapshotPruneSweep(prune, kernel.scheduler(), clock, retentionOn);
         AutoCloseable sweepHandle = sweep.start();
 
-        return new Wired(List.of(captureListener), List.of(command), () -> close(sweepHandle, kernel));
+        return new Wired(
+                List.of(captureListener), List.of(command), repository, restorer, () -> close(sweepHandle, kernel));
     }
 
     /** Cancel the repeating retention sweep on module stop; a failure to close is logged, never rethrown. */
@@ -129,12 +130,21 @@ public final class InvrollbackWiring {
      *
      * @param listeners the Bukkit listeners to register
      * @param commands the Brigadier commands to register
+     * @param repository the snapshot store the published query lists from
+     * @param restorer the three-hop restore flow the published action runs, safety copy and all
      * @param stop the teardown run on module stop
      */
-    public record Wired(List<Listener> listeners, List<CommandRegistration> commands, Runnable stop) {
+    public record Wired(
+            List<Listener> listeners,
+            List<CommandRegistration> commands,
+            SnapshotRepository repository,
+            SnapshotRestorer restorer,
+            Runnable stop) {
         public Wired {
             listeners = List.copyOf(listeners);
             commands = List.copyOf(commands);
+            Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(restorer, "restorer");
             Objects.requireNonNull(stop, "stop");
         }
     }

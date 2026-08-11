@@ -116,7 +116,7 @@ class SnapshotRestorerTest {
         CapturingSink sink = new CapturingSink();
         RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
 
-        new SnapshotRestorer(restore, inlineScheduler(), keyEchoMessages(), sink, CLOCK)
+        new SnapshotRestorer(restore, inlineScheduler(), keyEchoMessages(), sink, CLOCK, event -> {})
                 .restore(ref(staff), offlineTarget, SnapshotId.random());
 
         assertThat(sink.last).contains("invrollback.player-not-found");
@@ -125,7 +125,7 @@ class SnapshotRestorerTest {
 
     private static SnapshotRestorer restorer(SnapshotRepository repository) {
         RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
-        return new SnapshotRestorer(restore, inlineScheduler(), keyEchoMessages(), noopSink(), CLOCK);
+        return new SnapshotRestorer(restore, inlineScheduler(), keyEchoMessages(), noopSink(), CLOCK, event -> {});
     }
 
     private static PlayerRef ref(PlayerMock player) {

@@ -23,8 +23,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
+import com.uxplima.uxmessentials.api.action.UxmInvRollbackActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.action.UxmRanksActions;
+import com.uxplima.uxmessentials.api.action.UxmSecurityActions;
 import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
@@ -32,6 +34,7 @@ import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
@@ -40,6 +43,8 @@ import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
+import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
+import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
@@ -88,6 +93,8 @@ import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeQueries;
 import com.uxplima.uxmessentials.homes.application.HomeRespawnLocator;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.invrollback.adapter.InvrollbackWiring;
+import com.uxplima.uxmessentials.invrollback.adapter.outbound.api.InvRollbackActions;
+import com.uxplima.uxmessentials.invrollback.adapter.outbound.api.InvRollbackQueries;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.adapter.outbound.api.KitQueries;
@@ -128,9 +135,12 @@ import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksActions;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksQueries;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
+import com.uxplima.uxmessentials.regions.adapter.outbound.api.RegionsQueries;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
 import com.uxplima.uxmessentials.security.adapter.outbound.ModerationLockoutBan;
+import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityActions;
+import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityQueries;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.servertweaks.adapter.ServerTweaksWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
@@ -1226,9 +1236,9 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("villagers"))) {
             wireVillagers(plugin, ctx, resources, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
-            wireInvrollback(plugin, ctx, persistence, resources, menus, menuBindings);
+            wireInvrollback(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("regions"))) {
-            wireRegions(plugin, ctx, resources, guiRegistry, menus, textInput, guiLayouts);
+            wireRegions(plugin, ctx, resources, links, guiRegistry, menus, textInput, guiLayouts);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources);
         }
@@ -1251,6 +1261,7 @@ public final class PluginModule {
             JavaPlugin plugin,
             ModuleContext ctx,
             CloseableResources resources,
+            ContextLinks links,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             TextInput textInput,
@@ -1264,6 +1275,14 @@ public final class PluginModule {
         // runtime state, so there is no stop hook. A disabled module wires none of this.
         RegionsWiring.Wired wired = RegionsWiring.wire(plugin, ctx, guiRegistry, menus, textInput, guiLayouts);
         wired.commands().forEach(resources::addCommand);
+        // Read-only, and on the server thread rather than a worker: WorldGuard's region container is live state.
+        // There is no action surface because editing a region is an operator act with its own audit trail.
+        links.queries.register(
+                UxmRegionsQuery.class,
+                new RegionsQueries(
+                        wired.service(),
+                        ctx.kernel().worldLookup(),
+                        ctx.kernel().scheduler()));
     }
 
     private static void wireInvrollback(
@@ -1271,6 +1290,7 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
+            ContextLinks links,
             Menus menus,
             MenuBindings menuBindings) {
         // invrollback builds its jOOQ SnapshotRepository over persistence.dsl() and registers the death/logout
@@ -1288,6 +1308,14 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.commands().forEach(resources::addCommand);
         resources.onClose(wired.stop());
+        // The published restore runs the same three-hop flow the GUI button does, safety copy and all, so a plugin
+        // cannot overwrite an inventory in a way staff could not then undo.
+        links.queries.register(
+                UxmInvRollbackQuery.class,
+                new InvRollbackQueries(wired.repository(), ctx.kernel().scheduler()));
+        links.actions.register(
+                UxmInvRollbackActions.class,
+                source -> new InvRollbackActions(wired.restorer(), ctx.kernel().playerLookup()));
     }
 
     private static void wireVillagers(
@@ -1362,6 +1390,18 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        // The read reports the shape of a registration and never its material, and the two writes both go in the
+        // safe direction: make somebody prove themselves again, or let somebody back in early.
+        links.queries.register(
+                UxmSecurityQuery.class,
+                new SecurityQueries(
+                        wired.repository(), wired.limiter(), ctx.kernel().scheduler(), wired.clock()));
+        links.actions.register(
+                UxmSecurityActions.class,
+                source -> new SecurityActions(
+                        wired.forceReverification(),
+                        wired.limiter(),
+                        ctx.kernel().scheduler()));
     }
 
     private static void wireCommandControl(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {

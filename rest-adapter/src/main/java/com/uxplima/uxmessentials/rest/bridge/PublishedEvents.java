@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeLimitReachedEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeRelocateEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeRenameEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.home.UxmHomeVisibilityChangeEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.invrollback.UxmInventoryRestoreEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.itemworld.UxmEntityPurgeEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.itemworld.UxmMobSpawnEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.kit.UxmKitClaimEvent;
@@ -56,6 +57,9 @@ import com.uxplima.uxmessentials.api.bukkit.event.rank.UxmPrestigeEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.rank.UxmRankSetEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.rank.UxmRankUpEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.scoreboard.UxmScoreboardVisibilityEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.security.UxmSecurityLockoutEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.security.UxmVerificationFailEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.security.UxmVerificationPassEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffChatEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffModeEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmBackLocationCaptureEvent;
@@ -135,6 +139,9 @@ public final class PublishedEvents {
             UxmEntityPurgeEvent.class,
             UxmMobSpawnEvent.class,
 
+            // invrollback
+            UxmInventoryRestoreEvent.class,
+
             // kit
             UxmKitClaimEvent.class,
 
@@ -189,6 +196,11 @@ public final class PublishedEvents {
             // staff
             UxmStaffChatEvent.class,
             UxmStaffModeEvent.class,
+
+            // security
+            UxmSecurityLockoutEvent.class,
+            UxmVerificationFailEvent.class,
+            UxmVerificationPassEvent.class,
 
             // teleport
             UxmBackLocationCaptureEvent.class,

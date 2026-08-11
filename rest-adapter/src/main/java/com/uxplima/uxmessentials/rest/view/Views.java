@@ -28,8 +28,11 @@ import com.uxplima.uxmessentials.api.view.UxmPlaytime;
 import com.uxplima.uxmessentials.api.view.UxmPresence;
 import com.uxplima.uxmessentials.api.view.UxmRank;
 import com.uxplima.uxmessentials.api.view.UxmRankStanding;
+import com.uxplima.uxmessentials.api.view.UxmRegion;
 import com.uxplima.uxmessentials.api.view.UxmSanction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionRecord;
+import com.uxplima.uxmessentials.api.view.UxmSecurityStatus;
+import com.uxplima.uxmessentials.api.view.UxmSnapshot;
 import com.uxplima.uxmessentials.api.view.UxmTeleportRequest;
 import com.uxplima.uxmessentials.api.view.UxmTrade;
 import com.uxplima.uxmessentials.api.view.UxmVault;
@@ -297,6 +300,39 @@ public final class Views {
         json.addProperty("player-id", link.playerId().toString());
         json.addProperty("discord-id", link.discordId());
         json.addProperty("linked-at", link.linkedAt().toString());
+        return json;
+    }
+
+    public static JsonElement securityStatus(UxmSecurityStatus status) {
+        JsonObject json = new JsonObject();
+        json.addProperty("player-id", status.playerId().toString());
+        json.addProperty("enrolled", status.enrolled());
+        json.addProperty("totp-enabled", status.totpEnabled());
+        json.addProperty("pin-set", status.pinSet());
+        json.add("enrolled-at", status.enrolledAt().map(Views::isoText).orElse(JsonNull.INSTANCE));
+        json.addProperty("locked-out", status.lockedOut());
+        return json;
+    }
+
+    public static JsonElement snapshot(UxmSnapshot snapshot) {
+        JsonObject json = new JsonObject();
+        json.addProperty("id", snapshot.id().toString());
+        json.addProperty("owner-id", snapshot.ownerId().toString());
+        json.addProperty("cause", snapshot.cause().name());
+        json.addProperty("taken-at", snapshot.takenAt().toString());
+        return json;
+    }
+
+    public static JsonElement region(UxmRegion region) {
+        JsonObject json = new JsonObject();
+        json.addProperty("world", region.world());
+        json.addProperty("id", region.id());
+        json.addProperty("priority", region.priority());
+        json.add("owners", each(region.owners(), Views::text));
+        json.add("members", each(region.members(), Views::text));
+        JsonObject flags = new JsonObject();
+        region.flags().forEach(flag -> flags.addProperty(flag.name(), flag.value()));
+        json.add("flags", flags);
         return json;
     }
 

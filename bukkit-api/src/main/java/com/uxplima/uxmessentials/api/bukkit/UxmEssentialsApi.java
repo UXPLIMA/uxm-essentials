@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
+import com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
@@ -18,6 +19,8 @@ import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
+import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
+import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
@@ -163,6 +166,15 @@ public interface UxmEssentialsApi {
 
     /** Reading who is linked to which Discord account, or empty when the discordlink module is switched off. */
     Optional<UxmDiscordLinkQuery> discordLink();
+
+    /** Reading what WorldGuard protects, or empty when the regions module is switched off. */
+    Optional<UxmRegionsQuery> regions();
+
+    /** Reading the inventory snapshots held for a player, or empty when the invrollback module is switched off. */
+    Optional<UxmInvRollbackQuery> invRollback();
+
+    /** Reading which accounts hold a second factor, or empty when the security module is switched off. */
+    Optional<UxmSecurityQuery> security();
 
     /** Reading vote counts and party progress, or empty when the vote module is switched off. */
     Optional<UxmVoteQuery> vote();

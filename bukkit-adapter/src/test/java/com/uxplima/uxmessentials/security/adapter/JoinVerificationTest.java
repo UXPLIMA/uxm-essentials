@@ -63,6 +63,9 @@ import com.uxplima.uxmessentials.security.domain.SafetyNet;
 import com.uxplima.uxmessentials.security.domain.SpectatorPolicy;
 import com.uxplima.uxmessentials.security.domain.TotpCode;
 import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
+import com.uxplima.uxmessentials.security.domain.event.AccountLockedOut;
+import com.uxplima.uxmessentials.security.domain.event.VerificationFailed;
+import com.uxplima.uxmessentials.security.domain.event.VerificationPassed;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuOpenEvent;
@@ -79,6 +82,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -128,6 +132,10 @@ class JoinVerificationTest {
     private HeldPermissions permissions;
     private PinKeypadView keypad;
     private VerificationController controller;
+
+    /** Everything the controller announced, so a test can assert on the facts as well as on the messages. */
+    private final List<DomainEvent> events = new ArrayList<>();
+
     private VerificationFreezeListener freezeListener;
     private MenuListener menuListener;
     private FreezeTeleports ownTeleports;
@@ -192,6 +200,7 @@ class JoinVerificationTest {
                 new FreezeHoldingArea(null, ownTeleports, new NoopLogger()),
                 proxy,
                 IP_HASHING,
+                events::add,
                 scheduler,
                 messages,
                 sink,
@@ -276,6 +285,7 @@ class JoinVerificationTest {
         // The verified device is remembered for the next join.
         assertThat(trustStore.isTrusted(player.getUniqueId(), IP_HASHING.tokenFor("10.0.0.5"), NOW))
                 .isTrue();
+        assertThat(events).containsExactly(new VerificationPassed(ref(player)));
     }
 
     @Test
@@ -345,6 +355,7 @@ class JoinVerificationTest {
 
         assertThat(sessions.isPending(player.getUniqueId())).isTrue(); // still frozen
         assertThat(sink.delivered).contains("security.verify.failed");
+        assertThat(events).containsExactly(new VerificationFailed(ref(player), MAX_ATTEMPTS - 1));
     }
 
     @Test
@@ -357,6 +368,9 @@ class JoinVerificationTest {
 
         assertThat(sessions.isPending(player.getUniqueId())).isFalse();
         assertThat(limiter.isLockedOut(player.getUniqueId(), NOW)).isTrue();
+        // The attempt that spends the last try announces the lockout rather than another failure, and reports it
+        // as unbanned, because this fixture has no ban surface to write one to.
+        assertThat(events).last().isEqualTo(new AccountLockedOut(ref(player), config().lockout(), false));
     }
 
     @Test
@@ -803,6 +817,7 @@ class JoinVerificationTest {
                 new FreezeHoldingArea(holding, ownTeleports, new NoopLogger()),
                 proxy,
                 IP_HASHING,
+                events::add,
                 new InlineScheduler(),
                 new KeyMessages(),
                 sink,
@@ -954,6 +969,7 @@ class JoinVerificationTest {
                 new FreezeHoldingArea(null, ownTeleports, new NoopLogger()),
                 proxy,
                 IP_HASHING,
+                events::add,
                 scheduler,
                 new KeyMessages(),
                 sink,

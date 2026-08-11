@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.api.EconomyEventBridge
 import com.uxplima.uxmessentials.holograms.adapter.outbound.api.HologramEventBridges;
 import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeEventBridges;
 import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeVetoBridges;
+import com.uxplima.uxmessentials.invrollback.adapter.outbound.api.InvRollbackEventBridges;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.api.ItemWorldEventBridges;
 import com.uxplima.uxmessentials.kits.adapter.outbound.api.KitEventBridges;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingEventBridges;
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.poses.adapter.outbound.api.PoseEventBridges;
 import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceEventBridges;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RankEventBridges;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardEventBridges;
+import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityEventBridges;
 import com.uxplima.uxmessentials.staff.adapter.outbound.api.StaffEventBridges;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportEventBridges;
 import com.uxplima.uxmessentials.trade.adapter.outbound.api.TradeEventBridges;
@@ -68,6 +70,8 @@ public final class EventBridges {
         RankEventBridges.register(registry);
         TradeEventBridges.register(registry);
         DiscordLinkEventBridges.register(registry);
+        InvRollbackEventBridges.register(registry);
+        SecurityEventBridges.register(registry);
     }
 
     /** Install every context's veto mappings into {@code registry}, in context order. */

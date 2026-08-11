@@ -27,6 +27,26 @@ public final class AsyncQueries {
 
     private AsyncQueries() {}
 
+    /**
+     * Run {@code read} on the server's own thread and complete the returned future with its result.
+     *
+     * <p>For the few reads that are not database reads: live server state a worker thread may not touch. The
+     * caller still gets a future, so it need not know which of the two kinds it asked for.
+     */
+    public static <T> CompletableFuture<T> onServer(Scheduler scheduler, Supplier<T> read) {
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(read, "read");
+        CompletableFuture<T> answer = new CompletableFuture<>();
+        scheduler.onGlobal(() -> {
+            try {
+                answer.complete(read.get());
+            } catch (RuntimeException failure) {
+                answer.completeExceptionally(failure);
+            }
+        });
+        return answer;
+    }
+
     /** Run {@code read} on a worker thread and complete the returned future with its result. */
     public static <T> CompletableFuture<T> supply(Scheduler scheduler, Supplier<T> read) {
         Objects.requireNonNull(scheduler, "scheduler");

@@ -86,7 +86,7 @@ class InvrestoreCommandTest {
         engine.installListener(plugin);
         Menus menus = engine.menus();
         RestoreSnapshot restore = new RestoreSnapshot(repository, new CaptureSnapshot(repository, 0));
-        SnapshotRestorer restorer = new SnapshotRestorer(restore, scheduler, messages, noopSink(), CLOCK);
+        SnapshotRestorer restorer = new SnapshotRestorer(restore, scheduler, messages, noopSink(), CLOCK, event -> {});
         SnapshotTeleporter teleporter = new SnapshotTeleporter(scheduler, messages, noopSink(), noopLog());
         SnapshotExporter exporter = new SnapshotExporter(scheduler, messages, noopSink());
         SnapshotPreviewView preview = new SnapshotPreviewView(

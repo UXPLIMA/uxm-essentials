@@ -153,7 +153,7 @@ public final class RegionsWiring {
                 Material.BRICKS,
                 LIST_PERMISSION,
                 (player, viewer) -> command.openBrowser(player)));
-        return new Wired(List.of(command));
+        return new Wired(List.of(command), service);
     }
 
     /**
@@ -218,10 +218,12 @@ public final class RegionsWiring {
      * listener and holds no runtime state (WorldGuard owns the region store), so there is no stop hook.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param service the region seam bound for this run, which the published region query reads through
      */
-    public record Wired(List<CommandRegistration> commands) {
+    public record Wired(List<CommandRegistration> commands, RegionService service) {
         public Wired {
             commands = List.copyOf(commands);
+            Objects.requireNonNull(service, "service");
         }
     }
 }

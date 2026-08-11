@@ -18,6 +18,7 @@ home.limit-reached: current-count, limit, player-id, player-name
 home.relocate: player-id, player-name, slot, slot-number
 home.rename: player-id, player-name, slot, slot-number
 home.visibility-change: player-id, player-name, slot, slot-number
+invrollback.inventory-restore: cause, player-id, player-name, snapshot-id, taken-at
 itemworld.entity-purge: at, category, entity-type, player-id, player-name, radius, removed, scope, world-name
 itemworld.mob-spawn: at, entity-type, player-id, player-name, requested, spawned, world-name
 kit.claim: actor-id, actor-name, at, kit-id, player-id, player-name, self-claimed
@@ -51,6 +52,9 @@ rank.prestige: level, player-id, player-name, reward-multiplier
 rank.set: player-id, player-name, previous-rank, rank
 rank.up: from-rank, player-id, player-name, to-rank
 scoreboard.visibility: hidden, player-id, player-name
+security.lockout: banned, lockout-seconds, player-id, player-name
+security.verification-fail: player-id, player-name, remaining-attempts
+security.verification-pass: player-id, player-name
 staff.chat: message, player-id, player-name
 staff.mode: entered, player-id, player-name
 teleport.back-location-capture: cause, location, player-id, player-name

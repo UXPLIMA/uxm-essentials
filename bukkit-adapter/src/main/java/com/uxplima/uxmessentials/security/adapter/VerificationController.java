@@ -24,9 +24,13 @@ import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.SafetyNet;
+import com.uxplima.uxmessentials.security.domain.event.AccountLockedOut;
+import com.uxplima.uxmessentials.security.domain.event.VerificationFailed;
+import com.uxplima.uxmessentials.security.domain.event.VerificationPassed;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -74,6 +78,7 @@ public final class VerificationController implements KeypadActions {
     private final Permissions permissions;
     private final FreezeHoldingArea holdingArea;
     private final ServerConnector proxy;
+    private final DomainEventPublisher events;
 
     /**
      * Set once at startup when a login plugin is hooked. It is written on the main thread during wiring and read by
@@ -105,6 +110,7 @@ public final class VerificationController implements KeypadActions {
             FreezeHoldingArea holdingArea,
             ServerConnector proxy,
             IpTokens ipHashing,
+            DomainEventPublisher events,
             Scheduler scheduler,
             Messages messages,
             MessageSink sink,
@@ -127,6 +133,7 @@ public final class VerificationController implements KeypadActions {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.holdingArea = Objects.requireNonNull(holdingArea, "holdingArea");
         this.proxy = Objects.requireNonNull(proxy, "proxy");
+        this.events = Objects.requireNonNull(events, "events");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
@@ -378,12 +385,12 @@ public final class VerificationController implements KeypadActions {
 
     private void applyResult(Player player, PlayerRef viewer, VerifyResult result, boolean reopenOnFailure) {
         switch (result) {
-            case SUCCESS, NOT_ENROLLED -> succeed(player, viewer);
+            case SUCCESS, NOT_ENROLLED -> succeed(player, viewer, result == VerifyResult.SUCCESS);
             case INVALID -> fail(player, viewer, reopenOnFailure);
         }
     }
 
-    private void succeed(Player player, PlayerRef viewer) {
+    private void succeed(Player player, PlayerRef viewer, boolean proved) {
         sessions.clear(viewer.uuid());
         gameMode.restore(player);
         limiter.recordSuccess(viewer.uuid());
@@ -395,6 +402,11 @@ public final class VerificationController implements KeypadActions {
         notify(viewer, SecurityMessageKey.SECURITY_VERIFY_SUCCESS);
         feedback.success(viewer);
         rememberDevice(player, viewer);
+        // Only a real proof is a pass. A player who turned out to hold no factor was never asked for one, and
+        // saying they proved something would be untrue.
+        if (proved) {
+            events.publish(new VerificationPassed(viewer));
+        }
         transferOnward(player);
     }
 
@@ -405,6 +417,7 @@ public final class VerificationController implements KeypadActions {
             lockOut(viewer);
             return;
         }
+        events.publish(new VerificationFailed(viewer, outcome.remaining()));
         notify(
                 viewer,
                 SecurityMessageKey.SECURITY_VERIFY_FAILED,
@@ -423,7 +436,9 @@ public final class VerificationController implements KeypadActions {
      */
     private void lockOut(PlayerRef viewer) {
         keypad.closeFor(viewer);
-        if (config.lockoutBans() && lockoutBan.ban(viewer, config.lockout(), config.lockoutBanReason())) {
+        boolean banned = config.lockoutBans() && lockoutBan.ban(viewer, config.lockout(), config.lockoutBanReason());
+        events.publish(new AccountLockedOut(viewer, config.lockout(), banned));
+        if (banned) {
             return;
         }
         kick(viewer, SecurityMessageKey.SECURITY_VERIFY_LOCKED_OUT);

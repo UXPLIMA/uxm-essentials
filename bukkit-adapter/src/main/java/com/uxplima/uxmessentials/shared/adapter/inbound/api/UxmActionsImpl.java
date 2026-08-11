@@ -7,12 +7,14 @@ import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
+import com.uxplima.uxmessentials.api.action.UxmInvRollbackActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.action.UxmMessagingActions;
 import com.uxplima.uxmessentials.api.action.UxmModerationActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
 import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
 import com.uxplima.uxmessentials.api.action.UxmRanksActions;
+import com.uxplima.uxmessentials.api.action.UxmSecurityActions;
 import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.action.UxmVanishActions;
 import com.uxplima.uxmessentials.api.action.UxmVoteActions;
@@ -86,6 +88,16 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmWorldsActions> worlds() {
         return contexts.find(UxmWorldsActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmSecurityActions> security() {
+        return contexts.find(UxmSecurityActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmInvRollbackActions> invRollback() {
+        return contexts.find(UxmInvRollbackActions.class, source);
     }
 
     @Override
