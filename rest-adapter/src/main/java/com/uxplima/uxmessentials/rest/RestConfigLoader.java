@@ -39,10 +39,11 @@ public final class RestConfigLoader {
         String bind = root.node("bind").getString(RestConfig.DORMANT.bind());
         int port = root.node("port").getInt(RestConfig.DORMANT.port());
         int perMinute = root.node("requests-per-minute").getInt(RestConfig.DORMANT.requestsPerMinute());
-        if (port < 1 || port > 65535 || perMinute < 1) {
+        int subscribers = root.node("max-subscribers").getInt(RestConfig.DORMANT.maxSubscribers());
+        if (port < 1 || port > 65535 || perMinute < 1 || subscribers < 1) {
             return RestConfig.DORMANT;
         }
-        return new RestConfig(enabled, bind, port, perMinute);
+        return new RestConfig(enabled, bind, port, perMinute, subscribers);
     }
 
     private static void extractDefaultIfMissing(Path file) {

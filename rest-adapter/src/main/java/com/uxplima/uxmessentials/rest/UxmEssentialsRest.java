@@ -62,7 +62,9 @@ public final class UxmEssentialsRest extends JavaPlugin {
                 .registerEventHandler(
                         LifecycleEvents.COMMANDS,
                         event -> event.registrar()
-                                .register(new TokenCommand(tokens).build(), "uxmEssentials REST API tokens"));
+                                .register(
+                                        new TokenCommand(tokens, () -> listening(config)).build(),
+                                        "uxmEssentials REST API tokens"));
         start(config, api, tokens);
     }
 
@@ -84,7 +86,7 @@ public final class UxmEssentialsRest extends JavaPlugin {
 
     private void start(RestConfig config, UxmEssentialsApi api, TokenStore tokens) {
         AuthFilter filter = new AuthFilter(tokens, new RateLimiter(config.requestsPerMinute(), Clock.systemUTC()));
-        EventStream stream = new EventStream(Routes.EVENTS, getLogger());
+        EventStream stream = new EventStream(Routes.EVENTS, config.maxSubscribers(), getLogger());
         try {
             server = RestServer.start(
                     config.bind(),
@@ -105,6 +107,14 @@ public final class UxmEssentialsRest extends JavaPlugin {
                 .info("REST API listening on " + config.bind() + ":" + config.port()
                         + ". Make a token with /uxmapi token create <label>.");
         warnIfExposed(config);
+    }
+
+    /** What {@code /uxmapi status} reports, read from the running listener rather than from the config alone. */
+    private TokenCommand.Listening listening(RestConfig config) {
+        if (server == null || events == null) {
+            return TokenCommand.Listening.OFF;
+        }
+        return new TokenCommand.Listening(true, config.bind(), server.port(), events.subscribers());
     }
 
     /**

@@ -27,11 +27,12 @@ import org.junit.jupiter.api.Test;
 class EventStreamTest {
 
     private static final String PATH = "/api/v1/events";
+    private static final int MAX_SUBSCRIBERS = 2;
     private static final Logger QUIET = quietLogger();
 
     @Test
     void aSubscriberIsGreetedAndThenHearsWhatItAskedFor() throws IOException {
-        EventStream stream = new EventStream(PATH, QUIET);
+        EventStream stream = new EventStream(PATH, MAX_SUBSCRIBERS, QUIET);
         try (RestServer server = start(stream);
                 Client client = Client.connect(server.port())) {
             assertThat(client.next().get("event").getAsString()).isEqualTo("connected");
@@ -50,7 +51,7 @@ class EventStreamTest {
 
     @Test
     void anEventNobodySubscribedToIsNotSent() throws IOException {
-        EventStream stream = new EventStream(PATH, QUIET);
+        EventStream stream = new EventStream(PATH, MAX_SUBSCRIBERS, QUIET);
         try (RestServer server = start(stream);
                 Client client = Client.connect(server.port())) {
             client.next(); // the greeting
@@ -66,7 +67,7 @@ class EventStreamTest {
 
     @Test
     void aConnectionThatSubscribedToNothingHearsNothing() throws IOException {
-        EventStream stream = new EventStream(PATH, QUIET);
+        EventStream stream = new EventStream(PATH, MAX_SUBSCRIBERS, QUIET);
         try (RestServer server = start(stream);
                 Client client = Client.connect(server.port())) {
             client.next(); // the greeting
@@ -80,7 +81,7 @@ class EventStreamTest {
 
     @Test
     void aLineThatIsNotJsonIsAnsweredRatherThanDropped() throws IOException {
-        EventStream stream = new EventStream(PATH, QUIET);
+        EventStream stream = new EventStream(PATH, MAX_SUBSCRIBERS, QUIET);
         try (RestServer server = start(stream);
                 Client client = Client.connect(server.port())) {
             client.next();
@@ -94,7 +95,7 @@ class EventStreamTest {
 
     @Test
     void aPingIsAnsweredWithAPong() throws IOException {
-        EventStream stream = new EventStream(PATH, QUIET);
+        EventStream stream = new EventStream(PATH, MAX_SUBSCRIBERS, QUIET);
         try (RestServer server = start(stream);
                 Client client = Client.connect(server.port())) {
             client.next();
@@ -106,7 +107,7 @@ class EventStreamTest {
 
     @Test
     void aClosedSubscriberLeavesTheLiveSet() throws IOException {
-        EventStream stream = new EventStream(PATH, QUIET);
+        EventStream stream = new EventStream(PATH, MAX_SUBSCRIBERS, QUIET);
         try (RestServer server = start(stream)) {
             try (Client client = Client.connect(server.port())) {
                 client.next();
@@ -119,9 +120,25 @@ class EventStreamTest {
         }
     }
 
+    /** Every open stream is a socket and a thread held until the client lets go, so there is a limit on them. */
+    @Test
+    void pastTheCapAFurtherStreamIsRefusedRatherThanOpened() throws IOException {
+        EventStream stream = new EventStream(PATH, MAX_SUBSCRIBERS, QUIET);
+        try (RestServer server = start(stream);
+                Client first = Client.connect(server.port());
+                Client second = Client.connect(server.port())) {
+            first.next();
+            second.next();
+
+            assertThat(handshakeAnswer(server.port()))
+                    .startsWith("HTTP/1.1 503 Service Unavailable")
+                    .contains("too-many-subscribers");
+        }
+    }
+
     @Test
     void anOrdinaryRequestToTheStreamPathIsToldToUpgrade() throws IOException {
-        try (RestServer server = start(new EventStream(PATH, QUIET))) {
+        try (RestServer server = start(new EventStream(PATH, MAX_SUBSCRIBERS, QUIET))) {
             assertThat(get(server.port())).startsWith("HTTP/1.1 426 Upgrade Required");
         }
     }
@@ -131,8 +148,8 @@ class EventStreamTest {
         RestServer.RequestFilter refusing = (request, route) -> RestServer.RequestFilter.Decision.refuse(
                 Json.error(HttpStatus.FORBIDDEN, "missing-scope", "this token needs the events scope"));
 
-        try (RestServer server =
-                RestServer.start("127.0.0.1", 0, router(), refusing, new EventStream(PATH, QUIET), QUIET)) {
+        try (RestServer server = RestServer.start(
+                "127.0.0.1", 0, router(), refusing, new EventStream(PATH, MAX_SUBSCRIBERS, QUIET), QUIET)) {
             assertThat(handshakeAnswer(server.port())).startsWith("HTTP/1.1 403 Forbidden");
         }
     }

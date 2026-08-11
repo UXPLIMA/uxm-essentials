@@ -5,6 +5,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -173,6 +174,24 @@ public final class TokenStore {
                 Instant.ofEpochSecond(object.get("created-at").getAsLong())));
     }
 
+    /**
+     * Keep the file to its owner, where the filesystem has the idea.
+     *
+     * <p>Hashes rather than secrets are what is in it, so this is not the thing standing between an attacker and
+     * the API. It is the thing standing between an attacker and the list of every integration a server has, which
+     * is worth a couple of lines. Windows and anything else without POSIX permissions is left alone rather than
+     * failed over: a store that would not open on Windows would be a worse bug than a file with wide permissions.
+     */
+    private void restrictToOwner() {
+        try {
+            if (file.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+                Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"));
+            }
+        } catch (IOException | UnsupportedOperationException notPossible) {
+            // Nothing to do about it and nothing broken by it: the file is written either way.
+        }
+    }
+
     private void save() {
         synchronized (writeLock) {
             JsonArray all = new JsonArray();
@@ -192,6 +211,7 @@ public final class TokenStore {
                     Files.createDirectories(parent);
                 }
                 Files.writeString(file, GSON.toJson(all), StandardCharsets.UTF_8);
+                restrictToOwner();
             } catch (IOException failure) {
                 throw new UncheckedIOException("could not write " + file, failure);
             }

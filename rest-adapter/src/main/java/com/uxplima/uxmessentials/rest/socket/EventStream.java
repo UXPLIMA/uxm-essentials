@@ -14,6 +14,7 @@ import java.util.logging.Logger;
 import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.rest.http.HttpRequest;
 import com.uxplima.uxmessentials.rest.http.HttpResponse;
+import com.uxplima.uxmessentials.rest.http.HttpStatus;
 import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.RestServer;
 
@@ -27,18 +28,28 @@ import com.uxplima.uxmessentials.rest.http.RestServer;
  * <p>The fan-out renders once and writes the same text to every subscriber that asked for it. Nothing waits on
  * anything: a socket that has gone is dropped by the writing thread, and its own thread finds out when its next
  * read fails.
+ *
+ * <p>How many may be open at once is capped. Every open stream is a socket and a thread held for as long as the
+ * client wants them, so a client reconnecting in a loop is the one shape of traffic this listener cannot shrug
+ * off the way it shrugs off a request.
  */
 public final class EventStream implements RestServer.Upgrade, AutoCloseable {
 
     private final String path;
+    private final int maxSubscribers;
     private final Set<EventSocket> live = ConcurrentHashMap.newKeySet();
     private final Logger log;
 
     /**
      * @param path the one path this upgrades, which is a route in the table so it is authenticated like any other
+     * @param maxSubscribers how many connections may be open at once, across every token
      */
-    public EventStream(String path, Logger log) {
+    public EventStream(String path, int maxSubscribers, Logger log) {
         this.path = Objects.requireNonNull(path, "path");
+        if (maxSubscribers < 1) {
+            throw new IllegalArgumentException("maxSubscribers must be at least one: " + maxSubscribers);
+        }
+        this.maxSubscribers = maxSubscribers;
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -52,6 +63,14 @@ public final class EventStream implements RestServer.Upgrade, AutoCloseable {
         Optional<HttpResponse> refusal = Handshake.refusalFor(request);
         if (refusal.isPresent()) {
             return refusal;
+        }
+        if (live.size() >= maxSubscribers) {
+            log.warning("Refused an event stream for " + caller + ": already " + maxSubscribers
+                    + " connections, which is max-subscribers in rest.conf.");
+            return Optional.of(Json.error(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "too-many-subscribers",
+                    "this listener already has " + maxSubscribers + " event streams open"));
         }
         InputStream in = socket.getInputStream();
         OutputStream out = socket.getOutputStream();

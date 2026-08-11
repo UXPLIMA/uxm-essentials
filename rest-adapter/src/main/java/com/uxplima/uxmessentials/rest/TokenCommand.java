@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.rest;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
 
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.rest.auth.TokenStore;
  *   /uxmapi token create &lt;label&gt; [scopes]   issue one, shown once
  *   /uxmapi token list                       what exists, without the secrets
  *   /uxmapi token revoke &lt;label&gt;             stop one working
+ *   /uxmapi status                           whether it is listening, and who is connected
  * </pre>
  *
  * <p>Issuing in game rather than in a config file is the whole point: a secret an operator has to paste into a
@@ -47,9 +49,11 @@ public final class TokenCommand {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 
     private final TokenStore tokens;
+    private final Supplier<Listening> status;
 
-    public TokenCommand(TokenStore tokens) {
+    public TokenCommand(TokenStore tokens, Supplier<Listening> status) {
         this.tokens = Objects.requireNonNull(tokens, "tokens");
+        this.status = Objects.requireNonNull(status, "status");
     }
 
     /** The command tree, ready to register. */
@@ -67,6 +71,7 @@ public final class TokenCommand {
                         .then(Commands.literal("revoke")
                                 .then(Commands.argument("label", StringArgumentType.word())
                                         .executes(this::revoke))))
+                .then(Commands.literal("status").executes(this::status))
                 .build();
     }
 
@@ -103,6 +108,30 @@ public final class TokenCommand {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * What the listener is doing right now.
+     *
+     * <p>The one question an operator asks when something is not working, and the answer is otherwise spread over
+     * a config file, a log line from an hour ago, and a guess about how many things are connected.
+     */
+    private int status(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        Listening now = status.get();
+        if (!now.up()) {
+            sender.sendMessage(Component.text(
+                    "The REST API is not listening. Turn it on in plugins/uxmEssentials-rest/config/rest.conf"
+                            + " and restart.",
+                    NamedTextColor.RED));
+            return Command.SINGLE_SUCCESS;
+        }
+        sender.sendMessage(
+                Component.text("REST API listening on " + now.bind() + ":" + now.port(), NamedTextColor.GREEN));
+        sender.sendMessage(Component.text(
+                "  " + tokens.list().size() + " token(s), " + now.subscribers() + " event stream(s) open",
+                NamedTextColor.GRAY));
+        return Command.SINGLE_SUCCESS;
+    }
+
     private int revoke(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String label = StringArgumentType.getString(ctx, "label");
@@ -112,5 +141,23 @@ public final class TokenCommand {
                         ? Component.text("Token " + label + " revoked.", NamedTextColor.GREEN)
                         : Component.text("No token named " + label + ".", NamedTextColor.RED));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * What the listener is doing, asked at the moment somebody runs the command.
+     *
+     * @param up whether the port is open at all
+     * @param bind the address it is bound to
+     * @param port the port it is bound to
+     * @param subscribers how many event streams are open
+     */
+    public record Listening(boolean up, String bind, int port, int subscribers) {
+
+        /** Nothing is listening, which is what an add-on that stayed off reports. */
+        public static final Listening OFF = new Listening(false, "", 0, 0);
+
+        public Listening {
+            Objects.requireNonNull(bind, "bind");
+        }
     }
 }

@@ -12,11 +12,12 @@ import java.util.Objects;
  * @param bind the address to listen on
  * @param port the port to listen on
  * @param requestsPerMinute how many requests one token may make in a minute
+ * @param maxSubscribers how many event-stream connections may be open at once
  */
-public record RestConfig(boolean enabled, String bind, int port, int requestsPerMinute) {
+public record RestConfig(boolean enabled, String bind, int port, int requestsPerMinute, int maxSubscribers) {
 
     /** The shipped defaults, and what a config that failed to load falls back to. */
-    public static final RestConfig DORMANT = new RestConfig(false, "127.0.0.1", 8123, 120);
+    public static final RestConfig DORMANT = new RestConfig(false, "127.0.0.1", 8123, 120, 8);
 
     public RestConfig {
         Objects.requireNonNull(bind, "bind");
@@ -25,6 +26,9 @@ public record RestConfig(boolean enabled, String bind, int port, int requestsPer
         }
         if (requestsPerMinute < 1) {
             throw new IllegalArgumentException("requests-per-minute must be at least one: " + requestsPerMinute);
+        }
+        if (maxSubscribers < 1) {
+            throw new IllegalArgumentException("max-subscribers must be at least one: " + maxSubscribers);
         }
     }
 

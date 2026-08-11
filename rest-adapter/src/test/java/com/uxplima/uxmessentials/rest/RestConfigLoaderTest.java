@@ -20,6 +20,7 @@ class RestConfigLoaderTest {
         assertThat(config.bind()).isEqualTo("127.0.0.1");
         assertThat(config.port()).isEqualTo(8123);
         assertThat(config.requestsPerMinute()).isEqualTo(120);
+        assertThat(config.maxSubscribers()).isEqualTo(8);
     }
 
     @Test
@@ -38,6 +39,26 @@ class RestConfigLoaderTest {
         assertThat(config.port()).isEqualTo(9000);
         assertThat(config.requestsPerMinute()).isEqualTo(30);
         assertThat(config.isExposed()).isTrue();
+    }
+
+    @Test
+    void theSubscriberCapIsRead(@TempDir Path folder) throws Exception {
+        write(folder, """
+                enabled = true
+                max-subscribers = 32
+                """);
+
+        assertThat(RestConfigLoader.load(folder).maxSubscribers()).isEqualTo(32);
+    }
+
+    @Test
+    void aCapOfNothingLeavesTheListenerOff(@TempDir Path folder) throws Exception {
+        write(folder, """
+                enabled = true
+                max-subscribers = 0
+                """);
+
+        assertThat(RestConfigLoader.load(folder)).isEqualTo(RestConfig.DORMANT);
     }
 
     @Test
@@ -63,8 +84,8 @@ class RestConfigLoaderTest {
     @Test
     void theLoopbackAddressIsNotCountedAsExposed() {
         assertThat(RestConfig.DORMANT.isExposed()).isFalse();
-        assertThat(new RestConfig(true, "localhost", 8123, 120).isExposed()).isFalse();
-        assertThat(new RestConfig(true, "::1", 8123, 120).isExposed()).isFalse();
+        assertThat(new RestConfig(true, "localhost", 8123, 120, 8).isExposed()).isFalse();
+        assertThat(new RestConfig(true, "::1", 8123, 120, 8).isExposed()).isFalse();
     }
 
     @Test
