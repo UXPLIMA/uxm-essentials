@@ -1,9 +1,9 @@
 name: Release
 
-# A tag is the release. Pushing v0.5.2 builds that commit and publishes the four
-# jars under it, so what people download is exactly what the tag points at. The
-# same jars then go to the four Modrinth projects, so the store never trails the
-# tag by a release the way 0.5.1 did.
+# A tag is the release. Pushing v0.5.2 builds that commit and publishes the jars
+# under it, so what people download is exactly what the tag points at. The same
+# jars then go to their store projects, so the store never trails the tag by a
+# release the way 0.5.1 did.
 on:
   push:
     tags:
@@ -26,6 +26,11 @@ jobs:
       # release, and a fork publishes nowhere.
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
       HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
+      # The REST add-on's store projects, which are newer than the other four. Set the repository variables once
+      # the projects exist and the jar starts going out with the rest; until then it ships on the GitHub release
+      # only, and the two steps below say so rather than failing.
+      MODRINTH_REST_PROJECT: ${{ vars.MODRINTH_REST_PROJECT }}
+      HANGAR_REST_PROJECT: ${{ vars.HANGAR_REST_PROJECT }}
     steps:
       - name: Check out uxmEssentials
         uses: actions/checkout@v4
@@ -64,6 +69,7 @@ jobs:
           :velocity-adapter:shadowJar
           :discord-adapter:shadowJar
           :redis-adapter:shadowJar
+          :rest-adapter:shadowJar
 
       # Written once and read by both publishers, so the two stores show the same text. A tag that already has a
       # release keeps the notes it has: asking GitHub to generate them again on an update puts the existing body in
@@ -94,6 +100,7 @@ jobs:
             uxmEssentials/velocity-adapter/build/libs/uxmEssentials-velocity-*.jar
             uxmEssentials/discord-adapter/build/libs/uxmEssentials-discord-*.jar
             uxmEssentials/redis-adapter/build/libs/uxmEssentials-redis-*.jar
+            uxmEssentials/rest-adapter/build/libs/uxmEssentials-rest-*.jar
 
       # The developer API artifacts go to a Maven repository that is just a branch of this repository, served over
       # raw.githubusercontent. Nothing has to be configured for that URL to work, which is the whole point: the
@@ -147,6 +154,10 @@ jobs:
             label="$2"
             jar="$3"
             loaders="$4"
+            if [ -z "$project" ]; then
+              echo "no modrinth project id for $label yet, leaving it to the GitHub release"
+              return
+            fi
             # Modrinth accepts the same version number twice and lists it twice rather than refusing it, so a second
             # run over a tag that is already out has to be stopped here.
             if curl -sS "https://api.modrinth.com/v2/project/${project}/version" \
@@ -194,6 +205,8 @@ jobs:
             "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" '["paper","folia","purpur"]'
           publish DCyMsr3U "uxmEssentials Redis" \
             "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" '["paper","folia","purpur"]'
+          publish "${MODRINTH_REST_PROJECT:-}" "uxmEssentials REST" \
+            "rest-adapter/build/libs/uxmEssentials-rest-${version}.jar" '["paper","folia","purpur"]'
 
       # Every jar has its own Hangar project, the way it does on Modrinth: Hangar carries one file per platform per
       # version, so the four could never have shared one. The add-ons declare the main plugin as a hard dependency,
@@ -223,6 +236,10 @@ jobs:
             jar="$4"
             deps="$5"
 
+            if [ -z "$slug" ]; then
+              echo "no hangar project for $(basename "$jar") yet, leaving it to the GitHub release"
+              return
+            fi
             existing="$(curl -sS -o /dev/null -w '%{http_code}' \
               "https://hangar.papermc.io/api/v1/projects/${slug}/versions/${version}")"
             if [ "$existing" = "200" ]; then
@@ -264,3 +281,5 @@ jobs:
             "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" "$ADDON_DEPS"
           publish uxmEssentials-Redis PAPER "$PAPER_VERSIONS" \
             "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" "$ADDON_DEPS"
+          publish "${HANGAR_REST_PROJECT:-}" PAPER "$PAPER_VERSIONS" \
+            "rest-adapter/build/libs/uxmEssentials-rest-${version}.jar" "$ADDON_DEPS"

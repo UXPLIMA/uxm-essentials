@@ -53,6 +53,7 @@ jobs:
           :velocity-adapter:shadowJar
           :discord-adapter:shadowJar
           :redis-adapter:shadowJar
+          :rest-adapter:shadowJar
 
       # The developer API is only real if somebody outside this build can resolve and compile against it. Nothing
       # else in CI would notice a broken coordinate, a POM that forgot its dependency, or a type that moved out of
