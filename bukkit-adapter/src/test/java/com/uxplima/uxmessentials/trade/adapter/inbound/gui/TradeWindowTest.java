@@ -79,7 +79,8 @@ class TradeWindowTest {
                 (p, v, s, x) -> {},
                 new TradeSettlement(new NoopEconomy(), experience),
                 experience,
-                receipt -> {});
+                receipt -> {},
+                event -> {});
         view.register(engine.bindings());
         engine.installListener(plugin);
         server.getPluginManager().registerEvents(view.newListener(), plugin);

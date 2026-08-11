@@ -131,7 +131,8 @@ public final class TradeWiring {
                 experiencePrompt,
                 settlement,
                 experience,
-                audit);
+                audit,
+                kernel.events());
         view.register(menuBindings);
         // The request/accept flow: a per-request expiry book and a per-player cooldown, both driven by the same clock,
         // gate /trade and open the window through the view once the target accepts. The clock is UTC so a request's

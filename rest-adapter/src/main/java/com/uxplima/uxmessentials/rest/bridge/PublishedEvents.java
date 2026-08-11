@@ -65,6 +65,8 @@ import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestExp
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmTeleportRequestSendEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmWarmupCancelEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmWarmupStartEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.trade.UxmTradeCancelEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.trade.UxmTradeCompleteEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultContentsChangeEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultOpenEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.vote.UxmVotePartyEvent;
@@ -192,6 +194,10 @@ public final class PublishedEvents {
             UxmTeleportRequestSendEvent.class,
             UxmWarmupCancelEvent.class,
             UxmWarmupStartEvent.class,
+
+            // trade
+            UxmTradeCancelEvent.class,
+            UxmTradeCompleteEvent.class,
 
             // vault
             UxmVaultContentsChangeEvent.class,

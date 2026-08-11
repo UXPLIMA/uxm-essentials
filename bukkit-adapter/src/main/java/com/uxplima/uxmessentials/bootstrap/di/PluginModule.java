@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
+import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
@@ -262,6 +263,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportQueries;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.trade.adapter.TradeWiring;
+import com.uxplima.uxmessentials.trade.adapter.outbound.api.TradeQueries;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.vanish.adapter.VanishWiring;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.api.VanishQueries;
@@ -1403,6 +1405,8 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::closeAll);
+        // The live registry is the whole store a same-server trade has, so the published query reads it directly.
+        links.queries.register(UxmTradeQuery.class, new TradeQueries(wired.sessions()));
     }
 
     private static void wireRanks(

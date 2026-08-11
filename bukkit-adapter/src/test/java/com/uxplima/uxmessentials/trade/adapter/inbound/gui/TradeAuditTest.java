@@ -12,9 +12,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
@@ -25,6 +27,8 @@ import com.uxplima.uxmessentials.trade.application.port.TradeAudit;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
+import com.uxplima.uxmessentials.trade.domain.event.TradeCancelled;
+import com.uxplima.uxmessentials.trade.domain.event.TradeCompleted;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,9 +95,48 @@ class TradeAuditTest {
         assertThat(fixture.audit.receipts).isEmpty();
     }
 
+    @Test
+    void aCompletedTradePublishesWhatEachSideGaveEvenWithTheAuditOff() {
+        Fixture fixture = fixture(false);
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        fixture.view.open(alice, bob);
+        place(fixture, alice, new ItemStack(Material.DIAMOND, 3));
+        place(fixture, bob, new ItemStack(Material.EMERALD, 2));
+
+        fixture.view.confirm(holder(fixture, alice));
+        fixture.view.confirm(holder(fixture, bob));
+
+        assertThat(fixture.events.published).hasSize(1);
+        TradeCompleted fact = (TradeCompleted) fixture.events.published.get(0);
+        assertThat(fact.initiator().name()).isEqualTo("Alice");
+        assertThat(fact.partner().name()).isEqualTo("Bob");
+        assertThat(fact.initiatorItems()).isEqualTo(3);
+        assertThat(fact.partnerItems()).isEqualTo(2);
+    }
+
+    @Test
+    void aTradeNobodyFinishedPublishesTheCancellationInstead() {
+        Fixture fixture = fixture(true);
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        fixture.view.open(alice, bob);
+        place(fixture, alice, new ItemStack(Material.DIAMOND, 3));
+
+        // The drain every module stop runs, which is the same cancel path a closed window takes.
+        fixture.view.closeAll();
+
+        assertThat(fixture.events.published).hasSize(1);
+        TradeCancelled fact = (TradeCancelled) fixture.events.published.get(0);
+        assertThat(fact.initiator().name()).isEqualTo("Alice");
+        assertThat(fact.partner().name()).isEqualTo("Bob");
+        assertThat(fixture.audit.receipts).isEmpty();
+    }
+
     private Fixture fixture(boolean auditEnabled) {
         TradeSessions sessions = new TradeSessions();
         RecordingAudit audit = new RecordingAudit();
+        RecordingEvents events = new RecordingEvents();
         TradeConfig config = new TradeConfig(true, List.of("coins"), List.of(), 0, 5, false, 60, auditEnabled);
         KeyMessages messages = new KeyMessages();
         TestMenuEngine engine = TestMenuEngine.create(messages, new SyncScheduler());
@@ -110,11 +153,12 @@ class TradeAuditTest {
                 (p, v, s, x) -> {},
                 new TradeSettlement(new NoopEconomy(), experience),
                 experience,
-                audit);
+                audit,
+                events);
         view.register(engine.bindings());
         engine.installListener(plugin);
         server.getPluginManager().registerEvents(view.newListener(), plugin);
-        return new Fixture(sessions, window, view, audit);
+        return new Fixture(sessions, window, view, audit, events);
     }
 
     private void place(Fixture fixture, PlayerMock player, ItemStack stack) {
@@ -130,7 +174,18 @@ class TradeAuditTest {
     }
 
     /** One test's collaborators over a shared session — kept local so each test picks its own audit setting. */
-    private record Fixture(TradeSessions sessions, TradeWindow window, TradeView view, RecordingAudit audit) {}
+    private record Fixture(
+            TradeSessions sessions, TradeWindow window, TradeView view, RecordingAudit audit, RecordingEvents events) {}
+
+    /** Collects the facts the view published, so a test can assert on them rather than on the audit line. */
+    private static final class RecordingEvents implements DomainEventPublisher {
+        private final List<DomainEvent> published = new ArrayList<>();
+
+        @Override
+        public void publish(DomainEvent event) {
+            published.add(event);
+        }
+    }
 
     /** Captures every completed-trade receipt so the test can assert emission (or silence). */
     private static final class RecordingAudit implements TradeAudit {

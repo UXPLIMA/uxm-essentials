@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
+import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
@@ -41,6 +42,7 @@ import com.uxplima.uxmessentials.api.view.UxmRank;
 import com.uxplima.uxmessentials.api.view.UxmRankStanding;
 import com.uxplima.uxmessentials.api.view.UxmSanction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionKind;
+import com.uxplima.uxmessentials.api.view.UxmTrade;
 import com.uxplima.uxmessentials.api.view.UxmVoteParty;
 import com.uxplima.uxmessentials.api.view.UxmVotePeriod;
 import com.uxplima.uxmessentials.api.view.UxmVoteTotals;
@@ -403,6 +405,27 @@ class ReadRoutesTest {
         assertThat(answer.array()).hasSize(2);
         assertThat(answer.array().get(0).getAsJsonObject().get("id").getAsString())
                 .isEqualTo("first");
+    }
+
+    @Test
+    void aTradeIsReadableForEitherSideAndIsNullForSomebodyNotInOne() {
+        UxmTradeQuery trade = mock(UxmTradeQuery.class);
+        UUID partner = UUID.randomUUID();
+        UxmTrade open = new UxmTrade(UUID.randomUUID(), PLAYER, "Alice", partner, "Bob", true, false);
+        when(trade.of(PLAYER)).thenReturn(Optional.of(open));
+        when(trade.of(partner)).thenReturn(Optional.empty());
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.trade()).thenReturn(Optional.of(trade));
+
+        JsonObject answer = Calls.get(api, PLAYER_PATH + "/trade").object();
+
+        assertThat(answer.get("partner-name").getAsString()).isEqualTo("Bob");
+        assertThat(answer.get("initiator-confirmed").getAsBoolean()).isTrue();
+        assertThat(answer.get("both-confirmed").getAsBoolean()).isFalse();
+        assertThat(Calls.get(api, "/api/v1/players/" + partner + "/trade")
+                        .data()
+                        .isJsonNull())
+                .isTrue();
     }
 
     @Test

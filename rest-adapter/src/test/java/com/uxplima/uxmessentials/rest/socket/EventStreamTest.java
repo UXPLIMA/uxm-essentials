@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.logging.Logger;
 
 import com.google.gson.JsonObject;
@@ -154,9 +155,22 @@ class EventStreamTest {
         }
     }
 
+    /**
+     * Wait for the reader thread to notice the close and drop its subscriber.
+     *
+     * <p>A spin of a fixed number of turns is not a wait: on a loaded machine the thread has not been scheduled yet
+     * and the assertion that follows fails for a reason that has nothing to do with the code. This gives it a real
+     * deadline instead, and still returns the moment the count reaches zero.
+     */
     private static void awaitNoSubscribers(EventStream stream) {
-        for (int attempt = 0; attempt < 100 && stream.subscribers() > 0; attempt++) {
-            Thread.onSpinWait();
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (stream.subscribers() > 0 && System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(5);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 

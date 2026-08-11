@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.api.view.UxmRankStanding;
 import com.uxplima.uxmessentials.api.view.UxmSanction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionRecord;
 import com.uxplima.uxmessentials.api.view.UxmTeleportRequest;
+import com.uxplima.uxmessentials.api.view.UxmTrade;
 import com.uxplima.uxmessentials.api.view.UxmVault;
 import com.uxplima.uxmessentials.api.view.UxmVoteParty;
 import com.uxplima.uxmessentials.api.view.UxmVoteRank;
@@ -287,6 +288,19 @@ public final class Views {
         json.add("next", standing.next().map(Views::rank).orElse(JsonNull.INSTANCE));
         json.addProperty("prestige", standing.prestige());
         json.addProperty("at-top", standing.atTop());
+        return json;
+    }
+
+    public static JsonElement trade(UxmTrade trade) {
+        JsonObject json = new JsonObject();
+        json.addProperty("id", trade.id().toString());
+        json.addProperty("initiator-id", trade.initiatorId().toString());
+        json.addProperty("initiator-name", trade.initiatorName());
+        json.addProperty("partner-id", trade.partnerId().toString());
+        json.addProperty("partner-name", trade.partnerName());
+        json.addProperty("initiator-confirmed", trade.initiatorConfirmed());
+        json.addProperty("partner-confirmed", trade.partnerConfirmed());
+        json.addProperty("both-confirmed", trade.bothConfirmed());
         return json;
     }
 

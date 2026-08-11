@@ -16,6 +16,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -29,6 +30,8 @@ import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
 import com.uxplima.uxmessentials.trade.domain.TradeSession;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
+import com.uxplima.uxmessentials.trade.domain.event.TradeCancelled;
+import com.uxplima.uxmessentials.trade.domain.event.TradeCompleted;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -67,6 +70,9 @@ public final class TradeView {
     /** The completed-trade audit sink; consulted only when {@link #auditEnabled} is set. */
     private final TradeAudit audit;
 
+    /** Where the two facts a trade ends with are published, whatever the audit knob is set to. */
+    private final DomainEventPublisher events;
+
     /** Whether a completed trade emits an audit line — the module's {@code audit} config knob, resolved once. */
     private final boolean auditEnabled;
 
@@ -90,7 +96,8 @@ public final class TradeView {
             TradeExperiencePrompt experiencePrompt,
             TradeSettlement settlement,
             TradeExperience experience,
-            TradeAudit audit) {
+            TradeAudit audit,
+            DomainEventPublisher events) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -102,6 +109,7 @@ public final class TradeView {
         this.settlement = Objects.requireNonNull(settlement, "settlement");
         this.experience = Objects.requireNonNull(experience, "experience");
         this.audit = Objects.requireNonNull(audit, "audit");
+        this.events = Objects.requireNonNull(events, "events");
         this.auditEnabled = config.audit();
         this.blacklist = parseBlacklist(config.itemBlacklist());
     }
@@ -401,6 +409,7 @@ public final class TradeView {
                 : TradeSide.PARTNER;
         deliver(quitter, TradeItemCodec.stacks(exchange.offer(side)));
         deliverAndClose(exchange, side.other(), exchange.offer(side.other()));
+        publishCancelled(exchange);
         notifyBoth(exchange, TradeMessageKey.TRADE_CANCELLED);
     }
 
@@ -456,9 +465,22 @@ public final class TradeView {
         if (settlement.settle(exchange.session())) {
             giveBack(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.PARTNER));
             giveBack(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.INITIATOR));
+            TradeReceipt receipt = TradeReceipt.of(exchange.session());
             if (auditEnabled) {
-                audit.completed(TradeReceipt.of(exchange.session()));
+                audit.completed(receipt);
             }
+            // The fact is published whether or not the operator wants an audit line: one is a log, the other is
+            // something another plugin acts on, and tying them together would make the API a logging setting.
+            events.publish(new TradeCompleted(
+                    exchange.id(),
+                    receipt.initiator(),
+                    receipt.partner(),
+                    receipt.initiatorItems(),
+                    receipt.partnerItems(),
+                    receipt.initiatorMoney(),
+                    receipt.partnerMoney(),
+                    receipt.initiatorExperience(),
+                    receipt.partnerExperience()));
             notifyBoth(exchange, TradeMessageKey.TRADE_COMPLETED);
         } else {
             giveBack(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.INITIATOR));
@@ -486,12 +508,19 @@ public final class TradeView {
         }
     }
 
+    /** The one place a cancelled trade is announced, so every path that ends one without a swap says so. */
+    private void publishCancelled(TradeExchange exchange) {
+        events.publish(new TradeCancelled(
+                exchange.id(), exchange.participant(TradeSide.INITIATOR), exchange.participant(TradeSide.PARTNER)));
+    }
+
     /** The body of a cancel, run by whichever path won the settle flag. */
     private void finishCancel(TradeExchange exchange) {
         exchange.markCancelled();
         sessions.remove(exchange);
         deliverAndClose(exchange, TradeSide.INITIATOR, exchange.offer(TradeSide.INITIATOR));
         deliverAndClose(exchange, TradeSide.PARTNER, exchange.offer(TradeSide.PARTNER));
+        publishCancelled(exchange);
         notifyBoth(exchange, TradeMessageKey.TRADE_CANCELLED);
     }
 

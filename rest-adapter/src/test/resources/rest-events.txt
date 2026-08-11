@@ -60,6 +60,8 @@ teleport.request-expire: player-id, player-name, request-id, requester-id, reque
 teleport.request-send: direction, expires-at, player-id, player-name, request-id, requester-id, requester-name, target-id, target-name
 teleport.warmup-cancel: kind, player-id, player-name, reason
 teleport.warmup-start: duration-seconds, kind, origin, player-id, player-name
+trade.cancel: initiator-id, initiator-name, partner-id, partner-name, trade-id
+trade.complete: initiator-experience, initiator-id, initiator-items, initiator-money, initiator-name, partner-experience, partner-id, partner-items, partner-money, partner-name, trade-id
 vault.contents-change: at, index, player-id, player-name
 vault.open: at, index, own-vault, player-id, player-name, viewer-id, viewer-name
 vote.party: threshold

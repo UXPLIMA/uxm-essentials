@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.trade.adapter.inbound.gui;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.domain.TradeId;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import org.jspecify.annotations.NullMarked;
@@ -58,6 +60,51 @@ public final class TradeSessions {
         byTrade.remove(exchange.id());
         byPlayer.remove(exchange.participant(TradeSide.INITIATOR).uuid());
         byPlayer.remove(exchange.participant(TradeSide.PARTNER).uuid());
+    }
+
+    /**
+     * The live trade a player is in, as the published view of it, or empty when they are not trading.
+     *
+     * <p>Read straight off the exchange, so it is the state as it stands at the moment of the call. A trade that
+     * settles a tick later does not make the answer wrong; it makes it a snapshot, which is all a live window can
+     * ever be.
+     */
+    public Optional<TradeSnapshot> snapshot(UUID player) {
+        Objects.requireNonNull(player, "player");
+        return Optional.ofNullable(byPlayer.get(player)).map(TradeSessions::snapshotOf);
+    }
+
+    /** The same snapshot for every trade open on this server. */
+    public List<TradeSnapshot> snapshots() {
+        return byTrade.values().stream().map(TradeSessions::snapshotOf).toList();
+    }
+
+    private static TradeSnapshot snapshotOf(TradeExchange exchange) {
+        return new TradeSnapshot(
+                exchange.id(),
+                exchange.participant(TradeSide.INITIATOR),
+                exchange.participant(TradeSide.PARTNER),
+                exchange.confirmed(TradeSide.INITIATOR),
+                exchange.confirmed(TradeSide.PARTNER));
+    }
+
+    /**
+     * One open trade, flattened out of the exchange the two windows share.
+     *
+     * @param id the trade's own id
+     * @param initiator the player who opened it
+     * @param partner the player who accepted it
+     * @param initiatorConfirmed whether the initiator has confirmed the offers as they stand
+     * @param partnerConfirmed whether the partner has confirmed the offers as they stand
+     */
+    public record TradeSnapshot(
+            TradeId id, PlayerRef initiator, PlayerRef partner, boolean initiatorConfirmed, boolean partnerConfirmed) {
+
+        public TradeSnapshot {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(initiator, "initiator");
+            Objects.requireNonNull(partner, "partner");
+        }
     }
 
     /** A snapshot of every live exchange, for draining all in-flight trades on module stop. */

@@ -74,7 +74,8 @@ class TradeMoneyTest {
                 (p, v, s, x) -> {},
                 new TradeSettlement(economy, experience),
                 experience,
-                receipt -> {});
+                receipt -> {},
+                event -> {});
         view.register(engine.bindings());
         engine.installListener(plugin);
         server.getPluginManager().registerEvents(view.newListener(), plugin);

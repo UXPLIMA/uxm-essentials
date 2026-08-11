@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
+import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
@@ -155,6 +156,9 @@ public interface UxmEssentialsApi {
 
     /** Reading where players stand on the rank ladder, or empty when the ranks module is switched off. */
     Optional<UxmRanksQuery> ranks();
+
+    /** Reading the trades open right now, or empty when the trade module is switched off. */
+    Optional<UxmTradeQuery> trade();
 
     /** Reading vote counts and party progress, or empty when the vote module is switched off. */
     Optional<UxmVoteQuery> vote();

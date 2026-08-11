@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
 import com.uxplima.uxmessentials.rest.route.PresenceRoutes;
 import com.uxplima.uxmessentials.rest.route.RanksRoutes;
 import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
+import com.uxplima.uxmessentials.rest.route.TradeRoutes;
 import com.uxplima.uxmessentials.rest.route.VanishRoutes;
 import com.uxplima.uxmessentials.rest.route.VaultsRoutes;
 import com.uxplima.uxmessentials.rest.route.VoteRoutes;
@@ -56,9 +57,9 @@ public final class Routes {
      * <p>Reads go through {@code api} directly; writes go through {@code actions}, which hands each request an action
      * surface named after the token that made it, so the audit trail says who asked rather than only which jar.
      *
-     * <p>Two contexts take no {@code actions}: player warps and vaults publish a query surface and no action surface,
-     * so over HTTP they are readable and nothing more. That is the published API's shape showing through rather than
-     * a decision taken here.
+     * <p>Three contexts take no {@code actions}: player warps, vaults and trade publish a query surface and no action
+     * surface, so over HTTP they are readable and nothing more. That is the published API's shape showing through
+     * rather than a decision taken here.
      */
     public static Router build(UxmEssentialsApi api, ActionsFor actions) {
         Objects.requireNonNull(api, "api");
@@ -76,6 +77,7 @@ public final class Routes {
                 .addAll(PresenceRoutes.of(api, actions))
                 .addAll(RanksRoutes.of(api, actions))
                 .addAll(TeleportRoutes.of(api, actions))
+                .addAll(TradeRoutes.of(api))
                 .addAll(VanishRoutes.of(api, actions))
                 .addAll(VaultsRoutes.of(api))
                 .addAll(VoteRoutes.of(api, actions))
@@ -129,6 +131,7 @@ public final class Routes {
         present.put("vote", api.vote().isPresent());
         present.put("messaging", api.messaging().isPresent());
         present.put("ranks", api.ranks().isPresent());
+        present.put("trade", api.trade().isPresent());
         return present;
     }
 }
