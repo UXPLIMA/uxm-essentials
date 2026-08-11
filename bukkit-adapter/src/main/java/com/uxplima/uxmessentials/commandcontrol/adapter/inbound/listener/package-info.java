@@ -6,7 +6,7 @@
  * {@link com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandVisibilityListener} keeps disallowed
  * and hidden commands out of what a client sees — scrubbing the sent command list, filtering tab completion, and
  * blocking the plugin-listing / help commands from executing (scrub-help);
- * {@link com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.BukkitPlayerFacts} adapts the live
+ * {@link com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFacts} adapts the live
  * {@code Player} to the domain's Bukkit-free player-facts view with a lazy group lookup.
  */
 @org.jspecify.annotations.NullMarked

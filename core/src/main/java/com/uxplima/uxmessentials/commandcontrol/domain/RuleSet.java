@@ -80,16 +80,30 @@ public final class RuleSet {
      * otherwise the player's group selects its list (or the default list) and the mode reads it.
      */
     public Decision decide(String commandRoot, PlayerFacts facts) {
+        return explain(commandRoot, facts).decision();
+    }
+
+    /**
+     * The same decision {@link #decide} makes, with what produced it: the mode that was read, whether the root was
+     * listed, and whose list it was. For anything that has to explain the outcome rather than act on it, so an
+     * explanation runs the resolution rather than restating it and can never drift from the gate.
+     */
+    public RuleVerdict explain(String commandRoot, PlayerFacts facts) {
         Objects.requireNonNull(commandRoot, "commandRoot");
         Objects.requireNonNull(facts, "facts");
+        String root = normalize(commandRoot);
         if (facts.hasPermission(bypassPermission)) {
-            return Decision.ALLOW;
+            return new RuleVerdict(root, mode, Decision.ALLOW, RuleVerdict.Reason.BYPASS, Optional.empty());
         }
-        boolean listed = listFor(facts.group()).contains(normalize(commandRoot));
-        return switch (mode) {
-            case WHITELIST -> listed ? Decision.ALLOW : Decision.DENY;
-            case BLACKLIST -> listed ? Decision.DENY : Decision.ALLOW;
-        };
+        Optional<String> group = facts.group();
+        boolean listed = listFor(group).contains(root);
+        Decision decision =
+                switch (mode) {
+                    case WHITELIST -> listed ? Decision.ALLOW : Decision.DENY;
+                    case BLACKLIST -> listed ? Decision.DENY : Decision.ALLOW;
+                };
+        RuleVerdict.Reason reason = listed ? RuleVerdict.Reason.LISTED : RuleVerdict.Reason.UNLISTED;
+        return new RuleVerdict(root, mode, decision, reason, listOwner(group));
     }
 
     /**
@@ -101,6 +115,11 @@ public final class RuleSet {
         return mode == RuleMode.BLACKLIST
                 && defaultCommands.isEmpty()
                 && groupCommands.values().stream().allMatch(Set::isEmpty);
+    }
+
+    /** The group whose own list governs it, or empty when the {@code default} list does. */
+    private Optional<String> listOwner(Optional<String> group) {
+        return group.map(RuleSet::normalize).filter(groupCommands::containsKey);
     }
 
     /** The list that governs {@code group}: the group's own list when it has one, else the {@code default} list. */

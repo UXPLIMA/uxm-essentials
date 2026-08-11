@@ -7,12 +7,15 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional kits()
   Optional messaging()
   Optional moderation()
+  Optional nametags()
   Optional npc()
   Optional playerState()
   Optional playerWarps()
   Optional presence()
   Optional ranks()
+  Optional scoreboard()
   Optional security()
+  Optional tablist()
   Optional teleport()
   Optional vanish()
   Optional vaults()
@@ -88,6 +91,8 @@ interface com.uxplima.uxmessentials.api.action.UxmModerationActions
   CompletableFuture unmute(UUID)
   CompletableFuture warn(UUID, String)
   com.uxplima.uxmessentials.api.action.UxmModerationActions silently()
+interface com.uxplima.uxmessentials.api.action.UxmNametagActions
+  CompletableFuture refresh(UUID)
 interface com.uxplima.uxmessentials.api.action.UxmNpcActions
   CompletableFuture clearClickCommand(UUID, String)
   CompletableFuture clearDisplayName(UUID, String)
@@ -147,9 +152,15 @@ class com.uxplima.uxmessentials.api.action.UxmResult
   com.uxplima.uxmessentials.api.action.UxmResult ok(Object)
   int hashCode()
   void ifFailed(Consumer)
+interface com.uxplima.uxmessentials.api.action.UxmScoreboardActions
+  CompletableFuture hide(UUID)
+  CompletableFuture refresh(UUID)
+  CompletableFuture show(UUID)
 interface com.uxplima.uxmessentials.api.action.UxmSecurityActions
   CompletableFuture clearLockout(UUID)
   CompletableFuture forceVerification(UUID)
+interface com.uxplima.uxmessentials.api.action.UxmTablistActions
+  CompletableFuture refresh(UUID)
 interface com.uxplima.uxmessentials.api.action.UxmTeleportActions
   CompletableFuture back(UUID)
   CompletableFuture teleport(UUID, com.uxplima.uxmessentials.api.view.UxmLocation)
@@ -178,6 +189,7 @@ class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
   void uninstall()
 interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
+  Optional commandControl()
   Optional discordLink()
   Optional economy()
   Optional holograms()
@@ -194,6 +206,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional presence()
   Optional ranks()
   Optional regions()
+  Optional scoreboard()
   Optional security()
   Optional staff()
   Optional teleport()
@@ -893,6 +906,9 @@ enum com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result INVALID
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result LINKED
   com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result NO_CODE
+interface com.uxplima.uxmessentials.api.query.UxmCommandControlQuery
+  CompletableFuture check(UUID, String)
+  CompletableFuture isBlocked(UUID, String)
 interface com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery
   CompletableFuture byDiscordId(String)
   CompletableFuture isLinked(UUID)
@@ -967,6 +983,8 @@ interface com.uxplima.uxmessentials.api.query.UxmRegionsQuery
   CompletableFuture in(String)
   CompletableFuture region(String, String)
   boolean available()
+interface com.uxplima.uxmessentials.api.query.UxmScoreboardQuery
+  CompletableFuture hidden(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmSecurityQuery
   CompletableFuture of(UUID)
   boolean isLockedOut(UUID)
@@ -1031,6 +1049,25 @@ record com.uxplima.uxmessentials.api.view.UxmBaltopEntry
   com.uxplima.uxmessentials.api.view.UxmMoney balance()
   int hashCode()
   int rank()
+record com.uxplima.uxmessentials.api.view.UxmCommandCheck
+  <init>(String, boolean, com.uxplima.uxmessentials.api.view.UxmCommandRule, Optional, Optional)
+  Optional group()
+  Optional world()
+  String command()
+  String toString()
+  boolean allowed()
+  boolean blocked()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmCommandRule rule()
+  int hashCode()
+enum com.uxplima.uxmessentials.api.view.UxmCommandRule
+  com.uxplima.uxmessentials.api.view.UxmCommandRule valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmCommandRule[] values()
+  com.uxplima.uxmessentials.api.view.UxmCommandRule BLACKLISTED
+  com.uxplima.uxmessentials.api.view.UxmCommandRule BYPASS
+  com.uxplima.uxmessentials.api.view.UxmCommandRule NOT_BLACKLISTED
+  com.uxplima.uxmessentials.api.view.UxmCommandRule NOT_WHITELISTED
+  com.uxplima.uxmessentials.api.view.UxmCommandRule WHITELISTED
 record com.uxplima.uxmessentials.api.view.UxmDiscordLink
   <init>(UUID, String, Instant)
   Instant linkedAt()

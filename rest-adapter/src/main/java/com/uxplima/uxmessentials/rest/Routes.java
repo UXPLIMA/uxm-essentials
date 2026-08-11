@@ -13,7 +13,9 @@ import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
 import com.uxplima.uxmessentials.rest.route.ActionsFor;
+import com.uxplima.uxmessentials.rest.route.CommandControlRoutes;
 import com.uxplima.uxmessentials.rest.route.DiscordLinkRoutes;
+import com.uxplima.uxmessentials.rest.route.DisplayRoutes;
 import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
 import com.uxplima.uxmessentials.rest.route.HologramsRoutes;
 import com.uxplima.uxmessentials.rest.route.HomesRoutes;
@@ -28,6 +30,7 @@ import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
 import com.uxplima.uxmessentials.rest.route.PresenceRoutes;
 import com.uxplima.uxmessentials.rest.route.RanksRoutes;
 import com.uxplima.uxmessentials.rest.route.RegionsRoutes;
+import com.uxplima.uxmessentials.rest.route.ScoreboardRoutes;
 import com.uxplima.uxmessentials.rest.route.SecurityRoutes;
 import com.uxplima.uxmessentials.rest.route.StaffRoutes;
 import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
@@ -65,9 +68,10 @@ public final class Routes {
      * <p>Reads go through {@code api} directly; writes go through {@code actions}, which hands each request an action
      * surface named after the token that made it, so the audit trail says who asked rather than only which jar.
      *
-     * <p>Four contexts take no {@code actions}: trade, regions, staff and itemworld publish a query surface and no
-     * action surface, so over HTTP they are readable and nothing more. That is the published API's shape showing
-     * through rather than a decision taken here.
+     * <p>Six contexts take no {@code actions}: trade, regions, staff, itemworld and commandcontrol publish a query
+     * surface and no action surface, so over HTTP they are readable and nothing more. One goes the other way:
+     * {@code DisplayRoutes} covers tablist and nametags, which publish a verb and nothing to read. Both are the
+     * published API's shape showing through rather than a decision taken here.
      */
     public static Router build(UxmEssentialsApi api, ActionsFor actions) {
         Objects.requireNonNull(api, "api");
@@ -75,7 +79,9 @@ public final class Routes {
         return new Router()
                 .add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)))
                 .add(Route.of("GET", EVENTS, Scopes.EVENTS, request -> upgradeRequired()))
+                .addAll(CommandControlRoutes.of(api))
                 .addAll(DiscordLinkRoutes.of(api, actions))
+                .addAll(DisplayRoutes.of(actions))
                 .addAll(EconomyRoutes.of(api, actions))
                 .addAll(HologramsRoutes.of(api, actions))
                 .addAll(HomesRoutes.of(api, actions))
@@ -90,6 +96,7 @@ public final class Routes {
                 .addAll(PresenceRoutes.of(api, actions))
                 .addAll(RanksRoutes.of(api, actions))
                 .addAll(RegionsRoutes.of(api))
+                .addAll(ScoreboardRoutes.of(api, actions))
                 .addAll(SecurityRoutes.of(api, actions))
                 .addAll(StaffRoutes.of(api))
                 .addAll(TeleportRoutes.of(api, actions))
@@ -116,7 +123,8 @@ public final class Routes {
      * What is running and what is on.
      *
      * <p>The modules are reported from the published surfaces themselves rather than from a list of names kept here,
-     * so a module that gains or loses a surface cannot leave this answering yesterday's truth.
+     * so a module that gains or loses a surface cannot leave this answering yesterday's truth. Tablist and nametags
+     * are absent for that reason: they publish a verb and nothing to read, so there is no read surface to ask.
      */
     private static HttpResponse status(UxmEssentialsApi api) {
         JsonObject payload = Json.object();
@@ -156,6 +164,8 @@ public final class Routes {
         present.put("holograms", api.holograms().isPresent());
         present.put("staff", api.staff().isPresent());
         present.put("itemworld", api.itemworld().isPresent());
+        present.put("commandcontrol", api.commandControl().isPresent());
+        present.put("scoreboard", api.scoreboard().isPresent());
         return present;
     }
 }

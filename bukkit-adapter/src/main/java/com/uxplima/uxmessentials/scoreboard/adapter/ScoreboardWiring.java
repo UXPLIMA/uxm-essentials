@@ -101,7 +101,15 @@ public final class ScoreboardWiring {
                 List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages(), settingsView));
         List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer, kernel.scheduler()));
         return new Wired(
-                commands, listeners, renderer, renderTask, running, visibility, settingsView, kernel.scheduler());
+                commands,
+                listeners,
+                renderer,
+                renderTask,
+                running,
+                visibility,
+                toggle,
+                settingsView,
+                kernel.scheduler());
     }
 
     private static SidebarManager sidebarManager(NameVisibilityCoordinator nameVisibility) {
@@ -126,6 +134,7 @@ public final class ScoreboardWiring {
      * @param renderTask the self-rescheduling render timer, armed by the caller
      * @param running the flag flipped false on stop so the render timer exits
      * @param visibility the per-player "hidden" preference store, exposed for the {@code scoreboard_*} PAPI seam
+     * @param toggle the flip use case, shared by the command, the settings panel and the published write
      * @param settingsView the per-player settings panel registered on the {@code /uxmess gui} hub
      * @param scheduler the kernel scheduler, used to enumerate the roster on the global thread and clear each board
      *     on its owner's region thread when the module stops
@@ -137,6 +146,7 @@ public final class ScoreboardWiring {
             ScoreboardRenderTask renderTask,
             AtomicBoolean running,
             ScoreboardVisibilityStore visibility,
+            ToggleScoreboard toggle,
             ScoreboardSettingsView settingsView,
             Scheduler scheduler) {
 
@@ -147,6 +157,7 @@ public final class ScoreboardWiring {
             Objects.requireNonNull(renderTask, "renderTask");
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(visibility, "visibility");
+            Objects.requireNonNull(toggle, "toggle");
             Objects.requireNonNull(settingsView, "settingsView");
             Objects.requireNonNull(scheduler, "scheduler");
         }

@@ -9,6 +9,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmCommandControlQuery;
 import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
@@ -25,6 +26,7 @@ import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
+import com.uxplima.uxmessentials.api.query.UxmScoreboardQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
 import com.uxplima.uxmessentials.api.query.UxmStaffQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
@@ -244,5 +246,15 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmItemworldQuery> itemworld() {
         return queries.find(UxmItemworldQuery.class);
+    }
+
+    @Override
+    public Optional<UxmCommandControlQuery> commandControl() {
+        return queries.find(UxmCommandControlQuery.class);
+    }
+
+    @Override
+    public Optional<UxmScoreboardQuery> scoreboard() {
+        return queries.find(UxmScoreboardQuery.class);
     }
 }

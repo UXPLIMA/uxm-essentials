@@ -67,7 +67,7 @@ public final class CommandControlWiring {
     private CommandControlWiring() {}
 
     /** Build the command-control listeners from {@code server} and {@code ctx}, ready to register. */
-    public static List<Listener> wire(Server server, ModuleContext ctx) {
+    public static Wired wire(Server server, ModuleContext ctx) {
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(ctx, "ctx");
         KernelPorts kernel = ctx.kernel();
@@ -107,7 +107,30 @@ public final class CommandControlWiring {
         if (channelHide.isEnabled()) {
             listeners.add(channelHideConnection(channelHide, kernel));
         }
-        return List.copyOf(listeners);
+        return new Wired(List.copyOf(listeners), worldRules, config.blockNamespaceBypass(), groups);
+    }
+
+    /**
+     * Everything the command-control module contributes once wired. The listeners are what gets registered; the rest
+     * is what the published check needs to answer with the rules that are actually in force, which is why the same
+     * resolution is handed out here rather than rebuilt from config a second time.
+     *
+     * @param listeners the gate, visibility, normalisation, spam and channel-hide listeners to register
+     * @param worldRules the world-scoped rules the gate consults
+     * @param blockNamespaceBypass whether a {@code namespace:} prefix is folded back to the bare command
+     * @param groups the primary-group source the rules read, LuckPerms-backed when it is installed
+     */
+    public record Wired(
+            List<Listener> listeners,
+            WorldRuleSets worldRules,
+            boolean blockNamespaceBypass,
+            PlayerGroupSource groups) {
+
+        public Wired {
+            listeners = List.copyOf(listeners);
+            Objects.requireNonNull(worldRules, "worldRules");
+            Objects.requireNonNull(groups, "groups");
+        }
     }
 
     /**

@@ -1188,7 +1188,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
-            wireTablist(plugin, ctx, resources);
+            wireTablist(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
@@ -1232,7 +1232,7 @@ public final class PluginModule {
                     menuBindings,
                     Objects.requireNonNull(ipCapture, "ipCapture"));
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
-            wireCommandControl(plugin, ctx, resources);
+            wireCommandControl(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
             wireVillagers(plugin, ctx, resources, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
@@ -1404,7 +1404,8 @@ public final class PluginModule {
                         ctx.kernel().scheduler()));
     }
 
-    private static void wireCommandControl(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireCommandControl(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // commandcontrol persists nothing: the whitelist/blacklist rule set and the plugin-hide policy are derived once
         // from the module's config into immutable snapshots, so a hot-reload re-runs this wiring and registers fresh
         // listeners. The gate listener consults the rule set on PlayerCommandPreprocessEvent and, on deny, cancels the
@@ -1412,7 +1413,18 @@ public final class PluginModule {
         // completion, and the scrub-help output so disallowed and hidden commands stay invisible. Both read the
         // player's group (LuckPerms when installed, empty otherwise) and permission facts. There is no runtime state to
         // drain on stop — unregistering the listeners is enough.
-        CommandControlWiring.wire(plugin.getServer(), ctx).forEach(resources::addListener);
+        CommandControlWiring.Wired wired = CommandControlWiring.wire(plugin.getServer(), ctx);
+        wired.listeners().forEach(resources::addListener);
+        // The published check answers from the same rules and the same facts the gate uses, so a plugin hiding a
+        // button agrees with what happens when the player types the command instead of guessing alongside it.
+        links.queries.register(
+                com.uxplima.uxmessentials.api.query.UxmCommandControlQuery.class,
+                new com.uxplima.uxmessentials.commandcontrol.adapter.outbound.api.CommandControlQueries(
+                        wired.worldRules(),
+                        wired.blockNamespaceBypass(),
+                        wired.groups(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
     }
 
     private static void wireTrade(
@@ -2586,9 +2598,26 @@ public final class PluginModule {
                 Material.PAINTING,
                 "uxmessentials.scoreboard.gui",
                 (player, viewer) -> wired.settingsView().open(player, viewer)));
+        // The published sidebar surface: the same preference /scoreboard flips, and the same renderer, so a
+        // consumer that brings a redraw forward or puts the board away is doing what the command does.
+        links.queries.register(
+                com.uxplima.uxmessentials.api.query.UxmScoreboardQuery.class,
+                new com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardQueries(
+                        wired.visibility(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmScoreboardActions.class,
+                source -> new com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardActions(
+                        wired.toggle(),
+                        wired.visibility(),
+                        wired.renderer(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
     }
 
-    private static void wireTablist(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireTablist(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // tablist persists nothing: the header/footer content is config-authored under modules/tablist/config.conf. It
         // carries no cross-context bridge — its only collaborators are the shared Scheduler and log ports — so nothing
         // is captured for a later context, and the tablist is always-on (no per-player toggle) so it publishes no
@@ -2597,6 +2626,14 @@ public final class PluginModule {
         TablistWiring.Wired wired = TablistWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The one published verb: the refresh timer's own pass, brought forward for a single viewer. Nothing outside
+        // the module owns a row it could set, so there is nothing else honest to offer.
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmTablistActions.class,
+                source -> new com.uxplima.uxmessentials.tablist.adapter.outbound.api.TablistActions(
+                        wired.renderer(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
     }
@@ -2623,6 +2660,14 @@ public final class PluginModule {
         NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx, vanish, links.nameVisibility);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The one published verb: the reconcile pass for a single wearer, which re-selects the format before it
+        // redraws. Removing a nametag from outside would last until the next pass, so it is not offered.
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmNametagActions.class,
+                source -> new com.uxplima.uxmessentials.nametags.adapter.outbound.api.NametagActions(
+                        wired.presenter(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
     }

@@ -45,6 +45,18 @@ class WorldRuleSetsTest {
     }
 
     @Test
+    void aWorldIsAskedWhetherTheOverrideOrTheBaseRulesDecidedIt() {
+        RuleSet base = RuleSet.of(RuleMode.BLACKLIST, List.of("fly"), Map.of(), BYPASS);
+        WorldRuleSets worlds = WorldRuleSets.of(base, Map.of("creative", base));
+
+        assertThat(worlds.hasOverrideFor("creative")).isTrue();
+        assertThat(worlds.hasOverrideFor("CREATIVE")).isTrue();
+        assertThat(worlds.hasOverrideFor("survival")).isFalse();
+        assertThat(worlds.hasOverrideFor(null)).isFalse();
+        assertThat(WorldRuleSets.ofBase(base).hasOverrideFor("creative")).isFalse();
+    }
+
+    @Test
     void theWorldNameIsMatchedCaseInsensitively() {
         RuleSet base = RuleSet.of(RuleMode.BLACKLIST, List.of("fly"), Map.of(), BYPASS);
         RuleSet creative = RuleSet.of(RuleMode.BLACKLIST, List.of(), Map.of(), BYPASS);

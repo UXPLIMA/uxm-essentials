@@ -12,12 +12,15 @@ import com.uxplima.uxmessentials.api.action.UxmInvRollbackActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.action.UxmMessagingActions;
 import com.uxplima.uxmessentials.api.action.UxmModerationActions;
+import com.uxplima.uxmessentials.api.action.UxmNametagActions;
 import com.uxplima.uxmessentials.api.action.UxmNpcActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerWarpsActions;
 import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
 import com.uxplima.uxmessentials.api.action.UxmRanksActions;
+import com.uxplima.uxmessentials.api.action.UxmScoreboardActions;
 import com.uxplima.uxmessentials.api.action.UxmSecurityActions;
+import com.uxplima.uxmessentials.api.action.UxmTablistActions;
 import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.action.UxmVanishActions;
 import com.uxplima.uxmessentials.api.action.UxmVaultsActions;
@@ -142,5 +145,20 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmHologramsActions> holograms() {
         return contexts.find(UxmHologramsActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmScoreboardActions> scoreboard() {
+        return contexts.find(UxmScoreboardActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmTablistActions> tablist() {
+        return contexts.find(UxmTablistActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmNametagActions> nametags() {
+        return contexts.find(UxmNametagActions.class, source);
     }
 }

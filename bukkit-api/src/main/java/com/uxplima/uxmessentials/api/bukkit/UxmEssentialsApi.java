@@ -7,6 +7,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmCommandControlQuery;
 import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
@@ -23,6 +24,7 @@ import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
+import com.uxplima.uxmessentials.api.query.UxmScoreboardQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
 import com.uxplima.uxmessentials.api.query.UxmStaffQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
@@ -197,6 +199,12 @@ public interface UxmEssentialsApi {
 
     /** Reading a player's powertool bindings, or empty when the itemworld module is switched off. */
     Optional<UxmItemworldQuery> itemworld();
+
+    /** Asking whether a command is gated, or empty when the commandcontrol module is switched off. */
+    Optional<UxmCommandControlQuery> commandControl();
+
+    /** Reading whether a player put their sidebar away, or empty when the scoreboard module is switched off. */
+    Optional<UxmScoreboardQuery> scoreboard();
 
     /** The API, or {@code null} when uxmEssentials is absent, still loading, or shutting down. */
     static @Nullable UxmEssentialsApi get() {

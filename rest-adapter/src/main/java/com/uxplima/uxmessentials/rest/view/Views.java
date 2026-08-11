@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.uxplima.uxmessentials.api.view.UxmBackPoint;
 import com.uxplima.uxmessentials.api.view.UxmBaltopEntry;
+import com.uxplima.uxmessentials.api.view.UxmCommandCheck;
 import com.uxplima.uxmessentials.api.view.UxmDiscordLink;
 import com.uxplima.uxmessentials.api.view.UxmHologram;
 import com.uxplima.uxmessentials.api.view.UxmHome;
@@ -460,6 +461,17 @@ public final class Views {
         json.addProperty("slot", powertool.slot());
         json.addProperty("item", powertool.item());
         json.add("commands", strings(powertool.commands()));
+        return json;
+    }
+
+    /** What the command gate would do with one command for one player, and which rule settled it. */
+    public static JsonElement commandCheck(UxmCommandCheck check) {
+        JsonObject json = new JsonObject();
+        json.addProperty("command", check.command());
+        json.addProperty("allowed", check.allowed());
+        json.addProperty("rule", check.rule().name());
+        text(json, "group", check.group());
+        text(json, "world", check.world());
         return json;
     }
 

@@ -60,6 +60,17 @@ public final class WorldRuleSets {
         return byWorld.getOrDefault(worldName.trim().toLowerCase(Locale.ROOT), base);
     }
 
+    /**
+     * True when {@code worldName} has an override of its own, so a decision made there came from the world's rules
+     * rather than the base ones. Only worth asking when explaining a decision; {@link #forWorld} already resolves it.
+     */
+    public boolean hasOverrideFor(@Nullable String worldName) {
+        if (worldName == null || worldName.isBlank()) {
+            return false;
+        }
+        return byWorld.containsKey(worldName.trim().toLowerCase(Locale.ROOT));
+    }
+
     /** True when at least one world overrides the base rule set - the signal to recompute visibility on world change. */
     public boolean hasWorldOverrides() {
         return !byWorld.isEmpty();

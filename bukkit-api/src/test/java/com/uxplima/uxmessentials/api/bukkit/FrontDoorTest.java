@@ -241,6 +241,16 @@ class FrontDoorTest {
         }
 
         @Override
+        public Optional<com.uxplima.uxmessentials.api.query.UxmCommandControlQuery> commandControl() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<com.uxplima.uxmessentials.api.query.UxmScoreboardQuery> scoreboard() {
+            return Optional.empty();
+        }
+
+        @Override
         public Optional<UxmTradeQuery> trade() {
             return Optional.empty();
         }

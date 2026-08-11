@@ -78,4 +78,13 @@ public interface UxmActions {
 
     /** Putting up, moving and editing holograms, or empty when the holograms module is switched off. */
     Optional<UxmHologramsActions> holograms();
+
+    /** Redrawing and hiding the sidebar, or empty when the scoreboard module is switched off. */
+    Optional<UxmScoreboardActions> scoreboard();
+
+    /** Redrawing the tab list, or empty when the tablist module is switched off. */
+    Optional<UxmTablistActions> tablist();
+
+    /** Redrawing a nametag, or empty when the nametags module is switched off. */
+    Optional<UxmNametagActions> nametags();
 }
