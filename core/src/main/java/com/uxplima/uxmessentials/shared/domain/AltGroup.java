@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.security.domain;
+package com.uxplima.uxmessentials.shared.domain;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -7,7 +7,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * The set of accounts that share at least one IP token with a target account — the target's alts. It is derived
+ * The set of accounts that share at least one IP token with a target account: the target's alts. It is derived
  * purely from a collection of {@link IpAssociation}s, so the grouping rule is unit-testable without a database:
  * find the tokens the target has ever connected from, then collect every other account seen on any of those
  * tokens. The target itself is never listed among its own alts.

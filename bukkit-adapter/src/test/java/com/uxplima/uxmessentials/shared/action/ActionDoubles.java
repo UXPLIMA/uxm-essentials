@@ -12,15 +12,18 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.DomainProposal;
+import com.uxplima.uxmessentials.shared.domain.IpAssociation;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The doubles a published action test needs on top of the query ones.
@@ -37,6 +40,11 @@ public final class ActionDoubles {
     /** A notifier that resolves a key to itself and delivers it nowhere. */
     public static Notifier silentNotifier() {
         return new Notifier(new KeyMessages(), new NullSink());
+    }
+
+    /** An IP history holding nothing, for the writes whose behaviour does not depend on a known address. */
+    public static IpHistoryStore emptyIpHistory() {
+        return new EmptyIpHistory();
     }
 
     /**
@@ -199,5 +207,26 @@ public final class ActionDoubles {
 
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    /** An {@link IpHistoryStore} that records nothing and knows nobody. */
+    private static final class EmptyIpHistory implements IpHistoryStore {
+        @Override
+        public void record(UUID account, String ipToken, @Nullable String address, java.time.Instant seenAt) {}
+
+        @Override
+        public java.util.Set<UUID> accountsOnToken(String ipToken) {
+            return java.util.Set.of();
+        }
+
+        @Override
+        public List<IpAssociation> sharingTokenWith(UUID account) {
+            return List.of();
+        }
+
+        @Override
+        public java.util.Set<String> addressesOf(UUID account) {
+            return java.util.Set.of();
+        }
     }
 }

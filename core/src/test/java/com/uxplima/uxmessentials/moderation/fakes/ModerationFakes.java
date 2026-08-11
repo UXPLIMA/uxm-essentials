@@ -12,9 +12,12 @@ import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
+import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpTokens;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -42,6 +45,11 @@ public final class ModerationFakes {
     /** A {@link Notifier} backed by a {@link RecordingSink}, so a test can assert who was told what. */
     public static Notifier recordingNotifier(RecordingSink sink) {
         return new Notifier(new KeyMessages(), sink);
+    }
+
+    /** The shared address-keyed alt lookup over an in-memory history store, tokenised the way the tests seed it. */
+    public static IpAlts ipAlts(FakeIpHistoryStore store) {
+        return new IpAlts(store, new FakeIpTokens());
     }
 
     /** A capturing {@link SanctionBroadcast} exposing every announced key + placeholder map. */

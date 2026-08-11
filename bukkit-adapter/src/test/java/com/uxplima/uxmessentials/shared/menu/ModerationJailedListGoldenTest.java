@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -314,27 +313,7 @@ class ModerationJailedListGoldenTest {
         }
 
         @Override
-        public void recordIpSeen(UUID uuid, String ip, Instant now) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
         public Optional<SeenRecord> seen(PlayerRef who) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Set<String> ipHistory(UUID uuid) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<UUID> altsByIp(String ip, UUID self) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<UUID> altsByAnyIp(Set<String> ips, UUID self) {
             throw new UnsupportedOperationException();
         }
 

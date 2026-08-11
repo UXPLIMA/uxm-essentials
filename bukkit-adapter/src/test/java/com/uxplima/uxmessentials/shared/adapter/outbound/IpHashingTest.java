@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.security.adapter;
+package com.uxplima.uxmessentials.shared.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,20 +22,20 @@ class IpHashingTest {
 
     @Test
     void theSameAddressAlwaysGivesTheSameHexToken() {
-        String token = hashing.hash(ADDRESS);
+        String token = hashing.tokenFor(ADDRESS);
 
-        assertThat(token).isEqualTo(hashing.hash(ADDRESS)).hasSize(64).matches("[0-9a-f]+");
-        assertThat(hashing.hash("203.0.113.8")).isNotEqualTo(token);
+        assertThat(token).isEqualTo(hashing.tokenFor(ADDRESS)).hasSize(64).matches("[0-9a-f]+");
+        assertThat(hashing.tokenFor("203.0.113.8")).isNotEqualTo(token);
     }
 
     @Test
     void theTokenNeverCarriesTheAddress() {
-        assertThat(hashing.hash(ADDRESS)).doesNotContain(ADDRESS).doesNotContain("203");
+        assertThat(hashing.tokenFor(ADDRESS)).doesNotContain(ADDRESS).doesNotContain("203");
     }
 
     @Test
     void aDifferentKeyGivesADifferentTokenForTheSameAddress() {
-        assertThat(keyed("other-key").hash(ADDRESS)).isNotEqualTo(hashing.hash(ADDRESS));
+        assertThat(keyed("other-key").tokenFor(ADDRESS)).isNotEqualTo(hashing.tokenFor(ADDRESS));
     }
 
     @Test

@@ -21,15 +21,16 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.security.application.FindAlts;
-import com.uxplima.uxmessentials.security.application.port.IpGuardStore;
-import com.uxplima.uxmessentials.security.domain.IpAssociation;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.IpAssociation;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * Locks in the resolution of the {@code /alts} root collision (review C-1): the security context's same-IP alt
  * lookup registers under {@code /ipalts}, not the top-level {@code /alts} that the moderation context owns. The
- * command keeps its own {@code uxmessentials.security.alts} node and its hashed-store read path; the two root
+ * command keeps its own {@code uxmessentials.security.alts} node and its keyed-token read path; the two root
  * literals coexist in one dispatcher so neither shadows the other on a stock install.
  */
 class IpAltsCommandTest {
@@ -49,14 +50,14 @@ class IpAltsCommandTest {
     private static final String TOKEN = "hashed-token";
 
     private ServerMock server;
-    private FakeIpGuardStore store;
+    private FakeIpHistoryStore store;
     private FakePlayerLookup lookup;
     private RecordingSink sink;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        store = new FakeIpGuardStore();
+        store = new FakeIpHistoryStore();
         lookup = new FakePlayerLookup();
         sink = new RecordingSink();
     }
@@ -76,8 +77,8 @@ class IpAltsCommandTest {
     void staffWithThePermissionListSharedIpAccountsFromTheHashedStore() {
         UUID target = UUID.randomUUID();
         UUID alt = UUID.randomUUID();
-        store.record(target, TOKEN, Instant.EPOCH);
-        store.record(alt, TOKEN, Instant.EPOCH);
+        store.record(target, TOKEN, null, Instant.EPOCH);
+        store.record(alt, TOKEN, null, Instant.EPOCH);
         lookup.names.put("Target", new PlayerRef(target, "Target"));
         lookup.uuids.put(alt, new PlayerRef(alt, "AltAccount"));
 
@@ -85,7 +86,7 @@ class IpAltsCommandTest {
         staff.addAttachment(MockBukkit.createMockPlugin(), IpAltsCommand.PERMISSION, true);
         execute(staff, "ipalts Target");
 
-        // The header proves the lookup ran through FindAlts over the hashed security_ip store, not moderation's.
+        // The header proves the lookup ran through FindAlts over the token-keyed history, in security's rendering.
         assertThat(sink.delivered).contains("security.alts.header", "security.alts.entry");
     }
 
@@ -95,8 +96,8 @@ class IpAltsCommandTest {
         // same IP, both resolving to the same name. The queried account must not appear as its own alt.
         UUID current = UUID.randomUUID();
         UUID old = UUID.randomUUID();
-        store.record(current, TOKEN, Instant.EPOCH);
-        store.record(old, TOKEN, Instant.EPOCH);
+        store.record(current, TOKEN, null, Instant.EPOCH);
+        store.record(old, TOKEN, null, Instant.EPOCH);
         lookup.names.put("Siracozmen", new PlayerRef(current, "Siracozmen"));
         lookup.uuids.put(old, new PlayerRef(old, "Siracozmen"));
 
@@ -115,10 +116,10 @@ class IpAltsCommandTest {
         UUID mateOne = UUID.randomUUID();
         UUID mateTwo = UUID.randomUUID(); // the same human "Mate" on a second UUID
         UUID other = UUID.randomUUID(); // a genuinely different alt
-        store.record(target, TOKEN, Instant.EPOCH);
-        store.record(mateOne, TOKEN, Instant.EPOCH);
-        store.record(mateTwo, TOKEN, Instant.EPOCH);
-        store.record(other, TOKEN, Instant.EPOCH);
+        store.record(target, TOKEN, null, Instant.EPOCH);
+        store.record(mateOne, TOKEN, null, Instant.EPOCH);
+        store.record(mateTwo, TOKEN, null, Instant.EPOCH);
+        store.record(other, TOKEN, null, Instant.EPOCH);
         lookup.names.put("Target", new PlayerRef(target, "Target"));
         lookup.uuids.put(mateOne, new PlayerRef(mateOne, "Mate"));
         lookup.uuids.put(mateTwo, new PlayerRef(mateTwo, "Mate"));
@@ -178,17 +179,20 @@ class IpAltsCommandTest {
         }
     }
 
-    /** In-memory {@link IpGuardStore} returning the full row set so {@link FindAlts} does the grouping, as jOOQ does. */
-    private static final class FakeIpGuardStore implements IpGuardStore {
+    /**
+     * In-memory {@link IpHistoryStore} returning the full row set so {@link FindAlts} does the grouping, as jOOQ
+     * does. These are the same kernel rows moderation's {@code /alts} reads; only the rendering differs.
+     */
+    private static final class FakeIpHistoryStore implements IpHistoryStore {
         private final List<IpAssociation> rows = new ArrayList<>();
 
         @Override
-        public void record(UUID account, String ipToken, Instant seenAt) {
+        public void record(UUID account, String ipToken, @Nullable String address, Instant seenAt) {
             rows.add(new IpAssociation(account, ipToken));
         }
 
         @Override
-        public Set<UUID> accountsOnIp(String ipToken) {
+        public Set<UUID> accountsOnToken(String ipToken) {
             return rows.stream()
                     .filter(link -> link.ipToken().equals(ipToken))
                     .map(IpAssociation::account)
@@ -196,8 +200,13 @@ class IpAltsCommandTest {
         }
 
         @Override
-        public List<IpAssociation> sharingIpWith(UUID account) {
+        public List<IpAssociation> sharingTokenWith(UUID account) {
             return List.copyOf(rows);
+        }
+
+        @Override
+        public Set<String> addressesOf(UUID account) {
+            return Set.of();
         }
     }
 

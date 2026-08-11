@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.security.domain.SafetyNet;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -59,7 +60,7 @@ public final class VerificationController implements KeypadActions {
     private final TwoFactorRepository repository;
     private final VerifyTwoFactor verify;
     private final TrustStore trustStore;
-    private final IpHashing ipHashing;
+    private final IpTokens ipHashing;
     private final VerificationSessions sessions;
     private final AttemptLimiter limiter;
     private final ReauthState reauthState;
@@ -103,7 +104,7 @@ public final class VerificationController implements KeypadActions {
             Permissions permissions,
             FreezeHoldingArea holdingArea,
             ServerConnector proxy,
-            IpHashing ipHashing,
+            IpTokens ipHashing,
             Scheduler scheduler,
             Messages messages,
             MessageSink sink,
@@ -482,7 +483,7 @@ public final class VerificationController implements KeypadActions {
             return null;
         }
         InetAddress address = socket.getAddress();
-        return address == null ? null : ipHashing.hash(address.getHostAddress());
+        return address == null ? null : ipHashing.tokenFor(address.getHostAddress());
     }
 
     private void notify(PlayerRef viewer, SecurityMessageKey key) {

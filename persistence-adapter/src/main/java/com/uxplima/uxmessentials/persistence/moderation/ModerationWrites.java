@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.persistence.moderation;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationIpBans.MODERATION_IP_BANS;
-import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationIpHistory.MODERATION_IP_HISTORY;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationJails.MODERATION_JAILS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationMutes.MODERATION_MUTES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSeen.MODERATION_SEEN;
@@ -9,7 +8,6 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationTempba
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationWarns.MODERATION_WARNS;
 
 import java.time.Instant;
-import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -189,24 +187,6 @@ final class ModerationWrites {
             update = update.set(MODERATION_SEEN.LAST_IP, ip);
         }
         return update.where(MODERATION_SEEN.UUID.eq(key)).execute();
-    }
-
-    static int recordIpSeen(DSLContext dsl, UUID uuid, String ip, Instant now) {
-        String key = uuid.toString();
-        boolean exists = dsl.fetchExists(
-                MODERATION_IP_HISTORY, MODERATION_IP_HISTORY.UUID.eq(key).and(MODERATION_IP_HISTORY.IP.eq(ip)));
-        if (exists) {
-            return dsl.update(MODERATION_IP_HISTORY)
-                    .set(MODERATION_IP_HISTORY.LAST_SEEN, now.toEpochMilli())
-                    .where(MODERATION_IP_HISTORY.UUID.eq(key).and(MODERATION_IP_HISTORY.IP.eq(ip)))
-                    .execute();
-        }
-        return dsl.insertInto(MODERATION_IP_HISTORY)
-                .set(MODERATION_IP_HISTORY.UUID, key)
-                .set(MODERATION_IP_HISTORY.IP, ip)
-                .set(MODERATION_IP_HISTORY.FIRST_SEEN, now.toEpochMilli())
-                .set(MODERATION_IP_HISTORY.LAST_SEEN, now.toEpochMilli())
-                .execute();
     }
 
     static int ensureSeenRow(DSLContext dsl, PlayerRef target, Instant at) {

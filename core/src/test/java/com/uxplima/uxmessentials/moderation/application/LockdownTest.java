@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingBroadcast;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingSink;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 
@@ -96,6 +97,11 @@ class LockdownTest {
     }
 
     private LoginEnforcement enforcement() {
-        return new LoginEnforcement(repository, ModerationFakes.notifier(), new RecordingModerationAudit(), CLOCK);
+        return new LoginEnforcement(
+                repository,
+                ModerationFakes.ipAlts(new FakeIpHistoryStore()),
+                ModerationFakes.notifier(),
+                new RecordingModerationAudit(),
+                CLOCK);
     }
 }

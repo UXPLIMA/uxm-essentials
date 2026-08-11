@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingBroad
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingSink;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,6 +94,7 @@ class SilentBroadcastAndCapTest {
                         broadcast,
                         SanctionSync.NONE,
                         AddressStrictness.NORMAL,
+                        new FakeIpHistoryStore(),
                         clock)
                 .ban(ACTOR, TARGET, Optional.of("griefing"), true);
 
@@ -203,6 +205,7 @@ class SilentBroadcastAndCapTest {
                         broadcast,
                         SanctionSync.NONE,
                         AddressStrictness.NORMAL,
+                        new FakeIpHistoryStore(),
                         clock)
                 .ban(ACTOR, TARGET, Optional.of("griefing"), false);
 
@@ -281,6 +284,7 @@ class SilentBroadcastAndCapTest {
                 broadcast,
                 SanctionSync.NONE,
                 AddressStrictness.NORMAL,
+                new FakeIpHistoryStore(),
                 clock);
     }
 
@@ -326,6 +330,7 @@ class SilentBroadcastAndCapTest {
                 broadcast,
                 SanctionSync.NONE,
                 AddressStrictness.NORMAL,
+                new FakeIpHistoryStore(),
                 clock);
         Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, history, broadcast);
         WarnEscalator escalator = new WarnEscalator(ladder, mute, tempBan, ban, kick, notifier);

@@ -11,27 +11,36 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
+import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * {@code /seen <player>} (last-seen + first-join) and {@code /seenip <player>} (last-seen by IP, surfacing
- * alts). Both are read-only lookups against the DB-backed {@link SeenRecord}: {@code /seen} renders the
- * first-join and last-activity (or "online now" when connected); {@code /seenip} renders the last IP and the
- * other UUIDs that have connected from it (the alt set), the same lookup the login alt-detection uses.
+ * alts). {@code /seen} renders the first-join and last-activity (or "online now" when connected) from the
+ * DB-backed {@link SeenRecord}; {@code /seenip} renders the last address that record holds and the other accounts
+ * that have connected from it. The alt half of {@code /seenip} goes through the shared {@link IpAlts} lookup, so
+ * it matches by token against the same rows {@code /alts} and {@code /ipalts} answer from.
  */
 public final class Seen {
 
     private final ModerationRepository repository;
+    private final IpAlts ipAlts;
     private final PlayerLookup players;
     private final Notifier notifier;
     private final boolean censorIp;
     private final Clock clock;
 
     public Seen(
-            ModerationRepository repository, PlayerLookup players, Notifier notifier, boolean censorIp, Clock clock) {
+            ModerationRepository repository,
+            IpAlts ipAlts,
+            PlayerLookup players,
+            Notifier notifier,
+            boolean censorIp,
+            Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.censorIp = censorIp;
@@ -83,7 +92,7 @@ public final class Seen {
     }
 
     private void reportAlts(PlayerRef actor, String ip, UUID self) {
-        List<UUID> alts = repository.altsByIp(ip, self);
+        List<UUID> alts = ipAlts.onAddress(ip, self);
         if (!alts.isEmpty()) {
             notifier.send(actor, ModerationMessageKey.SEENIP_ALTS, Map.of("alts", names(alts)));
         }

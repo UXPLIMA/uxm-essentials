@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 
@@ -74,6 +75,7 @@ class TempBanIpTest {
     private TempBanIp useCase(FakeModerationRepository repository, Clock clock) {
         return new TempBanIp(
                 repository,
+                ModerationFakes.ipAlts(new FakeIpHistoryStore()),
                 ModerationFakes.notifier(),
                 new RecordingModerationAudit(),
                 new ModerationFakes.RecordingEvents(),
@@ -84,6 +86,7 @@ class TempBanIpTest {
     private LoginEnforcement enforcement(FakeModerationRepository repository, Instant at) {
         return new LoginEnforcement(
                 repository,
+                ModerationFakes.ipAlts(new FakeIpHistoryStore()),
                 ModerationFakes.notifier(),
                 new RecordingModerationAudit(),
                 Clock.fixed(at, ZoneOffset.UTC));

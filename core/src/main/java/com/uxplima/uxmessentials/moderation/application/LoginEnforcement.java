@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -32,12 +33,15 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class LoginEnforcement {
 
     private final ModerationRepository repository;
+    private final IpAlts ipAlts;
     private final Notifier notifier;
     private final ModerationAudit audit;
     private final Clock clock;
 
-    public LoginEnforcement(ModerationRepository repository, Notifier notifier, ModerationAudit audit, Clock clock) {
+    public LoginEnforcement(
+            ModerationRepository repository, IpAlts ipAlts, Notifier notifier, ModerationAudit audit, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -83,10 +87,10 @@ public final class LoginEnforcement {
 
     private void recordAndDetect(PlayerRef who, String ip, Instant now, boolean kicked) {
         repository.recordSeen(who, Optional.of(ip), now);
-        repository.recordIpSeen(who.uuid(), ip, now);
-        // Alt-detection at login keys off the connecting address — the broadened /alts surface walks a
-        // player's full history, but a login is a single address, so this stays the per-address lookup.
-        List<UUID> alts = repository.altsByIp(ip, who.uuid());
+        // The association itself is written by the kernel recorder on join. Alt-detection here keys off the
+        // connecting address: /alts walks a player's whole history, but a login is one address, so this stays
+        // the per-address lookup.
+        List<UUID> alts = ipAlts.onAddress(ip, who.uuid());
         if (kicked || !alts.isEmpty()) {
             audit.altDetected(who.uuid(), ip, alts, kicked);
         }

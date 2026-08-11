@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.Material;
@@ -384,26 +383,8 @@ class ModerationGuiTest {
         public void recordSeen(PlayerRef who, Optional<String> ip, Instant at) {}
 
         @Override
-        public void recordIpSeen(UUID uuid, String ip, Instant now) {}
-
-        @Override
         public Optional<SeenRecord> seen(PlayerRef who) {
             return Optional.empty();
-        }
-
-        @Override
-        public Set<String> ipHistory(UUID uuid) {
-            return Set.of();
-        }
-
-        @Override
-        public List<UUID> altsByIp(String ip, UUID self) {
-            return List.of();
-        }
-
-        @Override
-        public List<UUID> altsByAnyIp(Set<String> ips, UUID self) {
-            return List.of();
         }
 
         @Override

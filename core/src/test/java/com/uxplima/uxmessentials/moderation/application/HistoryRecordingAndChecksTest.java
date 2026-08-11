@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingSink;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -278,6 +279,7 @@ class HistoryRecordingAndChecksTest {
                 broadcast,
                 com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
+                new FakeIpHistoryStore(),
                 clock);
         Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, recorder, broadcast);
         return new WarnEscalator(ladder, mute, tempBan, ban, kick, notifier);

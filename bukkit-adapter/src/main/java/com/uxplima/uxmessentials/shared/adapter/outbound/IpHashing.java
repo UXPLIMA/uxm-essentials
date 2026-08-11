@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.security.adapter;
+package com.uxplima.uxmessentials.shared.adapter.outbound;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -9,11 +9,12 @@ import java.util.Objects;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Turns a connecting player's IP address into the opaque token the device-trust and IP/alt stores key on, so the raw
- * address never reaches the database. It is an HMAC-SHA-256 over the address text, keyed by the server's own
+ * Turns a connecting player's IP address into the opaque token the device-trust and IP-history stores key on, so the raw
+ * address never reaches either of them. It is an HMAC-SHA-256 over the address text, keyed by the server's own
  * {@code modules/security/secret.key}, rendered as lower-case hex: two connections from the same address collide
  * (which is all the trust check and the alt lookup need) while the stored value tells a reader nothing.
  *
@@ -24,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
  * identity on its own: a token match only skips the keypad.
  */
 @NullMarked
-public final class IpHashing {
+public final class IpHashing implements IpTokens {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
@@ -40,7 +41,8 @@ public final class IpHashing {
     }
 
     /** The lower-case hex HMAC-SHA-256 of {@code ip}, the token a device or an address is keyed by. */
-    public String hash(String ip) {
+    @Override
+    public String tokenFor(String ip) {
         Objects.requireNonNull(ip, "ip");
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);

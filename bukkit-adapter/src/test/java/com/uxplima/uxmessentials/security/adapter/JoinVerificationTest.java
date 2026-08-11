@@ -71,6 +71,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.IpHashing;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -250,7 +251,7 @@ class JoinVerificationTest {
     void aTrustedDeviceSkipsThePrompt() {
         PlayerMock player = addPlayer();
         repository.setPin(player.getUniqueId(), PIN);
-        trustStore.trust(player.getUniqueId(), IP_HASHING.hash("10.0.0.5"), NOW.plusSeconds(3600));
+        trustStore.trust(player.getUniqueId(), IP_HASHING.tokenFor("10.0.0.5"), NOW.plusSeconds(3600));
 
         controller.onJoin(player);
 
@@ -273,7 +274,7 @@ class JoinVerificationTest {
         assertThat(sessions.isPending(player.getUniqueId())).isFalse();
         assertThat(sink.delivered).contains("security.verify.success");
         // The verified device is remembered for the next join.
-        assertThat(trustStore.isTrusted(player.getUniqueId(), IP_HASHING.hash("10.0.0.5"), NOW))
+        assertThat(trustStore.isTrusted(player.getUniqueId(), IP_HASHING.tokenFor("10.0.0.5"), NOW))
                 .isTrue();
     }
 

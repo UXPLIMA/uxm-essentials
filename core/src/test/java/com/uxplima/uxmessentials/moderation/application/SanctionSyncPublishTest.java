@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.fakes.FakeSanctions;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingSanctionSync;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +86,7 @@ class SanctionSyncPublishTest {
                 ModerationFakes.broadcast(),
                 sync,
                 AddressStrictness.NORMAL,
+                new FakeIpHistoryStore(),
                 CLOCK);
     }
 

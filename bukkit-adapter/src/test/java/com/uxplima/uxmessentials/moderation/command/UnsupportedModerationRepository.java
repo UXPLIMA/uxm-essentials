@@ -3,8 +3,6 @@ package com.uxplima.uxmessentials.moderation.command;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
@@ -117,27 +115,7 @@ abstract class UnsupportedModerationRepository implements ModerationRepository {
     }
 
     @Override
-    public void recordIpSeen(UUID uuid, String ip, Instant now) {
-        throw unsupported();
-    }
-
-    @Override
     public Optional<SeenRecord> seen(PlayerRef who) {
-        throw unsupported();
-    }
-
-    @Override
-    public Set<String> ipHistory(UUID uuid) {
-        throw unsupported();
-    }
-
-    @Override
-    public List<UUID> altsByIp(String ip, UUID self) {
-        throw unsupported();
-    }
-
-    @Override
-    public List<UUID> altsByAnyIp(Set<String> ips, UUID self) {
         throw unsupported();
     }
 

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.moderation.domain.event.PlayerTempbanned;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 
@@ -70,6 +71,7 @@ public final class Ban {
     private final SanctionBroadcast broadcast;
     private final SanctionSync sync;
     private final AddressStrictness strictness;
+    private final IpHistoryStore ipHistory;
     private final Clock clock;
 
     public Ban(
@@ -84,6 +86,7 @@ public final class Ban {
             SanctionBroadcast broadcast,
             SanctionSync sync,
             AddressStrictness strictness,
+            IpHistoryStore ipHistory,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
@@ -96,6 +99,7 @@ public final class Ban {
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
         this.sync = Objects.requireNonNull(sync, "sync");
         this.strictness = Objects.requireNonNull(strictness, "strictness");
+        this.ipHistory = Objects.requireNonNull(ipHistory, "ipHistory");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -144,8 +148,9 @@ public final class Ban {
     }
 
     /**
-     * Under STRICT, IP-ban every address the target is known to have connected from so a banned account
-     * cannot return on a fresh one from the same connection. Skipped for an exempt target (a defensive second
+     * Under STRICT, IP-ban every address the target is known to have connected from (the addresses the kernel
+     * IP-history store retained while this module was enabled) so a banned account cannot return on a fresh one
+     * from the same connection. Skipped for an exempt target (a defensive second
      * guard so STRICT never collaterally IP-bans an exempt player's shared connection) and fail-safe: an empty
      * IP set leaves the UUID ban as the only effect. The IP bans carry the UUID ban's own effective expiry
      * ({@code until}) — permanent when the ban is permanent, the capped expiry when a {@code maxduration} tier
@@ -156,7 +161,7 @@ public final class Ban {
         if (!strictness.fansOutToIps() || guard.isExempt(target)) {
             return;
         }
-        Set<String> ips = repository.ipHistory(target.uuid());
+        Set<String> ips = ipHistory.addressesOf(target.uuid());
         if (ips.isEmpty()) {
             return;
         }

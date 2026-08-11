@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.security.domain;
+package com.uxplima.uxmessentials.shared.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

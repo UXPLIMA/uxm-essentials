@@ -1,8 +1,5 @@
 package com.uxplima.uxmessentials.security.adapter;
 
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -16,74 +13,64 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
-import com.uxplima.uxmessentials.security.application.port.IpGuardStore;
 import com.uxplima.uxmessentials.security.domain.AltLimitPolicy;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryObserver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
- * The same-IP alt guard's join brain: on join it records the player's hashed IP token, then decides — off the tick
- * thread — whether the address now carries more distinct accounts than the configured cap (kick if so) and whether
- * the player shares an address with other accounts (notify staff if so). No raw address is ever handled past the
- * hash, and there is no GeoIP — only the one-way token and the accounts seen on it.
+ * The same-IP alt guard's brain: once the kernel recorder has written a join's association, it decides whether the
+ * address now carries more distinct accounts than the configured cap (kick if so) and whether the player shares an
+ * address with other accounts (notify staff if so). It never sees a raw address, only the one-way token the
+ * recorder hands it and the accounts seen on that token, and there is no GeoIP.
  *
- * <p>The DB record and the two reads run off the tick thread through the injected {@link Scheduler}; the kick hops
- * back onto the player's region thread. The whole guard is inert when {@code ip-guard.enabled} is false.
+ * <p>The guard captures nothing itself: it is an {@link IpHistoryObserver}, so the association is always written
+ * before it reads. Its callback already runs off the tick thread (the recorder's async task); the kick hops back
+ * onto the player's region thread. The whole guard is inert when {@code ip-guard.enabled} is false.
  */
 @NullMarked
-public final class IpGuardController {
+public final class IpGuardController implements IpHistoryObserver {
 
-    private final IpGuardStore store;
+    private final IpHistoryStore store;
     private final SecurityConfig.IpGuard config;
     private final PlayerLookup lookup;
     private final SecurityStaffNotifier notifier;
-    private final IpHashing ipHashing;
     private final Scheduler scheduler;
     private final Messages messages;
-    private final Clock clock;
 
     public IpGuardController(
-            IpGuardStore store,
+            IpHistoryStore store,
             SecurityConfig.IpGuard config,
             PlayerLookup lookup,
             SecurityStaffNotifier notifier,
-            IpHashing ipHashing,
             Scheduler scheduler,
-            Messages messages,
-            Clock clock) {
+            Messages messages) {
         this.store = Objects.requireNonNull(store, "store");
-        this.ipHashing = Objects.requireNonNull(ipHashing, "ipHashing");
         this.config = Objects.requireNonNull(config, "config");
         this.lookup = Objects.requireNonNull(lookup, "lookup");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Record {@code player}'s address off the tick thread and enforce the cap / staff notice for this join. */
-    public void onJoin(Player player) {
-        Objects.requireNonNull(player, "player");
+    /** Enforce the cap and the staff notice for the join the recorder has just written. */
+    @Override
+    public void onRecorded(PlayerRef ref, String ipToken) {
+        Objects.requireNonNull(ref, "ref");
+        Objects.requireNonNull(ipToken, "ipToken");
         if (!config.enabled()) {
             return;
         }
-        String ipHash = ipHash(player);
-        if (ipHash == null) {
-            return;
-        }
-        PlayerRef ref = BukkitRefs.toRef(player);
-        scheduler.async(() -> guard(ref, ipHash));
+        guard(ref, ipToken);
     }
 
     private void guard(PlayerRef ref, String ipHash) {
-        store.record(ref.uuid(), ipHash, clock.instant());
-        Set<UUID> onIp = store.accountsOnIp(ipHash);
+        Set<UUID> onIp = store.accountsOnToken(ipHash);
         Set<UUID> others =
                 onIp.stream().filter(account -> !account.equals(ref.uuid())).collect(Collectors.toUnmodifiableSet());
         if (config.notifyStaff() && !others.isEmpty()) {
@@ -118,14 +105,5 @@ public final class IpGuardController {
 
     private Component render(PlayerRef ref) {
         return StyledText.render(messages.resolve(ref, SecurityMessageKey.SECURITY_ALTS_KICKED, Map.of()));
-    }
-
-    private @Nullable String ipHash(Player player) {
-        InetSocketAddress socket = player.getAddress();
-        if (socket == null) {
-            return null;
-        }
-        InetAddress address = socket.getAddress();
-        return address == null ? null : ipHashing.hash(address.getHostAddress());
     }
 }

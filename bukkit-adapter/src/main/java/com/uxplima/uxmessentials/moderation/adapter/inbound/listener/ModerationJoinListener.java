@@ -21,13 +21,14 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The jail/seen lifecycle listener — the online-only jail countdown's connection edges (docs/02-concurrency,
+ * The jail/seen lifecycle listener: the online-only jail countdown's connection edges (docs/02-concurrency,
  * docs/09-deployment):
  *
  * <ul>
- *   <li><b>Join</b> — record last-seen/last-IP, then re-apply a still-active jail (offline jail re-applied so
- *       a player cannot escape by relogging) and stamp the session start. Nothing is decremented yet.
- *   <li><b>Quit</b> — burn the online time elapsed since the session start off an online-only sentence
+ *   <li><b>Join</b>: record last-seen/last-IP, then re-apply a still-active jail (offline jail re-applied so
+ *       a player cannot escape by relogging) and stamp the session start. Nothing is decremented yet. The address
+ *       history behind /alts is not written here; the kernel IP-history recorder owns that one capture.
+ *   <li><b>Quit</b>: burn the online time elapsed since the session start off an online-only sentence
  *       (frozen while offline), persisting the decremented remainder or releasing a served sentence, then
  *       record last-seen and drop the session stamp.
  * </ul>
@@ -56,7 +57,6 @@ public final class ModerationJoinListener implements Listener {
         Instant now = clock.instant();
         Optional<String> ip = ip(event);
         repository.recordSeen(who, ip, now);
-        ip.ifPresent(address -> repository.recordIpSeen(who.uuid(), address, now));
         countdown.onJoin(who);
         sessionStart.put(who.uuid(), now);
     }

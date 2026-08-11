@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctions;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -274,6 +275,7 @@ class ModerationRulesTest {
                 ModerationFakes.broadcast(),
                 com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
+                new FakeIpHistoryStore(),
                 clock);
         Kick kick = new Kick(
                 new FakeSanctions(), guard, ModerationFakes.notifier(), audit, history, ModerationFakes.broadcast());

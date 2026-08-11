@@ -10,33 +10,31 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.uxplima.uxmessentials.security.adapter.ClientBrandRegistry;
 import com.uxplima.uxmessentials.security.adapter.ClientGuard;
-import com.uxplima.uxmessentials.security.adapter.IpGuardController;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The connection edges of the Phase-4 guards: on join it hands the player to the {@link IpGuardController} (record
- * the hashed IP, enforce the same-IP cap, notify staff of alts) and the {@link ClientGuard} (read and judge the
- * client brand); on quit it drops the player's recorded brand so the session-only registry never grows. Both edges
- * fire at {@code MONITOR} — the guards only read state and schedule their own off-thread work, so they run after
- * every other join handler has settled the player in. Each guard self-gates on its own config flag, so a disabled
- * sub-feature is a no-op even though the listener is registered.
+ * The connection edges of the client guard: on join it hands the player to the {@link ClientGuard} (read and judge
+ * the client brand); on quit it drops the player's recorded brand so the session-only registry never grows. Both
+ * edges fire at {@code MONITOR}: the guard only reads state and schedules its own off-thread work, so it runs
+ * after every other join handler has settled the player in, and it self-gates on its own config flag, so a
+ * disabled sub-feature is a no-op even though the listener is registered.
+ *
+ * <p>The same-IP alt guard is not here. It watches the kernel IP-history recorder instead, so the association is
+ * written once, by one capture, and read only after that write lands.
  */
 @NullMarked
 public final class SecurityGuardListener implements Listener {
 
-    private final IpGuardController ipGuard;
     private final ClientGuard clientGuard;
     private final ClientBrandRegistry brands;
 
-    public SecurityGuardListener(IpGuardController ipGuard, ClientGuard clientGuard, ClientBrandRegistry brands) {
-        this.ipGuard = Objects.requireNonNull(ipGuard, "ipGuard");
+    public SecurityGuardListener(ClientGuard clientGuard, ClientBrandRegistry brands) {
         this.clientGuard = Objects.requireNonNull(clientGuard, "clientGuard");
         this.brands = Objects.requireNonNull(brands, "brands");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
-        ipGuard.onJoin(event.getPlayer());
         clientGuard.onJoin(event.getPlayer());
     }
 

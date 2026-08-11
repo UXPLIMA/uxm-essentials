@@ -20,7 +20,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.security.application.FindAlts;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
-import com.uxplima.uxmessentials.security.domain.AltGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -28,14 +27,15 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.AltGroup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /ipalts <player>}: list the accounts that share an IP with a target — the staff read behind the same-IP alt
+ * {@code /ipalts <player>}: list the accounts that share an IP with a target, the staff read behind the same-IP alt
  * guard. It lives on {@code /ipalts} rather than {@code /alts} because the moderation context already owns the
- * top-level {@code /alts} (last-IP history over its own raw store); this one reads the security context's hashed
- * {@code security_ip} store instead, so the two never share a command literal. Gated on
+ * top-level {@code /alts}; both answer from the one shared {@code ip_history} table, this one in the security
+ * context's own rendering and permission node, so the two never share a command literal. Gated on
  * {@code uxmessentials.security.alts} (staff). The target is resolved online-first and otherwise from the profile
  * cache, so an offline account is still checkable; the lookup, the DB read, and the grouping all run off the tick
  * thread through the {@link Scheduler}. Each alt's name is resolved from its stored UUID, falling back to the raw

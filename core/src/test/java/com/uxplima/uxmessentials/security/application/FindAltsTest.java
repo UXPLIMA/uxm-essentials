@@ -2,19 +2,16 @@ package com.uxplima.uxmessentials.security.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
-import com.uxplima.uxmessentials.security.application.port.IpGuardStore;
-import com.uxplima.uxmessentials.security.domain.AltGroup;
-import com.uxplima.uxmessentials.security.domain.IpAssociation;
+import com.uxplima.uxmessentials.shared.application.port.FakeIpHistoryStore;
+import com.uxplima.uxmessentials.shared.domain.AltGroup;
 import org.junit.jupiter.api.Test;
 
-/** {@link FindAlts} folds the store's shared-IP associations into an {@link AltGroup} keyed on the target. */
+/**
+ * {@link FindAlts} folds the kernel IP-history store's shared-token associations into an {@link AltGroup} keyed on
+ * the target. The rows are the same ones moderation's {@code /alts} reads, so both commands answer from one history.
+ */
 class FindAltsTest {
 
     @Test
@@ -22,43 +19,23 @@ class FindAltsTest {
         UUID target = UUID.randomUUID();
         UUID alt = UUID.randomUUID();
         UUID far = UUID.randomUUID();
-        FakeIpGuardStore store = new FakeIpGuardStore();
-        store.record(target, "ip-a", Instant.EPOCH);
-        store.record(alt, "ip-a", Instant.EPOCH);
-        store.record(far, "ip-z", Instant.EPOCH);
+        FakeIpHistoryStore store = new FakeIpHistoryStore();
+        store.seen(target, "ip-a", null);
+        store.seen(alt, "ip-a", null);
+        store.seen(far, "ip-z", null);
 
         AltGroup group = new FindAlts(store).find(target);
 
         assertThat(group.alts()).containsExactly(alt);
     }
 
-    /** An in-memory {@link IpGuardStore} mirroring the jOOQ store's contract for the use-case tests. */
-    private static final class FakeIpGuardStore implements IpGuardStore {
-        private final List<IpAssociation> rows = new ArrayList<>();
+    @Test
+    void anAccountWithNoSharedTokenHasNoAlts() {
+        UUID target = UUID.randomUUID();
+        FakeIpHistoryStore store = new FakeIpHistoryStore();
+        store.seen(target, "ip-a", null);
+        store.seen(UUID.randomUUID(), "ip-b", null);
 
-        @Override
-        public void record(UUID account, String ipToken, Instant seenAt) {
-            IpAssociation link = new IpAssociation(account, ipToken);
-            if (!rows.contains(link)) {
-                rows.add(link);
-            }
-        }
-
-        @Override
-        public Set<UUID> accountsOnIp(String ipToken) {
-            return rows.stream()
-                    .filter(link -> link.ipToken().equals(ipToken))
-                    .map(IpAssociation::account)
-                    .collect(Collectors.toSet());
-        }
-
-        @Override
-        public List<IpAssociation> sharingIpWith(UUID account) {
-            Set<String> tokens = rows.stream()
-                    .filter(link -> link.account().equals(account))
-                    .map(IpAssociation::ipToken)
-                    .collect(Collectors.toSet());
-            return rows.stream().filter(link -> tokens.contains(link.ipToken())).toList();
-        }
+        assertThat(new FindAlts(store).find(target).alts()).isEmpty();
     }
 }

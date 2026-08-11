@@ -29,8 +29,9 @@ import org.junit.jupiter.api.io.TempDir;
  * Flyway V5 moderation tables applied. It proves each sanction kind round-trips its shape (permanent vs timed
  * mute, online-only vs wall-clock jail, tempban), that a {@code None} save deletes the row, that the warn
  * history is append-only and read newest-first, that an IP ban with a stored target is queryable and
- * removable, and that the seen/last-IP record drives the alt-detection lookup — the durable facts the
- * {@code MutePolicy}, {@code JailGate}, login enforcement and alt-detection all read.
+ * removable, and that the seen record keeps each account's last address. These are the durable facts the
+ * {@code MutePolicy}, {@code JailGate} and login enforcement read; the address associations behind alt detection
+ * live in the kernel {@code ip_history} table instead (see {@code JooqIpHistoryStoreTest}).
  */
 class JooqModerationRepositoryTest {
 
@@ -154,46 +155,13 @@ class JooqModerationRepositoryTest {
     }
 
     @Test
-    void seenRecordDrivesAltDetectionBySharedIp() {
+    void seenRecordKeepsTheLastAddressPerAccount() {
         repository.recordSeen(alice, Optional.of("198.51.100.5"), T0);
         repository.recordSeen(bob, Optional.of("198.51.100.5"), T0.plusSeconds(10));
 
         assertThat(repository.seen(alice)).isPresent();
         assertThat(repository.seen(alice).orElseThrow().lastIp()).contains("198.51.100.5");
-        // Bob shares Alice's IP, so an alt lookup for Alice surfaces Bob and excludes Alice herself.
-        assertThat(repository.altsByIp("198.51.100.5", alice.uuid())).containsExactly(bob.uuid());
-    }
-
-    @Test
-    void ipHistoryAccruesPerJoinAndDeduplicatesByAddress() {
-        repository.recordIpSeen(alice.uuid(), "203.0.113.7", T0);
-        // A repeat connection from a known address bumps last_seen rather than inserting a duplicate row.
-        repository.recordIpSeen(alice.uuid(), "203.0.113.7", T0.plusSeconds(60));
-        repository.recordIpSeen(alice.uuid(), "198.51.100.5", T0.plusSeconds(120));
-
-        assertThat(repository.ipHistory(alice.uuid())).containsExactlyInAnyOrder("203.0.113.7", "198.51.100.5");
-    }
-
-    @Test
-    void ipHistoryUnionsTheHistoryWithTheLastSeenIp() {
-        // A player seen before V34 has only a last_ip; ipHistory still resolves it for /alts and STRICT.
-        repository.recordSeen(alice, Optional.of("10.0.0.1"), T0);
-        repository.recordIpSeen(alice.uuid(), "10.0.0.2", T0.plusSeconds(10));
-
-        assertThat(repository.ipHistory(alice.uuid())).containsExactlyInAnyOrder("10.0.0.1", "10.0.0.2");
-    }
-
-    @Test
-    void altsByAnyIpMatchesAcrossBothTheLastSeenIpAndTheHistory() {
-        // Bob shares a HISTORICAL address with Alice though his current last_ip differs.
-        repository.recordIpSeen(alice.uuid(), "198.51.100.5", T0);
-        repository.recordSeen(bob, Optional.of("203.0.113.9"), T0);
-        repository.recordIpSeen(bob.uuid(), "198.51.100.5", T0);
-
-        assertThat(repository.altsByAnyIp(java.util.Set.of("198.51.100.5"), alice.uuid()))
-                .containsExactly(bob.uuid());
-        // An empty address set yields no alts (the STRICT/alts no-IP path).
-        assertThat(repository.altsByAnyIp(java.util.Set.of(), alice.uuid())).isEmpty();
+        assertThat(repository.seen(bob).orElseThrow().lastIp()).contains("198.51.100.5");
     }
 
     @Test

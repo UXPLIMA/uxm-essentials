@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,7 +34,6 @@ public final class FakeModerationRepository implements ModerationRepository {
     private final Map<UUID, List<Warn>> warns = new ConcurrentHashMap<>();
     private final Map<String, IpBan> ipBans = new ConcurrentHashMap<>();
     private final Map<UUID, SeenRecord> seen = new ConcurrentHashMap<>();
-    private final Map<UUID, Set<String>> ipHistory = new ConcurrentHashMap<>();
     public final List<UUID> ensured = new ArrayList<>();
     private volatile boolean lockedDown;
 
@@ -174,44 +172,8 @@ public final class FakeModerationRepository implements ModerationRepository {
     }
 
     @Override
-    public void recordIpSeen(UUID uuid, String ip, Instant now) {
-        ipHistory.computeIfAbsent(uuid, key -> ConcurrentHashMap.newKeySet()).add(ip);
-    }
-
-    @Override
     public Optional<SeenRecord> seen(PlayerRef who) {
         return Optional.ofNullable(seen.get(who.uuid()));
-    }
-
-    @Override
-    public Set<String> ipHistory(UUID uuid) {
-        Set<String> ips = new java.util.HashSet<>(ipHistory.getOrDefault(uuid, Set.of()));
-        Optional.ofNullable(seen.get(uuid)).flatMap(SeenRecord::lastIp).ifPresent(ips::add);
-        return Set.copyOf(ips);
-    }
-
-    @Override
-    public List<UUID> altsByIp(String ip, UUID self) {
-        return altsByAnyIp(Set.of(ip), self);
-    }
-
-    @Override
-    public List<UUID> altsByAnyIp(Set<String> ips, UUID self) {
-        if (ips.isEmpty()) {
-            return List.of();
-        }
-        java.util.LinkedHashSet<UUID> alts = new java.util.LinkedHashSet<>();
-        seen.values().stream()
-                .filter(record -> record.lastIp().filter(ips::contains).isPresent())
-                .map(record -> record.player().uuid())
-                .filter(uuid -> !uuid.equals(self))
-                .forEach(alts::add);
-        ipHistory.forEach((uuid, addresses) -> {
-            if (!uuid.equals(self) && addresses.stream().anyMatch(ips::contains)) {
-                alts.add(uuid);
-            }
-        });
-        return List.copyOf(alts);
     }
 
     @Override

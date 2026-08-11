@@ -9,8 +9,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
-import com.uxplima.uxmessentials.persistence.security.IpGuardStores;
-import com.uxplima.uxmessentials.persistence.security.SecurityKeyFile;
 import com.uxplima.uxmessentials.persistence.security.TrustStores;
 import com.uxplima.uxmessentials.persistence.security.TwoFactorRepositories;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.ClientInfoCommand;
@@ -37,7 +35,6 @@ import com.uxplima.uxmessentials.security.application.ResetFactors;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SetPin;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
-import com.uxplima.uxmessentials.security.application.port.IpGuardStore;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
@@ -46,9 +43,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
+import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -73,7 +73,10 @@ public final class SecurityWiring {
             Menus menus,
             MenuBindings menuBindings,
             LockoutBan lockoutBan,
-            ServerConnector proxy) {
+            ServerConnector proxy,
+            IpHistoryStore ipHistory,
+            IpTokens ipTokens,
+            IpHistoryRecorder recorder) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -82,14 +85,14 @@ public final class SecurityWiring {
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(lockoutBan, "lockoutBan");
         Objects.requireNonNull(proxy, "proxy");
+        Objects.requireNonNull(ipHistory, "ipHistory");
+        Objects.requireNonNull(ipTokens, "ipTokens");
+        Objects.requireNonNull(recorder, "recorder");
         KernelPorts kernel = ctx.kernel();
         SecurityConfig config = SecurityConfig.from(ctx.config());
         SecurityConfig.TwoFactorSettings twoFactor = config.twoFactor();
         Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
         TwoFactorRepository repository = TwoFactorRepositories.jooq(persistence, keyFile);
-        // The same server key-file the TOTP secrets are encrypted under also keys the IP tokens, so an address
-        // written to the database cannot be swept back out of it by anyone who does not hold the file.
-        IpHashing ipHashing = new IpHashing(SecurityKeyFile.loadOrCreate(keyFile));
         PendingTotpEnrollments pending = new PendingTotpEnrollments();
         // The durable, account-scoped brute-force limiter is shared by every verification surface: the join freeze,
         // the op re-auth keypad, /2fa disable, /pin change and /pin remove. A failed proof on any of them counts
@@ -105,27 +108,26 @@ public final class SecurityWiring {
         RemovePin removePin = new RemovePin(repository, limiter);
         Clock clock = Clock.systemUTC();
 
-        // Phase 4 — IP/alt guard + ClientID: the DB-backed IP association store (hashed tokens only, never a raw
-        // address, so alts survive a restart), the session-only client-brand registry, the staff notifier that fans
-        // an alt / flagged-client notice to the notify-perm holders and mirrors it to the log, and the two join
-        // guards. Each guard self-gates on its own config flag; the /ipalts and /clientinfo staff reads are published
-        // alongside the enrolment verbs.
-        IpGuardStore ipGuardStore = IpGuardStores.jooq(persistence);
+        // Phase 4: IP/alt guard + ClientID. The associations come from the kernel IP-history store (tokens only on
+        // the read side, so this guard never sees an address) and the kernel recorder that writes them; the guard
+        // watches that recorder rather than capturing a join of its own. Alongside it are the session-only
+        // client-brand registry, the staff notifier that fans an alt / flagged-client notice to the notify-perm
+        // holders and mirrors it to the log, and the client guard. Each guard self-gates on its own config flag;
+        // the /ipalts and /clientinfo staff reads are published alongside the enrolment verbs.
         ClientBrandRegistry brands = new ClientBrandRegistry();
         SecurityStaffNotifier staffNotifier = new SecurityStaffNotifier(
                 plugin.getServer(), kernel.scheduler(), kernel.messages(), kernel.messageSink(), kernel.log());
         IpGuardController ipGuardController = new IpGuardController(
-                ipGuardStore,
+                ipHistory,
                 config.ipGuard(),
                 kernel.playerLookup(),
                 staffNotifier,
-                ipHashing,
                 kernel.scheduler(),
-                kernel.messages(),
-                clock);
+                kernel.messages());
+        recorder.observe(ipGuardController);
         ClientGuard clientGuard =
                 new ClientGuard(brands, config.clientId(), staffNotifier, kernel.scheduler(), kernel.messages());
-        FindAlts findAlts = new FindAlts(ipGuardStore);
+        FindAlts findAlts = new FindAlts(ipHistory);
 
         // Phase 2 — join verification: the DB-backed device-trust store, the transient freeze/lockout registry, the
         // keypad GUI, and the controller that decides on join and drives every submitted PIN/code to an unfreeze,
@@ -183,7 +185,7 @@ public final class SecurityWiring {
                 kernel.permissions(),
                 holdingArea,
                 proxy,
-                ipHashing,
+                ipTokens,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
@@ -277,7 +279,7 @@ public final class SecurityWiring {
                 new PinKeypadCloseListener(menus, keypad, sessions),
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
-                new SecurityGuardListener(ipGuardController, clientGuard, brands));
+                new SecurityGuardListener(clientGuard, brands));
         return new Wired(
                 commands,
                 listeners,

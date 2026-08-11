@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.event.AltDetected;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerIpBanned;
+import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -38,6 +39,7 @@ public final class TempBanIp {
     private static final UUID NO_UUID = new UUID(0L, 0L);
 
     private final ModerationRepository repository;
+    private final IpAlts ipAlts;
     private final Notifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
@@ -46,12 +48,14 @@ public final class TempBanIp {
 
     public TempBanIp(
             ModerationRepository repository,
+            IpAlts ipAlts,
             Notifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
             SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
@@ -81,7 +85,7 @@ public final class TempBanIp {
         IpBan ban = new IpBan(target.ip(), Optional.of(now.plus(span)), reason, target.uuid(), Issuer.of(actor), now);
         repository.saveIpBan(ban);
         history.banIp(actor, target.uuid(), target.ip(), reason, Optional.of(now.plus(span)));
-        List<UUID> alts = repository.altsByIp(target.ip(), target.uuid().orElse(NO_UUID));
+        List<UUID> alts = ipAlts.onAddress(target.ip(), target.uuid().orElse(NO_UUID));
         events.publish(new PlayerIpBanned(ban));
         events.publish(new AltDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true));
         audit.ipBanned(actor, target.ip(), target.uuid(), Optional.of(SanctionDuration.format(span)), true, reason);

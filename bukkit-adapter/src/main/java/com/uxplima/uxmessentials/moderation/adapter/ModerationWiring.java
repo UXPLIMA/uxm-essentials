@@ -100,9 +100,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
+import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.slf4j.LoggerFactory;
@@ -156,7 +159,9 @@ public final class ModerationWiring {
             PlayerPickerView picker,
             Menus menus,
             MenuBindings menuBindings,
-            Path dataFolder) {
+            Path dataFolder,
+            IpHistoryStore ipHistory,
+            IpTokens ipTokens) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -169,6 +174,8 @@ public final class ModerationWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(ipHistory, "ipHistory");
+        Objects.requireNonNull(ipTokens, "ipTokens");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -193,6 +200,8 @@ public final class ModerationWiring {
                 guard,
                 commandSpyStore,
                 sync,
+                ipHistory,
+                ipTokens,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
@@ -317,7 +326,12 @@ public final class ModerationWiring {
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
             SanctionSync sync,
+            IpHistoryStore ipHistory,
+            IpTokens ipTokens,
             Clock clock) {
+        // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
+        // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
+        IpAlts ipAlts = new IpAlts(ipHistory, ipTokens);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         // The operator audit is wrapped so a successful punishment also emits a name-based Discord notice on the
         // same channel when discord-notify is on; disabled or bridge-absent, it is a no-op.
@@ -362,6 +376,7 @@ public final class ModerationWiring {
                 broadcast,
                 sync,
                 settings.addressStrictness(),
+                ipHistory,
                 clock);
         Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast);
         // /punish resolves a configured template to a preset reason + duration and dispatches to the same
@@ -408,16 +423,17 @@ public final class ModerationWiring {
                         new ReviewPunishmentStats(sanctionHistory, new PunishmentStats(), notifier, clock))
                 .checkBan(new CheckBan(repository, notifier, clock))
                 .checkMute(new CheckMute(repository, notifier, clock))
-                .banIp(new BanIp(repository, notifier, audit, kernel.events(), history, clock))
-                .tempBanIp(new TempBanIp(repository, notifier, audit, kernel.events(), history, clock))
+                .banIp(new BanIp(repository, ipAlts, notifier, audit, kernel.events(), history, clock))
+                .tempBanIp(new TempBanIp(repository, ipAlts, notifier, audit, kernel.events(), history, clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit, history))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))
-                .seen(new Seen(repository, kernel.playerLookup(), notifier, settings.censorIpAddresses(), clock))
-                .listAlts(new ListAlts(repository, kernel.playerLookup(), notifier))
+                .seen(new Seen(
+                        repository, ipAlts, kernel.playerLookup(), notifier, settings.censorIpAddresses(), clock))
+                .listAlts(new ListAlts(ipHistory, kernel.playerLookup(), notifier))
                 .commandSpy(new CommandSpy(commandSpyStore, notifier))
                 .staffRollback(staffRollback)
                 .jailCountdown(new JailCountdown(repository, sanctionPort, audit, kernel.events(), clock))
-                .loginEnforcement(new LoginEnforcement(repository, notifier, audit, clock))
+                .loginEnforcement(new LoginEnforcement(repository, ipAlts, notifier, audit, clock))
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
                 .players(kernel.playerLookup())

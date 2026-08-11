@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.di;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -98,10 +99,13 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationQueri
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
 import com.uxplima.uxmessentials.persistence.communication.AnnouncementStores;
+import com.uxplima.uxmessentials.persistence.ip.IpHistoryStores;
+import com.uxplima.uxmessentials.persistence.ip.LegacyIpHistoryBackfill;
 import com.uxplima.uxmessentials.persistence.lookup.PlayerNameRepositories;
 import com.uxplima.uxmessentials.persistence.menu.PlayerDataRepositories;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.security.SecurityKeyFile;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlayerStateQueries;
@@ -170,8 +174,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PlayerDat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.IpHashing;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
@@ -236,6 +242,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
+import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
@@ -269,6 +277,7 @@ import com.uxplima.uxmlib.advancement.Toasts;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The single hand-rolled DI site. Consults the {@link ModuleRegistry} so a disabled module wires
@@ -848,10 +857,54 @@ public final class PluginModule {
     }
 
     private static boolean economyEnabled(ModuleRegistry registry, ConfigStore config) {
-        return registry.byId(ModuleId.of("economy"))
+        return moduleEnabled(registry, config, "economy");
+    }
+
+    private static boolean moduleEnabled(ModuleRegistry registry, ConfigStore config, String id) {
+        return registry.byId(ModuleId.of(id))
                 .map(module -> module.enabled(config))
                 .orElse(false);
     }
+
+    /**
+     * The one IP-history capture, or null when neither of its two readers is enabled. It is kernel infrastructure
+     * rather than one module's listener because moderation ({@code /alts}, {@code /seenip}, the STRICT ban fan-out)
+     * and security (the per-address account cap, {@code /ipalts}) answer from the same rows: two captures meant two
+     * schemas and a privacy claim on one side that the other contradicted. Addresses are tokenised under the same
+     * server key-file the two-factor secrets are encrypted with, and the raw address is retained only while
+     * moderation, its only consumer, is enabled.
+     *
+     * <p>The legacy moderation address rows are folded in off-thread on the first enable after the upgrade: SQL
+     * alone could not tokenise them, so the migration left them for this.
+     */
+    private static @Nullable IpCapture wireIpHistory(
+            JavaPlugin plugin,
+            ModuleRegistry registry,
+            ConfigStore config,
+            Persistence persistence,
+            KernelPorts kernel,
+            CloseableResources resources) {
+        boolean moderation = moduleEnabled(registry, config, "moderation");
+        if (!moderation && !moduleEnabled(registry, config, "security")) {
+            return null;
+        }
+        Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
+        IpHashing tokens = new IpHashing(SecurityKeyFile.loadOrCreate(keyFile));
+        IpHistoryStore store = IpHistoryStores.jooq(persistence);
+        IpHistoryRecorder recorder =
+                new IpHistoryRecorder(store, tokens, kernel.scheduler(), Clock.systemUTC(), moderation);
+        resources.addListener(recorder);
+        kernel.scheduler().async(() -> {
+            int moved = LegacyIpHistoryBackfill.run(persistence, tokens, moderation);
+            if (moved > 0) {
+                kernel.log().info("folded {} legacy address rows into the shared ip history", moved);
+            }
+        });
+        return new IpCapture(store, tokens, recorder);
+    }
+
+    /** The kernel IP-history seam handed to the two contexts that read it. */
+    private record IpCapture(IpHistoryStore store, IpTokens tokens, IpHistoryRecorder recorder) {}
 
     private static PlaceholderContexts wireModules(
             JavaPlugin plugin,
@@ -921,6 +974,9 @@ public final class PluginModule {
         // root config.conf, then handed to every context whose region gate consults claimed land (homes, teleport,
         // poses) so all three see the same provider set.
         ClaimProvidersConfig claimProviders = ClaimProvidersConfig.from(config, kernel.log());
+        // The one join capture behind /alts, /seenip and /ipalts, built before the modules wire so both readers
+        // observe the same recorder. Null when neither moderation nor security is enabled: nothing is recorded.
+        IpCapture ipCapture = wireIpHistory(plugin, registry, config, persistence, kernel, resources);
         loadModulesIsolated(registry.enabledModules(config), resources, log, module -> {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);
@@ -943,7 +999,8 @@ public final class PluginModule {
                     menus,
                     menuBindings,
                     menuCurrencyBackends,
-                    claimProviders);
+                    claimProviders,
+                    ipCapture);
         });
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -972,7 +1029,8 @@ public final class PluginModule {
             Menus menus,
             MenuBindings menuBindings,
             AtomicReference<EconomyBackends> menuCurrencyBackends,
-            ClaimProvidersConfig claimProviders) {
+            ClaimProvidersConfig claimProviders,
+            @Nullable IpCapture ipCapture) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
@@ -1063,7 +1121,8 @@ public final class PluginModule {
                     guiRegistry,
                     textInput,
                     menus,
-                    menuBindings);
+                    menuBindings,
+                    Objects.requireNonNull(ipCapture, "ipCapture"));
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
@@ -1142,7 +1201,16 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(plugin, ctx, persistence, resources, textInput, links, bus, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("security"))) {
-            wireSecurity(plugin, ctx, persistence, resources, links, textInput, menus, menuBindings);
+            wireSecurity(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    textInput,
+                    menus,
+                    menuBindings,
+                    Objects.requireNonNull(ipCapture, "ipCapture"));
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
             wireCommandControl(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
@@ -1245,7 +1313,8 @@ public final class PluginModule {
             ContextLinks links,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            IpCapture ipCapture) {
         // security stands up the DB-backed two-factor store (the PIN hashed, the TOTP secret AES-encrypted under a
         // key-file kept beside the module's config) and publishes the /2fa and /pin enrolment verbs over the shared
         // persistence DSL (through the security persistence factory, so no jOOQ type reaches this layer). Phase 2 adds
@@ -1268,8 +1337,18 @@ public final class PluginModule {
         ServerConnector proxy = resolvedProxy != null
                 ? resolvedProxy
                 : new BukkitServerConnector(plugin, ctx.kernel().log());
-        SecurityWiring.Wired wired =
-                SecurityWiring.wire(plugin, ctx, persistence, textInput, menus, menuBindings, lockoutBan, proxy);
+        SecurityWiring.Wired wired = SecurityWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                textInput,
+                menus,
+                menuBindings,
+                lockoutBan,
+                proxy,
+                ipCapture.store(),
+                ipCapture.tokens(),
+                ipCapture.recorder());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -1959,7 +2038,8 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            IpCapture ipCapture) {
         // moderation builds its jOOQ ModerationRepository over persistence.dsl(), the audit logger on the
         // dedicated audit channel, and the login/join/freeze listeners. It rebinds the messaging mute gate and
         // the teleport jail gate captured during their wiring to the real policies — when either context is
@@ -1985,7 +2065,9 @@ public final class PluginModule {
                 Objects.requireNonNull(links.playerPicker, "playerPicker"),
                 menus,
                 menuBindings,
-                plugin.getDataFolder().toPath());
+                plugin.getDataFolder().toPath(),
+                ipCapture.store(),
+                ipCapture.tokens());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

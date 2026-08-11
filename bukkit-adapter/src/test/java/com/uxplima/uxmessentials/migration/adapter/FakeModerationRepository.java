@@ -145,28 +145,8 @@ final class FakeModerationRepository implements ModerationRepository {
     }
 
     @Override
-    public void recordIpSeen(UUID uuid, String ip, Instant now) {
-        throw new UnsupportedOperationException("recordIpSeen");
-    }
-
-    @Override
     public Optional<SeenRecord> seen(PlayerRef who) {
         throw new UnsupportedOperationException("seen");
-    }
-
-    @Override
-    public Set<String> ipHistory(UUID uuid) {
-        throw new UnsupportedOperationException("ipHistory");
-    }
-
-    @Override
-    public List<UUID> altsByIp(String ip, UUID self) {
-        throw new UnsupportedOperationException("altsByIp");
-    }
-
-    @Override
-    public List<UUID> altsByAnyIp(Set<String> ips, UUID self) {
-        throw new UnsupportedOperationException("altsByAnyIp");
     }
 
     @Override
