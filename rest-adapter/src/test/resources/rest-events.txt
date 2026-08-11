@@ -1,0 +1,74 @@
+communication.announcer-reload: at, line-count
+communication.broadcast-opt-out: at, opted-out, player-id, player-name
+economy.bank-deposit: amount, bank-balance, bank-id, player-id, player-name
+economy.bank-withdraw: amount, bank-balance, bank-id, player-id, player-name
+economy.loan-disburse: loan-id, player-id, player-name, principal
+economy.loan-repay: loan-id, paid, player-id, player-name, remaining
+economy.wallet-credit: amount, balance, occurred-at, player-id, player-name, transaction-id
+economy.wallet-debit: amount, balance, occurred-at, player-id, player-name, transaction-id
+economy.wallet-reject: available, occurred-at, player-id, player-name, reason, requested
+hologram.create: hologram-name, location, player-id, player-name
+hologram.delete: hologram-name, player-id, player-name
+home.create: location, player-id, player-name, slot, slot-number
+home.delete: player-id, player-name, slot, slot-number
+home.icon-change: player-id, player-name, slot, slot-number
+home.limit-reached: current-count, limit, player-id, player-name
+home.relocate: player-id, player-name, slot, slot-number
+home.rename: player-id, player-name, slot, slot-number
+home.visibility-change: player-id, player-name, slot, slot-number
+itemworld.entity-purge: at, category, entity-type, player-id, player-name, radius, removed, scope, world-name
+itemworld.mob-spawn: at, entity-type, player-id, player-name, requested, spawned, world-name
+kit.claim: actor-id, actor-name, at, kit-id, player-id, player-name, self-claimed
+messaging.help-op: message, player-id, player-name, raised-at
+messaging.mail-deliver: message, player-id, player-name, sender-id, sender-name, sent-at
+messaging.private-message: message, player-id, player-name, recipient-id, recipient-name, sent-at
+moderation.alt-detected: ip, kicked, matched, player-id
+moderation.ip-ban: ip, issued-at, issuer, reason, target, until
+moderation.jail-location-define: at, jail, player-id, player-name
+moderation.jail-location-remove: at, jail, player-id, player-name
+moderation.player-jail: at, issuer, jail, player-id, player-name, reason, until
+moderation.player-mute: at, issuer, player-id, player-name, reason, until
+moderation.player-tempban: at, issuer, player-id, player-name, reason, until
+moderation.player-unjail: at, player-id, player-name
+moderation.player-unmute: at, player-id, player-name
+moderation.player-warn: at, expires-at, issuer, player-id, player-name, reason, total-warnings
+npc.create: actor-id, actor-name, location, npc-name
+npc.delete: actor-id, actor-name, npc-name
+npc.move: actor-id, actor-name, location, npc-name
+playerstate.player-feed: actor-id, actor-name, at, player-id, player-name, self-inflicted
+playerstate.player-fly-toggle: actor-id, actor-name, at, enabled, player-id, player-name, self-inflicted
+playerstate.player-game-mode-change: actor-id, actor-name, at, mode, player-id, player-name, self-inflicted
+playerstate.player-god-toggle: actor-id, actor-name, at, enabled, player-id, player-name, self-inflicted
+playerstate.player-heal: actor-id, actor-name, at, player-id, player-name, self-inflicted
+playerstate.player-speed-change: actor-id, actor-name, at, kind, player-id, player-name, scale, self-inflicted
+playerwarp.create: location, player-id, player-name, warp-name
+playerwarp.delete: player-id, player-name, warp-name
+pose.pose: player-id, player-name, return-location, started, started-at, target-id, type
+presence.afk: afk, at, automatic, player-id, player-name, reason
+scoreboard.visibility: hidden, player-id, player-name
+staff.chat: message, player-id, player-name
+staff.mode: entered, player-id, player-name
+teleport.back-location-capture: cause, location, player-id, player-name
+teleport.player-teleport: from, kind, player-id, player-name, to
+teleport.request-accept: player-id, player-name, request-id, requester-id, requester-name, target-id, target-name
+teleport.request-cancel: player-id, player-name, request-id, requester-id, requester-name, target-id, target-name
+teleport.request-deny: player-id, player-name, request-id, requester-id, requester-name, target-id, target-name
+teleport.request-expire: player-id, player-name, request-id, requester-id, requester-name, target-id, target-name
+teleport.request-send: direction, expires-at, player-id, player-name, request-id, requester-id, requester-name, target-id, target-name
+teleport.warmup-cancel: kind, player-id, player-name, reason
+teleport.warmup-start: duration-seconds, kind, origin, player-id, player-name
+vault.contents-change: at, index, player-id, player-name
+vault.open: at, index, own-vault, player-id, player-name, viewer-id, viewer-name
+vote.party: threshold
+vote.receive: player-id, player-name, service
+warp.create: location, player-id, player-name, warp-name
+warp.delete: player-id, player-name, warp-name
+world.adopt: world-name
+world.create: world-name
+world.delete: world-name
+world.entry-denied: player-id, player-name, reason, world-name
+world.import: world-name
+world.load: world-name
+world.setting-change: setting-key, setting-value, world-name
+world.unload: world-name
+world.unregister: world-name

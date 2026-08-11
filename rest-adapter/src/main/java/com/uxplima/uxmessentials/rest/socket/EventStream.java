@@ -97,6 +97,21 @@ public final class EventStream implements RestServer.Upgrade, AutoCloseable {
         }
     }
 
+    /**
+     * Whether anybody is listening for an event by this name.
+     *
+     * <p>Asked before an event is rendered, so a server with nothing subscribed pays a lookup per event and not a
+     * payload per event.
+     */
+    public boolean wanted(String name) {
+        for (EventSocket subscriber : live) {
+            if (subscriber.wants(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** How many connections are open, which is what {@code /uxmapi} reports. */
     public int subscribers() {
         return live.size();

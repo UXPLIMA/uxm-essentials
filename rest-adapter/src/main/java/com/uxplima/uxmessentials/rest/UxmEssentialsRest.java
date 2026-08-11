@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.rest.auth.AuthFilter;
 import com.uxplima.uxmessentials.rest.auth.RateLimiter;
 import com.uxplima.uxmessentials.rest.auth.TokenStore;
+import com.uxplima.uxmessentials.rest.bridge.EventBridge;
 import com.uxplima.uxmessentials.rest.http.RestServer;
 import com.uxplima.uxmessentials.rest.socket.EventStream;
 import org.jspecify.annotations.NullMarked;
@@ -42,6 +43,7 @@ public final class UxmEssentialsRest extends JavaPlugin {
 
     private @Nullable RestServer server;
     private @Nullable EventStream events;
+    private @Nullable EventBridge bridge;
 
     @Override
     public void onEnable() {
@@ -66,6 +68,10 @@ public final class UxmEssentialsRest extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (bridge != null) {
+            bridge.close();
+            bridge = null;
+        }
         if (events != null) {
             events.close();
             events = null;
@@ -92,6 +98,9 @@ public final class UxmEssentialsRest extends JavaPlugin {
             return;
         }
         events = stream;
+        EventBridge watcher = new EventBridge(stream, getLogger());
+        watcher.register(this, getServer().getPluginManager());
+        bridge = watcher;
         getLogger()
                 .info("REST API listening on " + config.bind() + ":" + config.port()
                         + ". Make a token with /uxmapi token create <label>.");
