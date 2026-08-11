@@ -11,11 +11,14 @@ import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
+import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery;
+import com.uxplima.uxmessentials.api.query.UxmItemworldQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
+import com.uxplima.uxmessentials.api.query.UxmNpcQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
@@ -23,6 +26,7 @@ import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
+import com.uxplima.uxmessentials.api.query.UxmStaffQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
@@ -220,5 +224,25 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmMessagingQuery> messaging() {
         return queries.find(UxmMessagingQuery.class);
+    }
+
+    @Override
+    public Optional<UxmNpcQuery> npc() {
+        return queries.find(UxmNpcQuery.class);
+    }
+
+    @Override
+    public Optional<UxmHologramsQuery> holograms() {
+        return queries.find(UxmHologramsQuery.class);
+    }
+
+    @Override
+    public Optional<UxmStaffQuery> staff() {
+        return queries.find(UxmStaffQuery.class);
+    }
+
+    @Override
+    public Optional<UxmItemworldQuery> itemworld() {
+        return queries.find(UxmItemworldQuery.class);
     }
 }

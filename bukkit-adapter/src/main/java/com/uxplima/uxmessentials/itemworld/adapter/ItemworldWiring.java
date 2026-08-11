@@ -119,7 +119,7 @@ public final class ItemworldWiring {
                 new PowertoolInteractListener(powertoolStore, powertoolToggles, config),
                 new UnlimitedPlacementListener(unlimited, config),
                 new ShulkerBoxListener(shulkerView, config));
-        return new Wired(List.copyOf(commands), listeners, hubView, shulkerView);
+        return new Wired(List.copyOf(commands), listeners, hubView, shulkerView, powertoolStore);
     }
 
     private static Logger auditLogger() {
@@ -136,18 +136,21 @@ public final class ItemworldWiring {
      * @param listeners the powertool interact, unlimited-placement, and shulker-open listeners to register
      * @param hubView the utilities hub the {@code /uxmess gui} hub entry opens
      * @param shulkerView the in-inventory shulker view, exposed so its still-open windows are flushed on module stop
+     * @param powertools the item-PDC powertool store, exposed so the published query reads the same bindings
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             ItemworldHubMenu hubView,
-            ShulkerBoxView shulkerView) {
+            ShulkerBoxView shulkerView,
+            PdcPowertoolStore powertools) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(hubView, "hubView");
             Objects.requireNonNull(shulkerView, "shulkerView");
+            Objects.requireNonNull(powertools, "powertools");
         }
     }
 }

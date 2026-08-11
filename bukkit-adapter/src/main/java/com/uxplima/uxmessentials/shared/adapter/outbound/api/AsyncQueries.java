@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -44,6 +45,35 @@ public final class AsyncQueries {
                 answer.completeExceptionally(failure);
             }
         });
+        return answer;
+    }
+
+    /**
+     * Run {@code read} on the thread that owns {@code who} and complete the returned future with its result.
+     *
+     * <p>The third and last kind of published read: one that looks at a live player rather than at a row. An
+     * inventory is only readable from the thread that owns the entity, which on Folia is a region thread and not
+     * the global one, so neither of the two above will do.
+     *
+     * <p>A player who leaves between the call and the hop is answered with {@code gone} rather than left hanging,
+     * the same way a write to a departed player is.
+     */
+    public static <T> CompletableFuture<T> onPlayer(Scheduler scheduler, PlayerRef who, Supplier<T> read, T gone) {
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(read, "read");
+        Objects.requireNonNull(gone, "gone");
+        CompletableFuture<T> answer = new CompletableFuture<>();
+        scheduler.onEntity(
+                who,
+                () -> {
+                    try {
+                        answer.complete(read.get());
+                    } catch (RuntimeException failure) {
+                        answer.completeExceptionally(failure);
+                    }
+                },
+                () -> answer.complete(gone));
         return answer;
     }
 

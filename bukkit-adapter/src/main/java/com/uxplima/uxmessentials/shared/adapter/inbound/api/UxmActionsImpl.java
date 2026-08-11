@@ -6,11 +6,13 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
+import com.uxplima.uxmessentials.api.action.UxmHologramsActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmInvRollbackActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.action.UxmMessagingActions;
 import com.uxplima.uxmessentials.api.action.UxmModerationActions;
+import com.uxplima.uxmessentials.api.action.UxmNpcActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerWarpsActions;
 import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
@@ -130,5 +132,15 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmPlayerWarpsActions> playerWarps() {
         return contexts.find(UxmPlayerWarpsActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmNpcActions> npc() {
+        return contexts.find(UxmNpcActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmHologramsActions> holograms() {
+        return contexts.find(UxmHologramsActions.class, source);
     }
 }

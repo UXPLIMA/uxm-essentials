@@ -15,17 +15,21 @@ import com.uxplima.uxmessentials.rest.http.Router;
 import com.uxplima.uxmessentials.rest.route.ActionsFor;
 import com.uxplima.uxmessentials.rest.route.DiscordLinkRoutes;
 import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
+import com.uxplima.uxmessentials.rest.route.HologramsRoutes;
 import com.uxplima.uxmessentials.rest.route.HomesRoutes;
 import com.uxplima.uxmessentials.rest.route.InvRollbackRoutes;
+import com.uxplima.uxmessentials.rest.route.ItemworldRoutes;
 import com.uxplima.uxmessentials.rest.route.KitsRoutes;
 import com.uxplima.uxmessentials.rest.route.MessagingRoutes;
 import com.uxplima.uxmessentials.rest.route.ModerationRoutes;
+import com.uxplima.uxmessentials.rest.route.NpcRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerStateRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
 import com.uxplima.uxmessentials.rest.route.PresenceRoutes;
 import com.uxplima.uxmessentials.rest.route.RanksRoutes;
 import com.uxplima.uxmessentials.rest.route.RegionsRoutes;
 import com.uxplima.uxmessentials.rest.route.SecurityRoutes;
+import com.uxplima.uxmessentials.rest.route.StaffRoutes;
 import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
 import com.uxplima.uxmessentials.rest.route.TradeRoutes;
 import com.uxplima.uxmessentials.rest.route.VanishRoutes;
@@ -61,9 +65,9 @@ public final class Routes {
      * <p>Reads go through {@code api} directly; writes go through {@code actions}, which hands each request an action
      * surface named after the token that made it, so the audit trail says who asked rather than only which jar.
      *
-     * <p>Two contexts take no {@code actions}: trade and regions publish a query surface and no action surface, so
-     * over HTTP they are readable and nothing more. That is the published API's shape showing through rather than a
-     * decision taken here.
+     * <p>Four contexts take no {@code actions}: trade, regions, staff and itemworld publish a query surface and no
+     * action surface, so over HTTP they are readable and nothing more. That is the published API's shape showing
+     * through rather than a decision taken here.
      */
     public static Router build(UxmEssentialsApi api, ActionsFor actions) {
         Objects.requireNonNull(api, "api");
@@ -73,17 +77,21 @@ public final class Routes {
                 .add(Route.of("GET", EVENTS, Scopes.EVENTS, request -> upgradeRequired()))
                 .addAll(DiscordLinkRoutes.of(api, actions))
                 .addAll(EconomyRoutes.of(api, actions))
+                .addAll(HologramsRoutes.of(api, actions))
                 .addAll(HomesRoutes.of(api, actions))
                 .addAll(InvRollbackRoutes.of(api, actions))
+                .addAll(ItemworldRoutes.of(api))
                 .addAll(KitsRoutes.of(api, actions))
                 .addAll(MessagingRoutes.of(api, actions))
                 .addAll(ModerationRoutes.of(api, actions))
+                .addAll(NpcRoutes.of(api, actions))
                 .addAll(PlayerStateRoutes.of(api, actions))
                 .addAll(PlayerWarpsRoutes.of(api, actions))
                 .addAll(PresenceRoutes.of(api, actions))
                 .addAll(RanksRoutes.of(api, actions))
                 .addAll(RegionsRoutes.of(api))
                 .addAll(SecurityRoutes.of(api, actions))
+                .addAll(StaffRoutes.of(api))
                 .addAll(TeleportRoutes.of(api, actions))
                 .addAll(TradeRoutes.of(api))
                 .addAll(VanishRoutes.of(api, actions))
@@ -144,6 +152,10 @@ public final class Routes {
         present.put("regions", api.regions().isPresent());
         present.put("invrollback", api.invRollback().isPresent());
         present.put("security", api.security().isPresent());
+        present.put("npc", api.npc().isPresent());
+        present.put("holograms", api.holograms().isPresent());
+        present.put("staff", api.staff().isPresent());
+        present.put("itemworld", api.itemworld().isPresent());
         return present;
     }
 }

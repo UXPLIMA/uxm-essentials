@@ -1,11 +1,13 @@
 interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional discordLink()
   Optional economy()
+  Optional holograms()
   Optional homes()
   Optional invRollback()
   Optional kits()
   Optional messaging()
   Optional moderation()
+  Optional npc()
   Optional playerState()
   Optional playerWarps()
   Optional presence()
@@ -45,6 +47,15 @@ record com.uxplima.uxmessentials.api.action.UxmFailure
   String NOT_FOUND
   String PLAYER_OFFLINE
   String REFUSED
+interface com.uxplima.uxmessentials.api.action.UxmHologramsActions
+  CompletableFuture addLine(UUID, String, String)
+  CompletableFuture clearClickCommand(UUID, String)
+  CompletableFuture create(UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation, String)
+  CompletableFuture delete(UUID, String)
+  CompletableFuture move(UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  CompletableFuture removeLine(UUID, String, int)
+  CompletableFuture setClickCommand(UUID, String, String)
+  CompletableFuture setLine(UUID, String, int, String)
 interface com.uxplima.uxmessentials.api.action.UxmHomeActions
   CompletableFuture delete(UUID, int)
   CompletableFuture relocate(UUID, int, com.uxplima.uxmessentials.api.view.UxmLocation)
@@ -77,6 +88,17 @@ interface com.uxplima.uxmessentials.api.action.UxmModerationActions
   CompletableFuture unmute(UUID)
   CompletableFuture warn(UUID, String)
   com.uxplima.uxmessentials.api.action.UxmModerationActions silently()
+interface com.uxplima.uxmessentials.api.action.UxmNpcActions
+  CompletableFuture clearClickCommand(UUID, String)
+  CompletableFuture clearDisplayName(UUID, String)
+  CompletableFuture clearSkin(UUID, String)
+  CompletableFuture create(UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  CompletableFuture delete(UUID, String)
+  CompletableFuture hideDisplayName(UUID, String)
+  CompletableFuture move(UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  CompletableFuture setClickCommand(UUID, String, String)
+  CompletableFuture setDisplayName(UUID, String, String)
+  CompletableFuture setSkin(UUID, String, String)
 record com.uxplima.uxmessentials.api.action.UxmOutcome
   <init>(Optional)
   Optional failure()
@@ -158,11 +180,14 @@ class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
 interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional discordLink()
   Optional economy()
+  Optional holograms()
   Optional homes()
   Optional invRollback()
+  Optional itemworld()
   Optional kits()
   Optional messaging()
   Optional moderation()
+  Optional npc()
   Optional playerState()
   Optional playerWarps()
   Optional playtime()
@@ -170,6 +195,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional ranks()
   Optional regions()
   Optional security()
+  Optional staff()
   Optional teleport()
   Optional trade()
   Optional vanish()
@@ -880,6 +906,10 @@ interface com.uxplima.uxmessentials.api.query.UxmEconomyQuery
   CompletableFuture top(String, int)
   CompletableFuture top(int)
   List currencies()
+interface com.uxplima.uxmessentials.api.query.UxmHologramsQuery
+  CompletableFuture exists(String)
+  CompletableFuture get(String)
+  CompletableFuture list()
 interface com.uxplima.uxmessentials.api.query.UxmHomesQuery
   CompletableFuture count(UUID)
   CompletableFuture get(UUID, int)
@@ -887,6 +917,9 @@ interface com.uxplima.uxmessentials.api.query.UxmHomesQuery
   CompletableFuture list(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery
   CompletableFuture of(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmItemworldQuery
+  CompletableFuture powertoolInHand(UUID)
+  CompletableFuture powertools(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmKitsQuery
   CompletableFuture canClaim(UUID, String)
   CompletableFuture claimableBy(UUID)
@@ -906,6 +939,11 @@ interface com.uxplima.uxmessentials.api.query.UxmModerationQuery
   CompletableFuture jail(UUID)
   CompletableFuture mute(UUID)
   CompletableFuture warns(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmNpcQuery
+  CompletableFuture exists(String)
+  CompletableFuture get(String)
+  CompletableFuture list()
+  CompletableFuture ownedBy(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery
   Optional of(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery
@@ -932,6 +970,10 @@ interface com.uxplima.uxmessentials.api.query.UxmRegionsQuery
 interface com.uxplima.uxmessentials.api.query.UxmSecurityQuery
   CompletableFuture of(UUID)
   boolean isLockedOut(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmStaffQuery
+  Optional modeOf(UUID)
+  Set inStaffMode()
+  boolean isInStaffMode(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmTeleportQuery
   List pendingFor(UUID)
   Optional backPoint(UUID)
@@ -1009,6 +1051,31 @@ enum com.uxplima.uxmessentials.api.view.UxmGameMode
   com.uxplima.uxmessentials.api.view.UxmGameMode CREATIVE
   com.uxplima.uxmessentials.api.view.UxmGameMode SPECTATOR
   com.uxplima.uxmessentials.api.view.UxmGameMode SURVIVAL
+record com.uxplima.uxmessentials.api.view.UxmHologram
+  <init>(String, com.uxplima.uxmessentials.api.view.UxmLocation, com.uxplima.uxmessentials.api.view.UxmHologramType, List, Optional, Optional, Optional, int, int, int, Instant)
+  Instant createdAt()
+  List lines()
+  Optional clickCommand()
+  Optional content()
+  Optional linkedNpc()
+  String name()
+  String toString()
+  boolean equals(Object)
+  boolean refreshes()
+  com.uxplima.uxmessentials.api.view.UxmHologramType type()
+  com.uxplima.uxmessentials.api.view.UxmLocation location()
+  int actions()
+  int hashCode()
+  int pages()
+  int refreshIntervalTicks()
+enum com.uxplima.uxmessentials.api.view.UxmHologramType
+  com.uxplima.uxmessentials.api.view.UxmHologramType valueOf(String)
+  com.uxplima.uxmessentials.api.view.UxmHologramType[] values()
+  com.uxplima.uxmessentials.api.view.UxmHologramType BLOCK
+  com.uxplima.uxmessentials.api.view.UxmHologramType ENTITY
+  com.uxplima.uxmessentials.api.view.UxmHologramType HEAD
+  com.uxplima.uxmessentials.api.view.UxmHologramType ITEM
+  com.uxplima.uxmessentials.api.view.UxmHologramType TEXT
 record com.uxplima.uxmessentials.api.view.UxmHome
   <init>(UUID, int, com.uxplima.uxmessentials.api.view.UxmLocation, Optional, Optional, boolean, Instant, Instant)
   Instant createdAt()
@@ -1094,6 +1161,24 @@ record com.uxplima.uxmessentials.api.view.UxmMoney
   String toString()
   boolean equals(Object)
   int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmNpc
+  <init>(String, com.uxplima.uxmessentials.api.view.UxmLocation, String, Optional, boolean, Optional, int, boolean, boolean, boolean, Optional, Instant)
+  Instant createdAt()
+  Optional clickCommand()
+  Optional displayName()
+  Optional ownerId()
+  String entityType()
+  String name()
+  String toString()
+  boolean equals(Object)
+  boolean glowing()
+  boolean isPlayer()
+  boolean lookAtPlayer()
+  boolean nameHidden()
+  boolean skinned()
+  com.uxplima.uxmessentials.api.view.UxmLocation location()
+  int actions()
+  int hashCode()
 record com.uxplima.uxmessentials.api.view.UxmPlayerState
   <init>(UUID, boolean, boolean, Optional, float, float)
   Optional gameMode()
@@ -1172,6 +1257,14 @@ enum com.uxplima.uxmessentials.api.view.UxmPoseType
   com.uxplima.uxmessentials.api.view.UxmPoseType PLAYER_SIT
   com.uxplima.uxmessentials.api.view.UxmPoseType SIT
   com.uxplima.uxmessentials.api.view.UxmPoseType SPIN
+record com.uxplima.uxmessentials.api.view.UxmPowertool
+  <init>(int, String, List)
+  List commands()
+  String item()
+  String toString()
+  boolean equals(Object)
+  int hashCode()
+  int slot()
 record com.uxplima.uxmessentials.api.view.UxmPresence
   <init>(UUID, boolean, Optional, Instant)
   Instant lastActivity()

@@ -1144,7 +1144,7 @@ public final class PluginModule {
                     menuBindings,
                     Objects.requireNonNull(ipCapture, "ipCapture"));
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
-            wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
+            wireItemworld(plugin, ctx, resources, links, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("communication"))) {
@@ -2174,6 +2174,7 @@ public final class PluginModule {
             JavaPlugin plugin,
             ModuleContext ctx,
             CloseableResources resources,
+            ContextLinks links,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
@@ -2197,6 +2198,14 @@ public final class PluginModule {
                 Material.CRAFTING_TABLE,
                 "uxmessentials.itemworld.gui",
                 (player, viewer) -> wired.hubView().open(viewer)));
+        // The one readable corner of an otherwise stateless module: the command bindings a player stamped onto
+        // their own items, read from the same item PDC /powertoollist reads.
+        links.queries.register(
+                com.uxplima.uxmessentials.api.query.UxmItemworldQuery.class,
+                new com.uxplima.uxmessentials.itemworld.adapter.outbound.api.ItemworldQueries(
+                        wired.powertools(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
     }
 
     private static void wireVaults(
@@ -2456,6 +2465,23 @@ public final class PluginModule {
                 org.bukkit.Material.ARMOR_STAND,
                 "uxmessentials.holograms.gui",
                 (player, viewer) -> wired.listMenu().open(viewer)));
+        links.queries.register(
+                com.uxplima.uxmessentials.api.query.UxmHologramsQuery.class,
+                new com.uxplima.uxmessentials.holograms.adapter.outbound.api.HologramQueries(
+                        wired.repository(), ctx.kernel().scheduler()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmHologramsActions.class,
+                source -> new com.uxplima.uxmessentials.holograms.adapter.outbound.api.HologramActions(
+                        wired.services().create(),
+                        wired.services().delete(),
+                        wired.services().move(),
+                        wired.services().addLine(),
+                        wired.services().setLine(),
+                        wired.services().removeLine(),
+                        wired.services().clickCommand(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().worldLookup(),
+                        ctx.kernel().scheduler()));
         resources.onClose(wired::stop);
     }
 
@@ -2638,6 +2664,26 @@ public final class PluginModule {
                 menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        links.queries.register(
+                com.uxplima.uxmessentials.api.query.UxmNpcQuery.class,
+                new com.uxplima.uxmessentials.npc.adapter.outbound.api.NpcQueries(
+                        wired.repository(), ctx.kernel().scheduler()));
+        // The published skin verb names an account rather than a base64 texture, and resolves it through the same
+        // server-wide lookup /npc skin uses, so it works on an offline-mode server too.
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmNpcActions.class,
+                source -> new com.uxplima.uxmessentials.npc.adapter.outbound.api.NpcActions(
+                        wired.repository(),
+                        wired.services().create(),
+                        wired.services().delete(),
+                        wired.services().moveTo(),
+                        wired.services().skin(),
+                        wired.services().displayName(),
+                        wired.services().command(),
+                        ctx.kernel().skins(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().worldLookup(),
+                        ctx.kernel().scheduler()));
         resources.onClose(wired::stop);
     }
 
@@ -2674,6 +2720,12 @@ public final class PluginModule {
         // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
         // staff-member holders the /stafflist roster shows, so a placeholder matches what the player sees in game.
         links.placeholders.staff(new StaffStaffPlaceholders(wired.services().store(), plugin.getServer()));
+        // Read-only: entering staff mode swaps a real inventory for a loadout, which only the module can undo,
+        // so who is on duty is published and turning it on is not.
+        links.queries.register(
+                com.uxplima.uxmessentials.api.query.UxmStaffQuery.class,
+                new com.uxplima.uxmessentials.staff.adapter.outbound.api.StaffQueries(
+                        wired.services().store()));
         resources.onClose(wired::stop);
     }
 

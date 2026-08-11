@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 
 import com.google.gson.JsonArray;
@@ -15,6 +16,7 @@ import com.google.gson.JsonPrimitive;
 import com.uxplima.uxmessentials.api.view.UxmBackPoint;
 import com.uxplima.uxmessentials.api.view.UxmBaltopEntry;
 import com.uxplima.uxmessentials.api.view.UxmDiscordLink;
+import com.uxplima.uxmessentials.api.view.UxmHologram;
 import com.uxplima.uxmessentials.api.view.UxmHome;
 import com.uxplima.uxmessentials.api.view.UxmIgnore;
 import com.uxplima.uxmessentials.api.view.UxmIssuer;
@@ -22,9 +24,11 @@ import com.uxplima.uxmessentials.api.view.UxmKit;
 import com.uxplima.uxmessentials.api.view.UxmLocation;
 import com.uxplima.uxmessentials.api.view.UxmMail;
 import com.uxplima.uxmessentials.api.view.UxmMoney;
+import com.uxplima.uxmessentials.api.view.UxmNpc;
 import com.uxplima.uxmessentials.api.view.UxmPlayerState;
 import com.uxplima.uxmessentials.api.view.UxmPlayerWarp;
 import com.uxplima.uxmessentials.api.view.UxmPlaytime;
+import com.uxplima.uxmessentials.api.view.UxmPowertool;
 import com.uxplima.uxmessentials.api.view.UxmPresence;
 import com.uxplima.uxmessentials.api.view.UxmRank;
 import com.uxplima.uxmessentials.api.view.UxmRankStanding;
@@ -415,6 +419,47 @@ public final class Views {
         json.add("location", location(point.location()));
         json.addProperty("cause", point.cause().name());
         instant(json, "captured-at", point.capturedAt());
+        return json;
+    }
+
+    public static JsonElement npc(UxmNpc npc) {
+        JsonObject json = new JsonObject();
+        json.addProperty("name", npc.name());
+        json.add("location", location(npc.location()));
+        json.addProperty("entity-type", npc.entityType());
+        text(json, "display-name", npc.displayName());
+        json.addProperty("name-hidden", npc.nameHidden());
+        text(json, "click-command", npc.clickCommand());
+        json.addProperty("actions", npc.actions());
+        json.addProperty("look-at-player", npc.lookAtPlayer());
+        json.addProperty("glowing", npc.glowing());
+        json.addProperty("skinned", npc.skinned());
+        json.add("owner-id", npc.ownerId().map(UUID::toString).map(Views::text).orElse(JsonNull.INSTANCE));
+        instant(json, "created-at", npc.createdAt());
+        return json;
+    }
+
+    public static JsonElement hologram(UxmHologram hologram) {
+        JsonObject json = new JsonObject();
+        json.addProperty("name", hologram.name());
+        json.add("location", location(hologram.location()));
+        json.addProperty("type", hologram.type().name());
+        json.add("lines", strings(hologram.lines()));
+        text(json, "content", hologram.content());
+        text(json, "linked-npc", hologram.linkedNpc());
+        text(json, "click-command", hologram.clickCommand());
+        json.addProperty("actions", hologram.actions());
+        json.addProperty("pages", hologram.pages());
+        json.addProperty("refresh-interval-ticks", hologram.refreshIntervalTicks());
+        instant(json, "created-at", hologram.createdAt());
+        return json;
+    }
+
+    public static JsonElement powertool(UxmPowertool powertool) {
+        JsonObject json = new JsonObject();
+        json.addProperty("slot", powertool.slot());
+        json.addProperty("item", powertool.item());
+        json.add("commands", strings(powertool.commands()));
         return json;
     }
 

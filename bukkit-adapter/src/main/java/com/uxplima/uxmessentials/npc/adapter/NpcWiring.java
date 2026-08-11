@@ -209,7 +209,7 @@ public final class NpcWiring {
         AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
         Duration lookPeriod = settings.lookPeriod();
         AutoCloseable lookTask = kernel.scheduler().repeatGlobal(renderer::lookTick, lookPeriod, lookPeriod);
-        return new Wired(commands, listeners, renderer, connector, refreshTask, lookTask);
+        return new Wired(commands, listeners, renderer, repository, services, connector, refreshTask, lookTask);
     }
 
     /** The editor's property-button slots, the code default matching the bundled npc-editor.conf. */
@@ -340,6 +340,8 @@ public final class NpcWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             NpcRenderer renderer,
+            NpcRepository repository,
+            NpcServices services,
             BukkitServerConnector connector,
             AutoCloseable refreshTask,
             AutoCloseable lookTask) {
@@ -348,6 +350,8 @@ public final class NpcWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(renderer, "renderer");
+            Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(services, "services");
             Objects.requireNonNull(connector, "connector");
             Objects.requireNonNull(refreshTask, "refreshTask");
             Objects.requireNonNull(lookTask, "lookTask");

@@ -72,4 +72,10 @@ public interface UxmActions {
 
     /** Creating and removing player-owned warps, or empty when the playerwarps module is switched off. */
     Optional<UxmPlayerWarpsActions> playerWarps();
+
+    /** Putting up, moving and removing NPCs, or empty when the npc module is switched off. */
+    Optional<UxmNpcActions> npc();
+
+    /** Putting up, moving and editing holograms, or empty when the holograms module is switched off. */
+    Optional<UxmHologramsActions> holograms();
 }

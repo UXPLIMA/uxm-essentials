@@ -9,11 +9,14 @@ import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
+import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery;
+import com.uxplima.uxmessentials.api.query.UxmItemworldQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
+import com.uxplima.uxmessentials.api.query.UxmNpcQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
@@ -21,6 +24,7 @@ import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
+import com.uxplima.uxmessentials.api.query.UxmStaffQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
@@ -181,6 +185,18 @@ public interface UxmEssentialsApi {
 
     /** Reading mail, ignores and the messaging switches, or empty when the messaging module is switched off. */
     Optional<UxmMessagingQuery> messaging();
+
+    /** Reading which NPCs exist and where, or empty when the npc module is switched off. */
+    Optional<UxmNpcQuery> npc();
+
+    /** Reading which holograms exist and what they say, or empty when the holograms module is switched off. */
+    Optional<UxmHologramsQuery> holograms();
+
+    /** Reading who is on duty, or empty when the staff module is switched off. */
+    Optional<UxmStaffQuery> staff();
+
+    /** Reading a player's powertool bindings, or empty when the itemworld module is switched off. */
+    Optional<UxmItemworldQuery> itemworld();
 
     /** The API, or {@code null} when uxmEssentials is absent, still loading, or shutting down. */
     static @Nullable UxmEssentialsApi get() {

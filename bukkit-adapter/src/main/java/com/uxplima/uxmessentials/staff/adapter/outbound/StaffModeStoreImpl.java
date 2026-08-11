@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.staff.adapter.outbound;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -45,8 +46,14 @@ public final class StaffModeStoreImpl implements StaffModeStore {
         active.remove(who.uuid());
     }
 
-    /** A snapshot of every uuid currently in staff mode — the disable-time exit-all set. */
+    /** A snapshot of every uuid currently in staff mode: the disable-time exit-all set. */
     public List<UUID> activePlayers() {
         return active.keySet().stream().collect(Collectors.toUnmodifiableList());
+    }
+
+    /** The mode profile this uuid is on duty under, or empty when they are off duty. */
+    public Optional<String> modeOf(UUID player) {
+        Objects.requireNonNull(player, "player");
+        return Optional.ofNullable(active.get(player)).map(StaffModeState::modeName);
     }
 }

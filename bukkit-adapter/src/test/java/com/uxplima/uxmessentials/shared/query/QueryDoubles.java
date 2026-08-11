@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.shared.query;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,10 +33,23 @@ public final class QueryDoubles {
     public static final class InlineScheduler implements Scheduler {
 
         private int asyncCalls;
+        private int entityCalls;
+        private final List<UUID> retired = new ArrayList<>();
+
+        /** Marks this player as gone, so a read scheduled for them runs the retired path instead. */
+        public InlineScheduler retire(PlayerRef player) {
+            retired.add(player.uuid());
+            return this;
+        }
 
         /** How many reads were handed to the worker pool, which is one per query call. */
         public int asyncCalls() {
             return asyncCalls;
+        }
+
+        /** How many reads went to a player's own thread, which only an inventory read may do. */
+        public int entityCalls() {
+            return entityCalls;
         }
 
         @Override
@@ -50,6 +65,20 @@ public final class QueryDoubles {
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
             throw new AssertionError("a published query must not schedule tick-thread work");
+        }
+
+        /**
+         * The one sanctioned exception: a read of a live player's own inventory, which no other thread may make.
+         * It carries a retired path, which is what tells it apart from the plain hop above.
+         */
+        @Override
+        public void onEntity(PlayerRef player, Runnable task, Runnable gone) {
+            entityCalls++;
+            if (retired.contains(player.uuid())) {
+                gone.run();
+                return;
+            }
+            task.run();
         }
 
         @Override

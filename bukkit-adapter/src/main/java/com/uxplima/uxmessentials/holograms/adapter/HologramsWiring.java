@@ -292,6 +292,7 @@ public final class HologramsWiring {
                 HologramCommands.all(services, kernel.messages(), hologramNames, npcNames, listMenu),
                 renderer,
                 repository,
+                services,
                 refreshTask,
                 events,
                 npcSubscriber,
@@ -430,6 +431,7 @@ public final class HologramsWiring {
             List<CommandRegistration> commands,
             HologramRenderer renderer,
             HologramRepository repository,
+            HologramServices services,
             AutoCloseable refreshTask,
             InProcessDomainEventPublisher events,
             Consumer<DomainEvent> npcSubscriber,
@@ -440,6 +442,7 @@ public final class HologramsWiring {
             commands = List.copyOf(commands);
             Objects.requireNonNull(renderer, "renderer");
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(services, "services");
             Objects.requireNonNull(refreshTask, "refreshTask");
             Objects.requireNonNull(events, "events");
             Objects.requireNonNull(npcSubscriber, "npcSubscriber");
