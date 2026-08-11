@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.api;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.communication.adapter.outbound.api.CommunicationEventBridges;
+import com.uxplima.uxmessentials.discordlink.adapter.outbound.api.DiscordLinkEventBridges;
 import com.uxplima.uxmessentials.economy.adapter.outbound.api.EconomyEventBridges;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.api.HologramEventBridges;
 import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeEventBridges;
@@ -66,6 +67,7 @@ public final class EventBridges {
         WorldEventBridges.register(registry);
         RankEventBridges.register(registry);
         TradeEventBridges.register(registry);
+        DiscordLinkEventBridges.register(registry);
     }
 
     /** Install every context's veto mappings into {@code registry}, in context order. */

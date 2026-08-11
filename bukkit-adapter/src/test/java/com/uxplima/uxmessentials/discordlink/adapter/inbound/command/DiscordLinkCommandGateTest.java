@@ -96,7 +96,7 @@ class DiscordLinkCommandGateTest {
         DiscordLinkServices services = new DiscordLinkServices(
                 beginLink,
                 new ConfirmLink(store, Clock.systemUTC()),
-                new Unlink(store),
+                new Unlink(store, event -> {}),
                 new LinkStatus(store),
                 notifier,
                 bridge);

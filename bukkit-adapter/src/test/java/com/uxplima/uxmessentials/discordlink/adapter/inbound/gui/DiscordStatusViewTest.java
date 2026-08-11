@@ -101,7 +101,7 @@ class DiscordStatusViewTest {
         store = new InMemoryStore();
         Clock clock = Clock.systemUTC();
         beginLink = new BeginLink(store, clock, new Random(1), Duration.ofMinutes(10));
-        unlink = new Unlink(store);
+        unlink = new Unlink(store, event -> {});
         linkStatus = new LinkStatus(store);
         sink = new RecordingSink();
         notifier = new Notifier(new KeyMessages(), sink);

@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,7 +23,10 @@ import com.uxplima.uxmessentials.discordlink.domain.ConfirmedLink;
 import com.uxplima.uxmessentials.discordlink.domain.DiscordId;
 import com.uxplima.uxmessentials.discordlink.domain.LinkCode;
 import com.uxplima.uxmessentials.discordlink.domain.PendingLink;
+import com.uxplima.uxmessentials.discordlink.domain.event.AccountLinked;
+import com.uxplima.uxmessentials.discordlink.domain.event.AccountUnlinked;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,13 +49,15 @@ class DiscordLinkCommandPathTest {
     private Unlink unlink;
     private LinkStatus linkStatus;
     private PlayerRef alice;
+    private List<DomainEvent> published;
 
     @BeforeEach
     void setUp() {
         store = new FakeStore();
+        published = new ArrayList<>();
         beginLink = new BeginLink(store, CLOCK, new java.util.Random(1L), Duration.ofMinutes(10));
-        confirmation = new ConfirmLinkService(new ConfirmLink(store, CLOCK), new StubLookup());
-        unlink = new Unlink(store);
+        confirmation = new ConfirmLinkService(new ConfirmLink(store, CLOCK), new StubLookup(), published::add);
+        unlink = new Unlink(store, published::add);
         linkStatus = new LinkStatus(store);
         alice = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-0000000000aa"), "Alice");
     }
@@ -77,6 +84,18 @@ class DiscordLinkCommandPathTest {
         assertThat(unlink.unlink(alice).isOk()).isTrue(); // /discordunlink
         assertThat(linkStatus.status(alice)).isEmpty();
         assertThat(unlink.unlink(alice).isErr()).isTrue(); // nothing left to unbind
+    }
+
+    @Test
+    void bothEndsOfTheBindingAreAnnouncedWithTheNameResolved() {
+        LinkCode code = beginLink.begin(alice);
+        confirmation.confirm(code.value(), "123456789012345678");
+        unlink.unlink(alice);
+
+        assertThat(published)
+                .containsExactly(
+                        new AccountLinked(alice, DiscordId.of("123456789012345678"), CLOCK.instant()),
+                        new AccountUnlinked(alice, DiscordId.of("123456789012345678")));
     }
 
     @Test

@@ -20,6 +20,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
+import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
@@ -66,6 +68,8 @@ import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
+import com.uxplima.uxmessentials.discordlink.adapter.outbound.api.DiscordLinkActions;
+import com.uxplima.uxmessentials.discordlink.adapter.outbound.api.DiscordLinkQueries;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderRankEconomy;
@@ -2683,6 +2687,17 @@ public final class PluginModule {
         // The discordlink PAPI seam reads the same DB-backed link store the /discordlink commands hold, so a
         // placeholder matches the binding the player redeemed (and answers for an offline player too).
         links.placeholders.discordlink(new StoreDiscordlinkPlaceholders(wired.store()));
+        // Both directions of the binding are readable, and the one write a plugin has business doing is the
+        // removal: a binding written without the Discord-side proof would say something untrue.
+        links.queries.register(
+                UxmDiscordLinkQuery.class,
+                new DiscordLinkQueries(wired.store(), ctx.kernel().scheduler()));
+        links.actions.register(
+                UxmDiscordLinkActions.class,
+                source -> new DiscordLinkActions(
+                        wired.unlink(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         plugin.getServer()
                 .getServicesManager()
                 .register(

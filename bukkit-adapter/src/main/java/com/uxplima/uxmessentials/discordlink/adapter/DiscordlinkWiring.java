@@ -59,7 +59,7 @@ public final class DiscordlinkWiring {
         Clock clock = Clock.systemUTC();
         BeginLink beginLink = new BeginLink(store, clock, rng(), ttl(ctx));
         ConfirmLink confirmLink = new ConfirmLink(store, clock);
-        Unlink unlink = new Unlink(store);
+        Unlink unlink = new Unlink(store, kernel.events());
         LinkStatus linkStatus = new LinkStatus(store);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         DiscordLinkServices services =
@@ -80,8 +80,9 @@ public final class DiscordlinkWiring {
                 notifier,
                 bridge,
                 menus);
-        DiscordLinkConfirmation confirmation = new ConfirmLinkService(confirmLink, kernel.playerLookup());
-        return new Wired(DiscordLinkCommands.all(services, view), confirmation, store, view);
+        DiscordLinkConfirmation confirmation =
+                new ConfirmLinkService(confirmLink, kernel.playerLookup(), kernel.events());
+        return new Wired(DiscordLinkCommands.all(services, view), confirmation, store, unlink, view);
     }
 
     private static Duration ttl(ModuleContext ctx) {
@@ -101,19 +102,22 @@ public final class DiscordlinkWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param confirmation the {@code /link} confirmation seam the Discord bridge consumes
-     * @param store the DB-backed link store the PAPI seam reads the player's binding from
+     * @param store the DB-backed link store the PAPI seam and the published query read the binding from
+     * @param unlink the use case behind {@code /discordunlink}, which the published unlink action runs
      * @param view the per-player link-status panel registered on the {@code /uxmess gui} hub
      */
     public record Wired(
             List<CommandRegistration> commands,
             DiscordLinkConfirmation confirmation,
             DiscordLinkStore store,
+            Unlink unlink,
             DiscordStatusView view) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(confirmation, "confirmation");
             Objects.requireNonNull(store, "store");
+            Objects.requireNonNull(unlink, "unlink");
             Objects.requireNonNull(view, "view");
         }
     }

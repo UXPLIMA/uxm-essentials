@@ -52,6 +52,9 @@ public interface UxmActions {
     /** Promoting, setting and prestiging a rank, or empty when the ranks module is switched off. */
     Optional<UxmRanksActions> ranks();
 
+    /** Changing a Discord binding, or empty when the discordlink module is switched off. */
+    Optional<UxmDiscordLinkActions> discordLink();
+
     /** Crediting votes, or empty when the vote module is switched off. */
     Optional<UxmVoteActions> vote();
 

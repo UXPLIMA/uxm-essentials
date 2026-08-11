@@ -1,5 +1,7 @@
 communication.announcer-reload: at, line-count
 communication.broadcast-opt-out: at, opted-out, player-id, player-name
+discordlink.account-link: discord-id, linked-at, player-id, player-name
+discordlink.account-unlink: discord-id, player-id, player-name
 economy.bank-deposit: amount, bank-balance, bank-id, player-id, player-name
 economy.bank-withdraw: amount, bank-balance, bank-id, player-id, player-name
 economy.loan-disburse: loan-id, player-id, player-name, principal

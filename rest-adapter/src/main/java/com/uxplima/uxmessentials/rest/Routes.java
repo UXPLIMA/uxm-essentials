@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
 import com.uxplima.uxmessentials.rest.route.ActionsFor;
+import com.uxplima.uxmessentials.rest.route.DiscordLinkRoutes;
 import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
 import com.uxplima.uxmessentials.rest.route.HomesRoutes;
 import com.uxplima.uxmessentials.rest.route.KitsRoutes;
@@ -67,6 +68,7 @@ public final class Routes {
         return new Router()
                 .add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)))
                 .add(Route.of("GET", EVENTS, Scopes.EVENTS, request -> upgradeRequired()))
+                .addAll(DiscordLinkRoutes.of(api, actions))
                 .addAll(EconomyRoutes.of(api, actions))
                 .addAll(HomesRoutes.of(api, actions))
                 .addAll(KitsRoutes.of(api, actions))
@@ -132,6 +134,7 @@ public final class Routes {
         present.put("messaging", api.messaging().isPresent());
         present.put("ranks", api.ranks().isPresent());
         present.put("trade", api.trade().isPresent());
+        present.put("discordlink", api.discordLink().isPresent());
         return present;
     }
 }

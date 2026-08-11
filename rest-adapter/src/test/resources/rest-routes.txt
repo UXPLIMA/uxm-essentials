@@ -1,5 +1,8 @@
 GET /api/v1/status [read]
 GET /api/v1/events [events]
+GET /api/v1/players/{uuid}/discord [read]
+GET /api/v1/discord/{id} [read]
+POST /api/v1/players/{uuid}/discord/unlink [write]
 GET /api/v1/economy/currencies [read]
 GET /api/v1/economy/top [read]
 GET /api/v1/players/{uuid}/balance [read]

@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
+import com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
@@ -85,6 +86,11 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmWorldsActions> worlds() {
         return contexts.find(UxmWorldsActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmDiscordLinkActions> discordLink() {
+        return contexts.find(UxmDiscordLinkActions.class, source);
     }
 
     @Override
