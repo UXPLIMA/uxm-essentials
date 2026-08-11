@@ -2232,6 +2232,17 @@ public final class PluginModule {
                         wired.sizeQuota(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmVaultsActions.class,
+                source -> new com.uxplima.uxmessentials.vaults.adapter.outbound.api.VaultActions(
+                        wired.services().openVault(),
+                        wired.services().deleteVault(),
+                        wired.services().renameVault(),
+                        wired.services().setVaultIcon(),
+                        wired.view(),
+                        wired.services().allowCustomIcon(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
         // Open the same /vault selector from the management hub, gated by the existing vault-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "vaults",
@@ -2502,6 +2513,15 @@ public final class PluginModule {
                         wired.browse(),
                         wired.quota(),
                         ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmPlayerWarpsActions.class,
+                source -> new com.uxplima.uxmessentials.playerwarps.adapter.outbound.api.PlayerWarpActions(
+                        wired.setPlayerWarp(),
+                        wired.editPlayerWarp(),
+                        wired.archivePlayerWarp(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().worldLookup(),
                         ctx.kernel().scheduler()));
         // Arm the rent sweep when the rent sub-group is on (a no-op otherwise), and halt it on disable/reload so no
         // orphaned off-tick task survives.

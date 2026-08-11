@@ -97,7 +97,8 @@ class VanishCommandTest {
                 levels,
                 new Notifier(new KeyMessages(), new DiscardingSink()),
                 new NoopBuffs(),
-                VanishBus.disabled());
+                VanishBus.disabled(),
+                event -> {});
         ListVanished listVanished = new ListVanished(store, levels, NetworkVanishStore.empty());
         PdcVanishPickup pickup = new PdcVanishPickup(server, false);
         VanishConnectionMessenger messenger = new VanishConnectionMessenger(scheduler, sink, levels, CONFIG);

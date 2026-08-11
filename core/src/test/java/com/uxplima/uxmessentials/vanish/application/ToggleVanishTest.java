@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
@@ -23,6 +24,7 @@ import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import com.uxplima.uxmessentials.vanish.domain.VanishState;
+import com.uxplima.uxmessentials.vanish.domain.event.VanishToggled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,8 +41,10 @@ class ToggleVanishTest {
     private final FakeLevels levels = new FakeLevels();
     private final RecordingBuffs buffs = new RecordingBuffs();
     private final RecordingBus bus = new RecordingBus();
-    private final ToggleVanish toggleVanish =
-            new ToggleVanish(store, view, levels, new Notifier(new KeyMessages(), new DiscardingSink()), buffs, bus);
+    private final List<DomainEvent> published = new ArrayList<>();
+
+    private final ToggleVanish toggleVanish = new ToggleVanish(
+            store, view, levels, new Notifier(new KeyMessages(), new DiscardingSink()), buffs, bus, published::add);
 
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Who");
 
@@ -74,6 +78,19 @@ class ToggleVanishTest {
         assertThat(bus.published.get(0).player()).isEqualTo(who.uuid());
         assertThat(bus.published.get(0).vanished()).isTrue();
         assertThat(bus.published.get(1).vanished()).isFalse();
+    }
+
+    @Test
+    void everyFlipRaisesTheFactWithTheLevelTheyWereHiddenAt() {
+        levels.level = new VanishLevel(3);
+
+        toggleVanish.toggle(who); // vanish
+        toggleVanish.toggle(who); // reveal
+
+        assertThat(published).hasSize(2);
+        assertThat(published.get(0)).isEqualTo(new VanishToggled(who, true, new VanishLevel(3)));
+        // The reveal carries the tier they were hidden at rather than a level nobody was ever at.
+        assertThat(published.get(1)).isEqualTo(new VanishToggled(who, false, new VanishLevel(3)));
     }
 
     private static final class RecordingBus implements VanishBus {
@@ -117,9 +134,11 @@ class ToggleVanishTest {
     }
 
     private static final class FakeLevels implements VanishLevelResolver {
+        private VanishLevel level = VanishLevel.DEFAULT;
+
         @Override
         public VanishLevel useLevel(PlayerRef p) {
-            return VanishLevel.DEFAULT;
+            return level;
         }
 
         @Override

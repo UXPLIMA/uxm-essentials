@@ -94,7 +94,8 @@ public final class VanishWiring {
 
         CrossServer cross = crossServer(config, bus, store, view, kernel.scheduler());
         NetworkVanishStore network = cross.network();
-        ToggleVanish toggleVanish = new ToggleVanish(store, view, levels, notifier, buffs, cross.bus());
+        ToggleVanish toggleVanish =
+                new ToggleVanish(store, view, levels, notifier, buffs, cross.bus(), kernel.events());
         SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs, cross.bus());
         ListVanished listVanished = new ListVanished(store, levels, network);
         JoinVanishReconciler reconciler = new JoinVanishReconciler(network, store);

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vanish.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
@@ -10,6 +11,7 @@ import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
+import com.uxplima.uxmessentials.vanish.domain.event.VanishToggled;
 
 /**
  * {@code /vanish}: flip a player's vanish state through the single {@link VanishStore} authority. Vanishing resolves
@@ -29,6 +31,10 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * vanish view: vanishing publishes the new state and level, unvanishing publishes the reveal. A quit does <em>not</em>
  * publish (a server hop must not read as an unvanish), so only a genuine {@code /vanish} flip crosses the bus. With the
  * bus {@link VanishBus#disabled() disabled} the publish is a no-op and cross-server is inert.
+ *
+ * <p>Every transition also raises {@link VanishToggled} on the in-process bus, which is what the published API
+ * bridges to a Bukkit event. The bus publish above talks to the other backends; this one talks to the plugins
+ * running on this one, and neither can stand in for the other.
  */
 public final class ToggleVanish {
 
@@ -38,6 +44,7 @@ public final class ToggleVanish {
     private final Notifier notifier;
     private final VanishBuffs buffs;
     private final VanishBus bus;
+    private final DomainEventPublisher events;
 
     public ToggleVanish(
             VanishStore store,
@@ -45,24 +52,30 @@ public final class ToggleVanish {
             VanishLevelResolver levels,
             Notifier notifier,
             VanishBuffs buffs,
-            VanishBus bus) {
+            VanishBus bus,
+            DomainEventPublisher events) {
         this.store = Objects.requireNonNull(store, "store");
         this.view = Objects.requireNonNull(view, "view");
         this.levels = Objects.requireNonNull(levels, "levels");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.buffs = Objects.requireNonNull(buffs, "buffs");
         this.bus = Objects.requireNonNull(bus, "bus");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     /** Toggle {@code who}'s vanish state; returns the new vanished flag. */
     public boolean toggle(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         if (store.isVanished(who.uuid())) {
+            // Read the level before the reveal drops it: the fact carries the tier they were hidden at, which is
+            // what a consumer mirroring the state needs to undo it.
+            VanishLevel was = store.levelOf(who.uuid()).orElse(VanishLevel.DEFAULT);
             store.reveal(who.uuid());
             view.reveal(who);
             buffs.clear(who);
             notifier.send(who, VanishMessageKey.VANISH_OFF);
             bus.publish(VanishSync.revealed(who));
+            events.publish(new VanishToggled(who, false, was));
             return false;
         }
         VanishLevel level = levels.useLevel(who);
@@ -71,6 +84,7 @@ public final class ToggleVanish {
         buffs.apply(who);
         notifier.send(who, VanishMessageKey.VANISH_ON);
         bus.publish(VanishSync.vanished(who, level));
+        events.publish(new VanishToggled(who, true, level));
         return true;
     }
 

@@ -68,6 +68,7 @@ teleport.warmup-cancel: kind, player-id, player-name, reason
 teleport.warmup-start: duration-seconds, kind, origin, player-id, player-name
 trade.cancel: initiator-id, initiator-name, partner-id, partner-name, trade-id
 trade.complete: initiator-experience, initiator-id, initiator-items, initiator-money, initiator-name, partner-experience, partner-id, partner-items, partner-money, partner-name, trade-id
+vanish.toggle: level, player-id, player-name, vanished
 vault.contents-change: at, index, player-id, player-name
 vault.open: at, index, own-vault, player-id, player-name, viewer-id, viewer-name
 vote.party: threshold

@@ -66,4 +66,10 @@ public interface UxmActions {
 
     /** Sending messages and mail, or empty when the messaging module is switched off. */
     Optional<UxmMessagingActions> messaging();
+
+    /** Opening, removing and labelling a player's vaults, or empty when the vaults module is switched off. */
+    Optional<UxmVaultsActions> vaults();
+
+    /** Creating and removing player-owned warps, or empty when the playerwarps module is switched off. */
+    Optional<UxmPlayerWarpsActions> playerWarps();
 }

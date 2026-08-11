@@ -12,11 +12,13 @@ import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.action.UxmMessagingActions;
 import com.uxplima.uxmessentials.api.action.UxmModerationActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
+import com.uxplima.uxmessentials.api.action.UxmPlayerWarpsActions;
 import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
 import com.uxplima.uxmessentials.api.action.UxmRanksActions;
 import com.uxplima.uxmessentials.api.action.UxmSecurityActions;
 import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.action.UxmVanishActions;
+import com.uxplima.uxmessentials.api.action.UxmVaultsActions;
 import com.uxplima.uxmessentials.api.action.UxmVoteActions;
 import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.api.action.UxmWorldsActions;
@@ -118,5 +120,15 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmMessagingActions> messaging() {
         return contexts.find(UxmMessagingActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmVaultsActions> vaults() {
+        return contexts.find(UxmVaultsActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmPlayerWarpsActions> playerWarps() {
+        return contexts.find(UxmPlayerWarpsActions.class, source);
     }
 }

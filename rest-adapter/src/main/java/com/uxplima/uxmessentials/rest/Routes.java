@@ -61,9 +61,9 @@ public final class Routes {
      * <p>Reads go through {@code api} directly; writes go through {@code actions}, which hands each request an action
      * surface named after the token that made it, so the audit trail says who asked rather than only which jar.
      *
-     * <p>Three contexts take no {@code actions}: player warps, vaults and trade publish a query surface and no action
-     * surface, so over HTTP they are readable and nothing more. That is the published API's shape showing through
-     * rather than a decision taken here.
+     * <p>Two contexts take no {@code actions}: trade and regions publish a query surface and no action surface, so
+     * over HTTP they are readable and nothing more. That is the published API's shape showing through rather than a
+     * decision taken here.
      */
     public static Router build(UxmEssentialsApi api, ActionsFor actions) {
         Objects.requireNonNull(api, "api");
@@ -79,7 +79,7 @@ public final class Routes {
                 .addAll(MessagingRoutes.of(api, actions))
                 .addAll(ModerationRoutes.of(api, actions))
                 .addAll(PlayerStateRoutes.of(api, actions))
-                .addAll(PlayerWarpsRoutes.of(api))
+                .addAll(PlayerWarpsRoutes.of(api, actions))
                 .addAll(PresenceRoutes.of(api, actions))
                 .addAll(RanksRoutes.of(api, actions))
                 .addAll(RegionsRoutes.of(api))
@@ -87,7 +87,7 @@ public final class Routes {
                 .addAll(TeleportRoutes.of(api, actions))
                 .addAll(TradeRoutes.of(api))
                 .addAll(VanishRoutes.of(api, actions))
-                .addAll(VaultsRoutes.of(api))
+                .addAll(VaultsRoutes.of(api, actions))
                 .addAll(VoteRoutes.of(api, actions))
                 .addAll(WarpsRoutes.of(api, actions))
                 .addAll(WorldsRoutes.of(api, actions));

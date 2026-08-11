@@ -86,7 +86,13 @@ class VanishActionsTest {
 
     private VanishActions actions() {
         ToggleVanish toggle = new ToggleVanish(
-                store, view, new FirstLevel(), ActionDoubles.silentNotifier(), new NoBuffs(), VanishBus.disabled());
+                store,
+                view,
+                new FirstLevel(),
+                ActionDoubles.silentNotifier(),
+                new NoBuffs(),
+                VanishBus.disabled(),
+                event -> {});
         return new VanishActions(toggle, new QueryDoubles.MapLookup().with(ALICE), scheduler);
     }
 

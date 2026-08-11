@@ -73,6 +73,7 @@ import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmWarmupCancelEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmWarmupStartEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.trade.UxmTradeCancelEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.trade.UxmTradeCompleteEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.vanish.UxmVanishToggleEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultContentsChangeEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultOpenEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.vote.UxmVotePartyEvent;
@@ -216,6 +217,9 @@ public final class PublishedEvents {
             // trade
             UxmTradeCancelEvent.class,
             UxmTradeCompleteEvent.class,
+
+            // vanish
+            UxmVanishToggleEvent.class,
 
             // vault
             UxmVaultContentsChangeEvent.class,

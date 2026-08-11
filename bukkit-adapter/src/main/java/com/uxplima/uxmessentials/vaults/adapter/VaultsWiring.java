@@ -150,6 +150,7 @@ public final class VaultsWiring {
                 repository,
                 amountQuota,
                 sizeQuota,
+                services,
                 sweep,
                 running);
     }
@@ -262,6 +263,7 @@ public final class VaultsWiring {
      * @param repository the vault store the {@code vaults_count} placeholder reads
      * @param amountQuota the vault-count reducer the {@code vaults_max}/{@code vaults_left} placeholders read
      * @param sizeQuota the per-vault size reducer the {@code vaults_size} placeholder reads
+     * @param services the assembled use cases, handed on so the published vault actions run the same ones
      * @param cleanupSweep the inactive-vault cleanup sweep, armed by {@link #startBackgroundWork} (empty when off)
      * @param running the flag flipped false on stop so the sweep's self-rescheduling loop exits
      */
@@ -273,6 +275,7 @@ public final class VaultsWiring {
             VaultRepository repository,
             VaultAmountQuota amountQuota,
             VaultSizeQuota sizeQuota,
+            VaultServices services,
             Optional<VaultCleanupSweep> cleanupSweep,
             AtomicBoolean running) {
 
@@ -284,6 +287,7 @@ public final class VaultsWiring {
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(amountQuota, "amountQuota");
             Objects.requireNonNull(sizeQuota, "sizeQuota");
+            Objects.requireNonNull(services, "services");
             Objects.requireNonNull(cleanupSweep, "cleanupSweep");
             Objects.requireNonNull(running, "running");
         }

@@ -82,7 +82,8 @@ class VanishLifecycleJoinTest {
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         Notifier notifier = new Notifier(new KeyMessages(), new DiscardingSink());
-        toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs(), VanishBus.disabled());
+        toggleVanish =
+                new ToggleVanish(store, view, levels, notifier, new NoopBuffs(), VanishBus.disabled(), event -> {});
         setVanishLevel = new SetVanishLevel(store, view, levels, new NoopBuffs(), VanishBus.disabled());
     }
 

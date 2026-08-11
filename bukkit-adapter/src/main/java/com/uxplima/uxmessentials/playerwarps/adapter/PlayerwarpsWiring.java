@@ -446,6 +446,9 @@ public final class PlayerwarpsWiring {
                 repository,
                 browse,
                 quota,
+                setPlayerWarp,
+                editPlayerWarp,
+                archivePlayerWarp,
                 rentSweep,
                 sponsorSweep);
     }
@@ -852,6 +855,9 @@ public final class PlayerwarpsWiring {
      * @param listeners the join cache-warmer the plugin registers
      * @param repository the cached player-warp repository the PAPI seam reads owned warps from
      * @param quota the per-owner count-limit reducer the PAPI seam reads the limit through
+     * @param setPlayerWarp the create/re-anchor use case, handed on so the published actions run the same one
+     * @param editPlayerWarp the edit use case, handed on for the published rename and relocate
+     * @param archivePlayerWarp the removal use case, handed on for the published archive, restore and delete
      * @param rentSweep the off-tick rent lifecycle sweep, or {@code null} when the rent sub-group is disabled
      * @param sponsorSweep the off-tick sponsor expiry sweep, or {@code null} when the sponsor sub-group is disabled
      */
@@ -861,6 +867,9 @@ public final class PlayerwarpsWiring {
             PlayerWarpRepository repository,
             PlayerWarpBrowse browse,
             PlayerWarpQuota quota,
+            SetPlayerWarp setPlayerWarp,
+            EditPlayerWarp editPlayerWarp,
+            ArchivePlayerWarp archivePlayerWarp,
             @org.jspecify.annotations.Nullable RentSweep rentSweep,
             @org.jspecify.annotations.Nullable SponsorExpirySweep sponsorSweep) {
 
@@ -870,6 +879,9 @@ public final class PlayerwarpsWiring {
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(browse, "browse");
             Objects.requireNonNull(quota, "quota");
+            Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
+            Objects.requireNonNull(editPlayerWarp, "editPlayerWarp");
+            Objects.requireNonNull(archivePlayerWarp, "archivePlayerWarp");
         }
 
         /** Arm the rent and sponsor sweeps, when they were wired; a no-op for a sub-group that is off. */

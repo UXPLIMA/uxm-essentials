@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityEventBrid
 import com.uxplima.uxmessentials.staff.adapter.outbound.api.StaffEventBridges;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportEventBridges;
 import com.uxplima.uxmessentials.trade.adapter.outbound.api.TradeEventBridges;
+import com.uxplima.uxmessentials.vanish.adapter.outbound.api.VanishEventBridges;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.api.VaultEventBridges;
 import com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteEventBridges;
 import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpEventBridges;
@@ -72,6 +73,7 @@ public final class EventBridges {
         DiscordLinkEventBridges.register(registry);
         InvRollbackEventBridges.register(registry);
         SecurityEventBridges.register(registry);
+        VanishEventBridges.register(registry);
     }
 
     /** Install every context's veto mappings into {@code registry}, in context order. */

@@ -7,11 +7,13 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional messaging()
   Optional moderation()
   Optional playerState()
+  Optional playerWarps()
   Optional presence()
   Optional ranks()
   Optional security()
   Optional teleport()
   Optional vanish()
+  Optional vaults()
   Optional vote()
   Optional warps()
   Optional worlds()
@@ -95,6 +97,13 @@ interface com.uxplima.uxmessentials.api.action.UxmPlayerStateActions
   CompletableFuture setGameMode(UUID, com.uxplima.uxmessentials.api.view.UxmGameMode)
   CompletableFuture setGodMode(UUID, boolean)
   CompletableFuture setWalkSpeed(UUID, float)
+interface com.uxplima.uxmessentials.api.action.UxmPlayerWarpsActions
+  CompletableFuture archive(UUID, String)
+  CompletableFuture create(UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  CompletableFuture delete(UUID, String)
+  CompletableFuture relocate(UUID, String, com.uxplima.uxmessentials.api.view.UxmLocation)
+  CompletableFuture rename(UUID, String, String)
+  CompletableFuture restore(UUID, String)
 interface com.uxplima.uxmessentials.api.action.UxmPresenceActions
   CompletableFuture setAfk(UUID, String)
   CompletableFuture setAfk(UUID, boolean)
@@ -124,6 +133,13 @@ interface com.uxplima.uxmessentials.api.action.UxmTeleportActions
   CompletableFuture teleport(UUID, com.uxplima.uxmessentials.api.view.UxmLocation)
 interface com.uxplima.uxmessentials.api.action.UxmVanishActions
   CompletableFuture setVanished(UUID, boolean)
+interface com.uxplima.uxmessentials.api.action.UxmVaultsActions
+  CompletableFuture clearIcon(UUID, int)
+  CompletableFuture clearName(UUID, int)
+  CompletableFuture delete(UUID, int)
+  CompletableFuture open(UUID, int)
+  CompletableFuture rename(UUID, int, String)
+  CompletableFuture setIcon(UUID, int, String)
 interface com.uxplima.uxmessentials.api.action.UxmVoteActions
   CompletableFuture addPartyProgress(int)
   CompletableFuture giveVote(UUID)
@@ -695,6 +711,12 @@ class com.uxplima.uxmessentials.api.bukkit.event.trade.UxmTradeCompleteEvent ext
   int getPartnerItems()
   long getInitiatorExperience()
   long getPartnerExperience()
+class com.uxplima.uxmessentials.api.bukkit.event.vanish.UxmVanishToggleEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, boolean, int)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  boolean isVanished()
+  int getLevel()
 class com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultContentsChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.vault.UxmVaultEvent
   <init>(UUID, String, int, Instant)
   HandlerList getHandlerList()

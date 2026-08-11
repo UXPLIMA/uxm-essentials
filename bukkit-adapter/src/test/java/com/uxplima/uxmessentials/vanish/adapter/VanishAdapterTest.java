@@ -57,7 +57,8 @@ class VanishAdapterTest {
         levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(MockBukkit.createMockPlugin(), scheduler, levels);
         Notifier notifier = new Notifier(new KeyMessages(), new DiscardingSink());
-        toggleVanish = new ToggleVanish(store, view, levels, notifier, new NoopBuffs(), VanishBus.disabled());
+        toggleVanish =
+                new ToggleVanish(store, view, levels, notifier, new NoopBuffs(), VanishBus.disabled(), event -> {});
     }
 
     @AfterEach
