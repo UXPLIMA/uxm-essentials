@@ -12,6 +12,8 @@ import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator
 import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankRequirement;
 import com.uxplima.uxmessentials.ranks.domain.RankStanding;
+import com.uxplima.uxmessentials.ranks.domain.event.PlayerRankedUp;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -52,6 +54,7 @@ public final class Rankup {
     private final RankRequirementEvaluator requirements;
     private final RankActionRunner actions;
     private final Optional<RankEconomy> economy;
+    private final DomainEventPublisher events;
 
     public Rankup(
             CurrentRank currentRank,
@@ -59,13 +62,15 @@ public final class Rankup {
             com.uxplima.uxmessentials.ranks.domain.RankLadder ladder,
             RankRequirementEvaluator requirements,
             RankActionRunner actions,
-            Optional<RankEconomy> economy) {
+            Optional<RankEconomy> economy,
+            DomainEventPublisher events) {
         this.currentRank = Objects.requireNonNull(currentRank, "currentRank");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ladder = Objects.requireNonNull(ladder, "ladder");
         this.requirements = Objects.requireNonNull(requirements, "requirements");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.economy = Objects.requireNonNull(economy, "economy");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     /** Attempt to advance {@code who} one rank up the ladder, charging the next rank's cost, returning the outcome. */
@@ -103,6 +108,9 @@ public final class Rankup {
         }
         repository.save(who.uuid(), target.id(), standing.prestige());
         actions.run(who, target.actions());
+        // Raised last, once the new pointer is durable and the rank's own actions have run, so a consumer that
+        // reads the player's rank in its handler reads the rank they were just given.
+        events.publish(new PlayerRankedUp(who, standing.rank().id(), target.id()));
         return RankupResult.rankedUp(target);
     }
 

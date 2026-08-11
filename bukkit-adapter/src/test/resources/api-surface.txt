@@ -6,6 +6,7 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional moderation()
   Optional playerState()
   Optional presence()
+  Optional ranks()
   Optional teleport()
   Optional vanish()
   Optional vote()
@@ -90,6 +91,10 @@ interface com.uxplima.uxmessentials.api.action.UxmPlayerStateActions
 interface com.uxplima.uxmessentials.api.action.UxmPresenceActions
   CompletableFuture setAfk(UUID, String)
   CompletableFuture setAfk(UUID, boolean)
+interface com.uxplima.uxmessentials.api.action.UxmRanksActions
+  CompletableFuture prestige(UUID)
+  CompletableFuture rankUp(UUID)
+  CompletableFuture setRank(UUID, String)
 class com.uxplima.uxmessentials.api.action.UxmResult
   Object valueOrThrow()
   Optional failure()
@@ -134,6 +139,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional playerWarps()
   Optional playtime()
   Optional presence()
+  Optional ranks()
   Optional teleport()
   Optional vanish()
   Optional vaults()
@@ -520,6 +526,24 @@ class com.uxplima.uxmessentials.api.bukkit.event.presence.UxmAfkEvent extends co
   Optional getReason()
   boolean isAfk()
   boolean isAutomatic()
+class com.uxplima.uxmessentials.api.bukkit.event.rank.UxmPrestigeEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, int, double)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  double getRewardMultiplier()
+  int getLevel()
+class com.uxplima.uxmessentials.api.bukkit.event.rank.UxmRankSetEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  Optional getPreviousRank()
+  String getRank()
+class com.uxplima.uxmessentials.api.bukkit.event.rank.UxmRankUpEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, String)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getFromRank()
+  String getToRank()
 class com.uxplima.uxmessentials.api.bukkit.event.scoreboard.UxmScoreboardVisibilityEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
   <init>(UUID, String, boolean)
   HandlerList getHandlerList()
@@ -796,6 +820,10 @@ interface com.uxplima.uxmessentials.api.query.UxmPresenceQuery
   List afk()
   Optional of(UUID)
   boolean isAfk(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmRanksQuery
+  CompletableFuture canRankUp(UUID)
+  CompletableFuture standingOf(UUID)
+  List ladder()
 interface com.uxplima.uxmessentials.api.query.UxmTeleportQuery
   List pendingFor(UUID)
   Optional backPoint(UUID)
@@ -1044,6 +1072,24 @@ enum com.uxplima.uxmessentials.api.view.UxmPurgeScope
   com.uxplima.uxmessentials.api.view.UxmPurgeScope[] values()
   com.uxplima.uxmessentials.api.view.UxmPurgeScope RADIUS
   com.uxplima.uxmessentials.api.view.UxmPurgeScope WORLD
+record com.uxplima.uxmessentials.api.view.UxmRank
+  <init>(String, String, int, long)
+  String displayName()
+  String id()
+  String toString()
+  boolean equals(Object)
+  int hashCode()
+  int order()
+  long cost()
+record com.uxplima.uxmessentials.api.view.UxmRankStanding
+  <init>(com.uxplima.uxmessentials.api.view.UxmRank, Optional, int)
+  Optional next()
+  String toString()
+  boolean atTop()
+  boolean equals(Object)
+  com.uxplima.uxmessentials.api.view.UxmRank rank()
+  int hashCode()
+  int prestige()
 record com.uxplima.uxmessentials.api.view.UxmSanction
   <init>(com.uxplima.uxmessentials.api.view.UxmSanctionKind, UUID, com.uxplima.uxmessentials.api.view.UxmIssuer, Optional, Instant, Optional)
   Instant issuedAt()

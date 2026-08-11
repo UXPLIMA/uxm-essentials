@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.rest.route.ModerationRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerStateRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
 import com.uxplima.uxmessentials.rest.route.PresenceRoutes;
+import com.uxplima.uxmessentials.rest.route.RanksRoutes;
 import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
 import com.uxplima.uxmessentials.rest.route.VanishRoutes;
 import com.uxplima.uxmessentials.rest.route.VaultsRoutes;
@@ -73,6 +74,7 @@ public final class Routes {
                 .addAll(PlayerStateRoutes.of(api, actions))
                 .addAll(PlayerWarpsRoutes.of(api))
                 .addAll(PresenceRoutes.of(api, actions))
+                .addAll(RanksRoutes.of(api, actions))
                 .addAll(TeleportRoutes.of(api, actions))
                 .addAll(VanishRoutes.of(api, actions))
                 .addAll(VaultsRoutes.of(api))
@@ -126,6 +128,7 @@ public final class Routes {
         present.put("worlds", api.worlds().isPresent());
         present.put("vote", api.vote().isPresent());
         present.put("messaging", api.messaging().isPresent());
+        present.put("ranks", api.ranks().isPresent());
         return present;
     }
 }

@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
@@ -182,6 +183,11 @@ class FrontDoorTest {
 
         @Override
         public Optional<UxmTeleportQuery> teleport() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmRanksQuery> ranks() {
             return Optional.empty();
         }
 

@@ -101,7 +101,8 @@ class RanksPanelGoldenTest {
         CurrentRank currentRank = new CurrentRank(repository, ladder);
         RankRequirementEvaluator requirements = (who, requirement) -> true;
         RankActionRunner actions = (who, lines) -> {};
-        rankup = new Rankup(currentRank, repository, ladder, requirements, actions, Optional.<RankEconomy>empty());
+        rankup = new Rankup(
+                currentRank, repository, ladder, requirements, actions, Optional.<RankEconomy>empty(), event -> {});
     }
 
     @AfterEach
@@ -153,8 +154,8 @@ class RanksPanelGoldenTest {
     void theBareRanksOpenIsNotWiredWhenTheGuiIsDisabled() {
         // A disabled GUI hands RanksCommand no panel, so the /ranks root carries no bare-open executor — it stays
         // the admin setrank-only surface, the operator-visible proof that a disabled GUI registers no open.
-        RanksCommand command =
-                new RanksCommand(new SetRank(repository, ladder), ladder, Optional.empty(), new TemplateMessages());
+        RanksCommand command = new RanksCommand(
+                new SetRank(repository, ladder, event -> {}), ladder, Optional.empty(), new TemplateMessages());
 
         assertThat(command.build().getCommand()).isNull();
     }
@@ -162,7 +163,7 @@ class RanksPanelGoldenTest {
     @Test
     void theBareRanksOpenIsWiredWhenTheGuiIsEnabled() {
         RanksCommand command = new RanksCommand(
-                new SetRank(repository, ladder), ladder, Optional.of(newPanel()), new TemplateMessages());
+                new SetRank(repository, ladder, event -> {}), ladder, Optional.of(newPanel()), new TemplateMessages());
 
         assertThat(command.build().getCommand()).isNotNull();
     }

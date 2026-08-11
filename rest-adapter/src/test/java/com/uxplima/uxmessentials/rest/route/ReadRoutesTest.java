@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.api.query.UxmKitsQuery;
 import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
@@ -35,6 +37,8 @@ import com.uxplima.uxmessentials.api.view.UxmLocation;
 import com.uxplima.uxmessentials.api.view.UxmMail;
 import com.uxplima.uxmessentials.api.view.UxmMoney;
 import com.uxplima.uxmessentials.api.view.UxmPresence;
+import com.uxplima.uxmessentials.api.view.UxmRank;
+import com.uxplima.uxmessentials.api.view.UxmRankStanding;
 import com.uxplima.uxmessentials.api.view.UxmSanction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionKind;
 import com.uxplima.uxmessentials.api.view.UxmVoteParty;
@@ -349,6 +353,56 @@ class ReadRoutesTest {
         Calls.get(api, "/api/v1/vote/top", Map.of("period", "all-time"));
 
         verify(vote).top(UxmVotePeriod.ALL_TIME, 10);
+    }
+
+    @Test
+    void aStandingCarriesTheRungAboveItAndWhetherItIsInReach() {
+        UxmRanksQuery ranks = mock(UxmRanksQuery.class);
+        when(ranks.standingOf(PLAYER))
+                .thenReturn(CompletableFuture.completedFuture(Optional.of(new UxmRankStanding(
+                        new UxmRank("citizen", "Citizen", 20, 0L),
+                        Optional.of(new UxmRank("vip", "VIP", 30, 5000L)),
+                        2))));
+        when(ranks.canRankUp(PLAYER)).thenReturn(CompletableFuture.completedFuture(true));
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.ranks()).thenReturn(Optional.of(ranks));
+
+        Calls.Answer answer = Calls.get(api, PLAYER_PATH + "/rank");
+
+        JsonObject standing = answer.object().getAsJsonObject("standing");
+        assertThat(standing.getAsJsonObject("rank").get("id").getAsString()).isEqualTo("citizen");
+        assertThat(standing.getAsJsonObject("next").get("cost").getAsLong()).isEqualTo(5000L);
+        assertThat(standing.get("prestige").getAsInt()).isEqualTo(2);
+        assertThat(standing.get("at-top").getAsBoolean()).isFalse();
+        assertThat(answer.object().get("can-rank-up").getAsBoolean()).isTrue();
+    }
+
+    @Test
+    void aPlayerWithNoStoredRankAnswersWithANullStandingRatherThanAMissingKey() {
+        UxmRanksQuery ranks = mock(UxmRanksQuery.class);
+        when(ranks.standingOf(PLAYER)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+        when(ranks.canRankUp(PLAYER)).thenReturn(CompletableFuture.completedFuture(false));
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.ranks()).thenReturn(Optional.of(ranks));
+
+        Calls.Answer answer = Calls.get(api, PLAYER_PATH + "/rank");
+
+        assertThat(answer.object().get("standing").isJsonNull()).isTrue();
+    }
+
+    @Test
+    void theLadderIsListedInTheOrderTheServerKeepsIt() {
+        UxmRanksQuery ranks = mock(UxmRanksQuery.class);
+        when(ranks.ladder())
+                .thenReturn(List.of(new UxmRank("first", "First", 10, 0L), new UxmRank("vip", "VIP", 30, 5000L)));
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.ranks()).thenReturn(Optional.of(ranks));
+
+        Calls.Answer answer = Calls.get(api, "/api/v1/ranks");
+
+        assertThat(answer.array()).hasSize(2);
+        assertThat(answer.array().get(0).getAsJsonObject().get("id").getAsString())
+                .isEqualTo("first");
     }
 
     @Test

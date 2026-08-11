@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.api.action.UxmModerationActions;
 import com.uxplima.uxmessentials.api.action.UxmOutcome;
 import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
 import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
+import com.uxplima.uxmessentials.api.action.UxmRanksActions;
 import com.uxplima.uxmessentials.api.action.UxmResult;
 import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.action.UxmVoteActions;
@@ -370,6 +371,33 @@ class WriteRoutesTest {
     }
 
     @Test
+    void theThreeRankVerbsEachReachTheirOwnAction() {
+        UxmRanksActions ranks = mock(UxmRanksActions.class);
+        when(ranks.rankUp(PLAYER)).thenReturn(CompletableFuture.completedFuture(UxmOutcome.ok()));
+        when(ranks.setRank(PLAYER, "vip")).thenReturn(CompletableFuture.completedFuture(UxmOutcome.ok()));
+        when(ranks.prestige(PLAYER)).thenReturn(CompletableFuture.completedFuture(UxmOutcome.ok()));
+
+        Calls.post(mock(UxmEssentialsApi.class), ranks(ranks), PLAYER_PATH + "/rank/rankup");
+        Calls.post(mock(UxmEssentialsApi.class), ranks(ranks), PLAYER_PATH + "/rank/set", """
+                {"rank":"vip"}""");
+        Calls.post(mock(UxmEssentialsApi.class), ranks(ranks), PLAYER_PATH + "/rank/prestige");
+
+        verify(ranks).rankUp(PLAYER);
+        verify(ranks).setRank(PLAYER, "vip");
+        verify(ranks).prestige(PLAYER);
+    }
+
+    @Test
+    void aSetWithNoRankNamedSaysWhichFieldIsMissing() {
+        UxmRanksActions ranks = mock(UxmRanksActions.class);
+
+        Calls.Answer answer = Calls.post(mock(UxmEssentialsApi.class), ranks(ranks), PLAYER_PATH + "/rank/set");
+
+        assertThat(answer.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(answer.message()).contains("rank");
+    }
+
+    @Test
     void mailWithNoSenderComesFromTheServer() {
         UxmMessagingActions messaging = mock(UxmMessagingActions.class);
         when(messaging.sendMail(PLAYER, "your appeal was accepted"))
@@ -483,6 +511,12 @@ class WriteRoutesTest {
     private static UxmActions vote(UxmVoteActions vote) {
         UxmActions actions = mock(UxmActions.class);
         when(actions.vote()).thenReturn(Optional.of(vote));
+        return actions;
+    }
+
+    private static UxmActions ranks(UxmRanksActions ranks) {
+        UxmActions actions = mock(UxmActions.class);
+        when(actions.ranks()).thenReturn(Optional.of(ranks));
         return actions;
     }
 

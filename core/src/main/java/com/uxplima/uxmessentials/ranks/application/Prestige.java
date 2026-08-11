@@ -14,6 +14,8 @@ import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.ranks.domain.RankRequirement;
 import com.uxplima.uxmessentials.ranks.domain.RankStanding;
+import com.uxplima.uxmessentials.ranks.domain.event.PlayerPrestiged;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -55,6 +57,7 @@ public final class Prestige {
     private final RankActionRunner actions;
     private final Optional<RankEconomy> economy;
     private final PrestigeSettings settings;
+    private final DomainEventPublisher events;
 
     public Prestige(
             CurrentRank currentRank,
@@ -63,7 +66,8 @@ public final class Prestige {
             RankRequirementEvaluator requirements,
             RankActionRunner actions,
             Optional<RankEconomy> economy,
-            PrestigeSettings settings) {
+            PrestigeSettings settings,
+            DomainEventPublisher events) {
         this.currentRank = Objects.requireNonNull(currentRank, "currentRank");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ladder = Objects.requireNonNull(ladder, "ladder");
@@ -71,6 +75,7 @@ public final class Prestige {
         this.actions = Objects.requireNonNull(actions, "actions");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     /** Attempt to prestige {@code who}, resetting them to the first rank, and return the typed outcome. */
@@ -102,7 +107,9 @@ public final class Prestige {
         var next = standing.prestige().increment();
         repository.save(who.uuid(), first.id(), next);
         actions.run(who, settings.actions());
-        return PrestigeResult.prestiged(next, next.rewardMultiplier(settings.rewardMultiplier()));
+        double multiplier = next.rewardMultiplier(settings.rewardMultiplier());
+        events.publish(new PlayerPrestiged(who, next.level(), multiplier));
+        return PrestigeResult.prestiged(next, multiplier);
     }
 
     /** Charge the prestige cost, or pass through free when the cost is zero or no economy provider is wired. */

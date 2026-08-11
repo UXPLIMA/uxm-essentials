@@ -10,6 +10,8 @@ import com.uxplima.uxmessentials.ranks.domain.Prestige;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankId;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
+import com.uxplima.uxmessentials.ranks.domain.event.PlayerRankSet;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 
 /**
  * {@code /ranks setrank <player> <rank>}: an administrator sets a player's rank pointer directly, bypassing the
@@ -24,10 +26,12 @@ public final class SetRank {
 
     private final PlayerRankRepository repository;
     private final RankLadder ladder;
+    private final DomainEventPublisher events;
 
-    public SetRank(PlayerRankRepository repository, RankLadder ladder) {
+    public SetRank(PlayerRankRepository repository, RankLadder ladder, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ladder = Objects.requireNonNull(ladder, "ladder");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     /**
@@ -41,8 +45,12 @@ public final class SetRank {
         if (target.isEmpty()) {
             return Optional.empty();
         }
-        Prestige prestige = repository.find(playerId).map(PlayerRank::prestige).orElse(Prestige.INITIAL);
+        Optional<PlayerRank> stored = repository.find(playerId);
+        Prestige prestige = stored.map(PlayerRank::prestige).orElse(Prestige.INITIAL);
         repository.save(playerId, rankId, prestige);
+        // A refused id returns above, so this is only reached once the pointer is written: the fact is the move,
+        // not the attempt.
+        events.publish(new PlayerRankSet(playerId, stored.map(PlayerRank::rankId), rankId));
         return target;
     }
 }

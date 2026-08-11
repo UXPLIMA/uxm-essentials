@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.ranks.adapter.inbound.gui.RanksPanelMenu;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.AutorankScan;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankActionRunner;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankRequirementEvaluator;
+import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksApiWrites;
 import com.uxplima.uxmessentials.ranks.application.CurrentRank;
 import com.uxplima.uxmessentials.ranks.application.Prestige;
 import com.uxplima.uxmessentials.ranks.application.RankLadders;
@@ -95,8 +96,8 @@ public final class RanksWiring {
         CurrentRank currentRank = new CurrentRank(repository, ladder);
         RankRequirementEvaluator requirements = requirementEvaluator(plugin, kernel, persistence, currentRank, economy);
         RankActionRunner actions = actionRunner(plugin, kernel);
-        Rankup rankup = new Rankup(currentRank, repository, ladder, requirements, actions, economy);
-        SetRank setRank = new SetRank(repository, ladder);
+        Rankup rankup = new Rankup(currentRank, repository, ladder, requirements, actions, economy, kernel.events());
+        SetRank setRank = new SetRank(repository, ladder, kernel.events());
         // The ladder GUI is config-gated: when gui.enabled is off, no spec is registered, no binding wired, and the
         // /ranks command publishes only its admin setrank surface (the panel Optional stays empty).
         Optional<RanksPanelMenu> panel =
@@ -111,12 +112,20 @@ public final class RanksWiring {
                 // The standalone /setrank publishes the same admin direct-set as /ranks setrank, under its own command
                 // id so it renames/disables independently through commands.conf.
                 new SetRankCommand(setRank, ladder, kernel.messages())));
+        Optional<Prestige> prestige = Optional.empty();
         if (config.prestige().enabled()) {
-            // Prestige is config-gated: when off, the /prestige verb is not published at all — it reuses the same
+            // Prestige is config-gated: when off, the /prestige verb is not published at all. It reuses the same
             // requirement evaluator, action runner and economy seam a rankup goes through.
-            Prestige prestige =
-                    new Prestige(currentRank, repository, ladder, requirements, actions, economy, config.prestige());
-            commands.add(new PrestigeCommand(prestige, kernel.messages()));
+            prestige = Optional.of(new Prestige(
+                    currentRank,
+                    repository,
+                    ladder,
+                    requirements,
+                    actions,
+                    economy,
+                    config.prestige(),
+                    kernel.events()));
+            commands.add(new PrestigeCommand(prestige.orElseThrow(), kernel.messages()));
         }
         // Autorank reuses the same Rankup pipeline per online player on a schedule. start() no-ops when the scan is
         // disabled, so the module always builds it and hands back the stop hook that cancels the repeating task.
@@ -124,7 +133,14 @@ public final class RanksWiring {
                 new AutorankScan(plugin.getServer(), kernel.scheduler(), rankup, config.autorank(), kernel.log());
         AutoCloseable autorankTask = autorank.start();
         Runnable stop = () -> cancelAutorank(autorankTask, kernel.log());
-        return new Wired(List.copyOf(commands), config, currentRank, ladder, stop);
+        return new Wired(
+                List.copyOf(commands),
+                config,
+                currentRank,
+                ladder,
+                requirements,
+                new RanksApiWrites(rankup, setRank, prestige),
+                stop);
     }
 
     /**
@@ -198,6 +214,8 @@ public final class RanksWiring {
      * @param config the typed ranks config snapshot
      * @param currentRank the read use case resolving a player's rank standing against the ladder
      * @param ladder the parsed ladder, exposed for the {@code %uxmessentials_rank_next%} placeholder seam
+     * @param requirements the evaluator the published query checks a pending rankup's conditions with
+     * @param apiWrites the same use cases the published rank actions run
      * @param stop the teardown hook the module registers, cancelling the autorank scan's repeating task
      */
     public record Wired(
@@ -205,6 +223,8 @@ public final class RanksWiring {
             RanksConfig config,
             CurrentRank currentRank,
             RankLadder ladder,
+            RankRequirementEvaluator requirements,
+            RanksApiWrites apiWrites,
             Runnable stop) {
 
         public Wired {
@@ -212,6 +232,8 @@ public final class RanksWiring {
             Objects.requireNonNull(config, "config");
             Objects.requireNonNull(currentRank, "currentRank");
             Objects.requireNonNull(ladder, "ladder");
+            Objects.requireNonNull(requirements, "requirements");
+            Objects.requireNonNull(apiWrites, "apiWrites");
             Objects.requireNonNull(stop, "stop");
         }
     }

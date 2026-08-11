@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlayerStateEve
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.api.PlayerWarpEventBridges;
 import com.uxplima.uxmessentials.poses.adapter.outbound.api.PoseEventBridges;
 import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceEventBridges;
+import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RankEventBridges;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardEventBridges;
 import com.uxplima.uxmessentials.staff.adapter.outbound.api.StaffEventBridges;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportEventBridges;
@@ -62,6 +63,7 @@ public final class EventBridges {
         HologramEventBridges.register(registry);
         NpcEventBridges.register(registry);
         WorldEventBridges.register(registry);
+        RankEventBridges.register(registry);
     }
 
     /** Install every context's veto mappings into {@code registry}, in context order. */

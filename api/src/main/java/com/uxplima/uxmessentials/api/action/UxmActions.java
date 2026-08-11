@@ -49,6 +49,9 @@ public interface UxmActions {
     /** Loading and unloading worlds, or empty when the worlds module is switched off. */
     Optional<UxmWorldsActions> worlds();
 
+    /** Promoting, setting and prestiging a rank, or empty when the ranks module is switched off. */
+    Optional<UxmRanksActions> ranks();
+
     /** Crediting votes, or empty when the vote module is switched off. */
     Optional<UxmVoteActions> vote();
 

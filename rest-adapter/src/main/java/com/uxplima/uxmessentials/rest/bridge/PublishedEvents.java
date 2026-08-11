@@ -50,6 +50,9 @@ import com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpCreate
 import com.uxplima.uxmessentials.api.bukkit.event.playerwarp.UxmPlayerWarpDeleteEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.pose.UxmPoseEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.presence.UxmAfkEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.rank.UxmPrestigeEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.rank.UxmRankSetEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.rank.UxmRankUpEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.scoreboard.UxmScoreboardVisibilityEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffChatEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffModeEvent;
@@ -166,6 +169,11 @@ public final class PublishedEvents {
 
             // presence
             UxmAfkEvent.class,
+
+            // rank
+            UxmPrestigeEvent.class,
+            UxmRankSetEvent.class,
+            UxmRankUpEvent.class,
 
             // scoreboard
             UxmScoreboardVisibilityEvent.class,

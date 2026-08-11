@@ -49,7 +49,7 @@ class SetRankCommandTest {
         RankLadder ladder = RankLadder.of(List.of(
                 new Rank(RankId.of("citizen"), 10, "Citizen", 0L, List.of(), List.of()),
                 new Rank(RankId.of("vip"), 20, "VIP", 5000L, List.of(), List.of())));
-        command = new SetRankCommand(new SetRank(new InMemoryRanks(), ladder), ladder, new KeyMessages());
+        command = new SetRankCommand(new SetRank(new InMemoryRanks(), ladder, event -> {}), ladder, new KeyMessages());
     }
 
     @AfterEach

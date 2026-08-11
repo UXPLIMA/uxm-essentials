@@ -25,6 +25,8 @@ import com.uxplima.uxmessentials.api.view.UxmPlayerState;
 import com.uxplima.uxmessentials.api.view.UxmPlayerWarp;
 import com.uxplima.uxmessentials.api.view.UxmPlaytime;
 import com.uxplima.uxmessentials.api.view.UxmPresence;
+import com.uxplima.uxmessentials.api.view.UxmRank;
+import com.uxplima.uxmessentials.api.view.UxmRankStanding;
 import com.uxplima.uxmessentials.api.view.UxmSanction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionRecord;
 import com.uxplima.uxmessentials.api.view.UxmTeleportRequest;
@@ -267,6 +269,24 @@ public final class Views {
         json.addProperty("auto-load", world.autoLoad());
         json.addProperty("loaded", world.loaded());
         json.addProperty("player-count", world.playerCount());
+        return json;
+    }
+
+    public static JsonElement rank(UxmRank rank) {
+        JsonObject json = new JsonObject();
+        json.addProperty("id", rank.id());
+        json.addProperty("display-name", rank.displayName());
+        json.addProperty("order", rank.order());
+        json.addProperty("cost", rank.cost());
+        return json;
+    }
+
+    public static JsonElement rankStanding(UxmRankStanding standing) {
+        JsonObject json = new JsonObject();
+        json.add("rank", rank(standing.rank()));
+        json.add("next", standing.next().map(Views::rank).orElse(JsonNull.INSTANCE));
+        json.addProperty("prestige", standing.prestige());
+        json.addProperty("at-top", standing.atTop());
         return json;
     }
 

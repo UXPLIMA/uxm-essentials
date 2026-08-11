@@ -10,6 +10,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.bukkit.event.HandlerList;
@@ -96,12 +97,16 @@ class PublishedEventShapeDriftTest {
                 .isEmpty();
     }
 
+    /** The naming rule the cancellables follow: a {@code Pre} that begins a word, as in {@code PreCreate}. */
+    private static final Pattern PRE_STAGE = Pattern.compile("Pre[A-Z]");
+
     @Test
     void onlyThePreEventsAreCancellable() {
         Set<String> misnamed = new TreeSet<>();
         for (Class<?> event : publishedEvents()) {
             boolean cancellable = UxmCancellableEvent.class.isAssignableFrom(event);
-            boolean namedPre = event.getSimpleName().contains("Pre");
+            // "Pre" only counts as the prefix of a stage word, so UxmPrestigeEvent is a fact, not a veto.
+            boolean namedPre = PRE_STAGE.matcher(event.getSimpleName()).find();
             if (cancellable != namedPre) {
                 misnamed.add(event.getName());
             }

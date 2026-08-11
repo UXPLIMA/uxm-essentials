@@ -19,6 +19,9 @@ import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankId;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.ranks.domain.RankRequirement;
+import com.uxplima.uxmessentials.ranks.domain.event.PlayerRankedUp;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +41,8 @@ class RankupTest {
     private static final RankLadder LADDER = RankLadder.of(List.of(FIRST, CITIZEN, VIP));
     private static final PlayerRef WHO = new PlayerRef(UUID.randomUUID(), "Ada");
 
+    private final RecordingEvents events = new RecordingEvents();
+
     @Test
     void advancesChargesAndFiresActionsWhenRequirementsAndCostAreMet() {
         FakeRepository repo = new FakeRepository(Optional.of(new PlayerRank(RankId.of("first"), new Prestige(2))));
@@ -52,6 +57,26 @@ class RankupTest {
         assertThat(repo.saved).containsExactly(new Saved(RankId.of("citizen"), new Prestige(2)));
         assertThat(economy.withdrawn).containsExactly(BigDecimal.valueOf(1000L));
         assertThat(actions.ran).containsExactly(CITIZEN.actions());
+    }
+
+    @Test
+    void publishesTheMoveWithBothEndsOfItWhenARankupLands() {
+        FakeRepository repo = new FakeRepository(Optional.of(new PlayerRank(RankId.of("first"), new Prestige(0))));
+        Rankup rankup = rankup(repo, allowAll(), new FakeActionRunner(), Optional.empty());
+
+        rankup.rankUp(WHO);
+
+        assertThat(events.published).containsExactly(new PlayerRankedUp(WHO, RankId.of("first"), RankId.of("citizen")));
+    }
+
+    @Test
+    void publishesNothingWhenTheRankupIsRefused() {
+        FakeRepository repo = new FakeRepository(Optional.of(new PlayerRank(RankId.of("first"), new Prestige(0))));
+        Rankup rankup = rankup(repo, denyAll(), new FakeActionRunner(), Optional.empty());
+
+        rankup.rankUp(WHO);
+
+        assertThat(events.published).isEmpty();
     }
 
     @Test
@@ -141,12 +166,23 @@ class RankupTest {
         assertThat(actions.ran).isEmpty();
     }
 
-    private static Rankup rankup(
+    private Rankup rankup(
             FakeRepository repo,
             RankRequirementEvaluator requirements,
             FakeActionRunner actions,
             Optional<RankEconomy> economy) {
-        return new Rankup(new CurrentRank(repo, LADDER), repo, LADDER, requirements, actions, economy);
+        return new Rankup(new CurrentRank(repo, LADDER), repo, LADDER, requirements, actions, economy, events);
+    }
+
+    /** Collects what the use case published, so a test can assert on the fact and not only on the return value. */
+    private static final class RecordingEvents implements DomainEventPublisher {
+
+        private final List<DomainEvent> published = new ArrayList<>();
+
+        @Override
+        public void publish(DomainEvent event) {
+            published.add(event);
+        }
     }
 
     private static RankRequirementEvaluator allowAll() {

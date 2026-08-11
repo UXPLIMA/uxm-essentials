@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.api.action.UxmMessagingActions;
 import com.uxplima.uxmessentials.api.action.UxmModerationActions;
 import com.uxplima.uxmessentials.api.action.UxmPlayerStateActions;
 import com.uxplima.uxmessentials.api.action.UxmPresenceActions;
+import com.uxplima.uxmessentials.api.action.UxmRanksActions;
 import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.action.UxmVanishActions;
 import com.uxplima.uxmessentials.api.action.UxmVoteActions;
@@ -84,6 +85,11 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmWorldsActions> worlds() {
         return contexts.find(UxmWorldsActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmRanksActions> ranks() {
+        return contexts.find(UxmRanksActions.class, source);
     }
 
     @Override

@@ -45,6 +45,9 @@ playerwarp.create: location, player-id, player-name, warp-name
 playerwarp.delete: player-id, player-name, warp-name
 pose.pose: player-id, player-name, return-location, started, started-at, target-id, type
 presence.afk: afk, at, automatic, player-id, player-name, reason
+rank.prestige: level, player-id, player-name, reward-multiplier
+rank.set: player-id, player-name, previous-rank, rank
+rank.up: from-rank, player-id, player-name, to-rank
 scoreboard.visibility: hidden, player-id, player-name
 staff.chat: message, player-id, player-name
 staff.mode: entered, player-id, player-name

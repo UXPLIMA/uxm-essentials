@@ -23,6 +23,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmKitActions;
+import com.uxplima.uxmessentials.api.action.UxmRanksActions;
 import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
@@ -117,6 +119,8 @@ import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceQueries;
 import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
+import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksActions;
+import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksQueries;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
@@ -1428,6 +1432,20 @@ public final class PluginModule {
         // The rank / next-rank / prestige placeholders read the DB-backed pointer through the CurrentRank use case and
         // the parsed ladder, so they answer for an offline player too.
         links.placeholders.ranks(new StoreRanksPlaceholders(wired.currentRank(), wired.ladder()));
+        links.queries.register(
+                UxmRanksQuery.class,
+                new RanksQueries(
+                        wired.currentRank(),
+                        wired.ladder(),
+                        wired.requirements(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
+        links.actions.register(
+                UxmRanksActions.class,
+                source -> new RanksActions(
+                        wired.apiWrites(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
     }
 
     private static void wireSurvival(

@@ -116,7 +116,8 @@ class AutorankScanTest {
                 LADDER,
                 requirements,
                 new NoopActionRunner(),
-                Optional.<RankEconomy>empty());
+                Optional.<RankEconomy>empty(),
+                event -> {});
         return new AutorankScan(server, scheduler, rankup, settings, new NoopLogger());
     }
 

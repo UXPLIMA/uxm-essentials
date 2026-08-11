@@ -19,6 +19,9 @@ import com.uxplima.uxmessentials.ranks.domain.Prestige;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankId;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
+import com.uxplima.uxmessentials.ranks.domain.event.PlayerPrestiged;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +43,8 @@ class PrestigeTest {
     private static final PlayerRef WHO = new PlayerRef(UUID.randomUUID(), "Ada");
     private static final List<String> ACTIONS = List.of("message you prestiged");
 
+    private final RecordingEvents events = new RecordingEvents();
+
     @Test
     void resetsChargesAndFiresActionsWhenAtTheTopRankAndEligible() {
         FakeRepository repo = atTop(new Prestige(2));
@@ -56,6 +61,28 @@ class PrestigeTest {
         assertThat(repo.saved).containsExactly(new Saved(RankId.of("first"), new Prestige(3)));
         assertThat(economy.withdrawn).containsExactly(BigDecimal.valueOf(1000L));
         assertThat(actions.ran).containsExactly(ACTIONS);
+    }
+
+    @Test
+    void publishesTheNewLevelAndItsEarnedMultiplierWhenAPrestigeLands() {
+        FakeRepository repo = atTop(new Prestige(2));
+        PrestigeSettings settings = settings(0, 0L, List.of(), 1.5);
+
+        prestige(repo, allowAll(), new FakeActionRunner(), Optional.empty(), settings)
+                .prestige(WHO);
+
+        assertThat(events.published).containsExactly(new PlayerPrestiged(WHO, 3, 2.5));
+    }
+
+    @Test
+    void publishesNothingWhenThePrestigeIsRefused() {
+        FakeRepository repo = new FakeRepository(Optional.of(new PlayerRank(RankId.of("citizen"), new Prestige(1))));
+        PrestigeSettings settings = settings(0, 0L, List.of(), 1.0);
+
+        prestige(repo, allowAll(), new FakeActionRunner(), Optional.empty(), settings)
+                .prestige(WHO);
+
+        assertThat(events.published).isEmpty();
     }
 
     @Test
@@ -143,14 +170,25 @@ class PrestigeTest {
         return new PrestigeSettings(true, maxLevel, cost, requirements, ACTIONS, multiplier);
     }
 
-    private static com.uxplima.uxmessentials.ranks.application.Prestige prestige(
+    private com.uxplima.uxmessentials.ranks.application.Prestige prestige(
             FakeRepository repo,
             RankRequirementEvaluator requirements,
             FakeActionRunner actions,
             Optional<RankEconomy> economy,
             PrestigeSettings settings) {
         return new com.uxplima.uxmessentials.ranks.application.Prestige(
-                new CurrentRank(repo, LADDER), repo, LADDER, requirements, actions, economy, settings);
+                new CurrentRank(repo, LADDER), repo, LADDER, requirements, actions, economy, settings, events);
+    }
+
+    /** Collects what the use case published, so a test can assert on the fact and not only on the return value. */
+    private static final class RecordingEvents implements DomainEventPublisher {
+
+        private final List<DomainEvent> published = new ArrayList<>();
+
+        @Override
+        public void publish(DomainEvent event) {
+            published.add(event);
+        }
     }
 
     private static RankRequirementEvaluator allowAll() {

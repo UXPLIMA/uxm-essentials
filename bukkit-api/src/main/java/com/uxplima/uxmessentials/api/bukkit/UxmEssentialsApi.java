@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
+import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
@@ -151,6 +152,9 @@ public interface UxmEssentialsApi {
 
     /** Reading teleport requests and return points, or empty when the teleport module is switched off. */
     Optional<UxmTeleportQuery> teleport();
+
+    /** Reading where players stand on the rank ladder, or empty when the ranks module is switched off. */
+    Optional<UxmRanksQuery> ranks();
 
     /** Reading vote counts and party progress, or empty when the vote module is switched off. */
     Optional<UxmVoteQuery> vote();
