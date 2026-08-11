@@ -247,28 +247,51 @@ jobs:
               return
             fi
 
+            # Hangar refuses an upload of 10000000 bytes or more with a 413, and the main jar passed that line at
+            # 0.6.0. A version may name an external download instead of carrying the file, which is what the
+            # release asset already is, so the ones that are too big are listed rather than hosted. Nothing about
+            # this is version-specific: whichever jars fit are uploaded, and the rest link out.
+            size="$(stat -c %s "$jar")"
+            if [ "$size" -ge 10000000 ]; then
+              url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$jar")"
+              files="$(jq -n --arg platform "$platform" --arg url "$url" \
+                '[{platforms: [$platform], externalUrl: $url}]')"
+              echo "$(basename "$jar") is ${size} bytes, over hangar's limit; linking to the release asset instead"
+            else
+              files="$(jq -n --arg platform "$platform" '[{platforms: [$platform]}]')"
+            fi
+
             jq -n \
               --arg version "$version" \
               --arg platform "$platform" \
               --argjson platformVersions "$platform_versions" \
               --argjson deps "$deps" \
+              --argjson files "$files" \
               --rawfile description "${RUNNER_TEMP}/release-notes.md" \
               '{
                  version: $version,
                  channel: "Alpha",
                  description: $description,
-                 files: [{platforms: [$platform]}],
+                 files: $files,
                  platformDependencies: {($platform): $platformVersions},
                  pluginDependencies: {($platform): $deps}
                }' > "${RUNNER_TEMP}/hangar-data.json"
 
             echo "publishing $(basename "$jar") to hangar project $slug"
-            curl -sS --fail-with-body -X POST \
-              "https://hangar.papermc.io/api/v1/projects/${slug}/upload" \
-              -H "Authorization: Bearer ${jwt}" \
-              -F "versionUpload=@${RUNNER_TEMP}/hangar-data.json;type=application/json" \
-              -F "files=@${jar}" \
-              -o /dev/null
+            if [ "$size" -ge 10000000 ]; then
+              curl -sS --fail-with-body -X POST \
+                "https://hangar.papermc.io/api/v1/projects/${slug}/upload" \
+                -H "Authorization: Bearer ${jwt}" \
+                -F "versionUpload=@${RUNNER_TEMP}/hangar-data.json;type=application/json" \
+                -o /dev/null
+            else
+              curl -sS --fail-with-body -X POST \
+                "https://hangar.papermc.io/api/v1/projects/${slug}/upload" \
+                -H "Authorization: Bearer ${jwt}" \
+                -F "versionUpload=@${RUNNER_TEMP}/hangar-data.json;type=application/json" \
+                -F "files=@${jar}" \
+                -o /dev/null
+            fi
           }
 
           PAPER_VERSIONS='["26.1", "26.1.1", "26.1.2", "26.2"]'
