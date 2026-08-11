@@ -33,7 +33,7 @@ class SecurityConfigTest {
         assertThat(twoFactor.pin()).isTrue();
         assertThat(twoFactor.issuer()).isEqualTo("uxmEssentials");
         assertThat(twoFactor.codeWindow()).isEqualTo(1);
-        assertThat(twoFactor.pinPolicy().minLength()).isEqualTo(4);
+        assertThat(twoFactor.pinPolicy().minLength()).isEqualTo(6);
         assertThat(twoFactor.pinPolicy().maxLength()).isEqualTo(8);
         // The blocked list ships populated, because a length rule cannot catch 1234: it is a perfectly valid
         // four-digit PIN and also the first thing anybody guessing would try.
@@ -243,7 +243,7 @@ class SecurityConfigTest {
                         new MapConfig(Map.of("two-factor.blocked-pins", List.of("1379", "2468"))))
                 .twoFactor();
 
-        assertThat(twoFactor.pinPolicy()).isEqualTo(new PinPolicy(4, 8, Set.of("1379", "2468")));
+        assertThat(twoFactor.pinPolicy()).isEqualTo(new PinPolicy(6, 8, Set.of("1379", "2468")));
     }
 
     @Test

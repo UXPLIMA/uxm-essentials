@@ -1,0 +1,14 @@
+-- Retire a used authenticator code (security). A TOTP code is only valid for the
+-- 30-second time-step it covers, but nothing stopped the same step being accepted
+-- twice, so a code someone read over a shoulder or lifted from a screen share
+-- worked again for whatever was left of its window. RFC 6238 section 5.2 says a
+-- verifier should refuse a step it has already accepted; this column is where that
+-- step is remembered.
+--
+-- Same portability contract as V1-V80: the DDL stays in the subset SQLite (the
+-- default), MySQL/MariaDB and PostgreSQL all accept, so it is a plain nullable
+-- BIGINT with no default expression. NULL and 0 both mean "no code accepted yet",
+-- which is where every existing row starts; the first successful code fills it in.
+-- jOOQ's DDLDatabase parses this file alongside V1-V80 at build time, so the
+-- generated classes always match the runtime schema.
+ALTER TABLE security_2fa ADD COLUMN last_totp_step BIGINT;

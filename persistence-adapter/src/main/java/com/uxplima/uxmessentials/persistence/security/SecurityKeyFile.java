@@ -1,15 +1,19 @@
 package com.uxplima.uxmessentials.persistence.security;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Loads — or, on first run, creates — the AES key the {@link TotpSecretCipher} encrypts TOTP secrets under. The key
@@ -18,9 +22,10 @@ import java.util.Objects;
  * same stored secrets. Keeping the key in a file rather than the config or the database is deliberate: an operator
  * backs up and permissions it separately from the world data a rollback would touch.
  *
- * <p>The freshly written file is restricted to owner read/write on a POSIX filesystem; on a non-POSIX one (Windows)
- * it relies on the directory ACL. The key itself is never logged, and the file is created atomically with
- * {@code CREATE_NEW} so two starts cannot race two different keys into place.
+ * <p>On a POSIX filesystem the file is <b>created</b> owner-read/write, not created and then tightened: the
+ * permissions are part of the create call, so there is no instant, however brief, where another local account can
+ * read the key. On a non-POSIX one (Windows) it relies on the directory ACL. The key itself is never logged, and the
+ * file is created atomically with {@code CREATE_NEW} so two starts cannot race two different keys into place.
  */
 public final class SecurityKeyFile {
 
@@ -58,22 +63,30 @@ public final class SecurityKeyFile {
         if (parent != null) {
             Files.createDirectories(parent);
         }
-        Files.writeString(
-                keyFile,
-                Base64.getEncoder().encodeToString(key),
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE);
-        restrictToOwner(keyFile);
+        byte[] encoded = Base64.getEncoder().encodeToString(key).getBytes(StandardCharsets.UTF_8);
+        try (SeekableByteChannel channel = Files.newByteChannel(keyFile, createOptions(), ownerOnly(keyFile))) {
+            channel.write(ByteBuffer.wrap(encoded));
+        }
         return key;
     }
 
-    private static void restrictToOwner(Path keyFile) throws IOException {
-        PosixFileAttributeView view = Files.getFileAttributeView(keyFile, PosixFileAttributeView.class);
-        if (view == null) {
-            // Non-POSIX filesystem (Windows): the OS/directory ACL governs access; there is nothing to tighten here.
-            return;
+    private static Set<OpenOption> createOptions() {
+        return Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+    }
+
+    /**
+     * The attributes the key-file is created with: owner read/write on POSIX, nothing at all elsewhere. Passing the
+     * permissions to the create call is the point: a file created world-readable and chmodded afterwards is
+     * readable by every local account for the moment in between, which is all a determined one needs.
+     */
+    private static FileAttribute<?>[] ownerOnly(Path keyFile) {
+        boolean posix = keyFile.getFileSystem().supportedFileAttributeViews().contains("posix");
+        if (!posix) {
+            // Non-POSIX filesystem (Windows): the OS/directory ACL governs access; there is nothing to set here.
+            return new FileAttribute<?>[0];
         }
-        Files.setPosixFilePermissions(keyFile, PosixFilePermissions.fromString("rw-------"));
+        return new FileAttribute<?>[] {
+            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))
+        };
     }
 }

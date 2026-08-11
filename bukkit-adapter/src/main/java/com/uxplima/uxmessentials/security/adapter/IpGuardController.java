@@ -43,6 +43,7 @@ public final class IpGuardController {
     private final SecurityConfig.IpGuard config;
     private final PlayerLookup lookup;
     private final SecurityStaffNotifier notifier;
+    private final IpHashing ipHashing;
     private final Scheduler scheduler;
     private final Messages messages;
     private final Clock clock;
@@ -52,10 +53,12 @@ public final class IpGuardController {
             SecurityConfig.IpGuard config,
             PlayerLookup lookup,
             SecurityStaffNotifier notifier,
+            IpHashing ipHashing,
             Scheduler scheduler,
             Messages messages,
             Clock clock) {
         this.store = Objects.requireNonNull(store, "store");
+        this.ipHashing = Objects.requireNonNull(ipHashing, "ipHashing");
         this.config = Objects.requireNonNull(config, "config");
         this.lookup = Objects.requireNonNull(lookup, "lookup");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -123,6 +126,6 @@ public final class IpGuardController {
             return null;
         }
         InetAddress address = socket.getAddress();
-        return address == null ? null : IpHashing.hash(address.getHostAddress());
+        return address == null ? null : ipHashing.hash(address.getHostAddress());
     }
 }

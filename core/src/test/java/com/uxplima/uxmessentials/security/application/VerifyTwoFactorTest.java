@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins {@link VerifyTwoFactor}: a correct PIN or a correct TOTP code passes, a wrong value is INVALID, and a player
- * with no factor is NOT_ENROLLED — the three outcomes the join-verification keypad branches on.
+ * with no factor is NOT_ENROLLED: the three outcomes the join-verification keypad branches on. An authenticator
+ * code is also single-use: the step it matched is spent, so presenting the same six digits again fails.
  */
 class VerifyTwoFactorTest {
 
@@ -42,6 +43,43 @@ class VerifyTwoFactorTest {
 
         assertThat(verify.verify(player, code, NOW)).isEqualTo(VerifyResult.SUCCESS);
         assertThat(verify.verify(player, "000000", NOW)).isEqualTo(VerifyResult.INVALID);
+    }
+
+    @Test
+    void refusesAnAuthenticatorCodeThatWasAlreadyUsed() {
+        TwoFactorSecret secret = new TwoFactorSecret("JBSWY3DPEHPK3PXP");
+        repository.enableTotp(player, secret);
+        String code = TotpCode.generate(secret, NOW);
+
+        assertThat(verify.verify(player, code, NOW)).isEqualTo(VerifyResult.SUCCESS);
+
+        // The same digits, still inside their 30-second window: whoever read them over the player's shoulder gets
+        // nothing, and the replay counts as an ordinary failure.
+        assertThat(verify.verify(player, code, NOW)).isEqualTo(VerifyResult.INVALID);
+        assertThat(verify.verify(player, code, NOW.plusSeconds(20))).isEqualTo(VerifyResult.INVALID);
+    }
+
+    @Test
+    void acceptsTheNextCodeOnceTheStepRollsOver() {
+        TwoFactorSecret secret = new TwoFactorSecret("JBSWY3DPEHPK3PXP");
+        repository.enableTotp(player, secret);
+        Instant later = NOW.plusSeconds(60);
+
+        assertThat(verify.verify(player, TotpCode.generate(secret, NOW), NOW)).isEqualTo(VerifyResult.SUCCESS);
+        assertThat(verify.verify(player, TotpCode.generate(secret, later), later))
+                .isEqualTo(VerifyResult.SUCCESS);
+    }
+
+    @Test
+    void aSpentCodeDoesNotStopThePinFromWorking() {
+        TwoFactorSecret secret = new TwoFactorSecret("JBSWY3DPEHPK3PXP");
+        repository.enableTotp(player, secret);
+        repository.setPin(player, "864213");
+        String code = TotpCode.generate(secret, NOW);
+
+        assertThat(verify.verify(player, code, NOW)).isEqualTo(VerifyResult.SUCCESS);
+        assertThat(verify.verify(player, code, NOW)).isEqualTo(VerifyResult.INVALID);
+        assertThat(verify.verify(player, "864213", NOW)).isEqualTo(VerifyResult.SUCCESS);
     }
 
     @Test

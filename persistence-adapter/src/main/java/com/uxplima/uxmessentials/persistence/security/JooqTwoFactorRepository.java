@@ -29,6 +29,10 @@ import org.jooq.Record;
  * read outside the connection scope, exactly as the warp-password store does. The <b>TOTP secret</b> is encrypted
  * through {@link TotpSecretCipher} on write and decrypted on read, because verification needs the shared secret
  * back. Every statement is typed jOOQ DSL; no SQL is string-concatenated, and no secret is ever logged.
+ *
+ * <p>{@code last_totp_step} carries the time-step of the last authenticator code the player got in with, so the
+ * same code cannot be presented twice. Its write only ever moves the value forward, in one statement, so two
+ * verifications racing cannot walk it backwards and reopen a step that was already spent.
  */
 public final class JooqTwoFactorRepository extends JooqRepository implements TwoFactorRepository {
 
@@ -121,6 +125,17 @@ public final class JooqTwoFactorRepository extends JooqRepository implements Two
     }
 
     @Override
+    public void recordTotpStep(UUID playerId, long step) {
+        Objects.requireNonNull(playerId, "playerId");
+        write(dsl -> dsl.update(SECURITY_2FA)
+                .set(SECURITY_2FA.LAST_TOTP_STEP, step)
+                .where(SECURITY_2FA.UUID.eq(playerId.toString()))
+                // Only ever forward: a late write from a slower verification cannot reopen an already-spent step.
+                .and(SECURITY_2FA.LAST_TOTP_STEP.isNull().or(SECURITY_2FA.LAST_TOTP_STEP.lt(step)))
+                .execute());
+    }
+
+    @Override
     public void delete(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         write(dsl -> dsl.deleteFrom(SECURITY_2FA)
@@ -155,7 +170,8 @@ public final class JooqTwoFactorRepository extends JooqRepository implements Two
         TwoFactorSecret secret = encrypted == null ? null : new TwoFactorSecret(cipher.decrypt(encrypted));
         boolean pinSet = row.get(SECURITY_2FA.PIN_HASH) != null;
         Instant enrolledAt = Instant.ofEpochMilli(row.get(SECURITY_2FA.ENROLLED_AT));
-        return new TwoFactorRegistration(playerId, secret, pinSet, enrolledAt);
+        Long lastStep = row.get(SECURITY_2FA.LAST_TOTP_STEP);
+        return new TwoFactorRegistration(playerId, secret, pinSet, enrolledAt, lastStep == null ? 0L : lastStep);
     }
 
     private static String serialize(PasswordHash hash) {

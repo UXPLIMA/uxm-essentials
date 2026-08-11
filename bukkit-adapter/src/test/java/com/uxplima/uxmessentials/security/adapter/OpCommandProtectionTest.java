@@ -327,7 +327,12 @@ class OpCommandProtectionTest {
     /** An in-memory two-factor store mirroring the jOOQ store's contract, keeping the PIN as plaintext for the test. */
     private static final class FakeRepository implements TwoFactorRepository {
         private record Row(
-                @Nullable TwoFactorSecret secret, @Nullable String pin) {}
+                @Nullable TwoFactorSecret secret, @Nullable String pin, long lastTotpStep) {
+
+            Row(@Nullable TwoFactorSecret secret, @Nullable String pin) {
+                this(secret, pin, 0L);
+            }
+        }
 
         private final Map<UUID, Row> rows = new HashMap<>();
 
@@ -336,7 +341,8 @@ class OpCommandProtectionTest {
             Row row = rows.get(playerId);
             return row == null
                     ? Optional.empty()
-                    : Optional.of(new TwoFactorRegistration(playerId, row.secret(), row.pin() != null, NOW));
+                    : Optional.of(new TwoFactorRegistration(
+                            playerId, row.secret(), row.pin() != null, NOW, row.lastTotpStep()));
         }
 
         @Override
@@ -365,6 +371,14 @@ class OpCommandProtectionTest {
         @Override
         public void clearPin(UUID playerId) {
             // The verification tests never remove a factor mid-flight; the removal paths have their own coverage.
+        }
+
+        @Override
+        public void recordTotpStep(UUID playerId, long step) {
+            Row row = rows.get(playerId);
+            if (row != null && step > row.lastTotpStep()) {
+                rows.put(playerId, new Row(row.secret(), row.pin(), step));
+            }
         }
 
         @Override

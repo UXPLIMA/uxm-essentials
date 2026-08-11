@@ -22,6 +22,11 @@ import javax.crypto.spec.SecretKeySpec;
  * #verify} accepts a small ± window of steps to tolerate clock skew and the player typing a code as its window
  * rolls, comparing candidate against expected in constant time so verification leaks nothing about which digits
  * were right.
+ *
+ * <p>{@link #matchingStep} is the same check reported as the time-step that matched instead of a plain yes/no. A
+ * caller that must not accept the same code twice (RFC 6238 §5.2: a verifier should reject a code whose step it
+ * has already accepted) remembers that number and refuses anything at or below it, which is what turns a shoulder-
+ * surfed or logged code into a single-use one.
  */
 public final class TotpCode {
 
@@ -35,6 +40,9 @@ public final class TotpCode {
     private static final int DIGITS_MODULUS = 1_000_000;
 
     private static final String HMAC_ALGORITHM = "HmacSHA1";
+
+    /** What {@link #matchingStep} returns when no step in the window matched: no real step is ever this small. */
+    public static final long NO_STEP = Long.MIN_VALUE;
 
     private TotpCode() {}
 
@@ -52,6 +60,17 @@ public final class TotpCode {
      * typing. The comparison is constant-time and a candidate that is not a well-formed 6-digit code simply fails.
      */
     public static boolean verify(TwoFactorSecret secret, String candidate, Instant at, int window) {
+        return matchingStep(secret, candidate, at, window) != NO_STEP;
+    }
+
+    /**
+     * The time-step {@code candidate} matched within ± {@code window} of {@code at}, or {@link #NO_STEP} when it
+     * matched none. The whole window is always scanned, so the time taken does not depend on which step matched;
+     * the step itself is returned because a caller that retires used codes needs to know which one to retire. When
+     * more than one step in the window renders the same code the latest matching step is reported, which is the
+     * conservative choice: retiring it also retires the earlier one.
+     */
+    public static long matchingStep(TwoFactorSecret secret, String candidate, Instant at, int window) {
         Objects.requireNonNull(secret, "secret");
         Objects.requireNonNull(candidate, "candidate");
         Objects.requireNonNull(at, "at");
@@ -60,11 +79,13 @@ public final class TotpCode {
         }
         String normalised = candidate.replace(" ", "");
         long base = counter(at);
-        boolean matched = false;
+        long matched = NO_STEP;
         for (long step = base - window; step <= base + window; step++) {
             // No early return inside the loop: check every step in the window so verification time does not depend
             // on which step (if any) matched, keeping the ± tolerance from leaking through timing.
-            matched |= constantTimeEquals(codeForCounter(secret, step), normalised);
+            if (constantTimeEquals(codeForCounter(secret, step), normalised)) {
+                matched = step;
+            }
         }
         return matched;
     }

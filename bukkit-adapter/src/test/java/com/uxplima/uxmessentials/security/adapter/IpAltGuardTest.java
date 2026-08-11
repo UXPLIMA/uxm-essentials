@@ -44,6 +44,10 @@ class IpAltGuardTest {
     private static final Instant NOW = Instant.ofEpochSecond(1_700_000_000L);
     private static final String RAW_IP = "203.0.113.7";
 
+    /** The tokeniser under test, keyed with a fixed test key so a token is reproducible across assertions. */
+    private static final IpHashing IP_HASHING =
+            new IpHashing("test-key".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
     private ServerMock server;
     private FakeIpGuardStore store;
     private FakePlayerLookup lookup;
@@ -72,14 +76,14 @@ class IpAltGuardTest {
 
         assertThat(store.records).hasSize(1);
         String token = store.records.get(0).ipToken();
-        assertThat(token).isEqualTo(IpHashing.hash(RAW_IP)).doesNotContain(RAW_IP);
+        assertThat(token).isEqualTo(IP_HASHING.hash(RAW_IP)).doesNotContain(RAW_IP);
     }
 
     @Test
     void aJoinOverTheAccountCapIsKicked() {
         IpGuardController controller = controller(config(true, 1, false));
         // An earlier account already holds the address.
-        store.record(UUID.randomUUID(), IpHashing.hash(RAW_IP), NOW);
+        store.record(UUID.randomUUID(), IP_HASHING.hash(RAW_IP), NOW);
 
         PlayerMock joiner = player(RAW_IP);
         controller.onJoin(joiner);
@@ -91,7 +95,7 @@ class IpAltGuardTest {
     @Test
     void aJoinWithinTheCapStays() {
         IpGuardController controller = controller(config(true, 2, false));
-        store.record(UUID.randomUUID(), IpHashing.hash(RAW_IP), NOW);
+        store.record(UUID.randomUUID(), IP_HASHING.hash(RAW_IP), NOW);
 
         PlayerMock joiner = player(RAW_IP);
         controller.onJoin(joiner);
@@ -103,7 +107,7 @@ class IpAltGuardTest {
     void aSharedAddressNotifiesStaff() {
         UUID existing = UUID.randomUUID();
         lookup.names.put(existing, "OldAccount");
-        store.record(existing, IpHashing.hash(RAW_IP), NOW);
+        store.record(existing, IP_HASHING.hash(RAW_IP), NOW);
         PlayerMock staff = server.addPlayer();
         staff.addAttachment(MockBukkit.createMockPlugin("Notify"), SecurityStaffNotifier.NOTIFY_NODE, true);
 
@@ -123,7 +127,8 @@ class IpAltGuardTest {
     }
 
     private IpGuardController controller(SecurityConfig.IpGuard config) {
-        return new IpGuardController(store, config, lookup, notifier, new InlineScheduler(), new KeyMessages(), clock);
+        return new IpGuardController(
+                store, config, lookup, notifier, IP_HASHING, new InlineScheduler(), new KeyMessages(), clock);
     }
 
     private PlayerMock player(String ip) {

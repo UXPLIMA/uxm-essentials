@@ -10,6 +10,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.security.IpGuardStores;
+import com.uxplima.uxmessentials.persistence.security.SecurityKeyFile;
 import com.uxplima.uxmessentials.persistence.security.TrustStores;
 import com.uxplima.uxmessentials.persistence.security.TwoFactorRepositories;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.ClientInfoCommand;
@@ -86,6 +87,9 @@ public final class SecurityWiring {
         SecurityConfig.TwoFactorSettings twoFactor = config.twoFactor();
         Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
         TwoFactorRepository repository = TwoFactorRepositories.jooq(persistence, keyFile);
+        // The same server key-file the TOTP secrets are encrypted under also keys the IP tokens, so an address
+        // written to the database cannot be swept back out of it by anyone who does not hold the file.
+        IpHashing ipHashing = new IpHashing(SecurityKeyFile.loadOrCreate(keyFile));
         PendingTotpEnrollments pending = new PendingTotpEnrollments();
         // The durable, account-scoped brute-force limiter is shared by every verification surface: the join freeze,
         // the op re-auth keypad, /2fa disable, /pin change and /pin remove. A failed proof on any of them counts
@@ -115,6 +119,7 @@ public final class SecurityWiring {
                 config.ipGuard(),
                 kernel.playerLookup(),
                 staffNotifier,
+                ipHashing,
                 kernel.scheduler(),
                 kernel.messages(),
                 clock);
@@ -178,6 +183,7 @@ public final class SecurityWiring {
                 kernel.permissions(),
                 holdingArea,
                 proxy,
+                ipHashing,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),

@@ -40,6 +40,12 @@ public interface TwoFactorRepository {
     /** Drop only the player's PIN hash, leaving any TOTP secret they hold intact. The mirror of {@link #clearTotp}. */
     void clearPin(UUID playerId);
 
+    /**
+     * Remember {@code step} as the last authenticator time-step accepted for this player, so the code that covered
+     * it cannot be presented a second time. Only ever moves forward: a step at or below the stored one is ignored.
+     */
+    void recordTotpStep(UUID playerId, long step);
+
     /** Remove the player's registration entirely (both factors), leaving no row behind. */
     void delete(UUID playerId);
 }

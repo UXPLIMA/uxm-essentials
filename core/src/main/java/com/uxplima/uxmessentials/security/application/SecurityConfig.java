@@ -91,7 +91,7 @@ public record SecurityConfig(
         /** The default ± time-step tolerance: one step (±30s) absorbs modest clock skew. */
         private static final int DEFAULT_WINDOW = 1;
 
-        private static final int DEFAULT_PIN_MIN = 4;
+        private static final int DEFAULT_PIN_MIN = 6;
         private static final int DEFAULT_PIN_MAX = 8;
 
         /**

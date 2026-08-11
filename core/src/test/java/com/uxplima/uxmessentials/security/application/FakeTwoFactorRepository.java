@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 final class FakeTwoFactorRepository implements TwoFactorRepository {
 
     private record Row(
-            @Nullable TwoFactorSecret secret, @Nullable String pin, Instant enrolledAt) {}
+            @Nullable TwoFactorSecret secret, @Nullable String pin, Instant enrolledAt, long lastTotpStep) {}
 
     private final Map<UUID, Row> rows = new HashMap<>();
     private final Instant enrolledAt;
@@ -36,19 +36,22 @@ final class FakeTwoFactorRepository implements TwoFactorRepository {
         if (row == null) {
             return Optional.empty();
         }
-        return Optional.of(new TwoFactorRegistration(playerId, row.secret(), row.pin() != null, row.enrolledAt()));
+        return Optional.of(new TwoFactorRegistration(
+                playerId, row.secret(), row.pin() != null, row.enrolledAt(), row.lastTotpStep()));
     }
 
     @Override
     public void enableTotp(UUID playerId, TwoFactorSecret secret) {
         Row existing = rows.get(playerId);
-        rows.put(playerId, new Row(secret, existing == null ? null : existing.pin(), stamp(existing)));
+        rows.put(playerId, new Row(secret, existing == null ? null : existing.pin(), stamp(existing), step(existing)));
     }
 
     @Override
     public void setPin(UUID playerId, String plaintextPin) {
         Row existing = rows.get(playerId);
-        rows.put(playerId, new Row(existing == null ? null : existing.secret(), plaintextPin, stamp(existing)));
+        rows.put(
+                playerId,
+                new Row(existing == null ? null : existing.secret(), plaintextPin, stamp(existing), step(existing)));
     }
 
     @Override
@@ -59,12 +62,20 @@ final class FakeTwoFactorRepository implements TwoFactorRepository {
 
     @Override
     public void clearTotp(UUID playerId) {
-        clear(playerId, row -> new Row(null, row.pin(), row.enrolledAt()));
+        clear(playerId, row -> new Row(null, row.pin(), row.enrolledAt(), row.lastTotpStep()));
     }
 
     @Override
     public void clearPin(UUID playerId) {
-        clear(playerId, row -> new Row(row.secret(), null, row.enrolledAt()));
+        clear(playerId, row -> new Row(row.secret(), null, row.enrolledAt(), row.lastTotpStep()));
+    }
+
+    @Override
+    public void recordTotpStep(UUID playerId, long step) {
+        Row row = rows.get(playerId);
+        if (row != null && step > row.lastTotpStep()) {
+            rows.put(playerId, new Row(row.secret(), row.pin(), row.enrolledAt(), step));
+        }
     }
 
     @Override
@@ -88,5 +99,9 @@ final class FakeTwoFactorRepository implements TwoFactorRepository {
 
     private Instant stamp(@Nullable Row existing) {
         return existing == null ? enrolledAt : existing.enrolledAt();
+    }
+
+    private static long step(@Nullable Row existing) {
+        return existing == null ? 0L : existing.lastTotpStep();
     }
 }

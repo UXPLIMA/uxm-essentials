@@ -59,6 +59,7 @@ public final class VerificationController implements KeypadActions {
     private final TwoFactorRepository repository;
     private final VerifyTwoFactor verify;
     private final TrustStore trustStore;
+    private final IpHashing ipHashing;
     private final VerificationSessions sessions;
     private final AttemptLimiter limiter;
     private final ReauthState reauthState;
@@ -102,6 +103,7 @@ public final class VerificationController implements KeypadActions {
             Permissions permissions,
             FreezeHoldingArea holdingArea,
             ServerConnector proxy,
+            IpHashing ipHashing,
             Scheduler scheduler,
             Messages messages,
             MessageSink sink,
@@ -110,6 +112,7 @@ public final class VerificationController implements KeypadActions {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.verify = Objects.requireNonNull(verify, "verify");
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
+        this.ipHashing = Objects.requireNonNull(ipHashing, "ipHashing");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.limiter = Objects.requireNonNull(limiter, "limiter");
         this.reauthState = Objects.requireNonNull(reauthState, "reauthState");
@@ -479,7 +482,7 @@ public final class VerificationController implements KeypadActions {
             return null;
         }
         InetAddress address = socket.getAddress();
-        return address == null ? null : IpHashing.hash(address.getHostAddress());
+        return address == null ? null : ipHashing.hash(address.getHostAddress());
     }
 
     private void notify(PlayerRef viewer, SecurityMessageKey key) {

@@ -97,6 +97,10 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  */
 class JoinVerificationTest {
 
+    /** The tokeniser the controller is wired with, keyed fixed so a test can recompute the same token. */
+    private static final IpHashing IP_HASHING =
+            new IpHashing("test-key".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
     private static final Instant NOW = Instant.ofEpochSecond(1_700_000_000L);
     private static final String PIN = "1234";
     private static final int MAX_ATTEMPTS = 3;
@@ -186,6 +190,7 @@ class JoinVerificationTest {
                 permissions,
                 new FreezeHoldingArea(null, ownTeleports, new NoopLogger()),
                 proxy,
+                IP_HASHING,
                 scheduler,
                 messages,
                 sink,
@@ -245,7 +250,7 @@ class JoinVerificationTest {
     void aTrustedDeviceSkipsThePrompt() {
         PlayerMock player = addPlayer();
         repository.setPin(player.getUniqueId(), PIN);
-        trustStore.trust(player.getUniqueId(), IpHashing.hash("10.0.0.5"), NOW.plusSeconds(3600));
+        trustStore.trust(player.getUniqueId(), IP_HASHING.hash("10.0.0.5"), NOW.plusSeconds(3600));
 
         controller.onJoin(player);
 
@@ -268,7 +273,7 @@ class JoinVerificationTest {
         assertThat(sessions.isPending(player.getUniqueId())).isFalse();
         assertThat(sink.delivered).contains("security.verify.success");
         // The verified device is remembered for the next join.
-        assertThat(trustStore.isTrusted(player.getUniqueId(), IpHashing.hash("10.0.0.5"), NOW))
+        assertThat(trustStore.isTrusted(player.getUniqueId(), IP_HASHING.hash("10.0.0.5"), NOW))
                 .isTrue();
     }
 
@@ -796,6 +801,7 @@ class JoinVerificationTest {
                 permissions,
                 new FreezeHoldingArea(holding, ownTeleports, new NoopLogger()),
                 proxy,
+                IP_HASHING,
                 new InlineScheduler(),
                 new KeyMessages(),
                 sink,
@@ -946,6 +952,7 @@ class JoinVerificationTest {
                 permissions,
                 new FreezeHoldingArea(null, ownTeleports, new NoopLogger()),
                 proxy,
+                IP_HASHING,
                 scheduler,
                 new KeyMessages(),
                 sink,
@@ -1191,7 +1198,12 @@ class JoinVerificationTest {
     /** An in-memory two-factor store mirroring the jOOQ store's contract, keeping the PIN as plaintext for the test. */
     private static final class FakeRepository implements TwoFactorRepository {
         private record Row(
-                @Nullable TwoFactorSecret secret, @Nullable String pin) {}
+                @Nullable TwoFactorSecret secret, @Nullable String pin, long lastTotpStep) {
+
+            Row(@Nullable TwoFactorSecret secret, @Nullable String pin) {
+                this(secret, pin, 0L);
+            }
+        }
 
         private final Map<UUID, Row> rows = new HashMap<>();
 
@@ -1206,7 +1218,8 @@ class JoinVerificationTest {
             Row row = rows.get(playerId);
             return row == null
                     ? Optional.empty()
-                    : Optional.of(new TwoFactorRegistration(playerId, row.secret(), row.pin() != null, NOW));
+                    : Optional.of(new TwoFactorRegistration(
+                            playerId, row.secret(), row.pin() != null, NOW, row.lastTotpStep()));
         }
 
         @Override
@@ -1235,6 +1248,14 @@ class JoinVerificationTest {
         @Override
         public void clearPin(UUID playerId) {
             // The verification tests never remove a factor mid-flight; the removal paths have their own coverage.
+        }
+
+        @Override
+        public void recordTotpStep(UUID playerId, long step) {
+            Row row = rows.get(playerId);
+            if (row != null && step > row.lastTotpStep()) {
+                rows.put(playerId, new Row(row.secret(), row.pin(), step));
+            }
         }
 
         @Override

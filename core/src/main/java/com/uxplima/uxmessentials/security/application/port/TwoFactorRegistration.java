@@ -18,13 +18,20 @@ import org.jspecify.annotations.Nullable;
  * verifies against internally through {@link TwoFactorRepository#verifyPin}, and is never reconstructed here, so a
  * PIN plaintext never reaches the application. {@code pinSet} records only that a hash exists.
  *
+ * <p>{@code lastTotpStep} is the RFC 6238 time-step of the last authenticator code this player got in with. A code
+ * is only good for the 30 seconds its step covers, so accepting the same step twice would let anyone who saw the
+ * six digits (over a shoulder, in a screen share, in a log) walk in behind the player while they are still valid.
+ * The verifier refuses any step at or below this one, which makes each code single-use. Zero means no code has been
+ * accepted yet, the state every player starts in.
+ *
  * @param playerId the player this registration belongs to
  * @param secret the decrypted TOTP shared secret, or {@code null} when the player has no authenticator factor
  * @param pinSet whether a PIN hash is on file (its plaintext is never exposed)
  * @param enrolledAt the instant the player first enrolled a factor
+ * @param lastTotpStep the time-step of the last accepted code, or 0 when none has been accepted
  */
 public record TwoFactorRegistration(
-        UUID playerId, @Nullable TwoFactorSecret secret, boolean pinSet, Instant enrolledAt) {
+        UUID playerId, @Nullable TwoFactorSecret secret, boolean pinSet, Instant enrolledAt, long lastTotpStep) {
 
     public TwoFactorRegistration {
         Objects.requireNonNull(playerId, "playerId");
