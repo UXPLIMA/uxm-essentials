@@ -1,0 +1,98 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.uxplima.uxmessentials",
+    "module": "uxmessentials-bukkit-api",
+    "version": "0.6.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.4.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.uxplima.uxmessentials",
+          "module": "uxmessentials-api",
+          "version": {
+            "requires": "0.6.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "uxmessentials-bukkit-api-0.6.0.jar",
+          "url": "uxmessentials-bukkit-api-0.6.0.jar",
+          "size": 113383,
+          "sha512": "5f910ca686d243159e490aa99651df771d04cc4e0b63b9382370f93fb51b86ed141c5082865b7327cc9e4e9cf26f37e22211449b3b2234619655d2e00feddb58",
+          "sha256": "62c8cce22208515e9d242309854243106aacf996681ce8862643832c305dd7e5",
+          "sha1": "85b5219e9a4a1fd203bea847d7640e4e5bb02fb6",
+          "md5": "4f0b969b4ee5cec850cedf73be5d4825"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.uxplima.uxmessentials",
+          "module": "uxmessentials-api",
+          "version": {
+            "requires": "0.6.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "uxmessentials-bukkit-api-0.6.0.jar",
+          "url": "uxmessentials-bukkit-api-0.6.0.jar",
+          "size": 113383,
+          "sha512": "5f910ca686d243159e490aa99651df771d04cc4e0b63b9382370f93fb51b86ed141c5082865b7327cc9e4e9cf26f37e22211449b3b2234619655d2e00feddb58",
+          "sha256": "62c8cce22208515e9d242309854243106aacf996681ce8862643832c305dd7e5",
+          "sha1": "85b5219e9a4a1fd203bea847d7640e4e5bb02fb6",
+          "md5": "4f0b969b4ee5cec850cedf73be5d4825"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "uxmessentials-bukkit-api-0.6.0-sources.jar",
+          "url": "uxmessentials-bukkit-api-0.6.0-sources.jar",
+          "size": 96953,
+          "sha512": "c33c60810df3661e7c9f59de759431bcf1aaf231861f4d4cd448879e5d7450bc8d760564ca1778b090281ffaf48618e8537a3cf656a8362d19544154b77bbe97",
+          "sha256": "d9138b0e84fcc498d6f07994101183a9ef41e46be384ea688fe3c046a6351320",
+          "sha1": "e99e9b2323420be87d30d4d829888e662726ecad",
+          "md5": "785437c4805f4796747bb936864bc2c8"
+        }
+      ]
+    }
+  ]
+}
