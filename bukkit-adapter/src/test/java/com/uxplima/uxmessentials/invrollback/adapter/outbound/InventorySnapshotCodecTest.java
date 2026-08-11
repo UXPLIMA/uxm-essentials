@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.invrollback.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -22,7 +23,9 @@ import org.mockbukkit.mockbukkit.MockBukkit;
  * MockBukkit coverage of {@link InventorySnapshotCodec}: a payload round-trips its items, its ender chest, and now
  * its capture location; an old (pre-location) blob still decodes cleanly to an absent location, so existing
  * snapshots keep listing/previewing/restoring; and the item-free {@link InventorySnapshotCodec#summarize} reads the
- * location and buckets the occupied slots by store.
+ * location and buckets the occupied slots by store. A payload whose declared lengths are nonsense (a corrupt row,
+ * a hand-edited database) is refused or clamped rather than believed: nothing sizes an array from a number the
+ * plugin never wrote.
  */
 class InventorySnapshotCodecTest {
 
@@ -116,6 +119,52 @@ class InventorySnapshotCodecTest {
      * occupied {@code (slot, len, bytes)} entries closed by a {@code -1} sentinel, with no leading format marker.
      * This is exactly what the old codec wrote, so decoding it proves backward compatibility.
      */
+    @Test
+    void aSectionLengthNothingCouldHaveWrittenIsClampedInsteadOfAllocated() {
+        // A corrupt row claiming two billion slots must not be taken at its word: believing it would try to
+        // allocate the array before discovering the payload holds nothing to put in it.
+        byte[] payload = payloadWithSectionLength(Integer.MAX_VALUE);
+
+        InventorySnapshotCodec.Decoded decoded = InventorySnapshotCodec.decode(payload);
+
+        assertThat(decoded.contents().length).isLessThanOrEqualTo(4096);
+    }
+
+    @Test
+    void anItemLengthNothingCouldHaveWrittenIsRefused() {
+        byte[] payload = payloadWithItemLength(Integer.MAX_VALUE);
+
+        assertThatThrownBy(() -> InventorySnapshotCodec.decode(payload)).isInstanceOf(UncheckedIOException.class);
+    }
+
+    private static byte[] payloadWithSectionLength(int declared) {
+        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(bytes)) {
+            out.writeInt(declared); // main section slot count, as a damaged row might carry it
+            out.writeInt(-1); // end of main section
+            out.writeInt(0); // ender section slot count
+            out.writeInt(-1); // end of ender section
+            return bytes.toByteArray();
+        } catch (IOException io) {
+            throw new UncheckedIOException("could not build a damaged payload", io);
+        }
+    }
+
+    private static byte[] payloadWithItemLength(int declared) {
+        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(bytes)) {
+            out.writeInt(41); // main section slot count
+            out.writeInt(0); // slot index 0 is occupied
+            out.writeInt(declared); // and claims to hold an item of an impossible size
+            out.writeInt(-1);
+            out.writeInt(0);
+            out.writeInt(-1);
+            return bytes.toByteArray();
+        } catch (IOException io) {
+            throw new UncheckedIOException("could not build a damaged payload", io);
+        }
+    }
+
     private static byte[] legacyPayload(ItemStack slotZero) {
         try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream out = new DataOutputStream(bytes)) {

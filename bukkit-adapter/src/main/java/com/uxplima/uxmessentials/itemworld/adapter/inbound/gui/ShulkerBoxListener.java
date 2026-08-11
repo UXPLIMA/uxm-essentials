@@ -11,6 +11,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -87,9 +88,19 @@ public final class ShulkerBoxListener implements Listener {
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         ShulkerBoxHolder holder = holderOf(event.getView().getTopInventory());
-        if (holder != null) {
-            view.onClose(holder);
+        if (holder != null && event.getPlayer() instanceof Player closer) {
+            view.onClose(holder, closer);
         }
+    }
+
+    /**
+     * Write back a view its owner still had open as they disconnect. The close handler is not a reliable last word on
+     * a quit, and a view left unwritten duplicates whatever was dragged out of the box, so the quit claims it too.
+     * Harmless when the close already ran: the view tracks each player once and only one of the two claims it.
+     */
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        view.onQuit(event.getPlayer());
     }
 
     private static boolean isRightClick(Action action) {

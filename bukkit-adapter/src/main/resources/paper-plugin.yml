@@ -732,6 +732,10 @@ permissions:
   uxmessentials.vanish.persist:
     description: 'Remain vanished across a relog instead of reappearing on join.'
     default: op
+  # vanish is its own context (it left presence), so it carries its own reload/inspect tier.
+  uxmessentials.module.vanish:
+    description: 'Hot-reload / inspect the vanish module.'
+    default: op
   # moderation context (docs/permissions.md "Moderation"). Lightweight per-player mute / jail / tempban; every
   # action is audit-logged and permission-gated. A muted player cannot /msg (messaging gate) and a jailed
   # player cannot /home or /tpa (teleport gate). The exempt node is target-side immunity.

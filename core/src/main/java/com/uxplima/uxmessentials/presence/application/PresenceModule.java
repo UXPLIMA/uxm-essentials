@@ -15,13 +15,13 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The presence bounded context as a first-class {@link FeatureModule}: it owns the transient
- * {@code PlayerPresence} aggregate per player (AFK + vanish), the {@code /afk /vanish} command surface
- * (docs/10-feature-modules.md §15.8), the dual sync-move / async-chat activity listeners, and the
- * self-rescheduling AFK idle sweep on the {@code Scheduler} port. It <em>soft-couples</em> outward to two
- * contexts through the vanish visibility it owns: a vanished player is hidden from messaging's {@code /msg}
- * target resolution and from teleport's {@code /tpa} listings. Both reads go through Bukkit's {@code canSee}
- * graph that the presence {@code VisibilityApplier} drives, so they degrade to "fully visible" when presence is
- * disabled — presence carries no hard dependency edge in either direction.
+ * {@code PlayerPresence} aggregate per player (AFK, plus the vanished flag it mirrors from the vanish context's
+ * authority), the {@code /afk /list /nick /whois /realname /gc /staff} command surface
+ * (docs/10-feature-modules.md §15.8), the dual sync-move /
+ * async-chat activity listeners, and the self-rescheduling AFK idle sweep on the {@code Scheduler} port. Vanish
+ * itself moved out to its own context: presence reads that state, it does not own it, and a presence reader
+ * (the {@code %..._vanished%} placeholder, the sleep exclusion) sees whatever the vanish authority holds, or
+ * "nobody is hidden" when that module is off.
  *
  * <p>Presence persists nothing in v1 (no DB, no migration): the per-player presence map is in-memory and
  * dropped on quit. The use cases, the in-memory store, the activity listeners, the visibility applier, and the

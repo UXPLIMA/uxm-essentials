@@ -10,6 +10,7 @@ import java.util.Objects;
 
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.PayloadLimits;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -93,8 +94,7 @@ public final class VaultItemCodec {
             in.readInt(); // stored array length, informational — the live size governs the target array
             int slot;
             while ((slot = in.readInt()) != -1) {
-                int length = in.readInt();
-                byte[] item = in.readNBytes(length);
+                byte[] item = PayloadLimits.readItemBytes(in);
                 if (slot >= 0 && slot < slots.length) {
                     slots[slot] = ItemStack.deserializeBytes(item);
                 }
@@ -106,12 +106,13 @@ public final class VaultItemCodec {
 
     private static ItemStack[] readAll(byte[] payload) {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
-            int stored = Math.max(0, in.readInt()); // the array length encode() wrote — the true stored slot count
+            // The array length encode() wrote (the true stored slot count), clamped: a corrupt row must not be
+            // able to size an array from a number nothing ever wrote.
+            int stored = PayloadLimits.slots(in.readInt());
             ItemStack[] slots = new ItemStack[stored];
             int slot;
             while ((slot = in.readInt()) != -1) {
-                int length = in.readInt();
-                byte[] item = in.readNBytes(length);
+                byte[] item = PayloadLimits.readItemBytes(in);
                 if (slot >= 0 && slot < slots.length) {
                     slots[slot] = ItemStack.deserializeBytes(item);
                 }

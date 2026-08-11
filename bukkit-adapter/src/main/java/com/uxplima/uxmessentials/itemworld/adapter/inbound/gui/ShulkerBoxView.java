@@ -38,6 +38,10 @@ import org.jspecify.annotations.Nullable;
  * shulker box before touching it, so a box that somehow left the slot discards the edits rather than corrupting a
  * different item.
  *
+ * <p>A disconnect is covered too. {@link #onQuit} claims a view its owner is still holding as they leave and writes
+ * it back off the quitting player, because a view abandoned unwritten would duplicate anything they had dragged out
+ * of the box: the item would be saved with the player while the box kept its own copy.
+ *
  * <p>The open runs from a {@code PlayerInteractEvent} on the player's own region thread and the close write-back
  * from a {@code InventoryCloseEvent} on that same thread, so both mutate the player's inventory directly; only the
  * disable-time {@link #flushAll} hops onto each owner's entity thread through the kernel {@link Scheduler}.
@@ -82,10 +86,26 @@ public final class ShulkerBoxView {
     }
 
     /** Claim {@code holder}'s view on close and write its edits back into the source box. Called by the listener. */
-    void onClose(ShulkerBoxHolder holder) {
+    void onClose(ShulkerBoxHolder holder, Player closer) {
         Objects.requireNonNull(holder, "holder");
+        Objects.requireNonNull(closer, "closer");
         if (open.remove(holder.owner().uuid(), holder)) {
-            writeBack(holder);
+            writeBack(closer, holder);
+        }
+    }
+
+    /**
+     * Write a quitting player's open view back before they leave. A disconnect is not guaranteed to reach the close
+     * handler while the player still counts as online, and a view abandoned unwritten is not merely a lost edit: an
+     * item dragged out of the box and into the inventory would be saved with the player while the box kept its copy,
+     * which duplicates it. The quitting player's inventory is still live here and is written to disk after this, so
+     * the write-back lands.
+     */
+    public void onQuit(Player player) {
+        Objects.requireNonNull(player, "player");
+        ShulkerBoxHolder holder = open.remove(player.getUniqueId());
+        if (holder != null) {
+            writeBack(player, holder);
         }
     }
 
@@ -93,7 +113,12 @@ public final class ShulkerBoxView {
     public void flushAll() {
         for (ShulkerBoxHolder holder : Map.copyOf(open).values()) {
             if (open.remove(holder.owner().uuid(), holder)) {
-                scheduler.onEntity(holder.owner(), () -> writeBack(holder));
+                scheduler.onEntity(holder.owner(), () -> {
+                    Player live = Bukkit.getPlayer(holder.owner().uuid());
+                    if (live != null) {
+                        writeBack(live, holder);
+                    }
+                });
             }
         }
     }
@@ -108,11 +133,7 @@ public final class ShulkerBoxView {
      * against movement while the view is open, so it still holds the same box; the guard here is defensive — if the
      * slot no longer carries a shulker box the edits are discarded rather than written onto a different item.
      */
-    private void writeBack(ShulkerBoxHolder holder) {
-        Player player = Bukkit.getPlayer(holder.owner().uuid());
-        if (player == null || !player.isOnline()) {
-            return;
-        }
+    private void writeBack(Player player, ShulkerBoxHolder holder) {
         ItemStack source = player.getInventory().getItem(holder.sourceSlot());
         if (source == null
                 || !(source.getItemMeta() instanceof BlockStateMeta meta)

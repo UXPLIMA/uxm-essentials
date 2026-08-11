@@ -16,12 +16,15 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -40,8 +43,10 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * MockBukkit coverage of the in-inventory shulker view. Right-clicking a shulker box in hand opens its contents as
  * a 27-slot editable view; edits are written back into the box item on close (round-trip); the source box is locked
- * against being moved while the view is open (no dupe); and a disabled sub-feature, a missing permission, or a
- * non-shulker item each leave vanilla behaviour untouched. The interact is driven straight through the listener (a
+ * against being moved while the view is open (no dupe); a player who logs out with the view still open has their
+ * edits written back as they leave, because an abandoned view would duplicate whatever they had dragged out of the
+ * box; and a disabled sub-feature, a missing permission, or a non-shulker item each leave vanilla behaviour
+ * untouched. The interact is driven straight through the listener (a
  * unit test of the handler), while clicks and the close go through MockBukkit's own dispatch.
  */
 class ShulkerBoxViewTest {
@@ -106,6 +111,23 @@ class ShulkerBoxViewTest {
         assertThat(contents[1]).isNotNull();
         assertThat(contents[1].getType()).isEqualTo(Material.EMERALD); // edit written back
         assertThat(contents[1].getAmount()).isEqualTo(2);
+        assertThat(view.openCount()).isZero();
+    }
+
+    @Test
+    void quittingWithTheViewOpenStillWritesTheEditsBack() {
+        grantPermission();
+        holdShulkerContaining(0, new ItemStack(Material.DIAMOND, 3));
+        rightClickHeldItem();
+        Inventory top = player.getOpenInventory().getTopInventory();
+
+        // The player takes the diamonds out of the box and logs out without closing the window. Their inventory
+        // keeps the diamonds, so the box must not keep a copy of them as well.
+        top.setItem(0, null);
+        player.getInventory().addItem(new ItemStack(Material.DIAMOND, 3));
+        listener.onQuit(new PlayerQuitEvent(player, (Component) null, PlayerQuitEvent.QuitReason.DISCONNECTED));
+
+        assertThat(boxContents(player.getInventory().getItem(0))[0]).isNull();
         assertThat(view.openCount()).isZero();
     }
 

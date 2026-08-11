@@ -13,6 +13,7 @@ import java.util.function.IntConsumer;
 
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.PayloadLimits;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.NullMarked;
@@ -191,11 +192,12 @@ public final class InventorySnapshotCodec {
     }
 
     private static ItemStack[] readSection(DataInputStream in, int rawLength) throws IOException {
-        int length = Math.max(0, rawLength);
-        ItemStack[] slots = new ItemStack[length];
+        // The declared length comes off the payload, so it is clamped before it sizes anything: a corrupt row
+        // must not be able to ask for a two-billion-element array.
+        ItemStack[] slots = new ItemStack[PayloadLimits.slots(rawLength)];
         int slot;
         while ((slot = in.readInt()) != END_OF_SECTION) {
-            byte[] item = in.readNBytes(in.readInt());
+            byte[] item = PayloadLimits.readItemBytes(in);
             if (slot >= 0 && slot < slots.length) {
                 slots[slot] = ItemStack.deserializeBytes(item);
             }
@@ -210,7 +212,7 @@ public final class InventorySnapshotCodec {
     private static void walkSection(DataInputStream in, IntConsumer onSlot) throws IOException {
         int slot;
         while ((slot = in.readInt()) != END_OF_SECTION) {
-            in.readNBytes(in.readInt());
+            PayloadLimits.readItemBytes(in);
             if (slot >= 0) {
                 onSlot.accept(slot);
             }

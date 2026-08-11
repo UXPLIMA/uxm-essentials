@@ -28,20 +28,16 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>per-holder PDC</b>. Reads and writes go through the live {@link Villager} on its own region thread
- * (the restock sweep's per-region hop, or the interact-event thread). Both {@link NamespacedKey}s are created once as
- * constants, never on a hot path.
+ * (the restock sweep's per-region hop, or the interact-event thread). Every {@link NamespacedKey} is built once as a
+ * constant through the same {@code key} helper the rest of the context uses, never on a hot path.
  */
 @NullMarked
 public final class PdcVillagerFlags {
 
-    private static final NamespacedKey RESTOCK_AT = Objects.requireNonNull(
-            NamespacedKey.fromString("uxmessentials:villagers_restock"), "villagers_restock key");
-    private static final NamespacedKey DISABLED = Objects.requireNonNull(
-            NamespacedKey.fromString("uxmessentials:villagers_disabled"), "villagers_disabled key");
-    private static final NamespacedKey PROTECTED = Objects.requireNonNull(
-            NamespacedKey.fromString("uxmessentials:villagers_protected"), "villagers_protected key");
-    private static final NamespacedKey FOLLOW_OWNER =
-            Objects.requireNonNull(NamespacedKey.fromString("uxmessentials:villagers_follow"), "villagers_follow key");
+    private static final NamespacedKey RESTOCK_AT = key("villagers_restock");
+    private static final NamespacedKey DISABLED = key("villagers_disabled");
+    private static final NamespacedKey PROTECTED = key("villagers_protected");
+    private static final NamespacedKey FOLLOW_OWNER = key("villagers_follow");
 
     /** The instant {@code villager} last restocked, or {@link Instant#EPOCH} when it never has. */
     public Instant lastRestock(Villager villager) {
@@ -109,5 +105,9 @@ public final class PdcVillagerFlags {
         } catch (IllegalArgumentException malformed) {
             return null;
         }
+    }
+
+    private static NamespacedKey key(String value) {
+        return Objects.requireNonNull(NamespacedKey.fromString("uxmessentials:" + value), value + " key");
     }
 }

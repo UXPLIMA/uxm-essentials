@@ -16,6 +16,7 @@ import org.bukkit.Registry;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.PayloadLimits;
 import com.uxplima.uxmessentials.staff.domain.LoadoutBlob;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -62,8 +63,9 @@ final class StaffEffectCodec {
             return List.of();
         }
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(blob.bytes()))) {
-            int count = in.readInt();
-            List<PotionEffect> effects = new ArrayList<>(Math.max(0, count));
+            // Clamped before it sizes anything: the count comes off the stored blob, not from us.
+            int count = PayloadLimits.entries(in.readInt());
+            List<PotionEffect> effects = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 PotionEffect effect = readEffect(in);
                 if (effect != null) {

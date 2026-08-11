@@ -13,6 +13,7 @@ import java.util.Objects;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MerchantRecipe;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.PayloadLimits;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -54,8 +55,9 @@ public final class VillagerRecipeCodec {
     public static List<MerchantRecipe> decode(byte[] blob) {
         Objects.requireNonNull(blob, "blob");
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(blob))) {
-            int count = in.readInt();
-            List<MerchantRecipe> recipes = new ArrayList<>(Math.max(0, count));
+            // Clamped before it sizes anything: the count comes off the stored blob, not from us.
+            int count = PayloadLimits.entries(in.readInt());
+            List<MerchantRecipe> recipes = new ArrayList<>(count);
             for (int index = 0; index < count; index++) {
                 recipes.add(readRecipe(in));
             }
@@ -80,8 +82,8 @@ public final class VillagerRecipeCodec {
 
     private static MerchantRecipe readRecipe(DataInputStream in) throws IOException {
         ItemStack result = readItem(in);
-        int ingredientCount = in.readInt();
-        List<ItemStack> ingredients = new ArrayList<>(Math.max(0, ingredientCount));
+        int ingredientCount = PayloadLimits.entries(in.readInt());
+        List<ItemStack> ingredients = new ArrayList<>(ingredientCount);
         for (int index = 0; index < ingredientCount; index++) {
             ingredients.add(readItem(in));
         }
@@ -103,7 +105,6 @@ public final class VillagerRecipeCodec {
     }
 
     private static ItemStack readItem(DataInputStream in) throws IOException {
-        int length = in.readInt();
-        return ItemStack.deserializeBytes(in.readNBytes(length));
+        return ItemStack.deserializeBytes(PayloadLimits.readItemBytes(in));
     }
 }

@@ -85,9 +85,10 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // resolution); both gates degrade gracefully when the other module is off, so messaging carries no
         // hard dependency edge and lands here independently of either.
         delegate.register(new MessagingModule());
-        // presence owns the vanish state that messaging's /msg resolution and teleport's /tpa listing read
-        // through the canSee graph; that coupling is soft (both degrade to "fully visible" without presence),
-        // so presence carries no hard dependency edge and lands after the contexts it informs.
+        // presence owns AFK and the transient per-player presence map; the vanished flag it reports is mirrored
+        // from the vanish context's authority rather than owned here. Its readers (the placeholders, the sleep
+        // exclusion) all degrade gracefully without it, so presence carries no hard dependency edge and lands
+        // after the contexts it informs.
         delegate.register(new PresenceModule());
         // moderation provides the real MutePolicy (messaging) and JailGate (teleport) the placeholder NEVER
         // bindings stand in for until it lands; both couplings are soft, so moderation carries no hard
@@ -139,8 +140,8 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // ENABLED, so it lands last after vote.
         delegate.register(new DiscordlinkModule());
         // nametags is the 19th context — a per-wearer above-head TextDisplay nametag rendered on the Scheduler refresh
-        // timer over uxmLib's packet nametag stack. It soft-couples to presence (vanish-aware viewer culling through
-        // the canSee graph, degrading to "everyone can see everyone" when presence is off), so it carries no hard
+        // timer over uxmLib's packet nametag stack. It soft-couples to vanish (vanish-aware viewer culling through
+        // the canSee graph, degrading to "everyone can see everyone" when vanish is off), so it carries no hard
         // dependency edge. It ships ENABLED by default with a single plain-name format and hides the vanilla above-head
         // name under it through a shared scoreboard-team coordinator (re-applied after every per-player board switch),
         // so the default surface is one clean custom nametag per wearer. It lands last after discordlink.
