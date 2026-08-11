@@ -65,6 +65,7 @@ public enum VaultsMessageKey implements MessageKey {
     VAULT_SELECTOR_NEXT("vaults.selector.next"),
 
     // shared
+    VAULT_ALREADY_OPEN("vaults.already-open"),
     VAULT_SAVED("vaults.saved"),
     VAULT_PLAYERS_ONLY("vaults.players-only");
 

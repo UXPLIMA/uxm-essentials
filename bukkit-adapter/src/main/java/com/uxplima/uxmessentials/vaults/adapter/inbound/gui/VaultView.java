@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.vaults.adapter.inbound.gui;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Sound;
@@ -41,7 +41,15 @@ import org.jspecify.annotations.Nullable;
  * <p>The window's {@code (owner, vault)} identity is captured per open, so the {@link StorageGui#onClose close
  * handler} writes exactly that vault straight to the database; each open window is tracked so {@link #flushAll}
  * can save every still-open vault on module stop (the {@code open-guis=N} the doctor line reports). Each window
- * is persisted at most once — whichever of close-or-flush reaches it first claims it.
+ * is persisted at most once: whichever of close-or-flush reaches it first claims it.
+ *
+ * <p>That identity is also a lock. A vault lives in at most one window at a time, so an owner and the staff
+ * member auditing them through {@code /vault <player>} cannot hold it at once: each would seed a GUI from the
+ * same stored row and write its own snapshot back on close, and the later close would restore whatever the
+ * earlier viewer had already taken out, duplicating it. The second opener is refused with
+ * {@code VAULT_ALREADY_OPEN} and the slot frees again the moment the first window closes or is flushed. The
+ * viewer already holding the vault is not a second viewer: they may re-open it, and their outgoing window is
+ * written back first.
  *
  * <p>The {@link VaultItemPolicy} blacklist is enforced on close: an item whose material is blocked is removed
  * from the vault and returned to the closer (added to their inventory, overflow dropped at their feet), so a
@@ -78,7 +86,7 @@ public final class VaultView {
     private final Permissions permissions;
     private final VaultItemPolicy itemPolicy;
     private final @Nullable Sound openSound;
-    private final Set<OpenWindow> open = ConcurrentHashMap.newKeySet();
+    private final Map<VaultKey, OpenWindow> open = new ConcurrentHashMap<>();
 
     public VaultView(
             Messages messages,
@@ -99,7 +107,8 @@ public final class VaultView {
 
     /**
      * Open {@code owner}'s {@code vault} for {@code player} (the live viewer behind {@code viewer}). Use the
-     * owner title when the viewer is the owner and the admin title when staff is auditing someone else.
+     * owner title when the viewer is the owner and the admin title when staff is auditing someone else. A vault
+     * already held by another viewer is refused with {@code VAULT_ALREADY_OPEN} and nothing is opened.
      */
     public void open(Player player, PlayerRef viewer, PlayerRef owner, Vault vault) {
         Objects.requireNonNull(player, "player");
@@ -111,20 +120,46 @@ public final class VaultView {
                 .title(title(viewer, owner, vault.index()))
                 .rows(size / 9)
                 .build();
+        VaultKey key = new VaultKey(owner.uuid(), vault.index());
+        OpenWindow window = new OpenWindow(viewer.uuid(), owner, vault, gui);
+        // Claim the vault before anything is shown or written. A vault open twice at once would be seeded twice
+        // from the same row and written back twice on close, so the later close would restore what the earlier
+        // viewer had already taken out: an item dupe. Only the viewer already holding it may re-open it.
+        OpenWindow[] displaced = new OpenWindow[1];
+        // The mapping function only swaps references, so no I/O runs while the map's bin is held.
+        OpenWindow holder = open.compute(key, (ignored, current) -> {
+            if (current == null) {
+                return window;
+            }
+            if (!current.viewer().equals(viewer.uuid())) {
+                return current;
+            }
+            displaced[0] = current;
+            return window;
+        });
+        if (holder != window) {
+            notifyAlreadyOpen(viewer, vault.index());
+            return;
+        }
+        OpenWindow retired = displaced[0];
+        if (retired != null) {
+            // The same viewer re-opening: write their outgoing window back (blacklist and all) before the new
+            // one takes over, exactly as its close handler would have.
+            returnBlockedItems(player, viewer, retired.gui());
+            persist(retired);
+        }
         // Decode the full stored contents so a slot beyond the (possibly shrunken) live size is visible: the
         // first `size` slots seed the GUI, any occupied overflow slot is rescued back to the opener.
         ItemStack[] stored = VaultItemCodec.decodeAll(vault.contents());
         gui.setContents(stored);
-        OpenWindow window = new OpenWindow(owner, vault, gui);
         int rescued = rescueOverflow(player, viewer, stored, size);
         if (rescued > 0) {
             // The overflow is now safely with the player, but the DB row still carries it; persist the truncated
             // (in-range) GUI immediately so a crash before close cannot re-run the rescue and hand it out again.
             persist(window);
         }
-        open.add(window);
         gui.onClose(event -> {
-            if (open.remove(window)) {
+            if (open.remove(key, window)) {
                 returnBlockedItems(event.getPlayer(), viewer, gui);
                 persist(window);
             }
@@ -169,9 +204,9 @@ public final class VaultView {
 
     /** Save every still-open vault and forget it; called on module stop so none is lost on disable. */
     public void flushAll() {
-        for (OpenWindow window : Set.copyOf(open)) {
-            if (open.remove(window)) {
-                persist(window);
+        for (Map.Entry<VaultKey, OpenWindow> entry : Map.copyOf(open).entrySet()) {
+            if (open.remove(entry.getKey(), entry.getValue())) {
+                persist(entry.getValue());
             }
         }
     }
@@ -225,6 +260,14 @@ public final class VaultView {
                         viewer, VaultsMessageKey.VAULT_ITEM_BLOCKED, Map.of("count", Integer.toString(count))));
     }
 
+    private void notifyAlreadyOpen(PlayerRef viewer, int index) {
+        // The sink bridges delivery to the viewer's region thread itself, so this needs no extra scheduling.
+        sink.deliver(
+                viewer,
+                messages.resolve(
+                        viewer, VaultsMessageKey.VAULT_ALREADY_OPEN, Map.of("index", Integer.toString(index))));
+    }
+
     private void notifyOverflow(PlayerRef viewer, int count) {
         // The sink bridges delivery to the viewer's region thread itself, so this needs no extra scheduling.
         sink.deliver(
@@ -247,8 +290,16 @@ public final class VaultView {
         return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
-    private record OpenWindow(PlayerRef owner, Vault vault, StorageGui gui) {
+    /** The identity of a vault as a window slot: one owner's numbered vault, open in at most one window. */
+    private record VaultKey(UUID owner, int index) {
+        VaultKey {
+            Objects.requireNonNull(owner, "owner");
+        }
+    }
+
+    private record OpenWindow(UUID viewer, PlayerRef owner, Vault vault, StorageGui gui) {
         OpenWindow {
+            Objects.requireNonNull(viewer, "viewer");
             Objects.requireNonNull(owner, "owner");
             Objects.requireNonNull(vault, "vault");
             Objects.requireNonNull(gui, "gui");
