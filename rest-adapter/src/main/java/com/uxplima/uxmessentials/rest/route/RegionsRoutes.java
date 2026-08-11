@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.view.UxmLocation;
@@ -31,8 +32,22 @@ public final class RegionsRoutes {
 
     public static List<Route> of(UxmEssentialsApi api) {
         return List.of(
+                Route.of("GET", PREFIX + "/regions", Scopes.READ, request -> support(api)),
                 Route.of("GET", PREFIX + "/worlds/{name}/regions", Scopes.READ, request -> regions(api, request)),
                 Route.of("GET", PREFIX + "/worlds/{name}/regions/{id}", Scopes.READ, request -> region(api, request)));
+    }
+
+    /**
+     * Whether region support is actually there.
+     *
+     * <p>The question to ask before the others, and the one the reads below cannot answer: with no WorldGuard
+     * installed every one of them comes back empty, which looks exactly like a world nobody has protected. This
+     * tells the two apart.
+     */
+    private static HttpResponse support(UxmEssentialsApi api) {
+        JsonObject payload = Json.object();
+        payload.addProperty("available", reads(api).available());
+        return Json.ok(payload);
     }
 
     /**

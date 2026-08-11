@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.api.query.UxmMessagingQuery;
 import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
+import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
@@ -478,6 +479,50 @@ class ReadRoutesTest {
                         .get(0)
                         .getAsJsonObject()
                         .get("from-player")
+                        .getAsBoolean())
+                .isFalse();
+    }
+
+    @Test
+    void affordabilityIsAnsweredByThePluginRatherThanLeftToTheCaller() {
+        UxmEconomyQuery economy = mock(UxmEconomyQuery.class);
+        when(economy.canAfford(PLAYER, new BigDecimal("250.5"))).thenReturn(CompletableFuture.completedFuture(true));
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.economy()).thenReturn(Optional.of(economy));
+
+        Calls.Answer answer = Calls.get(api, PLAYER_PATH + "/balance/afford", Map.of("amount", "250.5"));
+
+        assertThat(answer.object().get("can-afford").getAsBoolean()).isTrue();
+        assertThat(Calls.get(api, PLAYER_PATH + "/balance/afford").status()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void regionSupportIsAskedAboutSeparatelyFromTheRegionsThemselves() {
+        UxmRegionsQuery regions = mock(UxmRegionsQuery.class);
+        when(regions.available()).thenReturn(false);
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.regions()).thenReturn(Optional.of(regions));
+
+        // No provider installed is not the same as a world nobody protected, and the empty list cannot say which.
+        assertThat(Calls.get(api, "/api/v1/regions").object().get("available").getAsBoolean())
+                .isFalse();
+    }
+
+    @Test
+    void whetherAViewerCanSeeAVanishedPlayerIsAskedWithTheViewer() {
+        UUID viewer = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        UxmVanishQuery vanish = mock(UxmVanishQuery.class);
+        when(vanish.isVanished(PLAYER)).thenReturn(true);
+        when(vanish.levelOf(PLAYER)).thenReturn(2);
+        when(vanish.canSee(viewer, PLAYER)).thenReturn(false);
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.vanish()).thenReturn(Optional.of(vanish));
+
+        assertThat(Calls.get(api, PLAYER_PATH + "/vanish").object().has("visible-to-viewer"))
+                .isFalse();
+        assertThat(Calls.get(api, PLAYER_PATH + "/vanish", Map.of("viewer", viewer.toString()))
+                        .object()
+                        .get("visible-to-viewer")
                         .getAsBoolean())
                 .isFalse();
     }

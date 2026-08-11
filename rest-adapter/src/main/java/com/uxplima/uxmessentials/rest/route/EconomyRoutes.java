@@ -8,13 +8,16 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmResult;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.view.UxmMoney;
 import com.uxplima.uxmessentials.rest.auth.Scopes;
+import com.uxplima.uxmessentials.rest.http.HttpException;
 import com.uxplima.uxmessentials.rest.http.HttpResponse;
+import com.uxplima.uxmessentials.rest.http.HttpStatus;
 import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.RestRequest;
 import com.uxplima.uxmessentials.rest.http.Route;
@@ -34,6 +37,8 @@ public final class EconomyRoutes {
                 Route.of("GET", PREFIX + "/economy/top", Scopes.READ, request -> top(api, request)),
                 Route.of("GET", PREFIX + "/players/{uuid}/balance", Scopes.READ, request -> balance(api, request)),
                 Route.of("GET", PREFIX + "/players/{uuid}/balances", Scopes.READ, request -> balances(api, request)),
+                Route.of(
+                        "GET", PREFIX + "/players/{uuid}/balance/afford", Scopes.READ, request -> afford(api, request)),
                 Route.of(
                         "POST",
                         PREFIX + "/players/{uuid}/balance/deposit",
@@ -63,6 +68,46 @@ public final class EconomyRoutes {
         return Reads.list(
                 Reads.await(currency.map(name -> economy.top(name, limit)).orElseGet(() -> economy.top(limit))),
                 Views::baltopEntry);
+    }
+
+    /**
+     * Whether the player holds at least {@code ?amount=}.
+     *
+     * <p>The same comparison the plugin makes before charging, which is why it is worth a route rather than being
+     * left to the caller: a shop that subtracts two numbers itself and then asks uxmEssentials to charge can
+     * disagree with it, and the disagreement shows up as a purchase that fails after the player was told it would
+     * not. Takes the same optional {@code ?currency=} the balance read does.
+     */
+    private static HttpResponse afford(UxmEssentialsApi api, RestRequest request) {
+        UxmEconomyQuery economy = economy(api);
+        UUID playerId = request.uuidParameter("uuid");
+        BigDecimal amount = amount(request);
+        Optional<String> currency = request.http().queryParam("currency");
+
+        JsonObject payload = Json.object();
+        payload.addProperty("amount", amount);
+        currency.ifPresent(name -> payload.addProperty("currency", name));
+        payload.addProperty(
+                "can-afford",
+                Reads.await(currency.map(name -> economy.canAfford(playerId, amount, name))
+                        .orElseGet(() -> economy.canAfford(playerId, amount))));
+        return Json.ok(payload);
+    }
+
+    /** The amount to weigh the balance against, which is the whole request and so is required and must be sane. */
+    private static BigDecimal amount(RestRequest request) {
+        String raw = request.http()
+                .queryParam("amount")
+                .orElseThrow(() -> new HttpException(HttpStatus.BAD_REQUEST, "pass the amount as ?amount="));
+        try {
+            BigDecimal amount = new BigDecimal(raw);
+            if (amount.signum() < 0) {
+                throw new HttpException(HttpStatus.BAD_REQUEST, "amount must not be negative: " + raw);
+            }
+            return amount;
+        } catch (NumberFormatException notANumber) {
+            throw new HttpException(HttpStatus.BAD_REQUEST, "amount is not a number: " + raw);
+        }
     }
 
     /**

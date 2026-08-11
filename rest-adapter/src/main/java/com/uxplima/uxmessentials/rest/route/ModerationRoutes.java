@@ -33,6 +33,10 @@ import com.uxplima.uxmessentials.rest.view.Views;
  * <p>Bans, mutes and jails take an optional {@code duration-seconds}. Leaving it out means permanent, which is the
  * same thing leaving it out means on the command, and is why it is written as an absent field rather than as a
  * zero somebody could send by accident.
+ *
+ * <p>Every write also takes an optional {@code silent}, which suppresses the server-wide announcement and nothing
+ * else: the punishment still lands, is still audited, and the player is still told. It is what a caller writing its
+ * own announcements wants, so the server is not told twice.
  */
 public final class ModerationRoutes {
 
@@ -79,9 +83,9 @@ public final class ModerationRoutes {
     }
 
     private static HttpResponse ban(ActionsFor actions, RestRequest request) {
-        UxmModerationActions moderation = writes(actions, request);
-        UUID target = request.uuidParameter("uuid");
         Body body = Body.of(request);
+        UxmModerationActions moderation = writes(actions, request, body);
+        UUID target = request.uuidParameter("uuid");
         Optional<String> reason = body.optionalText("reason");
 
         return Writes.result(
@@ -94,9 +98,9 @@ public final class ModerationRoutes {
     }
 
     private static HttpResponse mute(ActionsFor actions, RestRequest request) {
-        UxmModerationActions moderation = writes(actions, request);
-        UUID target = request.uuidParameter("uuid");
         Body body = Body.of(request);
+        UxmModerationActions moderation = writes(actions, request, body);
+        UUID target = request.uuidParameter("uuid");
         Optional<String> reason = body.optionalText("reason");
 
         return Writes.result(
@@ -109,25 +113,25 @@ public final class ModerationRoutes {
     }
 
     private static HttpResponse kick(ActionsFor actions, RestRequest request) {
-        UxmModerationActions moderation = writes(actions, request);
+        Body body = Body.of(request);
+        UxmModerationActions moderation = writes(actions, request, body);
         UUID target = request.uuidParameter("uuid");
-        Optional<String> reason = Body.of(request).optionalText("reason");
+        Optional<String> reason = body.optionalText("reason");
 
         return Writes.outcome(reason.map(why -> moderation.kick(target, why)).orElseGet(() -> moderation.kick(target)));
     }
 
     /** A warning always says why: an entry on somebody's record with no reason on it is not worth writing. */
     private static HttpResponse warn(ActionsFor actions, RestRequest request) {
+        Body body = Body.of(request);
         return Writes.result(
-                writes(actions, request)
-                        .warn(request.uuidParameter("uuid"), Body.of(request).text("reason")),
-                Views::warn);
+                writes(actions, request, body).warn(request.uuidParameter("uuid"), body.text("reason")), Views::warn);
     }
 
     private static HttpResponse jail(ActionsFor actions, RestRequest request) {
-        UxmModerationActions moderation = writes(actions, request);
-        UUID target = request.uuidParameter("uuid");
         Body body = Body.of(request);
+        UxmModerationActions moderation = writes(actions, request, body);
+        UUID target = request.uuidParameter("uuid");
         String jail = body.text("jail");
         String reason = body.optionalText("reason").orElse("");
         Optional<Duration> length = body.seconds("duration-seconds");
@@ -139,15 +143,15 @@ public final class ModerationRoutes {
     }
 
     private static HttpResponse unban(ActionsFor actions, RestRequest request) {
-        return Writes.outcome(writes(actions, request).unban(request.uuidParameter("uuid")));
+        return Writes.outcome(writes(actions, request, Body.of(request)).unban(request.uuidParameter("uuid")));
     }
 
     private static HttpResponse unmute(ActionsFor actions, RestRequest request) {
-        return Writes.outcome(writes(actions, request).unmute(request.uuidParameter("uuid")));
+        return Writes.outcome(writes(actions, request, Body.of(request)).unmute(request.uuidParameter("uuid")));
     }
 
     private static HttpResponse unjail(ActionsFor actions, RestRequest request) {
-        return Writes.outcome(writes(actions, request).unjail(request.uuidParameter("uuid")));
+        return Writes.outcome(writes(actions, request, Body.of(request)).unjail(request.uuidParameter("uuid")));
     }
 
     private static JsonElement sanction(CompletableFuture<Optional<UxmSanction>> pending) {
@@ -158,7 +162,13 @@ public final class ModerationRoutes {
         return Reads.module(api.moderation(), "moderation");
     }
 
-    private static UxmModerationActions writes(ActionsFor actions, RestRequest request) {
-        return Reads.module(actions.actingFor(request.caller()).moderation(), "moderation");
+    /**
+     * The write surface, quietened when the body asked for it. {@code silently()} is a variation of the surface
+     * rather than a per-verb flag, so the choice is made once here and every verb below inherits it.
+     */
+    private static UxmModerationActions writes(ActionsFor actions, RestRequest request, Body body) {
+        UxmModerationActions moderation =
+                Reads.module(actions.actingFor(request.caller()).moderation(), "moderation");
+        return body.flag("silent", false) ? moderation.silently() : moderation;
     }
 }

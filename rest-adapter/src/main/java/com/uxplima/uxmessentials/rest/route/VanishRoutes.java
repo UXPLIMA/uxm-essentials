@@ -21,6 +21,8 @@ import com.uxplima.uxmessentials.rest.http.Route;
  *
  * <p>Reachable only with a token, which is the whole reason it can be answered at all: an operator's panel needs to
  * know who is vanished, and nothing a player can reach ever asks this.
+ *
+ * <p>The per-player read takes an optional {@code ?viewer=}, which adds whether that viewer can see them.
  */
 public final class VanishRoutes {
 
@@ -45,6 +47,11 @@ public final class VanishRoutes {
         payload.addProperty("player-id", playerId.toString());
         payload.addProperty("vanished", query.isVanished(playerId));
         payload.addProperty("level", query.levelOf(playerId));
+        // With ?viewer= the answer also says whether that particular player can see them. Vanish has levels, so
+        // "is this player hidden" and "is this player hidden from you" are different questions, and a caller that
+        // worked the second one out from the first two would be reimplementing the rule.
+        Reads.uuidQuery(request, "viewer")
+                .ifPresent(viewer -> payload.addProperty("visible-to-viewer", query.canSee(viewer, playerId)));
         return Json.ok(payload);
     }
 

@@ -460,6 +460,22 @@ class WriteRoutesTest {
                 Optional.empty());
     }
 
+    @Test
+    void aPunishmentIsAnnouncedUnlessTheBodyAsksForQuiet() {
+        UxmModerationActions loud = mock(UxmModerationActions.class);
+        UxmModerationActions quiet = mock(UxmModerationActions.class);
+        when(loud.silently()).thenReturn(quiet);
+        when(loud.ban(PLAYER)).thenReturn(CompletableFuture.completedFuture(UxmResult.ok(sanction())));
+        when(quiet.ban(PLAYER)).thenReturn(CompletableFuture.completedFuture(UxmResult.ok(sanction())));
+
+        Calls.post(mock(UxmEssentialsApi.class), moderation(loud), PLAYER_PATH + "/ban");
+        verify(loud).ban(PLAYER);
+
+        Calls.post(mock(UxmEssentialsApi.class), moderation(loud), PLAYER_PATH + "/ban", """
+                {"silent":true}""");
+        verify(quiet).ban(PLAYER);
+    }
+
     private static UxmActions economy(UxmEconomyActions economy) {
         UxmActions actions = mock(UxmActions.class);
         when(actions.economy()).thenReturn(Optional.of(economy));
