@@ -197,6 +197,17 @@ val localeParityCheck by tasks.registering(JavaExec::class) {
 }
 tasks.named("check") { dependsOn(localeParityCheck) }
 
+// Documentation export: the module pages on docs.uxplima.com take their command, permission, setting and
+// placeholder tables from this file rather than from someone retyping them. Deliberately not wired into
+// `check`: it writes a file and is run by hand when the docs are refreshed.
+val docsExport by tasks.registering(JavaExec::class) {
+    group = "documentation"
+    description = "Write build/docs/docs-data.json for tools/docs/generate.py."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.uxplima.uxmessentials.docs.DocsExport")
+    dependsOn(tasks.named("compileTestJava"), tasks.processResources)
+}
+
 // JMH's annotation processor emits harness classes under …/jmh_generated/… that Thread.yield() in a spin loop
 // and are not tagged @Generated, so Error Prone's ThreadPriorityCheck fires on them and the shared -Werror fatals
 // it. Exclude only that generated path from Error Prone; the benchmark's own source stays fully checked.
