@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * and {@code /bring} (pull the target to you, mirrors {@code /tphere}) — into the teleport context's command
  * surface. Both ride the shared {@code uxmessentials.tp.use} node that {@code /tp} and {@code /tphere}
  * already use; this guard fails if either drops out of the surface or ever wires under a different
- * permission, which would otherwise drift the permissions reference and paper-plugin.yml.
+ * permission, which would otherwise drift the permissions reference and the permission catalogue.
  */
 class StaffTeleportAliasSurfaceDriftTest {
 

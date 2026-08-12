@@ -8,6 +8,8 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
+import net.kyori.adventure.text.minimessage.MiniMessage;
+
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
@@ -42,6 +44,9 @@ abstract class MessagingCommandSupport {
     /** The shared catalog key for a name that resolves to no player. */
     static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
 
+    /** Holding this lets a sender's MiniMessage tags render instead of arriving as text. */
+    static final String COLOUR = "uxmessentials.msg.color";
+
     final MessagingServices services;
     final Messages messages;
     final MessageSink sink;
@@ -69,10 +74,22 @@ abstract class MessagingCommandSupport {
         return BukkitRefs.toRef(player);
     }
 
-    /** Build a {@link MessageBody} from raw text, or {@code null} (after no feedback) when it is blank/overlong. */
-    static @Nullable MessageBody body(String raw) {
+    /**
+     * Build a {@link MessageBody} from what {@code sender} typed, or {@code null} (after no feedback) when it is
+     * blank or overlong.
+     *
+     * <p>The body reaches the viewer inside a MiniMessage template, so anything tag-shaped in it would be parsed
+     * along with the template. That is a formatting privilege and it is gated: without
+     * {@code uxmessentials.msg.color} the tags are escaped and arrive as the characters that were typed. The
+     * section sign is removed for everybody, since it is the legacy colour escape and nothing we render uses it.
+     */
+    static @Nullable MessageBody body(Player sender, String raw) {
+        String text = raw.replace('§', ' ');
+        if (!sender.hasPermission(COLOUR)) {
+            text = MiniMessage.miniMessage().escapeTags(text);
+        }
         try {
-            return MessageBody.of(raw);
+            return MessageBody.of(text);
         } catch (IllegalArgumentException invalid) {
             return null;
         }

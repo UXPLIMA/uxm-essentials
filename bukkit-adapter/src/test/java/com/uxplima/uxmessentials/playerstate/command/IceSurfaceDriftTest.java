@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins {@code /ice} into the playerstate context's command surface — the cosmetic opposite of {@code /burn}
  * that applies the powder-snow freeze to a target for a number of seconds. This guard fails if the literal
  * drops out of the surface or ever wires under a node other than its own {@code uxmessentials.ice.use}, which
- * would otherwise drift the permissions reference and paper-plugin.yml.
+ * would otherwise drift the permissions reference and the permission catalogue.
  */
 class IceSurfaceDriftTest {
 

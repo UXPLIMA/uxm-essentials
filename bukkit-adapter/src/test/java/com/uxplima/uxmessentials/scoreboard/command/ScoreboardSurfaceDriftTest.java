@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins {@code /scoreboard} into the scoreboard context's command surface and its gating node. The single per-player
  * toggle command is the whole surface; this guard fails if the literal drops out or wires under a node other than
- * {@code uxmessentials.scoreboard.use}, keeping the kernel surface in lockstep with {@code paper-plugin.yml}.
+ * {@code uxmessentials.scoreboard.use}, keeping the kernel surface in lockstep with the permission catalogue.
  */
 class ScoreboardSurfaceDriftTest {
 

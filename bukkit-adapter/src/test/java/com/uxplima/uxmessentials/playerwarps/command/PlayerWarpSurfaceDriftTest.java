@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins each player-warps command literal to its base permission node. The three self-service commands are the
  * whole top-level surface; this guard fails if a literal drops out or wires under a node other than its
- * documented one, keeping the kernel surface in lockstep with {@code paper-plugin.yml}. The
+ * documented one, keeping the kernel surface in lockstep with the permission catalogue. The
  * {@code visibility public|private <name>} toggles and {@code del <name>} are subcommands of {@code /pwarp}
  * (gated by {@code uxmessentials.pwarp.public} and {@code uxmessentials.pwarp.delete}) rather than command
  * literals, so they are not part of this table — {@code del} folded into {@code /pwarp} the way {@code /warp del}

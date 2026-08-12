@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins {@code /hologram} into the holograms context's command surface and its gating node. The single
  * operator command (with its create / delete / list / line-edit / move subcommands) is the whole surface;
  * this guard fails if the literal drops out or wires under a node other than
- * {@code uxmessentials.hologram.use}, keeping the kernel surface in lockstep with {@code paper-plugin.yml}.
+ * {@code uxmessentials.hologram.use}, keeping the kernel surface in lockstep with the permission catalogue.
  */
 class HologramSurfaceDriftTest {
 

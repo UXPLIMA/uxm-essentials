@@ -10,6 +10,7 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlagRegistrar;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardSetPwarpFlagRegistrar;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
@@ -27,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 public final class UxmEssentialsPlugin extends JavaPlugin {
 
     private @Nullable CloseableResources resources;
+    private @Nullable CatalogPermissions permissions;
 
     /**
      * Registers our WorldGuard custom flags before any plugin is enabled. WorldGuard locks its flag registry the moment
@@ -60,18 +62,25 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
 
         long startTime = System.currentTimeMillis();
 
-        getLogger().info("[1/4] Writing default resources...");
+        getLogger().info("[1/5] Registering permissions...");
+        // Every node the catalogue declares, handed to the server before anything can check one, so a permission
+        // plugin sees the whole surface rather than the subset a hand-written file happened to list.
+        CatalogPermissions permissions = new CatalogPermissions(getServer().getPluginManager(), getLogger());
+        this.permissions = permissions;
+        getLogger().info("       " + permissions.register() + " permission nodes registered.");
+
+        getLogger().info("[2/5] Writing default resources...");
         // First-run side effect: drop the editable default config files next to the database so an operator has
         // something to configure. Existing files are never overwritten; an update only appends the settings it
         // added, so a new knob is visible in their file instead of only in the jar (see DefaultResources).
         DefaultResources.writeInto(
                 getDataFolder().toPath(), getLogger(), getPluginMeta().getVersion());
 
-        getLogger().info("[2/4] Wiring core modules and persistence...");
+        getLogger().info("[3/5] Wiring core modules and persistence...");
         CloseableResources wired = PluginModule.wire(this);
         this.resources = wired;
 
-        getLogger().info("[3/4] Registering command handlers...");
+        getLogger().info("[4/5] Registering command handlers...");
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             var registrar = event.registrar();
             // Guard each publish so one malformed command (a broken build() or a duplicate literal) is logged
@@ -90,7 +99,7 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
             });
         });
 
-        getLogger().info("[4/4] Registering listener hooks...");
+        getLogger().info("[5/5] Registering listener hooks...");
         // Same isolation on the listener side: one listener that throws on registration must not stop the rest.
         wired.listeners().forEach(listener -> {
             try {
@@ -140,6 +149,11 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
             getLogger().info("Closing active modules and dependencies...");
             wired.close(); // stops every started module in reverse wiring order
             this.resources = null;
+        }
+        CatalogPermissions declared = this.permissions;
+        if (declared != null) {
+            declared.unregister();
+            this.permissions = null;
         }
         getLogger().info("UxmEssentials has been disabled!");
     }

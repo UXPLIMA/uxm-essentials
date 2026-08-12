@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * toggle that makes a self {@code /clearinventory} ask for a second confirmation before it clears. This guard
  * fails if the literal drops out of the surface or ever wires under a node other than its own
  * {@code uxmessentials.clearinventory.confirmtoggle}, which would otherwise drift the permissions reference and
- * paper-plugin.yml.
+ * the permission catalogue.
  */
 class ClearInventoryConfirmToggleSurfaceDriftTest {
 

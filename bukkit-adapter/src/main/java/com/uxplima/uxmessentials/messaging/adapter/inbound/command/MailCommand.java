@@ -110,7 +110,7 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
         if (sender == null) {
             return 0;
         }
-        MessageBody text = body(ctx.getArgument("text", String.class));
+        MessageBody text = body(sender, ctx.getArgument("text", String.class));
         if (text == null) {
             return 0;
         }
@@ -130,7 +130,7 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
         if (sender == null) {
             return 0;
         }
-        MessageBody text = body(ctx.getArgument("text", String.class));
+        MessageBody text = body(sender, ctx.getArgument("text", String.class));
         if (text == null) {
             return 0;
         }

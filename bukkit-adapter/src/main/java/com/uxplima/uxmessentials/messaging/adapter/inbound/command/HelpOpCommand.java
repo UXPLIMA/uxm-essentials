@@ -49,7 +49,7 @@ public final class HelpOpCommand extends MessagingCommandSupport implements Comm
         if (requester == null) {
             return 0;
         }
-        MessageBody text = body(ctx.getArgument("text", String.class));
+        MessageBody text = body(requester, ctx.getArgument("text", String.class));
         if (text == null) {
             return 0;
         }

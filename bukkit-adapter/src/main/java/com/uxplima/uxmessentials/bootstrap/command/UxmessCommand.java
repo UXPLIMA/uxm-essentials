@@ -67,6 +67,8 @@ public final class UxmessCommand implements CommandRegistration {
     private static final String HELP_RELOAD =
             "/uxmess reload [module] — re-read the config and message files, all or scoped to one module";
     private static final String HELP_IMPORT = "/uxmess import <source> [--dry-run] — import legacy data";
+    private static final String HELP_PERMISSIONS =
+            "/uxmess permissions [area] [page]: read the permission catalogue, export writes it to a file";
 
     private static final String DOCTOR_HEADER = "uxmEssentials — health checks";
     private static final String DOCTOR_RUNNING = "Running health checks off-tick…";
@@ -95,6 +97,7 @@ public final class UxmessCommand implements CommandRegistration {
     private final ConfigStore config;
     private final MigrationImportNode importNode;
     private final GuiSubcommand guiNode;
+    private final PermissionsSubcommand permissionsNode;
     private final Scheduler scheduler;
     private final List<HealthCheck> healthChecks;
     private final List<ReloadTask> reloadTasks;
@@ -104,6 +107,7 @@ public final class UxmessCommand implements CommandRegistration {
             ConfigStore config,
             MigrationImportNode importNode,
             GuiSubcommand guiNode,
+            PermissionsSubcommand permissionsNode,
             Scheduler scheduler,
             List<HealthCheck> healthChecks,
             List<ReloadTask> reloadTasks) {
@@ -111,6 +115,7 @@ public final class UxmessCommand implements CommandRegistration {
         this.config = Objects.requireNonNull(config, "config");
         this.importNode = Objects.requireNonNull(importNode, "importNode");
         this.guiNode = Objects.requireNonNull(guiNode, "guiNode");
+        this.permissionsNode = Objects.requireNonNull(permissionsNode, "permissionsNode");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.healthChecks = List.copyOf(Objects.requireNonNull(healthChecks, "healthChecks"));
         this.reloadTasks = List.copyOf(Objects.requireNonNull(reloadTasks, "reloadTasks"));
@@ -127,6 +132,7 @@ public final class UxmessCommand implements CommandRegistration {
                 .then(guiNode.build())
                 .then(reloadNode())
                 .then(importNode.build())
+                .then(permissionsNode.build())
                 .build();
     }
 
@@ -224,6 +230,7 @@ public final class UxmessCommand implements CommandRegistration {
         sendBody(sender, HELP_GUI);
         sendBody(sender, HELP_RELOAD);
         sendBody(sender, HELP_IMPORT);
+        sendBody(sender, HELP_PERMISSIONS);
         return Command.SINGLE_SUCCESS;
     }
 

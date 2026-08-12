@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * context's command surface. These are the idempotent on/off verbs that sit alongside
  * the flip-style {@code /tptoggle}; this guard fails if either drops out of the surface or wires under a
  * permission node other than the shared {@code uxmessentials.tpa.toggle} {@code /tptoggle} already uses,
- * which would otherwise drift the permissions reference and paper-plugin.yml.
+ * which would otherwise drift the permissions reference and the permission catalogue.
  */
 class TpRequestToggleSurfaceDriftTest {
 

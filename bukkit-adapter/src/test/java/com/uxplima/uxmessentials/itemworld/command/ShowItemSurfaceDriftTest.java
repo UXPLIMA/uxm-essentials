@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * item's name to chat so other players can read what someone is
  * holding; this guard fails if the literal drops out of the surface or wires under a node other than
  * {@code uxmessentials.showitem.use}, which would otherwise drift the permissions reference and
- * paper-plugin.yml.
+ * the permission catalogue.
  */
 class ShowItemSurfaceDriftTest {
 

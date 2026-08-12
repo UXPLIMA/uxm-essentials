@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins {@code /worth} into the economy context's command surface. {@code /worth} reports
  * the configured sell value of the held item before a player commits to {@code /sell}; this guard fails if the
  * literal drops out of the surface or wires under a node other than {@code uxmessentials.economy.worth}, which
- * would otherwise drift the permissions reference and paper-plugin.yml.
+ * would otherwise drift the permissions reference and the permission catalogue.
  */
 class WorthSurfaceDriftTest {
 

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins {@code /vote} and {@code /voteparty} into the vote context's command surface and their gating nodes.
  * The two top-level commands are the whole surface ({@code /vote testreward} is a subcommand of {@code /vote},
  * not a separate literal); this guard fails if a literal drops out or wires under a node other than its own,
- * keeping the kernel surface in lockstep with {@code paper-plugin.yml}.
+ * keeping the kernel surface in lockstep with the permission catalogue.
  */
 class VoteSurfaceDriftTest {
 

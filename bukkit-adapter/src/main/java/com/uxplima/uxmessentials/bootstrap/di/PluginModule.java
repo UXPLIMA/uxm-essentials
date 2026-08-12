@@ -58,6 +58,7 @@ import com.uxplima.uxmessentials.bootstrap.command.GuiSubcommand;
 import com.uxplima.uxmessentials.bootstrap.command.HelpCommand;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
+import com.uxplima.uxmessentials.bootstrap.command.PermissionsSubcommand;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.bootstrap.health.BusTransportHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.ClusterPeersHealthCheck;
@@ -756,7 +757,14 @@ public final class PluginModule {
                 new ManagementHubView(menus, guiText, kernel.scheduler(), kernel.permissions(), guiRegistry, hubLayout);
         GuiSubcommand guiNode = new GuiSubcommand(guiRegistry, hub, kernel.permissions(), kernel.messages());
         resources.addCommand(new UxmessCommand(
-                registry, config, importNode, guiNode, kernel.scheduler(), healthChecks, resources.reloadTasks()));
+                registry,
+                config,
+                importNode,
+                guiNode,
+                new PermissionsSubcommand(plugin.getDataFolder().toPath(), kernel.log()),
+                kernel.scheduler(),
+                healthChecks,
+                resources.reloadTasks()));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));

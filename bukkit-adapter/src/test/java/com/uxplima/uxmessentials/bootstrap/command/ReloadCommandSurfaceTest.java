@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.bootstrap.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -91,7 +93,19 @@ class ReloadCommandSurfaceTest {
         Mockito.when(config.scoped(Mockito.anyString())).thenReturn(config);
         MigrationImportService service = Mockito.mock(MigrationImportService.class);
         return new UxmessCommand(
-                registry, config, new MigrationImportNode(service), guiNode(), new InlineScheduler(), List.of(), tasks);
+                registry,
+                config,
+                new MigrationImportNode(service),
+                guiNode(),
+                permissionsNode(),
+                new InlineScheduler(),
+                List.of(),
+                tasks);
+    }
+
+    /** A permissions node pointed at a scratch folder: this guard never runs its export. */
+    private static PermissionsSubcommand permissionsNode() {
+        return new PermissionsSubcommand(Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class));
     }
 
     /** A minimal /uxmess gui node: this surface guard only runs the reload child, never opens the hub. */

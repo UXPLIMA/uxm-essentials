@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins {@code /modstats} into the moderation context's command surface and its gating node. The staff
  * punishment-analytics command carries its own {@code uxmessentials.moderation.stats} node (analytics can be
  * granted apart from the act-on-sanction powers); this guard fails if the literal drops out of the surface or
- * wires under the wrong node, which would otherwise drift the permissions reference and paper-plugin.yml.
+ * wires under the wrong node, which would otherwise drift the permissions reference and the permission catalogue.
  */
 class ModStatsSurfaceDriftTest {
 

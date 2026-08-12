@@ -50,7 +50,7 @@ public final class ReplyCommand extends MessagingCommandSupport implements Comma
         if (sender == null) {
             return 0;
         }
-        MessageBody text = body(ctx.getArgument("text", String.class));
+        MessageBody text = body(sender, ctx.getArgument("text", String.class));
         if (text == null) {
             return 0;
         }

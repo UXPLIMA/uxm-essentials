@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.bootstrap.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthResult;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -87,9 +89,15 @@ class DoctorCommandSurfaceTest {
                 config,
                 new MigrationImportNode(service),
                 guiNode(),
+                permissionsNode(),
                 new InlineScheduler(),
                 checks,
                 List.of());
+    }
+
+    /** A permissions node pointed at a scratch folder: this guard never runs its export. */
+    private static PermissionsSubcommand permissionsNode() {
+        return new PermissionsSubcommand(Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class));
     }
 
     /** A minimal /uxmess gui node — this surface guard only inspects the doctor child, never opens the hub. */

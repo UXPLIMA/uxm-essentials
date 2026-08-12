@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins {@code /npc} into the npc context's command surface and its gating node. The single operator command
  * (with its create / delete / list / movehere / skin / command subcommands) is the whole surface; this guard
  * fails if the literal drops out or wires under a node other than {@code uxmessentials.npc.admin}, keeping the
- * kernel surface in lockstep with {@code paper-plugin.yml}.
+ * kernel surface in lockstep with the permission catalogue.
  */
 class NpcSurfaceDriftTest {
 

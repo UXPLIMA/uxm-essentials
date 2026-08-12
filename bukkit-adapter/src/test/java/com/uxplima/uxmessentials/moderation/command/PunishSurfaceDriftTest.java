@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * punishment-template convenience carries its own {@code uxmessentials.moderation.templates} node (the preset
  * power can be granted apart from the raw ban/tempban nodes); this guard fails if the literal drops out of the
  * surface or wires under the wrong node, which would otherwise drift the permissions reference and
- * paper-plugin.yml.
+ * the permission catalogue.
  */
 class PunishSurfaceDriftTest {
 

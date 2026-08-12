@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins {@code /setworth} into the economy context's command surface. Worth pricing was config-only and
  * immutable; {@code /setworth} writes a DB-backed per-item override. This guard fails if the literal drops out
  * of the surface or wires under a node other than {@code uxmessentials.economy.setworth}, which would otherwise
- * drift the permissions reference and paper-plugin.yml.
+ * drift the permissions reference and the permission catalogue.
  */
 class SetWorthSurfaceDriftTest {
 

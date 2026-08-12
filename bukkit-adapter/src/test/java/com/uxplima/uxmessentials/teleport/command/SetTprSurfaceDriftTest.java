@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * {@code /rtp} search zone at runtime by swapping the live pre-warmed queue's radii. This guard fails if the
  * literal drops out of the surface or ever wires under a node other than its own
  * {@code uxmessentials.teleport.settpr}, which would otherwise drift the permissions reference and
- * paper-plugin.yml.
+ * the permission catalogue.
  */
 class SetTprSurfaceDriftTest {
 
