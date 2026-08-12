@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /ext [player]} (alias {@code /extinguish}, {@code uxmessentials.extinguish.use}): put out a burning
- * player — yourself or another with the {@code uxmessentials.playerstate.others} node. The {@code Extinguish}
+ * player, yourself or another with the {@code uxmessentials.extinguish.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The {@code Extinguish}
  * use case owns the live-only effect and the feedback.
  */
 @NullMarked
@@ -29,6 +29,12 @@ public final class ExtinguishCommand extends PlayerstateCommandSupport implement
 
     public ExtinguishCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.extinguish.others";
     }
 
     @Override

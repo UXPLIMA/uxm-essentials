@@ -66,6 +66,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
 
     private static final String USE_PERMISSION = "uxmessentials.pwarp.use";
     private static final String PUBLIC_PERMISSION = "uxmessentials.pwarp.public";
+    private static final String EDIT_PERMISSION = "uxmessentials.pwarp.edit";
     private static final String DELETE_PERMISSION = "uxmessentials.pwarp.delete";
     private static final String SET_PERMISSION = "uxmessentials.pwarp.set";
     private static final String MOVE_PERMISSION = "uxmessentials.pwarp.move";
@@ -102,7 +103,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                 .requires(src -> src.getSender().hasPermission(USE_PERMISSION))
                 .executes(this::openGui)
                 .then(visibilitySubtree())
-                .then(Commands.literal("edit").then(nameArg().executes(this::openPlayerWarpEditor)))
+                .then(verb("edit", EDIT_PERMISSION).then(nameArg().executes(this::openPlayerWarpEditor)))
                 .then(verb("del", DELETE_PERMISSION).then(nameArg().executes(this::runDelete)))
                 .then(verb("set", SET_PERMISSION).then(nameArg().executes(this::runSet)))
                 .then(verb("move", MOVE_PERMISSION).then(nameArg().executes(this::runMove)))

@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * value. The amount is bounded below by Brigadier and floored at {@code 0} in the domain ({@link HealthLevel});
  * the adapter caps it to the player's live maximum health, so a value of {@code 0} kills. Distinct from
  * {@code /heal}, which always restores to full. The {@code .others} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node; the {@code SetHealth} use case owns the effect and feedback.
+ * {@code uxmessentials.health.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node; the {@code SetHealth} use case owns the effect and feedback.
  */
 @NullMarked
 public final class HealthCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -34,6 +34,12 @@ public final class HealthCommand extends PlayerstateCommandSupport implements Co
 
     public HealthCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.health.others";
     }
 
     @Override

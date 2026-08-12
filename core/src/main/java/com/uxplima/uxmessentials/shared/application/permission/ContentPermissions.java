@@ -55,6 +55,41 @@ final class ContentPermissions {
                         PermissionDefault.OP,
                         NPC),
                 PermissionSpec.of(
+                        "uxmessentials.npc.create",
+                        "/npc create and /npc copy. Held by default alongside the admin node; negate it to leave an operator editing only the NPCs that already exist.",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
+                        "uxmessentials.npc.delete",
+                        "/npc delete. Held by default alongside the admin node; the capability most worth negating for build staff.",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
+                        "uxmessentials.npc.move",
+                        "/npc movehere, moveto, teleport, center and fix: change where an NPC stands.",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
+                        "uxmessentials.npc.appearance",
+                        "/npc skin, skinslim, type, equip, glow, pose, scale and displayname: change how an NPC looks.",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
+                        "uxmessentials.npc.action",
+                        "/npc command and /npc action: change what an NPC runs when clicked.",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
+                        "uxmessentials.npc.view",
+                        "/npc list, info, nearby and help: read-only inspection.",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
+                        "uxmessentials.npc.edit",
+                        "Every remaining /npc setting (data, state, cooldown, mirror, collidable, showintab, view and turn distance).",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
                         "uxmessentials.npc.gui",
                         "/npc (no args) opens the NPC management GUI.",
                         PermissionDefault.OP,
@@ -73,6 +108,46 @@ final class ContentPermissions {
                         "uxmessentials.hologram.use",
                         "/hologram to create, edit, move, list and delete native-Display holograms.",
                         PermissionDefault.OP,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.create",
+                        "/hologram create and copy. Held by default alongside the base node; negate it to leave an operator editing only the holograms that already exist.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.delete",
+                        "/hologram delete. Held by default alongside the base node; the capability most worth negating for build staff.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.move",
+                        "/hologram movehere, moveto, center, teleport and rotate: change where a hologram sits.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.appearance",
+                        "/hologram billboard, background, glow, opacity, shadow, linewidth, viewrange, alignment, seethrough, growup, item, block, head and entity: change how a hologram looks.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.visibility",
+                        "/hologram visibility, visibilitydistance, show, hide, blacklist and unblacklist: change who sees a hologram.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.action",
+                        "/hologram action and clickcommand: change what a hologram runs when clicked.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.view",
+                        "/hologram list, info and nearby: read-only inspection.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.edit",
+                        "The line and page content of a hologram (addline, setline, insertline, removeline, page, leaderboard, linknpc, unlinknpc).",
+                        PermissionDefault.TRUE,
                         HOLOGRAMS),
                 PermissionSpec.of(
                         "uxmessentials.holograms.gui",

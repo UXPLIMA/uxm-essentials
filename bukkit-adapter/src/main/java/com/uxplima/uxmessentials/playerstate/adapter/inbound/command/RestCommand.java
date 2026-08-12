@@ -21,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /rest [player]} ({@code uxmessentials.rest.use}): reset a player's time-since-rest statistic so the
  * accumulated phantom-spawn pressure clears and phantoms stop. The {@code ResetRest} use case is config-gated
  * (it tells the actor when the feature is disabled). The {@code .others} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node.
+ * {@code uxmessentials.rest.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node.
  */
 @NullMarked
 public final class RestCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -30,6 +30,12 @@ public final class RestCommand extends PlayerstateCommandSupport implements Comm
 
     public RestCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.rest.others";
     }
 
     @Override

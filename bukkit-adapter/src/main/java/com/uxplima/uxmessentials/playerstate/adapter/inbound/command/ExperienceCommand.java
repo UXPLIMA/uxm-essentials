@@ -26,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /exp} (alias {@code /xp}, {@code uxmessentials.exp.use}): read or change a player's experience —
  * {@code get}, {@code set <amount>}, {@code give <amount>}, {@code take <amount>}, or {@code reset}, with an
  * optional {@code levels}/{@code points} unit and an optional {@code [player]} target gated by the shared
- * {@code uxmessentials.playerstate.others} node. The non-negative amount is bounded by Brigadier; the domain
+ * {@code uxmessentials.exp.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The non-negative amount is bounded by Brigadier; the domain
  * {@link ExperienceChange} clamps the resulting total. The {@code SetExperience} use case owns the effect.
  */
 @NullMarked
@@ -36,6 +36,12 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
 
     public ExperienceCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.exp.others";
     }
 
     @Override

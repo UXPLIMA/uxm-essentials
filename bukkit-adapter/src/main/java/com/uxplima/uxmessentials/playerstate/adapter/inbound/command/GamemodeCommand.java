@@ -28,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /gamemode <mode> [player]} ({@code uxmessentials.gamemode.use}): set a player's game mode. The mode
  * is parsed from the full name, the short alias, or the numeric id; an unrecognised mode is rejected with
  * {@link PlayerstateMessageKey#GAMEMODE_INVALID}. The {@code .others} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node. The {@code /gmc /gms /gma /gmsp} shortcuts are separate
+ * {@code uxmessentials.gamemode.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The {@code /gmc /gms /gma /gmsp} shortcuts are separate
  * fixed-mode commands ({@link GamemodeAliasCommand}), not aliases of this literal, because each pins a mode.
  */
 @NullMarked
@@ -42,6 +42,12 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
 
     public GamemodeCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.gamemode.others";
     }
 
     @Override

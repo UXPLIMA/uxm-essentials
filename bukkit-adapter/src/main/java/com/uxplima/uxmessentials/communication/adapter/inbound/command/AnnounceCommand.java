@@ -63,6 +63,23 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
 
     private static final String PERMISSION = "uxmessentials.announce.admin";
 
+    /**
+     * The per-verb nodes under {@link #PERMISSION}. Authoring an announcement, re-reading the file, and reading the
+     * rotation are three different acts: a build team may be trusted with the editor while only an administrator
+     * reloads, and the opt-out is a personal switch that happens to live under this root. Each defaults to allowed,
+     * so an existing {@code uxmessentials.announce.admin} grant is unchanged and an operator narrows by negating
+     * one node.
+     */
+    private static final String EDITOR = PERMISSION + ".editor";
+
+    private static final String RELOAD = PERMISSION + ".reload";
+
+    private static final String LIST = PERMISSION + ".list";
+
+    private static final String PREVIEW = PERMISSION + ".preview";
+
+    private static final String TOGGLE = PERMISSION + ".toggle";
+
     private final CommunicationSettings settings;
     private final Supplier<AnnouncerConfig> mergedConfig;
     private final BukkitAnnouncerBroadcaster broadcaster;
@@ -94,12 +111,21 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("announce")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.literal("editor").executes(this::openEditor))
-                .then(Commands.literal("reload").executes(this::reload))
-                .then(Commands.literal("list").executes(this::list))
+                .then(Commands.literal("editor")
+                        .requires(src -> src.getSender().hasPermission(EDITOR))
+                        .executes(this::openEditor))
+                .then(Commands.literal("reload")
+                        .requires(src -> src.getSender().hasPermission(RELOAD))
+                        .executes(this::reload))
+                .then(Commands.literal("list")
+                        .requires(src -> src.getSender().hasPermission(LIST))
+                        .executes(this::list))
                 .then(Commands.literal("preview")
+                        .requires(src -> src.getSender().hasPermission(PREVIEW))
                         .then(Commands.argument("id", StringArgumentType.word()).executes(this::preview)))
-                .then(Commands.literal("toggle").executes(this::toggle))
+                .then(Commands.literal("toggle")
+                        .requires(src -> src.getSender().hasPermission(TOGGLE))
+                        .executes(this::toggle))
                 .build();
     }
 

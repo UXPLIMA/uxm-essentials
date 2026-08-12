@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * player for a number of seconds — the cosmetic opposite of {@code /burn}. The seconds argument is optional
  * (defaulting to {@link #DEFAULT_SECONDS}), bounded by Brigadier and clamped to a sane range in the domain
  * ({@link FreezeDuration}). The {@code [player]} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node; the {@code Freeze} use case owns the effect and feedback.
+ * {@code uxmessentials.ice.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node; the {@code Freeze} use case owns the effect and feedback.
  */
 @NullMarked
 public final class IceCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -34,6 +34,12 @@ public final class IceCommand extends PlayerstateCommandSupport implements Comma
 
     public IceCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.ice.others";
     }
 
     @Override

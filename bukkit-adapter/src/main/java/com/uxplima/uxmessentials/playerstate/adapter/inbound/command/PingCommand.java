@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * {@link com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo} port. The target is a plain
  * online-player name (never an {@code @a}/{@code @p}/{@code @s} selector — one player's ping is a single-target
  * read where a fan-out is nonsensical); the {@code .others} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node.
+ * {@code uxmessentials.ping.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node.
  */
 @NullMarked
 public final class PingCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -32,6 +32,12 @@ public final class PingCommand extends PlayerstateCommandSupport implements Comm
 
     public PingCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.ping.others";
     }
 
     @Override

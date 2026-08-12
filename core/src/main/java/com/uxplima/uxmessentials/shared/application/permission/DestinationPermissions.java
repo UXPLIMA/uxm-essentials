@@ -307,6 +307,12 @@ final class DestinationPermissions {
                         PermissionDefault.TRUE,
                         PLAYERWARPS),
                 PermissionSpec.of(
+                        "uxmessentials.pwarp.edit",
+                        "/pwarp edit <name> to open one warp's property editor, the click-driven form of the typed "
+                                + "verbs. Held by default alongside the use node.",
+                        PermissionDefault.TRUE,
+                        PLAYERWARPS),
+                PermissionSpec.of(
                         "uxmessentials.pwarp.gui",
                         "Manage every player's warps in the /pwarp GUI (a player without it edits only their own).",
                         PermissionDefault.OP,

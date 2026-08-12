@@ -89,11 +89,30 @@ abstract class PlayerstateCommandSupport {
         if (resolver.isEmpty()) {
             return List.of(BukkitRefs.toRef(sender));
         }
-        if (!sender.hasPermission(OTHERS_PERMISSION)) {
+        if (!mayTargetOthers(sender)) {
             reply(sender, NO_PERMISSION, Map.of());
             return List.of();
         }
         return resolveSelector(resolver.get(), ctx, sender);
+    }
+
+    /**
+     * This command's own others node, as {@code uxmessentials.heal.others} for {@code /heal}. Overridden by each
+     * command so a target grant can be given one verb at a time; the default is the cross-cutting node, which is
+     * what a command with no target form of its own would want.
+     */
+    String othersNode() {
+        return OTHERS_PERMISSION;
+    }
+
+    /**
+     * Whether the sender may act on somebody else: the cross-cutting {@link #OTHERS_PERMISSION} grants every
+     * playerstate command at once, and {@link #othersNode()} grants this one. Either is enough, so an operator
+     * chooses the breadth: one node for a full administrator, {@code uxmessentials.heal.others} alone for a medic
+     * who must not also empty an inventory.
+     */
+    final boolean mayTargetOthers(Player sender) {
+        return sender.hasPermission(OTHERS_PERMISSION) || sender.hasPermission(othersNode());
     }
 
     /**
@@ -129,7 +148,7 @@ abstract class PlayerstateCommandSupport {
         if (typed.isEmpty()) {
             return Optional.of(BukkitRefs.toRef(sender));
         }
-        if (!sender.hasPermission(OTHERS_PERMISSION)) {
+        if (!mayTargetOthers(sender)) {
             reply(sender, NO_PERMISSION, Map.of());
             return Optional.empty();
         }
@@ -154,7 +173,7 @@ abstract class PlayerstateCommandSupport {
         if (typed.isEmpty()) {
             return Optional.of(BukkitRefs.toRef(sender));
         }
-        if (!sender.hasPermission(OTHERS_PERMISSION)) {
+        if (!mayTargetOthers(sender)) {
             reply(sender, NO_PERMISSION, Map.of());
             return Optional.empty();
         }

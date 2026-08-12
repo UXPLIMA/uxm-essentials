@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /burn <seconds> [player]} ({@code uxmessentials.burn.use}): set a player on fire for a number of
  * seconds — the inverse of {@code /ext}. The seconds argument is bounded by Brigadier and clamped to a sane
  * range in the domain ({@link BurnDuration}). The {@code .others} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node; the {@code Burn} use case owns the effect and feedback.
+ * {@code uxmessentials.burn.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node; the {@code Burn} use case owns the effect and feedback.
  */
 @NullMarked
 public final class BurnCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -32,6 +32,12 @@ public final class BurnCommand extends PlayerstateCommandSupport implements Comm
 
     public BurnCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.burn.others";
     }
 
     @Override

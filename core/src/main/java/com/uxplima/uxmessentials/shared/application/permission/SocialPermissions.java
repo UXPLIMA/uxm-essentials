@@ -163,6 +163,31 @@ final class SocialPermissions {
                         PermissionDefault.OP,
                         COMMUNICATION),
                 PermissionSpec.of(
+                        "uxmessentials.announce.admin.editor",
+                        "/announce editor to author announcements in the GUI.",
+                        PermissionDefault.TRUE,
+                        COMMUNICATION),
+                PermissionSpec.of(
+                        "uxmessentials.announce.admin.reload",
+                        "/announce reload to re-read announcer.conf and re-arm the rotation.",
+                        PermissionDefault.TRUE,
+                        COMMUNICATION),
+                PermissionSpec.of(
+                        "uxmessentials.announce.admin.list",
+                        "/announce list to read the rotation and the channels each announcement pushes to.",
+                        PermissionDefault.TRUE,
+                        COMMUNICATION),
+                PermissionSpec.of(
+                        "uxmessentials.announce.admin.preview",
+                        "/announce preview <id> to show one announcement to yourself alone.",
+                        PermissionDefault.TRUE,
+                        COMMUNICATION),
+                PermissionSpec.of(
+                        "uxmessentials.announce.admin.toggle",
+                        "/announce toggle to stop or resume receiving the rotating announcements.",
+                        PermissionDefault.TRUE,
+                        COMMUNICATION),
+                PermissionSpec.of(
                         "uxmessentials.communication.broadcast",
                         "/broadcast to send a one-off announcement to all online players.",
                         PermissionDefault.OP,

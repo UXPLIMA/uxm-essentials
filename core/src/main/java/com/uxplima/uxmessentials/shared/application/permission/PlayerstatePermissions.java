@@ -222,6 +222,106 @@ final class PlayerstatePermissions {
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
+                        "uxmessentials.air.others",
+                        "/air on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.burn.others",
+                        "/burn on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.clearinventory.others",
+                        "/clearinventory on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.endersee.others",
+                        "/endersee to open another player ender chest. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.exp.others",
+                        "/exp on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.extinguish.others",
+                        "/extinguish on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.feed.others",
+                        "/feed on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.fly.others",
+                        "/fly on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.foodlevel.others",
+                        "/foodlevel on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.gamemode.others",
+                        "/gamemode on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.getpos.others",
+                        "/getpos on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.god.others",
+                        "/god on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.heal.others",
+                        "/heal on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.health.others",
+                        "/health on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.ice.others",
+                        "/ice on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.invsee.others",
+                        "/invsee to open another player inventory. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.ping.others",
+                        "/ping on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.playtime.others",
+                        "/playtime on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.rest.others",
+                        "/rest on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.speed.others",
+                        "/speed on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
                         "uxmessentials.playerstate.others",
                         "Use any playerstate command with a [player] target other than yourself.",
                         PermissionDefault.OP,

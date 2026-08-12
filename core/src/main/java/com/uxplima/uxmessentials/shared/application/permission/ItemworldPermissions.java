@@ -142,6 +142,51 @@ final class ItemworldPermissions {
                         PermissionDefault.OP,
                         ITEMWORLD),
                 PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.rename",
+                        "/itemedit rename and resetname. Defaults on for anyone who already holds the editor node; negate it to withhold just this verb.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.lore",
+                        "/itemedit lore add|set|insert|remove|clear. Defaults on for an editor-node holder; negate it to withhold just this verb.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.enchant",
+                        "/itemedit enchant and unenchant. Defaults on for an editor-node holder; negate it to withhold just this verb.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.flag",
+                        "/itemedit flag: toggle an item flag such as HIDE_ENCHANTS. Defaults on for an editor-node holder.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.attribute",
+                        "/itemedit attribute add|remove: edit attribute modifiers. Defaults on for an editor-node holder; the verb most worth withholding on a survival server.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.durability",
+                        "/itemedit durability and repair. Defaults on for an editor-node holder; negate it to withhold just this verb.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.unbreakable",
+                        "/itemedit unbreakable: mark the held item unbreakable. Defaults on for an editor-node holder.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.model",
+                        "/itemedit custommodeldata: set or clear the resource-pack model selector. Defaults on for an editor-node holder.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
+                        "uxmessentials.itemworld.itemedit.gui",
+                        "A bare /itemedit, which opens the click-driven editor. Defaults on for an editor-node holder; negate it to leave only the typed verbs.",
+                        PermissionDefault.TRUE,
+                        ITEMWORLD),
+                PermissionSpec.of(
                         "uxmessentials.itemworld.shulker",
                         "Right-click a shulker box in the inventory to open its contents in place (shulkers.enabled).",
                         PermissionDefault.OP,

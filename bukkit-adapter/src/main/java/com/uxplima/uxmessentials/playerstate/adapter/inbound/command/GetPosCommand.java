@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * through the {@link com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo} port and renders a
  * click-to-copy line. The target is a plain online-player name (never an {@code @a}/{@code @p}/{@code @s}
  * selector — showing one player's position is a single-target read where a fan-out is nonsensical); the
- * {@code .others} target is gated by the shared {@code uxmessentials.playerstate.others} node.
+ * {@code .others} target is gated by the shared {@code uxmessentials.getpos.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node.
  */
 @NullMarked
 public final class GetPosCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -33,6 +33,12 @@ public final class GetPosCommand extends PlayerstateCommandSupport implements Co
 
     public GetPosCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.getpos.others";
     }
 
     @Override

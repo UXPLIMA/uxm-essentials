@@ -1,8 +1,11 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -32,13 +35,69 @@ import org.jspecify.annotations.Nullable;
  * command for native-Display holograms. Each subcommand maps its arguments to one use-case call; the
  * create/move forms read the operator's current position, the line indices are 1-based at the command boundary
  * (converted to 0-based for the use cases), and {@code item}/{@code block} switch an existing hologram to a
- * floating item or block. The base {@code uxmessentials.hologram.use} node guards the whole command.
+ * floating item or block. The base {@code uxmessentials.hologram.use} node guards the whole command, and each verb
+ * additionally runs behind the capability node its work belongs to ({@code uxmessentials.hologram.create},
+ * {@code .delete}, {@code .move}, {@code .appearance}, {@code .visibility}, {@code .action}, {@code .view},
+ * {@code .edit}), every one of which defaults to allowed so an existing grant is unchanged until an operator
+ * negates one.
  */
 @NullMarked
 public final class HologramCommand extends HologramCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.hologram.use";
     private static final String GUI_PERMISSION = "uxmessentials.holograms.gui";
+
+    private static final String CREATE = "uxmessentials.hologram.create";
+    private static final String DELETE = "uxmessentials.hologram.delete";
+    private static final String MOVE = "uxmessentials.hologram.move";
+    private static final String APPEARANCE = "uxmessentials.hologram.appearance";
+    private static final String VISIBILITY = "uxmessentials.hologram.visibility";
+    private static final String ACTION = "uxmessentials.hologram.action";
+    private static final String VIEW = "uxmessentials.hologram.view";
+    private static final String EDIT = "uxmessentials.hologram.edit";
+
+    /**
+     * Which capability each verb belongs to, so the many verbs of {@code /hologram} are grantable in the shapes an
+     * operator actually thinks in rather than one at a time. A verb not named here counts as {@link #EDIT}, the
+     * content editing every hologram command ultimately serves, which keeps a newly added verb gated rather than
+     * open.
+     */
+    private static final Map<String, String> CAPABILITIES = Map.ofEntries(
+            Map.entry("create", CREATE),
+            Map.entry("copy", CREATE),
+            Map.entry("delete", DELETE),
+            Map.entry("list", VIEW),
+            Map.entry("info", VIEW),
+            Map.entry("nearby", VIEW),
+            Map.entry("movehere", MOVE),
+            Map.entry("moveto", MOVE),
+            Map.entry("center", MOVE),
+            Map.entry("teleport", MOVE),
+            Map.entry("rotate", MOVE),
+            Map.entry("billboard", APPEARANCE),
+            Map.entry("background", APPEARANCE),
+            Map.entry("glow", APPEARANCE),
+            Map.entry("opacity", APPEARANCE),
+            Map.entry("shadow", APPEARANCE),
+            Map.entry("shadowradius", APPEARANCE),
+            Map.entry("shadowstrength", APPEARANCE),
+            Map.entry("linewidth", APPEARANCE),
+            Map.entry("viewrange", APPEARANCE),
+            Map.entry("alignment", APPEARANCE),
+            Map.entry("seethrough", APPEARANCE),
+            Map.entry("growup", APPEARANCE),
+            Map.entry("item", APPEARANCE),
+            Map.entry("block", APPEARANCE),
+            Map.entry("head", APPEARANCE),
+            Map.entry("entity", APPEARANCE),
+            Map.entry("visibility", VISIBILITY),
+            Map.entry("visibilitydistance", VISIBILITY),
+            Map.entry("show", VISIBILITY),
+            Map.entry("hide", VISIBILITY),
+            Map.entry("blacklist", VISIBILITY),
+            Map.entry("unblacklist", VISIBILITY),
+            Map.entry("action", ACTION),
+            Map.entry("clickcommand", ACTION));
 
     private final Supplier<? extends Collection<String>> hologramNames;
     private final Supplier<? extends Collection<String>> npcNames;
@@ -60,44 +119,39 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("hologram")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(this::openGui)
-                .then(createNode())
-                .then(name("delete", this::delete))
-                .then(Commands.literal("list").executes(this::list))
-                .then(textNode("addline", this::addLine))
-                .then(setLineNode())
-                .then(indexNode("removeline", this::removeLine))
-                .then(name("movehere", this::move))
-                .then(moveToNode());
-        for (LiteralArgumentBuilder<CommandSourceStack> styling :
-                new HologramAppearanceCommand(services, messages, hologramNames).nodes()) {
-            root.then(styling);
-        }
-        for (LiteralArgumentBuilder<CommandSourceStack> visibility :
-                new HologramVisibilityCommand(services, messages, hologramNames).nodes()) {
-            root.then(visibility);
-        }
-        for (LiteralArgumentBuilder<CommandSourceStack> model :
-                new HologramModelCommand(services, messages, hologramNames).nodes()) {
-            root.then(model);
-        }
-        for (LiteralArgumentBuilder<CommandSourceStack> convenience :
-                new HologramConvenienceCommand(services, messages, hologramNames).nodes()) {
-            root.then(convenience);
-        }
-        for (LiteralArgumentBuilder<CommandSourceStack> link :
-                new HologramNpcCommand(services, messages, hologramNames, npcNames).nodes()) {
-            root.then(link);
-        }
-        for (LiteralArgumentBuilder<CommandSourceStack> page :
-                new HologramPageCommand(services, messages, hologramNames).nodes()) {
-            root.then(page);
-        }
-        for (LiteralArgumentBuilder<CommandSourceStack> action :
-                new HologramActionCommand(services, messages, hologramNames).nodes()) {
-            root.then(action);
+                .executes(this::openGui);
+        List<LiteralArgumentBuilder<CommandSourceStack>> verbs = new ArrayList<>(List.of(
+                createNode(),
+                name("delete", this::delete),
+                Commands.literal("list").executes(this::list),
+                textNode("addline", this::addLine),
+                setLineNode(),
+                indexNode("removeline", this::removeLine),
+                name("movehere", this::move),
+                moveToNode()));
+        verbs.addAll(new HologramAppearanceCommand(services, messages, hologramNames).nodes());
+        verbs.addAll(new HologramVisibilityCommand(services, messages, hologramNames).nodes());
+        verbs.addAll(new HologramModelCommand(services, messages, hologramNames).nodes());
+        verbs.addAll(new HologramConvenienceCommand(services, messages, hologramNames).nodes());
+        verbs.addAll(new HologramNpcCommand(services, messages, hologramNames, npcNames).nodes());
+        verbs.addAll(new HologramPageCommand(services, messages, hologramNames).nodes());
+        verbs.addAll(new HologramActionCommand(services, messages, hologramNames).nodes());
+        for (LiteralArgumentBuilder<CommandSourceStack> verb : verbs) {
+            root.then(verb.requires(capability(verb.getLiteral())));
         }
         return root.build();
+    }
+
+    /**
+     * The gate one verb runs behind: the base node, then the capability node its verb belongs to. Every capability
+     * node defaults to allowed, so an existing {@code uxmessentials.hologram.use} grant keeps the whole command and
+     * an operator narrows it by negating one capability: a builder who may re-style and move a hologram but never
+     * delete one holds the base node with {@code uxmessentials.hologram.delete} negated.
+     */
+    private static Predicate<CommandSourceStack> capability(String verb) {
+        String node = CAPABILITIES.getOrDefault(verb, EDIT);
+        return src ->
+                src.getSender().hasPermission(PERMISSION) && src.getSender().hasPermission(node);
     }
 
     @Override

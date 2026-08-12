@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /fly [player]} ({@code uxmessentials.fly.use}): toggle flight for yourself, or another player with
- * the {@code uxmessentials.playerstate.others} node. v1 ships the plain on/off toggle — timed fly is deferred
+ * the {@code uxmessentials.fly.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. v1 ships the plain on/off toggle; timed fly is deferred
  * post-v1, so there is no duration argument. The {@code ToggleFly} use case owns the snapshot mutation,
  * reconciliation, event, and feedback.
  *
@@ -44,6 +44,12 @@ public final class FlyCommand extends PlayerstateCommandSupport implements Comma
     public FlyCommand(PlayerStateServices services, Messages messages, NoFlyWorldPolicy noFlyWorlds) {
         super(services, messages);
         this.noFlyWorlds = Objects.requireNonNull(noFlyWorlds, "noFlyWorlds");
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.fly.others";
     }
 
     @Override

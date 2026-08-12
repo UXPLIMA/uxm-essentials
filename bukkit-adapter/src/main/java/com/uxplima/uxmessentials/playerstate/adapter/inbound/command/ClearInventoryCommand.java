@@ -21,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /clearinventory [player]} (aliases {@code /ci}, {@code /clear}, {@code uxmessentials.clearinventory.use}):
- * empty an inventory — your own or another player's with the {@code uxmessentials.playerstate.others} node. The
+ * empty an inventory, your own or another player's with the {@code uxmessentials.clearinventory.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The
  * {@code ClearInventory} use case owns the live-only effect and the feedback; when the sender has turned on
  * {@code /clearinventoryconfirmtoggle}, a self clear asks for a second confirmation before it empties.
  */
@@ -32,6 +32,12 @@ public final class ClearInventoryCommand extends PlayerstateCommandSupport imple
 
     public ClearInventoryCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.clearinventory.others";
     }
 
     @Override

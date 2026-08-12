@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * A fixed-mode game-mode shortcut: {@code /gmc} (creative), {@code /gms} (survival), {@code /gma} (adventure),
  * {@code /gmsp} (spectator). Each pins one {@link GameModeRef}, so they are separate command literals rather
  * than aliases of {@code /gamemode}. The {@code [player]} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node and the command base is {@code uxmessentials.gamemode.use},
+ * {@code uxmessentials.gamemode.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node and the command base is {@code uxmessentials.gamemode.use},
  * matching the {@code /gamemode} surface.
  */
 @NullMarked
@@ -38,6 +38,12 @@ public final class GamemodeAliasCommand extends PlayerstateCommandSupport implem
         super(services, messages);
         this.literal = Objects.requireNonNull(literal, "literal");
         this.mode = Objects.requireNonNull(mode, "mode");
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.gamemode.others";
     }
 
     @Override

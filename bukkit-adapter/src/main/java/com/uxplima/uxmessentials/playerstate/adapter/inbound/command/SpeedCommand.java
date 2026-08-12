@@ -54,6 +54,12 @@ public final class SpeedCommand extends PlayerstateCommandSupport implements Com
         this.target = Objects.requireNonNull(target, "target");
     }
 
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.speed.others";
+    }
+
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(target.literal)

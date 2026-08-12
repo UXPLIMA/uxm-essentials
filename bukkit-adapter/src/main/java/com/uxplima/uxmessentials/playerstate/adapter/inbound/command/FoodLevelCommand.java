@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /foodlevel <amount> [player]} ({@code uxmessentials.foodlevel.use}): set a player's hunger to a
  * specific value. The amount is bounded {@code 0..20} by Brigadier and re-clamped in the domain
  * ({@link FoodLevel}). Distinct from {@code /feed}, which always restores to full. The {@code .others} target is
- * gated by the shared {@code uxmessentials.playerstate.others} node; the {@code SetFoodLevel} use case owns the
+ * gated by the shared {@code uxmessentials.foodlevel.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node; the {@code SetFoodLevel} use case owns the
  * effect and feedback.
  */
 @NullMarked
@@ -33,6 +33,12 @@ public final class FoodLevelCommand extends PlayerstateCommandSupport implements
 
     public FoodLevelCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.foodlevel.others";
     }
 
     @Override

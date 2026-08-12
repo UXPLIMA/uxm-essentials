@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /heal [player]} ({@code uxmessentials.heal.use}): restore health (and optionally clear effects) for
- * yourself or another player with the {@code uxmessentials.playerstate.others} node. The {@code Heal} use case
+ * yourself or another player with the {@code uxmessentials.heal.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The {@code Heal} use case
  * owns the apply-once effect, the event, and the feedback.
  */
 @NullMarked
@@ -29,6 +29,12 @@ public final class HealCommand extends PlayerstateCommandSupport implements Comm
 
     public HealCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.heal.others";
     }
 
     @Override

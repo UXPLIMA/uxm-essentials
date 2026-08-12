@@ -77,6 +77,26 @@ final class EconomyPermissions {
                         PermissionDefault.TRUE,
                         ECONOMY),
                 PermissionSpec.of(
+                        "uxmessentials.economy.bank.create",
+                        "/bank create <name>: open a new shared bank account. Held by default alongside the bank node.",
+                        PermissionDefault.TRUE,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.bank.deposit",
+                        "/bank deposit: pay into a shared bank account. Held by default alongside the bank node.",
+                        PermissionDefault.TRUE,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.bank.withdraw",
+                        "/bank withdraw: take money out of a shared bank account; the capability worth withholding from junior members.",
+                        PermissionDefault.TRUE,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.bank.members",
+                        "/bank addmember and removemember: change who may use a shared bank account.",
+                        PermissionDefault.TRUE,
+                        ECONOMY),
+                PermissionSpec.of(
                         "uxmessentials.economy.bypasscmdcost",
                         "Skip the configured per-command economy charge (command-costs in economy.conf).",
                         PermissionDefault.OP,
@@ -101,6 +121,11 @@ final class EconomyPermissions {
                         "uxmessentials.economy.loan",
                         "/loan: take, review and repay a loan against the configured limit and interest.",
                         PermissionDefault.FALSE,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.loan.take",
+                        "/loan take: borrow. Held by default alongside the loan node, so negating it leaves a borrower able to check and repay what they already owe but not to take more.",
+                        PermissionDefault.TRUE,
                         ECONOMY),
                 PermissionSpec.of(
                         "uxmessentials.economy.pay",

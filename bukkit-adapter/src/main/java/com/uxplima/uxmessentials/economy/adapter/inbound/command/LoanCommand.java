@@ -35,6 +35,7 @@ import org.jspecify.annotations.Nullable;
 public final class LoanCommand extends EconomyCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.economy.loan";
+    private static final String TAKE = "uxmessentials.economy.loan.take";
 
     public LoanCommand(Plugin plugin, EconomyServices services, Messages messages) {
         super(services, messages);
@@ -47,6 +48,7 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                 .executes(this::runStatus)
                 .then(Commands.literal("status").executes(this::runStatus))
                 .then(Commands.literal("take")
+                        .requires(src -> src.getSender().hasPermission(TAKE))
                         .executes(ctx -> usage(ctx, "loan take", "<amount> [currency] [installments]", "Take a loan"))
                         .then(Commands.argument("amount", StringArgumentType.word())
                                 .executes(ctx -> this.runTake(ctx, null, 10)) // default 10 installments

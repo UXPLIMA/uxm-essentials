@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /invsee [player]} ({@code uxmessentials.invsee.use}): open a view of another player's inventory in your
- * own screen — gated for a named target by the shared {@code uxmessentials.playerstate.others} node. The target
+ * own screen, gated for a named target by the shared {@code uxmessentials.invsee.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The target
  * may be online (a live managed copy) or offline (read from their stored player data); the {@code OpenContainer}
  * use case owns the open and the viewer confirmation, and the adapter routes by online state.
  */
@@ -30,6 +30,12 @@ public final class InvseeCommand extends PlayerstateCommandSupport implements Co
 
     public InvseeCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.invsee.others";
     }
 
     @Override

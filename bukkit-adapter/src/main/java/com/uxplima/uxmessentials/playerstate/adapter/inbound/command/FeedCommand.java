@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /feed [player]} ({@code uxmessentials.feed.use}): restore hunger and saturation for yourself or
- * another player with the {@code uxmessentials.playerstate.others} node. The {@code Feed} use case owns the
+ * another player with the {@code uxmessentials.feed.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The {@code Feed} use case owns the
  * apply-once effect, the event, and the feedback.
  */
 @NullMarked
@@ -29,6 +29,12 @@ public final class FeedCommand extends PlayerstateCommandSupport implements Comm
 
     public FeedCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.feed.others";
     }
 
     @Override

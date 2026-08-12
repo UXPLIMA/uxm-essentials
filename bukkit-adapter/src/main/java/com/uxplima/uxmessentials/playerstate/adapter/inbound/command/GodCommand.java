@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /god [player]} ({@code uxmessentials.god.use}): toggle damage immunity for yourself, or for another
- * player when the {@code uxmessentials.playerstate.others} node is held. The {@code ToggleGod} use case owns
+ * player when the {@code uxmessentials.god.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node is held. The {@code ToggleGod} use case owns
  * the snapshot mutation, the reconciliation, the event, and the feedback; this handler maps the arguments and
  * resolves the optional target.
  */
@@ -30,6 +30,12 @@ public final class GodCommand extends PlayerstateCommandSupport implements Comma
 
     public GodCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.god.others";
     }
 
     @Override

@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /endersee [player]} ({@code uxmessentials.endersee.use}): open a view of another player's ender chest in
- * your own screen — gated for a named target by the shared {@code uxmessentials.playerstate.others} node. The
+ * your own screen, gated for a named target by the shared {@code uxmessentials.endersee.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The
  * target may be online (the live ender chest) or offline (read from their stored player data); the
  * {@code OpenContainer} use case owns the open and the viewer confirmation, and the adapter routes by online
  * state.
@@ -31,6 +31,12 @@ public final class EnderseeCommand extends PlayerstateCommandSupport implements 
 
     public EnderseeCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.endersee.others";
     }
 
     @Override

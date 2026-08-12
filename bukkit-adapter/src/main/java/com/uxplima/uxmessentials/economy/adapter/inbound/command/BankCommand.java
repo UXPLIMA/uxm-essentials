@@ -34,6 +34,10 @@ import org.jspecify.annotations.NullMarked;
 public final class BankCommand extends EconomyCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.economy.bank";
+    private static final String CREATE = "uxmessentials.economy.bank.create";
+    private static final String DEPOSIT = "uxmessentials.economy.bank.deposit";
+    private static final String WITHDRAW = "uxmessentials.economy.bank.withdraw";
+    private static final String MEMBERS = "uxmessentials.economy.bank.members";
 
     public BankCommand(Plugin plugin, EconomyServices services, Messages messages) {
         super(services, messages);
@@ -45,11 +49,13 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runOpenGui)
                 .then(Commands.literal("create")
+                        .requires(src -> src.getSender().hasPermission(CREATE))
                         .executes(ctx -> usage(ctx, "bank create", "<name> [currency]", "Create a bank account"))
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .executes(this::runCreate)
                                 .then(currencyArgument().executes(this::runCreate))))
                 .then(Commands.literal("deposit")
+                        .requires(src -> src.getSender().hasPermission(DEPOSIT))
                         .executes(ctx -> usage(ctx, "bank deposit", "<bank_id> <amount>", "Deposit into bank"))
                         .then(Commands.argument("bank_id", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
@@ -57,6 +63,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                                 .then(Commands.argument("amount", StringArgumentType.word())
                                         .executes(this::runDeposit))))
                 .then(Commands.literal("withdraw")
+                        .requires(src -> src.getSender().hasPermission(WITHDRAW))
                         .executes(ctx -> usage(ctx, "bank withdraw", "<bank_id> <amount>", "Withdraw from bank"))
                         .then(Commands.argument("bank_id", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
@@ -65,6 +72,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                                 .then(Commands.argument("amount", StringArgumentType.word())
                                         .executes(this::runWithdraw))))
                 .then(Commands.literal("addmember")
+                        .requires(src -> src.getSender().hasPermission(MEMBERS))
                         .executes(ctx -> usage(ctx, "bank addmember", "<bank_id> <player>", "Add member to bank"))
                         .then(Commands.argument("bank_id", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
@@ -74,6 +82,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                                         .suggests(CommandSuggestions.onlinePlayers())
                                         .executes(this::runAddMember))))
                 .then(Commands.literal("removemember")
+                        .requires(src -> src.getSender().hasPermission(MEMBERS))
                         .executes(
                                 ctx -> usage(ctx, "bank removemember", "<bank_id> <player>", "Remove member from bank"))
                         .then(Commands.argument("bank_id", StringArgumentType.word())

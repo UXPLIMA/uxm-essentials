@@ -1,6 +1,10 @@
 package com.uxplima.uxmessentials.npc.adapter.inbound.command;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.EntityType;
@@ -34,13 +38,53 @@ import org.jspecify.annotations.NullMarked;
  * click command), and {@code lookatplayer} (whether the NPC turns to face nearby players) — and attaches the skin
  * (name/player/url/texture), appearance (type/equip/glow/pose/scale), data (set/clear/list) and action
  * (add/list/remove/clear) sub-handlers under the one {@code /npc} literal, each contributing argument nodes
- * rather than a new literal. The base {@code uxmessentials.npc.admin} node guards the whole command.
+ * rather than a new literal. The base {@code uxmessentials.npc.admin} node guards the whole command, and each verb
+ * additionally runs behind the capability node its work belongs to ({@code uxmessentials.npc.create}, {@code .delete},
+ * {@code .move}, {@code .appearance}, {@code .action}, {@code .view}, {@code .edit}), every one of which defaults to
+ * allowed so an existing grant is unchanged until an operator negates one.
  */
 @NullMarked
 public final class NpcCommand extends NpcCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.npc.admin";
     private static final String GUI_PERMISSION = "uxmessentials.npc.gui";
+
+    private static final String CREATE = "uxmessentials.npc.create";
+    private static final String DELETE = "uxmessentials.npc.delete";
+    private static final String MOVE = "uxmessentials.npc.move";
+    private static final String APPEARANCE = "uxmessentials.npc.appearance";
+    private static final String ACTION = "uxmessentials.npc.action";
+    private static final String VIEW = "uxmessentials.npc.view";
+    private static final String EDIT = "uxmessentials.npc.edit";
+
+    /**
+     * Which capability each verb belongs to, so the many verbs of {@code /npc} are grantable in the shapes an
+     * operator actually thinks in rather than one at a time. A verb not named here counts as {@link #EDIT}, which
+     * keeps a newly added verb gated rather than open.
+     */
+    private static final Map<String, String> CAPABILITIES = Map.ofEntries(
+            Map.entry("create", CREATE),
+            Map.entry("copy", CREATE),
+            Map.entry("delete", DELETE),
+            Map.entry("list", VIEW),
+            Map.entry("info", VIEW),
+            Map.entry("nearby", VIEW),
+            Map.entry("help", VIEW),
+            Map.entry("movehere", MOVE),
+            Map.entry("moveto", MOVE),
+            Map.entry("teleport", MOVE),
+            Map.entry("center", MOVE),
+            Map.entry("fix", MOVE),
+            Map.entry("command", ACTION),
+            Map.entry("action", ACTION),
+            Map.entry("skin", APPEARANCE),
+            Map.entry("skinslim", APPEARANCE),
+            Map.entry("type", APPEARANCE),
+            Map.entry("equip", APPEARANCE),
+            Map.entry("glow", APPEARANCE),
+            Map.entry("pose", APPEARANCE),
+            Map.entry("scale", APPEARANCE),
+            Map.entry("displayname", APPEARANCE));
 
     private final NpcSkinCommands skinCommands;
     private final NpcAppearanceCommands appearanceCommands;
@@ -68,46 +112,58 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("npc")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(this::openGui)
-                .then(Commands.literal("create")
+                .executes(this::openGui);
+        List<LiteralArgumentBuilder<CommandSourceStack>> verbs = new ArrayList<>(List.of(
+                Commands.literal("create")
                         .executes(ctx -> usage(ctx, "npc create", "<name> [type]", "Create a new NPC"))
                         .then(nameArgument()
                                 .executes(this::create)
                                 .then(Commands.argument("type", StringArgumentType.word())
-                                        .executes(this::createTyped))))
-                .then(name("delete", this::delete))
-                .then(Commands.literal("list")
+                                        .executes(this::createTyped))),
+                name("delete", this::delete),
+                Commands.literal("list")
                         .executes(this::list)
                         .then(Commands.argument("type", StringArgumentType.word())
-                                .executes(this::listFiltered)))
-                .then(Commands.literal("help").executes(this::help))
-                .then(Commands.literal("nearby")
+                                .executes(this::listFiltered)),
+                Commands.literal("help").executes(this::help),
+                Commands.literal("nearby")
                         .executes(ctx -> nearby(ctx, NearbyNpcs.DEFAULT_RADIUS))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, NearbyNpcs.MAX_RADIUS))
-                                .executes(ctx -> nearby(ctx, ctx.getArgument("radius", Integer.class)))))
-                .then(name("movehere", this::move))
-                .then(name("info", this::info))
-                .then(name("teleport", this::teleport))
-                .then(Commands.literal("copy")
+                                .executes(ctx -> nearby(ctx, ctx.getArgument("radius", Integer.class)))),
+                name("movehere", this::move),
+                name("info", this::info),
+                name("teleport", this::teleport),
+                Commands.literal("copy")
                         .executes(ctx -> usage(ctx, "npc copy", "<name> <target>", "Copy NPC to new name"))
                         .then(nameArgument()
                                 .executes(ctx -> usage(ctx, "npc copy", "<name> <target>", "Copy NPC to new name"))
                                 .then(Commands.argument("target", StringArgumentType.string())
-                                        .executes(this::copy))))
-                .then(name("center", this::center))
-                .then(name("fix", this::fix))
-                .then(greedy("command", this::command))
-                .then(bool("lookatplayer", this::lookAtPlayer))
-                .then(skinCommands.node())
-                .then(dataCommands.node())
-                .then(actionCommands.node());
-        for (LiteralArgumentBuilder<CommandSourceStack> appearance : appearanceCommands.nodes()) {
-            root.then(appearance);
-        }
-        for (LiteralArgumentBuilder<CommandSourceStack> stateNode : stateCommands.nodes()) {
-            root.then(stateNode);
+                                        .executes(this::copy))),
+                name("center", this::center),
+                name("fix", this::fix),
+                greedy("command", this::command),
+                bool("lookatplayer", this::lookAtPlayer),
+                skinCommands.node(),
+                dataCommands.node(),
+                actionCommands.node()));
+        verbs.addAll(appearanceCommands.nodes());
+        verbs.addAll(stateCommands.nodes());
+        for (LiteralArgumentBuilder<CommandSourceStack> verb : verbs) {
+            root.then(verb.requires(capability(verb.getLiteral())));
         }
         return root.build();
+    }
+
+    /**
+     * The gate one verb runs behind: the base node, then the capability node its verb belongs to. Every capability
+     * node defaults to allowed, so an existing {@code uxmessentials.npc.admin} grant keeps the whole command and an
+     * operator narrows it by negating one capability: builder staff who may move and re-dress an NPC but never
+     * delete one hold the base node with {@code uxmessentials.npc.admin.delete} negated.
+     */
+    private static Predicate<CommandSourceStack> capability(String verb) {
+        String node = CAPABILITIES.getOrDefault(verb, EDIT);
+        return src ->
+                src.getSender().hasPermission(PERMISSION) && src.getSender().hasPermission(node);
     }
 
     @Override

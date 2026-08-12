@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /air <seconds> [player]} ({@code uxmessentials.air.use}): set a player's remaining air. The seconds
  * argument is bounded non-negative by Brigadier and converted to ticks, then clamped to the player's maximum
  * air in the domain ({@link AirAmount}) by the adapter. The {@code .others} target is gated by the shared
- * {@code uxmessentials.playerstate.others} node; the {@code SetAir} use case owns the effect and feedback.
+ * {@code uxmessentials.air.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node; the {@code SetAir} use case owns the effect and feedback.
  */
 @NullMarked
 public final class AirCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -32,6 +32,12 @@ public final class AirCommand extends PlayerstateCommandSupport implements Comma
 
     public AirCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.air.others";
     }
 
     @Override

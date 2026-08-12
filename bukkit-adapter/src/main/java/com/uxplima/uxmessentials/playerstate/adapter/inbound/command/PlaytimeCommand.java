@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
  * {@code ShowPlaytime} use case, plus a lifetime continuity line. The target is a plain online-player name (an
  * online-name-completing word, never an {@code @a}/{@code @p}/{@code @s} selector): showing one player's stats is
  * a single-target read where a fan-out to every player is nonsensical. The {@code .others} target is gated by the
- * shared {@code uxmessentials.playerstate.others} node.
+ * shared {@code uxmessentials.playtime.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node.
  *
  * <p>The breakdown can show as a GUI panel or as the chat lines. Bare {@code /playtime} opens the viewer's own
  * panel through {@link #guiRoot()} when the command's catalog {@code gui} flag is on, and renders the chat
@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  * <p>{@code /playtime reset [player]} ({@code uxmessentials.playtime.reset}): wipe a player's tracked playtime.
  * The reset capability itself is the {@code uxmessentials.playtime.reset} admin node (resetting even your own
  * tracked time is an administrative action, off by default); resetting <em>another</em> player additionally
- * requires the shared {@code uxmessentials.playerstate.others} node, the same target gate every other
+ * requires the shared {@code uxmessentials.playtime.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node, the same target gate every other
  * self/other playerstate command uses.
  *
  * <p>{@code /playtime resetall} ({@code uxmessentials.playtime.reset}): wipe every player's tracked ledger in one
@@ -58,6 +58,12 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     public PlaytimeCommand(PlayerStateServices services, Messages messages, @Nullable PlaytimeView view) {
         super(services, messages);
         this.view = view;
+    }
+
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.playtime.others";
     }
 
     @Override
