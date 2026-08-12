@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.SurvivalPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -46,6 +47,7 @@ import com.uxplima.uxmessentials.survival.adapter.inbound.listener.VeinminerList
 import com.uxplima.uxmessentials.survival.adapter.outbound.AutoSellNotices;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.adapter.outbound.ThreadLocalRandomSource;
+import com.uxplima.uxmessentials.survival.adapter.outbound.TogglesSurvivalPlaceholders;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig.SaleNotice;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
@@ -171,7 +173,7 @@ public final class SurvivalWiring {
                     new ThreadLocalRandomSource()));
         }
         wireAutos(config, toggles, autoDrops, kernel, commands, listeners);
-        return new Wired(commands, listeners);
+        return new Wired(commands, listeners, new TogglesSurvivalPlaceholders(server, toggles, config));
     }
 
     /**
@@ -323,11 +325,14 @@ public final class SurvivalWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
+     * @param placeholders the read seam the {@code survival_*} placeholders answer from
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners) {
+    public record Wired(
+            List<CommandRegistration> commands, List<Listener> listeners, SurvivalPlaceholders placeholders) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(placeholders, "placeholders");
         }
     }
 }

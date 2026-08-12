@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerLeas
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerProtectionListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerRecipeReapplyListener;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerTradeListener;
+import com.uxplima.uxmessentials.villagers.adapter.outbound.FollowVillagersPlaceholders;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.PathfinderVillagerMover;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.PdcVillagerFlags;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerBucketItem;
@@ -181,7 +183,11 @@ public final class VillagersWiring {
         AutoCloseable followTask = followService != null ? followService.start() : () -> {};
         VillagerManagerView viewToDrain = managerView;
         Runnable stop = () -> stop(sweepTask, followTask, viewToDrain, kernel.log());
-        return new Wired(listeners, commands, stop);
+        // The follow sessions are the module's one readable per-player fact, so the seam exists only when follow
+        // does: with the feature off there is nothing to count and the placeholder degrades to the dash.
+        VillagersPlaceholders placeholders =
+                followService == null ? null : new FollowVillagersPlaceholders(followService);
+        return new Wired(listeners, commands, stop, placeholders);
     }
 
     // The click-to-trade opener: force-open the villager's trade window. Both openMerchant overloads carry a
@@ -219,7 +225,11 @@ public final class VillagersWiring {
      * @param commands the Brigadier commands to register
      * @param stop the teardown hook run on module stop
      */
-    public record Wired(List<Listener> listeners, List<CommandRegistration> commands, Runnable stop) {
+    public record Wired(
+            List<Listener> listeners,
+            List<CommandRegistration> commands,
+            Runnable stop,
+            @Nullable VillagersPlaceholders placeholders) {
 
         public Wired {
             listeners = List.copyOf(listeners);

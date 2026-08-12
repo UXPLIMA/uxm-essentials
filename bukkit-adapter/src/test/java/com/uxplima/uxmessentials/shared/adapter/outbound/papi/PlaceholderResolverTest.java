@@ -1057,6 +1057,95 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void theHudFamiliesNameTheFormatEachModuleIsDrawingThePlayerFrom() {
+        FakeScoreboard board = new FakeScoreboard().visible(ALICE, true).board(ALICE, "vip");
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .scoreboard(board)
+                .tablist(who -> who.equals(ALICE) ? Optional.of("staff") : Optional.empty())
+                .nametags(who -> who.equals(ALICE) ? Optional.of("admins") : Optional.empty())
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "scoreboard_board")).contains("vip");
+        assertThat(resolver.resolve(ALICE, true, "tablist_format")).contains("staff");
+        assertThat(resolver.resolve(ALICE, true, "tablist_shown")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "nametags_format")).contains("admins");
+        assertThat(resolver.resolve(ALICE, true, "nametags_shown")).contains("yes");
+        // Matching no format is not an error: the name dashes and "shown" says no, which is what a player with a
+        // bare tab and no nametag actually has.
+        assertThat(resolver.resolve(BOB, true, "tablist_format")).contains("-");
+        assertThat(resolver.resolve(BOB, true, "tablist_shown")).contains("no");
+        assertThat(resolver.resolve(BOB, true, "nametags_shown")).contains("no");
+        // The HUD is a live surface, so an offline requester has none of it.
+        assertThat(resolver.resolve(ALICE, false, "tablist_format")).contains("-");
+        assertThat(resolver.resolve(ALICE, false, "nametags_format")).contains("-");
+    }
+
+    @Test
+    void theVillagerFollowCountReadsPerPlayer() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .villagers(who -> who.equals(ALICE) ? 2 : 0)
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "villagers_following")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "villagers_has_follower")).contains("yes");
+        assertThat(resolver.resolve(BOB, true, "villagers_following")).contains("0");
+        assertThat(resolver.resolve(BOB, true, "villagers_has_follower")).contains("no");
+    }
+
+    @Test
+    void theServerBrandReadsWhatTheClientIsTold() {
+        PlaceholderResolver branded = resolverWith(PlaceholderContexts.builder()
+                .serverTweaks(() -> Optional.of("uxmEssentials"))
+                .build());
+        PlaceholderResolver stock = resolverWith(
+                PlaceholderContexts.builder().serverTweaks(Optional::empty).build());
+
+        assertThat(branded.resolve(ALICE, true, "servertweaks_brand")).contains("uxmEssentials");
+        // The tweak switched off means the server's own brand stands, and the key says so rather than inventing one.
+        assertThat(stock.resolve(ALICE, true, "servertweaks_brand")).contains("-");
+    }
+
+    @Test
+    void theCommandCheckFamilyAnswersForTheCommandNamedInTheKey() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .commandControl((who, command) -> !command.equals("gamemode"))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "commandcontrol_allowed_home")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "commandcontrol_allowed_gamemode"))
+                .contains("no");
+        // A family read with nothing after the prefix names no command, so there is nothing to answer about.
+        assertThat(resolver.resolve(ALICE, true, "commandcontrol_allowed_")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "commandcontrol_something_else"))
+                .contains("-");
+    }
+
+    @Test
+    void theRollbackKeysReadTheLastCaptureThisEnableTook() {
+        Instant captured = Instant.now().minus(Duration.ofMinutes(5));
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .invrollback(new InvrollbackPlaceholders() {
+                    @Override
+                    public Optional<Instant> lastCapture(PlayerRef who) {
+                        return who.equals(ALICE) ? Optional.of(captured) : Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<String> lastCause(PlayerRef who) {
+                        return who.equals(ALICE) ? Optional.of("death") : Optional.empty();
+                    }
+                })
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "invrollback_last_capture")).contains("5m");
+        assertThat(resolver.resolve(ALICE, true, "invrollback_last_cause")).contains("death");
+        assertThat(resolver.resolve(ALICE, true, "invrollback_captured")).contains("yes");
+        // Nothing captured since the restart reads the dash rather than a zero that would look like "just now".
+        assertThat(resolver.resolve(BOB, true, "invrollback_last_capture")).contains("-");
+        assertThat(resolver.resolve(BOB, true, "invrollback_captured")).contains("no");
+    }
+
+    @Test
     void scoreboardDegradesWhenModuleIsDisabled() {
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
@@ -1443,6 +1532,137 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void theIdentityKeysReadWhoThePlayerIsToTheServer() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .identity(new PlayerFactsPlaceholders.Identity(
+                        "Alice",
+                        "[VIP] Alice",
+                        "0b5f3f42-0000-0000-0000-000000000001",
+                        Optional.of("203.0.113.7"),
+                        "en_us",
+                        "survival",
+                        true,
+                        true,
+                        0.1f,
+                        0.2f,
+                        Optional.of(new PlayerFactsPlaceholders.Position("world", 100.5, 64.0, -33.9)),
+                        Optional.of(new PlayerFactsPlaceholders.Position("world", 0.0, 70.0, 0.0))));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_name")).contains("Alice");
+        assertThat(resolver.resolve(ALICE, true, "player_display_name")).contains("[VIP] Alice");
+        assertThat(resolver.resolve(ALICE, true, "player_ip")).contains("203.0.113.7");
+        assertThat(resolver.resolve(ALICE, true, "player_locale")).contains("en_us");
+        assertThat(resolver.resolve(ALICE, true, "player_gamemode")).contains("survival");
+        assertThat(resolver.resolve(ALICE, true, "player_flying")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "player_fly_speed")).contains("0.1");
+        assertThat(resolver.resolve(ALICE, true, "player_has_bed")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "player_bed")).contains("world 100 64 -34");
+        assertThat(resolver.resolve(ALICE, true, "player_compass")).contains("world 0 70 0");
+    }
+
+    @Test
+    void theVitalKeysRenderTheBodyAndItsShare() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .vitals(new PlayerFactsPlaceholders.Vitals(15.0, 20.0, 18, 4.5f, 200, 300, 12.0, 4.0, true));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_health")).contains("15");
+        assertThat(resolver.resolve(ALICE, true, "player_health_max")).contains("20");
+        assertThat(resolver.resolve(ALICE, true, "player_health_percent")).contains("75");
+        assertThat(resolver.resolve(ALICE, true, "player_food")).contains("18");
+        assertThat(resolver.resolve(ALICE, true, "player_saturation")).contains("4.5");
+        assertThat(resolver.resolve(ALICE, true, "player_air")).contains("200");
+        assertThat(resolver.resolve(ALICE, true, "player_air_max")).contains("300");
+        assertThat(resolver.resolve(ALICE, true, "player_armor")).contains("12");
+        assertThat(resolver.resolve(ALICE, true, "player_absorption")).contains("4");
+        assertThat(resolver.resolve(ALICE, true, "player_burning")).contains("yes");
+    }
+
+    @Test
+    void aHealthPercentOfNothingIsZeroRatherThanADivisionByZero() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .vitals(new PlayerFactsPlaceholders.Vitals(0.0, 0.0, 0, 0f, 0, 0, 0.0, 0.0, false));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_health_percent")).contains("0");
+    }
+
+    @Test
+    void thePositionKeysRenderBlocksExactCoordinatesAndTheFacing() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .where(new PlayerFactsPlaceholders.Where(
+                        "world", "normal", 100.75, 64.0, -33.25, 90f, -12.5f, "plains", "grass_block", 15));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_x")).contains("100");
+        assertThat(resolver.resolve(ALICE, true, "player_z")).contains("-34");
+        assertThat(resolver.resolve(ALICE, true, "player_x_exact")).contains("100.75");
+        assertThat(resolver.resolve(ALICE, true, "player_pitch")).contains("-12.5");
+        assertThat(resolver.resolve(ALICE, true, "player_biome")).contains("plains");
+        assertThat(resolver.resolve(ALICE, true, "player_block_below")).contains("grass_block");
+        assertThat(resolver.resolve(ALICE, true, "player_light")).contains("15");
+        assertThat(resolver.resolve(ALICE, true, "player_world_environment")).contains("normal");
+        assertThat(resolver.resolve(ALICE, true, "player_location")).contains("world 100 64 -34");
+    }
+
+    @Test
+    void everyEighthOfATurnHasItsOwnNameAndTheTurnWrapsAround() {
+        FakePlayerFacts facts = new FakePlayerFacts();
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(facing(resolver, facts, 0f)).contains("south");
+        assertThat(facing(resolver, facts, 45f)).contains("south_west");
+        assertThat(facing(resolver, facts, 180f)).contains("north");
+        assertThat(facing(resolver, facts, -90f)).contains("east");
+        assertThat(facing(resolver, facts, 359f)).contains("south");
+    }
+
+    private static Optional<String> facing(PlaceholderResolver resolver, FakePlayerFacts facts, float yaw) {
+        facts.where(new PlayerFactsPlaceholders.Where("world", "normal", 0, 0, 0, yaw, 0f, "plains", "stone", 0));
+        return resolver.resolve(ALICE, true, "player_direction");
+    }
+
+    @Test
+    void aStatisticIsReadWholeOrSplitIntoItsQualifier() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .statistic("deaths", 7L)
+                .statistic("player_kills", 3L)
+                .statistic("mine_block_diamond_ore", 42L);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "stat_deaths")).contains("7");
+        assertThat(resolver.resolve(ALICE, true, "stat_mine_block_diamond_ore")).contains("42");
+        assertThat(resolver.resolve(ALICE, true, "player_deaths")).contains("7");
+        assertThat(resolver.resolve(ALICE, true, "player_kills")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "stat_nothing_like_this")).contains("-");
+    }
+
+    @Test
+    void theServerKeysNameTheServerAndCountItsWorlds() {
+        FakeServerMetrics metrics =
+                new FakeServerMetrics().named("Survival", "Welcome home", 3).worldCounts("world", 812, 441);
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().serverMetrics(metrics).build());
+
+        assertThat(resolver.resolve(ALICE, true, "server_name")).contains("Survival");
+        assertThat(resolver.resolve(ALICE, true, "server_motd")).contains("Welcome home");
+        assertThat(resolver.resolve(ALICE, true, "server_worlds")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "server_world_entities_world")).contains("812");
+        assertThat(resolver.resolve(ALICE, true, "server_world_chunks_world")).contains("441");
+        assertThat(resolver.resolve(ALICE, true, "server_world_entities_nether"))
+                .contains("-");
+        assertThat(resolver.resolve(ALICE, true, "server_time")).isPresent();
+        assertThat(resolver.resolve(ALICE, true, "server_date")).isPresent();
+    }
+
+    @Test
     void theSessionKeysReadTheDashWhileThePlayerIsOffline() {
         FakePlayerFacts facts = new FakePlayerFacts()
                 .account(new PlayerFactsPlaceholders.Account(Optional.empty(), Optional.empty(), Duration.ZERO, false));
@@ -1672,6 +1892,200 @@ class PlaceholderResolverTest {
         assertThat(resolver.resolve(ALICE, true, "cansee")).isEmpty();
     }
 
+    @Test
+    void aSurvivalMechanicIsReadPerPlayerAndPerServerSeparately() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .survival(new SurvivalPlaceholders() {
+                    @Override
+                    public boolean active(PlayerRef who, Mechanic mechanic) {
+                        return mechanic == Mechanic.AUTO_PICKUP;
+                    }
+
+                    @Override
+                    public boolean enabled(Mechanic mechanic) {
+                        return mechanic != Mechanic.AUTO_SELL;
+                    }
+                })
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "survival_autopickup")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "survival_veinminer")).contains("no");
+        // The switch a player left on reads on even where the server no longer runs the mechanic: the pair is
+        // what lets a HUD explain why nothing is happening.
+        assertThat(resolver.resolve(ALICE, true, "survival_autosell_enabled")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "survival_treefeller_enabled")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "survival_nothing_like_this")).contains("-");
+    }
+
+    @Test
+    void theItemworldKeysReadTheHeldBindingAndTheTwoSwitches() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .itemworld(new ItemworldPlaceholders() {
+                    @Override
+                    public List<String> powertool(PlayerRef who) {
+                        return who.equals(ALICE) ? List.of("spawn", "kit tools") : List.of();
+                    }
+
+                    @Override
+                    public boolean powertoolEnabled(PlayerRef who) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean unlimitedPlacement(PlayerRef who) {
+                        return false;
+                    }
+                })
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "itemworld_powertool")).contains("spawn, kit tools");
+        assertThat(resolver.resolve(ALICE, true, "itemworld_powertool_count")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "itemworld_powertool_bound")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "itemworld_powertool_enabled")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "itemworld_unlimited")).contains("no");
+        assertThat(resolver.resolve(BOB, true, "itemworld_powertool")).contains("-");
+        assertThat(resolver.resolve(BOB, true, "itemworld_powertool_bound")).contains("no");
+    }
+
+    @Test
+    void theNpcQuotaKeysCountWhatIsLeftAndSayUnlimitedWhenThereIsNoCap() {
+        PlaceholderResolver capped = resolverWith(PlaceholderContexts.builder()
+                .npc(npcSeam(12, 3, OptionalInt.of(5)))
+                .build());
+
+        assertThat(capped.resolve(ALICE, true, "npc_total")).contains("12");
+        assertThat(capped.resolve(ALICE, true, "npc_owned")).contains("3");
+        assertThat(capped.resolve(ALICE, true, "npc_limit")).contains("5");
+        assertThat(capped.resolve(ALICE, true, "npc_remaining")).contains("2");
+
+        PlaceholderResolver uncapped = resolverWith(PlaceholderContexts.builder()
+                .npc(npcSeam(12, 9, OptionalInt.empty()))
+                .build());
+
+        assertThat(uncapped.resolve(ALICE, true, "npc_limit")).contains("unlimited");
+        assertThat(uncapped.resolve(ALICE, true, "npc_remaining")).contains("unlimited");
+    }
+
+    @Test
+    void anOverQuotaOwnerHasNoneRemainingRatherThanANegativeCount() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .npc(npcSeam(9, 7, OptionalInt.of(5)))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "npc_remaining")).contains("0");
+    }
+
+    @Test
+    void theRegionKeysNameTheRegionThePlayerStandsInAndItsRoster() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .regions(new RegionsPlaceholders() {
+                    @Override
+                    public boolean available() {
+                        return true;
+                    }
+
+                    @Override
+                    public Optional<Standing> standingIn(PlayerRef who) {
+                        return who.equals(ALICE)
+                                ? Optional.of(new Standing("spawn", 7, List.of("Alice"), List.of("Bob", "Cara")))
+                                : Optional.empty();
+                    }
+
+                    @Override
+                    public int coveringCount(PlayerRef who) {
+                        return who.equals(ALICE) ? 2 : 0;
+                    }
+
+                    @Override
+                    public int worldCount(PlayerRef who) {
+                        return 14;
+                    }
+                })
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "regions_available")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "regions_inside")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "regions_here")).contains("spawn");
+        assertThat(resolver.resolve(ALICE, true, "regions_here_priority")).contains("7");
+        assertThat(resolver.resolve(ALICE, true, "regions_here_owners")).contains("Alice");
+        assertThat(resolver.resolve(ALICE, true, "regions_here_members")).contains("Bob, Cara");
+        assertThat(resolver.resolve(ALICE, true, "regions_count")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "regions_world_count")).contains("14");
+        // Standing in open land is not an error: the name dashes and "inside" says no.
+        assertThat(resolver.resolve(BOB, true, "regions_inside")).contains("no");
+        assertThat(resolver.resolve(BOB, true, "regions_here")).contains("-");
+    }
+
+    @Test
+    void theSecurityKeysReadTheLiveChallengeAndNothingAboutEnrolment() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .security(new SecurityPlaceholders() {
+                    @Override
+                    public boolean verifying(PlayerRef who) {
+                        return who.equals(ALICE);
+                    }
+
+                    @Override
+                    public boolean enforced() {
+                        return true;
+                    }
+                })
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "security_verifying")).contains("yes");
+        assertThat(resolver.resolve(BOB, true, "security_verifying")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "security_enforced")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "security_enrolled")).contains("-");
+    }
+
+    @Test
+    void theModuleFamilyAnswersForEveryIdAndDashesWithNothingWired() {
+        PlaceholderResolver wired = resolverWith(PlaceholderContexts.builder()
+                .modules(id -> id.equals("homes") || id.equals("economy"))
+                .build());
+
+        assertThat(wired.resolve(ALICE, true, "module_homes")).contains("yes");
+        assertThat(wired.resolve(ALICE, true, "module_economy")).contains("yes");
+        assertThat(wired.resolve(ALICE, true, "module_vaults")).contains("no");
+        assertThat(wired.resolve(ALICE, true, "module_notamodule")).contains("no");
+
+        PlaceholderResolver bare = resolverWith(PlaceholderContexts.builder().build());
+        assertThat(bare.resolve(ALICE, true, "module_homes")).contains("-");
+    }
+
+    @Test
+    void everySilentModuleFamilyDashesWithItsModuleOff() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        for (String key : List.of(
+                "survival_autopickup", "itemworld_powertool", "npc_total", "regions_here", "security_verifying")) {
+            assertThat(resolver.resolve(ALICE, true, key))
+                    .as("%s must dash rather than leave the raw token", key)
+                    .contains("-");
+        }
+    }
+
+    /** An NPC seam with a fixed population, a fixed owned count, and the quota handed to it. */
+    private static NpcPlaceholders npcSeam(int total, int owned, OptionalInt limit) {
+        return new NpcPlaceholders() {
+            @Override
+            public int total() {
+                return total;
+            }
+
+            @Override
+            public int owned(PlayerRef who) {
+                return owned;
+            }
+
+            @Override
+            public OptionalInt limit(PlayerRef who) {
+                return limit;
+            }
+        };
+    }
+
     /** A trade registry holding exactly one live exchange, between the two players handed to it. */
     private static TradePlaceholders tradingPair(PlayerRef one, PlayerRef other) {
         return new TradePlaceholders() {
@@ -1718,8 +2132,12 @@ class PlaceholderResolverTest {
         private final java.util.Map<Hand, HeldItem> hands = new java.util.EnumMap<>(Hand.class);
         private final java.util.Map<String, Integer> counts = new java.util.HashMap<>();
         private final java.util.Map<UUID, Position> positions = new java.util.HashMap<>();
+        private final java.util.Map<String, Long> statistics = new java.util.HashMap<>();
         private @Nullable Session session;
         private @Nullable Account account;
+        private @Nullable Identity identity;
+        private @Nullable Vitals vitals;
+        private @Nullable Where where;
 
         FakePlayerFacts session(Session live) {
             this.session = live;
@@ -1738,6 +2156,26 @@ class PlaceholderResolverTest {
 
         FakePlayerFacts itemCount(String material, int held) {
             counts.put(material, held);
+            return this;
+        }
+
+        FakePlayerFacts identity(Identity who) {
+            this.identity = who;
+            return this;
+        }
+
+        FakePlayerFacts vitals(Vitals body) {
+            this.vitals = body;
+            return this;
+        }
+
+        FakePlayerFacts where(Where place) {
+            this.where = place;
+            return this;
+        }
+
+        FakePlayerFacts statistic(String name, long value) {
+            statistics.put(name, value);
             return this;
         }
 
@@ -1770,6 +2208,27 @@ class PlaceholderResolverTest {
         @Override
         public Optional<Position> position(PlayerRef who) {
             return Optional.ofNullable(positions.get(who.uuid()));
+        }
+
+        @Override
+        public Optional<Identity> identity(PlayerRef who) {
+            return Optional.ofNullable(identity);
+        }
+
+        @Override
+        public Optional<Vitals> vitals(PlayerRef who) {
+            return Optional.ofNullable(vitals);
+        }
+
+        @Override
+        public Optional<Where> where(PlayerRef who) {
+            return Optional.ofNullable(where);
+        }
+
+        @Override
+        public java.util.OptionalLong statistic(PlayerRef who, String statistic, String qualifier) {
+            Long counted = statistics.get(qualifier.isEmpty() ? statistic : statistic + "_" + qualifier);
+            return counted == null ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(counted);
         }
     }
 
@@ -2313,6 +2772,7 @@ class PlaceholderResolverTest {
     private static final class FakeScoreboard implements ScoreboardPlaceholders {
 
         private final java.util.Set<PlayerRef> shown = new java.util.HashSet<>();
+        private final java.util.Map<PlayerRef, String> boards = new java.util.HashMap<>();
 
         FakeScoreboard visible(PlayerRef who, boolean value) {
             if (value) {
@@ -2323,9 +2783,19 @@ class PlaceholderResolverTest {
             return this;
         }
 
+        FakeScoreboard board(PlayerRef who, String board) {
+            boards.put(who, board);
+            return this;
+        }
+
         @Override
         public boolean visible(PlayerRef who) {
             return shown.contains(who);
+        }
+
+        @Override
+        public Optional<String> board(PlayerRef who) {
+            return Optional.ofNullable(boards.get(who));
         }
     }
 
@@ -2435,9 +2905,14 @@ class PlaceholderResolverTest {
         private String version = "1.21.11";
         private Duration uptime = Duration.ZERO;
         private double[] tps = {20.0, 20.0, 20.0};
+        private final java.util.Map<String, Integer> worldEntities = new java.util.HashMap<>();
+        private final java.util.Map<String, Integer> worldChunks = new java.util.HashMap<>();
         private long ramUsed;
         private long ramMax;
         private long ramFree;
+        private String name = "uxm";
+        private String motd = "A Minecraft Server";
+        private int worlds;
 
         FakeServerMetrics online(int value) {
             this.online = value;
@@ -2473,6 +2948,19 @@ class PlaceholderResolverTest {
 
         FakeServerMetrics worldPlayers(String world, int count) {
             this.worldPlayers.put(world, count);
+            return this;
+        }
+
+        FakeServerMetrics named(String value, String message, int loaded) {
+            this.name = value;
+            this.motd = message;
+            this.worlds = loaded;
+            return this;
+        }
+
+        FakeServerMetrics worldCounts(String world, int entities, int chunks) {
+            this.worldEntities.put(world, entities);
+            this.worldChunks.put(world, chunks);
             return this;
         }
 
@@ -2519,6 +3007,33 @@ class PlaceholderResolverTest {
         @Override
         public long ramFreeMb() {
             return ramFree;
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        @Override
+        public String motd() {
+            return motd;
+        }
+
+        @Override
+        public int worlds() {
+            return worlds;
+        }
+
+        @Override
+        public OptionalInt worldEntities(String world) {
+            Integer count = worldEntities.get(world);
+            return count == null ? OptionalInt.empty() : OptionalInt.of(count);
+        }
+
+        @Override
+        public OptionalInt worldChunks(String world) {
+            Integer count = worldChunks.get(world);
+            return count == null ? OptionalInt.empty() : OptionalInt.of(count);
         }
 
         @Override

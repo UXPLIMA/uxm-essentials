@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.invrollback.adapter.inbound.listener;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -36,6 +39,14 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 public final class SnapshotCaptureListener implements Listener {
+
+    /**
+     * When this enable last captured each player, and why, keyed by player UUID. Written after the DB write
+     * returns, so a capture that failed is not reported as one. It is deliberately session-scoped rather than a
+     * count read back from the table: the snapshots are staff-read history, and a HUD refresh must never become a
+     * query.
+     */
+    private final Map<UUID, Capture> lastCapture = new ConcurrentHashMap<>();
 
     private final CaptureSnapshot captureSnapshot;
     private final Scheduler scheduler;
@@ -86,6 +97,23 @@ public final class SnapshotCaptureListener implements Listener {
         byte[] payload = InventorySnapshotCodec.encode(contents, enderChest, location);
         UUID owner = player.getUniqueId();
         Instant now = clock.instant();
-        scheduler.async(() -> captureSnapshot.capture(owner, cause, payload, now));
+        scheduler.async(() -> {
+            captureSnapshot.capture(owner, cause, payload, now);
+            lastCapture.put(owner, new Capture(now, cause));
+        });
+    }
+
+    /** The last capture taken for {@code owner} since this enable, or empty when none was. */
+    public Optional<Capture> lastCapture(UUID owner) {
+        return Optional.ofNullable(lastCapture.get(Objects.requireNonNull(owner, "owner")));
+    }
+
+    /** One recorded capture: when it was written, and what caused it. */
+    public record Capture(Instant at, SnapshotCause cause) {
+
+        public Capture {
+            Objects.requireNonNull(at, "at");
+            Objects.requireNonNull(cause, "cause");
+        }
     }
 }

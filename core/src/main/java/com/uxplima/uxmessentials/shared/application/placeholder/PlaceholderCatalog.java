@@ -23,7 +23,8 @@ public final class PlaceholderCatalog {
                     EconomyPlaceholderKeys.all(),
                     SocialPlaceholderKeys.all(),
                     StatePlaceholderKeys.all(),
-                    ContentPlaceholderKeys.all())
+                    ContentPlaceholderKeys.all(),
+                    WorldMechanicsPlaceholderKeys.all())
             .flatMap(List::stream)
             .toList();
 

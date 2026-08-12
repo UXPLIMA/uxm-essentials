@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
 import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
@@ -81,6 +82,21 @@ public final class TablistRenderer {
      * region/entity thread.
      */
     private final Map<UUID, Boolean> appliedHeaderFooter = new ConcurrentHashMap<>();
+
+    /**
+     * The name of the format each player is currently drawn from, keyed by player UUID, or absent when they are
+     * drawn from none (no format matched, or the content is suppressed in their world). Written on the same region
+     * thread as the paint it describes and read by the {@code tablist_format} placeholder. It records what was
+     * applied rather than re-running the selector, because re-selecting would evaluate the format conditions a
+     * second time and a condition may itself expand a placeholder.
+     */
+    private final Map<UUID, String> appliedFormat = new ConcurrentHashMap<>();
+
+    /** The format {@code who}'s tab is currently drawn from, or empty when this renderer is drawing them none. */
+    public Optional<String> appliedFormat(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        return Optional.ofNullable(appliedFormat.get(who.uuid()));
+    }
 
     /** Paints the real player's name/order/skin row a selected format may carry; see {@link RealPlayerRowPainter}. */
     private final RealPlayerRowPainter rowPainter;
@@ -157,6 +173,7 @@ public final class TablistRenderer {
             clear(player);
             return;
         }
+        appliedFormat.put(player.getUniqueId(), format.name());
         applyHeaderFooter(player, content, tick);
         rowPainter.applyRow(player, format, tick);
         // Reconcile the opt-in suppress mode BEFORE the fillers are painted, priming the protected-id snapshot with the
@@ -189,6 +206,7 @@ public final class TablistRenderer {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
         appliedHeaderFooter.remove(player.getUniqueId());
+        appliedFormat.remove(player.getUniqueId());
         fillerPainter.clear(player);
         rowPainter.resetRow(player);
         // Take the viewer out of suppress mode and relist the real players so a cleared tab is never left synthetic.
@@ -202,6 +220,7 @@ public final class TablistRenderer {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
         appliedHeaderFooter.remove(player.getUniqueId());
+        appliedFormat.remove(player.getUniqueId());
         // On quit the player's connection is gone; just drop the tracking. A native reset packet to a closing channel
         // is a no-op, so revert is skipped — only the tracking is forgotten so a relog re-paints from scratch.
         fillerPainter.forget(player);

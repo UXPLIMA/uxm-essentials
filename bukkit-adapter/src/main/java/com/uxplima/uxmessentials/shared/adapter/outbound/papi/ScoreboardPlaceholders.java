@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
+import java.util.Optional;
+
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -19,4 +21,12 @@ public interface ScoreboardPlaceholders {
      * who never toggled is shown, so the default is {@code true}.
      */
     boolean visible(PlayerRef who);
+
+    /**
+     * The board {@code who}'s sidebar is currently drawn from, or empty when they are shown none: hidden by the
+     * toggle, suppressed in this world, or matching no board. Reported from what the renderer last applied rather
+     * than re-selecting, so it costs nothing per read and cannot re-evaluate a condition that itself expands a
+     * placeholder.
+     */
+    Optional<String> board(PlayerRef who);
 }

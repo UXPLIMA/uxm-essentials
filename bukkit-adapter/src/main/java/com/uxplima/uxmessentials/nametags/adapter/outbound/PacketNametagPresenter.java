@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.nametag.Appearance;
 import com.uxplima.uxmlib.nametag.NametagHandle;
@@ -78,6 +79,18 @@ public final class PacketNametagPresenter {
     private final NameVisibilityCoordinator nameVisibility;
     private final BooleanSupplier hideVanillaName;
     private final Map<UUID, Tracked> live = new ConcurrentHashMap<>();
+
+    /**
+     * The format {@code who}'s nametag is currently drawn from, or empty when they wear none: nobody matched a
+     * format, or their handle was removed. Read by the {@code nametags_format} placeholder off the same map the
+     * reconcile tick maintains, so it answers with what is actually shown above their head rather than re-running
+     * the selector (which would evaluate the format conditions a second time).
+     */
+    public Optional<String> appliedFormat(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        Tracked tracked = live.get(who.uuid());
+        return tracked == null ? Optional.empty() : Optional.of(tracked.format().name());
+    }
 
     /**
      * Each online player's last-known {@link Position}, refreshed on that player's <em>own</em> region thread by

@@ -6,10 +6,12 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -71,6 +73,7 @@ import com.uxplima.uxmessentials.bootstrap.health.SchedulerHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SoftDependencyHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
 import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlWiring;
+import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.RulesCommandControlPlaceholders;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
@@ -114,6 +117,7 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationQueries;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
+import com.uxplima.uxmessentials.nametags.adapter.outbound.PresenterNametagsPlaceholders;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
 import com.uxplima.uxmessentials.persistence.communication.AnnouncementStores;
 import com.uxplima.uxmessentials.persistence.ip.IpHistoryStores;
@@ -138,14 +142,19 @@ import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksActions;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksQueries;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
+import com.uxplima.uxmessentials.regions.adapter.outbound.ServiceRegionsPlaceholders;
 import com.uxplima.uxmessentials.regions.adapter.outbound.api.RegionsQueries;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
 import com.uxplima.uxmessentials.security.adapter.outbound.ModerationLockoutBan;
+import com.uxplima.uxmessentials.security.adapter.outbound.SessionSecurityPlaceholders;
 import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityActions;
 import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityQueries;
+import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.servertweaks.adapter.ServerTweaksWiring;
+import com.uxplima.uxmessentials.servertweaks.adapter.outbound.ConfigServerTweaksPlaceholders;
+import com.uxplima.uxmessentials.servertweaks.application.ServerTweaksConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
@@ -232,6 +241,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.MenusMenuPlacehold
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RegistryModulesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHologramsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryPlayerwarpsPlaceholders;
@@ -247,6 +257,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePosesPlacehol
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreRanksPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
@@ -274,6 +285,7 @@ import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
+import com.uxplima.uxmessentials.tablist.adapter.outbound.RendererTablistPlaceholders;
 import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
@@ -1011,6 +1023,10 @@ public final class PluginModule {
         // The one join capture behind /alts, /seenip and /ipalts, built before the modules wire so both readers
         // observe the same recorder. Null when neither moderation nor security is enabled: nothing is recorded.
         IpCapture ipCapture = wireIpHistory(plugin, registry, config, persistence, kernel, resources);
+        // Which modules truly came up, recorded as each one wires rather than read off the registry: a module can
+        // be enabled in the config and still never wire (a capability check it fails, an isolated start that
+        // threw), and the module_<id> family has to answer with what the server is actually running.
+        Set<String> wiredModules = new HashSet<>();
         loadModulesIsolated(registry.enabledModules(config), resources, log, module -> {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);
@@ -1018,6 +1034,7 @@ public final class PluginModule {
                 return;
             }
             startModule(module, ctx, resources, log);
+            wiredModules.add(module.id().value());
             wireAdapters(
                     plugin,
                     module,
@@ -1063,6 +1080,10 @@ public final class PluginModule {
         // scoreboards and tab can read %uxmessentials_menu_*%. Wired unconditionally over the same Menus façade the
         // modules opened their menus through.
         links.placeholders.menu(new MenusMenuPlaceholders(menus));
+        // Whether a module is on is a question about the server, not about any one context, and it is most useful
+        // exactly when the answer is no: an operator's own template reads it to hide a line rather than print a
+        // dash at every player. Wired last, from what the loop above recorded.
+        links.placeholders.modules(new RegistryModulesPlaceholders(wiredModules));
         return links.placeholders.build();
     }
 
@@ -1266,17 +1287,18 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
             wireCommandControl(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
-            wireVillagers(plugin, ctx, resources, menus, menuBindings);
+            wireVillagers(plugin, ctx, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
             wireInvrollback(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("regions"))) {
             wireRegions(plugin, ctx, resources, links, guiRegistry, menus, textInput, guiLayouts);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
-            wireServerTweaks(plugin, ctx, resources);
+            wireServerTweaks(plugin, ctx, resources, links);
         }
     }
 
-    private static void wireServerTweaks(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireServerTweaks(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // servertweaks is a grab-bag of small server/infra tweaks, each gated by its own switch (both default off), so
         // the wiring registers only the effects an operator has opted into. When f3-brand is on, a join listener
         // re-sends the configured brand over the minecraft:brand channel so it shows on F3; when console-filter is on,
@@ -1286,6 +1308,10 @@ public final class PluginModule {
         // disabled module wires none of this.
         ServerTweaksWiring.Wired wired = ServerTweaksWiring.wire(plugin, ctx);
         wired.listeners().forEach(resources::addListener);
+        // The brand this server reports is the module's one publicly interesting value, and an operator usually
+        // wants a scoreboard or a join line to repeat it rather than restate it in two places.
+        links.placeholders.serverTweaks(new ConfigServerTweaksPlaceholders(
+                ServerTweaksConfig.from(ctx.config()).f3Brand()));
         resources.onClose(wired::stop);
     }
 
@@ -1315,6 +1341,10 @@ public final class PluginModule {
                         wired.service(),
                         ctx.kernel().worldLookup(),
                         ctx.kernel().scheduler()));
+        // Which region a player stands in is the one regions fact a scoreboard asks for, so the same service the
+        // command reads is handed to the expansion. Without WorldGuard the no-op service reports nothing available
+        // and every key degrades to the dash, exactly as the command replies.
+        links.placeholders.regions(new ServiceRegionsPlaceholders(plugin.getServer(), wired.service()));
     }
 
     private static void wireInvrollback(
@@ -1348,12 +1378,16 @@ public final class PluginModule {
         links.actions.register(
                 UxmInvRollbackActions.class,
                 source -> new InvRollbackActions(wired.restorer(), ctx.kernel().playerLookup()));
+        // When this enable last snapshotted the player, read off the capture listener's own record rather than the
+        // snapshot table, so a staff HUD line never turns into a query.
+        links.placeholders.invrollback(wired.placeholders());
     }
 
     private static void wireVillagers(
             JavaPlugin plugin,
             ModuleContext ctx,
             CloseableResources resources,
+            ContextLinks links,
             Menus menus,
             MenuBindings menuBindings) {
         // villagers persists nothing relational: the last-restock stamp, the disable flag, and the manager's custom
@@ -1372,6 +1406,11 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath());
         wired.listeners().forEach(resources::addListener);
         wired.commands().forEach(resources::addCommand);
+        // Present only when the follow sub-feature wired: with nothing able to follow, there is nothing to count.
+        VillagersPlaceholders villagers = wired.placeholders();
+        if (villagers != null) {
+            links.placeholders.villagers(villagers);
+        }
         resources.onClose(wired.stop());
     }
 
@@ -1434,6 +1473,11 @@ public final class PluginModule {
                         wired.forceReverification(),
                         wired.limiter(),
                         ctx.kernel().scheduler()));
+        // Only the in-memory challenge state is exposed to placeholders. What factors an account has enrolled is a
+        // database row, and a scoreboard refreshing every second must never become a query.
+        links.placeholders.security(new SessionSecurityPlaceholders(
+                wired.sessions(),
+                SecurityConfig.from(ctx.config()).joinVerification().enabled()));
     }
 
     private static void wireCommandControl(
@@ -1457,6 +1501,10 @@ public final class PluginModule {
                         wired.groups(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        // The same check, readable from a menu requirement or a HUD line: a button hidden by the placeholder and a
+        // command refused by the gate are then the same decision rather than two that drift apart.
+        links.placeholders.commandControl(new RulesCommandControlPlaceholders(
+                plugin.getServer(), wired.worldRules(), wired.blockNamespaceBypass(), wired.groups()));
     }
 
     private static void wireTrade(
@@ -1565,6 +1613,9 @@ public final class PluginModule {
                 SurvivalWiring.wire(ctx, sales, guiLayouts, guiRegistry, menus, plugin.getServer());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The per-player mechanic switches are what a HUD wants to show ("auto-pickup: on"), so the same toggle
+        // store the listeners read is handed to the expansion; with survival off the seam stays absent.
+        links.placeholders.survival(wired.placeholders());
     }
 
     private static void wirePoses(
@@ -2252,6 +2303,9 @@ public final class PluginModule {
                         wired.powertools(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        // The same two personal switches and the same item binding, readable from a HUD rather than only from
+        // /powertoollist.
+        links.placeholders.itemworld(wired.placeholders());
     }
 
     private static void wireVaults(
@@ -2622,7 +2676,7 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         // The scoreboard PAPI seam reads the same PDC-backed "hidden" bit the /scoreboard toggle flips, so the
         // scoreboard_visible placeholder matches whether the player actually sees the sidebar in game.
-        links.placeholders.scoreboard(new StoreScoreboardPlaceholders(wired.visibility()));
+        links.placeholders.scoreboard(new StoreScoreboardPlaceholders(wired.visibility(), wired.renderer()));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         // Register the scoreboard settings panel on the /uxmess gui hub, gated by the player-facing GUI node.
@@ -2668,6 +2722,9 @@ public final class PluginModule {
                         wired.renderer(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        // Which format a player's tab is drawn from, read off what the renderer last painted so a chat prefix or a
+        // hologram line can agree with the tab the player is looking at.
+        links.placeholders.tablist(new RendererTablistPlaceholders(wired.renderer()));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
     }
@@ -2702,6 +2759,9 @@ public final class PluginModule {
                         wired.presenter(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+        // The same read for the nametag: the format the wearer is actually shown from, not the one a re-selection
+        // would pick.
+        links.placeholders.nametags(new PresenterNametagsPlaceholders(wired.presenter()));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
     }
@@ -2763,6 +2823,9 @@ public final class PluginModule {
                         ctx.kernel().playerLookup(),
                         ctx.kernel().worldLookup(),
                         ctx.kernel().scheduler()));
+        // How many NPCs a player owns against the quota /npc create resolves, read off the same cached repository
+        // so a HUD refresh is an in-memory walk rather than a query.
+        links.placeholders.npc(wired.placeholders());
         resources.onClose(wired::stop);
     }
 

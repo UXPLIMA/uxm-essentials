@@ -9,9 +9,32 @@ final class SharedPlaceholderKeys {
     private SharedPlaceholderKeys() {}
 
     static List<PlaceholderSpec> all() {
-        return Stream.of(addressing(), between(), account(), session(), held(), waits(), formatting(), server())
+        return Stream.of(
+                        modules(),
+                        addressing(),
+                        between(),
+                        account(),
+                        identity(),
+                        session(),
+                        vitals(),
+                        place(),
+                        statistics(),
+                        held(),
+                        waits(),
+                        formatting(),
+                        server())
                 .flatMap(List::stream)
                 .toList();
+    }
+
+    /** Which feature modules are switched on, so a template can hide a line rather than print a dash. */
+    private static List<PlaceholderSpec> modules() {
+        return List.of(PlaceholderSpec.sharedFamily(
+                "module_<id>",
+                "Whether that feature module is switched on (yes/no); the id is the one in modules.conf, as "
+                        + "homes or economy. Reading it lets a scoreboard hide the lines a disabled module would "
+                        + "answer with a dash.",
+                PlaceholderScope.GLOBAL));
     }
 
     /** Reading a key about somebody other than the player the placeholder is being rendered for. */
@@ -129,6 +152,127 @@ final class SharedPlaceholderKeys {
                         PlaceholderScope.SESSION));
     }
 
+    /** Who the player is to the server, and how they are configured to move. */
+    private static List<PlaceholderSpec> identity() {
+        return List.of(
+                PlaceholderSpec.shared("player_name", "The player's account name.", PlaceholderScope.PLAYER),
+                PlaceholderSpec.shared(
+                        "player_display_name", "The name other players see, as plain text.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared("player_uuid", "The player's account id.", PlaceholderScope.PLAYER),
+                PlaceholderSpec.shared(
+                        "player_ip",
+                        "The address the player is connected from, without the port.",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared("player_locale", "The client's language, as en_us.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared("player_gamemode", "The game mode the player is in.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_flying", "Whether the player is flying right now (yes/no).", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_can_fly", "Whether the player is allowed to fly (yes/no).", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_fly_speed", "The player's flight speed, from 0 to 1.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_walk_speed", "The player's walking speed, from 0 to 1.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_bed", "The player's respawn point, as world x y z.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_has_bed",
+                        "Whether the player has a respawn point set (yes/no).",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_compass",
+                        "Where the player's compass points, as world x y z.",
+                        PlaceholderScope.SESSION));
+    }
+
+    /** How the player's body is doing right now. */
+    private static List<PlaceholderSpec> vitals() {
+        return List.of(
+                PlaceholderSpec.shared(
+                        "player_health", "The player's health, in half-hearts.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_health_rounded",
+                        "The player's health rounded to a whole number.",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_health_max",
+                        "The health ceiling the player's health is measured against.",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_health_percent",
+                        "The player's health as a percentage of their maximum.",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_food", "The player's hunger bar, from 0 to 20.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_saturation", "The hidden saturation behind the hunger bar.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_air", "The air the player has left underwater, in ticks.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_air_max", "The air a full breath holds, in ticks.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_armor", "The armour points the player's equipment is worth.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_absorption",
+                        "The absorption hearts on top of the player's health.",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_burning", "Whether the player is on fire (yes/no).", PlaceholderScope.SESSION));
+    }
+
+    /** Where the player stands, in more detail than the world name. */
+    private static List<PlaceholderSpec> place() {
+        return List.of(
+                PlaceholderSpec.shared(
+                        "player_x", "The player's x coordinate, as a whole block.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_y", "The player's y coordinate, as a whole block.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_z", "The player's z coordinate, as a whole block.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_x_exact", "The player's x coordinate, to two decimals.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_y_exact", "The player's y coordinate, to two decimals.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_z_exact", "The player's z coordinate, to two decimals.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_yaw", "The direction the player faces, in degrees.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_pitch", "How far up or down the player looks, in degrees.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_direction",
+                        "The compass direction the player faces, as north or south_west.",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared("player_biome", "The biome the player stands in.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_block_below", "The block the player stands on.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_light", "The light level where the player stands.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_world_environment",
+                        "The environment of the player's world: normal, nether or the_end.",
+                        PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_location", "Where the player stands, as world x y z.", PlaceholderScope.SESSION));
+    }
+
+    /** The vanilla statistics, as one open family plus the three counters a scoreboard asks for by name. */
+    private static List<PlaceholderSpec> statistics() {
+        return List.of(
+                PlaceholderSpec.sharedFamily(
+                        "stat_<statistic>",
+                        "Any vanilla statistic by name, as stat_jump or stat_damage_dealt; a statistic that "
+                                + "counts per block, item or entity takes it on the end, as "
+                                + "stat_mine_block_diamond_ore or stat_kill_entity_zombie.",
+                        PlaceholderScope.PLAYER),
+                PlaceholderSpec.shared(
+                        "player_deaths", "How many times the account has died.", PlaceholderScope.PLAYER),
+                PlaceholderSpec.shared(
+                        "player_kills", "How many players the account has killed.", PlaceholderScope.PLAYER),
+                PlaceholderSpec.shared(
+                        "player_mob_kills", "How many mobs the account has killed.", PlaceholderScope.PLAYER));
+    }
+
     /** The item in each hand, for a HUD that mirrors what the player is holding. */
     private static List<PlaceholderSpec> held() {
         return List.of(
@@ -237,6 +381,26 @@ final class SharedPlaceholderKeys {
     private static List<PlaceholderSpec> server() {
         return List.of(
                 PlaceholderSpec.shared("server_online", "How many players are connected.", PlaceholderScope.GLOBAL),
+                PlaceholderSpec.shared("server_name", "The server's own name.", PlaceholderScope.GLOBAL),
+                PlaceholderSpec.shared(
+                        "server_motd", "The message of the day, as plain text.", PlaceholderScope.GLOBAL),
+                PlaceholderSpec.shared("server_worlds", "How many worlds are loaded.", PlaceholderScope.GLOBAL),
+                PlaceholderSpec.shared(
+                        "server_time",
+                        "The wall-clock time on the machine the server runs on, as a 24-hour clock.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.shared(
+                        "server_date",
+                        "The calendar day on the machine the server runs on, as yyyy-mm-dd.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
+                        "server_world_entities_<world>",
+                        "How many entities are in the named world.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
+                        "server_world_chunks_<world>",
+                        "How many chunks are loaded in the named world.",
+                        PlaceholderScope.GLOBAL),
                 PlaceholderSpec.shared(
                         "server_max_players", "The server's player slot count.", PlaceholderScope.GLOBAL),
                 PlaceholderSpec.shared(

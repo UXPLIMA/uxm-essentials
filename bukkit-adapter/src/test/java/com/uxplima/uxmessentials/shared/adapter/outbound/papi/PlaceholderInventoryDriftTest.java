@@ -60,6 +60,18 @@ class PlaceholderInventoryDriftTest {
             "poses_",
             "worlds_",
             "menu_",
+            "survival_",
+            "itemworld_",
+            "npc_",
+            "regions_",
+            "security_",
+            "module_",
+            "tablist_",
+            "nametags_",
+            "villagers_",
+            "servertweaks_",
+            "commandcontrol_",
+            "invrollback_",
             "server_");
 
     /** The bare (un-prefixed) keys the resolver dispatches in its terminal switch. */
@@ -179,12 +191,154 @@ class PlaceholderInventoryDriftTest {
                 .discordlink(discordlink())
                 .holograms(() -> 0)
                 .communication(communication())
-                .scoreboard(who -> true)
+                .scoreboard(scoreboard())
                 .poses(poses())
                 .worlds(worlds())
                 .serverMetrics(serverMetrics())
                 .menu(menu())
+                .survival(survival())
+                .itemworld(itemworld())
+                .npc(npc())
+                .regions(regions())
+                .security(security())
+                .modules(id -> true)
+                .tablist(tablist())
+                .nametags(nametags())
+                .villagers(villagers())
+                .serverTweaks(() -> Optional.of("uxmEssentials"))
+                .commandControl((who, command) -> true)
+                .invrollback(invrollback())
                 .build();
+    }
+
+    private static ScoreboardPlaceholders scoreboard() {
+        return new ScoreboardPlaceholders() {
+            @Override
+            public boolean visible(PlayerRef who) {
+                return true;
+            }
+
+            @Override
+            public Optional<String> board(PlayerRef who) {
+                return Optional.of("default");
+            }
+        };
+    }
+
+    private static TablistPlaceholders tablist() {
+        return who -> Optional.of("default");
+    }
+
+    private static NametagsPlaceholders nametags() {
+        return who -> Optional.of("default");
+    }
+
+    private static VillagersPlaceholders villagers() {
+        return who -> 0;
+    }
+
+    private static InvrollbackPlaceholders invrollback() {
+        return new InvrollbackPlaceholders() {
+            @Override
+            public Optional<java.time.Instant> lastCapture(PlayerRef who) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> lastCause(PlayerRef who) {
+                return Optional.empty();
+            }
+        };
+    }
+
+    private static SurvivalPlaceholders survival() {
+        return new SurvivalPlaceholders() {
+            @Override
+            public boolean active(PlayerRef who, Mechanic mechanic) {
+                return true;
+            }
+
+            @Override
+            public boolean enabled(Mechanic mechanic) {
+                return true;
+            }
+        };
+    }
+
+    private static ItemworldPlaceholders itemworld() {
+        return new ItemworldPlaceholders() {
+            @Override
+            public List<String> powertool(PlayerRef who) {
+                return List.of();
+            }
+
+            @Override
+            public boolean powertoolEnabled(PlayerRef who) {
+                return true;
+            }
+
+            @Override
+            public boolean unlimitedPlacement(PlayerRef who) {
+                return false;
+            }
+        };
+    }
+
+    private static NpcPlaceholders npc() {
+        return new NpcPlaceholders() {
+            @Override
+            public int total() {
+                return 0;
+            }
+
+            @Override
+            public int owned(PlayerRef who) {
+                return 0;
+            }
+
+            @Override
+            public OptionalInt limit(PlayerRef who) {
+                return OptionalInt.empty();
+            }
+        };
+    }
+
+    private static RegionsPlaceholders regions() {
+        return new RegionsPlaceholders() {
+            @Override
+            public boolean available() {
+                return true;
+            }
+
+            @Override
+            public Optional<Standing> standingIn(PlayerRef who) {
+                return Optional.of(new Standing("spawn", 1, List.of(), List.of()));
+            }
+
+            @Override
+            public int coveringCount(PlayerRef who) {
+                return 1;
+            }
+
+            @Override
+            public int worldCount(PlayerRef who) {
+                return 1;
+            }
+        };
+    }
+
+    private static SecurityPlaceholders security() {
+        return new SecurityPlaceholders() {
+            @Override
+            public boolean verifying(PlayerRef who) {
+                return false;
+            }
+
+            @Override
+            public boolean enforced() {
+                return true;
+            }
+        };
     }
 
     private static PosesPlaceholders poses() {
@@ -651,6 +805,31 @@ class PlaceholderInventoryDriftTest {
             @Override
             public long ramFreeMb() {
                 return 0L;
+            }
+
+            @Override
+            public String name() {
+                return "uxm";
+            }
+
+            @Override
+            public String motd() {
+                return "A Minecraft Server";
+            }
+
+            @Override
+            public int worlds() {
+                return 1;
+            }
+
+            @Override
+            public OptionalInt worldEntities(String world) {
+                return OptionalInt.empty();
+            }
+
+            @Override
+            public OptionalInt worldChunks(String world) {
+                return OptionalInt.empty();
             }
 
             @Override

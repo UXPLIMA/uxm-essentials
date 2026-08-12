@@ -43,6 +43,21 @@ public interface ServerMetricsPlaceholders {
     /** Free heap within the currently committed total, in megabytes. */
     long ramFreeMb();
 
+    /** The server's own name, as the operator set it. */
+    String name();
+
+    /** The message of the day, already flattened to plain text. */
+    String motd();
+
+    /** How many worlds are loaded. */
+    int worlds();
+
+    /** Entities in the named world, or empty when no world carries that name. */
+    OptionalInt worldEntities(String world);
+
+    /** Loaded chunks in the named world, or empty when no world carries that name. */
+    OptionalInt worldChunks(String world);
+
     /** Players in the named world, or empty when no world carries that name. */
     OptionalInt worldPlayers(String world);
 

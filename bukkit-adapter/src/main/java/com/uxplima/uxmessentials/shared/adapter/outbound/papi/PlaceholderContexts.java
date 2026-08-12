@@ -40,6 +40,18 @@ public final class PlaceholderContexts {
     private final @Nullable WorldsPlaceholders worldsPlaceholders;
     private final @Nullable MenuPlaceholders menu;
     private final @Nullable PosesPlaceholders poses;
+    private final @Nullable SurvivalPlaceholders survival;
+    private final @Nullable TablistPlaceholders tablist;
+    private final @Nullable NametagsPlaceholders nametags;
+    private final @Nullable VillagersPlaceholders villagers;
+    private final @Nullable ServerTweaksPlaceholders serverTweaks;
+    private final @Nullable CommandControlPlaceholders commandControl;
+    private final @Nullable InvrollbackPlaceholders invrollback;
+    private final @Nullable ItemworldPlaceholders itemworld;
+    private final @Nullable NpcPlaceholders npc;
+    private final @Nullable RegionsPlaceholders regions;
+    private final @Nullable SecurityPlaceholders security;
+    private final @Nullable ModulesPlaceholders modules;
     private final @Nullable RanksPlaceholders ranks;
     private final @Nullable PlayerLookup players;
     private final @Nullable PlayerFactsPlaceholders playerFacts;
@@ -69,6 +81,18 @@ public final class PlaceholderContexts {
         this.worldsPlaceholders = builder.worldsPlaceholders;
         this.menu = builder.menu;
         this.poses = builder.poses;
+        this.survival = builder.survival;
+        this.tablist = builder.tablist;
+        this.nametags = builder.nametags;
+        this.villagers = builder.villagers;
+        this.serverTweaks = builder.serverTweaks;
+        this.commandControl = builder.commandControl;
+        this.invrollback = builder.invrollback;
+        this.itemworld = builder.itemworld;
+        this.npc = builder.npc;
+        this.regions = builder.regions;
+        this.security = builder.security;
+        this.modules = builder.modules;
         this.ranks = builder.ranks;
         this.players = builder.players;
         this.playerFacts = builder.playerFacts;
@@ -191,6 +215,54 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(poses);
     }
 
+    public Optional<SurvivalPlaceholders> survival() {
+        return Optional.ofNullable(survival);
+    }
+
+    public Optional<TablistPlaceholders> tablist() {
+        return Optional.ofNullable(tablist);
+    }
+
+    public Optional<NametagsPlaceholders> nametags() {
+        return Optional.ofNullable(nametags);
+    }
+
+    public Optional<VillagersPlaceholders> villagers() {
+        return Optional.ofNullable(villagers);
+    }
+
+    public Optional<ServerTweaksPlaceholders> serverTweaks() {
+        return Optional.ofNullable(serverTweaks);
+    }
+
+    public Optional<CommandControlPlaceholders> commandControl() {
+        return Optional.ofNullable(commandControl);
+    }
+
+    public Optional<InvrollbackPlaceholders> invrollback() {
+        return Optional.ofNullable(invrollback);
+    }
+
+    public Optional<ItemworldPlaceholders> itemworld() {
+        return Optional.ofNullable(itemworld);
+    }
+
+    public Optional<NpcPlaceholders> npc() {
+        return Optional.ofNullable(npc);
+    }
+
+    public Optional<RegionsPlaceholders> regions() {
+        return Optional.ofNullable(regions);
+    }
+
+    public Optional<SecurityPlaceholders> security() {
+        return Optional.ofNullable(security);
+    }
+
+    public Optional<ModulesPlaceholders> modules() {
+        return Optional.ofNullable(modules);
+    }
+
     public Optional<RanksPlaceholders> ranks() {
         return Optional.ofNullable(ranks);
     }
@@ -244,6 +316,18 @@ public final class PlaceholderContexts {
         private @Nullable WorldsPlaceholders worldsPlaceholders;
         private @Nullable MenuPlaceholders menu;
         private @Nullable PosesPlaceholders poses;
+        private @Nullable SurvivalPlaceholders survival;
+        private @Nullable TablistPlaceholders tablist;
+        private @Nullable NametagsPlaceholders nametags;
+        private @Nullable VillagersPlaceholders villagers;
+        private @Nullable ServerTweaksPlaceholders serverTweaks;
+        private @Nullable CommandControlPlaceholders commandControl;
+        private @Nullable InvrollbackPlaceholders invrollback;
+        private @Nullable ItemworldPlaceholders itemworld;
+        private @Nullable NpcPlaceholders npc;
+        private @Nullable RegionsPlaceholders regions;
+        private @Nullable SecurityPlaceholders security;
+        private @Nullable ModulesPlaceholders modules;
         private @Nullable RanksPlaceholders ranks;
         private @Nullable PlayerLookup players;
         private @Nullable PlayerFactsPlaceholders playerFacts;
@@ -380,6 +464,66 @@ public final class PlaceholderContexts {
 
         public Builder poses(PosesPlaceholders seam) {
             this.poses = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder survival(SurvivalPlaceholders seam) {
+            this.survival = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder tablist(TablistPlaceholders seam) {
+            this.tablist = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder nametags(NametagsPlaceholders seam) {
+            this.nametags = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder villagers(VillagersPlaceholders seam) {
+            this.villagers = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder serverTweaks(ServerTweaksPlaceholders seam) {
+            this.serverTweaks = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder commandControl(CommandControlPlaceholders seam) {
+            this.commandControl = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder invrollback(InvrollbackPlaceholders seam) {
+            this.invrollback = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder itemworld(ItemworldPlaceholders seam) {
+            this.itemworld = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder npc(NpcPlaceholders seam) {
+            this.npc = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder regions(RegionsPlaceholders seam) {
+            this.regions = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder security(SecurityPlaceholders seam) {
+            this.security = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder modules(ModulesPlaceholders seam) {
+            this.modules = java.util.Objects.requireNonNull(seam, "seam");
             return this;
         }
 

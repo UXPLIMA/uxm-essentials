@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.util.Objects;
+import java.util.Optional;
 
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -19,13 +21,20 @@ import org.jspecify.annotations.NullMarked;
 public final class StoreScoreboardPlaceholders implements ScoreboardPlaceholders {
 
     private final ScoreboardVisibilityStore store;
+    private final ScoreboardRenderer renderer;
 
-    public StoreScoreboardPlaceholders(ScoreboardVisibilityStore store) {
+    public StoreScoreboardPlaceholders(ScoreboardVisibilityStore store, ScoreboardRenderer renderer) {
         this.store = Objects.requireNonNull(store, "store");
+        this.renderer = Objects.requireNonNull(renderer, "renderer");
     }
 
     @Override
     public boolean visible(PlayerRef who) {
         return !store.hidden(Objects.requireNonNull(who, "who"));
+    }
+
+    @Override
+    public Optional<String> board(PlayerRef who) {
+        return renderer.appliedBoard(Objects.requireNonNull(who, "who"));
     }
 }

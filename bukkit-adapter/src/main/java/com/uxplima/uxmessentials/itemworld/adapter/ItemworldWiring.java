@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.UnlimitedPla
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.LoggingItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PdcPowertoolStore;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PowertoolToggleStore;
+import com.uxplima.uxmessentials.itemworld.adapter.outbound.StoreItemworldPlaceholders;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.UnlimitedPlacementStore;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.PowertoolPolicy;
@@ -33,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ItemworldPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -119,7 +121,13 @@ public final class ItemworldWiring {
                 new PowertoolInteractListener(powertoolStore, powertoolToggles, config),
                 new UnlimitedPlacementListener(unlimited, config),
                 new ShulkerBoxListener(shulkerView, config));
-        return new Wired(List.copyOf(commands), listeners, hubView, shulkerView, powertoolStore);
+        return new Wired(
+                List.copyOf(commands),
+                listeners,
+                hubView,
+                shulkerView,
+                powertoolStore,
+                new StoreItemworldPlaceholders(plugin.getServer(), powertoolStore, powertoolToggles, unlimited));
     }
 
     private static Logger auditLogger() {
@@ -143,7 +151,8 @@ public final class ItemworldWiring {
             List<Listener> listeners,
             ItemworldHubMenu hubView,
             ShulkerBoxView shulkerView,
-            PdcPowertoolStore powertools) {
+            PdcPowertoolStore powertools,
+            ItemworldPlaceholders placeholders) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -151,6 +160,7 @@ public final class ItemworldWiring {
             Objects.requireNonNull(hubView, "hubView");
             Objects.requireNonNull(shulkerView, "shulkerView");
             Objects.requireNonNull(powertools, "powertools");
+            Objects.requireNonNull(placeholders, "placeholders");
         }
     }
 }

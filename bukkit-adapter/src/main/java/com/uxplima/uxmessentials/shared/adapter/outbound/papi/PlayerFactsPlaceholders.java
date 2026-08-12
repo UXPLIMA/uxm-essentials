@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -34,6 +35,22 @@ public interface PlayerFactsPlaceholders {
     /** Where the player stands, or empty when they are not connected. */
     Optional<Position> position(PlayerRef who);
 
+    /** Who the player is to the server, or empty when they are not connected. */
+    Optional<Identity> identity(PlayerRef who);
+
+    /** How the player's body is doing, or empty when they are not connected. */
+    Optional<Vitals> vitals(PlayerRef who);
+
+    /** Where the player stands, in the detail a placeholder asks for, or empty when they are not connected. */
+    Optional<Where> where(PlayerRef who);
+
+    /**
+     * One vanilla statistic for the account, or empty when the server knows no such statistic (or the qualifier
+     * does not belong to it). The qualifier completes a statistic that counts per block, item or entity, as
+     * {@code mine_block} does; a statistic that counts once takes an empty qualifier.
+     */
+    OptionalLong statistic(PlayerRef who, String statistic, String qualifier);
+
     /**
      * Where a connected player stands, for the relational distance keys.
      *
@@ -43,6 +60,86 @@ public interface PlayerFactsPlaceholders {
      * @param z their z coordinate
      */
     record Position(String world, double x, double y, double z) {}
+
+    /**
+     * Who a connected player is to the server.
+     *
+     * @param name the account name
+     * @param displayName the name other players see, already flattened to plain text
+     * @param uuid the account id
+     * @param address the connecting address, without the port, or empty when the server reports none
+     * @param locale the client's language tag, as {@code en_us}
+     * @param gameMode the game mode they are in, lower-cased
+     * @param flying whether they are flying right now
+     * @param allowFlight whether they are allowed to fly
+     * @param flySpeed their flight speed, from 0 to 1
+     * @param walkSpeed their walking speed, from 0 to 1
+     * @param bed where their respawn point is, or empty when they have none
+     * @param compass where their compass points
+     */
+    record Identity(
+            String name,
+            String displayName,
+            String uuid,
+            Optional<String> address,
+            String locale,
+            String gameMode,
+            boolean flying,
+            boolean allowFlight,
+            float flySpeed,
+            float walkSpeed,
+            Optional<Position> bed,
+            Optional<Position> compass) {}
+
+    /**
+     * How a connected player's body is doing.
+     *
+     * @param health their current health, in half-hearts
+     * @param maxHealth the ceiling that health is measured against
+     * @param food their hunger bar, from 0 to 20
+     * @param saturation the hidden saturation behind the hunger bar
+     * @param air the air they have left underwater, in ticks
+     * @param maxAir the air a full breath holds, in ticks
+     * @param armor the armour points their equipment is worth
+     * @param absorption the absorption hearts on top of their health
+     * @param burning whether they are on fire
+     */
+    record Vitals(
+            double health,
+            double maxHealth,
+            int food,
+            float saturation,
+            int air,
+            int maxAir,
+            double armor,
+            double absorption,
+            boolean burning) {}
+
+    /**
+     * Where a connected player stands, in the detail the position keys report.
+     *
+     * @param world the world they are in
+     * @param environment that world's environment ({@code normal}, {@code nether}, {@code the_end})
+     * @param x their x coordinate
+     * @param y their y coordinate
+     * @param z their z coordinate
+     * @param yaw the direction they face, in degrees
+     * @param pitch how far up or down they look, in degrees
+     * @param biome the biome id under them
+     * @param blockBelow the material id of the block they stand on
+     * @param light the light level where they stand
+     */
+    record Where(
+            String world,
+            String environment,
+            double x,
+            double y,
+            double z,
+            float yaw,
+            float pitch,
+            String biome,
+            String blockBelow,
+            int light) {}
 
     /** Which hand a {@code hand_*} key is asking about. */
     enum Hand {

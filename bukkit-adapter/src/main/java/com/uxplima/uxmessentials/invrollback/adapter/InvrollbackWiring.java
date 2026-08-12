@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotPreview
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotRestorer;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotTeleporter;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.listener.SnapshotCaptureListener;
+import com.uxplima.uxmessentials.invrollback.adapter.outbound.ListenerInvrollbackPlaceholders;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.SnapshotPruneSweep;
 import com.uxplima.uxmessentials.invrollback.application.CaptureSnapshot;
 import com.uxplima.uxmessentials.invrollback.application.InvrollbackConfig;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.InvrollbackPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -112,7 +114,12 @@ public final class InvrollbackWiring {
         AutoCloseable sweepHandle = sweep.start();
 
         return new Wired(
-                List.of(captureListener), List.of(command), repository, restorer, () -> close(sweepHandle, kernel));
+                List.of(captureListener),
+                List.of(command),
+                repository,
+                restorer,
+                () -> close(sweepHandle, kernel),
+                new ListenerInvrollbackPlaceholders(captureListener));
     }
 
     /** Cancel the repeating retention sweep on module stop; a failure to close is logged, never rethrown. */
@@ -139,13 +146,15 @@ public final class InvrollbackWiring {
             List<CommandRegistration> commands,
             SnapshotRepository repository,
             SnapshotRestorer restorer,
-            Runnable stop) {
+            Runnable stop,
+            InvrollbackPlaceholders placeholders) {
         public Wired {
             listeners = List.copyOf(listeners);
             commands = List.copyOf(commands);
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(restorer, "restorer");
             Objects.requireNonNull(stop, "stop");
+            Objects.requireNonNull(placeholders, "placeholders");
         }
     }
 }

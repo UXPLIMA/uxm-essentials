@@ -100,6 +100,21 @@ public final class ScoreboardRenderer {
      */
     private final Map<UUID, Boolean> appliedHideNumbers = new ConcurrentHashMap<>();
 
+    /**
+     * The name of the board each player is currently being drawn from, keyed by player UUID, or absent when they
+     * have none (hidden, suppressed in this world, or matching no board). Written on the same region thread as the
+     * paint it describes and read by the {@code scoreboard_format} placeholder, which is why it records what was
+     * applied rather than re-running the selector: re-selecting would evaluate the board conditions a second time,
+     * and a condition may itself expand a placeholder.
+     */
+    private final Map<UUID, String> appliedBoard = new ConcurrentHashMap<>();
+
+    /** The board {@code who} is currently drawn from, or empty when no sidebar is being shown to them. */
+    public Optional<String> appliedBoard(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        return Optional.ofNullable(appliedBoard.get(who.uuid()));
+    }
+
     public ScoreboardRenderer(
             SidebarManager sidebars,
             ScoreboardVisibilityStore visibility,
@@ -129,6 +144,7 @@ public final class ScoreboardRenderer {
             clear(player);
             return;
         }
+        appliedBoard.put(player.getUniqueId(), selected.get().name());
         renderSidebar(player, live, ctx, tick);
     }
 
@@ -136,6 +152,7 @@ public final class ScoreboardRenderer {
     public void clear(Player player) {
         Objects.requireNonNull(player, "player");
         appliedHideNumbers.remove(player.getUniqueId());
+        appliedBoard.remove(player.getUniqueId());
         if (sidebars.get(player.getUniqueId()) != null) {
             sidebars.remove(player);
         }
@@ -145,6 +162,7 @@ public final class ScoreboardRenderer {
     public void forget(Player player) {
         Objects.requireNonNull(player, "player");
         appliedHideNumbers.remove(player.getUniqueId());
+        appliedBoard.remove(player.getUniqueId());
         sidebars.forget(player.getUniqueId());
     }
 

@@ -11,6 +11,8 @@ final class StatePlaceholderKeys {
     private static final ModuleId PLAYERSTATE = ModuleId.of("playerstate");
     private static final ModuleId POSES = ModuleId.of("poses");
     private static final ModuleId SCOREBOARD = ModuleId.of("scoreboard");
+    private static final ModuleId TABLIST = ModuleId.of("tablist");
+    private static final ModuleId NAMETAGS = ModuleId.of("nametags");
     private static final ModuleId HOLOGRAMS = ModuleId.of("holograms");
     private static final ModuleId CUSTOMMENUS = ModuleId.of("custommenus");
 
@@ -116,6 +118,31 @@ final class StatePlaceholderKeys {
                         "Whether the player has the sidebar showing (yes/no).",
                         PlaceholderScope.SESSION,
                         SCOREBOARD),
+                PlaceholderSpec.of(
+                        "scoreboard_board",
+                        "The board the player's sidebar is drawn from, or a dash when they are shown none.",
+                        PlaceholderScope.SESSION,
+                        SCOREBOARD),
+                PlaceholderSpec.of(
+                        "tablist_format",
+                        "The tablist format the player's tab is drawn from, or a dash when they are drawn none.",
+                        PlaceholderScope.SESSION,
+                        TABLIST),
+                PlaceholderSpec.of(
+                        "tablist_shown",
+                        "Whether the player's tab is being drawn from a format at all (yes/no).",
+                        PlaceholderScope.SESSION,
+                        TABLIST),
+                PlaceholderSpec.of(
+                        "nametags_format",
+                        "The nametag format the player wears, or a dash when they wear none.",
+                        PlaceholderScope.SESSION,
+                        NAMETAGS),
+                PlaceholderSpec.of(
+                        "nametags_shown",
+                        "Whether the player wears a nametag at all (yes/no).",
+                        PlaceholderScope.SESSION,
+                        NAMETAGS),
                 PlaceholderSpec.of(
                         "holograms_count", "How many holograms are placed.", PlaceholderScope.GLOBAL, HOLOGRAMS));
     }

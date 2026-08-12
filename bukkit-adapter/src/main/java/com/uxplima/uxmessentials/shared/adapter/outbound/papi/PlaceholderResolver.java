@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -46,6 +48,11 @@ public final class PlaceholderResolver {
     /** How a stored timestamp reads: the day and the minute, in the server's own zone. */
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT);
 
+    /** The wall clock and calendar day of the machine the server runs on, for the two real-time server keys. */
+    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
+
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ROOT);
+
     private static final String YES = "yes";
     private static final String NO = "no";
     /** The player-sit toggle renders its own words rather than yes/no, so it reads as an opt-out state. */
@@ -54,6 +61,9 @@ public final class PlaceholderResolver {
     private static final String REFUSE = "refuse";
     /** The {@code %uxmessentials_rank_next%} value shown when the player is already at the highest rank. */
     private static final String MAX_RANK = "max";
+
+    /** What a quota with no ceiling reads as, the same word the vault and home quotas already use. */
+    private static final String UNLIMITED = "unlimited";
 
     private static final String KIT_PREFIX = "kit_";
     private static final String KIT_COOLDOWN_PREFIX = "cooldown_";
@@ -78,12 +88,21 @@ public final class PlaceholderResolver {
     private static final String HOLOGRAMS_PREFIX = "holograms_";
     private static final String COMMUNICATION_PREFIX = "communication_";
     private static final String SCOREBOARD_PREFIX = "scoreboard_";
+    private static final String TABLIST_PREFIX = "tablist_";
+    private static final String NAMETAGS_PREFIX = "nametags_";
+    private static final String VILLAGERS_PREFIX = "villagers_";
+    private static final String SERVERTWEAKS_PREFIX = "servertweaks_";
+    private static final String COMMANDCONTROL_PREFIX = "commandcontrol_";
+    private static final String COMMANDCONTROL_ALLOWED_PREFIX = "allowed_";
+    private static final String INVROLLBACK_PREFIX = "invrollback_";
     private static final String POSES_PREFIX = "poses_";
     private static final String WORLDS_PREFIX = "worlds_";
     private static final String MENU_PREFIX = "menu_";
     private static final String MENU_ARGUMENT_PREFIX = "argument_";
     private static final String SERVER_PREFIX = "server_";
     private static final String SERVER_WORLD_PLAYERS_PREFIX = "world_players_";
+    private static final String SERVER_WORLD_ENTITIES_PREFIX = "world_entities_";
+    private static final String SERVER_WORLD_CHUNKS_PREFIX = "world_chunks_";
     private static final String SERVER_WORLD_TIME_FORMATTED_PREFIX = "world_time_formatted_";
     private static final String SERVER_WORLD_TIME_PREFIX = "world_time_";
     private static final String SERVER_WORLD_WEATHER_PREFIX = "world_weather_";
@@ -104,6 +123,14 @@ public final class PlaceholderResolver {
     private static final String FORMAT_COMPACT_PREFIX = "format_compact_";
     private static final String FORMAT_TIME_PREFIX = "format_time_";
     private static final String PROGRESS_BAR_PREFIX = "progressbar_";
+    private static final String STATISTIC_PREFIX = "stat_";
+    private static final String SURVIVAL_PREFIX = "survival_";
+    private static final String ITEMWORLD_PREFIX = "itemworld_";
+    private static final String NPC_PREFIX = "npc_";
+    private static final String REGIONS_PREFIX = "regions_";
+    private static final String SECURITY_PREFIX = "security_";
+    private static final String MODULE_PREFIX = "module_";
+    private static final String ENABLED_SUFFIX = "_enabled";
     private static final String COOLDOWN_PREFIX = "cooldown_";
     private static final String COOLDOWN_ACTIVE_PREFIX = "active_";
     private static final String FORMATTED_SUFFIX = "_formatted";
@@ -154,6 +181,11 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(COOLDOWN_PREFIX)) {
             return Optional.of(cooldown(who, normalized.substring(COOLDOWN_PREFIX.length())));
+        }
+        if (normalized.startsWith(STATISTIC_PREFIX)) {
+            return Optional.of(contexts.playerFacts()
+                    .map(facts -> statistic(facts, who, normalized.substring(STATISTIC_PREFIX.length())))
+                    .orElse(EMPTY));
         }
         if (normalized.startsWith(ECONOMY_PREFIX)) {
             return Optional.of(economyFamily(who, normalized.substring(ECONOMY_PREFIX.length())));
@@ -217,6 +249,24 @@ public final class PlaceholderResolver {
         if (normalized.startsWith(SCOREBOARD_PREFIX)) {
             return Optional.of(scoreboard(who, online, normalized.substring(SCOREBOARD_PREFIX.length())));
         }
+        if (normalized.startsWith(TABLIST_PREFIX)) {
+            return Optional.of(tablist(who, online, normalized.substring(TABLIST_PREFIX.length())));
+        }
+        if (normalized.startsWith(NAMETAGS_PREFIX)) {
+            return Optional.of(nametags(who, online, normalized.substring(NAMETAGS_PREFIX.length())));
+        }
+        if (normalized.startsWith(VILLAGERS_PREFIX)) {
+            return Optional.of(villagers(who, online, normalized.substring(VILLAGERS_PREFIX.length())));
+        }
+        if (normalized.startsWith(SERVERTWEAKS_PREFIX)) {
+            return Optional.of(serverTweaks(normalized.substring(SERVERTWEAKS_PREFIX.length())));
+        }
+        if (normalized.startsWith(COMMANDCONTROL_PREFIX)) {
+            return Optional.of(commandControl(who, online, normalized.substring(COMMANDCONTROL_PREFIX.length())));
+        }
+        if (normalized.startsWith(INVROLLBACK_PREFIX)) {
+            return Optional.of(invrollback(who, normalized.substring(INVROLLBACK_PREFIX.length())));
+        }
         if (normalized.startsWith(POSES_PREFIX)) {
             return Optional.of(poses(who, online, normalized.substring(POSES_PREFIX.length())));
         }
@@ -225,6 +275,24 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(MENU_PREFIX)) {
             return Optional.of(menuFamily(who, normalized.substring(MENU_PREFIX.length())));
+        }
+        if (normalized.startsWith(SURVIVAL_PREFIX)) {
+            return Optional.of(survival(who, normalized.substring(SURVIVAL_PREFIX.length())));
+        }
+        if (normalized.startsWith(ITEMWORLD_PREFIX)) {
+            return Optional.of(itemworld(who, normalized.substring(ITEMWORLD_PREFIX.length())));
+        }
+        if (normalized.startsWith(NPC_PREFIX)) {
+            return Optional.of(npc(who, normalized.substring(NPC_PREFIX.length())));
+        }
+        if (normalized.startsWith(REGIONS_PREFIX)) {
+            return Optional.of(regions(who, normalized.substring(REGIONS_PREFIX.length())));
+        }
+        if (normalized.startsWith(SECURITY_PREFIX)) {
+            return Optional.of(security(who, normalized.substring(SECURITY_PREFIX.length())));
+        }
+        if (normalized.startsWith(MODULE_PREFIX)) {
+            return Optional.of(module(normalized.substring(MODULE_PREFIX.length())));
         }
         if (normalized.startsWith(SERVER_PREFIX)) {
             return Optional.of(serverMetric(normalized.substring(SERVER_PREFIX.length())));
@@ -257,7 +325,200 @@ public final class PlaceholderResolver {
         if (fromAccount.isPresent()) {
             return fromAccount.get();
         }
+        Optional<String> fromIdentity = identityFact(facts, who, tail);
+        if (fromIdentity.isPresent()) {
+            return fromIdentity.get();
+        }
+        Optional<String> fromVitals = vitalsFact(facts, who, tail);
+        if (fromVitals.isPresent()) {
+            return fromVitals.get();
+        }
+        Optional<String> fromWhere = whereFact(facts, who, tail);
+        if (fromWhere.isPresent()) {
+            return fromWhere.get();
+        }
+        Optional<String> fromStatistic = statisticShortcut(facts, who, tail);
+        if (fromStatistic.isPresent()) {
+            return fromStatistic.get();
+        }
         return facts.session(who).map(session -> sessionFact(session, tail)).orElse(EMPTY);
+    }
+
+    /** The keys that read who the player is, which answer with the account name and id even when offline. */
+    private static Optional<String> identityFact(PlayerFactsPlaceholders facts, PlayerRef who, String tail) {
+        return switch (tail) {
+            case "name",
+                    "display_name",
+                    "uuid",
+                    "ip",
+                    "locale",
+                    "gamemode",
+                    "flying",
+                    "can_fly",
+                    "fly_speed",
+                    "walk_speed",
+                    "bed",
+                    "has_bed",
+                    "compass" ->
+                Optional.of(facts.identity(who)
+                        .map(identity -> identity(identity, tail))
+                        .orElse(EMPTY));
+            default -> Optional.empty();
+        };
+    }
+
+    private static String identity(PlayerFactsPlaceholders.Identity identity, String tail) {
+        return switch (tail) {
+            case "name" -> identity.name();
+            case "display_name" -> identity.displayName();
+            case "uuid" -> identity.uuid();
+            case "ip" -> identity.address().orElse(EMPTY);
+            case "locale" -> identity.locale().isEmpty() ? EMPTY : identity.locale();
+            case "gamemode" -> identity.gameMode().isEmpty() ? EMPTY : identity.gameMode();
+            case "flying" -> bool(identity.flying());
+            case "can_fly" -> bool(identity.allowFlight());
+            case "fly_speed" -> decimal(identity.flySpeed());
+            case "walk_speed" -> decimal(identity.walkSpeed());
+            case "bed" -> identity.bed().map(PlaceholderResolver::place).orElse(EMPTY);
+            case "has_bed" -> bool(identity.bed().isPresent());
+            case "compass" -> identity.compass().map(PlaceholderResolver::place).orElse(EMPTY);
+            default -> EMPTY;
+        };
+    }
+
+    /** One position written the way an operator reads it back: the world, then whole-block coordinates. */
+    private static String place(PlayerFactsPlaceholders.Position position) {
+        return position.world() + " " + (int) Math.floor(position.x()) + " "
+                + (int) Math.floor(position.y()) + " "
+                + (int) Math.floor(position.z());
+    }
+
+    /** The keys that read the player's body, which hold no meaning for an account that is not connected. */
+    private static Optional<String> vitalsFact(PlayerFactsPlaceholders facts, PlayerRef who, String tail) {
+        return switch (tail) {
+            case "health",
+                    "health_rounded",
+                    "health_max",
+                    "health_percent",
+                    "food",
+                    "saturation",
+                    "air",
+                    "air_max",
+                    "armor",
+                    "absorption",
+                    "burning" ->
+                Optional.of(
+                        facts.vitals(who).map(vitals -> vitals(vitals, tail)).orElse(EMPTY));
+            default -> Optional.empty();
+        };
+    }
+
+    private static String vitals(PlayerFactsPlaceholders.Vitals vitals, String tail) {
+        return switch (tail) {
+            case "health" -> decimal(vitals.health());
+            case "health_rounded" -> Long.toString(Math.round(vitals.health()));
+            case "health_max" -> decimal(vitals.maxHealth());
+            case "health_percent" -> percent(vitals.health(), vitals.maxHealth());
+            case "food" -> Integer.toString(vitals.food());
+            case "saturation" -> decimal(vitals.saturation());
+            case "air" -> Integer.toString(vitals.air());
+            case "air_max" -> Integer.toString(vitals.maxAir());
+            case "armor" -> decimal(vitals.armor());
+            case "absorption" -> decimal(vitals.absorption());
+            case "burning" -> bool(vitals.burning());
+            default -> EMPTY;
+        };
+    }
+
+    /** A share of a whole, rounded to a whole percent; a zero whole reads as zero rather than dividing by it. */
+    private static String percent(double part, double whole) {
+        return whole <= 0 ? "0" : Long.toString(Math.round(part / whole * 100));
+    }
+
+    /** The keys that read where the player stands, in more detail than the session's world name. */
+    private static Optional<String> whereFact(PlayerFactsPlaceholders facts, PlayerRef who, String tail) {
+        return switch (tail) {
+            case "x",
+                    "y",
+                    "z",
+                    "x_exact",
+                    "y_exact",
+                    "z_exact",
+                    "yaw",
+                    "pitch",
+                    "direction",
+                    "biome",
+                    "block_below",
+                    "light",
+                    "world_environment",
+                    "location" ->
+                Optional.of(facts.where(who).map(where -> where(where, tail)).orElse(EMPTY));
+            default -> Optional.empty();
+        };
+    }
+
+    private static String where(PlayerFactsPlaceholders.Where where, String tail) {
+        return switch (tail) {
+            case "x" -> Long.toString((long) Math.floor(where.x()));
+            case "y" -> Long.toString((long) Math.floor(where.y()));
+            case "z" -> Long.toString((long) Math.floor(where.z()));
+            case "x_exact" -> decimal(where.x());
+            case "y_exact" -> decimal(where.y());
+            case "z_exact" -> decimal(where.z());
+            case "yaw" -> decimal(where.yaw());
+            case "pitch" -> decimal(where.pitch());
+            case "direction" -> direction(where.yaw());
+            case "biome" -> where.biome();
+            case "block_below" -> where.blockBelow();
+            case "light" -> Integer.toString(where.light());
+            case "world_environment" -> where.environment();
+            case "location" ->
+                where.world() + " " + (long) Math.floor(where.x()) + " " + (long) Math.floor(where.y()) + " "
+                        + (long) Math.floor(where.z());
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * The compass direction a yaw points at, in the eight-point form a HUD shows. Yaw counts clockwise from south,
+     * so the table starts there; the half-step offset makes each name cover the 45 degrees centred on it.
+     */
+    private static String direction(float yaw) {
+        String[] points = {"south", "south_west", "west", "north_west", "north", "north_east", "east", "south_east"};
+        float normalized = (yaw % 360 + 360) % 360;
+        return points[(int) Math.floor((normalized + 22.5f) / 45f) % points.length];
+    }
+
+    /** The named counters that read a vanilla statistic without the operator having to spell one. */
+    private static Optional<String> statisticShortcut(PlayerFactsPlaceholders facts, PlayerRef who, String tail) {
+        String statistic =
+                switch (tail) {
+                    case "deaths" -> "deaths";
+                    case "kills" -> "player_kills";
+                    case "mob_kills" -> "mob_kills";
+                    default -> "";
+                };
+        if (statistic.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(statistic(facts, who, statistic));
+    }
+
+    /** One statistic, with anything after the statistic name taken as its block, item or entity qualifier. */
+    private static String statistic(PlayerFactsPlaceholders facts, PlayerRef who, String tail) {
+        OptionalLong whole = facts.statistic(who, tail, "");
+        if (whole.isPresent()) {
+            return Long.toString(whole.getAsLong());
+        }
+        int cut = tail.lastIndexOf('_');
+        while (cut > 0) {
+            OptionalLong qualified = facts.statistic(who, tail.substring(0, cut), tail.substring(cut + 1));
+            if (qualified.isPresent()) {
+                return Long.toString(qualified.getAsLong());
+            }
+            cut = tail.lastIndexOf('_', cut - 1);
+        }
+        return EMPTY;
     }
 
     /** The keys that read the stored profile, so they answer whether or not the player is connected. */
@@ -1226,7 +1487,41 @@ public final class PlaceholderResolver {
         if (seam.isEmpty() || !online) {
             return EMPTY;
         }
-        return key.equals("visible") ? bool(seam.get().visible(who)) : EMPTY;
+        return switch (key) {
+            case "visible" -> bool(seam.get().visible(who));
+            case "board" -> seam.get().board(who).orElse(EMPTY);
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code tablist_}-stripped key: which authored format the player's tab is drawn from right now. A
+     * player drawn from none (no format matched, or the content is suppressed in their world) reads the dash, and so
+     * does an offline requester, who has no tab at all.
+     */
+    private String tablist(PlayerRef who, boolean online, String key) {
+        Optional<TablistPlaceholders> seam = contexts.tablist();
+        if (seam.isEmpty() || !online) {
+            return EMPTY;
+        }
+        return switch (key) {
+            case "format" -> seam.get().format(who).orElse(EMPTY);
+            case "shown" -> bool(seam.get().format(who).isPresent());
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve a {@code nametags_}-stripped key: the format the player wears above their head, if any. */
+    private String nametags(PlayerRef who, boolean online, String key) {
+        Optional<NametagsPlaceholders> seam = contexts.nametags();
+        if (seam.isEmpty() || !online) {
+            return EMPTY;
+        }
+        return switch (key) {
+            case "format" -> seam.get().format(who).orElse(EMPTY);
+            case "shown" -> bool(seam.get().format(who).isPresent());
+            default -> EMPTY;
+        };
     }
 
     /**
@@ -1251,6 +1546,184 @@ public final class PlaceholderResolver {
     }
 
     /**
+     * Resolve a {@code survival_*} tail. A tail ending in {@code _enabled} asks about the server ("does this
+     * server run auto-pickup at all"); anything else asks about the player ("is my own switch on"). The two
+     * answers differ often enough that a HUD wants both: a switch that is on while the mechanic is off is exactly
+     * the confusion this pair explains.
+     */
+    private String survival(PlayerRef who, String tail) {
+        Optional<SurvivalPlaceholders> seam = contexts.survival();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        boolean serverSide = tail.endsWith(ENABLED_SUFFIX);
+        String name = serverSide ? tail.substring(0, tail.length() - ENABLED_SUFFIX.length()) : tail;
+        SurvivalPlaceholders.Mechanic mechanic = mechanic(name);
+        if (mechanic == null) {
+            return EMPTY;
+        }
+        return bool(serverSide ? seam.get().enabled(mechanic) : seam.get().active(who, mechanic));
+    }
+
+    private static SurvivalPlaceholders.@Nullable Mechanic mechanic(String name) {
+        return switch (name) {
+            case "treefeller" -> SurvivalPlaceholders.Mechanic.TREE_FELLER;
+            case "veinminer" -> SurvivalPlaceholders.Mechanic.VEINMINER;
+            case "farmprotect" -> SurvivalPlaceholders.Mechanic.FARM_PROTECT;
+            case "autopickup" -> SurvivalPlaceholders.Mechanic.AUTO_PICKUP;
+            case "autosmelt" -> SurvivalPlaceholders.Mechanic.AUTO_SMELT;
+            case "autosell" -> SurvivalPlaceholders.Mechanic.AUTO_SELL;
+            case "autotool" -> SurvivalPlaceholders.Mechanic.AUTO_TOOL;
+            default -> null;
+        };
+    }
+
+    /** Resolve an {@code itemworld_*} tail: what the held item runs, and the two personal switches. */
+    private String itemworld(PlayerRef who, String tail) {
+        Optional<ItemworldPlaceholders> seam = contexts.itemworld();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        ItemworldPlaceholders items = seam.get();
+        return switch (tail) {
+            case "powertool" -> {
+                List<String> bound = items.powertool(who);
+                yield bound.isEmpty() ? EMPTY : String.join(", ", bound);
+            }
+            case "powertool_bound" -> bool(!items.powertool(who).isEmpty());
+            case "powertool_count" -> Integer.toString(items.powertool(who).size());
+            case "powertool_enabled" -> bool(items.powertoolEnabled(who));
+            case "unlimited" -> bool(items.unlimitedPlacement(who));
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve an {@code npc_*} tail: the server's population, and what one player has left of their quota. */
+    private String npc(PlayerRef who, String tail) {
+        Optional<NpcPlaceholders> seam = contexts.npc();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        NpcPlaceholders npcs = seam.get();
+        return switch (tail) {
+            case "total" -> Integer.toString(npcs.total());
+            case "owned" -> Integer.toString(npcs.owned(who));
+            case "limit" ->
+                npcs.limit(who).isPresent() ? Integer.toString(npcs.limit(who).getAsInt()) : UNLIMITED;
+            case "remaining" -> {
+                OptionalInt cap = npcs.limit(who);
+                yield cap.isPresent() ? Integer.toString(Math.max(0, cap.getAsInt() - npcs.owned(who))) : UNLIMITED;
+            }
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve a {@code regions_*} tail against the region the player is standing in right now. */
+    private String regions(PlayerRef who, String tail) {
+        Optional<RegionsPlaceholders> seam = contexts.regions();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        RegionsPlaceholders regions = seam.get();
+        return switch (tail) {
+            case "available" -> bool(regions.available());
+            case "inside" -> bool(regions.standingIn(who).isPresent());
+            case "count" -> Integer.toString(regions.coveringCount(who));
+            case "world_count" -> Integer.toString(regions.worldCount(who));
+            case "here", "here_priority", "here_owners", "here_members" ->
+                regions.standingIn(who)
+                        .map(standing -> standing(standing, tail))
+                        .orElse(EMPTY);
+            default -> EMPTY;
+        };
+    }
+
+    private static String standing(RegionsPlaceholders.Standing standing, String tail) {
+        return switch (tail) {
+            case "here" -> standing.id();
+            case "here_priority" -> Integer.toString(standing.priority());
+            case "here_owners" -> standing.owners().isEmpty() ? EMPTY : String.join(", ", standing.owners());
+            case "here_members" -> standing.members().isEmpty() ? EMPTY : String.join(", ", standing.members());
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve a {@code security_*} tail. Only in-memory session state is readable; enrolment is not. */
+    private String security(PlayerRef who, String tail) {
+        Optional<SecurityPlaceholders> seam = contexts.security();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        return switch (tail) {
+            case "verifying" -> bool(seam.get().verifying(who));
+            case "enforced" -> bool(seam.get().enforced());
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve a {@code villagers_}-stripped key: how many villagers walk after the requester right now. */
+    private String villagers(PlayerRef who, boolean online, String key) {
+        Optional<VillagersPlaceholders> seam = contexts.villagers();
+        if (seam.isEmpty() || !online) {
+            return EMPTY;
+        }
+        return switch (key) {
+            case "following" -> Integer.toString(seam.get().following(who));
+            case "has_follower" -> bool(seam.get().following(who) > 0);
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve a {@code servertweaks_}-stripped key: what brand this server reports to its clients. */
+    private String serverTweaks(String key) {
+        Optional<ServerTweaksPlaceholders> seam = contexts.serverTweaks();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        return key.equals("brand") ? seam.get().brand().orElse(EMPTY) : EMPTY;
+    }
+
+    /**
+     * Resolve a {@code commandcontrol_}-stripped key. The one family is {@code allowed_<command>}: whether the
+     * requester would be allowed to run that command where they stand, answered from the rules the gate uses.
+     */
+    private String commandControl(PlayerRef who, boolean online, String key) {
+        Optional<CommandControlPlaceholders> seam = contexts.commandControl();
+        if (seam.isEmpty() || !online || !key.startsWith(COMMANDCONTROL_ALLOWED_PREFIX)) {
+            return EMPTY;
+        }
+        String command = key.substring(COMMANDCONTROL_ALLOWED_PREFIX.length());
+        return command.isEmpty() ? EMPTY : bool(seam.get().allowed(who, command));
+    }
+
+    /**
+     * Resolve an {@code invrollback_}-stripped key: when this enable last snapshotted the player's inventory, and
+     * why. A player nothing has been captured for since the last restart reads the dash, which is the difference
+     * between "no snapshot was taken here" and "we do not know", and the module says only the first.
+     */
+    private String invrollback(PlayerRef who, String key) {
+        Optional<InvrollbackPlaceholders> seam = contexts.invrollback();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        return switch (key) {
+            case "last_capture" ->
+                seam.get()
+                        .lastCapture(who)
+                        .map(at -> PlaceholderDurations.compact(Duration.between(at, Instant.now())))
+                        .orElse(EMPTY);
+            case "last_cause" -> seam.get().lastCause(who).orElse(EMPTY);
+            case "captured" -> bool(seam.get().lastCapture(who).isPresent());
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve {@code module_<id>}: whether that feature module wired on this enable. */
+    private String module(String id) {
+        return contexts.modules().map(modules -> bool(modules.enabled(id))).orElse(EMPTY);
+    }
+
+    /**
      * Resolve a {@code server_}-stripped key against the always-present server-metrics seam. Every value is a
      * server-wide global, so the requesting player is ignored. The TPS keys read the Paper {@code getTPS()}
      * window — {@code tps} the 1-minute rate, {@code tps_5m}/{@code tps_15m} the longer windows, and
@@ -1267,6 +1740,12 @@ public final class PlaceholderResolver {
         ServerMetricsPlaceholders metrics = seam.get();
         if (tail.startsWith(SERVER_WORLD_PLAYERS_PREFIX)) {
             return worldPlayers(metrics, tail.substring(SERVER_WORLD_PLAYERS_PREFIX.length()));
+        }
+        if (tail.startsWith(SERVER_WORLD_ENTITIES_PREFIX)) {
+            return count(metrics.worldEntities(tail.substring(SERVER_WORLD_ENTITIES_PREFIX.length())));
+        }
+        if (tail.startsWith(SERVER_WORLD_CHUNKS_PREFIX)) {
+            return count(metrics.worldChunks(tail.substring(SERVER_WORLD_CHUNKS_PREFIX.length())));
         }
         // The formatted spelling is checked first: it is itself prefixed by the raw one.
         if (tail.startsWith(SERVER_WORLD_TIME_FORMATTED_PREFIX)) {
@@ -1291,8 +1770,18 @@ public final class PlaceholderResolver {
             case "ram_used" -> Long.toString(metrics.ramUsedMb());
             case "ram_max" -> Long.toString(metrics.ramMaxMb());
             case "ram_free" -> Long.toString(metrics.ramFreeMb());
+            case "name" -> metrics.name();
+            case "motd" -> metrics.motd();
+            case "worlds" -> Integer.toString(metrics.worlds());
+            case "time" -> CLOCK.format(LocalTime.now(ZoneId.systemDefault()));
+            case "date" -> DAY.format(LocalDate.now(ZoneId.systemDefault()));
             default -> EMPTY;
         };
+    }
+
+    /** A per-world count, or the dash when the key named a world the server has not loaded. */
+    private static String count(java.util.OptionalInt found) {
+        return found.isPresent() ? Integer.toString(found.getAsInt()) : EMPTY;
     }
 
     /** A named world's time of day, in ticks or as the clock a player reads; the dash for an unloaded world. */

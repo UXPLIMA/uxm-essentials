@@ -10,6 +10,8 @@ import java.util.OptionalInt;
 import org.bukkit.Server;
 import org.bukkit.World;
 
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -26,6 +28,8 @@ import org.jspecify.annotations.Nullable;
 public final class BukkitServerMetrics implements ServerMetricsPlaceholders {
 
     private static final long BYTES_PER_MB = 1024L * 1024L;
+
+    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     private final Server server;
     private final Instant enabledAt;
@@ -91,6 +95,33 @@ public final class BukkitServerMetrics implements ServerMetricsPlaceholders {
     @Override
     public long ramFreeMb() {
         return Runtime.getRuntime().freeMemory() / BYTES_PER_MB;
+    }
+
+    @Override
+    public String name() {
+        return server.getName();
+    }
+
+    @Override
+    public String motd() {
+        return PLAIN.serialize(server.motd());
+    }
+
+    @Override
+    public int worlds() {
+        return server.getWorlds().size();
+    }
+
+    @Override
+    public OptionalInt worldEntities(String world) {
+        @Nullable World found = server.getWorld(Objects.requireNonNull(world, "world"));
+        return found == null ? OptionalInt.empty() : OptionalInt.of(found.getEntityCount());
+    }
+
+    @Override
+    public OptionalInt worldChunks(String world) {
+        @Nullable World found = server.getWorld(Objects.requireNonNull(world, "world"));
+        return found == null ? OptionalInt.empty() : OptionalInt.of(found.getChunkCount());
     }
 
     @Override

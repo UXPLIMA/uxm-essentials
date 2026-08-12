@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
+import com.uxplima.uxmessentials.npc.adapter.outbound.RepositoryNpcPlaceholders;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
 import com.uxplima.uxmessentials.npc.application.CenterNpc;
 import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
@@ -82,6 +83,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.NpcPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.teleport.BukkitDirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -209,7 +211,16 @@ public final class NpcWiring {
         AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
         Duration lookPeriod = settings.lookPeriod();
         AutoCloseable lookTask = kernel.scheduler().repeatGlobal(renderer::lookTick, lookPeriod, lookPeriod);
-        return new Wired(commands, listeners, renderer, repository, services, connector, refreshTask, lookTask);
+        return new Wired(
+                commands,
+                listeners,
+                renderer,
+                repository,
+                services,
+                connector,
+                refreshTask,
+                lookTask,
+                new RepositoryNpcPlaceholders(repository, quota));
     }
 
     /** The editor's property-button slots, the code default matching the bundled npc-editor.conf. */
@@ -344,7 +355,8 @@ public final class NpcWiring {
             NpcServices services,
             BukkitServerConnector connector,
             AutoCloseable refreshTask,
-            AutoCloseable lookTask) {
+            AutoCloseable lookTask,
+            NpcPlaceholders placeholders) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -355,6 +367,7 @@ public final class NpcWiring {
             Objects.requireNonNull(connector, "connector");
             Objects.requireNonNull(refreshTask, "refreshTask");
             Objects.requireNonNull(lookTask, "lookTask");
+            Objects.requireNonNull(placeholders, "placeholders");
         }
 
         /** Cancel the timers, unregister the proxy channel, and remove every shown NPC so nothing is orphaned. */

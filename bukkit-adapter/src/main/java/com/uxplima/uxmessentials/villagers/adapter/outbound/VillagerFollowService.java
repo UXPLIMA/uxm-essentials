@@ -96,6 +96,22 @@ public final class VillagerFollowService {
         };
     }
 
+    /**
+     * How many villagers are currently following {@code ownerId}. A dead or despawned villager is only dropped from
+     * the map by the follow sweep, so a count taken between sweeps can be one high for at most half a second; that
+     * is the same window the sweep itself works against and is invisible on a HUD.
+     */
+    public int followingCount(UUID ownerId) {
+        Objects.requireNonNull(ownerId, "ownerId");
+        int following = 0;
+        for (UUID owner : sessions.values()) {
+            if (ownerId.equals(owner)) {
+                following++;
+            }
+        }
+        return following;
+    }
+
     /** Whether {@code villagerId} is currently following someone. */
     public boolean isFollowing(UUID villagerId) {
         return sessions.containsKey(Objects.requireNonNull(villagerId, "villagerId"));
