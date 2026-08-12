@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -13,8 +14,10 @@ import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -1295,6 +1298,273 @@ class PlaceholderResolverTest {
 
     private static PresencePlaceholders presenceSeam(PresencePlaceholders.Snapshot snapshot) {
         return who -> Optional.of(snapshot);
+    }
+
+    @Test
+    void theOtherPlayerFormAnswersAboutTheNamedPlayer() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .players(lookupOf(BOB))
+                .homes(fakeHomes(4, 9))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "p_bob_homes_count")).contains("4");
+    }
+
+    @Test
+    void theOtherPlayerFormCutsTheNameWhereTheCatalogueSaysTheKeyBegins() {
+        // A player name may carry underscores, so the split cannot simply be the first one.
+        PlayerRef underscored = new PlayerRef(UUID.randomUUID(), "not_ch");
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .players(lookupOf(underscored))
+                .homes(fakeHomes(2, 9))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "p_not_ch_homes_count")).contains("2");
+    }
+
+    @Test
+    void theOtherPlayerFormDashesWhenTheNameOrTheKeyIsUnknown() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .players(lookupOf(BOB))
+                .homes(fakeHomes(4, 9))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "p_nobody_homes_count")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "p_bob_not_a_placeholder")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "p_bob")).contains("-");
+    }
+
+    @Test
+    void theOtherPlayerFormDoesNotNestIntoItself() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .players(lookupOf(BOB))
+                .homes(fakeHomes(4, 9))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "p_bob_p_bob_homes_count")).contains("-");
+    }
+
+    @Test
+    void theOtherPlayerFormDashesWithNoLookupWired() {
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().homes(fakeHomes(4, 9)).build());
+
+        assertThat(resolver.resolve(ALICE, true, "p_bob_homes_count")).contains("-");
+    }
+
+    @Test
+    void theAccountKeysAnswerForAnOfflinePlayerToo() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .account(new PlayerFactsPlaceholders.Account(
+                        Optional.of(Instant.parse("2024-03-01T10:15:00Z")),
+                        Optional.of(Instant.parse("2026-08-11T21:00:00Z")),
+                        Duration.ofHours(30).plusMinutes(90),
+                        true));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, false, "player_playtime")).contains("31");
+        assertThat(resolver.resolve(ALICE, false, "player_playtime_minutes")).contains("1890");
+        assertThat(resolver.resolve(ALICE, false, "player_playtime_formatted")).contains("1d7h30m");
+        assertThat(resolver.resolve(ALICE, false, "player_banned")).contains("yes");
+        assertThat(resolver.resolve(ALICE, false, "player_first_join")).isPresent();
+        assertThat(resolver.resolve(ALICE, false, "player_last_seen_date")).isPresent();
+    }
+
+    @Test
+    void theSessionKeysReadTheDashWhileThePlayerIsOffline() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .account(new PlayerFactsPlaceholders.Account(Optional.empty(), Optional.empty(), Duration.ZERO, false));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, false, "player_ping")).contains("-");
+        assertThat(resolver.resolve(ALICE, false, "player_world")).contains("-");
+        assertThat(resolver.resolve(ALICE, false, "player_first_join")).contains("-");
+    }
+
+    @Test
+    void theSessionKeysRenderTheLiveSession() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .session(new PlayerFactsPlaceholders.Session(
+                        42, true, false, true, "world_nether", 6_000L, true, false, 30, 1_395, 62, 0.25f));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_ping")).contains("42");
+        assertThat(resolver.resolve(ALICE, true, "player_sneaking")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "player_sprinting")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "player_op")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "player_world")).contains("world_nether");
+        assertThat(resolver.resolve(ALICE, true, "player_world_time")).contains("6000");
+        assertThat(resolver.resolve(ALICE, true, "player_world_time_formatted")).contains("12:00");
+        assertThat(resolver.resolve(ALICE, true, "player_world_weather")).contains("rain");
+        assertThat(resolver.resolve(ALICE, true, "player_level")).contains("30");
+        assertThat(resolver.resolve(ALICE, true, "player_exp_total")).contains("1395");
+        assertThat(resolver.resolve(ALICE, true, "player_exp_to_next")).contains("62");
+        assertThat(resolver.resolve(ALICE, true, "player_exp_percent")).contains("25");
+    }
+
+    @Test
+    void aThunderstormOutranksTheRainFlag() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .session(new PlayerFactsPlaceholders.Session(
+                        1, false, false, false, "world", 0L, true, true, 0, 0, 7, 0f));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_world_weather")).contains("thunder");
+        assertThat(resolver.resolve(ALICE, true, "player_world_time_formatted")).contains("06:00");
+    }
+
+    @Test
+    void theHeldItemKeysReadEachHandSeparately() {
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .held(
+                        PlayerFactsPlaceholders.Hand.MAIN,
+                        new PlayerFactsPlaceholders.HeldItem(
+                                "diamond_pickaxe",
+                                "Spitzhacke",
+                                1,
+                                31,
+                                1_561,
+                                List.of("efficiency 5", "unbreaking 3"),
+                                List.of("Mine faster"),
+                                OptionalInt.of(7)))
+                .held(
+                        PlayerFactsPlaceholders.Hand.OFF,
+                        new PlayerFactsPlaceholders.HeldItem(
+                                "torch", "torch", 16, 0, 0, List.of(), List.of(), OptionalInt.empty()));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "hand_type")).contains("diamond_pickaxe");
+        assertThat(resolver.resolve(ALICE, true, "hand_name")).contains("Spitzhacke");
+        assertThat(resolver.resolve(ALICE, true, "hand_durability")).contains("1530");
+        assertThat(resolver.resolve(ALICE, true, "hand_durability_max")).contains("1561");
+        assertThat(resolver.resolve(ALICE, true, "hand_enchants")).contains("efficiency 5, unbreaking 3");
+        assertThat(resolver.resolve(ALICE, true, "hand_enchants_count")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "hand_lore")).contains("Mine faster");
+        assertThat(resolver.resolve(ALICE, true, "hand_model")).contains("7");
+        assertThat(resolver.resolve(ALICE, true, "offhand_amount")).contains("16");
+        assertThat(resolver.resolve(ALICE, true, "offhand_enchants")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "offhand_model")).contains("-");
+    }
+
+    @Test
+    void anEmptyHandAndAnUnknownMaterialBothDash() {
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().playerFacts(new FakePlayerFacts()).build());
+
+        assertThat(resolver.resolve(ALICE, true, "hand_type")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "itemcount_not_a_material")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "itemcount_")).contains("-");
+    }
+
+    @Test
+    void theItemCountKeyCountsWhatThePlayerCarries() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .playerFacts(new FakePlayerFacts().itemCount("diamond", 12))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "itemcount_diamond")).contains("12");
+    }
+
+    @Test
+    void thePlayerFactsDashWithNoSeamWired() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_ping")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "hand_type")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "itemcount_diamond")).contains("-");
+    }
+
+    @Test
+    void theOtherPlayerFormReachesThePlayerFactsToo() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .players(lookupOf(BOB))
+                .playerFacts(new FakePlayerFacts()
+                        .session(new PlayerFactsPlaceholders.Session(
+                                77, false, false, false, "world", 0L, false, false, 1, 2, 3, 0f)))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "p_bob_player_ping")).contains("77");
+    }
+
+    /** A player-facts seam that answers with exactly what the test seeded, for every player. */
+    private static final class FakePlayerFacts implements PlayerFactsPlaceholders {
+
+        private final java.util.Map<Hand, HeldItem> hands = new java.util.EnumMap<>(Hand.class);
+        private final java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        private @Nullable Session session;
+        private @Nullable Account account;
+
+        FakePlayerFacts session(Session live) {
+            this.session = live;
+            return this;
+        }
+
+        FakePlayerFacts account(Account stored) {
+            this.account = stored;
+            return this;
+        }
+
+        FakePlayerFacts held(Hand hand, HeldItem item) {
+            hands.put(hand, item);
+            return this;
+        }
+
+        FakePlayerFacts itemCount(String material, int held) {
+            counts.put(material, held);
+            return this;
+        }
+
+        @Override
+        public Optional<Session> session(PlayerRef who) {
+            return Optional.ofNullable(session);
+        }
+
+        @Override
+        public Optional<Account> account(PlayerRef who) {
+            return Optional.ofNullable(account);
+        }
+
+        @Override
+        public Optional<HeldItem> held(PlayerRef who, Hand hand) {
+            return Optional.ofNullable(hands.get(hand));
+        }
+
+        @Override
+        public OptionalInt itemCount(PlayerRef who, String material) {
+            Integer held = counts.get(material);
+            return held == null ? OptionalInt.empty() : OptionalInt.of(held);
+        }
+    }
+
+    /** A lookup that knows exactly the players handed to it, by name, and calls each of them online. */
+    private static PlayerLookup lookupOf(PlayerRef... known) {
+        List<PlayerRef> players = List.of(known);
+        return new PlayerLookup() {
+            @Override
+            public Optional<PlayerRef> findOnlineByName(String name) {
+                return players.stream()
+                        .filter(player -> player.name().equalsIgnoreCase(name))
+                        .findFirst();
+            }
+
+            @Override
+            public Optional<PlayerRef> findByUuid(UUID uuid) {
+                return players.stream()
+                        .filter(player -> player.uuid().equals(uuid))
+                        .findFirst();
+            }
+
+            @Override
+            public boolean isOnline(UUID uuid) {
+                return findByUuid(uuid).isPresent();
+            }
+        };
     }
 
     private static PlaceholderResolver resolverWith(PlaceholderContexts contexts) {

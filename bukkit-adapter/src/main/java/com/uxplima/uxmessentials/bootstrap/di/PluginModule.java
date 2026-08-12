@@ -223,6 +223,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHo
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitAccessPlaceholders;
@@ -1036,6 +1037,12 @@ public final class PluginModule {
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
         // from this enable (a reload restarts it) rather than the whole JVM's age.
         links.placeholders.serverMetrics(new BukkitServerMetrics(plugin.getServer(), Instant.now()));
+        // The name lookup belongs to no context either: it is what turns the name in %uxmessentials_p_<name>_<key>%
+        // into an account, through the same kernel port every command resolves a name with.
+        links.placeholders.players(kernel.playerLookup());
+        // The account facts (ping, first join, playtime, the item in hand) are the server's own, not any
+        // module's, so they are wired here too and keep answering with every feature switched off.
+        links.placeholders.playerFacts(new BukkitPlayerFacts(plugin.getServer()));
         // The menu-engine source seam belongs to no feature context either — it reads the always-present engine's
         // own runtime state (whether the requester is in a menu, which one, its page/rows, and a typed argument) so
         // scoreboards and tab can read %uxmessentials_menu_*%. Wired unconditionally over the same Menus façade the

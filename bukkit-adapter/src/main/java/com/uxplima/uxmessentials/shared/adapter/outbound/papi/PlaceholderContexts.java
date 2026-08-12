@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -38,6 +39,8 @@ public final class PlaceholderContexts {
     private final @Nullable MenuPlaceholders menu;
     private final @Nullable PosesPlaceholders poses;
     private final @Nullable RanksPlaceholders ranks;
+    private final @Nullable PlayerLookup players;
+    private final @Nullable PlayerFactsPlaceholders playerFacts;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -62,11 +65,23 @@ public final class PlaceholderContexts {
         this.menu = builder.menu;
         this.poses = builder.poses;
         this.ranks = builder.ranks;
+        this.players = builder.players;
+        this.playerFacts = builder.playerFacts;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
     public static Builder builder() {
         return new Builder();
+    }
+
+    /** How a name becomes an account, for the {@code p_<name>_<key>} form that reads another player. */
+    public Optional<PlayerLookup> players() {
+        return Optional.ofNullable(players);
+    }
+
+    /** What the server itself holds about an account, for the {@code player_*} and item-in-hand keys. */
+    public Optional<PlayerFactsPlaceholders> playerFacts() {
+        return Optional.ofNullable(playerFacts);
     }
 
     public Optional<HomesPlaceholders> homes() {
@@ -207,8 +222,20 @@ public final class PlaceholderContexts {
         private @Nullable MenuPlaceholders menu;
         private @Nullable PosesPlaceholders poses;
         private @Nullable RanksPlaceholders ranks;
+        private @Nullable PlayerLookup players;
+        private @Nullable PlayerFactsPlaceholders playerFacts;
 
         private Builder() {}
+
+        public Builder players(PlayerLookup lookup) {
+            this.players = lookup;
+            return this;
+        }
+
+        public Builder playerFacts(PlayerFactsPlaceholders seam) {
+            this.playerFacts = seam;
+            return this;
+        }
 
         public Builder homes(HomesPlaceholders seam) {
             this.homes = seam;

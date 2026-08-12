@@ -1,6 +1,9 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -12,6 +15,8 @@ import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalog;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
@@ -35,6 +40,9 @@ public final class PlaceholderResolver {
 
     /** The value a placeholder degrades to when its owning module is disabled or the data is absent. */
     public static final String EMPTY = "-";
+
+    /** How a stored timestamp reads: the day and the minute, in the server's own zone. */
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT);
 
     private static final String YES = "yes";
     private static final String NO = "no";
@@ -79,6 +87,13 @@ public final class PlaceholderResolver {
     private static final String VOTES_POSITION_PREFIX = "position_";
     private static final String VOTES_STREAK_PREFIX = "streak_";
     private static final String VOTEPARTY_PREFIX = "voteparty_";
+    /** The other-player form: {@code p_<name>_<key>} answers <key> about the named player, not the requester. */
+    private static final String OTHER_PLAYER_PREFIX = "p_";
+
+    private static final String PLAYER_PREFIX = "player_";
+    private static final String HAND_PREFIX = "hand_";
+    private static final String OFFHAND_PREFIX = "offhand_";
+    private static final String ITEM_COUNT_PREFIX = "itemcount_";
 
     private final PlaceholderContexts contexts;
 
@@ -95,8 +110,22 @@ public final class PlaceholderResolver {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(key, "key");
         String normalized = key.toLowerCase(Locale.ROOT);
+        if (normalized.startsWith(OTHER_PLAYER_PREFIX)) {
+            return Optional.of(otherPlayer(normalized.substring(OTHER_PLAYER_PREFIX.length())));
+        }
         if (normalized.startsWith(KIT_PREFIX)) {
             return Optional.of(kitFamily(who, normalized.substring(KIT_PREFIX.length())));
+        }
+        if (normalized.startsWith(HAND_PREFIX)) {
+            return Optional.of(
+                    heldItem(who, PlayerFactsPlaceholders.Hand.MAIN, normalized.substring(HAND_PREFIX.length())));
+        }
+        if (normalized.startsWith(OFFHAND_PREFIX)) {
+            return Optional.of(
+                    heldItem(who, PlayerFactsPlaceholders.Hand.OFF, normalized.substring(OFFHAND_PREFIX.length())));
+        }
+        if (normalized.startsWith(ITEM_COUNT_PREFIX)) {
+            return Optional.of(itemCount(who, normalized.substring(ITEM_COUNT_PREFIX.length())));
         }
         if (normalized.startsWith(ECONOMY_PREFIX)) {
             return Optional.of(economyFamily(who, normalized.substring(ECONOMY_PREFIX.length())));
@@ -132,6 +161,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(PLAYERSTATE_PREFIX)) {
             return Optional.of(playerstate(who, online, normalized.substring(PLAYERSTATE_PREFIX.length())));
+        }
+        if (normalized.startsWith(PLAYER_PREFIX)) {
+            return Optional.of(playerFact(who, normalized.substring(PLAYER_PREFIX.length())));
         }
         if (normalized.startsWith(TELEPORT_PREFIX)) {
             return Optional.of(teleport(who, online, normalized.substring(TELEPORT_PREFIX.length())));
@@ -177,6 +209,171 @@ public final class PlaceholderResolver {
             case "rank", "rank_next", "prestige" -> Optional.of(ranks(who, normalized));
             default -> Optional.empty();
         };
+    }
+
+    /**
+     * Resolve a {@code player_*} tail against the always-wired player-facts seam: what the server itself holds
+     * about the account, rather than what a module stores. The session keys (ping, crouch, the world they stand
+     * in and its sky) hold no value for an offline player; the account keys (first join, last seen, playtime, the
+     * server's own ban flag) answer for one. A seam that is absent, which only a test bundle is, degrades every
+     * key to the dash.
+     */
+    private String playerFact(PlayerRef who, String tail) {
+        Optional<PlayerFactsPlaceholders> seam = contexts.playerFacts();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        PlayerFactsPlaceholders facts = seam.get();
+        Optional<String> fromAccount = accountFact(facts, who, tail);
+        if (fromAccount.isPresent()) {
+            return fromAccount.get();
+        }
+        return facts.session(who).map(session -> sessionFact(session, tail)).orElse(EMPTY);
+    }
+
+    /** The keys that read the stored profile, so they answer whether or not the player is connected. */
+    private static Optional<String> accountFact(PlayerFactsPlaceholders facts, PlayerRef who, String tail) {
+        return switch (tail) {
+            case "first_join",
+                    "first_join_date",
+                    "last_seen",
+                    "last_seen_date",
+                    "playtime",
+                    "playtime_formatted",
+                    "playtime_days",
+                    "playtime_hours",
+                    "playtime_minutes",
+                    "playtime_seconds",
+                    "banned" ->
+                Optional.of(facts.account(who)
+                        .map(account -> account(account, tail))
+                        .orElse(EMPTY));
+            default -> Optional.empty();
+        };
+    }
+
+    private static String account(PlayerFactsPlaceholders.Account account, String tail) {
+        Duration played = account.playtime();
+        return switch (tail) {
+            case "first_join", "first_join_date" ->
+                account.firstPlayed().map(PlaceholderResolver::date).orElse(EMPTY);
+            case "last_seen", "last_seen_date" ->
+                account.lastSeen().map(PlaceholderResolver::date).orElse(EMPTY);
+            case "playtime" -> Long.toString(played.toHours());
+            case "playtime_formatted" -> PlaceholderDurations.compact(played);
+            case "playtime_days" -> Long.toString(played.toDays());
+            case "playtime_hours" -> Long.toString(played.toHours());
+            case "playtime_minutes" -> Long.toString(played.toMinutes());
+            case "playtime_seconds" -> Long.toString(played.toSeconds());
+            case "banned" -> bool(account.banned());
+            default -> EMPTY;
+        };
+    }
+
+    /** The keys that read the live session, which hold no value once the player disconnects. */
+    private static String sessionFact(PlayerFactsPlaceholders.Session session, String tail) {
+        return switch (tail) {
+            case "ping" -> Integer.toString(session.ping());
+            case "sneaking" -> bool(session.sneaking());
+            case "sprinting" -> bool(session.sprinting());
+            case "op" -> bool(session.op());
+            case "world" -> session.world();
+            case "world_time" -> Long.toString(session.worldTime());
+            case "world_time_formatted" -> clockTime(session.worldTime());
+            case "world_weather" -> weather(session);
+            case "level" -> Integer.toString(session.level());
+            case "exp_total" -> Integer.toString(session.totalExperience());
+            case "exp_to_next" -> Integer.toString(session.experienceToNextLevel());
+            case "exp_progress" -> decimal(session.experienceProgress());
+            case "exp_percent" -> Long.toString(Math.round(session.experienceProgress() * 100));
+            default -> EMPTY;
+        };
+    }
+
+    /** A world's tick clock as the wall time a player reads on it: tick 0 is 06:00. */
+    private static String clockTime(long ticks) {
+        long minutesOfDay = (ticks / 1_000 * 60 + ticks % 1_000 * 60 / 1_000 + 6 * 60) % 1_440;
+        return String.format(Locale.ROOT, "%02d:%02d", minutesOfDay / 60, minutesOfDay % 60);
+    }
+
+    private static String weather(PlayerFactsPlaceholders.Session session) {
+        if (session.worldThundering()) {
+            return "thunder";
+        }
+        return session.worldStorming() ? "rain" : "clear";
+    }
+
+    private static String date(Instant instant) {
+        return DATE.format(instant.atZone(ZoneId.systemDefault()));
+    }
+
+    /**
+     * Resolve a {@code hand_*} or {@code offhand_*} tail against the item in that hand. An empty hand, an offline
+     * player, or an absent seam degrades every key to the dash, so a scoreboard line reads blank rather than
+     * stale when the player puts the item away.
+     */
+    private String heldItem(PlayerRef who, PlayerFactsPlaceholders.Hand hand, String tail) {
+        Optional<PlayerFactsPlaceholders> seam = contexts.playerFacts();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        return seam.get().held(who, hand).map(item -> itemField(item, tail)).orElse(EMPTY);
+    }
+
+    private static String itemField(PlayerFactsPlaceholders.HeldItem item, String tail) {
+        return switch (tail) {
+            case "type" -> item.type();
+            case "name" -> item.name();
+            case "amount" -> Integer.toString(item.amount());
+            case "damage" -> Integer.toString(item.damage());
+            case "durability" -> Integer.toString(Math.max(0, item.maxDurability() - item.damage()));
+            case "durability_max" -> Integer.toString(item.maxDurability());
+            case "enchants" -> item.enchantments().isEmpty() ? EMPTY : String.join(", ", item.enchantments());
+            case "enchants_count" -> Integer.toString(item.enchantments().size());
+            case "lore" -> item.lore().isEmpty() ? EMPTY : String.join(" ", item.lore());
+            case "model" -> optionalIntOr(item.model());
+            default -> EMPTY;
+        };
+    }
+
+    /** Resolve {@code itemcount_<material>}: how many of one material the player carries. */
+    private String itemCount(PlayerRef who, String material) {
+        Optional<PlayerFactsPlaceholders> seam = contexts.playerFacts();
+        if (seam.isEmpty() || material.isBlank()) {
+            return EMPTY;
+        }
+        return optionalIntOr(seam.get().itemCount(who, material));
+    }
+
+    /**
+     * Resolve a {@code p_<name>_<key>} tail: the key answered about the named player rather than the requester.
+     *
+     * <p>A player name may itself contain underscores, so the split is decided by the catalogue rather than by the
+     * first underscore: the tail is cut at the earliest point whose remainder is a key the catalogue knows, which
+     * makes {@code p_Not_ch_homes_count} read as the player {@code Not_ch}. The name is resolved through the kernel
+     * lookup, so an offline-mode server resolves it the same way an online-mode one does, and an unknown name, an
+     * absent lookup or a tail that names no key all degrade to the dash. The form never nests: a key that is itself
+     * another {@code p_} is not followed.
+     */
+    private String otherPlayer(String tail) {
+        Optional<PlayerLookup> seam = contexts.players();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        for (int split = tail.indexOf('_'); split > 0; split = tail.indexOf('_', split + 1)) {
+            String key = tail.substring(split + 1);
+            if (key.startsWith(OTHER_PLAYER_PREFIX)
+                    || PlaceholderCatalog.find(key).isEmpty()) {
+                continue;
+            }
+            Optional<PlayerRef> target = seam.get().findByName(tail.substring(0, split));
+            if (target.isEmpty()) {
+                return EMPTY;
+            }
+            PlayerRef who = target.get();
+            return resolve(who, seam.get().isOnline(who.uuid()), key).orElse(EMPTY);
+        }
+        return EMPTY;
     }
 
     /**
