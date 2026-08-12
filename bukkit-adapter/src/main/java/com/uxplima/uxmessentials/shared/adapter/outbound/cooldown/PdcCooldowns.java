@@ -20,11 +20,11 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@link Cooldowns} implementation: a per-holder "ready-at" epoch-millis stamped in PDC. The
- * duration is resolved from the player's numbered {@code uxmessentials.<feature>.cooldown.<seconds>}
- * nodes via {@link Permissions} (the {@code min}-reducer — the shortest tier wins), and the
- * {@code .bypass} node skips the gate entirely. The generic per-command layer
- * ({@link #checkLabel}/{@link #stampLabel}) keys the same machinery by an operator-chosen label under
- * {@code uxmessentials.cooldown.<label>}.
+ * duration is resolved from the player's numbered {@code uxmessentials.cooldown.<feature>.<seconds>}
+ * nodes via {@link Permissions} (the {@code min}-reducer: the shortest tier wins), and
+ * {@code uxmessentials.cooldown.bypass.<feature>} skips the gate entirely. The generic per-command
+ * layer ({@link #checkLabel}/{@link #stampLabel}) keys the same machinery by an operator-chosen label
+ * in the same space.
  *
  * <p>Stamps are transient per-holder state that may safely die with a world rollback, which is why
  * they live in PDC rather than the database (docs/03-paper-api §3.6). An offline player has no PDC to

@@ -33,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ServicesTeleportPlaceholders implements TeleportPlaceholders {
 
-    /** The shared teleport cooldown feature segment ({@code uxmessentials.tp.cooldown.*}). */
+    /** The shared teleport cooldown feature segment ({@code uxmessentials.cooldown.tp.<seconds>}). */
     private static final String FEATURE = "tp";
 
     private final Cooldowns cooldowns;

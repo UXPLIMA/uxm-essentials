@@ -322,6 +322,20 @@ final class EnforcementPermissions {
                         "See other vanished players (staff-among-staff visibility) and target them with /tp.",
                         PermissionDefault.OP,
                         VANISH),
+                PermissionSpec.family(
+                        "uxmessentials.vanish.see.level<n>",
+                        "How deeply you see: a viewer sees a vanished player when their see level reaches that "
+                                + "player's use level; the largest level held wins and plain .see is level 1.",
+                        PermissionDefault.OP,
+                        PermissionShape.QUOTA,
+                        VANISH),
+                PermissionSpec.family(
+                        "uxmessentials.vanish.use.level<n>",
+                        "How deeply you vanish: only a viewer whose see level reaches this level finds you; the "
+                                + "largest level held wins and plain .use is level 1.",
+                        PermissionDefault.OP,
+                        PermissionShape.QUOTA,
+                        VANISH),
                 PermissionSpec.of(
                         "uxmessentials.vanish.silent",
                         "/vanish -s to vanish or reappear without the fake join/quit broadcast.",
