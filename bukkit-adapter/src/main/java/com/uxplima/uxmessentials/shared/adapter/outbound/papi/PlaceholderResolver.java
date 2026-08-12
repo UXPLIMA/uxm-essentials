@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
@@ -83,6 +84,9 @@ public final class PlaceholderResolver {
     private static final String MENU_ARGUMENT_PREFIX = "argument_";
     private static final String SERVER_PREFIX = "server_";
     private static final String SERVER_WORLD_PLAYERS_PREFIX = "world_players_";
+    private static final String SERVER_WORLD_TIME_FORMATTED_PREFIX = "world_time_formatted_";
+    private static final String SERVER_WORLD_TIME_PREFIX = "world_time_";
+    private static final String SERVER_WORLD_WEATHER_PREFIX = "world_weather_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -230,7 +234,8 @@ public final class PlaceholderResolver {
             case "afk", "afk_duration", "vanished" -> Optional.of(presence(who, online, normalized));
             case "kits_list" -> Optional.of(kitsList(who));
             case "muted", "jailed" -> Optional.of(moderation(who, normalized));
-            case "rank", "rank_next", "prestige" -> Optional.of(ranks(who, normalized));
+            case "rank", "rank_next", "rank_next_cost", "rank_position", "rank_total", "rank_progress", "prestige" ->
+                Optional.of(ranks(who, normalized));
             default -> Optional.empty();
         };
     }
@@ -321,10 +326,7 @@ public final class PlaceholderResolver {
     }
 
     private static String weather(PlayerFactsPlaceholders.Session session) {
-        if (session.worldThundering()) {
-            return "thunder";
-        }
-        return session.worldStorming() ? "rain" : "clear";
+        return sky(session.worldStorming(), session.worldThundering());
     }
 
     private static String date(Instant instant) {
@@ -467,9 +469,25 @@ public final class PlaceholderResolver {
         return switch (key) {
             case "rank" -> held.rank();
             case "rank_next" -> held.next().orElse(MAX_RANK);
+            case "rank_next_cost" -> optionalLongOr(held.nextCost());
+            case "rank_position" -> Integer.toString(held.position());
+            case "rank_total" -> Integer.toString(held.total());
+            case "rank_progress" -> ladderProgress(held);
             case "prestige" -> Integer.toString(held.prestige());
             default -> EMPTY;
         };
+    }
+
+    /** How far up the ladder the player stands, as a whole percentage; the top rung reads 100. */
+    private static String ladderProgress(RanksPlaceholders.Standing held) {
+        if (held.total() <= 0) {
+            return EMPTY;
+        }
+        return Long.toString(Math.round(held.position() * 100.0 / held.total()));
+    }
+
+    private static String optionalLongOr(OptionalLong value) {
+        return value.isPresent() ? Long.toString(value.getAsLong()) : EMPTY;
     }
 
     /**
@@ -1177,6 +1195,16 @@ public final class PlaceholderResolver {
         if (tail.startsWith(SERVER_WORLD_PLAYERS_PREFIX)) {
             return worldPlayers(metrics, tail.substring(SERVER_WORLD_PLAYERS_PREFIX.length()));
         }
+        // The formatted spelling is checked first: it is itself prefixed by the raw one.
+        if (tail.startsWith(SERVER_WORLD_TIME_FORMATTED_PREFIX)) {
+            return worldClock(metrics, tail.substring(SERVER_WORLD_TIME_FORMATTED_PREFIX.length()), true);
+        }
+        if (tail.startsWith(SERVER_WORLD_TIME_PREFIX)) {
+            return worldClock(metrics, tail.substring(SERVER_WORLD_TIME_PREFIX.length()), false);
+        }
+        if (tail.startsWith(SERVER_WORLD_WEATHER_PREFIX)) {
+            return worldWeather(metrics, tail.substring(SERVER_WORLD_WEATHER_PREFIX.length()));
+        }
         return switch (tail) {
             case "online" -> Integer.toString(metrics.onlinePlayers());
             case "max_players" -> Integer.toString(metrics.maxPlayers());
@@ -1192,6 +1220,34 @@ public final class PlaceholderResolver {
             case "ram_free" -> Long.toString(metrics.ramFreeMb());
             default -> EMPTY;
         };
+    }
+
+    /** A named world's time of day, in ticks or as the clock a player reads; the dash for an unloaded world. */
+    private static String worldClock(ServerMetricsPlaceholders metrics, String world, boolean formatted) {
+        if (world.isBlank()) {
+            return EMPTY;
+        }
+        return metrics.worldSky(world)
+                .map(sky -> formatted ? clockTime(sky.time()) : Long.toString(sky.time()))
+                .orElse(EMPTY);
+    }
+
+    /** A named world's sky: clear, rain or thunder; the dash for an unloaded world. */
+    private static String worldWeather(ServerMetricsPlaceholders metrics, String world) {
+        if (world.isBlank()) {
+            return EMPTY;
+        }
+        return metrics.worldSky(world)
+                .map(above -> sky(above.storming(), above.thundering()))
+                .orElse(EMPTY);
+    }
+
+    /** What the sky over a world reads as: a thunderstorm outranks the rain flag it always carries with it. */
+    private static String sky(boolean storming, boolean thundering) {
+        if (thundering) {
+            return "thunder";
+        }
+        return storming ? "rain" : "clear";
     }
 
     /** Render one TPS window, clamped to the 20.0 ceiling and trimmed to two decimals. */
@@ -1411,6 +1467,25 @@ public final class PlaceholderResolver {
             case "mute_issuer" -> sanctionField(moderation.activeMute(who), Sanction.ISSUER, false);
             case "mute_remaining" -> sanctionField(moderation.activeMute(who), Sanction.REMAINING, false);
             case "mute_remaining_formatted" -> sanctionField(moderation.activeMute(who), Sanction.REMAINING, true);
+            case "jail_name" ->
+                moderation
+                        .activeJail(who)
+                        .map(ModerationPlaceholders.JailView::jail)
+                        .orElse(EMPTY);
+            case "jail_reason" ->
+                moderation
+                        .activeJail(who)
+                        .map(ModerationPlaceholders.JailView::reason)
+                        .orElse(EMPTY);
+            case "jail_issuer" ->
+                moderation
+                        .activeJail(who)
+                        .map(ModerationPlaceholders.JailView::issuer)
+                        .orElse(EMPTY);
+            case "jail_remaining" -> jailField(moderation.activeJail(who), false);
+            case "jail_remaining_formatted" -> jailField(moderation.activeJail(who), true);
+            case "jail_online_only" ->
+                moderation.activeJail(who).map(jail -> bool(jail.onlineOnly())).orElse(NO);
             default -> EMPTY;
         };
     }
@@ -1440,6 +1515,11 @@ public final class PlaceholderResolver {
             case ISSUER -> active.issuer();
             case REMAINING -> sanctionRemaining(active.remaining(), formatted);
         };
+    }
+
+    /** A jail's remaining wait, on the same shape as a ban's: the dash when no jail holds the player. */
+    private static String jailField(Optional<ModerationPlaceholders.JailView> view, boolean formatted) {
+        return view.map(jail -> sanctionRemaining(jail.remaining(), formatted)).orElse(EMPTY);
     }
 
     /** A sanction's remaining wait, or {@code permanent} when it never lifts. */

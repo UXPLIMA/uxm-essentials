@@ -36,6 +36,9 @@ public interface ModerationPlaceholders {
     /** {@code who}'s active mute state, or empty when not muted. */
     Optional<SanctionView> activeMute(PlayerRef who);
 
+    /** {@code who}'s active jail sentence, or empty when not jailed. */
+    Optional<JailView> activeJail(PlayerRef who);
+
     /**
      * A flattened view of an active sanction — the remaining wait, the reason and the issuer — so the resolver
      * renders the placeholders without importing a moderation domain type. {@code remaining} is empty for a
@@ -47,4 +50,19 @@ public interface ModerationPlaceholders {
      * @param issuer the name of the staff member (or console) who issued it
      */
     record SanctionView(Optional<Duration> remaining, String reason, String issuer) {}
+
+    /**
+     * An active jail sentence, flattened the same way a sanction is, plus the named jail the target is held in.
+     * A jail counts down in one of two ways and the difference matters to whoever reads the placeholder: a
+     * wall-clock sentence lifts at an instant, while the default online-only sentence only advances while the
+     * target is connected. {@code remaining} carries whichever wait applies and is empty for a permanent jail,
+     * which the resolver renders as {@code permanent}.
+     *
+     * @param jail the named jail the target is held in
+     * @param remaining the wait still to serve, or empty for a permanent sentence
+     * @param onlineOnly whether that wait burns down on online time rather than the wall clock
+     * @param reason the issued reason, or the dash when none was given
+     * @param issuer the name of the staff member (or console) who issued it
+     */
+    record JailView(String jail, Optional<Duration> remaining, boolean onlineOnly, String reason, String issuer) {}
 }

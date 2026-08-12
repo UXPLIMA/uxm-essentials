@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -659,6 +660,47 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void moderationJailPlaceholdersReadTheCellReasonIssuerAndWait() {
+        FakeModeration moderation = new FakeModeration()
+                .jail(new ModerationPlaceholders.JailView(
+                        "cells", Optional.of(Duration.ofMinutes(30)), true, "chat abuse", "Admin"));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(moderation).build());
+
+        assertThat(resolver.resolve(ALICE, true, "moderation_jailed")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_name")).contains("cells");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_reason")).contains("chat abuse");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_issuer")).contains("Admin");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_remaining")).contains("1800");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_remaining_formatted"))
+                .contains("30m");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_online_only")).contains("yes");
+    }
+
+    @Test
+    void aPermanentJailRendersPermanentAndAWallClockOneIsNotOnlineOnly() {
+        FakeModeration moderation = new FakeModeration()
+                .jail(new ModerationPlaceholders.JailView("cells", Optional.empty(), false, "-", "Console"));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(moderation).build());
+
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_remaining")).contains("permanent");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_online_only")).contains("no");
+    }
+
+    @Test
+    void theJailDetailKeysDashWhenNoJailHoldsThePlayer() {
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(new FakeModeration()).build());
+
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_name")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_remaining")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "moderation_jail_online_only")).contains("no");
+        assertThat(resolverWith(PlaceholderContexts.builder().build()).resolve(ALICE, true, "moderation_jail_name"))
+                .contains("-");
+    }
+
+    @Test
     void moderationFrozenAndWarnsReadThroughTheSeam() {
         FakeModeration moderation = new FakeModeration().frozen(true).warns(3);
         PlaceholderResolver resolver = resolverWith(
@@ -1257,6 +1299,24 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void serverWorldClockAndWeatherReadOneNamedWorld() {
+        FakeServerMetrics metrics = new FakeServerMetrics()
+                .worldSky("world", new ServerMetricsPlaceholders.WorldSky(18_000L, false, false))
+                .worldSky("world_nether", new ServerMetricsPlaceholders.WorldSky(0L, true, true));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().serverMetrics(metrics).build());
+
+        assertThat(resolver.resolve(ALICE, true, "server_world_time_world")).contains("18000");
+        assertThat(resolver.resolve(ALICE, true, "server_world_time_formatted_world"))
+                .contains("00:00");
+        assertThat(resolver.resolve(ALICE, true, "server_world_weather_world")).contains("clear");
+        assertThat(resolver.resolve(ALICE, true, "server_world_weather_world_nether"))
+                .contains("thunder");
+        assertThat(resolver.resolve(ALICE, true, "server_world_time_void")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "server_world_weather_")).contains("-");
+    }
+
+    @Test
     void serverMetricsDegradeWhenSeamAbsentButUnknownKeyStaysRaw() {
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
@@ -1271,22 +1331,30 @@ class PlaceholderResolverTest {
     @Test
     void ranksPlaceholdersResolveCurrentNextAndPrestige() {
         PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
-                .ranks(who -> Optional.of(new RanksPlaceholders.Standing("Citizen", Optional.of("VIP"), 2)))
+                .ranks(who -> Optional.of(new RanksPlaceholders.Standing(
+                        "Citizen", Optional.of("VIP"), 2, 2, 5, OptionalLong.of(2_500L))))
                 .build());
 
         assertThat(resolver.resolve(ALICE, true, "rank")).contains("Citizen");
         assertThat(resolver.resolve(ALICE, true, "rank_next")).contains("VIP");
         assertThat(resolver.resolve(ALICE, true, "prestige")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "rank_position")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "rank_total")).contains("5");
+        assertThat(resolver.resolve(ALICE, true, "rank_progress")).contains("40");
+        assertThat(resolver.resolve(ALICE, true, "rank_next_cost")).contains("2500");
     }
 
     @Test
     void rankNextReadsTheMaxMarkerAtTheTopRank() {
         PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
-                .ranks(who -> Optional.of(new RanksPlaceholders.Standing("VIP", Optional.empty(), 0)))
+                .ranks(who -> Optional.of(
+                        new RanksPlaceholders.Standing("VIP", Optional.empty(), 0, 5, 5, OptionalLong.empty())))
                 .build());
 
         assertThat(resolver.resolve(ALICE, true, "rank")).contains("VIP");
         assertThat(resolver.resolve(ALICE, true, "rank_next")).contains("max");
+        assertThat(resolver.resolve(ALICE, true, "rank_next_cost")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "rank_progress")).contains("100");
     }
 
     @Test
@@ -1821,6 +1889,7 @@ class PlaceholderResolverTest {
         private int warns;
         private Optional<SanctionView> ban = Optional.empty();
         private Optional<SanctionView> mute = Optional.empty();
+        private Optional<JailView> jail = Optional.empty();
 
         FakeModeration muted(boolean value) {
             this.muted = value;
@@ -1853,6 +1922,12 @@ class PlaceholderResolverTest {
             return this;
         }
 
+        FakeModeration jail(JailView view) {
+            this.jail = Optional.of(view);
+            this.jailed = true;
+            return this;
+        }
+
         @Override
         public boolean isMuted(PlayerRef who) {
             return muted;
@@ -1881,6 +1956,11 @@ class PlaceholderResolverTest {
         @Override
         public Optional<SanctionView> activeMute(PlayerRef who) {
             return mute;
+        }
+
+        @Override
+        public Optional<JailView> activeJail(PlayerRef who) {
+            return jail;
         }
     }
 
@@ -2251,6 +2331,7 @@ class PlaceholderResolverTest {
     private static final class FakeServerMetrics implements ServerMetricsPlaceholders {
 
         private final java.util.Map<String, Integer> worldPlayers = new java.util.HashMap<>();
+        private final java.util.Map<String, WorldSky> skies = new java.util.HashMap<>();
         private int online;
         private int maxPlayers;
         private String version = "1.21.11";
@@ -2294,6 +2375,11 @@ class PlaceholderResolverTest {
 
         FakeServerMetrics worldPlayers(String world, int count) {
             this.worldPlayers.put(world, count);
+            return this;
+        }
+
+        FakeServerMetrics worldSky(String world, WorldSky sky) {
+            this.skies.put(world, sky);
             return this;
         }
 
@@ -2341,6 +2427,11 @@ class PlaceholderResolverTest {
         public OptionalInt worldPlayers(String world) {
             Integer count = worldPlayers.get(world);
             return count == null ? OptionalInt.empty() : OptionalInt.of(count);
+        }
+
+        @Override
+        public Optional<WorldSky> worldSky(String world) {
+            return Optional.ofNullable(skies.get(world));
         }
     }
 

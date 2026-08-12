@@ -182,6 +182,30 @@ final class SocialPlaceholderKeys {
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
+                        "moderation_jail_name",
+                        "The named jail the player is held in.",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
+                PlaceholderSpec.of(
+                        "moderation_jail_reason", "Why the player was jailed.", PlaceholderScope.PLAYER, MODERATION),
+                PlaceholderSpec.of(
+                        "moderation_jail_issuer", "Who jailed the player.", PlaceholderScope.PLAYER, MODERATION),
+                PlaceholderSpec.of(
+                        "moderation_jail_remaining",
+                        "How long is left on the jail, in whole seconds; permanent when only an unjail lifts it.",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
+                PlaceholderSpec.of(
+                        "moderation_jail_remaining_formatted",
+                        "The same remaining jail, in the compact 1d2h form.",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
+                PlaceholderSpec.of(
+                        "moderation_jail_online_only",
+                        "Whether the jail counts down on online time rather than the wall clock (yes/no).",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
+                PlaceholderSpec.of(
                         "moderation_mute_reason", "Why the player was muted.", PlaceholderScope.PLAYER, MODERATION),
                 PlaceholderSpec.of(
                         "moderation_mute_issuer", "Who muted the player.", PlaceholderScope.PLAYER, MODERATION),

@@ -248,6 +248,18 @@ final class SharedPlaceholderKeys {
                 PlaceholderSpec.shared(
                         "server_ram_free", "Heap still free, in whole megabytes.", PlaceholderScope.GLOBAL),
                 PlaceholderSpec.sharedFamily(
+                        "server_world_time_<world>",
+                        "The time of day in one named world, in ticks; the dash when no such world is loaded.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
+                        "server_world_time_formatted_<world>",
+                        "The same time as a 24-hour clock, where tick 0 is 06:00.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
+                        "server_world_weather_<world>",
+                        "The sky over one named world: clear, rain or thunder.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
                         "server_world_players_<world>",
                         "How many players are in one named world; the dash when no such world is loaded.",
                         PlaceholderScope.GLOBAL));

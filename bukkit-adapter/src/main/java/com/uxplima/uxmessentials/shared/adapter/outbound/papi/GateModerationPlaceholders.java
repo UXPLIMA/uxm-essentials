@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -105,6 +106,32 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
             return Optional.of(view(Optional.empty(), permanent.reason(), permanent.issuer()));
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<JailView> activeJail(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        Instant now = clock.instant();
+        if (repository.loadJail(who) instanceof JailState.Active jail && jail.isActiveAt(now)) {
+            return Optional.of(new JailView(
+                    jail.jail(),
+                    jailRemaining(now, jail),
+                    jail.isOnlineTimed(),
+                    jail.reason().orElse(PlaceholderResolver.EMPTY),
+                    jail.issuer().name()));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * A jail's remaining wait: the online time still to serve for the default sentence, the wall-clock wait for
+     * an opted-in one, and empty for a permanent jail that only {@code /unjail} lifts.
+     */
+    private static Optional<Duration> jailRemaining(Instant now, JailState.Active jail) {
+        if (jail.remaining().isPresent()) {
+            return Optional.of(positive(jail.remaining().get()));
+        }
+        return jail.until().map(until -> positive(Duration.between(now, until)));
     }
 
     /** A ban's remaining wait, or empty when its far-future expiry marks it permanent. */

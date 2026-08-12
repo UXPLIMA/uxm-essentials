@@ -469,6 +469,11 @@ class PlaceholderInventoryDriftTest {
             public Optional<SanctionView> activeMute(PlayerRef who) {
                 return Optional.empty();
             }
+
+            @Override
+            public Optional<JailView> activeJail(PlayerRef who) {
+                return Optional.empty();
+            }
         };
     }
 
@@ -646,6 +651,11 @@ class PlaceholderInventoryDriftTest {
             @Override
             public OptionalInt worldPlayers(String world) {
                 return OptionalInt.empty();
+            }
+
+            @Override
+            public Optional<WorldSky> worldSky(String world) {
+                return Optional.empty();
             }
         };
     }

@@ -134,6 +134,22 @@ final class EconomyPlaceholderKeys {
                         PlaceholderScope.PLAYER,
                         RANKS),
                 PlaceholderSpec.of(
+                        "rank_next_cost",
+                        "What the next rankup charges, or the dash at the top of the ladder.",
+                        PlaceholderScope.PLAYER,
+                        RANKS),
+                PlaceholderSpec.of(
+                        "rank_position",
+                        "Which rung of the ladder the player stands on, counting from one.",
+                        PlaceholderScope.PLAYER,
+                        RANKS),
+                PlaceholderSpec.of("rank_total", "How many rungs the ladder holds.", PlaceholderScope.PLAYER, RANKS),
+                PlaceholderSpec.of(
+                        "rank_progress",
+                        "How far up the ladder the player stands, as a whole percentage.",
+                        PlaceholderScope.PLAYER,
+                        RANKS),
+                PlaceholderSpec.of(
                         "prestige", "How many times the player has prestiged.", PlaceholderScope.PLAYER, RANKS));
     }
 }

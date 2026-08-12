@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 
 import org.bukkit.Server;
@@ -98,5 +99,13 @@ public final class BukkitServerMetrics implements ServerMetricsPlaceholders {
         return found == null
                 ? OptionalInt.empty()
                 : OptionalInt.of(found.getPlayers().size());
+    }
+
+    @Override
+    public Optional<WorldSky> worldSky(String world) {
+        @Nullable World found = server.getWorld(Objects.requireNonNull(world, "world"));
+        return found == null
+                ? Optional.empty()
+                : Optional.of(new WorldSky(found.getTime(), found.hasStorm(), found.isThundering()));
     }
 }

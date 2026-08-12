@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
@@ -44,4 +45,16 @@ public interface ServerMetricsPlaceholders {
 
     /** Players in the named world, or empty when no world carries that name. */
     OptionalInt worldPlayers(String world);
+
+    /** The named world's time of day and sky, or empty when no world carries that name. */
+    Optional<WorldSky> worldSky(String world);
+
+    /**
+     * A world's clock and weather, read together because a HUD line that shows one usually shows the other.
+     *
+     * @param time the time of day, in ticks
+     * @param storming whether it is raining there
+     * @param thundering whether a thunderstorm is overhead
+     */
+    record WorldSky(long time, boolean storming, boolean thundering) {}
 }
