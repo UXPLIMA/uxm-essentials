@@ -32,6 +32,10 @@ final class SharedPermissions {
                         "/uxmess permissions [area] [page] and /uxmess permissions export: read the permission catalogue in game or write it to a file.",
                         PermissionDefault.OP),
                 PermissionSpec.shared(
+                        "uxmessentials.admin.placeholders",
+                        "/uxmess placeholders [area] [page] and /uxmess placeholders export: read the placeholder catalogue in game or write it to a file.",
+                        PermissionDefault.OP),
+                PermissionSpec.shared(
                         "uxmessentials.admin.reload", "Reload all modules via /uxmess reload.", PermissionDefault.OP),
                 PermissionSpec.sharedFamily(
                         "uxmessentials.cooldown.<feature>.<seconds>",

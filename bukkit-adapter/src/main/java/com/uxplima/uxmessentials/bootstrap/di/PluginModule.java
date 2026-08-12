@@ -59,6 +59,7 @@ import com.uxplima.uxmessentials.bootstrap.command.HelpCommand;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.PermissionsSubcommand;
+import com.uxplima.uxmessentials.bootstrap.command.PlaceholdersSubcommand;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.bootstrap.health.BusTransportHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.ClusterPeersHealthCheck;
@@ -762,6 +763,7 @@ public final class PluginModule {
                 importNode,
                 guiNode,
                 new PermissionsSubcommand(plugin.getDataFolder().toPath(), kernel.log()),
+                new PlaceholdersSubcommand(plugin.getDataFolder().toPath(), kernel.log()),
                 kernel.scheduler(),
                 healthChecks,
                 resources.reloadTasks()));

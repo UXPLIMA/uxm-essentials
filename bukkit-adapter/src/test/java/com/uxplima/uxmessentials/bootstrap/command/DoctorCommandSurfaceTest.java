@@ -90,6 +90,7 @@ class DoctorCommandSurfaceTest {
                 new MigrationImportNode(service),
                 guiNode(),
                 permissionsNode(),
+                placeholdersNode(),
                 new InlineScheduler(),
                 checks,
                 List.of());
@@ -98,6 +99,11 @@ class DoctorCommandSurfaceTest {
     /** A permissions node pointed at a scratch folder: this guard never runs its export. */
     private static PermissionsSubcommand permissionsNode() {
         return new PermissionsSubcommand(Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class));
+    }
+
+    /** A placeholders node pointed at a scratch folder: this guard never runs its export either. */
+    private static PlaceholdersSubcommand placeholdersNode() {
+        return new PlaceholdersSubcommand(Path.of("build", "tmp", "placeholders-guard"), Mockito.mock(Logger.class));
     }
 
     /** A minimal /uxmess gui node — this surface guard only inspects the doctor child, never opens the hub. */

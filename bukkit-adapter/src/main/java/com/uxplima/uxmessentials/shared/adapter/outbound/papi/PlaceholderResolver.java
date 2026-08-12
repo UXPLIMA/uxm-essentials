@@ -425,7 +425,8 @@ public final class PlaceholderResolver {
             case "afk_reason" -> state.afk() ? state.afkReason().orElse(EMPTY) : EMPTY;
             case "nickname" -> state.nickname();
             case "realname" -> who.name();
-            default -> bool(state.vanished());
+            case "vanished" -> bool(state.vanished());
+            default -> EMPTY;
         };
     }
 

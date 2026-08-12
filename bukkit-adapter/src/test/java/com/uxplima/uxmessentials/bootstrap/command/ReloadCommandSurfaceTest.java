@@ -98,6 +98,7 @@ class ReloadCommandSurfaceTest {
                 new MigrationImportNode(service),
                 guiNode(),
                 permissionsNode(),
+                placeholdersNode(),
                 new InlineScheduler(),
                 List.of(),
                 tasks);
@@ -106,6 +107,11 @@ class ReloadCommandSurfaceTest {
     /** A permissions node pointed at a scratch folder: this guard never runs its export. */
     private static PermissionsSubcommand permissionsNode() {
         return new PermissionsSubcommand(Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class));
+    }
+
+    /** A placeholders node pointed at a scratch folder: this guard never runs its export either. */
+    private static PlaceholdersSubcommand placeholdersNode() {
+        return new PlaceholdersSubcommand(Path.of("build", "tmp", "placeholders-guard"), Mockito.mock(Logger.class));
     }
 
     /** A minimal /uxmess gui node: this surface guard only runs the reload child, never opens the hub. */
