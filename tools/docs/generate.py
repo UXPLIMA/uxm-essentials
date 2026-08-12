@@ -18,14 +18,15 @@ DEFAULTS = {"TRUE": "everyone", "OP": "op", "FALSE": "off"}
 
 
 def cell(text):
-    """A description sits in a table cell, where a bare pipe ends the column and a bare `<` opens a JSX
-    tag the docs platform then demands a closing tag for. Both are escaped; a `<` inside backticks is
-    already inert and is left alone."""
+    """A description sits in a table cell, where a bare pipe ends the column, a bare `<` opens a JSX tag
+    the docs platform then demands a closing tag for, and a bare `{` opens an expression it tries to
+    parse as JavaScript. All three are escaped; inside backticks they are already inert. A description
+    stitched together from several comment lines also arrives with runs of spaces, which are collapsed."""
     escaped, in_code = [], False
-    for character in text.strip():
+    for character in " ".join(text.split()):
         if character == "`":
             in_code = not in_code
-        if character in "|<" and not in_code:
+        if character in "|<{" and not in_code:
             escaped.append("\\")
         escaped.append(character)
     return "".join(escaped)

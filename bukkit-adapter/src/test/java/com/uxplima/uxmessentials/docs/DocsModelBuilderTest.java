@@ -84,6 +84,17 @@ class DocsModelBuilderTest {
     }
 
     @Test
+    void findsTheGuardNodeOfACommandThatNamesItSomethingOtherThanPermission() {
+        DocsData.Command setrank = module("ranks").commands().stream()
+                .filter(c -> c.literal().equals("setrank"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(setrank.permission()).isEqualTo("uxmessentials.ranks.admin");
+        assertThat(setrank.description()).isNotBlank();
+    }
+
+    @Test
     void startsACommandDescriptionAtItsVerbRatherThanRepeatingTheCommand() {
         DocsData.Command home = module("homes").commands().stream()
                 .filter(c -> c.literal().equals("home"))

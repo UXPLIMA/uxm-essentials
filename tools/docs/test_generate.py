@@ -51,12 +51,27 @@ class RenderTest(unittest.TestCase):
     def test_a_pipe_in_a_description_is_escaped(self):
         self.assertIn("How many homes \\| are saved", render_placeholders(MODULE))
 
+    def test_a_brace_outside_backticks_is_escaped(self):
+        module = dict(
+            MODULE,
+            settings=[dict(MODULE["settings"][0], description="{player} is the name, `{n}` the count")],
+        )
+        self.assertIn("\\{player} is the name, `{n}` the count", render_settings(module))
+
     def test_an_angle_bracket_outside_backticks_is_escaped(self):
         module = dict(
             MODULE,
             permissions=[dict(MODULE["permissions"][0], description="/eco give <player> and `<n>` tiers")],
         )
         self.assertIn("/eco give \\<player> and `<n>` tiers", render_permissions(module))
+
+
+    def test_a_description_stitched_from_several_comment_lines_keeps_single_spaces(self):
+        module = dict(
+            MODULE,
+            settings=[dict(MODULE["settings"][0], description="One sentence.  Another one.")],
+        )
+        self.assertIn("| One sentence. Another one. |", render_settings(module))
 
 
 class RewriteTest(unittest.TestCase):

@@ -76,28 +76,40 @@ final class DocsModelBuilder {
             String id,
             List<CommandOwners.SourceCommand> sourceCommands,
             Map<String, List<String>> aliases) {
+        Map<String, String> saidBySource = new LinkedHashMap<>();
         Map<String, DocsData.Command> byLiteral = new LinkedHashMap<>();
         for (CommandOwners.SourceCommand command : sourceCommands) {
             if (command.context().equals(id)) {
-                byLiteral.put(command.literal(), command(command.literal(), command.permission(), aliases));
+                saidBySource.put(command.literal(), command.description());
+                byLiteral.put(
+                        command.literal(),
+                        command(command.literal(), command.permission(), command.description(), aliases));
             }
         }
         for (CommandSpec spec : module.commands()) {
-            byLiteral.put(spec.literal(), command(spec.literal(), spec.permission(), aliases));
+            byLiteral.put(
+                    spec.literal(),
+                    command(spec.literal(), spec.permission(), saidBySource.getOrDefault(spec.literal(), ""), aliases));
         }
         return byLiteral.values().stream()
                 .sorted(Comparator.comparing(DocsData.Command::literal))
                 .toList();
     }
 
-    private static DocsData.Command command(String literal, String permission, Map<String, List<String>> aliases) {
-        return new DocsData.Command(
-                literal,
-                aliases.getOrDefault(literal, List.of()),
-                permission,
-                describe(PermissionCatalog.find(permission)
+    /**
+     * One row of the commands table. What the command says about itself is what Paper shows in the command
+     * listing, so it is the first choice; the node's description stands in where a class builds its sentence
+     * rather than returning a literal.
+     */
+    private static DocsData.Command command(
+            String literal, String permission, String said, Map<String, List<String>> aliases) {
+        String description = said.isBlank()
+                ? PermissionCatalog.find(permission)
                         .map(PermissionSpec::description)
-                        .orElse("")));
+                        .orElse("")
+                : said;
+        return new DocsData.Command(
+                literal, aliases.getOrDefault(literal, List.of()), permission, describe(description));
     }
 
     /**

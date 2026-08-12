@@ -193,7 +193,7 @@ final class PlayerstatePermissions {
                         PLAYERSTATE),
                 PermissionSpec.of(
                         "uxmessentials.world.use",
-                        "/world to show the world you are standing in.",
+                        "/world to show the world you are standing in, and /worlds to reach the world manager.",
                         PermissionDefault.TRUE,
                         PLAYERSTATE));
     }

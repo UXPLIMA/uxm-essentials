@@ -37,6 +37,7 @@ final class ShippedConfigReader {
     static List<DocsData.Setting> parse(List<String> lines) {
         List<DocsData.Setting> settings = new ArrayList<>();
         Deque<String> path = new ArrayDeque<>();
+        List<String> comment = new ArrayList<>();
         int listDepth = 0;
         for (String raw : lines) {
             String line = raw.strip();
@@ -44,33 +45,76 @@ final class ShippedConfigReader {
                 listDepth += count(line, '[') - count(line, ']');
                 continue;
             }
-            if (line.isEmpty() || line.startsWith("#")) {
+            if (line.isEmpty()) {
+                comment.clear();
+                continue;
+            }
+            if (line.startsWith("#")) {
+                comment.add(line.substring(1).strip());
                 continue;
             }
             if (line.equals("}")) {
                 path.pollLast();
+                comment.clear();
                 continue;
             }
             if (line.endsWith("{")) {
                 path.addLast(line.substring(0, line.length() - 1).strip());
+                comment.clear();
+                continue;
+            }
+            if (line.endsWith("}") && line.contains("{")) {
+                int brace = line.indexOf('{');
+                path.addLast(line.substring(0, brace).strip());
+                for (String member : commaSeparated(line.substring(brace + 1, line.lastIndexOf('}')))) {
+                    int assign = member.indexOf('=');
+                    if (assign > 0) {
+                        settings.add(new DocsData.Setting(
+                                qualify(path, member.substring(0, assign).strip()),
+                                member.substring(assign + 1).strip(),
+                                String.join(" ", comment)));
+                    }
+                }
+                path.pollLast();
+                comment.clear();
                 continue;
             }
             int equals = line.indexOf('=');
             if (equals < 0) {
+                comment.clear();
                 continue;
             }
             String key = line.substring(0, equals).strip();
             String rest = line.substring(equals + 1);
             int hash = rest.indexOf('#');
             String value = (hash < 0 ? rest : rest.substring(0, hash)).strip();
-            String description = hash < 0 ? "" : rest.substring(hash + 1).strip();
+            String description = hash < 0
+                    ? String.join(" ", comment)
+                    : rest.substring(hash + 1).strip();
             if (value.equals("[")) {
                 listDepth = 1;
                 value = "[...]";
             }
             settings.add(new DocsData.Setting(qualify(path, key), value, description));
+            comment.clear();
         }
         return List.copyOf(settings);
+    }
+
+    /** Splits the members of a one-line object ({@code void { biome = "plains" }}) on their commas. */
+    private static List<String> commaSeparated(String inside) {
+        List<String> members = new ArrayList<>();
+        int start = 0;
+        for (int index = 0; index <= inside.length(); index++) {
+            if (index == inside.length() || inside.charAt(index) == ',') {
+                String member = inside.substring(start, index).strip();
+                if (!member.isEmpty()) {
+                    members.add(member);
+                }
+                start = index + 1;
+            }
+        }
+        return List.copyOf(members);
     }
 
     private static String qualify(Deque<String> path, String key) {

@@ -11,14 +11,43 @@ class ShippedConfigReaderTest {
     @Test
     void readsAKeyItsDefaultAndItsTrailingComment() {
         List<DocsData.Setting> settings = ShippedConfigReader.parse(List.of(
-                "# Homes",
-                "enabled = true",
-                "default-limit = 3                   # homes per player without a limit node"));
+                "enabled = true", "default-limit = 3                   # homes per player without a limit node"));
 
         assertThat(settings)
                 .containsExactly(
                         new DocsData.Setting("enabled", "true", ""),
                         new DocsData.Setting("default-limit", "3", "homes per player without a limit node"));
+    }
+
+    @Test
+    void takesTheCommentAboveAKeyWhenThereIsNoneBesideIt() {
+        List<DocsData.Setting> settings = ShippedConfigReader.parse(List.of(
+                "# How long a staged delete stays valid",
+                "# before it must be re-requested.",
+                "delete-confirm-timeout = \"30s\"",
+                "",
+                "# A header with nothing under it",
+                "",
+                "protect-default-world = true"));
+
+        assertThat(settings)
+                .containsExactly(
+                        new DocsData.Setting(
+                                "delete-confirm-timeout",
+                                "\"30s\"",
+                                "How long a staged delete stays valid before it must be re-requested."),
+                        new DocsData.Setting("protect-default-world", "true", ""));
+    }
+
+    @Test
+    void readsTheMembersOfAOneLineObject() {
+        List<DocsData.Setting> settings = ShippedConfigReader.parse(
+                List.of("generators {", "  void { biome = \"plains\" }", "  flat { biome = \"desert\" }", "}"));
+
+        assertThat(settings)
+                .containsExactly(
+                        new DocsData.Setting("generators.void.biome", "\"plains\"", ""),
+                        new DocsData.Setting("generators.flat.biome", "\"desert\"", ""));
     }
 
     @Test
