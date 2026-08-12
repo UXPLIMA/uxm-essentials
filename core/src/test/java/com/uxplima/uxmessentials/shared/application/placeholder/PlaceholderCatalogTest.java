@@ -38,8 +38,17 @@ class PlaceholderCatalogTest {
     void everyKeyReadsAsAPlaceholderAnOperatorCanPaste() {
         assertThat(PlaceholderCatalog.all())
                 .allSatisfy(spec -> assertThat(spec.placeholder())
-                        .startsWith("%uxmessentials_")
+                        .startsWith(spec.relational() ? "%rel_uxmessentials_" : "%uxmessentials_")
                         .endsWith("%"));
+    }
+
+    @Test
+    void onlyARelationalKeyCarriesTheRelationalPrefix() {
+        // The two-player form is what PlaceholderAPI routes under rel_; anything else must not claim it.
+        assertThat(PlaceholderCatalog.all())
+                .allSatisfy(spec -> assertThat(spec.placeholder().startsWith("%rel_"))
+                        .describedAs("%s is scoped %s", spec.key(), spec.scope())
+                        .isEqualTo(spec.relational()));
     }
 
     @Test

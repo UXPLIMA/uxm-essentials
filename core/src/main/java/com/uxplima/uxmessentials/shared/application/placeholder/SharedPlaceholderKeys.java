@@ -9,7 +9,7 @@ final class SharedPlaceholderKeys {
     private SharedPlaceholderKeys() {}
 
     static List<PlaceholderSpec> all() {
-        return Stream.of(addressing(), account(), session(), held(), waits(), formatting(), server())
+        return Stream.of(addressing(), between(), account(), session(), held(), waits(), formatting(), server())
                 .flatMap(List::stream)
                 .toList();
     }
@@ -22,6 +22,19 @@ final class SharedPlaceholderKeys {
                         + "the name is resolved the same way a command resolves it, so it works offline and "
                         + "on a cracked server.",
                 PlaceholderScope.PLAYER));
+    }
+
+    /** What holds between two players wherever they stand, which needs no feature module. */
+    private static List<PlaceholderSpec> between() {
+        return List.of(
+                PlaceholderSpec.shared(
+                        "same_world",
+                        "Whether the two players stand in the same world (yes/no).",
+                        PlaceholderScope.RELATIONAL),
+                PlaceholderSpec.shared(
+                        "distance",
+                        "How far apart the two players stand, in blocks; the dash across worlds or when either is offline.",
+                        PlaceholderScope.RELATIONAL));
     }
 
     /** What the server remembers about an account, which answers whether or not it is connected. */

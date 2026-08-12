@@ -69,9 +69,17 @@ public record PlaceholderSpec(
         return owner.map(ModuleId::value).orElse("shared");
     }
 
-    /** How the key reads in a message, with the prefix an operator actually types. */
+    /**
+     * How the key reads in a message, with the prefix an operator actually types. A relational key carries the
+     * {@code rel_} prefix PlaceholderAPI routes the two-player form under.
+     */
     public String placeholder() {
-        return "%uxmessentials_" + key + "%";
+        return (scope == PlaceholderScope.RELATIONAL ? "%rel_uxmessentials_" : "%uxmessentials_") + key + "%";
+    }
+
+    /** Whether this key answers about a pair of players rather than the one it is rendered for. */
+    public boolean relational() {
+        return scope == PlaceholderScope.RELATIONAL;
     }
 
     /**

@@ -76,4 +76,11 @@ public final class StoresMessagingPlaceholders implements MessagingPlaceholders 
     public int ignoringCount(PlayerRef who) {
         return ignores.load(Objects.requireNonNull(who, "who")).size();
     }
+
+    @Override
+    public boolean ignores(PlayerRef owner, PlayerRef other) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(other, "other");
+        return ignores.load(owner).ignores(other);
+    }
 }

@@ -371,6 +371,79 @@ public final class PlaceholderResolver {
         return optionalIntOr(seam.get().itemCount(who, material));
     }
 
+    /**
+     * Resolve a {@code %rel_uxmessentials_<key>%} key, which reads the relation between two players rather than
+     * one player's own state: {@code viewer} is the player the line is being rendered for and {@code target} the
+     * player it is about. PlaceholderAPI only supplies both sides where a surface renders per viewer (a chat
+     * format, a tab or nametag line), so these keys are typed apart from the rest rather than folded into
+     * {@link #resolve}. An unknown key returns {@link Optional#empty()} so the raw token survives, and every
+     * absent seam degrades to the same answer a disabled module gives: nobody is hidden, nobody is ignoring,
+     * nobody is trading.
+     */
+    public Optional<String> resolveRelational(PlayerRef viewer, PlayerRef target, String key) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(key, "key");
+        return switch (key.toLowerCase(Locale.ROOT)) {
+            case "cansee" -> Optional.of(bool(canSee(viewer, target)));
+            case "hidden" -> Optional.of(bool(!canSee(viewer, target)));
+            case "ignoring" -> Optional.of(bool(ignores(viewer, target)));
+            case "ignored_by" -> Optional.of(bool(ignores(target, viewer)));
+            case "same_world" -> Optional.of(bool(sameWorld(viewer, target)));
+            case "distance" -> Optional.of(distance(viewer, target));
+            case "trading" ->
+                Optional.of(bool(contexts.trade()
+                        .map(seam -> seam.isTradingWith(viewer, target))
+                        .orElse(false)));
+            default -> Optional.empty();
+        };
+    }
+
+    /** Whether vanish leaves the target visible to the viewer; with vanish off nobody is hidden. */
+    private boolean canSee(PlayerRef viewer, PlayerRef target) {
+        return contexts.visibility()
+                .map(gate -> !gate.isHiddenFrom(viewer, target))
+                .orElse(true);
+    }
+
+    private boolean ignores(PlayerRef owner, PlayerRef other) {
+        return contexts.messaging().map(seam -> seam.ignores(owner, other)).orElse(false);
+    }
+
+    private boolean sameWorld(PlayerRef viewer, PlayerRef target) {
+        Optional<PlayerFactsPlaceholders> seam = contexts.playerFacts();
+        if (seam.isEmpty()) {
+            return false;
+        }
+        Optional<PlayerFactsPlaceholders.Position> here = seam.get().position(viewer);
+        Optional<PlayerFactsPlaceholders.Position> there = seam.get().position(target);
+        return here.isPresent()
+                && there.isPresent()
+                && here.get().world().equals(there.get().world());
+    }
+
+    /**
+     * How far apart the two stand, in blocks to two decimals. Two players in different worlds have no distance
+     * to speak of, and neither does a pair where one is offline, so both read the dash.
+     */
+    private String distance(PlayerRef viewer, PlayerRef target) {
+        Optional<PlayerFactsPlaceholders> seam = contexts.playerFacts();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        Optional<PlayerFactsPlaceholders.Position> here = seam.get().position(viewer);
+        Optional<PlayerFactsPlaceholders.Position> there = seam.get().position(target);
+        if (here.isEmpty()
+                || there.isEmpty()
+                || !here.get().world().equals(there.get().world())) {
+            return EMPTY;
+        }
+        double dx = here.get().x() - there.get().x();
+        double dy = here.get().y() - there.get().y();
+        double dz = here.get().z() - there.get().z();
+        return decimal(Math.sqrt(dx * dx + dy * dy + dz * dz));
+    }
+
     private static String formatNumber(String raw) {
         return PlaceholderFormats.number(raw).orElse(EMPTY);
     }

@@ -10,5 +10,12 @@ public enum PlaceholderScope {
     SESSION,
 
     /** Reads a server-wide value; the requesting player is ignored. */
-    GLOBAL
+    GLOBAL,
+
+    /**
+     * Reads the relation between two players rather than one player's own state, so it is typed with the
+     * {@code rel_} prefix and only answers where PlaceholderAPI supplies both sides (a chat format, a tab or
+     * nametag line rendered per viewer).
+     */
+    RELATIONAL
 }

@@ -1612,6 +1612,81 @@ class PlaceholderResolverTest {
         assertThat(resolver.resolve(ALICE, true, "format_number_soon")).contains("-");
     }
 
+    @Test
+    void theRelationalKeysReadOneSideAgainstTheOther() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .messaging(new FakeMessaging().ignores(BOB))
+                .visibility((viewer, target) -> target.equals(BOB))
+                .trade(tradingPair(ALICE, BOB))
+                .playerFacts(
+                        new FakePlayerFacts().standing(ALICE, "world", 0, 64, 0).standing(BOB, "world", 3, 64, 4))
+                .build());
+
+        assertThat(resolver.resolveRelational(ALICE, BOB, "ignoring")).contains("yes");
+        assertThat(resolver.resolveRelational(BOB, ALICE, "ignoring")).contains("no");
+        assertThat(resolver.resolveRelational(BOB, ALICE, "ignored_by")).contains("yes");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "cansee")).contains("no");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "hidden")).contains("yes");
+        assertThat(resolver.resolveRelational(BOB, ALICE, "cansee")).contains("yes");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "trading")).contains("yes");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "same_world")).contains("yes");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "distance")).contains("5");
+    }
+
+    @Test
+    void distanceAcrossWorldsAndForAnOfflinePlayerReadsTheDash() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .playerFacts(new FakePlayerFacts()
+                        .standing(ALICE, "world", 0, 64, 0)
+                        .standing(BOB, "world_nether", 0, 64, 0))
+                .build());
+
+        assertThat(resolver.resolveRelational(ALICE, BOB, "distance")).contains("-");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "same_world")).contains("no");
+        PlayerRef offline = new PlayerRef(UUID.randomUUID(), "Ghost");
+        assertThat(resolver.resolveRelational(ALICE, offline, "distance")).contains("-");
+        assertThat(resolver.resolveRelational(ALICE, offline, "same_world")).contains("no");
+    }
+
+    @Test
+    void theRelationalKeysDegradeWithEveryModuleOff() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        // Nobody is hidden, nobody is ignoring, nobody is trading: the same answers a disabled module gives.
+        assertThat(resolver.resolveRelational(ALICE, BOB, "cansee")).contains("yes");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "hidden")).contains("no");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "ignoring")).contains("no");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "trading")).contains("no");
+        assertThat(resolver.resolveRelational(ALICE, BOB, "distance")).contains("-");
+    }
+
+    @Test
+    void anUnknownRelationalKeyLeavesTheRawToken() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolveRelational(ALICE, BOB, "nothing_like_this")).isEmpty();
+        // A one-player key is not answered through the relational form, and the other way round.
+        assertThat(resolver.resolveRelational(ALICE, BOB, "server_online")).isEmpty();
+        assertThat(resolver.resolve(ALICE, true, "cansee")).isEmpty();
+    }
+
+    /** A trade registry holding exactly one live exchange, between the two players handed to it. */
+    private static TradePlaceholders tradingPair(PlayerRef one, PlayerRef other) {
+        return new TradePlaceholders() {
+            @Override
+            public boolean isTrading(PlayerRef who) {
+                return who.equals(one) || who.equals(other);
+            }
+
+            @Override
+            public boolean isTradingWith(PlayerRef first, PlayerRef second) {
+                return isTrading(first) && isTrading(second) && !first.equals(second);
+            }
+        };
+    }
+
     /** A gate that holds exactly one label for exactly one wait, and calls every other label open. */
     private static Cooldowns cooldownsHolding(String label, Duration left) {
         return new Cooldowns() {
@@ -1642,6 +1717,7 @@ class PlaceholderResolverTest {
 
         private final java.util.Map<Hand, HeldItem> hands = new java.util.EnumMap<>(Hand.class);
         private final java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        private final java.util.Map<UUID, Position> positions = new java.util.HashMap<>();
         private @Nullable Session session;
         private @Nullable Account account;
 
@@ -1665,6 +1741,11 @@ class PlaceholderResolverTest {
             return this;
         }
 
+        FakePlayerFacts standing(PlayerRef who, String world, double x, double y, double z) {
+            positions.put(who.uuid(), new Position(world, x, y, z));
+            return this;
+        }
+
         @Override
         public Optional<Session> session(PlayerRef who) {
             return Optional.ofNullable(session);
@@ -1684,6 +1765,11 @@ class PlaceholderResolverTest {
         public OptionalInt itemCount(PlayerRef who, String material) {
             Integer held = counts.get(material);
             return held == null ? OptionalInt.empty() : OptionalInt.of(held);
+        }
+
+        @Override
+        public Optional<Position> position(PlayerRef who) {
+            return Optional.ofNullable(positions.get(who.uuid()));
         }
     }
 
@@ -2118,6 +2204,13 @@ class PlaceholderResolverTest {
         private boolean accepting = true;
         private boolean spying;
         private int ignoring;
+        private final java.util.Set<UUID> ignored = new java.util.HashSet<>();
+
+        FakeMessaging ignores(PlayerRef other) {
+            ignored.add(other.uuid());
+            this.ignoring = ignored.size();
+            return this;
+        }
 
         FakeMessaging unread(long value) {
             this.unread = value;
@@ -2177,6 +2270,11 @@ class PlaceholderResolverTest {
         @Override
         public int ignoringCount(PlayerRef who) {
             return ignoring;
+        }
+
+        @Override
+        public boolean ignores(PlayerRef owner, PlayerRef other) {
+            return ignored.contains(other.uuid());
         }
     }
 

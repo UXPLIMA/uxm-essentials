@@ -561,6 +561,11 @@ class PlaceholderInventoryDriftTest {
             public int ignoringCount(PlayerRef who) {
                 return 0;
             }
+
+            @Override
+            public boolean ignores(PlayerRef owner, PlayerRef other) {
+                return false;
+            }
         };
     }
 

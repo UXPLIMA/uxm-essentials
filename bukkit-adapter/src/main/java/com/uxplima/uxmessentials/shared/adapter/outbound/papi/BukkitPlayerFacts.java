@@ -124,6 +124,18 @@ public final class BukkitPlayerFacts implements PlayerFactsPlaceholders {
         return OptionalInt.of(held);
     }
 
+    @Override
+    public Optional<Position> position(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        Player player = server.getPlayer(who.uuid());
+        if (player == null) {
+            return Optional.empty();
+        }
+        // Read straight off the entity rather than through a Location, which allocates a copy per call and
+        // carries a nullable world reference of its own.
+        return Optional.of(new Position(player.getWorld().getName(), player.getX(), player.getY(), player.getZ()));
+    }
+
     private static HeldItem describe(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
         String type = item.getType().getKey().getKey();

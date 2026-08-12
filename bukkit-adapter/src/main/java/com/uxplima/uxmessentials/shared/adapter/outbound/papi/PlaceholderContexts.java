@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +44,8 @@ public final class PlaceholderContexts {
     private final @Nullable PlayerLookup players;
     private final @Nullable PlayerFactsPlaceholders playerFacts;
     private final @Nullable Cooldowns cooldowns;
+    private final @Nullable VanishVisibility visibility;
+    private final @Nullable TradePlaceholders trade;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -70,6 +73,8 @@ public final class PlaceholderContexts {
         this.players = builder.players;
         this.playerFacts = builder.playerFacts;
         this.cooldowns = builder.cooldowns;
+        this.visibility = builder.visibility;
+        this.trade = builder.trade;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -90,6 +95,16 @@ public final class PlaceholderContexts {
     /** The shared cooldown gate, for the generic {@code cooldown_<label>} family. */
     public Optional<Cooldowns> cooldowns() {
         return Optional.ofNullable(cooldowns);
+    }
+
+    /** Whether vanish hides one player from another, for the relational {@code cansee} key. */
+    public Optional<VanishVisibility> visibility() {
+        return Optional.ofNullable(visibility);
+    }
+
+    /** The live trade registry, for the {@code trading} keys. */
+    public Optional<TradePlaceholders> trade() {
+        return Optional.ofNullable(trade);
     }
 
     public Optional<HomesPlaceholders> homes() {
@@ -233,6 +248,8 @@ public final class PlaceholderContexts {
         private @Nullable PlayerLookup players;
         private @Nullable PlayerFactsPlaceholders playerFacts;
         private @Nullable Cooldowns cooldowns;
+        private @Nullable VanishVisibility visibility;
+        private @Nullable TradePlaceholders trade;
 
         private Builder() {}
 
@@ -248,6 +265,16 @@ public final class PlaceholderContexts {
 
         public Builder cooldowns(Cooldowns gate) {
             this.cooldowns = gate;
+            return this;
+        }
+
+        public Builder visibility(VanishVisibility gate) {
+            this.visibility = gate;
+            return this;
+        }
+
+        public Builder trade(TradePlaceholders seam) {
+            this.trade = seam;
             return this;
         }
 

@@ -36,4 +36,7 @@ public interface MessagingPlaceholders {
 
     /** How many players {@code who} ignores (the persistent ignore list size). DB-backed; safe offline. */
     int ignoringCount(PlayerRef who);
+
+    /** True when {@code owner}'s ignore list holds {@code other}. */
+    boolean ignores(PlayerRef owner, PlayerRef other);
 }

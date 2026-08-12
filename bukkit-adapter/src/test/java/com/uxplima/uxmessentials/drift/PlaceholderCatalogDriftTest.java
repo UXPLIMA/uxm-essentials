@@ -53,6 +53,9 @@ class PlaceholderCatalogDriftTest {
      */
     private static final Set<String> NOT_KEYS = Set.of(
             // Rendered values rather than keys.
+            "thunder",
+            "rain",
+            "clear",
             "free",
             "unlimited",
             // Vote periods, which are the open segment of votes_<period>.
@@ -82,10 +85,16 @@ class PlaceholderCatalogDriftTest {
                 new PlaceholderResolver(PlaceholderContexts.builder().build());
         PlayerRef who = new PlayerRef(UUID.randomUUID(), "Drift");
 
+        PlayerRef other = new PlayerRef(UUID.randomUUID(), "Drifter");
+
         Set<String> unanswered = new TreeSet<>();
         for (PlaceholderSpec spec : PlaceholderCatalog.all()) {
             String key = spec.sampled("example");
-            if (resolver.resolve(who, true, key).isEmpty()) {
+            // A relational key is answered through the two-player form PlaceholderAPI routes under rel_.
+            boolean answered = spec.relational()
+                    ? resolver.resolveRelational(who, other, key).isPresent()
+                    : resolver.resolve(who, true, key).isPresent();
+            if (!answered) {
                 unanswered.add(spec.key());
             }
         }
@@ -102,6 +111,7 @@ class PlaceholderCatalogDriftTest {
         PlayerRef who = new PlayerRef(UUID.randomUUID(), "Drift");
 
         assertThat(resolver.resolve(who, true, "nothing_like_this")).isEmpty();
+        assertThat(resolver.resolveRelational(who, who, "nothing_like_this")).isEmpty();
         assertThat(PlaceholderCatalog.find("nothing_like_this")).isEmpty();
     }
 

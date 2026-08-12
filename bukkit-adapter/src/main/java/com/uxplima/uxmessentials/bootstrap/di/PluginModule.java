@@ -104,6 +104,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
 import com.uxplima.uxmessentials.messaging.adapter.MutableAfkStatus;
 import com.uxplima.uxmessentials.messaging.adapter.MutableMutePolicy;
+import com.uxplima.uxmessentials.messaging.adapter.outbound.AuthorityVanishVisibility;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.PresenceAfkStatus;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingQueries;
 import com.uxplima.uxmessentials.migration.MigrationModule;
@@ -280,6 +281,8 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportQueries;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.trade.adapter.TradeWiring;
+import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeSessions;
+import com.uxplima.uxmessentials.trade.adapter.outbound.SessionsTradePlaceholders;
 import com.uxplima.uxmessentials.trade.adapter.outbound.api.TradeQueries;
 import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.vanish.adapter.VanishWiring;
@@ -1046,6 +1049,15 @@ public final class PluginModule {
         // The generic cooldown family reads the same kernel gate every command-control rule stamps, so a label an
         // operator invented is readable from a scoreboard without the plugin knowing about it in advance.
         links.placeholders.cooldowns(kernel.cooldowns());
+        // The relational keys read across two players. Vanish visibility is the same gate messaging resolves a
+        // target through, built here from the one vanish authority; with vanish disabled the seam stays absent and
+        // "can see" answers yes, which is what a server without vanish means.
+        if (links.vanishStore != null && links.vanishLevelResolver != null) {
+            links.placeholders.visibility(new AuthorityVanishVisibility(links.vanishStore, links.vanishLevelResolver));
+        }
+        if (links.tradeSessions != null) {
+            links.placeholders.trade(new SessionsTradePlaceholders(links.tradeSessions));
+        }
         // The menu-engine source seam belongs to no feature context either — it reads the always-present engine's
         // own runtime state (whether the requester is in a menu, which one, its page/rows, and a typed argument) so
         // scoreboards and tab can read %uxmessentials_menu_*%. Wired unconditionally over the same Menus façade the
@@ -1483,6 +1495,8 @@ public final class PluginModule {
         resources.onClose(wired::closeAll);
         // The live registry is the whole store a same-server trade has, so the published query reads it directly.
         links.queries.register(UxmTradeQuery.class, new TradeQueries(wired.sessions()));
+        // Captured for the relational trade placeholders, which are wired unconditionally after the modules.
+        links.tradeSessions = wired.sessions();
     }
 
     private static void wireRanks(
@@ -2943,6 +2957,9 @@ public final class PluginModule {
         // see level the world does. Null when the vanish module is disabled (the gates degrade to fully-visible).
         private com.uxplima.uxmessentials.vanish.application.port.@org.jspecify.annotations.Nullable VanishLevelResolver
                 vanishLevelResolver;
+        // The live trade registry, captured during trade wiring so the relational trade placeholders can read it
+        // after every module has wired. Null when the trade module is disabled, which reads as "nobody is trading".
+        private @org.jspecify.annotations.Nullable TradeSessions tradeSessions;
         // The soft-couple seams staff binds when it wires (it lands last). Each is captured during the source
         // context's wiring and left null when that context is disabled, so staff degrades the matching gadget or
         // staff chat to a no-op rather than failing.

@@ -31,6 +31,19 @@ public interface PlayerFactsPlaceholders {
     /** How many of one material the player carries, or empty when the material is not one the server knows. */
     OptionalInt itemCount(PlayerRef who, String material);
 
+    /** Where the player stands, or empty when they are not connected. */
+    Optional<Position> position(PlayerRef who);
+
+    /**
+     * Where a connected player stands, for the relational distance keys.
+     *
+     * @param world the world they are in
+     * @param x their x coordinate
+     * @param y their y coordinate
+     * @param z their z coordinate
+     */
+    record Position(String world, double x, double y, double z) {}
+
     /** Which hand a {@code hand_*} key is asking about. */
     enum Hand {
         MAIN,

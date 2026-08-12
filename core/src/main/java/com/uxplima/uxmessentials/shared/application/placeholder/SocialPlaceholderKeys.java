@@ -14,13 +14,48 @@ final class SocialPlaceholderKeys {
     private static final ModuleId STAFF = ModuleId.of("staff");
     private static final ModuleId DISCORDLINK = ModuleId.of("discordlink");
     private static final ModuleId MODERATION = ModuleId.of("moderation");
+    private static final ModuleId VANISH = ModuleId.of("vanish");
+    private static final ModuleId TRADE = ModuleId.of("trade");
 
     private SocialPlaceholderKeys() {}
 
     static List<PlaceholderSpec> all() {
-        return Stream.of(presence(), messaging(), communication(), staff(), discordlink(), moderation())
+        return Stream.of(presence(), messaging(), communication(), staff(), discordlink(), moderation(), relational())
                 .flatMap(List::stream)
                 .toList();
+    }
+
+    /**
+     * The keys that read the relation between two players. They carry the {@code rel_} prefix and only answer
+     * where the surface renders per viewer: a chat format, a tab line, a nametag.
+     */
+    private static List<PlaceholderSpec> relational() {
+        return List.of(
+                PlaceholderSpec.of(
+                        "ignoring",
+                        "Whether the viewer's ignore list holds the player the line is about (yes/no).",
+                        PlaceholderScope.RELATIONAL,
+                        MESSAGING),
+                PlaceholderSpec.of(
+                        "ignored_by",
+                        "Whether the player the line is about ignores the viewer (yes/no).",
+                        PlaceholderScope.RELATIONAL,
+                        MESSAGING),
+                PlaceholderSpec.of(
+                        "cansee",
+                        "Whether the viewer can see the player the line is about, or vanish hides them (yes/no).",
+                        PlaceholderScope.RELATIONAL,
+                        VANISH),
+                PlaceholderSpec.of(
+                        "hidden",
+                        "The same read the other way round: whether vanish hides them from the viewer (yes/no).",
+                        PlaceholderScope.RELATIONAL,
+                        VANISH),
+                PlaceholderSpec.of(
+                        "trading",
+                        "Whether the two are the sides of the same live trade (yes/no).",
+                        PlaceholderScope.RELATIONAL,
+                        TRADE));
     }
 
     private static List<PlaceholderSpec> presence() {
