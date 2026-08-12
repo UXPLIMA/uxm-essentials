@@ -9,7 +9,7 @@ final class SharedPlaceholderKeys {
     private SharedPlaceholderKeys() {}
 
     static List<PlaceholderSpec> all() {
-        return Stream.of(addressing(), account(), session(), held(), server())
+        return Stream.of(addressing(), account(), session(), held(), waits(), formatting(), server())
                 .flatMap(List::stream)
                 .toList();
     }
@@ -180,6 +180,44 @@ final class SharedPlaceholderKeys {
                         "itemcount_<material>",
                         "How many of one material the player carries, counting every stack in their inventory.",
                         PlaceholderScope.SESSION));
+    }
+
+    /** The generic cooldown gate, keyed by whatever label an operator chose for it. */
+    private static List<PlaceholderSpec> waits() {
+        return List.of(
+                PlaceholderSpec.sharedFamily(
+                        "cooldown_<label>",
+                        "How long the player still waits on one cooldown label, in whole seconds; 0 when it is open.",
+                        PlaceholderScope.PLAYER),
+                PlaceholderSpec.sharedFamily(
+                        "cooldown_<label>_formatted",
+                        "The same wait in the compact 1h2m3s form; 0s when it is open.",
+                        PlaceholderScope.PLAYER),
+                PlaceholderSpec.sharedFamily(
+                        "cooldown_active_<label>",
+                        "Whether a cooldown is running on that label at all (yes/no).",
+                        PlaceholderScope.PLAYER));
+    }
+
+    /** Helpers that carry their own input in the key and render it, rather than reading anything. */
+    private static List<PlaceholderSpec> formatting() {
+        return List.of(
+                PlaceholderSpec.sharedFamily(
+                        "format_number_<n>",
+                        "The number with its thousands grouped, so 1234567 reads 1,234,567.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
+                        "format_compact_<n>",
+                        "The number shortened to k, M, B or T, so 1234567 reads 1.23M.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
+                        "format_time_<n>",
+                        "A count of seconds spelled in the compact 1h2m3s form.",
+                        PlaceholderScope.GLOBAL),
+                PlaceholderSpec.sharedFamily(
+                        "progressbar_<now>_<total>",
+                        "A twenty-character bar filled to now out of total; append a third segment to set the width.",
+                        PlaceholderScope.GLOBAL));
     }
 
     /** The server-wide metrics, which need no player at all. */

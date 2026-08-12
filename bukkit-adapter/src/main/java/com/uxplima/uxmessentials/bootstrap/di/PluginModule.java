@@ -1043,6 +1043,9 @@ public final class PluginModule {
         // The account facts (ping, first join, playtime, the item in hand) are the server's own, not any
         // module's, so they are wired here too and keep answering with every feature switched off.
         links.placeholders.playerFacts(new BukkitPlayerFacts(plugin.getServer()));
+        // The generic cooldown family reads the same kernel gate every command-control rule stamps, so a label an
+        // operator invented is readable from a scoreboard without the plugin knowing about it in advance.
+        links.placeholders.cooldowns(kernel.cooldowns());
         // The menu-engine source seam belongs to no feature context either — it reads the always-present engine's
         // own runtime state (whether the requester is in a menu, which one, its page/rows, and a typed argument) so
         // scoreboards and tab can read %uxmessentials_menu_*%. Wired unconditionally over the same Menus façade the

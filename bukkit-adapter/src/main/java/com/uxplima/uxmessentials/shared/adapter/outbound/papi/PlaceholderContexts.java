@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import org.jspecify.annotations.Nullable;
 
@@ -41,6 +42,7 @@ public final class PlaceholderContexts {
     private final @Nullable RanksPlaceholders ranks;
     private final @Nullable PlayerLookup players;
     private final @Nullable PlayerFactsPlaceholders playerFacts;
+    private final @Nullable Cooldowns cooldowns;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -67,6 +69,7 @@ public final class PlaceholderContexts {
         this.ranks = builder.ranks;
         this.players = builder.players;
         this.playerFacts = builder.playerFacts;
+        this.cooldowns = builder.cooldowns;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -82,6 +85,11 @@ public final class PlaceholderContexts {
     /** What the server itself holds about an account, for the {@code player_*} and item-in-hand keys. */
     public Optional<PlayerFactsPlaceholders> playerFacts() {
         return Optional.ofNullable(playerFacts);
+    }
+
+    /** The shared cooldown gate, for the generic {@code cooldown_<label>} family. */
+    public Optional<Cooldowns> cooldowns() {
+        return Optional.ofNullable(cooldowns);
     }
 
     public Optional<HomesPlaceholders> homes() {
@@ -224,6 +232,7 @@ public final class PlaceholderContexts {
         private @Nullable RanksPlaceholders ranks;
         private @Nullable PlayerLookup players;
         private @Nullable PlayerFactsPlaceholders playerFacts;
+        private @Nullable Cooldowns cooldowns;
 
         private Builder() {}
 
@@ -234,6 +243,11 @@ public final class PlaceholderContexts {
 
         public Builder playerFacts(PlayerFactsPlaceholders seam) {
             this.playerFacts = seam;
+            return this;
+        }
+
+        public Builder cooldowns(Cooldowns gate) {
+            this.cooldowns = gate;
             return this;
         }
 

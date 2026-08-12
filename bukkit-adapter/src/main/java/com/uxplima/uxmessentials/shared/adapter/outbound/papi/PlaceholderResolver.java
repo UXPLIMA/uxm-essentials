@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalog;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
@@ -95,6 +96,14 @@ public final class PlaceholderResolver {
     private static final String OFFHAND_PREFIX = "offhand_";
     private static final String ITEM_COUNT_PREFIX = "itemcount_";
 
+    private static final String FORMAT_NUMBER_PREFIX = "format_number_";
+    private static final String FORMAT_COMPACT_PREFIX = "format_compact_";
+    private static final String FORMAT_TIME_PREFIX = "format_time_";
+    private static final String PROGRESS_BAR_PREFIX = "progressbar_";
+    private static final String COOLDOWN_PREFIX = "cooldown_";
+    private static final String COOLDOWN_ACTIVE_PREFIX = "active_";
+    private static final String FORMATTED_SUFFIX = "_formatted";
+
     private final PlaceholderContexts contexts;
 
     public PlaceholderResolver(PlaceholderContexts contexts) {
@@ -126,6 +135,21 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(ITEM_COUNT_PREFIX)) {
             return Optional.of(itemCount(who, normalized.substring(ITEM_COUNT_PREFIX.length())));
+        }
+        if (normalized.startsWith(FORMAT_NUMBER_PREFIX)) {
+            return Optional.of(formatNumber(normalized.substring(FORMAT_NUMBER_PREFIX.length())));
+        }
+        if (normalized.startsWith(FORMAT_COMPACT_PREFIX)) {
+            return Optional.of(formatCompact(normalized.substring(FORMAT_COMPACT_PREFIX.length())));
+        }
+        if (normalized.startsWith(FORMAT_TIME_PREFIX)) {
+            return Optional.of(formatTime(normalized.substring(FORMAT_TIME_PREFIX.length())));
+        }
+        if (normalized.startsWith(PROGRESS_BAR_PREFIX)) {
+            return Optional.of(progressBar(normalized.substring(PROGRESS_BAR_PREFIX.length())));
+        }
+        if (normalized.startsWith(COOLDOWN_PREFIX)) {
+            return Optional.of(cooldown(who, normalized.substring(COOLDOWN_PREFIX.length())));
         }
         if (normalized.startsWith(ECONOMY_PREFIX)) {
             return Optional.of(economyFamily(who, normalized.substring(ECONOMY_PREFIX.length())));
@@ -343,6 +367,54 @@ public final class PlaceholderResolver {
             return EMPTY;
         }
         return optionalIntOr(seam.get().itemCount(who, material));
+    }
+
+    private static String formatNumber(String raw) {
+        return PlaceholderFormats.number(raw).orElse(EMPTY);
+    }
+
+    private static String formatCompact(String raw) {
+        return PlaceholderFormats.compact(raw).orElse(EMPTY);
+    }
+
+    private static String formatTime(String raw) {
+        return PlaceholderFormats.time(raw).orElse(EMPTY);
+    }
+
+    private static String progressBar(String tail) {
+        return PlaceholderFormats.progressBar(tail).orElse(EMPTY);
+    }
+
+    /**
+     * Resolve the generic cooldown family against the shared gate: {@code cooldown_<label>} is the wait left in
+     * whole seconds, {@code cooldown_<label>_formatted} the same wait in the compact form, and
+     * {@code cooldown_active_<label>} whether one is running at all. The label is the operator's own, the one
+     * the command-control rule stamps, so a scoreboard can count down any gated command without the plugin
+     * knowing about it in advance. Reading never stamps, so a placeholder refresh cannot start a cooldown.
+     */
+    private String cooldown(PlayerRef who, String tail) {
+        Optional<Cooldowns> seam = contexts.cooldowns();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        if (tail.startsWith(COOLDOWN_ACTIVE_PREFIX)) {
+            String label = tail.substring(COOLDOWN_ACTIVE_PREFIX.length());
+            return label.isBlank()
+                    ? EMPTY
+                    : bool(remaining(seam.get(), who, label).isPresent());
+        }
+        boolean formatted = tail.endsWith(FORMATTED_SUFFIX);
+        String label = formatted ? tail.substring(0, tail.length() - FORMATTED_SUFFIX.length()) : tail;
+        if (label.isBlank()) {
+            return EMPTY;
+        }
+        Duration left = remaining(seam.get(), who, label).orElse(Duration.ZERO);
+        return formatted ? PlaceholderDurations.compact(left) : Long.toString(left.toSeconds());
+    }
+
+    /** The wait a label still holds over {@code who}, or empty when the gate is open. */
+    private static Optional<Duration> remaining(Cooldowns gate, PlayerRef who, String label) {
+        return gate.checkLabel(who, label).asError();
     }
 
     /**

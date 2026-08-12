@@ -14,8 +14,11 @@ import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -1490,6 +1493,80 @@ class PlaceholderResolverTest {
                 .build());
 
         assertThat(resolver.resolve(ALICE, true, "p_bob_player_ping")).contains("77");
+    }
+
+    @Test
+    void theGenericCooldownFamilyReadsTheLabelTheOperatorChose() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .cooldowns(cooldownsHolding("daily_reward", Duration.ofMinutes(90)))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "cooldown_daily_reward")).contains("5400");
+        assertThat(resolver.resolve(ALICE, true, "cooldown_daily_reward_formatted"))
+                .contains("1h30m");
+        assertThat(resolver.resolve(ALICE, true, "cooldown_active_daily_reward"))
+                .contains("yes");
+    }
+
+    @Test
+    void anOpenCooldownReadsZeroRatherThanTheDash() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .cooldowns(cooldownsHolding("daily_reward", Duration.ofMinutes(90)))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "cooldown_something_else")).contains("0");
+        assertThat(resolver.resolve(ALICE, true, "cooldown_something_else_formatted"))
+                .contains("0s");
+        assertThat(resolver.resolve(ALICE, true, "cooldown_active_something_else"))
+                .contains("no");
+    }
+
+    @Test
+    void theCooldownFamilyDashesWithNoGateWiredOrNoLabelGiven() {
+        assertThat(resolverWith(PlaceholderContexts.builder().build()).resolve(ALICE, true, "cooldown_daily"))
+                .contains("-");
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .cooldowns(cooldownsHolding("daily", Duration.ofSeconds(5)))
+                .build());
+        assertThat(resolver.resolve(ALICE, true, "cooldown_")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "cooldown_active_")).contains("-");
+    }
+
+    @Test
+    void theFormattingHelpersRenderTheirOwnInput() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "format_number_1234567")).contains("1,234,567");
+        assertThat(resolver.resolve(ALICE, true, "format_compact_1234567")).contains("1.23M");
+        assertThat(resolver.resolve(ALICE, true, "format_time_3725")).contains("1h2m5s");
+        assertThat(resolver.resolve(ALICE, true, "progressbar_5_10_10")).contains("█████░░░░░");
+        assertThat(resolver.resolve(ALICE, true, "format_number_soon")).contains("-");
+    }
+
+    /** A gate that holds exactly one label for exactly one wait, and calls every other label open. */
+    private static Cooldowns cooldownsHolding(String label, Duration left) {
+        return new Cooldowns() {
+            @Override
+            public Result<Unit, Duration> check(PlayerRef who, CooldownKind kind) {
+                return Result.ok();
+            }
+
+            @Override
+            public void stamp(PlayerRef who, CooldownKind kind) {
+                throw new AssertionError("reading a placeholder must never stamp a cooldown");
+            }
+
+            @Override
+            public Result<Unit, Duration> checkLabel(PlayerRef who, String asked) {
+                return label.equals(asked) ? Result.err(left) : Result.ok();
+            }
+
+            @Override
+            public void stampLabel(PlayerRef who, String asked) {
+                throw new AssertionError("reading a placeholder must never stamp a cooldown");
+            }
+        };
     }
 
     /** A player-facts seam that answers with exactly what the test seeded, for every player. */
