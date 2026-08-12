@@ -22,7 +22,8 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The five custom-item icon providers (ItemsAdder, Oraxen, Nexo, MMOItems, ExecutableItems) in the only states a
+ * The six custom-item icon providers (ItemsAdder, Oraxen, Nexo, CraftEngine, MMOItems, ExecutableItems) in the only
+ * states a
  * test without those SDKs on the classpath can reach. Each is built purely by reflection behind a plugin-present guard, so the proved
  * contract is the load-safe one, exactly as the currency reflection providers prove:
  *
@@ -64,6 +65,7 @@ class CustomItemIconProvidersTest {
         assertAbsentIsSilentEmpty(log -> new ItemsAdderIconProvider(server, log), "itemsadder:ruby_sword");
         assertAbsentIsSilentEmpty(log -> new OraxenIconProvider(server, log), "oraxen:ruby_sword");
         assertAbsentIsSilentEmpty(log -> new NexoIconProvider(server, log), "nexo:ruby_sword");
+        assertAbsentIsSilentEmpty(log -> new CraftEngineIconProvider(server, log), "craftengine:default:ruby_sword");
         assertAbsentIsSilentEmpty(log -> new MMOItemsIconProvider(server, log), "mmoitems:SWORD:ruby");
         assertAbsentIsSilentEmpty(log -> new ExecutableItemsIconProvider(server, log), "ei:ruby_sword");
     }
@@ -75,6 +77,8 @@ class CustomItemIconProvidersTest {
         assertThat(referencesPackage(ItemsAdderIconProvider.class, "dev.lone")).isFalse();
         assertThat(referencesPackage(OraxenIconProvider.class, "io.th0rgal")).isFalse();
         assertThat(referencesPackage(NexoIconProvider.class, "com.nexomc")).isFalse();
+        assertThat(referencesPackage(CraftEngineIconProvider.class, "net.momirealms"))
+                .isFalse();
         assertThat(referencesPackage(MMOItemsIconProvider.class, "net.Indyuce")).isFalse();
         assertThat(referencesPackage(ExecutableItemsIconProvider.class, "com.ssomar"))
                 .isFalse();
@@ -83,6 +87,8 @@ class CustomItemIconProvidersTest {
         assertThat(referencesPackage(ReflectiveItemProvider.class, "io.th0rgal"))
                 .isFalse();
         assertThat(referencesPackage(ReflectiveItemProvider.class, "com.nexomc"))
+                .isFalse();
+        assertThat(referencesPackage(ReflectiveItemProvider.class, "net.momirealms"))
                 .isFalse();
         assertThat(referencesPackage(ReflectiveItemProvider.class, "net.Indyuce"))
                 .isFalse();
@@ -97,10 +103,13 @@ class CustomItemIconProvidersTest {
         assertThat(itemsAdder.icon("DIAMOND", ctx)).isEmpty();
         assertThat(itemsAdder.icon("oraxen:ruby", ctx)).isEmpty();
         assertThat(itemsAdder.icon("nexo:ruby", ctx)).isEmpty();
+        assertThat(itemsAdder.icon("craftengine:ruby", ctx)).isEmpty();
         assertThat(itemsAdder.icon("mmoitems:SWORD:ruby", ctx)).isEmpty();
         assertThat(new OraxenIconProvider(server, SILENT).icon("itemsadder:ruby", ctx))
                 .isEmpty();
         assertThat(new NexoIconProvider(server, SILENT).icon("oraxen:ruby", ctx))
+                .isEmpty();
+        assertThat(new CraftEngineIconProvider(server, SILENT).icon("nexo:ruby", ctx))
                 .isEmpty();
         assertThat(new MMOItemsIconProvider(server, SILENT).icon("DIAMOND", ctx))
                 .isEmpty();
@@ -124,6 +133,7 @@ class CustomItemIconProvidersTest {
                     assertThat(chain.resolve("itemsadder:ruby", ctx)).isEmpty();
                     assertThat(chain.resolve("oraxen:ruby", ctx)).isEmpty();
                     assertThat(chain.resolve("nexo:ruby", ctx)).isEmpty();
+                    assertThat(chain.resolve("craftengine:default:ruby", ctx)).isEmpty();
                     assertThat(chain.resolve("mmoitems:SWORD:ruby", ctx)).isEmpty();
                     assertThat(chain.resolve("mmoitems:NOTYPE", ctx)).isEmpty();
                     assertThat(chain.resolve("ei:ruby", ctx)).isEmpty();
@@ -143,6 +153,8 @@ class CustomItemIconProvidersTest {
         assertReachesLookupAndWarnsOnce("ItemsAdder", log -> new ItemsAdderIconProvider(server, log), "itemsadder:x");
         assertReachesLookupAndWarnsOnce("Oraxen", log -> new OraxenIconProvider(server, log), "oraxen:x");
         assertReachesLookupAndWarnsOnce("Nexo", log -> new NexoIconProvider(server, log), "nexo:x");
+        assertReachesLookupAndWarnsOnce(
+                "CraftEngine", log -> new CraftEngineIconProvider(server, log), "craftengine:default:x");
         assertReachesLookupAndWarnsOnce("MMOItems", log -> new MMOItemsIconProvider(server, log), "mmoitems:SWORD:x");
         assertReachesLookupAndWarnsOnce("ExecutableItems", log -> new ExecutableItemsIconProvider(server, log), "ei:x");
     }

@@ -24,9 +24,9 @@ import org.jspecify.annotations.Nullable;
  * {@link #withHeadDatabase(HeadQuery)} additionally chains the HeadDatabase provider, built from the Phase-0
  * {@link HeadQuery} hook; bootstrap uses it so {@code hdb:<id>} resolves when HeadDatabase is installed and
  * degrades to a plain head (the material fallback) when it is not. {@link #full(Server, Logger, HeadQuery)} is the
- * composition root's full chain: those same providers plus the five custom-item integrations (ItemsAdder,
- * Oraxen, Nexo, MMOItems, ExecutableItems), each reached reflectively and degrading to the material fallback
- * when its plugin is absent.
+ * composition root's full chain: those same providers plus the six custom-item integrations (ItemsAdder,
+ * Oraxen, Nexo, CraftEngine, MMOItems, ExecutableItems), each reached reflectively and degrading to the material
+ * fallback when its plugin is absent.
  *
  * <p>The built-in chain is immutable, but the composition root may opt a chain into a live {@link
  * IconProviderRegistry} via {@link #withRuntime}: a plugin then registers its own {@link IconProvider} through the
@@ -93,9 +93,9 @@ public final class IconProviders {
     /**
      * The full chain the composition root wires: the raw-entry stack provider, the skull and equipment providers,
      * the two native special sources (a serialized {@code b64:} stack and the {@code water_bottle}/{@code light:<n>}
-     * keywords), then the five
-     * custom-item providers (ItemsAdder, Oraxen, Nexo, MMOItems, ExecutableItems), then the HeadDatabase
-     * provider. The prefixes are
+     * keywords), then the six
+     * custom-item providers (ItemsAdder, Oraxen, Nexo, CraftEngine, MMOItems, ExecutableItems), then the
+     * HeadDatabase provider. The prefixes are
      * disjoint, so order is a readability choice rather than a routing one — a spec reaches exactly the one provider
      * that owns its prefix. The two native sources need no external plugin; each custom-item provider reaches its
      * plugin reflectively behind a present-guard, so on a server without that plugin its prefix resolves to empty and
@@ -114,6 +114,7 @@ public final class IconProviders {
                 new ItemsAdderIconProvider(server, log),
                 new OraxenIconProvider(server, log),
                 new NexoIconProvider(server, log),
+                new CraftEngineIconProvider(server, log),
                 new MMOItemsIconProvider(server, log),
                 new ExecutableItemsIconProvider(server, log),
                 new HeadDatabaseIconProvider(headQuery)));

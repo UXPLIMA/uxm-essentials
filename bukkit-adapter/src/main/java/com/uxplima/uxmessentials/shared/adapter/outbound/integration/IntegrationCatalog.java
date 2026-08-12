@@ -94,6 +94,11 @@ public final class IntegrationCatalog {
             new Integration(
                     "Nexo", IntegrationFamily.ITEMS, "NexoIconProvider.java", "Nexo custom items as menu icons"),
             new Integration(
+                    "CraftEngine",
+                    IntegrationFamily.ITEMS,
+                    "CraftEngineIconProvider.java",
+                    "CraftEngine custom items as menu icons"),
+            new Integration(
                     "MMOItems", IntegrationFamily.ITEMS, "MMOItemsIconProvider.java", "MMOItems items as menu icons"),
             new Integration(
                     "ExecutableItems",

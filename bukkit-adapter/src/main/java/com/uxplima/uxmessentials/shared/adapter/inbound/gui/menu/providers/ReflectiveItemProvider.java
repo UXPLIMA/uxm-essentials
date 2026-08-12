@@ -14,9 +14,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Shared scaffolding for the icon providers that resolve a custom-item id through another plugin reached purely by
- * reflection — ItemsAdder, Oraxen, Nexo, MMOItems. A subclass names the plugin it integrates with and its {@code
- * material} prefix (e.g. {@code itemsadder:}) and implements one reflective primitive: turn the bare id into an
- * {@link ItemStack}. This base owns the load-safe contract around it. A spec it does not own (the prefix does not
+ * reflection: ItemsAdder, Oraxen, Nexo, CraftEngine, MMOItems. A subclass names the plugin it integrates with and
+ * its {@code material} prefix (e.g. {@code itemsadder:}) and implements one reflective primitive: turn the bare id
+ * into an {@link ItemStack}. This base owns the load-safe contract around it. A spec it does not own (the prefix does not
  * match) is left for the next provider; a matching spec is gated by the plugin-present guard, so a server without the
  * plugin resolves to empty — the renderer's plain-material fallback then renders the id as a material name. Any
  * {@link ReflectiveOperationException} (the API absent, or its shape shifted under a version bump) or unchecked

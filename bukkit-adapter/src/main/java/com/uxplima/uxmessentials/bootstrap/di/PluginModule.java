@@ -447,7 +447,7 @@ public final class PluginModule {
         // register its bindings and open a spec through them); Phase 3 reuses the same path for the rest.
         MenuBindings menuBindings = new MenuBindings();
         // The icon chain backs every menu item's material field: the skull and equipment providers, the four
-        // custom-item providers (ItemsAdder/Oraxen/Nexo/MMOItems, each reached reflectively behind a present-guard),
+        // custom-item providers (ItemsAdder/Oraxen/Nexo/CraftEngine/MMOItems, reached reflectively behind a guard),
         // and the HeadDatabase provider over the just-resolved hook. So skull:/itemsadder:/hdb: etc. resolve when
         // the backing plugin is installed and degrade to the plain material when it is not. The plain two-arg
         // ItemRenderer used by feature menus uses only the no-dependency default chain (skull + equipment); this

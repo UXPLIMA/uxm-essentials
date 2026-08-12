@@ -126,6 +126,9 @@ dependencies:
     Nexo:
       load: BEFORE
       required: false
+    CraftEngine:
+      load: BEFORE
+      required: false
     MMOItems:
       load: BEFORE
       required: false
