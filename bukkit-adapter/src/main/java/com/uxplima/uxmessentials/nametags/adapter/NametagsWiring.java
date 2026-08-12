@@ -14,7 +14,7 @@ import com.uxplima.uxmessentials.nametags.adapter.outbound.PacketNametagPresente
 import com.uxplima.uxmessentials.nametags.application.port.NametagVanish;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
-import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
+import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmlib.nametag.NametagPackets;
@@ -50,15 +50,14 @@ public final class NametagsWiring {
 
     /**
      * Build the nametags adapters from {@code plugin} and {@code ctx}, ready to register. The shared
-     * {@code nameVisibility} coordinator (built once in the bootstrap and also handed to the scoreboard wiring) hides
+     * {@code teams} coordinator (built once in the bootstrap and also handed to the scoreboard wiring) hides
      * the vanilla above-head name while a custom nametag is live.
      */
-    public static Wired wire(
-            Plugin plugin, ModuleContext ctx, NametagVanish vanish, NameVisibilityCoordinator nameVisibility) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, NametagVanish vanish, PlayerTeamCoordinator teams) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(vanish, "vanish");
-        Objects.requireNonNull(nameVisibility, "nameVisibility");
+        Objects.requireNonNull(teams, "teams");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         NametagSettings settings = new NametagSettings(dir, kernel.log());
@@ -89,7 +88,7 @@ public final class NametagsWiring {
                 animations,
                 vanish,
                 settings::refreshInterval,
-                nameVisibility,
+                teams,
                 settings::hideVanillaName);
         NametagRenderTask renderTask = new NametagRenderTask(
                 kernel.scheduler(), presenter, animations, kernel.log(), settings::refreshInterval, running::get);

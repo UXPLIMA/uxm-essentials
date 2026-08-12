@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PlayerStateSnapshot;
 import com.uxplima.uxmessentials.playerstate.domain.SpeedValue;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -60,7 +61,7 @@ class PlayerStateReconciliationTest {
         scheduler = new InlineScheduler();
         store = new InMemoryPlayerStateStore();
         reconciler = new BukkitStateReconciler(scheduler);
-        effects = new BukkitPlayerEffects(scheduler);
+        effects = new BukkitPlayerEffects(scheduler, new PlayerTeamCoordinator());
     }
 
     @AfterEach

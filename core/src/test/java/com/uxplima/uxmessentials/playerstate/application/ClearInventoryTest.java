@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
+import com.uxplima.uxmessentials.playerstate.domain.GlowColor;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
@@ -172,6 +173,9 @@ class ClearInventoryTest {
         public boolean toggleGlow(PlayerRef who) {
             return false;
         }
+
+        @Override
+        public void setGlow(PlayerRef who, GlowColor colour) {}
 
         @Override
         public void applyTime(PlayerRef who, PersonalTime time) {}

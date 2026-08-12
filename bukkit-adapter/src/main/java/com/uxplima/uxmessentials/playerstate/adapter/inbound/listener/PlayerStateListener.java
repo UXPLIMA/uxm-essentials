@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.playerstate.domain.PlayerStateSnapshot;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -29,6 +30,10 @@ import org.jspecify.annotations.NullMarked;
  *   <li><b>Quit</b> — drop the snapshot so a disconnected player holds no state.
  * </ul>
  *
+ * <p>Join and quit also clear the player's glow colour through the shared {@link PlayerTeamCoordinator}. The glowing
+ * flag itself does not survive a restart, but the team that colours it lives in the persisted main scoreboard, so
+ * without this a player who glowed before a restart would come back with a coloured name and no outline to explain it.
+ *
  * <p>The events fire on the player's region thread, but reconciliation is still routed through the
  * {@link StateReconciler}, which hops to the owning entity thread via the {@code Scheduler} port — the one
  * place Bukkit state is mutated, valid on Folia.
@@ -38,14 +43,17 @@ public final class PlayerStateListener implements Listener {
 
     private final PlayerStateStore store;
     private final StateReconciler reconciler;
+    private final PlayerTeamCoordinator teams;
 
-    public PlayerStateListener(PlayerStateStore store, StateReconciler reconciler) {
+    public PlayerStateListener(PlayerStateStore store, StateReconciler reconciler, PlayerTeamCoordinator teams) {
         this.store = Objects.requireNonNull(store, "store");
         this.reconciler = Objects.requireNonNull(reconciler, "reconciler");
+        this.teams = Objects.requireNonNull(teams, "teams");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
+        teams.clear(event.getPlayer());
         reapply(event.getPlayer());
     }
 
@@ -57,6 +65,7 @@ public final class PlayerStateListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         store.forget(BukkitRefs.toRef(event.getPlayer()));
+        teams.clear(event.getPlayer());
     }
 
     private void reapply(Player player) {

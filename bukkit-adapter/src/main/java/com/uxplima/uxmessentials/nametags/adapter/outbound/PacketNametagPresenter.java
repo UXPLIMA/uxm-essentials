@@ -27,8 +27,8 @@ import com.uxplima.uxmessentials.nametags.domain.NametagVisibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
-import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -76,7 +76,7 @@ public final class PacketNametagPresenter {
     private final AnimationRegistry animations;
     private final NametagVanish vanish;
     private final Supplier<Duration> refreshPeriod;
-    private final NameVisibilityCoordinator nameVisibility;
+    private final PlayerTeamCoordinator teams;
     private final BooleanSupplier hideVanillaName;
     private final Map<UUID, Tracked> live = new ConcurrentHashMap<>();
 
@@ -109,14 +109,14 @@ public final class PacketNametagPresenter {
             AnimationRegistry animations,
             NametagVanish vanish,
             Supplier<Duration> refreshPeriod,
-            NameVisibilityCoordinator nameVisibility,
+            PlayerTeamCoordinator teams,
             BooleanSupplier hideVanillaName) {
         this.config = Objects.requireNonNull(config, "config");
         this.libRenderer = Objects.requireNonNull(libRenderer, "libRenderer");
         this.animations = Objects.requireNonNull(animations, "animations");
         this.vanish = Objects.requireNonNull(vanish, "vanish");
         this.refreshPeriod = Objects.requireNonNull(refreshPeriod, "refreshPeriod");
-        this.nameVisibility = Objects.requireNonNull(nameVisibility, "nameVisibility");
+        this.teams = Objects.requireNonNull(teams, "teams");
         this.hideVanillaName = Objects.requireNonNull(hideVanillaName, "hideVanillaName");
     }
 
@@ -137,7 +137,7 @@ public final class PacketNametagPresenter {
             // No format applies (e.g. a reconnecting player who used to match one no longer does). Defensively restore
             // the vanilla name in case a stale hide-team entry somehow survived, so the player is never left nameless.
             // We are on the wearer's region thread, so touching the board is safe.
-            nameVisibility.show(wearer);
+            teams.show(wearer);
             return;
         }
         NametagFormat format = selected.get();
@@ -157,7 +157,7 @@ public final class PacketNametagPresenter {
         // visibility) so a viewer does not see both. Minor known interaction: a viewer just outside the packet
         // nametag's view-range sees no name at all rather than the vanilla one. We are on the wearer's region thread.
         if (hideVanillaName.getAsBoolean()) {
-            nameVisibility.hide(wearer);
+            teams.hide(wearer);
         }
     }
 
@@ -178,7 +178,7 @@ public final class PacketNametagPresenter {
             remove(wearer.getUniqueId());
             // No format applies any more, so the wearer should show their vanilla name again. We have the live player
             // on their region thread here, so restore it directly (remove(uuid) only clears the bookkeeping).
-            nameVisibility.show(wearer);
+            teams.show(wearer);
             return;
         }
         NametagFormat format = selected.get();
@@ -206,7 +206,7 @@ public final class PacketNametagPresenter {
         if (tracked != null) {
             tracked.handle().remove();
         }
-        nameVisibility.clear(uuid);
+        teams.clear(uuid);
     }
 
     /**
@@ -226,7 +226,7 @@ public final class PacketNametagPresenter {
         // over uptime. A world change goes through remove(uuid), which keeps the snapshot — the player is still online
         // and re-publishes on their next reconcile.
         positionSnapshots.remove(player.getUniqueId());
-        nameVisibility.clear(player);
+        teams.clear(player);
     }
 
     /** Remove every tracked nametag now — call on module stop so no nametag leaks. */
@@ -237,7 +237,7 @@ public final class PacketNametagPresenter {
             // they left, so resolving null is a no-op the clear in remove(uuid) covers.
             Player wearer = Bukkit.getPlayer(uuid);
             if (wearer != null) {
-                nameVisibility.show(wearer);
+                teams.show(wearer);
             }
             remove(uuid);
         }

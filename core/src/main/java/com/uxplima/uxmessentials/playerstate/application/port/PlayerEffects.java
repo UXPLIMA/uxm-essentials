@@ -5,6 +5,7 @@ import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
+import com.uxplima.uxmessentials.playerstate.domain.GlowColor;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
@@ -41,8 +42,18 @@ public interface PlayerEffects {
     /** Toggle a permanent night-vision effect on {@code who}; returns the resulting on/off state. */
     boolean toggleNightVision(PlayerRef who);
 
-    /** Toggle a permanent glowing outline on {@code who}; returns the resulting on/off state. */
+    /**
+     * Toggle a permanent glowing outline on {@code who}; returns the resulting on/off state. Turning the outline off
+     * also drops any colour {@link #setGlow} gave it, so a re-toggle starts from the uncoloured outline again.
+     */
     boolean toggleGlow(PlayerRef who);
+
+    /**
+     * Turn the glowing outline on for {@code who} and draw it in {@code colour} ({@link GlowColor#DEFAULT} leaves the
+     * uncoloured white outline). Unlike {@link #toggleGlow} this is idempotent: a player who already glows keeps
+     * glowing and only changes colour.
+     */
+    void setGlow(PlayerRef who, GlowColor colour);
 
     /** Apply {@code who}'s personal client-side time, or reset it when {@code time.reset()}. */
     void applyTime(PlayerRef who, PersonalTime time);

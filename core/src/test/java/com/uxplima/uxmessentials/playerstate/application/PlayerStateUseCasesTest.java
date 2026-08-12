@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
+import com.uxplima.uxmessentials.playerstate.domain.GlowColor;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
@@ -180,6 +181,53 @@ class PlayerStateUseCasesTest {
 
         assertThat(glow.toggle(alice)).isTrue();
         assertThat(glow.toggle(alice)).isFalse();
+    }
+
+    @Test
+    void namingAColourTurnsTheOutlineOnAndKeepsItOnWhenRepeated() {
+        ToggleGlow glow = new ToggleGlow(effects, notifier);
+
+        glow.colourFor(alice, alice, GlowColor.RED);
+        glow.colourFor(alice, alice, GlowColor.AQUA);
+
+        // Colouring is not a toggle: a second call only re-colours, so the outline never blinks off mid-choice.
+        assertThat(effects.glowing).containsEntry(alice.uuid(), Boolean.TRUE);
+        assertThat(effects.glowColours).containsEntry(alice.uuid(), GlowColor.AQUA);
+    }
+
+    @Test
+    void glowingSomebodyElseConfirmsToTheActorAndTellsTheSubject() {
+        CapturingSink sink = new CapturingSink();
+        ToggleGlow glow = new ToggleGlow(effects, new Notifier(new KeyMessages(), sink));
+
+        glow.toggleFor(alice, bob);
+
+        assertThat(sink.delivered)
+                .containsExactly(PlayerstateMessageKey.GLOW_ON_OTHER.key(), PlayerstateMessageKey.GLOW_ON.key());
+    }
+
+    @Test
+    void colouringSomebodyElseConfirmsToBothSides() {
+        CapturingSink sink = new CapturingSink();
+        ToggleGlow glow = new ToggleGlow(effects, new Notifier(new KeyMessages(), sink));
+
+        glow.colourFor(alice, bob, GlowColor.GOLD);
+
+        assertThat(sink.delivered)
+                .containsExactly(PlayerstateMessageKey.GLOW_COLOR_OTHER.key(), PlayerstateMessageKey.GLOW_COLOR.key());
+        assertThat(effects.glowColours).containsEntry(bob.uuid(), GlowColor.GOLD);
+    }
+
+    @Test
+    void nightVisionOnSomebodyElseConfirmsToBothSides() {
+        CapturingSink sink = new CapturingSink();
+        ToggleNightVision nv = new ToggleNightVision(effects, new Notifier(new KeyMessages(), sink));
+
+        nv.toggleFor(alice, bob);
+
+        assertThat(sink.delivered)
+                .containsExactly(
+                        PlayerstateMessageKey.NIGHTVISION_ON_OTHER.key(), PlayerstateMessageKey.NIGHTVISION_ON.key());
     }
 
     @Test
@@ -422,6 +470,7 @@ class PlayerStateUseCasesTest {
         private final List<UUID> killed = new ArrayList<>();
         private final Map<UUID, Boolean> nightVision = new ConcurrentHashMap<>();
         private final Map<UUID, Boolean> glowing = new ConcurrentHashMap<>();
+        private final Map<UUID, GlowColor> glowColours = new ConcurrentHashMap<>();
         private final Map<UUID, PersonalTime> appliedTime = new ConcurrentHashMap<>();
         private final Map<UUID, PersonalWeather> appliedWeather = new ConcurrentHashMap<>();
         private final Map<UUID, Integer> currentExp = new ConcurrentHashMap<>();
@@ -468,6 +517,12 @@ class PlayerStateUseCasesTest {
         @Override
         public boolean toggleGlow(PlayerRef who) {
             return glowing.merge(who.uuid(), Boolean.TRUE, (old, ignored) -> !old);
+        }
+
+        @Override
+        public void setGlow(PlayerRef who, GlowColor colour) {
+            glowing.put(who.uuid(), Boolean.TRUE);
+            glowColours.put(who.uuid(), colour);
         }
 
         @Override

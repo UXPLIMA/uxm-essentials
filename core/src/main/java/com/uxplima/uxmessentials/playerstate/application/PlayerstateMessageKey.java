@@ -89,10 +89,17 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /nightvision
     NIGHTVISION_ON("playerstate.nightvision.on"),
     NIGHTVISION_OFF("playerstate.nightvision.off"),
+    NIGHTVISION_ON_OTHER("playerstate.nightvision.on-other"),
+    NIGHTVISION_OFF_OTHER("playerstate.nightvision.off-other"),
 
     // /glow
     GLOW_ON("playerstate.glow.on"),
     GLOW_OFF("playerstate.glow.off"),
+    GLOW_ON_OTHER("playerstate.glow.on-other"),
+    GLOW_OFF_OTHER("playerstate.glow.off-other"),
+    GLOW_COLOR("playerstate.glow.color"),
+    GLOW_COLOR_OTHER("playerstate.glow.color-other"),
+    GLOW_COLOR_INVALID("playerstate.glow.color-invalid"),
 
     // /ptime
     PTIME_SET("playerstate.ptime.set"),

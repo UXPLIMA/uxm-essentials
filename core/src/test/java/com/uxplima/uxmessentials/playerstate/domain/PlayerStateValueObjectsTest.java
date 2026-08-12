@@ -71,4 +71,19 @@ class PlayerStateValueObjectsTest {
         assertThat(PersonalWeather.parse("reset")).contains(PersonalWeather.RESET);
         assertThat(PersonalWeather.parse("snow")).isEmpty();
     }
+
+    @Test
+    void glowColourParsesItsIdsCaseInsensitively() {
+        assertThat(GlowColor.fromId("red")).contains(GlowColor.RED);
+        assertThat(GlowColor.fromId("DARK_AQUA")).contains(GlowColor.DARK_AQUA);
+        assertThat(GlowColor.fromId(" light_purple ")).contains(GlowColor.LIGHT_PURPLE);
+        assertThat(GlowColor.fromId("turquoise")).isEmpty();
+        assertThat(GlowColor.fromId("")).isEmpty();
+    }
+
+    @Test
+    void glowColourIdIsTheLowercasedName() {
+        assertThat(GlowColor.DARK_PURPLE.id()).isEqualTo("dark_purple");
+        assertThat(GlowColor.DEFAULT.id()).isEqualTo("default");
+    }
 }

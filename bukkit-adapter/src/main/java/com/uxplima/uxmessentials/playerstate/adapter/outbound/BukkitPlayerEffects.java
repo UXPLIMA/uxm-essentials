@@ -17,9 +17,11 @@ import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
+import com.uxplima.uxmessentials.playerstate.domain.GlowColor;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
+import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -33,6 +35,10 @@ import org.jspecify.annotations.NullMarked;
  * <p>{@link #toggleNightVision} and {@link #toggleGlow} report the resulting on/off state synchronously off the
  * snapshot the call captures so the use case can render the right confirmation, while the effect mutation itself
  * is hopped to the entity thread.
+ *
+ * <p>The outline's colour is not an entity property: vanilla draws it in the colour of the player's scoreboard team, so
+ * {@link #setGlow} hands the colour to the shared {@link PlayerTeamCoordinator}, which owns team membership for the
+ * nametags and scoreboard contexts too.
  */
 @NullMarked
 public final class BukkitPlayerEffects implements PlayerEffects {
@@ -40,9 +46,11 @@ public final class BukkitPlayerEffects implements PlayerEffects {
     private static final long INFINITE_TICKS = -1L;
 
     private final Scheduler scheduler;
+    private final PlayerTeamCoordinator teams;
 
-    public BukkitPlayerEffects(Scheduler scheduler) {
+    public BukkitPlayerEffects(Scheduler scheduler, PlayerTeamCoordinator teams) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.teams = Objects.requireNonNull(teams, "teams");
     }
 
     @Override
@@ -100,8 +108,24 @@ public final class BukkitPlayerEffects implements PlayerEffects {
     public boolean toggleGlow(PlayerRef who) {
         Player snapshot = Bukkit.getPlayer(who.uuid());
         boolean willEnable = snapshot == null || !snapshot.isGlowing();
-        onEntity(who, player -> player.setGlowing(!player.isGlowing()));
+        onEntity(who, player -> {
+            boolean glowing = !player.isGlowing();
+            player.setGlowing(glowing);
+            // An outline that goes out takes its colour with it, so the next bare /glow starts from the plain white
+            // one rather than a colour the player set an hour ago and has forgotten about.
+            if (!glowing) {
+                teams.colour(player, GlowColor.DEFAULT);
+            }
+        });
         return willEnable;
+    }
+
+    @Override
+    public void setGlow(PlayerRef who, GlowColor colour) {
+        onEntity(who, player -> {
+            player.setGlowing(true);
+            teams.colour(player, colour);
+        });
     }
 
     @Override

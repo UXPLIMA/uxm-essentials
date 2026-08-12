@@ -20,11 +20,13 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /ice [player] [seconds]} ({@code uxmessentials.ice.use}): apply the powder-snow freezing effect to a
- * player for a number of seconds — the cosmetic opposite of {@code /burn}. The seconds argument is optional
- * (defaulting to {@link #DEFAULT_SECONDS}), bounded by Brigadier and clamped to a sane range in the domain
- * ({@link FreezeDuration}). The {@code [player]} target is gated by the shared
- * {@code uxmessentials.ice.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node; the {@code Freeze} use case owns the effect and feedback.
+ * {@code /ice [seconds] [player]} ({@code uxmessentials.ice.use}): apply the powder-snow freezing effect to a
+ * player for a number of seconds, the cosmetic opposite of {@code /burn}. The arguments read in the same order as
+ * {@code /air} and {@code /burn} (the amount first, the target after it), with the seconds staying optional here
+ * because a bare {@code /ice} on {@link #DEFAULT_SECONDS} is the common case. The value is bounded by Brigadier
+ * and clamped to a sane range in the domain ({@link FreezeDuration}). The {@code [player]} target is gated by the
+ * shared {@code uxmessentials.ice.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node;
+ * the {@code Freeze} use case owns the effect and feedback.
  */
 @NullMarked
 public final class IceCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -47,10 +49,9 @@ public final class IceCommand extends PlayerstateCommandSupport implements Comma
         return Commands.literal("ice")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::ice)
-                .then(PlayerTargets.players("player")
+                .then(Commands.argument("seconds", IntegerArgumentType.integer(0, FreezeDuration.MAX_SECONDS))
                         .executes(this::ice)
-                        .then(Commands.argument("seconds", IntegerArgumentType.integer(0, FreezeDuration.MAX_SECONDS))
-                                .executes(this::ice)))
+                        .then(PlayerTargets.players("player").executes(this::ice)))
                 .build();
     }
 

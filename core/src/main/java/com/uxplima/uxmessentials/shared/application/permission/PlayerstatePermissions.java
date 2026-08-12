@@ -62,8 +62,13 @@ final class PlayerstatePermissions {
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
+                        "uxmessentials.glow.color",
+                        "/glow <color> to pick the colour of the outline. Without it, /glow still toggles the plain one.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
                         "uxmessentials.glow.use",
-                        "/glow to toggle a glowing outline on yourself.",
+                        "/glow [color] [player] to toggle a glowing outline.",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
@@ -83,12 +88,12 @@ final class PlayerstatePermissions {
                         PLAYERSTATE),
                 PermissionSpec.of(
                         "uxmessentials.ice.use",
-                        "/ice [player] [seconds] to freeze a player (inverse of /burn).",
+                        "/ice [seconds] [player] to freeze a player (inverse of /burn).",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
                         "uxmessentials.nightvision.use",
-                        "/nightvision (/nv) to toggle a night-vision effect on yourself.",
+                        "/nightvision (/nv) [player] to toggle a night-vision effect.",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
@@ -277,6 +282,11 @@ final class PlayerstatePermissions {
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
+                        "uxmessentials.glow.others",
+                        "/glow on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
                         "uxmessentials.god.others",
                         "/god on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
                         PermissionDefault.OP,
@@ -299,6 +309,11 @@ final class PlayerstatePermissions {
                 PermissionSpec.of(
                         "uxmessentials.invsee.others",
                         "/invsee to open another player inventory. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.nightvision.others",
+                        "/nightvision on another player. Granted on its own, or by the cross-cutting uxmessentials.playerstate.others.",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(

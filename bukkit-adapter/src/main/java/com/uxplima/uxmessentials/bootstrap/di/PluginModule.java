@@ -232,7 +232,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
-import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
@@ -260,6 +259,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
+import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
@@ -2081,7 +2081,7 @@ public final class PluginModule {
                 ctx.kernel().log());
         mirrorWindow.register(menuBindings);
         PlayerstateWiring.Wired wired =
-                PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus, mirrorWindow);
+                PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus, mirrorWindow, links.teams);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -2665,13 +2665,13 @@ public final class PluginModule {
             Menus menus) {
         // scoreboard persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the sidebar /
         // tablist content is config-authored under modules/scoreboard/config.conf. Its one cross-context handle is the
-        // shared NameVisibilityCoordinator: the SidebarManager re-applies the vanilla-name-hide team after every board
+        // shared PlayerTeamCoordinator: the SidebarManager re-applies the vanilla-name-hide team after every board
         // switch through it (the setScoreboard team-registry reset would otherwise drop it), so a nametag wearer keeps
         // their name hidden across board switches. The renderer dogfoods uxmlib-hud's SidebarManager; the render timer
         // on the Scheduler port is stopped and every active board torn down on disable. The settings panel consumes
         // the SP0 GUI framework (a GuiText over the shared catalog, the data-folder layout loader) and registers its
         // /uxmess gui hub entry; /scoreboard gui opens the same single-toggle panel, gated on the GUI node.
-        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.nameVisibility, guiLayouts, menus);
+        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.teams, guiLayouts, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The scoreboard PAPI seam reads the same PDC-backed "hidden" bit the /scoreboard toggle flips, so the
@@ -2733,7 +2733,7 @@ public final class PluginModule {
             JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // nametags persists nothing: the per-wearer formats are config-authored under modules/nametags/config.conf. It
         // soft-couples to presence (vanish-aware viewer culling through Bukkit's canSee graph, degrading to "everyone
-        // can see everyone" with presence off). Its one cross-context handle is the shared NameVisibilityCoordinator:
+        // can see everyone" with presence off). Its one cross-context handle is the shared PlayerTeamCoordinator:
         // the presenter hides a wearer's vanilla above-head name through it while the custom nametag is live (and the
         // scoreboard SidebarManager re-applies that hide-team after every board switch through the same instance). The
         // nametag is always-on (no per-player toggle) so it publishes no command. Rendering goes through uxmLib's
@@ -2748,7 +2748,7 @@ public final class PluginModule {
                 ? com.uxplima.uxmessentials.nametags.application.port.NametagVanish.ALWAYS_VISIBLE
                 : new com.uxplima.uxmessentials.nametags.adapter.outbound.AuthorityNametagVanish(
                         vanishStore, java.util.Objects.requireNonNull(links.vanishLevelResolver));
-        NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx, vanish, links.nameVisibility);
+        NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx, vanish, links.teams);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The one published verb: the reconcile pass for a single wearer, which re-selects the format before it
@@ -3058,7 +3058,7 @@ public final class PluginModule {
         // presenter hides a wearer's vanilla name through it, the scoreboard SidebarManager re-applies the hide-team
         // after every board switch through it. Inert until a nametags hide call marks a player, so it costs nothing
         // when either module is off.
-        private final NameVisibilityCoordinator nameVisibility = new NameVisibilityCoordinator();
+        private final PlayerTeamCoordinator teams = new PlayerTeamCoordinator();
     }
 
     /**

@@ -69,6 +69,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -97,20 +98,22 @@ public final class PlayerstateWiring {
             PlaytimeRepository playtimeRepository,
             GuiLayouts guiLayouts,
             Menus menus,
-            MirrorWindow mirrorWindow) {
+            MirrorWindow mirrorWindow,
+            PlayerTeamCoordinator teams) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(playtimeRepository, "playtimeRepository");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(mirrorWindow, "mirrorWindow");
+        Objects.requireNonNull(teams, "teams");
         KernelPorts kernel = ctx.kernel();
         ConfigStore config = ctx.config();
         Clock clock = Clock.systemUTC();
 
         PlayerStateStore store = new InMemoryPlayerStateStore();
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
-        PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler());
+        PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler(), teams);
         InvseeView invseeView = new InvseeView(kernel.scheduler(), mirrorWindow);
         EnderseeView enderseeView = new EnderseeView(kernel.scheduler(), mirrorWindow);
         OfflinePlayerStorage offlineStorage = new NmsOfflinePlayerStorage(kernel.log());
@@ -147,7 +150,7 @@ public final class PlayerstateWiring {
         List<CommandRegistration> commands =
                 PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView);
         List<Listener> listeners = List.of(
-                new PlayerStateListener(store, reconciler),
+                new PlayerStateListener(store, reconciler, teams),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
                 new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
         return new Wired(

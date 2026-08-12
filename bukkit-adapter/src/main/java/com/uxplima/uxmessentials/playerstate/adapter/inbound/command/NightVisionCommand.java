@@ -12,13 +12,16 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /nightvision} (alias {@code /nv}, {@code uxmessentials.nightvision.use}): toggle a permanent
- * night-vision effect on yourself. Self-only. The {@code ToggleNightVision} use case owns the effect mutation
- * and the on/off confirmation.
+ * {@code /nightvision [player]} (alias {@code /nv}, {@code uxmessentials.nightvision.use}): toggle a permanent
+ * night-vision effect. The {@code [player]} target is gated by the shared {@code uxmessentials.nightvision.others}
+ * (or the cross-cutting {@code uxmessentials.playerstate.others}) node; the {@code ToggleNightVision} use case owns
+ * the effect mutation and the on/off confirmation.
  */
 @NullMarked
 public final class NightVisionCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -29,11 +32,18 @@ public final class NightVisionCommand extends PlayerstateCommandSupport implemen
         super(services, messages);
     }
 
+    /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
+    @Override
+    String othersNode() {
+        return "uxmessentials.nightvision.others";
+    }
+
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("nightvision")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::toggle)
+                .then(PlayerTargets.players("player").executes(this::toggle))
                 .build();
     }
 
@@ -52,7 +62,13 @@ public final class NightVisionCommand extends PlayerstateCommandSupport implemen
         if (sender == null) {
             return 0;
         }
-        services.toggleNightVision().toggle(ref(sender));
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
+            return 0;
+        }
+        for (PlayerRef target : targets) {
+            services.toggleNightVision().toggleFor(ref(sender), target);
+        }
         return Command.SINGLE_SUCCESS;
     }
 }
