@@ -17,7 +17,7 @@ publishing {
             pom {
                 name.set("uxmessentials-${project.name}")
                 description.set("uxmEssentials developer API")
-                url.set("https://docs.uxplima.com/minecraft/uxmessentials/developer/overview/")
+                url.set("https://docs.uxplima.com/minecraft/plugins/uxmessentials/developer/overview/")
                 licenses {
                     license {
                         name.set("MIT")

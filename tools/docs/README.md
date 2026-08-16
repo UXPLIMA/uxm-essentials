@@ -9,7 +9,7 @@ python3 tools/docs/generate.py bukkit-adapter/build/docs/docs-data.json ../docs-
 ```
 
 `generate.py` only rewrites the text between `{/* generated:x */}` and `{/* /generated */}` in
-`content/minecraft/uxmessentials/modules/<module>.md`. Prose outside those markers is never touched, and a
+`content/minecraft/plugins/uxmessentials/modules/<module>.md`. Prose outside those markers is never touched, and a
 second run over an unchanged model produces no diff. The markers are MDX comments rather than HTML ones
 because the docs platform compiles every page as MDX, where `<!-- -->` is a parse error.
 

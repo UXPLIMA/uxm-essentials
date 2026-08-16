@@ -32,4 +32,4 @@ produces rather than at the released ones:
 ./gradlew showResolvedApi
 ```
 
-The full documentation lives at <https://docs.uxplima.com/minecraft/uxmessentials/developer/overview/>.
+The full documentation lives at <https://docs.uxplima.com/minecraft/plugins/uxmessentials/developer/overview/>.

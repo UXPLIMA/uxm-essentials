@@ -98,14 +98,14 @@ def rewrite(text, blocks):
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("data", type=Path, help="docs-data.json written by the docsExport task")
-    parser.add_argument("content", type=Path, help="content root holding minecraft/uxmessentials")
+    parser.add_argument("content", type=Path, help="content root holding minecraft/plugins/uxmessentials")
     parser.add_argument(
         "--require-all", action="store_true", help="fail when a registered module has no page yet"
     )
     args = parser.parse_args(argv)
 
     modules = json.loads(args.data.read_text(encoding="utf-8"))["modules"]
-    pages = args.content / "minecraft" / "uxmessentials" / "modules"
+    pages = args.content / "minecraft" / "plugins" / "uxmessentials" / "modules"
     written, missing = 0, []
     for module in modules:
         page = pages / f"{module['id']}.md"
