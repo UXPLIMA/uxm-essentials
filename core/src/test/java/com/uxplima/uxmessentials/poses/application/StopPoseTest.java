@@ -36,7 +36,6 @@ class StopPoseTest {
     private static final Position RETURN = new Position(WORLD, 11.0, 64.0, 21.0, 0f, 0f);
 
     private final PoseSessions sessions = new PoseSessions();
-    private final CrawlSessions crawlSessions = new CrawlSessions();
     private final RecordingSeatPort seats = new RecordingSeatPort();
     private final RecordingPosePort poses = new RecordingPosePort();
     private final RecordingSnores snores = new RecordingSnores();
@@ -47,8 +46,7 @@ class StopPoseTest {
     @Test
     void dismountsRemovesReturnsClearsAndFires() {
         seed("h1");
-        StopPose stopPose =
-                new StopPose(sessions, crawlSessions, seats, poses, snores, crawlView, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, crawlView, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isPresent();
 
@@ -62,8 +60,7 @@ class StopPoseTest {
     void clearsTheFreePoseRenderAndStopsSnoringOnEveryExit() {
         // A laying player carries a free-pose render and a snore; ending the pose must undo both, whatever the exit.
         sessions.start(new PoseSession(WHO, PoseType.LAY, RETURN, "h1", null, Instant.parse("2026-07-02T00:00:00Z")));
-        StopPose stopPose =
-                new StopPose(sessions, crawlSessions, seats, poses, snores, crawlView, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, crawlView, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isPresent();
 
@@ -78,8 +75,7 @@ class StopPoseTest {
         // A player-sit rides a carrier, not a seat entity, so stopping it dismounts the rider — no seat is removed.
         sessions.start(new PoseSession(
                 WHO, PoseType.PLAYER_SIT, RETURN, "player-sit", CARRIER, Instant.parse("2026-07-02T00:00:00Z")));
-        StopPose stopPose =
-                new StopPose(sessions, crawlSessions, seats, poses, snores, crawlView, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, crawlView, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isPresent();
 
@@ -90,20 +86,16 @@ class StopPoseTest {
     }
 
     @Test
-    void restoresTheRealBlockForACrawlAndNeitherRemovesASeatNorReturns() {
-        // A crawl rides no seat entity — it holds a client-only fake block. Stopping it must restore the real block
-        // at the tracked head (so no phantom is left), clear the swimming pose, remove no seat, and never return.
-        Position head = Position.of(WORLD, 3, 65, 7);
-        crawlSessions.track(WHO, head);
+    void releasesTheCrawlAndNeitherRemovesASeatNorReturns() {
+        // A crawl rides no seat entity: it is held by the swimming pose and a client-only ceiling. Stopping it must
+        // release both, remove no seat, and never return the player to where the crawl began.
         sessions.start(
                 new PoseSession(WHO, PoseType.CRAWL, RETURN, "crawl", null, Instant.parse("2026-07-02T00:00:00Z")));
-        StopPose stopPose =
-                new StopPose(sessions, crawlSessions, seats, poses, snores, crawlView, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, crawlView, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isPresent();
 
-        assertThat(crawlView.restored).containsExactly(head);
-        assertThat(crawlSessions.current(WHO)).isEmpty();
+        assertThat(crawlView.released).containsExactly(WHO);
         assertThat(seats.removed).isEmpty();
         assertThat(seats.dismounted).isEmpty();
         assertThat(poses.cleared).containsExactly(WHO);
@@ -114,8 +106,7 @@ class StopPoseTest {
 
     @Test
     void isASafeNoOpWhenThePlayerIsNotPosing() {
-        StopPose stopPose =
-                new StopPose(sessions, crawlSessions, seats, poses, snores, crawlView, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, crawlView, poseReturn, events, true);
 
         assertThat(stopPose.stop(WHO)).isEmpty();
         assertThat(seats.removed).isEmpty();
@@ -126,8 +117,7 @@ class StopPoseTest {
     @Test
     void suppressesTheReturnWhenTheExitDisallowsIt() {
         seed("h1");
-        StopPose stopPose =
-                new StopPose(sessions, crawlSessions, seats, poses, snores, crawlView, poseReturn, events, true);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, crawlView, poseReturn, events, true);
 
         stopPose.stop(WHO, false);
 
@@ -139,8 +129,7 @@ class StopPoseTest {
     @Test
     void skipsTheReturnWhenReturnToStartIsOff() {
         seed("h1");
-        StopPose stopPose =
-                new StopPose(sessions, crawlSessions, seats, poses, snores, crawlView, poseReturn, events, false);
+        StopPose stopPose = new StopPose(sessions, seats, poses, snores, crawlView, poseReturn, events, false);
 
         stopPose.stop(WHO);
 
@@ -215,16 +204,16 @@ class StopPoseTest {
         }
     }
 
-    /** Records the head positions the crawl view was asked to restore. */
+    /** Records every release the crawl view was asked for. */
     private static final class RecordingCrawlView implements CrawlView {
-        private final List<Position> restored = new ArrayList<>();
+        private final List<PlayerRef> released = new ArrayList<>();
 
         @Override
-        public void showFakeBlockAbove(PlayerRef who, Position headBlock) {}
+        public void hold(PlayerRef who, Position feet) {}
 
         @Override
-        public void restoreRealBlock(PlayerRef who, Position headBlock) {
-            restored.add(headBlock);
+        public void release(PlayerRef who) {
+            released.add(who);
         }
     }
 

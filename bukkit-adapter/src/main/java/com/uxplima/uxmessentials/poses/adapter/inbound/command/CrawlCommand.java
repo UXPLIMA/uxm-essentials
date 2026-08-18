@@ -31,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /crawl} ({@code uxmessentials.crawl.use}): a toggle for the prone crawl. When the player is already
- * crawling a second {@code /crawl} ends it through {@link StopPose} (which restores the client-only fake block so no
+ * crawling a second {@code /crawl} ends it through {@link StopPose} (which releases the hold so no
  * phantom is left); otherwise it starts a crawl through {@link StartCrawl}, which gates the feature, the region, and
  * the one-session invariant. A player holding a different pose (a sit or a lie-down) is not crawling, so
  * {@code /crawl} routes to the start path and {@link StartCrawl} turns it away as already-posing rather than the
@@ -82,7 +82,7 @@ public final class CrawlCommand implements CommandRegistration {
         }
         PlayerRef who = BukkitRefs.toRef(player);
         if (isCrawling(who)) {
-            // Toggle off: end the crawl (StopPose restores the fake block), then confirm they stood up.
+            // Toggle off: end the crawl (StopPose releases the hold), then confirm they stood up.
             stopPose.stop(who);
             feedback.send(player, PosesMessageKey.POSES_CRAWL_STOPPED);
             return Command.SINGLE_SUCCESS;

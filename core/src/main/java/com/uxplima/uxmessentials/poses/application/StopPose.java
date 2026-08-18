@@ -25,8 +25,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * exit, unconditionally: a plain block-sit or a player-sit never applied either, so both calls are safe no-ops for
  * those sessions, which keeps this exit free of pose-type branching. What a session <em>rode</em> does branch,
  * though: a block/in-place sit rides a spawned seat entity (removed here), a player-sit rides a carrier (the rider
- * is dismounted), and a {@link PoseType#CRAWL} rides a client-only fake block (the real block is restored so no
- * phantom is left on the player's screen — the crawl equivalent of the seat ghost-discipline).
+ * is dismounted), and a {@link PoseType#CRAWL} rides the swimming pose plus a client-only ceiling, both released
+ * through the {@link CrawlView} so nothing is left holding the player down.
  *
  * <p>The {@code return-to-start} teleport is suppressed on the exits where it would be wrong: a quit (the player
  * is gone) and a teleport (returning them would fight the teleport that ended the pose) call
@@ -37,7 +37,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class StopPose {
 
     private final PoseSessions sessions;
-    private final CrawlSessions crawlSessions;
     private final SeatPort seats;
     private final PosePort poses;
     private final Snores snores;
@@ -48,7 +47,6 @@ public final class StopPose {
 
     public StopPose(
             PoseSessions sessions,
-            CrawlSessions crawlSessions,
             SeatPort seats,
             PosePort poses,
             Snores snores,
@@ -57,7 +55,6 @@ public final class StopPose {
             DomainEventPublisher events,
             boolean returnToStart) {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
-        this.crawlSessions = Objects.requireNonNull(crawlSessions, "crawlSessions");
         this.seats = Objects.requireNonNull(seats, "seats");
         this.poses = Objects.requireNonNull(poses, "poses");
         this.snores = Objects.requireNonNull(snores, "snores");
@@ -85,9 +82,9 @@ public final class StopPose {
         }
         PoseSession session = ended.get();
         if (session.type() == PoseType.CRAWL) {
-            // A crawl rides no seat entity — it holds a client-only fake block above the head. Restore the real
-            // block at the last fake position so no phantom block is left on the player's screen, whatever the exit.
-            crawlSessions.end(who).ifPresent(head -> crawlView.restoreRealBlock(who, head));
+            // A crawl rides no seat entity: it is held by the swimming pose and a client-only ceiling. Releasing
+            // both is what stands the player back up, whatever the exit.
+            crawlView.release(who);
         } else if (session.target() != null) {
             // A player-sit rides a carrier, not a seat entity: take the rider off the carrier directly.
             seats.dismount(who);

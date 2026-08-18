@@ -20,19 +20,18 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@link PosePort} over uxmLib's packet layer — the same {@link NpcPackets} metadata seam the {@code npc} module
- * uses to freeze a fake player in a body pose, aimed here at a <em>real</em> player. A {@code /lay}, {@code
- * /bellyflop}, or {@code /crawl} overrides the player's {@code DATA_POSE} to {@link NpcPose#SWIMMING} so their body
- * lies flat (crawl pairs this with a client-only fake block above the head, handled by the {@code CrawlView}); a
+ * uses to freeze a fake player in a body pose, aimed here at a <em>real</em> player. A {@code /lay} or {@code
+ * /bellyflop} overrides the player's {@code DATA_POSE} to {@link NpcPose#SWIMMING} so their body lies flat; a
  * {@code /spin} instead rotates the invisible seat the player rides (a real entity, so vanilla tracking carries the
  * rotation to viewers on its own) on a repeating scheduler pass.
  *
  * <p>Because the server never itself sends a swimming pose for a seated player, the lie-down is a client override:
  * the metadata packet is broadcast to everyone in the poser's world on the global region thread, where {@code
- * getOnlinePlayers()} is coherent under Folia, the {@code npc} renderer's discipline. A lie-down is sent to the
- * poser too (so they see their own pose in third person); a crawl is sent to <em>everyone but</em> the poser, whose
- * own client already holds the crawl through the fake block, since a self-sent pose there fights their movement
- * prediction and jitters them. The server re-syncs the real (standing) metadata on a mount, a new nearby viewer, or a
- * damage tick, so {@link #tick} re-asserts every held pose each pass rather than sending it once and losing it.
+ * getOnlinePlayers()} is coherent under Folia, the {@code npc} renderer's discipline. It is sent to the poser too,
+ * so they see their own pose in third person. The server re-syncs the real (standing) metadata on a mount, a new
+ * nearby viewer, or a damage tick, so {@link #tick} re-asserts every held pose each pass rather than sending it
+ * once and losing it. A crawl never reaches this port at all: it rides a real server-side swimming pose, which the
+ * server syncs itself.
  * {@link #clearPose} resends the {@link NpcPose#STANDING} default to undo it and drops the player from the spin loop;
  * a player who never held a free pose is a clean no-op.
  *
@@ -78,11 +77,8 @@ public final class BukkitPacketPosePort implements PosePort {
         UUID id = who.uuid();
         active.put(id, pose);
         switch (pose) {
-            // A lie-down is seen third-person by the poser too, so it goes to everyone; a crawl is the one pose the
-            // poser drives on their own client (the fake block holds them prone), so sending them the pose would fight
-            // their own movement prediction and jitter them - only the other viewers need it.
+            // A lie-down is seen third-person by the poser too, so it goes to everyone.
             case LAY, BELLYFLOP -> broadcastPose(id, NpcPose.SWIMMING, true);
-            case CRAWL -> broadcastPose(id, NpcPose.SWIMMING, false);
             case SPIN -> spinning.put(id, 0f);
             default ->
                 throw new IllegalArgumentException("BukkitPacketPosePort renders only the free poses, not " + pose);
@@ -120,14 +116,13 @@ public final class BukkitPacketPosePort implements PosePort {
         }
     }
 
-    // Re-send the body pose a lie-down or crawl overrides, so it holds against the server's re-sync. A spin overrides
-    // no pose (it rotates the seat), and a sit never reaches this port, so both fall through to nothing.
+    // Re-send the body pose a lie-down overrides, so it holds against the server's re-sync. A spin overrides no pose
+    // (it rotates the seat), and a sit never reaches this port, so both fall through to nothing.
     private void refreshPose(UUID id, PoseType pose) {
         switch (pose) {
             case LAY, BELLYFLOP -> sendPose(id, NpcPose.SWIMMING, true);
-            case CRAWL -> sendPose(id, NpcPose.SWIMMING, false);
             default -> {
-                // SPIN is advanced by the spin loop below; SIT/PLAYER_SIT never reach this port.
+                // SPIN is advanced by the spin loop below; SIT/PLAYER_SIT/CRAWL never reach this port.
             }
         }
     }
@@ -170,8 +165,8 @@ public final class BukkitPacketPosePort implements PosePort {
     }
 
     // Send the pose-metadata override to everyone sharing the poser's world. When includeSelf is false the poser's own
-    // client is skipped (a crawl, which the poser drives locally through the fake block); a lie-down includes them so
-    // they see their own pose in third person. Runs on the global region thread, where getOnlinePlayers() is coherent
+    // client is skipped; a lie-down includes them so they see their own pose in third person. Runs on the global
+    // region thread, where getOnlinePlayers() is coherent
     // under Folia; a client not tracking the poser's entity id simply ignores the packet, so no range check is needed.
     private void sendPose(UUID id, NpcPose pose, boolean includeSelf) {
         Player posed = server.getPlayer(id);

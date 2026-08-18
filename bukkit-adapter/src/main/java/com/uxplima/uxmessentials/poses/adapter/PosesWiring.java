@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitSnores;
 import com.uxplima.uxmessentials.poses.adapter.outbound.PdcPlayerSitPreferences;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlags;
 import com.uxplima.uxmessentials.poses.application.ClaimAwareRegionGate;
-import com.uxplima.uxmessentials.poses.application.CrawlSessions;
 import com.uxplima.uxmessentials.poses.application.PoseCooldown;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.PosesConfig;
@@ -112,7 +111,6 @@ public final class PosesWiring {
         KernelPorts kernel = ctx.kernel();
         PosesConfig config = PosesConfig.from(ctx.config());
         PoseSessions sessions = new PoseSessions();
-        CrawlSessions crawlSessions = new CrawlSessions();
         SittableBlocks sittableBlocks = new SittableBlocks(config.sittableMaterials());
         PoseCooldown poseCooldown = PoseCooldown.backedBy(kernel.cooldowns());
         PoseCooldownNotice cooldownNotice = new PoseCooldownNotice(poseCooldown, kernel.messages());
@@ -122,11 +120,12 @@ public final class PosesWiring {
         PoseRegionGate regionGate =
                 new ClaimAwareRegionGate(claims, regionFlags, config.respectClaims(), config.respectWorldguard());
         BukkitPoseReturn poseReturn = new BukkitPoseReturn(plugin, kernel.scheduler());
-        BukkitCrawlView crawlView = new BukkitCrawlView(plugin.getServer());
         PlayerSitPreferences playerSitPreferences = new PdcPlayerSitPreferences();
         // The free-pose render rides the same uxmLib packet stack the npc module uses for a fake player's body pose;
-        // here it overrides a real player's DATA_POSE to the swimming lie-down for /lay and /bellyflop.
+        // here it overrides a real player's DATA_POSE to the swimming lie-down for /lay and /bellyflop, and builds
+        // the client-only shulker a crawl uses as its ceiling.
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
+        BukkitCrawlView crawlView = new BukkitCrawlView(plugin.getServer(), packets);
         BukkitPacketPosePort posePort = new BukkitPacketPosePort(
                 plugin.getServer(), kernel.scheduler(), packets, kernel.log(), SPIN_INTERVAL_TICKS, SPIN_STEP_DEGREES);
         BukkitSnores snores = new BukkitSnores(
@@ -173,9 +172,7 @@ public final class PosesWiring {
                 poseCooldown);
         StartCrawl startCrawl = new StartCrawl(
                 sessions,
-                crawlSessions,
                 crawlView,
-                posePort,
                 regionGate,
                 kernel.events(),
                 Clock.systemUTC(),
@@ -183,15 +180,7 @@ public final class PosesWiring {
                 poseCooldown);
         TogglePlayerSit togglePlayerSit = new TogglePlayerSit(playerSitPreferences);
         StopPose stopPose = new StopPose(
-                sessions,
-                crawlSessions,
-                seats,
-                posePort,
-                snores,
-                crawlView,
-                poseReturn,
-                kernel.events(),
-                config.returnToStart());
+                sessions, seats, posePort, snores, crawlView, poseReturn, kernel.events(), config.returnToStart());
 
         // The personal settings/status panel rides the shared SP0 GUI framework, reading the live session registry
         // and flipping the player-sit opt-out through the same TogglePlayerSit the /poses toggle command uses. The
@@ -269,9 +258,9 @@ public final class PosesWiring {
                         config.maxDistance()),
                 new PlayerSitInteractListener(startPlayerSit, kernel.messages(), cooldownNotice),
                 new PoseCancelListener(stopPose, sessions),
-                new CrawlMoveListener(sessions, crawlSessions, crawlView),
+                new CrawlMoveListener(sessions, crawlView, stopPose),
                 new PoseCleanupListener(seats));
-        return new Wired(commands, listeners, seats, posePort, snores, sessions, crawlSessions, playerSitPreferences);
+        return new Wired(commands, listeners, seats, posePort, snores, sessions, playerSitPreferences);
     }
 
     /**
@@ -295,7 +284,7 @@ public final class PosesWiring {
      * Everything the poses module contributes once wired: the {@code /sit}, {@code /lay}, {@code /bellyflop},
      * {@code /spin}, {@code /crawl}, and {@code /poses} commands, the interact / cancel / crawl-move / cleanup
      * listeners, the seat port (swept on enable, drained on stop), the pose and snore ports (their repeating loops
-     * cancelled on stop), the crawl fake-block tracker, and the session registry (the placeholder seam's read
+     * cancelled on stop) and the session registry (the placeholder seam's read
      * source, cleared on stop).
      *
      * @param commands the Brigadier command registrations to publish
@@ -304,7 +293,6 @@ public final class PosesWiring {
      * @param posePort the free-pose render port, whose spin loop is cancelled on stop
      * @param snores the snore port, whose loop is cancelled on stop
      * @param sessions the session registry, exposed for the {@code poses_sitting}/{@code poses_pose} placeholder seam
-     * @param crawlSessions the crawl fake-block tracker, cleared on stop so no phantom-block state survives a reload
      * @param playerSitPreferences the player-sit opt-out store, exposed for the {@code poses_toggle} placeholder seam
      */
     public record Wired(
@@ -314,7 +302,6 @@ public final class PosesWiring {
             BukkitPacketPosePort posePort,
             BukkitSnores snores,
             PoseSessions sessions,
-            CrawlSessions crawlSessions,
             PlayerSitPreferences playerSitPreferences) {
 
         public Wired {
@@ -324,22 +311,20 @@ public final class PosesWiring {
             Objects.requireNonNull(posePort, "posePort");
             Objects.requireNonNull(snores, "snores");
             Objects.requireNonNull(sessions, "sessions");
-            Objects.requireNonNull(crawlSessions, "crawlSessions");
             Objects.requireNonNull(playerSitPreferences, "playerSitPreferences");
         }
 
         /**
          * Remove every live seat, cancel the spin and snore loops, and drop every session, so a disable or reload
-         * leaves no ghost, no running task, and no residual state. Crawl fake blocks are client-only and per-player,
-         * so a reload simply drops the tracker — any player still online keeps their pose ended by the module's own
-         * stop path, and an offline player has nothing on their screen to restore.
+         * leaves no ghost, no running task, and no residual state. A crawl's ceiling is client-only and per-player,
+         * so it needs no draining here: a player still online has their pose ended by the module's own stop path,
+         * which removes it, and an offline player's client dropped it with the connection.
          */
         public void stop() {
             seats.removeAll();
             posePort.shutdown();
             snores.shutdown();
             sessions.clear();
-            crawlSessions.clear();
         }
     }
 }

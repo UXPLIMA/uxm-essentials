@@ -449,6 +449,11 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object shulkerAttachFace(int entityId, String face) {
+            return new Object();
+        }
+
+        @Override
         public Object pandaGene(int entityId, int gene) {
             return new Object();
         }

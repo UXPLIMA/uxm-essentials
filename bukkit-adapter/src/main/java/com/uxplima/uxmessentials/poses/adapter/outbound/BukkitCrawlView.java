@@ -1,91 +1,132 @@
 package com.uxplima.uxmessentials.poses.adapter.outbound;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
-import org.bukkit.Material;
 import org.bukkit.Server;
-import org.bukkit.World;
-import org.bukkit.block.Block;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 
 import com.uxplima.uxmessentials.poses.application.port.CrawlView;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.packet.npc.NpcPackets;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link CrawlView} over Paper's client-only block change — {@code player.sendBlockChange}, the classic
- * fake-block crawl trick. To hold a player crawling, an invisible {@link Material#BARRIER} is sent to <em>only</em>
- * that player's connection at the block their head would occupy when standing (a block above their feet); the
- * server never places a real block, so there is no server-side block update and no real suffocation. The client
- * sees a solid block where it would stand, so it stays in the low swimming pose the {@code BukkitPacketPosePort}
- * broadcasts.
+ * The {@link CrawlView} over Paper's own swimming pose plus a client-only shulker used as a ceiling.
  *
- * <p>Ghost-prevention lives in {@link #restoreRealBlock}: it resends the world's actual block data at the fake
- * position, so the client sees reality again. The crawl move-follow restores the block just vacated and shows a new
- * one at the new head each block, and every crawl exit restores the last fake block — so no phantom block is ever
- * left on a player's screen. Restoring a block the client already sees correctly is a harmless no-op, which keeps
- * the restore safe to send on every exit path.
+ * <p>The pose half is plain Bukkit: a <em>fixed</em> {@link Pose#SWIMMING} lays the player flat as a real
+ * server-side pose, so every onlooker and the crawler's own camera see the same thing and the hitbox shrinks the
+ * way vanilla swimming does. Fixed is what makes it stick: an unpinned pose is recomputed from the player's
+ * surroundings every tick, and a crawler is not in water, so the next tick would stand them straight back up.
  *
- * <p>The fake block is placed at the head block, not engulfing the crawling body: a crawling player is about
- * 0.6 blocks tall and occupies only the feet block, so the barrier a block above sits at the top boundary above
- * their eyes rather than inside the hitbox — the client renders no suffocation or darkness overlay. When a real
- * solid block already fills the head space the player is already in a one-block gap, so the fake block is simply
- * not sent there ({@link Block#isPassable()} is false); the swimming pose still carries the crawl look.
+ * <p>The ceiling half is the interesting one. What stops a crawling player from simply standing back up is a low
+ * roof, and the roof must exist for the client's own movement prediction, not just the server's. A fake block sent
+ * to that one client would do it, but a block is terrain: the third-person camera collides with it and pulls in,
+ * and the light around it changes, so the player sees an invisible box over their head. A shulker is the way out.
+ * It is the one mob a client treats as solid to walk into, so a shulker whose box sits half a block above the
+ * crawler's feet is a ceiling for movement and nothing at all for the camera or the light engine. It is spawned
+ * through packets to the crawler alone, so no other player, and no server-side entity list, ever knows about it.
  *
- * <p>Every call runs on the caller's thread — the {@code /crawl} command, the move listener, and {@code StopPose}
- * all invoke it on the player's own region thread, where the player's block column is owned — so a single-player
- * client packet and a block read at the player's own head need no scheduler hop. The player and world are resolved
- * from the refs; an offline player or unloaded world is a clean no-op.
+ * <p>The box is invisible, attached to {@code UP} (so its collision hangs over the position it was spawned at) and
+ * fully closed ({@code peek = 0}). {@link #hold} doubles as the follow call: a crawler walks around, so each move
+ * teleports the same box to the new spot rather than respawning it. {@link #release} removes it and clears the
+ * pose; a player who was never crawling simply has no box to remove, which makes the release safe on every exit.
+ *
+ * <p>The box index is keyed by player uuid and mutated only from that player's own region thread (the command, the
+ * move listener, and the exits all run there), so a plain {@link ConcurrentHashMap} of per-player records is the
+ * whole ownership model. An offline player is a clean no-op on both calls.
  */
 @NullMarked
 public final class BukkitCrawlView implements CrawlView {
 
+    /** The mob the ceiling is made of: the one type a client collides with but never renders as terrain. */
+    private static final String BOX_TYPE = "shulker";
+
+    /**
+     * How far above the crawler's feet the ceiling sits. A shulker's box is a block tall, so half a block of
+     * clearance leaves the crawler their prone height and puts the roof exactly where a standing head would go.
+     */
+    private static final double BOX_HEIGHT = 0.5;
+
     private final Server server;
-    // The invisible solid block the client believes it cannot stand into. Built once — never on the move hot path.
-    private final BlockData fakeBlock;
+    private final NpcPackets packets;
+    // The live ceiling per crawler. Written only from the crawler's own region thread; read on the same thread.
+    private final ConcurrentHashMap<UUID, Box> boxes = new ConcurrentHashMap<>();
 
-    public BukkitCrawlView(Server server) {
+    public BukkitCrawlView(Server server, NpcPackets packets) {
         this.server = Objects.requireNonNull(server, "server");
-        this.fakeBlock = Material.BARRIER.createBlockData();
+        this.packets = Objects.requireNonNull(packets, "packets");
     }
 
     @Override
-    public void showFakeBlockAbove(PlayerRef who, Position headBlock) {
+    public void hold(PlayerRef who, Position feet) {
         Objects.requireNonNull(who, "who");
-        Objects.requireNonNull(headBlock, "headBlock");
+        Objects.requireNonNull(feet, "feet");
         Player player = server.getPlayer(who.uuid());
-        Block block = blockAt(player, headBlock);
-        if (player == null || block == null || !block.isPassable()) {
-            // Offline/unloaded, or a real solid block already fills the head space (a one-block gap): no fake needed.
-            return;
-        }
-        player.sendBlockChange(block.getLocation(), fakeBlock);
-    }
-
-    @Override
-    public void restoreRealBlock(PlayerRef who, Position headBlock) {
-        Objects.requireNonNull(who, "who");
-        Objects.requireNonNull(headBlock, "headBlock");
-        Player player = server.getPlayer(who.uuid());
-        Block block = blockAt(player, headBlock);
-        if (player == null || block == null) {
-            return;
-        }
-        // Resend the world's true block data so the client drops any fake block it still shows at this position.
-        player.sendBlockChange(block.getLocation(), block.getBlockData());
-    }
-
-    private @Nullable Block blockAt(@Nullable Player player, Position headBlock) {
         if (player == null) {
-            return null;
+            return;
         }
-        World world = server.getWorld(headBlock.world().uid());
-        if (world == null) {
-            return null;
+        if (player.getPose() != Pose.SWIMMING) {
+            // Fixed, so the server stops recomputing the pose from the player's surroundings: a crawler is not in
+            // water, and without the pin the very next tick would put them back upright.
+            player.setPose(Pose.SWIMMING, true);
         }
-        return world.getBlockAt(headBlock.blockX(), headBlock.blockY(), headBlock.blockZ());
+        Box box = boxes.computeIfAbsent(who.uuid(), id -> new Box(packets.allocateEntityId(), UUID.randomUUID()));
+        double y = feet.y() + BOX_HEIGHT;
+        if (box.spawned) {
+            packets.send(player, packets.teleport(box.entityId, feet.x(), y, feet.z(), 0f, 0f));
+            return;
+        }
+        packets.send(
+                player,
+                packets.bundle(List.of(
+                        packets.spawnEntity(box.entityId, box.entityUuid, BOX_TYPE, feet.x(), y, feet.z(), 0f, 0f),
+                        packets.sharedFlags(box.entityId, false, false, true),
+                        packets.shulkerAttachFace(box.entityId, "up"),
+                        packets.shulkerPeek(box.entityId, 0))));
+        box.spawned = true;
+    }
+
+    @Override
+    public void release(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        Box box = boxes.remove(who.uuid());
+        Player player = server.getPlayer(who.uuid());
+        if (player == null) {
+            // Offline: the client is gone, so both the pose and the box died with the connection.
+            return;
+        }
+        // Unpin the pose and hand it back to the server, which recomputes it from the player's own state again.
+        player.setPose(Pose.STANDING, false);
+        if (box != null && box.spawned) {
+            packets.send(player, packets.remove(box.entityId));
+        }
+    }
+
+    /**
+     * One crawler's ceiling: the fake entity id and uuid it was spawned under, and whether the spawn has been sent
+     * yet. Owned by the crawler's own region thread, the only thread that reads or writes it.
+     */
+    private static final class Box {
+
+        private final int entityId;
+        private final UUID entityUuid;
+        private boolean spawned;
+
+        private Box(int entityId, UUID entityUuid) {
+            this.entityId = entityId;
+            this.entityUuid = entityUuid;
+        }
+    }
+
+    /** Whether {@code who} currently has a ceiling above them, for the tests that pin the spawn-once behaviour. */
+    public boolean isHolding(UUID who) {
+        @Nullable Box box = boxes.get(Objects.requireNonNull(who, "who"));
+        return box != null && box.spawned;
     }
 }

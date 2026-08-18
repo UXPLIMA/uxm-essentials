@@ -4,79 +4,71 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 
-import com.uxplima.uxmessentials.poses.application.CrawlSessions;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
+import com.uxplima.uxmessentials.poses.application.StopPose;
 import com.uxplima.uxmessentials.poses.application.port.CrawlView;
 import com.uxplima.uxmessentials.poses.domain.PoseSession;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Makes the crawl fake block follow the player as they walk. A crawl is not anchored on a seat — the player moves
- * around while prone — so as they cross into a new block the fake block that holds them crawling must move with
- * them: the block just left is restored to reality and a new fake block is shown above the new head. Both packets
- * go to the one player on their own region thread (the thread this event already fires on), so no scheduler hop is
- * needed.
+ * Keeps a crawl running while the crawler walks. A crawl is anchored on no seat, so the ceiling that stops their
+ * client standing back up has to travel with them: {@link CrawlView#hold} re-states it at each new position.
  *
- * <p>The handler is gated to real movement: a {@link PlayerMoveEvent} fires on every look and micro-step, so it
- * first rejects any move that does not cross a block boundary (a look-only or sub-block jitter carries the same
- * block coordinates), then ignores anyone who is not crawling. Only a genuine block change by a crawler reaches the
- * follow work, which keeps the listener cheap on the hot move path.
+ * <p>The handler runs on the player's own region thread, the thread the move event already fires on, so it needs no
+ * scheduler hop. It is gated to real movement first (a {@link PlayerMoveEvent} fires on every look and micro-step)
+ * and only then looks the session up, which keeps the hot move path cheap for the players who are not crawling.
+ *
+ * <p>Two environments end a crawl rather than follow it: water, where the swimming pose is the real thing and the
+ * ceiling would only get in the way, and flight, where a prone player is not crawling in any meaningful sense.
  */
 @NullMarked
 public final class CrawlMoveListener implements Listener {
 
     private final PoseSessions sessions;
-    private final CrawlSessions crawlSessions;
     private final CrawlView crawlView;
+    private final StopPose stopPose;
 
-    public CrawlMoveListener(PoseSessions sessions, CrawlSessions crawlSessions, CrawlView crawlView) {
+    public CrawlMoveListener(PoseSessions sessions, CrawlView crawlView, StopPose stopPose) {
         this.sessions = Objects.requireNonNull(sessions, "sessions");
-        this.crawlSessions = Objects.requireNonNull(crawlSessions, "crawlSessions");
         this.crawlView = Objects.requireNonNull(crawlView, "crawlView");
+        this.stopPose = Objects.requireNonNull(stopPose, "stopPose");
     }
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         Location from = event.getFrom();
         Location to = event.getTo();
-        if (sameBlock(from, to)) {
-            // A look-only turn or a sub-block jitter — no new head to fake, so skip before any lookup (hot path).
+        if (samePosition(from, to)) {
+            // A look-only turn: the ceiling has not moved, so skip before any lookup (this is the hot path).
             return;
         }
-        PlayerRef who = BukkitRefs.toRef(event.getPlayer());
-        Optional<PoseSession> session = sessions.current(who);
-        if (session.isEmpty() || session.get().type() != PoseType.CRAWL) {
+        Player player = event.getPlayer();
+        if (!isCrawling(player)) {
             return;
         }
-        follow(who, to);
+        PlayerRef who = BukkitRefs.toRef(player);
+        if (player.isInWater() || player.isFlying()) {
+            stopPose.stop(who);
+            return;
+        }
+        crawlView.hold(who, BukkitRefs.toPosition(to));
     }
 
-    /** Restore the block the crawler just left and fake a new one above their new head, tracking the new position. */
-    private void follow(PlayerRef who, Location to) {
-        Position feet = BukkitRefs.toPosition(to);
-        Position newHead = CrawlSessions.headBlockAbove(feet);
-        Optional<Position> oldHead = crawlSessions.current(who);
-        if (oldHead.isPresent() && oldHead.get().sameBlock(newHead)) {
-            // Moved within the same block column (only Y-into-the-same-cell rounding) — the head block is unchanged.
-            return;
-        }
-        oldHead.ifPresent(old -> crawlView.restoreRealBlock(who, old));
-        crawlView.showFakeBlockAbove(who, newHead);
-        crawlSessions.track(who, newHead);
+    private boolean isCrawling(Player player) {
+        Optional<PoseSession> session = sessions.current(BukkitRefs.toRef(player));
+        return session.isPresent() && session.get().type() == PoseType.CRAWL;
     }
 
-    /** Whether {@code from} and {@code to} resolve to the same block cell — a look-only or sub-block move. */
-    private static boolean sameBlock(Location from, Location to) {
-        return from.getBlockX() == to.getBlockX()
-                && from.getBlockY() == to.getBlockY()
-                && from.getBlockZ() == to.getBlockZ();
+    /** Whether {@code from} and {@code to} sit at the very same spot, which is every look-only move. */
+    private static boolean samePosition(Location from, Location to) {
+        return from.getX() == to.getX() && from.getY() == to.getY() && from.getZ() == to.getZ();
     }
 }

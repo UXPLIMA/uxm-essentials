@@ -25,8 +25,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Ends a pose on the exits a posing player can take: they quit, teleport away, die, change world, take damage,
  * dismount the seat, or start sneaking. {@link StopPose} cleans up whatever the pose rode on each — it removes the
- * seat entity for a sit and restores the real block for a crawl — so no ghost seat and no phantom block are left
- * behind. The quit, teleport, death, and world-change exits pass {@code allowReturn = false} (the player is leaving
+ * seat entity for a sit and releases the hold on a crawl, so nothing is left behind. The quit, teleport, death, and world-change exits pass {@code allowReturn = false} (the player is leaving
  * or already moving, so the {@code return-to-start} teleport would be wrong there); the others return the player
  * when the server is configured to. Every branch is guarded by the session registry so a non-posing player is
  * untouched.
@@ -39,8 +38,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>A crawl is the exception on one exit: a crawler is actively moving and may take damage without meaning to
  * stand up, so {@link #onDamage} leaves a crawl running while it still ends a sit, lay, or spin. Sneak does end a
- * crawl, matching every other pose. Teleport, death, world-change, and quit end a crawl too, restoring its fake
- * block first through {@code StopPose}, so no exit can strand a phantom block.
+ * crawl, matching every other pose. Teleport, death, world-change, and quit end a crawl too, releasing its hold
+ * through {@code StopPose}, so no exit can leave a player pinned prone.
  *
  * <p>A quit also ends the pose of anyone stacked <em>on</em> the leaver: when a player-sit carrier logs out, Bukkit
  * drops the rider as a passenger, but the rider's {@link PoseSession} would linger unless it is ended too. The quit
@@ -61,7 +60,7 @@ public final class PoseCancelListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         PlayerRef who = BukkitRefs.toRef(event.getPlayer());
-        // Always attempt cleanup on quit so a seat or fake block can never outlive the player; no return for a leaver.
+        // Always attempt cleanup on quit so no seat can outlive the player; no return for a leaver.
         stopPose.stop(who, false);
         // End the pose of anyone stacked on the leaver too, so no rider is left with a session once its carrier is
         // gone. Snapshot first, then stop each — stopping mutates the registry ridersOf reads.
@@ -77,15 +76,15 @@ public final class PoseCancelListener implements Listener {
 
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
-        // A crawler has no seat to be dismounted from on death (that path ends a sit), so end any pose here — the
-        // fake block is restored first through StopPose — and never return a corpse to where its pose began.
+        // A crawler has no seat to be dismounted from on death (that path ends a sit), so end any pose here and
+        // never return a corpse to where its pose began.
         endIfPosing(event.getEntity(), false);
     }
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
         // Backstop for the teleport exit: a cross-world move already fires a teleport, but a portal or plugin move
-        // that lands here still ends the pose so a crawl's fake block cannot linger in the world just left.
+        // that lands here still ends the pose, so no crawl is left held down in the world just left.
         endIfPosing(event.getPlayer(), false);
     }
 
