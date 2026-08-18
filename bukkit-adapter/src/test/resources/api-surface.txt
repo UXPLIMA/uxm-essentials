@@ -652,6 +652,13 @@ class com.uxplima.uxmessentials.api.bukkit.event.security.UxmVerificationPassEve
   <init>(UUID, String)
   HandlerList getHandlerList()
   HandlerList getHandlers()
+class com.uxplima.uxmessentials.api.bukkit.event.skin.UxmSkinChangeEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, String, String, boolean)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  String getSourceType()
+  String getSourceValue()
+  boolean isCleared()
 class com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffChatEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
   <init>(UUID, String, String)
   HandlerList getHandlerList()

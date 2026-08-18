@@ -55,6 +55,7 @@ scoreboard.visibility: hidden, player-id, player-name
 security.lockout: banned, lockout-seconds, player-id, player-name
 security.verification-fail: player-id, player-name, remaining-attempts
 security.verification-pass: player-id, player-name
+skin.change: cleared, player-id, player-name, source-type, source-value
 staff.chat: message, player-id, player-name
 staff.mode: entered, player-id, player-name
 teleport.back-location-capture: cause, location, player-id, player-name

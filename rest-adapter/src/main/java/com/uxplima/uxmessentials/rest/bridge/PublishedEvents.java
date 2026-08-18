@@ -60,6 +60,7 @@ import com.uxplima.uxmessentials.api.bukkit.event.scoreboard.UxmScoreboardVisibi
 import com.uxplima.uxmessentials.api.bukkit.event.security.UxmSecurityLockoutEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.security.UxmVerificationFailEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.security.UxmVerificationPassEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.skin.UxmSkinChangeEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffChatEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.staff.UxmStaffModeEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.teleport.UxmBackLocationCaptureEvent;
@@ -219,6 +220,7 @@ public final class PublishedEvents {
             UxmTradeCompleteEvent.class,
 
             // vanish
+            UxmSkinChangeEvent.class,
             UxmVanishToggleEvent.class,
 
             // vault

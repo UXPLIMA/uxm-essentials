@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceEventBrid
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RankEventBridges;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardEventBridges;
 import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityEventBridges;
+import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinEventBridges;
 import com.uxplima.uxmessentials.staff.adapter.outbound.api.StaffEventBridges;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportEventBridges;
 import com.uxplima.uxmessentials.trade.adapter.outbound.api.TradeEventBridges;
@@ -74,6 +75,7 @@ public final class EventBridges {
         InvRollbackEventBridges.register(registry);
         SecurityEventBridges.register(registry);
         VanishEventBridges.register(registry);
+        SkinEventBridges.register(registry);
     }
 
     /** Install every context's veto mappings into {@code registry}, in context order. */
