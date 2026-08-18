@@ -51,7 +51,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code /lay} is the sleeping pose. A sleeping body is laid out along the bed it sleeps in, so the copy is
  *       given a sleeping position and the viewer is sent a client-only bed at that spot. The spot is the bottom of
  *       the world, far under anyone's feet, where the bed can orient the body without ever being seen; the copy is
- *       then teleported back up to the poser, since the sleep field alone would have dragged it down to the bed.
+ *       then teleported back up to the poser, once as it spawns and twice more over the following ticks, because a
+ *       client that hears a body is asleep keeps dragging it to its bed for a moment afterwards.
  *   <li>{@code /bellyflop} is the swimming pose, which face-down is exactly a belly flop.
  *   <li>{@code /spin} is the riptide spin. The client keeps that animation turning by itself for as long as the
  *       flag is set, so the spin needs no per-tick rotation, only a body pitched over so it spins flat.
@@ -77,6 +78,14 @@ public final class BukkitPacketPosePort implements PosePort {
 
     /** The riptide spin turns around the body's own length, so the copy is pitched over to spin flat. */
     private static final float SPIN_PITCH = -90f;
+
+    /**
+     * When the sleeping body is put back where the poser lies. A client that learns an entity is asleep drags it
+     * to its bed, and it keeps doing so for a tick after the news arrives, so one correction inside the spawn
+     * bundle is not enough: without these two the body settles at the bed, which is the bottom of the world, and
+     * the poser appears to have simply vanished.
+     */
+    private static final List<Duration> LAY_SETTLE = List.of(Duration.ofMillis(50), Duration.ofMillis(100));
 
     /** Strips every slot the copy's real owner could be wearing, so an invisible player carries nothing visible. */
     private static final Map<EquipmentSlot, ItemStack> NOTHING_WORN = Map.of();
@@ -250,6 +259,28 @@ public final class BukkitPacketPosePort implements PosePort {
             shown.add(packets.bodyLook(copy.entityId, copy.yaw, SPIN_PITCH));
         }
         packets.send(viewer, packets.bundle(shown));
+        if (copy.pose == PoseType.LAY) {
+            UUID viewerId = viewer.getUniqueId();
+            for (Duration settle : LAY_SETTLE) {
+                scheduler.laterGlobal(settle, () -> liftOffTheBed(viewerId, copy));
+            }
+        }
+    }
+
+    /**
+     * Put a sleeping copy back where its poser lies, once the viewer's client has finished dragging it down to
+     * the bed. Skipped when the copy is already gone or the viewer no longer watches it, so a pose that ends
+     * within the tick or two this waits leaves nothing behind.
+     */
+    private void liftOffTheBed(UUID viewerId, Copy copy) {
+        if (!copy.viewers.contains(viewerId)) {
+            return;
+        }
+        Player viewer = server.getPlayer(viewerId);
+        if (viewer == null) {
+            return;
+        }
+        packets.send(viewer, packets.teleport(copy.entityId, copy.x, copy.y, copy.z, copy.yaw, 0f));
     }
 
     private void hideFrom(Player viewer, Copy copy, @Nullable Player owner) {

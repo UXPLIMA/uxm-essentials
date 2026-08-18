@@ -127,6 +127,16 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     }
 
     @Override
+    public void laterGlobal(Duration delay, Runnable task) {
+        Objects.requireNonNull(delay, "delay");
+        Objects.requireNonNull(task, "task");
+        // Ticks, floored to one: the global scheduler rejects a zero delay, and the next tick is the soonest
+        // anything can run anyway.
+        long ticks = Math.max(1L, delay.toMillis() / 50L);
+        Bukkit.getGlobalRegionScheduler().runDelayed(plugin, ignored -> task.run(), ticks);
+    }
+
+    @Override
     public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
         Objects.requireNonNull(task, "task");
         Objects.requireNonNull(initialDelay, "initialDelay");

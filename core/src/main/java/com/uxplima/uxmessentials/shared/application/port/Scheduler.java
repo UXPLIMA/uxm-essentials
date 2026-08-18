@@ -86,6 +86,19 @@ public interface Scheduler {
     void asyncAfter(Duration delay, Runnable task);
 
     /**
+     * Run {@code task} once on the global region thread after {@code delay}, which is how a caller states
+     * "do this a tick or two from now" without holding a repeating task open for it. A delay shorter than one
+     * tick still lands on the next tick, since a tick is the smallest step the server schedules in.
+     *
+     * <p>The default throws {@link UnsupportedOperationException} so a test stub that never defers anything can
+     * implement {@link Scheduler} without boilerplate, the same way {@link #repeatGlobal} does.
+     */
+    default void laterGlobal(Duration delay, Runnable task) {
+        throw new UnsupportedOperationException("laterGlobal is not implemented by this Scheduler stub; "
+                + "override it in the FoliaScheduler adapter or in tests that call it");
+    }
+
+    /**
      * Schedule {@code task} to run on the global region thread at a fixed rate: first after
      * {@code initialDelay}, then every {@code period}. The returned handle cancels the repeating
      * task when closed; callers must hold the handle and call {@link AutoCloseable#close()} on

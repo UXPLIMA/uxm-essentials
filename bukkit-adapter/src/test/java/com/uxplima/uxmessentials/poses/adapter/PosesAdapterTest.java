@@ -357,6 +357,20 @@ class PosesAdapterTest {
     }
 
     @Test
+    void theSleepingCopyIsPutBackOverTheBedAfterTheClientWouldHaveDraggedItDown() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+
+        // A client told a body is asleep drags it to its bed, and the bed is at the bottom of the world, so the
+        // copy has to be put back more than once: in the spawn bundle and again on the ticks that follow. One
+        // correction alone is what left the poser looking as though they had vanished.
+        verify(packets, atLeast(2)).teleport(anyInt(), eq(0.5), eq(64.1125), eq(0.5), anyFloat(), anyFloat());
+    }
+
+    @Test
     void aPlayerWhoWalksIntoRangeIsShownTheCopy() {
         PlayerMock poser = playerAt(0.5, 64, 0.5);
         PlayerRef who = BukkitRefs.toRef(poser);
@@ -367,8 +381,9 @@ class PosesAdapterTest {
         latecomer.teleport(new Location(world, 5, 64, 5));
         posePort.tick();
 
-        // Someone arriving after the pose began still sees it: the refresh pass hands them the copy.
-        verify(packets).send(eq(latecomer), any());
+        // Someone arriving after the pose began still sees it: the refresh pass hands them the copy (and, for a
+        // lie-down, the follow-up that puts the sleeping body back over its bed).
+        verify(packets, atLeast(1)).send(eq(latecomer), any());
     }
 
     @Test
@@ -772,6 +787,11 @@ class PosesAdapterTest {
 
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void laterGlobal(Duration delay, Runnable task) {
             task.run();
         }
 
