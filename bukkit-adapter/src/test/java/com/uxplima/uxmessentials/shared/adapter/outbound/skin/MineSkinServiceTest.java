@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.skin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,13 +15,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.uxplima.uxmessentials.npc.domain.NpcSkin;
-import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
-import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpResponseView;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -48,8 +46,8 @@ class MineSkinServiceTest {
     /** A v2 queue body that defers the texture to a job poll. */
     private static final String V2_QUEUED = "{\"job\":{\"id\":\"job-77\",\"status\":\"waiting\"}}";
 
-    private static final NpcSkin V1_SKIN = new NpcSkin("Z2VuZXJhdGVk", "genSig=");
-    private static final NpcSkin V2_SKIN = new NpcSkin("djJnZW4=", "v2Sig=");
+    private static final SignedSkin V1_SKIN = new SignedSkin(new SkinTexture("Z2VuZXJhdGVk", "genSig="), false);
+    private static final SignedSkin V2_SKIN = new SignedSkin(new SkinTexture("djJnZW4=", "v2Sig="), false);
 
     @Test
     void generatesASignedSkinFromAnImageUrlViaTheV2InlineResponse() {
@@ -57,7 +55,7 @@ class MineSkinServiceTest {
         seam.script(HttpResponseView.of(200, V2_GENERATED));
         MineSkinService service = newService(seam, null);
 
-        Optional<NpcSkin> skin = await(service.fetchFromUrl(IMAGE_URL));
+        Optional<SignedSkin> skin = await(service.fetchFromUrl(IMAGE_URL));
 
         assertThat(skin).contains(V2_SKIN);
         // The image URL is carried in the JSON POST body, and the v2 endpoint is hit.
@@ -213,7 +211,7 @@ class MineSkinServiceTest {
         seam.thrower = new IllegalStateException("boom");
         MineSkinService service = newService(seam, null);
 
-        CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl(IMAGE_URL);
+        CompletableFuture<Optional<SignedSkin>> future = service.fetchFromUrl(IMAGE_URL);
 
         assertThat(future).isCompleted();
         assertThat(future).isNotCompletedExceptionally();
@@ -231,7 +229,7 @@ class MineSkinServiceTest {
         seam.getThrower = new IllegalStateException("poll exploded");
         MineSkinService service = newService(seam, null);
 
-        CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl(IMAGE_URL);
+        CompletableFuture<Optional<SignedSkin>> future = service.fetchFromUrl(IMAGE_URL);
 
         assertThat(future).isCompleted();
         assertThat(future).isNotCompletedExceptionally();
@@ -246,7 +244,7 @@ class MineSkinServiceTest {
         seam.thrower = new IllegalStateException("must never be reached");
         MineSkinService service = newService(seam, null);
 
-        CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl("not a url");
+        CompletableFuture<Optional<SignedSkin>> future = service.fetchFromUrl("not a url");
 
         assertThat(future).isCompleted();
         assertThat(future.join()).isEmpty();
@@ -277,7 +275,7 @@ class MineSkinServiceTest {
         return new MineSkinService(new ImmediateScheduler(), new NoOpLogger(), seam, apiKey, Duration.ZERO);
     }
 
-    private static Optional<NpcSkin> await(CompletableFuture<Optional<NpcSkin>> future) {
+    private static Optional<SignedSkin> await(CompletableFuture<Optional<SignedSkin>> future) {
         assertThat(future).isCompleted();
         return future.join();
     }

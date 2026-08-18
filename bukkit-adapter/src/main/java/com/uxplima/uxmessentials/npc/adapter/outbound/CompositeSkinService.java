@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MineSkinService;
 import com.uxplima.uxmessentials.shared.application.port.SkinTextures;
 import org.jspecify.annotations.NullMarked;
 
@@ -36,6 +37,8 @@ public final class CompositeSkinService implements SkinService {
 
     @Override
     public CompletableFuture<Optional<NpcSkin>> fetchFromUrl(String imageUrl) {
-        return fromUrl.fetchFromUrl(Objects.requireNonNull(imageUrl, "imageUrl"));
+        return fromUrl.fetchFromUrl(Objects.requireNonNull(imageUrl, "imageUrl"))
+                .thenApply(generated -> generated.map(skin ->
+                        new NpcSkin(skin.texture().value(), skin.texture().signature(), skin.slim())));
     }
 }

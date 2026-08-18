@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.skin;
 
 import java.net.URI;
 import java.time.Duration;
@@ -8,8 +8,6 @@ import java.util.concurrent.CompletableFuture;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.uxplima.uxmessentials.npc.domain.NpcSkin;
-import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
@@ -75,8 +73,8 @@ public final class MineSkinService {
     private final Scheduler scheduler;
     private final Logger log;
     private final MineSkinV2 v2;
-    private final Cache<String, Optional<NpcSkin>> positive;
-    private final Cache<String, Optional<NpcSkin>> negative;
+    private final Cache<String, Optional<SignedSkin>> positive;
+    private final Cache<String, Optional<SignedSkin>> negative;
 
     /** Wires the v2 flow with the default {@link #DEFAULT_POLL_DELAY}; {@code apiKey} may be blank/null. */
     public MineSkinService(Scheduler scheduler, Logger log, HttpFetcher fetcher, @Nullable String apiKey) {
@@ -115,27 +113,27 @@ public final class MineSkinService {
      * Generate {@code imageUrl}'s signed skin off-thread, completing with the present skin or with
      * {@link Optional#empty()} for any miss. Never completes exceptionally; never blocks the calling thread.
      */
-    public CompletableFuture<Optional<NpcSkin>> fetchFromUrl(String imageUrl) {
+    public CompletableFuture<Optional<SignedSkin>> fetchFromUrl(String imageUrl) {
         Objects.requireNonNull(imageUrl, "imageUrl");
         String key = imageUrl.strip();
         if (key.isEmpty() || !isUsableImageUrl(key)) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
-        Optional<NpcSkin> hit = positive.getIfPresent(key);
+        Optional<SignedSkin> hit = positive.getIfPresent(key);
         if (hit != null) {
             return CompletableFuture.completedFuture(hit);
         }
-        Optional<NpcSkin> miss = negative.getIfPresent(key);
+        Optional<SignedSkin> miss = negative.getIfPresent(key);
         if (miss != null) {
             return CompletableFuture.completedFuture(miss);
         }
-        CompletableFuture<Optional<NpcSkin>> result = new CompletableFuture<>();
+        CompletableFuture<Optional<SignedSkin>> result = new CompletableFuture<>();
         // Guarantee the future always completes: a throw from the generate seam (the injected fetcher, gson, the
         // cache) must not escape the async stage and orphan the future, or the operator hangs on the "generating"
         // line forever. Any unexpected throw completes the future empty after logging.
         scheduler.async(() -> {
             try {
-                result.complete(load(key));
+                result.complete(load(key, null));
             } catch (RuntimeException unexpected) {
                 log.error("Unexpected failure generating MineSkin skin for image URL " + key, unexpected);
                 result.complete(Optional.empty());
@@ -150,14 +148,64 @@ public final class MineSkinService {
      * rate limit, a timeout, a textureless response, an exhausted poll — is cached only briefly so a transient
      * MineSkin outage does not block that URL for the full positive TTL, while still absorbing a burst of retries.
      */
-    private Optional<NpcSkin> load(String imageUrl) {
-        Optional<NpcSkin> skin = v2.generate(imageUrl);
+    private Optional<SignedSkin> load(String imageUrl, @Nullable String variant) {
+        Optional<SignedSkin> skin = v2.generate(imageUrl, variant);
+        String key = cacheKey(imageUrl, variant);
         if (skin.isPresent()) {
-            positive.put(imageUrl, skin);
+            positive.put(key, skin);
         } else {
-            negative.put(imageUrl, skin);
+            negative.put(key, skin);
         }
         return skin;
+    }
+
+    /**
+     * Generate {@code imageUrl}'s signed skin on the calling thread, asking for a body model.
+     *
+     * <p>The blocking twin of {@link #fetchFromUrl(String)}, for a caller that is already off a tick thread and
+     * wants the answer in hand rather than a future to chain (the {@code /skin} command, which has hopped to the
+     * async pool and has nothing else to do until the texture arrives). It shares the caches and the fail-soft
+     * contract: any miss is an empty result, never an exception.
+     *
+     * <p>A {@code data:} url is accepted as well as an http one, which is how a file on the server's own disk is
+     * uploaded: the MineSkin v2 generate endpoint documents its {@code url} field as taking a base64 data url.
+     */
+    public Optional<SignedSkin> generateNow(String imageUrl, @Nullable String variant) {
+        Objects.requireNonNull(imageUrl, "imageUrl");
+        String key = imageUrl.strip();
+        if (key.isEmpty() || !(isUsableImageUrl(key) || isDataUrl(key))) {
+            return Optional.empty();
+        }
+        String cacheKey = cacheKey(key, variant);
+        Optional<SignedSkin> hit = positive.getIfPresent(cacheKey);
+        if (hit != null) {
+            return hit;
+        }
+        Optional<SignedSkin> miss = negative.getIfPresent(cacheKey);
+        if (miss != null) {
+            return miss;
+        }
+        try {
+            return load(key, variant);
+        } catch (RuntimeException unexpected) {
+            log.error("Unexpected failure generating MineSkin skin for image URL " + summarise(key), unexpected);
+            return Optional.empty();
+        }
+    }
+
+    /** The cache key: the image plus the variant asked for, since the same image cuts two different skins. */
+    private static String cacheKey(String imageUrl, @Nullable String variant) {
+        return variant == null || variant.isBlank() ? imageUrl : variant + ":" + imageUrl;
+    }
+
+    /** Whether {@code spec} is a base64 data url, the form a file read off the server's disk is uploaded as. */
+    private static boolean isDataUrl(String spec) {
+        return spec.startsWith("data:image/");
+    }
+
+    /** A data url is thousands of characters long, so only its head belongs in a log line. */
+    private static String summarise(String imageUrl) {
+        return imageUrl.length() <= 96 ? imageUrl : imageUrl.substring(0, 96) + "...";
     }
 
     /**

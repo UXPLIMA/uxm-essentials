@@ -1,11 +1,11 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.skin;
 
 import java.util.Optional;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -29,8 +29,8 @@ final class MineSkinJson {
 
     private MineSkinJson() {}
 
-    /** The signed {@link NpcSkin} from a generate response, or empty when it carries no usable texture value. */
-    static Optional<NpcSkin> skin(String body) {
+    /** The signed {@link SignedSkin} from a generate response, or empty when it carries no usable texture value. */
+    static Optional<SignedSkin> skin(String body) {
         Optional<JsonObject> root = object(body);
         if (root.isEmpty()) {
             return Optional.empty();
@@ -92,14 +92,24 @@ final class MineSkinJson {
         return Optional.of(nested != null ? nested : texture);
     }
 
-    /** Build an {@link NpcSkin} from a texture object, or empty when its {@code value} is absent or blank. */
-    private static Optional<NpcSkin> fromTexture(JsonObject texture) {
+    /** Build an {@link SignedSkin} from a texture object, or empty when its {@code value} is absent or blank. */
+    private static Optional<SignedSkin> fromTexture(JsonObject texture) {
         String value = string(texture, "value");
         if (value == null || value.isBlank()) {
             return Optional.empty();
         }
         String signature = string(texture, "signature");
-        return Optional.of(new NpcSkin(value, (signature == null || signature.isBlank()) ? null : signature));
+        String signed = (signature == null || signature.isBlank()) ? null : signature;
+        return Optional.of(new SignedSkin(new SkinTexture(value, signed), slim(texture)));
+    }
+
+    /**
+     * Whether the generated texture is the slim (Alex) model. MineSkin reports the variant it settled on, so the
+     * answer comes from the response rather than from what was asked for; anything else reads as classic.
+     */
+    private static boolean slim(JsonObject texture) {
+        String variant = string(texture, "variant");
+        return "slim".equalsIgnoreCase(variant);
     }
 
     private static @Nullable JsonObject child(JsonObject parent, String name) {

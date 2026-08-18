@@ -1,10 +1,10 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.skin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
-import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,16 +20,16 @@ class MineSkinJsonTest {
     void extractsValueAndSignatureFromDataTextureShape() {
         String body = "{\"data\":{\"texture\":{\"value\":\"dGV4dA==\",\"signature\":\"sig=\"}}}";
 
-        Optional<NpcSkin> skin = MineSkinJson.skin(body);
+        Optional<SignedSkin> skin = MineSkinJson.skin(body);
 
-        assertThat(skin).contains(new NpcSkin("dGV4dA==", "sig="));
+        assertThat(skin).contains(new SignedSkin(new SkinTexture("dGV4dA==", "sig="), false));
     }
 
     @Test
     void extractsFromBareTextureShape() {
         String body = "{\"texture\":{\"value\":\"dGV4dA==\",\"signature\":\"sig=\"}}";
 
-        assertThat(MineSkinJson.skin(body)).contains(new NpcSkin("dGV4dA==", "sig="));
+        assertThat(MineSkinJson.skin(body)).contains(new SignedSkin(new SkinTexture("dGV4dA==", "sig="), false));
     }
 
     @Test
@@ -37,18 +37,18 @@ class MineSkinJsonTest {
         // The v2 queue response nests the strings one level deeper under texture.data.
         String body = "{\"texture\":{\"data\":{\"value\":\"dGV4dA==\",\"signature\":\"sig=\"}}}";
 
-        assertThat(MineSkinJson.skin(body)).contains(new NpcSkin("dGV4dA==", "sig="));
+        assertThat(MineSkinJson.skin(body)).contains(new SignedSkin(new SkinTexture("dGV4dA==", "sig="), false));
     }
 
     @Test
     void aValueWithNoSignatureYieldsAnUnsignedSkin() {
         String body = "{\"data\":{\"texture\":{\"value\":\"dGV4dA==\"}}}";
 
-        Optional<NpcSkin> skin = MineSkinJson.skin(body);
+        Optional<SignedSkin> skin = MineSkinJson.skin(body);
 
         assertThat(skin).isPresent();
-        assertThat(skin.orElseThrow().texture()).isEqualTo("dGV4dA==");
-        assertThat(skin.orElseThrow().signature()).isNull();
+        assertThat(skin.orElseThrow().value()).isEqualTo("dGV4dA==");
+        assertThat(skin.orElseThrow().texture().signature()).isNull();
     }
 
     @Test
@@ -57,7 +57,7 @@ class MineSkinJsonTest {
         // client reads (skinInfo.texture().data().value()).
         String body = "{\"skin\":{\"texture\":{\"data\":{\"value\":\"dGV4dA==\",\"signature\":\"sig=\"}}}}";
 
-        assertThat(MineSkinJson.skin(body)).contains(new NpcSkin("dGV4dA==", "sig="));
+        assertThat(MineSkinJson.skin(body)).contains(new SignedSkin(new SkinTexture("dGV4dA==", "sig="), false));
     }
 
     @Test
@@ -65,7 +65,7 @@ class MineSkinJsonTest {
         // A v1-style data.texture nesting wrapped under a v2 skin object — tolerated defensively.
         String body = "{\"skin\":{\"data\":{\"texture\":{\"value\":\"dGV4dA==\",\"signature\":\"sig=\"}}}}";
 
-        assertThat(MineSkinJson.skin(body)).contains(new NpcSkin("dGV4dA==", "sig="));
+        assertThat(MineSkinJson.skin(body)).contains(new SignedSkin(new SkinTexture("dGV4dA==", "sig="), false));
     }
 
     @Test

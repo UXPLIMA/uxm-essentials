@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.skin;
 
 import java.net.URI;
 import java.time.Duration;
@@ -8,9 +8,6 @@ import java.util.OptionalLong;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.uxplima.uxmessentials.npc.domain.NpcSkin;
-import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
-import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpResponseView;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -86,9 +83,18 @@ final class MineSkinV2 {
     }
 
     /** Generate {@code imageUrl}'s signed skin through the v2 flow, or empty for any miss. Never throws checked. */
-    Optional<NpcSkin> generate(String imageUrl) {
+    Optional<SignedSkin> generate(String imageUrl) {
+        return generate(imageUrl, null);
+    }
+
+    /**
+     * Generate {@code imageUrl}'s signed skin, asking for a body model. A {@code null} {@code variant} leaves the
+     * choice to MineSkin, which reads it off the image; {@code classic} or {@code slim} state it outright, which
+     * is what an uploaded image needs, since the uploader knows which arm they drew.
+     */
+    Optional<SignedSkin> generate(String imageUrl, @Nullable String variant) {
         for (int attempt = 0; attempt <= maxRateLimitRetries; attempt++) {
-            HttpResponseView response = fetcher.exchange(generateEndpoint, requestBody(imageUrl), apiKey);
+            HttpResponseView response = fetcher.exchange(generateEndpoint, requestBody(imageUrl, variant), apiKey);
             if (response.status() == HTTP_TOO_MANY_REQUESTS) {
                 if (attempt == maxRateLimitRetries || !backoff(response, imageUrl)) {
                     return Optional.empty();
@@ -101,14 +107,14 @@ final class MineSkinV2 {
     }
 
     /** Resolve a non-429 generate response: an inline texture, a queued job to poll, or a miss. */
-    private Optional<NpcSkin> fromGenerateResponse(HttpResponseView response, String imageUrl) {
+    private Optional<SignedSkin> fromGenerateResponse(HttpResponseView response, String imageUrl) {
         Optional<String> body = response.body();
         if (body.isEmpty()) {
             log.debug(
                     "MineSkin v2 generate for image URL {} returned no body (status {})", imageUrl, response.status());
             return Optional.empty();
         }
-        Optional<NpcSkin> inline = MineSkinJson.skin(body.get());
+        Optional<SignedSkin> inline = MineSkinJson.skin(body.get());
         if (inline.isPresent()) {
             return inline;
         }
@@ -121,7 +127,7 @@ final class MineSkinV2 {
     }
 
     /** Poll the queue for {@code jobId} a bounded number of times until the texture is ready, else a miss. */
-    private Optional<NpcSkin> poll(String jobId, String imageUrl) {
+    private Optional<SignedSkin> poll(String jobId, String imageUrl) {
         Optional<URI> endpoint = queueUri(jobId);
         if (endpoint.isEmpty()) {
             return Optional.empty();
@@ -131,7 +137,7 @@ final class MineSkinV2 {
                 return Optional.empty();
             }
             HttpResponseView response = fetcher.exchangeGet(endpoint.get(), apiKey);
-            Optional<NpcSkin> ready = response.body().flatMap(MineSkinJson::skin);
+            Optional<SignedSkin> ready = response.body().flatMap(MineSkinJson::skin);
             if (ready.isPresent()) {
                 return ready;
             }
@@ -179,10 +185,13 @@ final class MineSkinV2 {
      * may carry a quote, backslash, or control character — is escaped exactly as JSON requires and can never break
      * the body or inject a field, rather than relying on hand-rolled escaping.
      */
-    private String requestBody(String imageUrl) {
+    private String requestBody(String imageUrl, @Nullable String variant) {
         JsonObject body = new JsonObject();
         body.addProperty("url", imageUrl);
         body.addProperty("visibility", visibility);
+        if (variant != null && !variant.isBlank()) {
+            body.addProperty("variant", variant);
+        }
         return GSON.toJson(body);
     }
 

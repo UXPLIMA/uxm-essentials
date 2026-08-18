@@ -18,7 +18,6 @@ import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionList
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
 import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
-import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.RepositoryNpcPlaceholders;
@@ -85,6 +84,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.NpcPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MineSkinService;
 import com.uxplima.uxmessentials.shared.adapter.outbound.teleport.BukkitDirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
