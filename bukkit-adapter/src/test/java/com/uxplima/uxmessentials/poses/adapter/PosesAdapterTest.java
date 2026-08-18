@@ -3,8 +3,11 @@ package com.uxplima.uxmessentials.poses.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -147,7 +150,7 @@ class PosesAdapterTest {
         packets = mock(NpcPackets.class);
         // Hand back a distinct built packet so the pose-broadcast tests can verify which viewers it was sent to.
         when(packets.pose(anyInt(), any())).thenReturn(new Object());
-        posePort = new BukkitPacketPosePort(server, scheduler, packets, new NoopLogger(), 1, 30f);
+        posePort = new BukkitPacketPosePort(server, scheduler, packets, new NoopLogger(), 1);
         snores = new BukkitSnores(server, scheduler, new NoopLogger(), "minecraft:entity.fox.sleep", 0.5f, 1.0f, 20);
 
         PoseCooldownNotice cooldownNotice = new PoseCooldownNotice(PoseCooldown.unlimited(), new KeyMessages());
@@ -337,18 +340,35 @@ class PosesAdapterTest {
     }
 
     @Test
-    void layingReassertsTheSwimmingPoseOnEachTickSoAServerResyncCannotClobberIt() {
+    void layingSpawnsTheCopyOnceAndLaterPassesOnlyKeepItUp() {
         PlayerMock player = playerAt(0.5, 64, 0.5);
         PlayerRef who = BukkitRefs.toRef(player);
         Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
 
         startPose.start(who, PoseType.LAY, feet, feet.yaw());
-        // The initial anchor sends the lie-down pose once; each loop pass re-sends it so a mount or resync that reset
-        // the player to standing is corrected within a tick or two rather than leaving them looking merely seated.
         posePort.tick();
         posePort.tick();
 
-        verify(packets, times(3)).send(eq(player), any());
+        // The copy is spawned once for a viewer already watching; the later passes only re-state what the server
+        // undoes (the owner's stripped gear), rather than spawning a second body every half second.
+        verify(packets, times(1))
+                .spawnPlayer(anyInt(), any(), anyDouble(), anyDouble(), anyDouble(), anyFloat(), anyFloat());
+        verify(packets, atLeast(2)).equipment(eq(player.getEntityId()), any());
+    }
+
+    @Test
+    void aPlayerWhoWalksIntoRangeIsShownTheCopy() {
+        PlayerMock poser = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(poser);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(poser.getLocation(), "location"));
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+
+        PlayerMock latecomer = server.addPlayer("Latecomer");
+        latecomer.teleport(new Location(world, 5, 64, 5));
+        posePort.tick();
+
+        // Someone arriving after the pose began still sees it: the refresh pass hands them the copy.
+        verify(packets).send(eq(latecomer), any());
     }
 
     @Test
@@ -368,7 +388,7 @@ class PosesAdapterTest {
     }
 
     @Test
-    void spinningAdvancesTheSeatYawAcrossTicksAndStoppingCancelsIt() {
+    void spinningRendersACopyAndStoppingTakesItDown() {
         PlayerMock player = playerAt(0.5, 64, 0.5);
         PlayerRef who = BukkitRefs.toRef(player);
         Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
@@ -376,21 +396,18 @@ class PosesAdapterTest {
         startPose.start(who, PoseType.SPIN, feet, feet.yaw());
         ArmorStand seat = (ArmorStand) taggedSeats().get(0);
         assertThat(seat.getPassengers()).contains(player);
-        assertThat(posePort.isSpinning(player.getUniqueId())).isTrue();
+        // The spinner stays seated and invisible while their copy does the spinning for them.
+        assertThat(posePort.isRendering(player.getUniqueId())).isTrue();
+        assertThat(player.isInvisible()).isTrue();
 
-        posePort.tick();
-        float afterOne = Objects.requireNonNull(seat.getLocation(), "location").getYaw();
-        posePort.tick();
-        float afterTwo = Objects.requireNonNull(seat.getLocation(), "location").getYaw();
-        // The repeating pass turns the seat a little more each tick, so the yaw strictly advances.
-        assertThat(afterTwo).isGreaterThan(afterOne);
+        posePort.tick(); // a further pass keeps the copy up rather than doubling it
 
         stopPose.stop(who);
 
-        // Stopping cancels the spin (no lingering rotation) and removes the seat (no ghost).
-        assertThat(posePort.isSpinning(player.getUniqueId())).isFalse();
-        assertThat(taggedSeats()).isEmpty();
-        posePort.tick(); // a further pass is a harmless no-op — the player is no longer in the spin set
+        assertThat(posePort.isRendering(player.getUniqueId())).isFalse();
+        assertThat(player.isInvisible()).isFalse();
+        assertThat(taggedSeats()).isEmpty(); // no ghost seat left behind
+        posePort.tick(); // a further pass is a harmless no-op: the copy is gone
     }
 
     @Test

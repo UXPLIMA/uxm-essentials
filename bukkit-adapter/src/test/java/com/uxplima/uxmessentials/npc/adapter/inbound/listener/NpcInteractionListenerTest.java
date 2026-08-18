@@ -454,6 +454,21 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object spinAttack(int entityId, boolean spinning) {
+            return new Object();
+        }
+
+        @Override
+        public Object sleepingPosition(int entityId, int x, int y, int z) {
+            return new Object();
+        }
+
+        @Override
+        public Object noSleepingPosition(int entityId) {
+            return new Object();
+        }
+
+        @Override
         public Object pandaGene(int entityId, int gene) {
             return new Object();
         }

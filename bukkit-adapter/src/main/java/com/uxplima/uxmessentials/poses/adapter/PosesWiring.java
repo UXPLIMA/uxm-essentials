@@ -78,10 +78,12 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PosesWiring {
 
-    /** How often the spin loop turns the seat, and by how much each step, giving a smooth in-place rotation. */
-    private static final int SPIN_INTERVAL_TICKS = 2;
-
-    private static final float SPIN_STEP_DEGREES = 20f;
+    /**
+     * How often the pose render re-checks who can see a posing player and re-asserts what the server undoes. Half a
+     * second is quick enough that someone walking up sees the pose without a visible gap, and rare enough to stay
+     * free on a server where almost nobody is posing.
+     */
+    private static final int POSE_REFRESH_INTERVAL_TICKS = 10;
 
     /** The resource-pack-free snore: a soft fox-sleep sound at a low volume, replayed every few seconds. */
     private static final String SNORE_SOUND = "minecraft:entity.fox.sleep";
@@ -127,7 +129,7 @@ public final class PosesWiring {
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
         BukkitCrawlView crawlView = new BukkitCrawlView(plugin.getServer(), packets);
         BukkitPacketPosePort posePort = new BukkitPacketPosePort(
-                plugin.getServer(), kernel.scheduler(), packets, kernel.log(), SPIN_INTERVAL_TICKS, SPIN_STEP_DEGREES);
+                plugin.getServer(), kernel.scheduler(), packets, kernel.log(), POSE_REFRESH_INTERVAL_TICKS);
         BukkitSnores snores = new BukkitSnores(
                 plugin.getServer(),
                 kernel.scheduler(),
