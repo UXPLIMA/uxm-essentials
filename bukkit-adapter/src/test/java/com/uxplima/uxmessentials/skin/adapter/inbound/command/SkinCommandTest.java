@@ -25,7 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.SkinTextures;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -379,18 +379,30 @@ class SkinCommandTest {
         }
     }
 
-    /** A name index answering from a fixed map: nobody else exists. */
-    private static final class Names implements PlayerNameIndex {
+    /** A lookup answering from a fixed map: nobody else exists. */
+    private static final class Names implements PlayerLookup {
         private final Map<String, PlayerRef> known = new HashMap<>();
 
         @Override
-        public Optional<PlayerRef> byName(String name) {
+        public Optional<PlayerRef> findByName(String name) {
             return Optional.ofNullable(known.get(name));
         }
 
         @Override
-        public void record(UUID uuid, String name) {
-            known.put(name, new PlayerRef(uuid, name));
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return findByName(name);
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return known.values().stream()
+                    .filter(ref -> ref.uuid().equals(uuid))
+                    .findFirst();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return findByUuid(uuid).isPresent();
         }
     }
 

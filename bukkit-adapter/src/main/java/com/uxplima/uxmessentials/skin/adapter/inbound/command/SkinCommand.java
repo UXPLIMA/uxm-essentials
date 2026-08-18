@@ -23,7 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinSources;
@@ -76,7 +76,7 @@ public final class SkinCommand implements CommandRegistration {
     private final DropSkin dropSkin;
     private final DescribeSkin describeSkin;
     private final PurgeSkinCache purgeCache;
-    private final PlayerNameIndex names;
+    private final PlayerLookup names;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
 
@@ -87,7 +87,7 @@ public final class SkinCommand implements CommandRegistration {
             DropSkin dropSkin,
             DescribeSkin describeSkin,
             PurgeSkinCache purgeCache,
-            PlayerNameIndex names,
+            PlayerLookup names,
             Scheduler scheduler,
             Messages messages) {
         this.setSkin = Objects.requireNonNull(setSkin, "setSkin");
@@ -346,7 +346,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** The account known by {@code name}, or null after saying nobody here goes by it. */
     private @Nullable PlayerRef named(CommandSender sender, String name) {
-        Optional<PlayerRef> found = names.byName(name);
+        Optional<PlayerRef> found = names.findByName(name);
         if (found.isEmpty()) {
             feedback.send(sender, SkinMessageKey.SKIN_UNKNOWN_PLAYER, Map.of("player", name));
             return null;

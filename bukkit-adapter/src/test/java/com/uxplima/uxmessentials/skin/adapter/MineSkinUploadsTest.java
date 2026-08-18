@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
@@ -70,7 +71,7 @@ class MineSkinUploadsTest {
 
     @Test
     void aFileOutsideTheFolderIsRefusedWithoutReadingAnything(@TempDir Path folder) throws IOException {
-        Files.write(folder.getParent().resolve("secret.png"), new byte[] {9});
+        Files.write(Objects.requireNonNull(folder.getParent()).resolve("secret.png"), new byte[] {9});
         FakeSeam seam = new FakeSeam(HttpResponseView.of(200, GENERATED));
 
         assertThat(uploads(seam, folder).fromFile("../secret", SkinModel.CLASSIC))

@@ -281,6 +281,7 @@ import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
+import com.uxplima.uxmessentials.skin.adapter.SkinWiring;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
@@ -1294,7 +1295,30 @@ public final class PluginModule {
             wireRegions(plugin, ctx, resources, links, guiRegistry, menus, textInput, guiLayouts);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
+        } else if (module.id().equals(ModuleId.of("skin"))) {
+            wireSkin(plugin, ctx, persistence, resources);
         }
+    }
+
+    private static void wireSkin(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // skin builds its jOOQ repository over persistence.dsl() and registers the /skin command plus the pre-login
+        // listener that dresses a joining player before their entity exists (no respawn, no re-send, no flicker).
+        // Every lookup that leaves the server - a name at Mojang, an image at MineSkin, a Bedrock skin at the Geyser
+        // endpoint - runs on the async pool through the Scheduler port, and the login path waits on it only for the
+        // configured timeout, so a slow or missing service lets the player in undressed rather than costing them the
+        // login. Floodgate is soft: the xuid comes through the already-resolved BedrockDetector, so a Java-only server
+        // never names it. The listener stops dressing anybody through the Wired stop hook, so a disable or reload
+        // strands no lookup against a live connection; a disabled module wires none of this.
+        SkinWiring.Wired wired = SkinWiring.wire(
+                ctx,
+                persistence,
+                plugin.getServer(),
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE),
+                plugin.getDataFolder().toPath());
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired.stop());
     }
 
     private static void wireServerTweaks(
