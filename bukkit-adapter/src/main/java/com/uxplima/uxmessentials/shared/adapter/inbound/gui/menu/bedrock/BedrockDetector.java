@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Server;
@@ -22,7 +23,12 @@ import org.bukkit.Server;
 public interface BedrockDetector {
 
     /** The Java-only default: everyone is a Java player, and no Floodgate class is referenced. */
-    BedrockDetector NONE = player -> false;
+    BedrockDetector NONE = new BedrockDetector() {
+        @Override
+        public boolean isBedrock(UUID player) {
+            return false;
+        }
+    };
 
     /**
      * Whether {@code player} connected through Floodgate as a Bedrock player.
@@ -31,6 +37,17 @@ public interface BedrockDetector {
      * @return {@code true} only when a Floodgate-backed detector confirms it; always {@code false} for {@link #NONE}
      */
     boolean isBedrock(UUID player);
+
+    /**
+     * The Xbox id {@code player} connected under, when the backend knows it.
+     *
+     * <p>It is the key every Bedrock-side service is addressed by, the skin service among them, which is why it
+     * lives beside the detection rather than in a second probe of the same plugin. A Java player, a backend that
+     * cannot name one, or no backend at all all answer empty.
+     */
+    default Optional<String> xuid(UUID player) {
+        return Optional.empty();
+    }
 
     /**
      * Which plugin answers this detector's questions, for the one line the bootstrap logs on enable. Operators
