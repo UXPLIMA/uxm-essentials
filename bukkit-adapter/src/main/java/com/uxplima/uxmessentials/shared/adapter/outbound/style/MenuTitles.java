@@ -13,10 +13,15 @@ import org.jspecify.annotations.NullMarked;
  * competing with the icons under it. The vanilla client draws the title left-aligned from a fixed origin, so the
  * only way to centre it is to prepend spaces.
  *
- * <p>The maths is the client's own font metrics: the title is drawn in the default font, where a space is four
- * pixels wide and the usable label area of a generic chest is 176 pixels. Each character's width is looked up in
- * {@link FontWidths}, the remaining space is halved, and that many spaces are prepended. A title that is already
- * wider than the window gets no padding rather than a negative one.
+ * <p>The maths is the client's own layout: a chest window is 176 pixels wide and its label is drawn from an
+ * origin eight pixels in from the left edge, so the padding that centres a title is the free width either side of
+ * it less that origin. Each character's width is looked up in {@link FontWidths} and the padding is converted into
+ * four-pixel spaces, rounded to the nearest one, which leaves any title within two pixels of the middle. A title
+ * already wider than the window gets no padding rather than a negative one.
+ *
+ * <p>Forgetting the origin is what makes a whole menu look subtly wrong: it pushes every title eight pixels (two
+ * spaces) to the right, and because the rounding then lands differently for each length, some titles read as
+ * centred and others do not.
  *
  * <p>The styling is dropped here rather than trusted to every catalog entry: a title is flattened to its plain
  * text and handed back as one unstyled component, so a key that still carries a colour tag (or a value tag around
@@ -26,8 +31,11 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class MenuTitles {
 
-    /** The inner width of a generic chest's label area, in pixels of the default font. */
+    /** The width of a chest window, in pixels of the default font. */
     private static final int WINDOW_WIDTH = 176;
+
+    /** How far in from the left edge of the window the client starts drawing the label. */
+    private static final int TITLE_ORIGIN = 8;
 
     private static final int SPACE_WIDTH = 4;
 
@@ -46,7 +54,8 @@ public final class MenuTitles {
         if (plain.isBlank()) {
             return title;
         }
-        int pad = (WINDOW_WIDTH - FontWidths.of(plain)) / (2 * SPACE_WIDTH);
+        int free = WINDOW_WIDTH - 2 * TITLE_ORIGIN - FontWidths.of(plain);
+        int pad = Math.round(free / (2f * SPACE_WIDTH));
         return Component.text(pad <= 0 ? plain : SPACE.repeat(pad) + plain);
     }
 

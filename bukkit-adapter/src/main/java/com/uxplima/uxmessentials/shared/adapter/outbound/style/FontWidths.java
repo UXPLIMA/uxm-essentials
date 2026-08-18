@@ -7,12 +7,14 @@ import org.jspecify.annotations.NullMarked;
 /**
  * How wide a string is when the client draws it in the default font, measured in pixels including the one-pixel
  * gap the client leaves after every glyph. Only the characters whose advance differs from the common six pixels
- * are listed; everything else, including the small-capital letters the interface is written in, is six.
+ * are listed; everything else, including all but one of the small-capital letters the interface is written in, is
+ * six.
  *
- * <p>This exists so a menu title can be centred (see {@link MenuTitles}). It is deliberately a table rather than
- * a measurement: the server has no font atlas to ask, and the default font's advances have been stable across
- * releases. A resource pack that replaces the font will shift a title by a few pixels, which is a cosmetic
- * offset rather than a defect.
+ * <p>This exists so a menu title can be centred (see {@link MenuTitles}). The numbers are not estimates: they are
+ * read off the client's own font atlas by {@code tools/style/fontwidths.py}, which trims each glyph in
+ * {@code assets/minecraft/textures/font} the way the client does and adds the one-pixel gap. Rerun it against a
+ * newer client to refresh the table. A resource pack that replaces the font will shift a title by a few pixels,
+ * which is a cosmetic offset rather than a defect.
  */
 @NullMarked
 final class FontWidths {
@@ -22,17 +24,19 @@ final class FontWidths {
     private static final Map<Character, Integer> NARROW = Map.ofEntries(
             Map.entry(' ', 4),
             Map.entry('!', 2),
-            Map.entry('"', 5),
-            Map.entry('\'', 3),
-            Map.entry('(', 5),
-            Map.entry(')', 5),
-            Map.entry('*', 5),
+            Map.entry('"', 4),
+            Map.entry('\'', 2),
+            Map.entry('(', 4),
+            Map.entry(')', 4),
+            Map.entry('*', 4),
             Map.entry(',', 2),
             Map.entry('.', 2),
             Map.entry(':', 2),
             Map.entry(';', 2),
             Map.entry('<', 5),
             Map.entry('>', 5),
+            Map.entry('@', 7),
+            Map.entry('I', 4),
             Map.entry('[', 4),
             Map.entry(']', 4),
             Map.entry('`', 3),
@@ -41,11 +45,12 @@ final class FontWidths {
             Map.entry('k', 5),
             Map.entry('l', 3),
             Map.entry('t', 4),
+            Map.entry('{', 4),
             Map.entry('|', 2),
-            Map.entry('{', 5),
-            Map.entry('}', 5),
-            Map.entry('I', 4),
-            Map.entry('@', 7));
+            Map.entry('}', 4),
+            Map.entry('~', 7),
+            // The one small capital that is not six pixels wide.
+            Map.entry('\u026a', 4));
 
     private FontWidths() {}
 

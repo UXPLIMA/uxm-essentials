@@ -10,6 +10,7 @@ resources, are idempotent, and print what they changed.
 | `nav.py` | Gives every pagination and back key the single-line arrow shape. |
 | `lore.py` | Builds a menu item's lore in the canonical order (title, breadcrumb, description, information, actions). |
 | `apply_lore.py` | Writes generated lore blocks back into the catalog by key. |
+| `fontwidths.py` | Measures the default font's glyph advances off a client jar, for the table `FontWidths` centres titles with. |
 | `modules/<module>.py` | One file per module describing its items through `lore.py`, then applying them. |
 
 Run from the repository root:
