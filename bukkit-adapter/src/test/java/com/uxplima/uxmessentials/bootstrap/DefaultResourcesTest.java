@@ -33,7 +33,6 @@ class DefaultResourcesTest {
         assertThat(dataFolder.resolve("modules/communication/announcer.conf")).isRegularFile();
         assertThat(dataFolder.resolve("modules/communication/info-pages.conf")).isRegularFile();
         assertThat(dataFolder.resolve("messages/messages_en.conf")).isRegularFile();
-        assertThat(dataFolder.resolve("messages/messages_tr.conf")).isRegularFile();
     }
 
     @Test

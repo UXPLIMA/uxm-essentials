@@ -66,7 +66,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * The invited-players list golden test: the engine-rendered list must draw the exact menu the original {@code
  * InvitedPlayersMenu} drew. The home has two invited players ("alpha", "beta"), so the list draws two PLAYER_HEAD
  * heads in the first two inner cells (slots 10 and 11, sorted by name), the LIME_DYE add button (slot 49), the
- * BARRIER back button (slot 45), and the two ARROW nav buttons (slots 48 and 50). The window is snapshotted as
+ * ARROW back button (slot 45), and the two ARROW nav buttons (slots 48 and 50). The window is snapshotted as
  * {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the baseline the old view produced —
  * captured while both rendered the same fixture, then frozen here so the old class could be deleted. Then a head
  * click, an add submission, and the back button through the engine's own {@link MenuListener} prove the migrated path
@@ -159,13 +159,13 @@ class HomeInvitesGoldenTest {
      * The slot -> (material, plain name) map the deleted {@code InvitedPlayersMenu} produced for this fixture (two
      * invited players "alpha" and "beta"), captured while both paths rendered it identically and frozen here as the
      * contract: two PLAYER_HEAD heads in the first inner cells (slots 10 and 11, names through {@code invited_player}),
-     * the LIME_DYE add button (slot 49), the BARRIER back button (slot 45), and the two nav ARROWs (slots 48 and 50).
+     * the LIME_DYE add button (slot 49), the ARROW back button (slot 45), and the two nav ARROWs (slots 48 and 50).
      */
     private static Map<Integer, Snapshot> oldViewBaseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(10, new Snapshot(Material.PLAYER_HEAD, "alpha"));
         baseline.put(11, new Snapshot(Material.PLAYER_HEAD, "beta"));
-        baseline.put(45, new Snapshot(Material.BARRIER, "home.invites.back"));
+        baseline.put(45, new Snapshot(Material.ARROW, "home.invites.back"));
         baseline.put(48, new Snapshot(Material.ARROW, "home.invites.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "home.invites.add.name"));
         baseline.put(50, new Snapshot(Material.ARROW, "home.invites.next"));

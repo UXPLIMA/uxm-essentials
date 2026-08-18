@@ -185,8 +185,7 @@ final class DefaultResources {
             "modules/worlds/gui/world-main.conf",
             "menus/example.conf",
             "text-input.conf",
-            "messages/messages_en.conf",
-            "messages/messages_tr.conf");
+            "messages/messages_en.conf");
 
     private DefaultResources() {}
 

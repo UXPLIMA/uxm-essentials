@@ -48,9 +48,9 @@ class GuiTextPrefixTest {
         String anvil = PlainTextComponentSerializer.plainText().serialize(anvilTitle);
         String chat = PlainTextComponentSerializer.plainText().serialize(chatLine);
         assertThat(anvil).isEqualTo("Enter the warp name:");
-        // The brand prefix renders a "»" separator; the chat line keeps it, the anvil title must not.
-        assertThat(chat).contains("»");
-        assertThat(anvil).doesNotContain("»");
+        // The category prefix renders a "▶" separator; the chat line keeps it, the anvil title must not.
+        assertThat(chat).contains("▶");
+        assertThat(anvil).doesNotContain("▶");
     }
 
     private static Messages prompt(String value) {

@@ -38,7 +38,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * The new-world create-screen golden test: the engine-rendered create screen must draw the field buttons the original
  * {@code WorldCreateView} drew — the NAME_TAG name button at 4, the GRASS_BLOCK environment selector at 10, the MAP
- * type selector at 12, the COMMAND_BLOCK generator selector at 14, the WHEAT_SEEDS seed button at 16, the BARRIER back
+ * type selector at 12, the COMMAND_BLOCK generator selector at 14, the WHEAT_SEEDS seed button at 16, the ARROW back
  * button at 18, and the NETHER_STAR create button at 22. The engine's window is snapshotted as {@code (slot ->
  * material, plain name)} and asserted equal, slot for slot, to that baseline. Then the migrated behaviours are proved
  * through the engine's own {@code MenuListener} and the package-private name seam: a left click on the environment
@@ -144,7 +144,7 @@ class WorldCreateGoldenTest {
                 12, new Snapshot(Material.MAP, "world.editor.create.type"),
                 14, new Snapshot(Material.COMMAND_BLOCK, "world.editor.create.generator"),
                 16, new Snapshot(Material.WHEAT_SEEDS, "world.editor.create.seed"),
-                18, new Snapshot(Material.BARRIER, "world.editor.nav.back"),
+                18, new Snapshot(Material.ARROW, "world.editor.nav.back"),
                 22, new Snapshot(Material.NETHER_STAR, "world.editor.create.confirm"));
     }
 

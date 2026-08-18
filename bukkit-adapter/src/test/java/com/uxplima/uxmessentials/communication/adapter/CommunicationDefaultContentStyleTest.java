@@ -32,14 +32,14 @@ class CommunicationDefaultContentStyleTest {
     /** Representative restyled lines, copied verbatim from the shipped {@code modules/communication} defaults. */
     private static final String INFO_TITLE = "<h:'Welcome to the server'> <value>{player}</value>!";
 
-    private static final String INFO_LINK = "<cta>/rules</cta> <muted>—</muted> <body>read the server rules.</body>";
+    private static final String INFO_LINK = "<cta>/rules</cta> <muted>·</muted> <body>read the server rules.</body>";
     private static final String ADVANCEMENT =
             "<tag:'NEWS'> <value>{player}</value> <body>has made the advancement</body> <good>[{title}]</good>";
 
     @Test
     void theInfoPageValueTokenResolvesToCyanAndLeavesNoLiteralToken() {
         Component rendered = MINI.deserialize(INFO_TITLE, StyleTags.resolver());
-        assertThat(colours(rendered)).contains(StyleTags.ACCENT); // <value> → cyan
+        assertThat(colours(rendered)).contains(StyleTags.VALUE);
         assertNoLiteralTokens(rendered);
     }
 
@@ -55,8 +55,8 @@ class CommunicationDefaultContentStyleTest {
         // The HudText path: PlaceholderAPI pre-parse is the identity for this template (no %papi%), then this parse.
         Component rendered = MINI.deserialize(ADVANCEMENT, StyleTags.resolver());
         String plain = PLAIN.serialize(rendered);
-        assertThat(plain).startsWith("uxmEssentials »"); // <tag:'NEWS'> renders the single brand prefix
-        assertThat(colours(rendered)).contains(StyleTags.ACCENT, StyleTags.BODY, StyleTags.MONEY);
+        assertThat(plain).startsWith("ɴᴇᴡꜱ ▶"); // <tag:'NEWS'> renders the category prefix
+        assertThat(colours(rendered)).contains(StyleTags.ACCENT, StyleTags.BODY, StyleTags.GOOD);
         assertNoLiteralTokens(rendered);
     }
 

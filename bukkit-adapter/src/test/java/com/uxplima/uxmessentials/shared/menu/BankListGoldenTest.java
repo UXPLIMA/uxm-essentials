@@ -150,12 +150,12 @@ class BankListGoldenTest {
         fireClick(0, ClickType.LEFT); // content slot 0 holds Vault; a left click opens its actions hub
 
         // The bank-actions hub is now an engine-rendered MenuHolder window: a 3-row window with the deposit GOLD_INGOT
-        // at slot 10 and the BARRIER back button at slot 22, distinct from the 6-row list this click left.
+        // at slot 10 and the ARROW back button at slot 22, distinct from the 6-row list this click left.
         Inventory top = player.getOpenInventory().getTopInventory();
         assertThat(top.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(top.getSize()).isEqualTo(27);
         assertThat(Objects.requireNonNull(top.getItem(10)).getType()).isEqualTo(Material.GOLD_INGOT);
-        assertThat(Objects.requireNonNull(top.getItem(22)).getType()).isEqualTo(Material.BARRIER);
+        assertThat(Objects.requireNonNull(top.getItem(22)).getType()).isEqualTo(Material.ARROW);
     }
 
     @Test

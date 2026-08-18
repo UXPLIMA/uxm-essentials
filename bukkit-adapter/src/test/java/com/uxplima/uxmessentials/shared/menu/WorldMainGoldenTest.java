@@ -37,7 +37,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * The per-world hub golden test: the engine-rendered editor hub must draw the navigation panel the original
  * {@code WorldMainView} drew — the MAP summary at 4, the DIAMOND_SWORD rules button at 11, the GRASS_BLOCK generation
- * button at 13, the IRON_DOOR access button at 15, the BARRIER back button at 18, and the load/unload toggle at 22
+ * button at 13, the IRON_DOOR access button at 15, the ARROW back button at 18, and the load/unload toggle at 22
  * (LIME_DYE while loaded). The engine's window is snapshotted as {@code (slot -> material, plain name)} and asserted
  * equal, slot for slot, to that baseline. Then, through the engine's own {@code MenuListener}, the three drill buttons
  * are clicked to prove each opens the right sub-screen (rules and access open the shared grid with the right title;
@@ -143,7 +143,7 @@ class WorldMainGoldenTest {
                 11, new Snapshot(Material.DIAMOND_SWORD, "world.editor.nav.rules"),
                 13, new Snapshot(Material.GRASS_BLOCK, "world.editor.nav.generation"),
                 15, new Snapshot(Material.IRON_DOOR, "world.editor.nav.access"),
-                18, new Snapshot(Material.BARRIER, "world.editor.nav.back"),
+                18, new Snapshot(Material.ARROW, "world.editor.nav.back"),
                 22, new Snapshot(Material.LIME_DYE, "world.editor.nav.unload"));
     }
 

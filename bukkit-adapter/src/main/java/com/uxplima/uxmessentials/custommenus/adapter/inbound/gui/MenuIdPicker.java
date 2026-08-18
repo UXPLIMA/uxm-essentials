@@ -40,7 +40,7 @@ final class MenuIdPicker {
 
     private static final Material ID_ICON = Material.PAPER;
     private static final Material NAV_ICON = Material.ARROW;
-    private static final Material BACK_ICON = Material.BARRIER;
+    private static final Material BACK_ICON = Material.ARROW;
     private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
 
     private final GuiText guiText;

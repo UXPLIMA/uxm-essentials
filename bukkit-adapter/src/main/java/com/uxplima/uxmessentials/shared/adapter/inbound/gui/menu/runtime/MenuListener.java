@@ -1114,6 +1114,7 @@ public final class MenuListener implements Listener {
     private void handleClick(MenuHolder holder, RenderedSlot rs, ClickType click) {
         ItemType type = rs.item().type();
         if (type == ItemType.NEXT || type == ItemType.PREVIOUS || type == ItemType.JUMP) {
+            MenuFeedback.page(holder);
             navigate(holder, type);
             return;
         }
@@ -1128,6 +1129,7 @@ public final class MenuListener implements Listener {
         RequirementSpec requirement = rs.item().click().requirementFor(kind);
         if (!evaluateRequirements(holder, base, kind, requirement)) {
             Optional<ClickBranch> elseChain = rs.item().click().elseFor(kind);
+            MenuFeedback.deny(holder);
             if (elseChain.isPresent()) {
                 evaluateBranch(holder, base, kind, elseChain.get());
             } else {
@@ -1135,7 +1137,9 @@ public final class MenuListener implements Listener {
             }
             return;
         }
-        runChain(holder, base, kind, rs.item().click().actionsFor(kind), 0);
+        List<Ref> actions = rs.item().click().actionsFor(kind);
+        MenuFeedback.click(holder, actions);
+        runChain(holder, base, kind, actions, 0);
     }
 
     /**

@@ -1,7 +1,12 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
+import java.util.Locale;
+import java.util.Set;
+
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.Context;
 import net.kyori.adventure.text.minimessage.tag.Tag;
 import net.kyori.adventure.text.minimessage.tag.resolver.ArgumentQueue;
@@ -11,30 +16,59 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The project palette as MiniMessage tags. Solid-colour tags ({@code <accent>}, {@code <body>}, …) wrap
- * their content; {@code <tag:'…'>} and {@code <etag:'…'>} both render the single {@code uxmEssentials »}
- * brand chat prefix (blue brand, dark-gray separator) — the label argument is accepted but ignored, so
- * catalog keys may keep their {@code <tag:'MODULE'>} form while every message shows the one brand prefix.
- * {@code <h:'…'>} is a solid blue header. The two staff-facing message channels carry their own labelled
- * prefixes instead of the brand one so they read apart from each other in chat: {@code <helpop>} renders
- * {@code HelpOP »} and {@code <staffchat>} renders {@code StaffChat »}, both in the same brand styling. The
- * resolver is immutable and cached; callers add it at every MiniMessage parse.
+ * The project palette as MiniMessage tags. Solid-colour tags ({@code <accent>}, {@code <body>}, …) wrap their
+ * content; the prefix and header tags take a quoted argument and are self-closing.
+ *
+ * <p>Colour carries meaning, never decoration: sky is the brand accent, ice is a value, white and subtext are
+ * the reading colours, and green/red/gold are reserved for outcome, denial and attention. The hexes are the
+ * palette canon and nothing outside this class may name one.
+ *
+ * <p>{@code <tag:'HOME'>} renders the category prefix a chat line opens with: the label in small capitals, bold,
+ * coloured by what the category is about (money categories green, everything else sky), then the dim triangle.
+ * {@code <etag:'…'>} ignores its label and renders the red error word, because a denial reads as an error
+ * whichever module raised it. {@code <helpop>} and {@code <staffchat>} are the two channels that keep their own
+ * label so they read apart from each other. {@code <h:'…'>} is the bold sky header a lore block opens with.
+ * The resolver is immutable and cached; callers add it at every MiniMessage parse.
  */
 @NullMarked
 public final class StyleTags {
 
-    public static final TextColor HEADER = TextColor.color(0x4aa3ff);
-    public static final TextColor ACCENT = TextColor.color(0x45cdf9);
-    public static final TextColor BODY = TextColor.color(0xfcfce3);
-    public static final TextColor CTA = TextColor.color(0x7cc7ff);
-    public static final TextColor MONEY = TextColor.color(0x2ecc71);
-    public static final TextColor BAD = TextColor.color(0xe63946);
-    public static final TextColor LEVEL = TextColor.color(0xffe66d);
-    public static final TextColor MUTED = TextColor.color(0xa9a9a9);
-    public static final TextColor TITLE = TextColor.color(0x555555);
+    public static final TextColor ACCENT = TextColor.color(0x38b6ff);
+    public static final TextColor VALUE = TextColor.color(0x8fd9ff);
+    public static final TextColor BODY = TextColor.color(0xffffff);
+    public static final TextColor SUBTEXT = TextColor.color(0xdde8f0);
+    public static final TextColor MUTED = TextColor.color(0x93a4b3);
+    public static final TextColor DIM = TextColor.color(0x6b7886);
+    public static final TextColor ICON = TextColor.color(0x8a93a1);
+    public static final TextColor CRUMB = TextColor.color(0x565f6b);
+    public static final TextColor GOOD = TextColor.color(0x5be38c);
+    public static final TextColor BAD = TextColor.color(0xff6b6b);
+    public static final TextColor GOLD = TextColor.color(0xffc93c);
+    public static final TextColor INFO = TextColor.color(0x4fd6e8);
+    public static final TextColor RANK = TextColor.color(0xb68cff);
+    public static final TextColor EVENT = TextColor.color(0xff8fd0);
 
-    private static final String BRAND = "uxmEssentials";
-    private static final String SEPARATOR = " »";
+    /**
+     * Role names for the three colours the palette reuses. An amount, a highlighted number and the click word
+     * all read gold; a header and a plain title read in the brand accent and the body colour respectively. They
+     * are separate constants because a call site names the role it means, not the hex behind it.
+     */
+    public static final TextColor MONEY = GOLD;
+
+    public static final TextColor LEVEL = GOLD;
+    public static final TextColor CTA = GOLD;
+    public static final TextColor HEADER = ACCENT;
+    public static final TextColor TITLE = BODY;
+
+    private static final String SEPARATOR = "▶";
+    private static final String GAP = " ";
+    private static final String ERROR_LABEL = "error";
+
+    /**
+     * The categories whose prefix is green rather than sky. Money is the one subject the palette gives its own
+     * prefix colour to, so a line that moves a balance is recognisable before it is read.
+     */
+    private static final Set<String> MONEY_CATEGORIES = Set.of("economy", "bank", "loan", "trade", "vault");
 
     private static final TagResolver RESOLVER = build();
 
@@ -48,56 +82,80 @@ public final class StyleTags {
         return TagResolver.builder()
                 .resolvers(
                         Placeholder.styling("accent", ACCENT),
-                        Placeholder.styling("value", ACCENT),
+                        Placeholder.styling("value", VALUE),
                         Placeholder.styling("body", BODY),
-                        Placeholder.styling("cta", CTA),
-                        Placeholder.styling("money", MONEY),
-                        Placeholder.styling("good", MONEY),
-                        Placeholder.styling("bad", BAD),
-                        Placeholder.styling("level", LEVEL),
+                        Placeholder.styling("subtext", SUBTEXT),
                         Placeholder.styling("muted", MUTED),
-                        Placeholder.styling("title", TITLE),
-                        prefixTag("tag"),
-                        prefixTag("etag"),
-                        labelledPrefix("helpop", "HelpOP"),
-                        labelledPrefix("staffchat", "StaffChat"),
+                        Placeholder.styling("dim", DIM),
+                        Placeholder.styling("icon", ICON),
+                        Placeholder.styling("crumb", CRUMB),
+                        Placeholder.styling("good", GOOD),
+                        Placeholder.styling("bad", BAD),
+                        Placeholder.styling("money", GOLD),
+                        Placeholder.styling("level", GOLD),
+                        Placeholder.styling("cta", GOLD),
+                        Placeholder.styling("info", INFO),
+                        Placeholder.styling("rank", RANK),
+                        Placeholder.styling("event", EVENT),
+                        Placeholder.styling("title", BODY),
+                        categoryPrefix("tag"),
+                        errorPrefix("etag"),
+                        labelledPrefix("helpop", "helpop"),
+                        labelledPrefix("staffchat", "staffchat"),
                         header("h"))
                 .build();
     }
 
     /**
-     * Both {@code <tag:'…'>} and {@code <etag:'…'>} render the one {@code uxmEssentials »} brand prefix. The
-     * label argument is popped and ignored so existing catalog keys (e.g. {@code <tag:'HOME'>}) keep working
-     * while every message shows the same prefix. The separator carries a leading space and no trailing space;
-     * the single gap before the message body comes from the catalog key, so the prefix is never double-spaced.
+     * The category prefix: the label the catalog key carries, in small capitals and bold, then the dim triangle.
+     * The label colour comes from what the category is about rather than from the module that raised the line,
+     * so every money movement reads green and every other feature reads in the brand sky. The separator carries
+     * no trailing space; the single gap before the body comes from the catalog key.
      */
-    private static TagResolver prefixTag(String name) {
+    private static TagResolver categoryPrefix(String name) {
         return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
-            args.popOr("");
-            Component component = Component.text(BRAND, HEADER).append(Component.text(SEPARATOR, TITLE));
-            return Tag.selfClosingInserting(component);
+            String label = args.popOr("").value();
+            TextColor colour = MONEY_CATEGORIES.contains(label.toLowerCase(Locale.ROOT)) ? GOOD : ACCENT;
+            return Tag.selfClosingInserting(prefix(label, colour));
         });
     }
 
     /**
-     * A self-closing prefix that renders a fixed channel {@code label} followed by the brand separator
-     * ({@code HelpOP »}), in the same brand/separator styling as {@code <tag>} but with the channel's own
-     * name. Unlike {@code prefixTag} the label is the visible text, not an ignored argument — the helpop and
-     * staffchat channels need to be told apart in chat, so each carries its own constant label here rather
-     * than the shared brand prefix. The separator has no trailing space; the gap before the body comes from
-     * the catalog key, exactly as for the brand prefix.
+     * The denial prefix. The label argument is popped and ignored: a refusal reads as an error whichever module
+     * raised it, and the red word plus the dim triangle is the whole signal, which is why an error line carries
+     * no trailing cross either.
      */
-    private static TagResolver labelledPrefix(String name, String label) {
+    private static TagResolver errorPrefix(String name) {
         return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
-            Component component = Component.text(label, HEADER).append(Component.text(SEPARATOR, TITLE));
-            return Tag.selfClosingInserting(component);
+            args.popOr("");
+            return Tag.selfClosingInserting(prefix(ERROR_LABEL, BAD));
         });
     }
 
+    /**
+     * A channel prefix that keeps its own constant label instead of taking one from the catalog. The two staff
+     * channels need to be told apart at a glance, so each names itself rather than sharing a category word.
+     */
+    private static TagResolver labelledPrefix(String name, String label) {
+        return TagResolver.resolver(
+                name, (ArgumentQueue args, Context ctx) -> Tag.selfClosingInserting(prefix(label, ACCENT)));
+    }
+
+    /** The bold sky header a lore block opens with, and the heading a banner chat line uses. */
     private static TagResolver header(String name) {
         return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
             String text = args.popOr(name + " requires text").value();
-            return Tag.selfClosingInserting(Component.text(text, HEADER));
+            return Tag.selfClosingInserting(Component.text(SmallCaps.of(text), ACCENT)
+                    .decoration(TextDecoration.BOLD, true)
+                    .decoration(TextDecoration.ITALIC, false));
         });
+    }
+
+    private static Component prefix(String label, TextColor colour) {
+        return Component.text(SmallCaps.of(label), colour)
+                .decoration(TextDecoration.BOLD, true)
+                .decoration(TextDecoration.ITALIC, false)
+                .append(Component.text(GAP, NamedTextColor.WHITE).decoration(TextDecoration.BOLD, false))
+                .append(Component.text(SEPARATOR, DIM).decoration(TextDecoration.BOLD, false));
     }
 }

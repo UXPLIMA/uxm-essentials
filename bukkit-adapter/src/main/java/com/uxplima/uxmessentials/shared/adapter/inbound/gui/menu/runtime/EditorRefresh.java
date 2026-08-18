@@ -8,6 +8,7 @@ import org.bukkit.inventory.Inventory;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
@@ -67,7 +68,9 @@ public final class EditorRefresh {
             MenuHolder holder, EditorState state, EditorSpec spec, Player live, EditorRenderer renderer) {
         state.clearSlots();
         Inventory inv = Bukkit.createInventory(
-                holder, spec.layout().rows() * 9, spec.title(holder.ctx().viewer(), state.subject()));
+                holder,
+                spec.layout().rows() * 9,
+                MenuTitles.centre(spec.title(holder.ctx().viewer(), state.subject())));
         holder.attach(inv);
         renderer.populate(inv, spec, state, live, holder.ctx().viewer());
         live.openInventory(inv);

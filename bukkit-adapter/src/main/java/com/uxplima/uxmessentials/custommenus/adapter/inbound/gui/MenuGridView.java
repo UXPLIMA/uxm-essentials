@@ -74,7 +74,7 @@ public final class MenuGridView {
 
     private static final Material EMPTY_ICON = Material.LIGHT_GRAY_STAINED_GLASS_PANE;
     private static final Material BLOCKER_ICON = Material.GRAY_STAINED_GLASS_PANE;
-    private static final Material BACK_ICON = Material.BARRIER;
+    private static final Material BACK_ICON = Material.ARROW;
     private static final Material SAVE_ICON = Material.EMERALD;
     private static final Material PREVIEW_ICON = Material.SPYGLASS;
     private static final Material NAV_ICON = Material.ARROW;

@@ -596,7 +596,7 @@ public final class ItemEditView {
     }
 
     private ItemStack backIcon(PlayerRef viewer) {
-        return ItemBuilder.of(Material.BARRIER)
+        return ItemBuilder.of(Material.ARROW)
                 .name(text(viewer, ItemworldMessageKey.ITEMEDIT_GUI_SELECTOR_BACK))
                 .build();
     }

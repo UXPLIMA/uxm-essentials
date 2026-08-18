@@ -71,7 +71,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * The bank-members golden test: the engine-rendered members menu must draw the exact grid the original
  * {@code BankMembersView} drew. The fresh bank holds two members (the viewer "Alice" as LEADER, "Bob" as MEMBER), so
  * the list draws two PLAYER_HEAD icons (content slots 0 and 1 — each member's name surfaces through the {@code
- * bank_member} token), the prev ARROW (slot 45), the BARRIER back button (slot 47), the EMERALD_BLOCK add button (slot
+ * bank_member} token), the prev ARROW (slot 45), the ARROW back button (slot 47), the EMERALD_BLOCK add button (slot
  * 49 — shown because the LEADER viewer may add through the {@code economy:can-add-member} condition), and the next
  * ARROW (slot 53). The engine window is snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot
  * for slot, to the baseline the old view produced for this fixture, frozen here as the contract so the old class could
@@ -150,7 +150,7 @@ class BankMembersListGoldenTest {
      * The slot -> (material, plain name) map the deleted {@code BankMembersView} produced for this fixture (the LEADER
      * viewer "Alice" and the MEMBER "Bob"), captured while both paths rendered it identically and frozen here: two
      * PLAYER_HEAD icons (content slots 0 and 1 — the names surface through the {@code bank_member} token), the prev
-     * ARROW (slot 45), the BARRIER back button (slot 47), the EMERALD_BLOCK add button (slot 49), and the next ARROW
+     * ARROW (slot 45), the ARROW back button (slot 47), the EMERALD_BLOCK add button (slot 49), and the next ARROW
      * (slot 53).
      */
     private static Map<Integer, Snapshot> oldViewBaseline() {
@@ -158,7 +158,7 @@ class BankMembersListGoldenTest {
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "Alice"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "Bob"));
         baseline.put(45, new Snapshot(Material.ARROW, "bank.members-gui-prev"));
-        baseline.put(47, new Snapshot(Material.BARRIER, "bank.members-gui-back"));
+        baseline.put(47, new Snapshot(Material.ARROW, "bank.members-gui-back"));
         baseline.put(49, new Snapshot(Material.EMERALD_BLOCK, "bank.members-gui-add"));
         baseline.put(53, new Snapshot(Material.ARROW, "bank.members-gui-next"));
         return baseline;

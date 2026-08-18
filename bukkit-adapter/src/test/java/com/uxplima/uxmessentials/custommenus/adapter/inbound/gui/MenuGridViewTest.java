@@ -176,7 +176,7 @@ class MenuGridViewTest {
         assertThat(inv.getSize()).isEqualTo(18); // one content row + one control row
         assertThat(inv.getItem(0).getType()).isEqualTo(Material.STONE); // the item painted at its slot
         assertThat(inv.getItem(1).getType()).isEqualTo(Material.LIGHT_GRAY_STAINED_GLASS_PANE); // empty placeholder
-        assertThat(inv.getItem(BACK_SLOT).getType()).isEqualTo(Material.BARRIER); // control bar: back
+        assertThat(inv.getItem(BACK_SLOT).getType()).isEqualTo(Material.ARROW); // control bar: back
         assertThat(inv.getItem(SAVE_SLOT).getType()).isEqualTo(Material.EMERALD); // control bar: save
     }
 

@@ -55,7 +55,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * {@code WarpParticleSelectorView} drew on its own {@code Bukkit.createInventory}, and a click must run the same set
  * the old click did. The fixture is one server warp "spawn". The window is snapshotted as {@code (slot -> material,
  * plain name)} and asserted equal, slot for slot, to the analytic baseline the old view produced: the fourteen preset
- * particle icons at content slots 0..13, the ANVIL custom button at slot 18, the BARRIER back button at slot 22, and
+ * particle icons at content slots 0..13, the ANVIL custom button at slot 18, the ARROW back button at slot 22, and
  * the LAVA_BUCKET remove button at slot 26. The gray-glass filler slots are dropped from the snapshot.
  *
  * <p>Then a left click on the first particle through the engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener}
@@ -176,7 +176,7 @@ class WarpParticleSelectorGoldenTest {
 
     /**
      * The slot -> (material, plain name) map the bespoke {@code WarpParticleSelectorView} produced for this fixture:
-     * one icon per preset particle at content slots 0..13, the ANVIL custom button at slot 18, the BARRIER back button
+     * one icon per preset particle at content slots 0..13, the ANVIL custom button at slot 18, the ARROW back button
      * at slot 22, and the LAVA_BUCKET remove button at slot 26, each named through the catalog key the test's
      * {@code KeyMessages} returns verbatim. The gray-glass filler slots are dropped from the snapshot.
      */
@@ -192,7 +192,7 @@ class WarpParticleSelectorGoldenTest {
         baseline.put(
                 CUSTOM_SLOT,
                 new Snapshot(Material.ANVIL, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_CUSTOM_NAME.key()));
-        baseline.put(BACK_SLOT, new Snapshot(Material.BARRIER, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK.key()));
+        baseline.put(BACK_SLOT, new Snapshot(Material.ARROW, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK.key()));
         baseline.put(
                 REMOVE_SLOT,
                 new Snapshot(Material.LAVA_BUCKET, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_REMOVE_NAME.key()));

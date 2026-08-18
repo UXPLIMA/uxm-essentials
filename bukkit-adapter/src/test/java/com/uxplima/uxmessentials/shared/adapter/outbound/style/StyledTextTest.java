@@ -18,7 +18,7 @@ class StyledTextTest {
 
     @Test
     void rendersHeaderToken() {
-        assertThat(PlainTextComponentSerializer.plainText().serialize(StyledText.render("<h:'HOME PANEL'>")))
-                .isEqualTo("HOME PANEL");
+        assertThat(PlainTextComponentSerializer.plainText().serialize(StyledText.render("<h:'Home Panel'>")))
+                .isEqualTo("ʜᴏᴍᴇ ᴘᴀɴᴇʟ");
     }
 }

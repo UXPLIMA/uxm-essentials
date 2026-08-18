@@ -154,8 +154,6 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_BROWSE_MINE("pwarp.gui.browse.mine"),
     PWARP_GUI_BROWSE_FAVOURITES("pwarp.gui.browse.favourites"),
     PWARP_GUI_BROWSE_ALL("pwarp.gui.browse.all"),
-    PWARP_GUI_BROWSE_PREV_LORE("pwarp.gui.browse.prev-lore"),
-    PWARP_GUI_BROWSE_NEXT_LORE("pwarp.gui.browse.next-lore"),
     PWARP_GUI_BROWSE_SORT_LORE("pwarp.gui.browse.sort-lore"),
     PWARP_GUI_BROWSE_SEARCH_LORE("pwarp.gui.browse.search-lore"),
     PWARP_GUI_BROWSE_MINE_LORE("pwarp.gui.browse.mine-lore"),

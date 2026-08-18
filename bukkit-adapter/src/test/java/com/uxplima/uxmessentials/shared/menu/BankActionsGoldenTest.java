@@ -199,7 +199,7 @@ class BankActionsGoldenTest {
         baseline.put(
                 MEMBERS_SLOT, new Snapshot(Material.PLAYER_HEAD, key(EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_NAME)));
         baseline.put(LOGS_SLOT, new Snapshot(Material.BOOK, key(EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_NAME)));
-        baseline.put(BACK_SLOT, new Snapshot(Material.BARRIER, key(EconomyMessageKey.BANK_ACTIONS_GUI_BACK)));
+        baseline.put(BACK_SLOT, new Snapshot(Material.ARROW, key(EconomyMessageKey.BANK_ACTIONS_GUI_BACK)));
         return baseline;
     }
 

@@ -57,13 +57,24 @@ class StyleTagsTest {
     }
 
     @Test
-    void accentAppliesCyan() {
+    void accentAppliesTheBrandSky() {
         assertThat(firstColor(parse("<accent>hello</accent>"))).isEqualTo(StyleTags.ACCENT);
     }
 
     @Test
-    void valueIsAccentAlias() {
-        assertThat(firstColor(parse("<value>x</value>"))).isEqualTo(StyleTags.ACCENT);
+    void valueCarriesItsOwnIceRatherThanTheAccent() {
+        // A value used to be an alias of the accent. The palette gives it the lighter ice so a name or an
+        // amount separates from the sky the prefix and the section labels are written in.
+        assertThat(firstColor(parse("<value>a name</value>"))).isEqualTo(StyleTags.VALUE);
+        assertThat(StyleTags.VALUE).isNotEqualTo(StyleTags.ACCENT);
+    }
+
+    @Test
+    void moneyIsGoldAndSuccessIsGreen() {
+        // The two also used to be aliases: an amount is gold, a positive outcome is green.
+        assertThat(firstColor(parse("<money>500</money>"))).isEqualTo(StyleTags.MONEY);
+        assertThat(firstColor(parse("<good>done</good>"))).isEqualTo(StyleTags.GOOD);
+        assertThat(StyleTags.MONEY).isNotEqualTo(StyleTags.GOOD);
     }
 
     @Test
@@ -72,27 +83,39 @@ class StyleTagsTest {
     }
 
     @Test
-    void titleAppliesDarkGray() {
-        assertThat(firstColor(parse("<title>Your Homes</title>"))).isEqualTo(StyleTags.TITLE);
+    void loreToneTokensResolve() {
+        assertThat(firstColor(parse("<subtext>line</subtext>"))).isEqualTo(StyleTags.SUBTEXT);
+        assertThat(firstColor(parse("<dim>|</dim>"))).isEqualTo(StyleTags.DIM);
+        assertThat(firstColor(parse("<icon>*</icon>"))).isEqualTo(StyleTags.ICON);
+        assertThat(firstColor(parse("<crumb>kind</crumb>"))).isEqualTo(StyleTags.CRUMB);
+        assertThat(firstColor(parse("<info>details</info>"))).isEqualTo(StyleTags.INFO);
     }
 
     @Test
-    void tagRendersTheBrandPrefixWithASingleSpace() {
+    void tagRendersTheCategoryPrefixInSmallCapitals() {
         Component c = parse("<tag:'HOME'> hi");
         String plain = PlainTextComponentSerializer.plainText().serialize(c);
-        // label ('HOME') is ignored — every prefix is the brand — and exactly one space precedes the body
-        assertThat(plain).isEqualTo("uxmEssentials » hi");
-        assertThat(colorOfRun(c, "uxmEssentials")).isEqualTo(StyleTags.HEADER);
-        assertThat(anyBold(c)).isFalse();
+        // The label the catalog carries is the prefix word, small-capped, and exactly one space precedes the body.
+        assertThat(plain).isEqualTo("ʜᴏᴍᴇ ▶ hi");
+        assertThat(colorOfRun(c, "ʜᴏᴍᴇ")).isEqualTo(StyleTags.ACCENT);
+        assertThat(colorOfRun(c, "▶")).isEqualTo(StyleTags.DIM);
+        assertThat(anyBold(c)).isTrue();
     }
 
     @Test
-    void etagRendersTheSameBrandPrefix() {
-        Component c = parse("<etag:'ERROR'> oops");
+    void aMoneyCategoryPrefixIsGreen() {
+        // Money is the one subject the palette gives its own prefix colour, so a balance line is recognisable
+        // before it is read.
+        assertThat(colorOfRun(parse("<tag:'ECONOMY'> hi"), "ᴇᴄᴏɴᴏᴍʏ")).isEqualTo(StyleTags.GOOD);
+        assertThat(colorOfRun(parse("<tag:'BANK'> hi"), "ʙᴀɴᴋ")).isEqualTo(StyleTags.GOOD);
+    }
+
+    @Test
+    void etagRendersTheRedErrorWordWhicheverModuleRaisedIt() {
+        Component c = parse("<etag:'ECONOMY'> oops");
         String plain = PlainTextComponentSerializer.plainText().serialize(c);
-        assertThat(plain).isEqualTo("uxmEssentials » oops");
-        assertThat(colorOfRun(c, "uxmEssentials")).isEqualTo(StyleTags.HEADER);
-        assertThat(anyBold(c)).isFalse();
+        assertThat(plain).isEqualTo("ᴇʀʀᴏʀ ▶ oops");
+        assertThat(colorOfRun(c, "ᴇʀʀᴏʀ")).isEqualTo(StyleTags.BAD);
     }
 
     @Test
@@ -101,19 +124,19 @@ class StyleTagsTest {
         Component staff = parse("<staffchat> hi");
         PlainTextComponentSerializer plain = PlainTextComponentSerializer.plainText();
         // The two staff channels read apart from each other rather than both showing the brand prefix.
-        assertThat(plain.serialize(help)).isEqualTo("HelpOP » hi");
-        assertThat(plain.serialize(staff)).isEqualTo("StaffChat » hi");
-        assertThat(colorOfRun(help, "HelpOP")).isEqualTo(StyleTags.HEADER);
-        assertThat(colorOfRun(staff, "StaffChat")).isEqualTo(StyleTags.HEADER);
-        assertThat(anyBold(help)).isFalse();
-        assertThat(anyBold(staff)).isFalse();
+        assertThat(plain.serialize(help)).isEqualTo("ʜᴇʟᴘᴏᴘ ▶ hi");
+        assertThat(plain.serialize(staff)).isEqualTo("ꜱᴛᴀꜰꜰᴄʜᴀᴛ ▶ hi");
+        assertThat(colorOfRun(help, "ʜᴇʟᴘᴏᴘ")).isEqualTo(StyleTags.ACCENT);
+        assertThat(colorOfRun(staff, "ꜱᴛᴀꜰꜰᴄʜᴀᴛ")).isEqualTo(StyleTags.ACCENT);
     }
 
     @Test
-    void headerRendersSolidBlueText() {
-        Component c = parse("<h:'HOME PANEL'>");
-        assertThat(PlainTextComponentSerializer.plainText().serialize(c)).isEqualTo("HOME PANEL");
-        assertThat(firstColor(c)).isEqualTo(StyleTags.HEADER);
-        assertThat(anyBold(c)).isFalse();
+    void headerSmallCapsItsArgumentAndRendersItBoldSky() {
+        // A header keeps its argument in plain ASCII in the catalog; the tag is what writes it in the
+        // interface's small capitals, so a catalog author never types the glyphs by hand.
+        Component c = parse("<h:'Home Panel'>");
+        assertThat(PlainTextComponentSerializer.plainText().serialize(c)).isEqualTo("ʜᴏᴍᴇ ᴘᴀɴᴇʟ");
+        assertThat(firstColor(c)).isEqualTo(StyleTags.ACCENT);
+        assertThat(anyBold(c)).isTrue();
     }
 }

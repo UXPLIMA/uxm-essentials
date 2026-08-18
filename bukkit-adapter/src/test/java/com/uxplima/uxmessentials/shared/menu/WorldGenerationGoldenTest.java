@@ -33,7 +33,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * The world generation-summary golden test: the engine-rendered read-only generation screen must draw the four info
  * slots the original {@code WorldGenerationView} drew — environment (GRASS_BLOCK at 10), world type (MAP at 12), seed
- * (WHEAT_SEEDS at 14) and external generator (COMMAND_BLOCK at 16) — over the BARRIER back button at 22. The engine's
+ * (WHEAT_SEEDS at 14) and external generator (COMMAND_BLOCK at 16), over the ARROW back button at 22. The engine's
  * window is snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the baseline
  * the old view produced. Then, through the engine's own {@code MenuListener}, the back button is clicked to prove the
  * migrated path returns to that world's per-world hub (now a holder-backed engine window). Every key renders verbatim,
@@ -102,7 +102,7 @@ class WorldGenerationGoldenTest {
                 12, new Snapshot(Material.MAP, "world.editor.gen.type"),
                 14, new Snapshot(Material.WHEAT_SEEDS, "world.editor.gen.seed"),
                 16, new Snapshot(Material.COMMAND_BLOCK, "world.editor.gen.generator"),
-                22, new Snapshot(Material.BARRIER, "world.editor.nav.back"));
+                22, new Snapshot(Material.ARROW, "world.editor.nav.back"));
     }
 
     /** Wire the generation screen (bound to a real hub) over the engine and open it for "alpha". */

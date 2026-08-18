@@ -55,6 +55,7 @@ class ShippedSpecBindingsDriftTest {
             "messaging:mail-back",
             "ranks:rankup",
             "close",
+            "sound",
             "list-sort",
             "list-filter",
             "list-search",
