@@ -16,9 +16,13 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.poses.adapter.inbound.SeatGeometry;
 import com.uxplima.uxmessentials.poses.adapter.inbound.SeatGeometry.SeatTarget;
+import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.poses.application.StartSit;
 import com.uxplima.uxmessentials.poses.application.StartSit.SitOutcome;
+import com.uxplima.uxmessentials.poses.application.StopPose;
+import com.uxplima.uxmessentials.poses.domain.PoseSession;
+import com.uxplima.uxmessentials.poses.domain.PoseType;
 import com.uxplima.uxmessentials.poses.domain.SittableBlocks;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -34,6 +38,10 @@ import org.jspecify.annotations.NullMarked;
  * within reach. The {@link StartSit} use case owns the region gate, the one-session invariant, and the seat; this
  * handler only resolves <em>which</em> block to sit on — the {@link SeatGeometry} of the looked-at block when
  * {@code sit-on-blocks} is on and it is sittable, otherwise the player's own feet — and renders the outcome.
+ *
+ * <p>The command is a toggle: run it while already sitting and it stands the player back up, so the same word both
+ * seats and unseats. Only a plain sit toggles; a player sitting <em>on another player</em> is a different session
+ * type and falls through to {@link StartSit}, whose one-session invariant turns the attempt away.
  */
 @NullMarked
 public final class SitCommand implements CommandRegistration {
@@ -41,6 +49,8 @@ public final class SitCommand implements CommandRegistration {
     private static final String PERMISSION = "uxmessentials.sit.use";
 
     private final StartSit startSit;
+    private final StopPose stopPose;
+    private final PoseSessions sessions;
     private final SittableBlocks sittableBlocks;
     private final CommandFeedback feedback;
     private final PoseCooldownNotice cooldownNotice;
@@ -49,12 +59,16 @@ public final class SitCommand implements CommandRegistration {
 
     public SitCommand(
             StartSit startSit,
+            StopPose stopPose,
+            PoseSessions sessions,
             SittableBlocks sittableBlocks,
             Messages messages,
             PoseCooldownNotice cooldownNotice,
             boolean sitOnBlocks,
             double maxDistance) {
         this.startSit = Objects.requireNonNull(startSit, "startSit");
+        this.stopPose = Objects.requireNonNull(stopPose, "stopPose");
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.sittableBlocks = Objects.requireNonNull(sittableBlocks, "sittableBlocks");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
         this.cooldownNotice = Objects.requireNonNull(cooldownNotice, "cooldownNotice");
@@ -72,7 +86,7 @@ public final class SitCommand implements CommandRegistration {
 
     @Override
     public String description() {
-        return "Sit down where you stand or on the block you're looking at.";
+        return "Sit down where you stand or on the block you're looking at; run again to stand up.";
     }
 
     private int sit(CommandContext<CommandSourceStack> ctx) {
@@ -82,10 +96,22 @@ public final class SitCommand implements CommandRegistration {
             return 0;
         }
         PlayerRef who = BukkitRefs.toRef(player);
+        if (isSitting(who)) {
+            // Toggle off: StopPose removes the seat entity, then confirm they stood back up.
+            stopPose.stop(who);
+            feedback.send(player, PosesMessageKey.POSES_STOOD_UP);
+            return Command.SINGLE_SUCCESS;
+        }
         Spot spot = resolveSpot(player);
         SitOutcome outcome = startSit.start(who, spot.position(), spot.yaw(), spot.inPlace());
         render(player, who, outcome);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** Whether the player already holds a plain sit, so running the command again stands them back up. */
+    private boolean isSitting(PlayerRef who) {
+        Optional<PoseSession> session = sessions.current(who);
+        return session.isPresent() && session.get().type() == PoseType.SIT;
     }
 
     /** Where to sit: the looked-at sittable block when offered and in reach, otherwise the player's own feet. */

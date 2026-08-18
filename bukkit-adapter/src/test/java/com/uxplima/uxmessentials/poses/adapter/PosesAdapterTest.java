@@ -28,6 +28,7 @@ import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -37,9 +38,16 @@ import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.persistence.PersistentDataType;
 
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+
 import net.kyori.adventure.text.Component;
 
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCommand;
 import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCooldownNotice;
+import com.uxplima.uxmessentials.poses.adapter.inbound.command.SitCommand;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.CrawlMoveListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PlayerSitInteractListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PoseCancelListener;
@@ -53,6 +61,7 @@ import com.uxplima.uxmessentials.poses.application.AllowAllRegionGate;
 import com.uxplima.uxmessentials.poses.application.CrawlSessions;
 import com.uxplima.uxmessentials.poses.application.PoseCooldown;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
+import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.poses.application.StartCrawl;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
 import com.uxplima.uxmessentials.poses.application.StartPose;
@@ -78,6 +87,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.world.WorldMock;
 
@@ -426,6 +436,97 @@ class PosesAdapterTest {
     }
 
     @Test
+    void dismountingTheSeatEndsTheFreePoseSoTheSneakKeyReachesIt() {
+        // A player riding a seat sends no sneak at all: the client turns the sneak key into a dismount. An armour
+        // stand is no Vehicle, so only the entity-dismount exit can catch it, and without it the session would
+        // linger while the player stood up.
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+        Entity seat = taggedSeats().getFirst();
+
+        cancelListener.onDismount(new EntityDismountEvent(player, seat));
+
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(taggedSeats()).isEmpty();
+        assertThat(snores.isSnoring(player.getUniqueId())).isFalse();
+    }
+
+    @Test
+    void dismountingASeatEndsAPlainSitToo() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        interactListener.onInteract(rightClick(player, stairAt(1, 64, 0)));
+        Entity seat = taggedSeats().getFirst();
+
+        cancelListener.onDismount(new EntityDismountEvent(player, seat));
+
+        assertThat(sessions.isPosing(BukkitRefs.toRef(player))).isFalse();
+        assertThat(taggedSeats()).isEmpty();
+    }
+
+    @Test
+    void sneakingEndsACrawlAndRestoresTheFakeBlock() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+        startCrawl.start(who, feet);
+        assertThat(crawlSessions.current(who)).isPresent();
+
+        cancelListener.onSneak(new PlayerToggleSneakEvent(player, true));
+
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(crawlSessions.current(who)).isEmpty();
+        assertThat(crawlView.restored).isNotEmpty();
+    }
+
+    @Test
+    void runningTheSamePoseCommandTwiceStandsThePlayerBackUp() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        PoseCommand lay = new PoseCommand(
+                "lay",
+                "uxmessentials.lay.use",
+                PoseType.LAY,
+                PosesMessageKey.POSES_NOW_LAYING,
+                "Lie down where you stand; run again to stand up.",
+                startPose,
+                stopPose,
+                sessions,
+                new KeyMessages(),
+                new PoseCooldownNotice(PoseCooldown.unlimited(), new KeyMessages()));
+
+        runAsPlayer(lay.build(), player);
+        assertThat(sessions.isPosing(who)).isTrue();
+
+        runAsPlayer(lay.build(), player);
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(taggedSeats()).isEmpty();
+    }
+
+    @Test
+    void runningTheSitCommandTwiceStandsThePlayerBackUp() {
+        PlayerMock player = playerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        SitCommand sit = new SitCommand(
+                startSit,
+                stopPose,
+                sessions,
+                new SittableBlocks(List.of("*_STAIRS")),
+                new KeyMessages(),
+                new PoseCooldownNotice(PoseCooldown.unlimited(), new KeyMessages()),
+                false,
+                2.0);
+
+        runAsPlayer(sit.build(), player);
+        assertThat(sessions.isPosing(who)).isTrue();
+
+        runAsPlayer(sit.build(), player);
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(taggedSeats()).isEmpty();
+    }
+
+    @Test
     void rightClickingAPlayerSeatsTheClickerOnThemAsAPassenger() {
         PlayerMock rider = playerAt(0.5, 64, 0.5);
         rider.addAttachment(plugin, "uxmessentials.playersit.use", true);
@@ -597,20 +698,6 @@ class PosesAdapterTest {
     }
 
     @Test
-    void sneakingWhileCrawlingDoesNotEndItUnlikeASit() {
-        PlayerMock player = playerAt(0.5, 64, 0.5);
-        PlayerRef who = BukkitRefs.toRef(player);
-        startCrawl.start(who, feetOf(player));
-
-        cancelListener.onSneak(new PlayerToggleSneakEvent(player, true));
-
-        // A crawler actively moves and may sneak without meaning to stand up, so sneak leaves the crawl running —
-        // the contrast with a sit, which ends on sneak (sneakingEndsThePoseAndReturnsThePlayerToWhereTheySat).
-        assertThat(sessions.current(who).orElseThrow().type()).isEqualTo(PoseType.CRAWL);
-        assertThat(crawlView.restored).isEmpty();
-    }
-
-    @Test
     void takingDamageWhileCrawlingDoesNotEndIt() {
         PlayerMock player = playerAt(0.5, 64, 0.5);
         PlayerMock attacker = server.addPlayer("Attacker");
@@ -687,6 +774,18 @@ class PosesAdapterTest {
             // The spin and snore loops are driven deterministically by the tests (via posePort.tick() /
             // snores.tick()), so the repeating registration is a no-op that hands back a closeable to cancel.
             return () -> {};
+        }
+    }
+
+    /** Dispatch a built command node as {@code player}, the way Paper's own dispatcher would. */
+    private void runAsPlayer(LiteralCommandNode<CommandSourceStack> node, PlayerMock player) {
+        player.addAttachment(plugin, "uxmessentials." + node.getName() + ".use", true);
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        dispatcher.getRoot().addChild(node);
+        try {
+            dispatcher.execute(node.getName(), CommandSourceStackMock.from(player));
+        } catch (CommandSyntaxException e) {
+            throw new AssertionError("the " + node.getName() + " command did not dispatch", e);
         }
     }
 
