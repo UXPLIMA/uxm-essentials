@@ -68,8 +68,7 @@ class WorldGridGoldenTest {
         player = server.addPlayer("Admin");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new WorldEditorTestSupport.TokenMessages(
-                com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey.PROPERTY_VALUE_LORE,
-                "world_grid_value"));
+                com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey.PROPERTY_LORE, "world_grid_value"));
         scheduler = new WorldEditorTestSupport.SyncScheduler();
         repository = new FakeRepository();
         events = new RecordingEvents();

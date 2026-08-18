@@ -54,8 +54,7 @@ public enum WorldEditorMessageKey implements MessageKey {
     GEN_GENERATOR("world.editor.gen.generator"),
     GEN_SEED("world.editor.gen.seed"),
 
-    PROPERTY_VALUE_LORE("world.editor.property.value-lore"),
-    PROPERTY_CYCLE_HINT("world.editor.property.cycle-hint"),
+    PROPERTY_LORE("world.editor.property.lore"),
 
     PROP_PVP("world.editor.prop.pvp"),
     PROP_DIFFICULTY("world.editor.prop.difficulty"),
