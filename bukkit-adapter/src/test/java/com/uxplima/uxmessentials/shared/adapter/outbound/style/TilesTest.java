@@ -11,10 +11,11 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins where a menu tile's title lives. The canon puts it on the first lore line under a blank display name, so
- * the title reads inside the tooltip with a line of air above it, and a bare button (no lore) keeps its one-line
- * name. Both halves matter: a title left on the display name is the mistake this replaced, and a title forced
- * onto a button would put a diamond on a back arrow.
+ * Pins where a menu tile's title lives and where its tooltip ends. The canon puts the title on the first lore
+ * line under a blank display name, so it reads inside the tooltip with a line of air above it, and closes the
+ * block with a blank line so the last line has air under it too. A bare button (no lore) keeps its one-line name:
+ * a title left on the display name is the mistake this replaced, and a title forced onto a button would put a
+ * diamond on a back arrow.
  */
 class TilesTest {
 
@@ -25,9 +26,10 @@ class TilesTest {
     void aTileWithLoreTakesItsTitleOntoTheFirstLoreLine() {
         List<Component> titled = Tiles.titled(TITLE, List.of(CRUMB));
 
-        assertThat(titled).hasSize(2);
+        assertThat(titled).hasSize(3);
         assertThat(plain(titled.get(0))).isEqualTo(" ◆ Accept teleport requests ");
         assertThat(titled.get(1)).isEqualTo(CRUMB);
+        assertThat(plain(titled.get(2))).isEqualTo(" ");
     }
 
     @Test
@@ -37,6 +39,16 @@ class TilesTest {
         Component diamond = head.children().get(0);
         assertThat(diamond.color()).isEqualTo(StyleTags.ICON);
         assertThat(head.children().get(1).decoration(TextDecoration.BOLD)).isEqualTo(TextDecoration.State.TRUE);
+    }
+
+    @Test
+    void theTitleIsRedrawnInTheGradientWhateverColourTheCatalogGaveIt() {
+        // The catalog painted this one ice; the tile still opens on the brand sky, so no two tiles disagree.
+        Component head =
+                Tiles.titled(TITLE.color(StyleTags.VALUE), List.of(CRUMB)).get(0);
+        Component title = head.children().get(1);
+
+        assertThat(title.children().get(0).color()).isEqualTo(StyleTags.ACCENT);
     }
 
     @Test
@@ -63,7 +75,7 @@ class TilesTest {
     void aSingleComponentLoreGetsTheTitleJoinedOnTopWithANewline() {
         Component titled = Tiles.titled(TITLE, CRUMB);
 
-        assertThat(plain(titled)).isEqualTo(" ◆ Accept teleport requests \nyour preference");
+        assertThat(plain(titled)).isEqualTo(" ◆ Accept teleport requests \nyour preference\n ");
     }
 
     private static String plain(Component component) {

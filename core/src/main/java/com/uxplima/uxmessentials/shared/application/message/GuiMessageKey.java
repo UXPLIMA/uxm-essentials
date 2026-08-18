@@ -18,7 +18,6 @@ public enum GuiMessageKey implements MessageKey {
 
     // the /uxmess gui management hub
     HUB_TITLE("gui.hub.title"),
-    HUB_ENTRY_NAME("gui.hub.entry.name"),
     HUB_ENTRY_LORE("gui.hub.entry.lore"),
     HUB_EMPTY("gui.hub.empty"),
     HUB_PREV("gui.hub.prev"),

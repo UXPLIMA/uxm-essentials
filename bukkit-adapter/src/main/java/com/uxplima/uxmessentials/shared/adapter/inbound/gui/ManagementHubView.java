@@ -74,10 +74,12 @@ public final class ManagementHubView {
 
     private ItemStack icon(PlayerRef viewer, ManagementGuiEntry entry) {
         Map<String, String> placeholders = Map.of("module", entry.id());
+        // The title is the module's own panel name, not its id: the id is a wiring key and reads like one, and it
+        // stays where it belongs, on the information row of the tooltip.
         return ItemBuilder.of(entry.icon())
                 .name(Tiles.blankName())
                 .lore(Tiles.titled(
-                        guiText.text(viewer, GuiMessageKey.HUB_ENTRY_NAME, placeholders),
+                        guiText.text(viewer, entry.label()),
                         guiText.text(viewer, GuiMessageKey.HUB_ENTRY_LORE, placeholders)))
                 .build();
     }

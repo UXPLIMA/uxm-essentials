@@ -15,6 +15,8 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
  * (a back arrow, a page arrow) in the display name with no lore at all. A golden test cares that a slot shows the
  * right title and the right facts under it, not which of the two places the client draws them from, so these two
  * readers hide that split: {@link #title} returns the title a player reads, and {@link #body} the lore beneath it.
+ * {@code body} also drops the blank line the canon closes a titled tooltip with, since that line is air rather
+ * than something the tile says.
  */
 public final class TileText {
 
@@ -49,7 +51,14 @@ public final class TileText {
         Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
         boolean titledInLore = (name == null || plain(name).isBlank())
                 && plain(lore.get(0)).strip().startsWith(DIAMOND);
-        return titledInLore ? List.copyOf(lore.subList(1, lore.size())) : List.copyOf(lore);
+        if (!titledInLore) {
+            return List.copyOf(lore);
+        }
+        int end = lore.size();
+        if (plain(lore.get(end - 1)).isBlank()) {
+            end--;
+        }
+        return List.copyOf(lore.subList(1, end));
     }
 
     private static String plain(Component component) {

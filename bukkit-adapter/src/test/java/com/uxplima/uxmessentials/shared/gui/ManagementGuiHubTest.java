@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmessentials.shared.menu.TileText;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -139,6 +140,17 @@ class ManagementGuiHubTest {
     }
 
     @Test
+    void anEntryIsTitledWithItsOwnPanelNameRatherThanItsModuleId(@TempDir Path dir) throws Exception {
+        ManagementGuiRegistry registry = new ManagementGuiRegistry();
+        registry.register(new ManagementGuiEntry("alpha", Key.PANEL, Material.DIAMOND, NODE_A, (p, v) -> {}));
+        hub(dir, registry, new FakePermissions(Set.of(NODE_A))).open(player, viewer);
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        // The id is a wiring key and reads like one; the title is the name of the panel behind the icon.
+        assertThat(TileText.title(inv.getItem(10))).isEqualTo(Key.PANEL.key());
+    }
+
+    @Test
     void emptyRegistryRendersNoEntries(@TempDir Path dir) throws Exception {
         ManagementGuiRegistry registry = new ManagementGuiRegistry();
         hub(dir, registry, new FakePermissions(Set.of())).open(player, viewer);
@@ -180,7 +192,8 @@ class ManagementGuiHubTest {
 
     /** A label key the entries reuse; its text is irrelevant to slot/material/opener assertions. */
     private enum Key implements MessageKey {
-        A(GuiMessageKey.HUB_ENTRY_NAME.key());
+        A(GuiMessageKey.HUB_ENTRY_LORE.key()),
+        PANEL(GuiMessageKey.HUB_TITLE.key());
 
         private final String key;
 

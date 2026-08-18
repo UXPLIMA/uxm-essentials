@@ -6,9 +6,10 @@ performs. This renders that skeleton from its parts so the 300-odd blocks in the
 from one another, and writes the fixed words in small capitals because that is how the interface is
 written.
 
-The diamond title line above the breadcrumb is not written here. The renderer puts it there from the
-tile's own name, which is what lets one shared block ("one of this NPC's settings") open on the
-setting the player is actually looking at.
+The diamond title line above the breadcrumb is not written here, and neither is the blank line that
+closes the block. The renderer adds both: the title comes from the tile's own name, which is what lets
+one shared block ("one of this NPC's settings") open on the setting the player is actually looking at,
+and the closing blank is the same line of air the blank display name buys at the top.
 """
 
 ASCII = "abcdefghijklmnopqrstuvwxyz"

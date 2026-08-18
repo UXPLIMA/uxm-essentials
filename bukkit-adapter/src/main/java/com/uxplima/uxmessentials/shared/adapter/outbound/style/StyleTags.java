@@ -49,6 +49,17 @@ public final class StyleTags {
     public static final TextColor EVENT = TextColor.color(0xff8fd0);
 
     /**
+     * The second half of each title gradient. A gradient runs from a palette colour to its lighter neighbour in
+     * the same family, which is what keeps a title reading as one colour rather than two: sky lightens into ice
+     * (that pair is {@link #ACCENT} and {@link #VALUE} above), green into emerald, red into rose, gold into
+     * yellow.
+     */
+    public static final TextColor EMERALD = TextColor.color(0x45d9a6);
+
+    public static final TextColor ROSE = TextColor.color(0xff7aa8);
+    public static final TextColor YELLOW = TextColor.color(0xffe15c);
+
+    /**
      * Role names for the three colours the palette reuses. An amount, a highlighted number and the click word
      * all read gold; a header and a plain title read in the brand accent and the body colour respectively. They
      * are separate constants because a call site names the role it means, not the hex behind it.

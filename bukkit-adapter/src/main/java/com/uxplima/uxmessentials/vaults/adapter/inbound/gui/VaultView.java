@@ -13,6 +13,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -287,7 +288,9 @@ public final class VaultView {
         Map<String, String> placeholders = adminView
                 ? Map.of("player", owner.name(), "index", Integer.toString(index))
                 : Map.of("index", Integer.toString(index));
-        return StyledText.render(messages.resolve(viewer, key, placeholders));
+        // Centred and bare, like every other window title: a vault is a real container, so it does not pass through
+        // the menu engine that would otherwise do it.
+        return MenuTitles.centre(StyledText.render(messages.resolve(viewer, key, placeholders)));
     }
 
     /** The identity of a vault as a window slot: one owner's numbered vault, open in at most one window. */
