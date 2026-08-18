@@ -51,6 +51,7 @@ class ManagementHubCoverageDriftTest {
             "commandcontrol",
             "servertweaks",
             "vanish",
+            "skin", // a skin is chosen by name or url through /skin, so there is no catalogue to browse
             // GUIs that only open onto a subject the viewer names first.
             "playerstate", // /invsee, /endersee and /playtime all open onto another player
             "invrollback", // /invrestore opens the snapshot list of one named player

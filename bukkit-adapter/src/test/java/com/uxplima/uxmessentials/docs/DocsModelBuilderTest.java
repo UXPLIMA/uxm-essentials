@@ -20,7 +20,7 @@ class DocsModelBuilderTest {
         List<String> ids =
                 DocsModelBuilder.build().stream().map(DocsData.Module::id).toList();
 
-        assertThat(ids).hasSize(34).doesNotHaveDuplicates().isSorted();
+        assertThat(ids).hasSize(35).doesNotHaveDuplicates().isSorted();
     }
 
     @Test

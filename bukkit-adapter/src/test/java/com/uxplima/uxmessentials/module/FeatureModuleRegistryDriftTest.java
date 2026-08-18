@@ -82,6 +82,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("invrollback"))).isPresent();
         assertThat(registry.byId(ModuleId.of("regions"))).isPresent();
         assertThat(registry.byId(ModuleId.of("servertweaks"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("skin"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -117,7 +118,8 @@ class FeatureModuleRegistryDriftTest {
                         "villagers",
                         "invrollback",
                         "regions",
-                        "servertweaks");
+                        "servertweaks",
+                        "skin");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -812,14 +814,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void serverTweaksIsTheLastModuleShipsEnabledAndPublishesNoDeclarativeSurface() {
+    void serverTweaksShipsEnabledAndPublishesNoDeclarativeSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule serverTweaks = registry.byId(ModuleId.of("servertweaks"))
                 .orElseThrow(() -> new AssertionError("servertweaks is not registered"));
 
-        // servertweaks is the last bounded context — a grab-bag of small server/infra tweaks (custom F3 brand,
-        // console-spam filter), registered last.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("servertweaks");
+        // servertweaks is a bounded context: a grab-bag of small server/infra tweaks (custom F3 brand,
+        // console-spam filter). The later skin context now lands last, so servertweaks must merely be registered.
+        assertThat(registry.byId(ModuleId.of("servertweaks"))).isPresent();
 
         // It ships ENABLED but inert (every individual tweak defaults off, so being on changes nothing until an
         // operator opts a tweak in): with no modules.conf override it is on, and disabling exactly it removes only it
@@ -840,6 +842,35 @@ class FeatureModuleRegistryDriftTest {
         // no command here, and it persists nothing (each tweak is a live side effect), so it declares no MigrationSet.
         assertThat(serverTweaks.commands()).isEmpty();
         assertThat(serverTweaks.migrations()).isEmpty();
+    }
+
+    @Test
+    void skinIsTheLastModuleShipsDisabledAndPublishesNoDeclarativeSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule skin =
+                registry.byId(ModuleId.of("skin")).orElseThrow(() -> new AssertionError("skin is not registered"));
+
+        // skin is the last bounded context: SkinsRestorer-parity skins by name, url, file and Bedrock, registered
+        // last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("skin");
+
+        // It ships DISABLED: on an online-mode server every player already wears their own skin, so the module
+        // would buy nothing but extra lookups. Turning exactly it on adds only it.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).doesNotContain("skin");
+        assertThat(defaults).contains("teleport", "economy", "holograms");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.skin.enabled", true))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(on).contains("skin", "teleport", "holograms");
+        assertThat(on).doesNotContain("invrollback");
+
+        // The /skin command and the pre-login listener are Bukkit-facing and contributed through the adapter
+        // wiring, and player_skins ships in the persistence baseline, so the module declares no MigrationSet.
+        assertThat(skin.commands()).isEmpty();
+        assertThat(skin.migrations()).isEmpty();
     }
 
     @Test

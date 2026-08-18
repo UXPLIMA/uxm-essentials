@@ -86,6 +86,7 @@ final class DefaultResources {
             "modules/invrollback/gui/snapshot-preview.conf",
             "modules/regions/config.conf",
             "modules/servertweaks/config.conf",
+            "modules/skin/config.conf",
             "modules/migration/config.conf",
             "modules/communication/gui/announcement-editor-list.conf",
             "modules/communication/gui/announcement-editor.conf",

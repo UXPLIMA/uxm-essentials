@@ -33,7 +33,8 @@ class ShippedModuleDefaultsDriftTest {
      * (scoreboard, tablist, nametags) rewrites what every player sees and collides with a dedicated HUD
      * plugin; survival and villagers change vanilla gameplay rules; discordlink, vote and regions do nothing
      * without an external service (a bot, Votifier, WorldGuard); invrollback writes a snapshot on every death
-     * and logout, a cost only a server that restores inventories should pay.
+     * and logout, a cost only a server that restores inventories should pay, and skin only earns its keep on a
+     * cracked or Bedrock-facing server, since on an online-mode one every player already wears their own.
      */
     private static final Set<String> SHIPS_DISABLED = Set.of(
             "scoreboard",
@@ -44,7 +45,8 @@ class ShippedModuleDefaultsDriftTest {
             "discordlink",
             "vote",
             "regions",
-            "invrollback");
+            "invrollback",
+            "skin");
 
     /** The single column-0 {@code enabled} switch at the head of a module's shipped config. */
     private static final Pattern ENABLED_LINE = Pattern.compile("^enabled\\s*=\\s*(true|false)", Pattern.MULTILINE);

@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.skin.application.SkinModule;
 import com.uxplima.uxmessentials.staff.application.StaffModule;
 import com.uxplima.uxmessentials.survival.application.SurvivalModule;
 import com.uxplima.uxmessentials.tablist.application.TablistModule;
@@ -230,6 +231,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // single tweak can be turned on in isolation — but every individual tweak defaults OFF, so a fresh install
         // wires nothing until an operator opts one in. It lands last after regions.
         delegate.register(new ServerTweaksModule());
+        // skin is a new bounded context: SkinsRestorer-parity skins, so a cracked server looks right and a
+        // Bedrock player arrives wearing their own face. It carries no hard dependency edge (its collaborators are
+        // the shared persistence DSL, the skin-texture lookup, the Scheduler, messages and event ports; Floodgate
+        // is an external soft-dep, not a module) and ships DISABLED, since an online-mode server gains nothing
+        // from it, so it lands last after servertweaks.
+        delegate.register(new SkinModule());
+
         // The shared kernel is not a module and never appears here.
     }
 

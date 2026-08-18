@@ -22,6 +22,7 @@ final class ContentPermissions {
     private static final ModuleId TABLIST = ModuleId.of("tablist");
     private static final ModuleId NAMETAGS = ModuleId.of("nametags");
     private static final ModuleId SERVERTWEAKS = ModuleId.of("servertweaks");
+    private static final ModuleId SKIN = ModuleId.of("skin");
 
     private ContentPermissions() {}
 
@@ -37,7 +38,8 @@ final class ContentPermissions {
                         scoreboard(),
                         tablist(),
                         nametags(),
-                        servertweaks())
+                        servertweaks(),
+                        skin())
                 .flatMap(List::stream)
                 .toList();
     }
@@ -454,5 +456,13 @@ final class ContentPermissions {
                 "Hot-reload / inspect the servertweaks module (the small server-behaviour switches).",
                 PermissionDefault.OP,
                 SERVERTWEAKS));
+    }
+
+    private static List<PermissionSpec> skin() {
+        return List.of(PermissionSpec.of(
+                "uxmessentials.module.skin",
+                "Hot-reload / inspect the skin module (the skin a player wears).",
+                PermissionDefault.OP,
+                SKIN));
     }
 }
