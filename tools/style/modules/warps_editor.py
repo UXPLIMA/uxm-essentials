@@ -16,14 +16,12 @@ CRUMB = "warp editor"
 
 BLOCKS = {
     "warp.editor.teleport.lore": lore(
-        "Visit",
         CRUMB,
         ["stand at the warp to see what a player arrives to."],
         [row("at", "{warp_edit_world} {warp_edit_x}, {warp_edit_y}, {warp_edit_z}")],
         [action("click", "to teleport there")],
     ),
     "warp.editor.icon.lore": lore(
-        "Icon",
         CRUMB,
         ["the item shown for this warp in every menu it appears in."],
         [row("current", "{warp_edit_icon}")],
@@ -33,21 +31,18 @@ BLOCKS = {
         ],
     ),
     "warp.editor.category.lore": lore(
-        "Category",
         CRUMB,
         ["the folder this warp is filed under in the browse menu."],
         [row("current", "{warp_edit_category}")],
         [action("click", "to assign a category")],
     ),
     "warp.editor.lock.lore": lore(
-        "Lock",
         CRUMB,
         ["a locked warp refuses everyone who is not staff, whatever else it allows."],
         [row("current", "{warp_edit_lock}")],
         [action("click", "to toggle the lock")],
     ),
     "warp.editor.password.lore": lore(
-        "Password",
         CRUMB,
         ["a word players have to type before they are let through."],
         [row("current", "{warp_edit_password}")],
@@ -57,7 +52,6 @@ BLOCKS = {
         ],
     ),
     "warp.editor.welcome.lore": lore(
-        "Welcome Message",
         CRUMB,
         ["what a player is shown the moment they arrive."],
         [
@@ -67,7 +61,6 @@ BLOCKS = {
         [action("click", "to manage the messages")],
     ),
     "warp.editor.sounds.lore": lore(
-        "Sounds",
         CRUMB,
         ["what the player hears leaving, and what they hear arriving."],
         [
@@ -77,7 +70,6 @@ BLOCKS = {
         [action("click", "to open the sound selector")],
     ),
     "warp.editor.particles.lore": lore(
-        "Particles",
         CRUMB,
         ["the effect drawn where the player leaves, and where they land."],
         [
@@ -87,7 +79,6 @@ BLOCKS = {
         [action("click", "to open the particle selector")],
     ),
     "warp.editor.warmup.lore": lore(
-        "Warmup",
         CRUMB,
         ["how long a player must stand still before this warp fires, whatever the module default is."],
         [row("current", "{warp_edit_warmup}")],
@@ -97,7 +88,6 @@ BLOCKS = {
         ],
     ),
     "warp.editor.cooldown.lore": lore(
-        "Cooldown",
         CRUMB,
         ["how long a player waits before using this warp again, whatever the module default is."],
         [row("current", "{warp_edit_cooldown}")],

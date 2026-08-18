@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -71,11 +72,18 @@ public final class EditorRenderer {
         }
     }
 
-    /** The bespoke editor's property button verbatim: the property icon, its label name, and the value-lore line. */
+    /**
+     * One property's button: the property icon, the shared value-lore, and the property's own label as the title
+     * on the first lore line, which is where the canon keeps a tile's title. The label used to be the display
+     * name, which put it outside the tooltip's body and left the lore opening on the generic word every property
+     * shares ("setting") rather than on the setting the player is looking at.
+     */
     private ItemStack propertyButton(PlayerRef viewer, EditorSpec spec, EditableProperty property) {
+        List<Component> lore =
+                List.of(guiText.text(viewer, spec.valueLore(), Map.of("value", property.valueLore(viewer))));
         return ItemBuilder.of(property.icon())
-                .name(guiText.text(viewer, property.label()))
-                .lore(guiText.text(viewer, spec.valueLore(), Map.of("value", property.valueLore(viewer))))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(guiText.text(viewer, property.label()), lore))
                 .build();
     }
 

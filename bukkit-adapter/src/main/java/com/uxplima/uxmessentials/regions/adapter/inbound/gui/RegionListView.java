@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -137,8 +138,10 @@ public final class RegionListView {
                 "members", Integer.toString(row.memberCount()),
                 "owners", Integer.toString(row.ownerCount()));
         return ItemBuilder.of(REGION_ICON)
-                .name(guiText.text(viewer, RegionsMessageKey.REGIONS_GUI_REGION, placeholders))
-                .lore(guiText.text(viewer, RegionsMessageKey.REGIONS_GUI_REGION_INFO, placeholders))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, RegionsMessageKey.REGIONS_GUI_REGION, placeholders),
+                        guiText.text(viewer, RegionsMessageKey.REGIONS_GUI_REGION_INFO, placeholders)))
                 .build();
     }
 

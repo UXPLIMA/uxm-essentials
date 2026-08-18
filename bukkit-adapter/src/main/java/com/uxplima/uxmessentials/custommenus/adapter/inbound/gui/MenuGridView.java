@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -479,8 +480,10 @@ public final class MenuGridView {
      */
     private ItemStack emptyIcon(PlayerRef viewer) {
         return ItemBuilder.of(EMPTY_ICON)
-                .name(guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_EMPTY))
-                .lore(guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_EMPTY_LORE))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_EMPTY),
+                        guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_EMPTY_LORE)))
                 .build();
     }
 

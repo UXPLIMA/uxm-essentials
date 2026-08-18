@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -74,8 +75,10 @@ public final class ManagementHubView {
     private ItemStack icon(PlayerRef viewer, ManagementGuiEntry entry) {
         Map<String, String> placeholders = Map.of("module", entry.id());
         return ItemBuilder.of(entry.icon())
-                .name(guiText.text(viewer, GuiMessageKey.HUB_ENTRY_NAME, placeholders))
-                .lore(guiText.text(viewer, GuiMessageKey.HUB_ENTRY_LORE, placeholders))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, GuiMessageKey.HUB_ENTRY_NAME, placeholders),
+                        guiText.text(viewer, GuiMessageKey.HUB_ENTRY_LORE, placeholders)))
                 .build();
     }
 }

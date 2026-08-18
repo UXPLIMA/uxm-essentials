@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -165,8 +166,10 @@ public final class RegionFlagEditorView {
                 "kind", messages.resolve(viewer, kindKey(row.kind()), Map.of()),
                 "hint", messages.resolve(viewer, hintKey(row.kind()), Map.of()));
         return ItemBuilder.of(material(row))
-                .name(guiText.text(viewer, RegionsMessageKey.REGIONS_FLAGS_FLAG, placeholders))
-                .lore(guiText.text(viewer, RegionsMessageKey.REGIONS_FLAGS_FLAG_INFO, placeholders))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, RegionsMessageKey.REGIONS_FLAGS_FLAG, placeholders),
+                        guiText.text(viewer, RegionsMessageKey.REGIONS_FLAGS_FLAG_INFO, placeholders)))
                 .build();
     }
 

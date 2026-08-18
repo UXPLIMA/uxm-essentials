@@ -9,17 +9,14 @@ from lore import lore, row
 
 BLOCKS = {
     "itemworld.recipe.gui.result-lore": lore(
-        "Result",
         "what this recipe makes",
         ["the item that comes out when the ingredients are laid out as shown."],
     ),
     "itemworld.recipe.gui.ingredient-lore": lore(
-        "Ingredient",
         "part of this recipe",
         ["one of the items the recipe consumes."],
     ),
     "itemworld.entitycount.gui.entry-lore": lore(
-        "Entity",
         "counted near you",
         ["how many of this kind are loaded around you right now."],
         [

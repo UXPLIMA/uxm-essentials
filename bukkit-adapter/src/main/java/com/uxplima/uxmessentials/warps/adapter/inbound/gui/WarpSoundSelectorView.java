@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -101,14 +102,16 @@ public final class WarpSoundSelectorView {
         for (int i = 0; i < Math.min(options.size(), OPTION_LIMIT); i++) {
             SoundOption opt = options.get(i);
             ItemStack icon = ItemBuilder.of(opt.material())
-                    .name(text(
-                            viewer,
-                            WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_NAME,
-                            Map.of("sound", opt.displayName())))
-                    .lore(List.of(text(
-                            viewer,
-                            WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_LORE,
-                            Map.of("sound", opt.soundName()))))
+                    .name(Tiles.blankName())
+                    .lore(Tiles.titled(
+                            text(
+                                    viewer,
+                                    WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_NAME,
+                                    Map.of("sound", opt.displayName())),
+                            List.of(text(
+                                    viewer,
+                                    WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_LORE,
+                                    Map.of("sound", opt.soundName())))))
                     .build();
             buttons.add(SelectorButton.of(
                     i, icon, () -> pick(player, viewer, name, owner, isDeparture, Optional.of(opt.soundName()))));
@@ -163,8 +166,10 @@ public final class WarpSoundSelectorView {
 
     private ItemStack customIcon(PlayerRef viewer) {
         return ItemBuilder.of(Material.ANVIL)
-                .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_CUSTOM_NAME))
-                .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_CUSTOM_LORE)))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_CUSTOM_NAME),
+                        List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_CUSTOM_LORE))))
                 .build();
     }
 
@@ -176,8 +181,10 @@ public final class WarpSoundSelectorView {
 
     private ItemStack removeIcon(PlayerRef viewer) {
         return ItemBuilder.of(Material.LAVA_BUCKET)
-                .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_REMOVE_NAME))
-                .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_REMOVE_LORE)))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_REMOVE_NAME),
+                        List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_REMOVE_LORE))))
                 .build();
     }
 

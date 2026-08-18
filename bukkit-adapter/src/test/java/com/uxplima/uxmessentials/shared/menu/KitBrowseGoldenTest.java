@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -23,9 +22,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
-
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
@@ -297,13 +293,14 @@ class KitBrowseGoldenTest {
 
     /** The number of lore lines on a rendered tile, proving the multi-line placeholder expanded variable lore. */
     private static int loreLines(ItemStack item) {
-        List<Component> lore = Objects.requireNonNull(item.getItemMeta()).lore();
-        return lore == null ? 0 : lore.size();
+        // The body under the title line: the count the variable-lore placeholder is responsible for.
+        return TileText.body(item).size();
     }
 
     private static String plainName(ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        // The title reads off the tile wherever the canon puts it: the display name of a bare button, or the
+        // first lore line of a titled tile, whose display name is deliberately blank.
+        return TileText.title(item);
     }
 
     private void seedKit(KitDefinition kit) {

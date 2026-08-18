@@ -156,9 +156,7 @@ class EconomyLoanGoldenTest {
 
         ItemStack loan = Objects.requireNonNull(
                 player.getOpenInventory().getTopInventory().getItem(LOAN_FIRST_SLOT), "loan entry");
-        List<Component> lore =
-                Objects.requireNonNull(loan.getItemMeta(), "meta").lore();
-        assertThat(plainLore(lore)).isEqualTo(loanLoreBaseline());
+        assertThat(plainLore(TileText.body(loan))).isEqualTo(loanLoreBaseline());
     }
 
     @Test
@@ -309,8 +307,9 @@ class EconomyLoanGoldenTest {
     }
 
     private static String plainName(ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        // The title reads off the tile wherever the canon puts it: the display name of a bare button, or the
+        // first lore line of a titled tile, whose display name is deliberately blank.
+        return TileText.title(item);
     }
 
     private static List<String> plainLore(List<Component> lore) {

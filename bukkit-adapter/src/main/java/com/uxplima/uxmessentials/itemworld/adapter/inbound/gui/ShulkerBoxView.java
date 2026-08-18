@@ -15,6 +15,7 @@ import org.bukkit.inventory.meta.BlockStateMeta;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -148,7 +149,7 @@ public final class ShulkerBoxView {
 
     private Component title(Player player) {
         PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
-        return StyledText.render(messages.resolve(ref, ItemworldMessageKey.SHULKER_TITLE, Map.of()));
+        return MenuTitles.centre(StyledText.render(messages.resolve(ref, ItemworldMessageKey.SHULKER_TITLE, Map.of())));
     }
 
     /** The {@link ShulkerBox} block state a shulker-box item carries, or {@code null} for any other item. */

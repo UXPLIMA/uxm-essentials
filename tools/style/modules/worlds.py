@@ -9,7 +9,6 @@ from lore import action, lore, row
 
 BLOCKS = {
     "world.editor.list.entry-lore": lore(
-        "World",
         "a world on this server",
         ["one of the worlds this server runs, loaded or waiting."],
         [
@@ -22,31 +21,26 @@ BLOCKS = {
         ],
     ),
     "world.editor.create.button-lore": lore(
-        "New World",
         "world editor",
         ["set a name, a seed and a generator, then build the world."],
         actions=[action("click", "to start")],
     ),
     "world.editor.create.name-lore": lore(
-        "Name",
         "required",
         ["the folder name the world is saved under, and the name commands use."],
         actions=[action("click", "to type a name")],
     ),
     "world.editor.create.seed-lore": lore(
-        "Seed",
         "optional",
         ["the number the generator starts from: leave it empty for a random world."],
         actions=[action("click", "to type a seed")],
     ),
     "world.editor.create.confirm-lore": lore(
-        "Create",
         "world editor",
         ["build the world with the settings above: generation runs in the background."],
         actions=[action("click", "to create it")],
     ),
     "world.editor.main.summary-lore": lore(
-        "World",
         "what this world is",
         ["the shape of this world and who is in it."],
         [

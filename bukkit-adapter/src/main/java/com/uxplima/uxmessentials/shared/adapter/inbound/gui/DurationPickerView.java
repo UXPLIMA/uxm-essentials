@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -141,15 +142,19 @@ public final class DurationPickerView {
 
     private ItemStack presetIcon(PlayerRef viewer, String preset) {
         return ItemBuilder.of(PRESET_ICON)
-                .name(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_PRESET_NAME, Map.of("duration", preset)))
-                .lore(List.of(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_PRESET_LORE)))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, GuiMessageKey.DURATION_PICKER_PRESET_NAME, Map.of("duration", preset)),
+                        List.of(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_PRESET_LORE))))
                 .build();
     }
 
     private ItemStack customIcon(PlayerRef viewer) {
         return ItemBuilder.of(CUSTOM_ICON)
-                .name(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_CUSTOM))
-                .lore(List.of(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_CUSTOM_LORE)))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, GuiMessageKey.DURATION_PICKER_CUSTOM),
+                        List.of(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_CUSTOM_LORE))))
                 .build();
     }
 

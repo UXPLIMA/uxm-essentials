@@ -162,9 +162,8 @@ class WorldGridGoldenTest {
 
     /** The plain text of the item's value-lore line (the world_grid_value token the catalog surfaces). */
     private static String valueLore(ItemStack item) {
-        List<Component> lore =
-                java.util.Objects.requireNonNull(item.getItemMeta()).lore();
-        if (lore == null || lore.isEmpty()) {
+        List<Component> lore = TileText.body(item);
+        if (lore.isEmpty()) {
             return "";
         }
         return PlainTextComponentSerializer.plainText().serialize(lore.get(0));

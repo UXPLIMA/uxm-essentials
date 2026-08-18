@@ -14,9 +14,6 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.Plugin;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -171,8 +168,7 @@ class RecipeGridGoldenTest {
     }
 
     private static String plainName(org.bukkit.inventory.ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        return TileText.title(item);
     }
 
     /** What one rendered slot looks like for comparison: its material and the plain-text of its display name. */

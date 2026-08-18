@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -191,8 +192,10 @@ public final class MenuEditorView {
                 "items",
                 spec == null ? "0" : Integer.toString(spec.items().size()));
         return ItemBuilder.of(Material.CHEST)
-                .name(guiText.text(viewer, CustomMenusMessageKey.MENU_EDITOR_ENTRY_NAME, placeholders))
-                .lore(guiText.text(viewer, CustomMenusMessageKey.MENU_EDITOR_ENTRY_LORE, placeholders))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, CustomMenusMessageKey.MENU_EDITOR_ENTRY_NAME, placeholders),
+                        guiText.text(viewer, CustomMenusMessageKey.MENU_EDITOR_ENTRY_LORE, placeholders)))
                 .build();
     }
 

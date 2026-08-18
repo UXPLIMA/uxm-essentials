@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -100,14 +101,16 @@ public final class WarpParticleSelectorView {
         for (int i = 0; i < Math.min(options.size(), OPTION_LIMIT); i++) {
             ParticleOption opt = options.get(i);
             ItemStack icon = ItemBuilder.of(opt.material())
-                    .name(text(
-                            viewer,
-                            WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_ENTRY_NAME,
-                            Map.of("particle", opt.displayName())))
-                    .lore(List.of(text(
-                            viewer,
-                            WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_ENTRY_LORE,
-                            Map.of("particle", opt.particleName()))))
+                    .name(Tiles.blankName())
+                    .lore(Tiles.titled(
+                            text(
+                                    viewer,
+                                    WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_ENTRY_NAME,
+                                    Map.of("particle", opt.displayName())),
+                            List.of(text(
+                                    viewer,
+                                    WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_ENTRY_LORE,
+                                    Map.of("particle", opt.particleName())))))
                     .build();
             buttons.add(SelectorButton.of(
                     i, icon, () -> pick(player, viewer, name, owner, isDeparture, Optional.of(opt.particleName()))));
@@ -162,8 +165,10 @@ public final class WarpParticleSelectorView {
 
     private ItemStack customIcon(PlayerRef viewer) {
         return ItemBuilder.of(Material.ANVIL)
-                .name(text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_CUSTOM_NAME))
-                .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_CUSTOM_LORE)))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_CUSTOM_NAME),
+                        List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_CUSTOM_LORE))))
                 .build();
     }
 
@@ -175,8 +180,10 @@ public final class WarpParticleSelectorView {
 
     private ItemStack removeIcon(PlayerRef viewer) {
         return ItemBuilder.of(Material.LAVA_BUCKET)
-                .name(text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_REMOVE_NAME))
-                .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_REMOVE_LORE)))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_REMOVE_NAME),
+                        List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_REMOVE_LORE))))
                 .build();
     }
 

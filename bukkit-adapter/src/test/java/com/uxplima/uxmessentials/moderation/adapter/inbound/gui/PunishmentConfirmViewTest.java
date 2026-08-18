@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmessentials.shared.menu.TileText;
 import com.uxplima.uxmlib.gui.Guis;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -211,8 +212,7 @@ class PunishmentConfirmViewTest {
     private String loreKey(int slot) {
         ItemStack item = Objects.requireNonNull(
                 actor.getOpenInventory().getTopInventory().getItem(slot), "item");
-        List<Component> lore = Objects.requireNonNull(item.getItemMeta()).lore();
-        Objects.requireNonNull(lore, "lore");
+        List<Component> lore = TileText.body(item);
         return PlainTextComponentSerializer.plainText().serialize(lore.get(0));
     }
 
@@ -246,8 +246,9 @@ class PunishmentConfirmViewTest {
     }
 
     private static String plainName(ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        // The title reads off the tile wherever the canon puts it: the display name of a bare button, or the
+        // first lore line of a titled tile, whose display name is deliberately blank.
+        return TileText.title(item);
     }
 
     private record Snapshot(Material material, String name) {}

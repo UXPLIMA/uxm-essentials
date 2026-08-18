@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickHandler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -179,11 +180,13 @@ public final class MenuRefListEditor {
 
     private ItemStack refIcon(ClickContext context, Ref ref) {
         return ItemBuilder.of(ENTRY_ICON)
-                .name(guiText.text(
-                        context.viewer(),
-                        CustomMenusMessageKey.MENU_ACTION_EDITOR_REF_NAME,
-                        Map.of("ref", refToken(ref))))
-                .lore(guiText.text(context.viewer(), CustomMenusMessageKey.MENU_ACTION_EDITOR_REF_HINTS))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(
+                                context.viewer(),
+                                CustomMenusMessageKey.MENU_ACTION_EDITOR_REF_NAME,
+                                Map.of("ref", refToken(ref))),
+                        guiText.text(context.viewer(), CustomMenusMessageKey.MENU_ACTION_EDITOR_REF_HINTS)))
                 .build();
     }
 

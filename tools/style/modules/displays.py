@@ -9,7 +9,6 @@ from lore import action, lore, row
 
 BLOCKS = {
     "hologram.gui.list.entry-lore": lore(
-        "Hologram",
         "a floating display",
         ["text hanging in the world, with nothing solid behind it."],
         [
@@ -20,7 +19,6 @@ BLOCKS = {
         [action("click", "to edit this hologram")],
     ),
     "npc.gui.list.entry-lore": lore(
-        "NPC",
         "a standing character",
         ["a character players can look at, click, and be sent somewhere by."],
         [

@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropert
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -329,8 +330,10 @@ public final class AnnouncementEditorView {
                 "lines", Integer.toString(announcement.lines().size()),
                 "channels", channels(announcement));
         return ItemBuilder.of(announcement.enabled() ? Material.PAPER : Material.GRAY_DYE)
-                .name(guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_EDITOR_ENTRY_NAME, placeholders))
-                .lore(guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_EDITOR_ENTRY_LORE, placeholders))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_EDITOR_ENTRY_NAME, placeholders),
+                        guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_EDITOR_ENTRY_LORE, placeholders)))
                 .build();
     }
 

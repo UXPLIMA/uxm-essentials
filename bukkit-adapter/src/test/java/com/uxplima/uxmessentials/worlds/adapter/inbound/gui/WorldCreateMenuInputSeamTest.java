@@ -17,9 +17,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
@@ -40,6 +37,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.menu.TileText;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
@@ -149,8 +147,7 @@ class WorldCreateMenuInputSeamTest {
         if (item == null || item.getItemMeta() == null) {
             return "";
         }
-        Component name = item.getItemMeta().displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        return TileText.title(item);
     }
 
     /** Surfaces the create-name and create-seed tokens (the slot labels) so a carried value is observable. */

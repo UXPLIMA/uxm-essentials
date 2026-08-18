@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -137,8 +138,10 @@ public final class RegionRosterView {
     private ItemStack icon(PlayerRef viewer, RosterRow row) {
         Map<String, String> placeholders = Map.of("name", row.display());
         return ItemBuilder.of(iconMaterial(row.member()))
-                .name(guiText.text(viewer, nameKey(row.member()), placeholders))
-                .lore(guiText.text(viewer, loreKey(row.member()), placeholders))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, nameKey(row.member()), placeholders),
+                        guiText.text(viewer, loreKey(row.member()), placeholders)))
                 .build();
     }
 

@@ -49,6 +49,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -202,7 +203,11 @@ public final class ItemRenderer {
         Optional<ItemStack> base = iconProviders.resolve(materialSpec, ctx);
         Component name = resolveText(item.name(), ctx);
         List<Component> lore = combineLore(item, base, ctx);
-        ItemStack built = applyDecor(builderFor(base, materialSpec).name(name).lore(lore), item.decor(), ctx)
+        // The canon writes a tile's title on the first lore line under a blank name; a lore-less button keeps
+        // the one-line name it was written with.
+        List<Component> titled = Tiles.titled(name, lore);
+        Component shown = titled == lore ? name : Tiles.blankName();
+        ItemStack built = applyDecor(builderFor(base, materialSpec).name(shown).lore(titled), item.decor(), ctx)
                 .build();
         // Tag every tile the engine renders — including an equipment/self-inventory icon, which is already a clone of
         // the viewer's real item — so any display copy that escapes into a real inventory is strippable. The mark rides

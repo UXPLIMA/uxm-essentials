@@ -21,9 +21,6 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
@@ -258,8 +255,9 @@ class ItemworldHubGoldenTest {
     }
 
     private static String plainName(ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        // The title reads off the tile wherever the canon puts it: the display name of a bare button, or the
+        // first lore line of a titled tile, whose display name is deliberately blank.
+        return TileText.title(item);
     }
 
     private record Snapshot(Material material, String name) {}

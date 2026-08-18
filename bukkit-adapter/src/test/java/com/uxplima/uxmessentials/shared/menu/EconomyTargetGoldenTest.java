@@ -24,9 +24,6 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EcoAdminOps;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyTargetMenu;
@@ -163,8 +160,7 @@ class EconomyTargetGoldenTest {
                 admin.getOpenInventory().getTopInventory().getItem(HEAD_SLOT), "head");
         // The old view emitted one target-head-lore line per configured currency; the engine splits the joined
         // placeholder block back into one component per balance, so both currencies' lines are present.
-        List<Component> lore = Objects.requireNonNull(head.getItemMeta()).lore();
-        assertThat(lore).hasSize(2);
+        assertThat(TileText.body(head)).hasSize(2);
     }
 
     // Give / Take / Set capture an amount through the anvil seam, which MockBukkit leaves unimplemented (no
@@ -305,8 +301,9 @@ class EconomyTargetGoldenTest {
     }
 
     private static String plainName(ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        // The title reads off the tile wherever the canon puts it: the display name of a bare button, or the
+        // first lore line of a titled tile, whose display name is deliberately blank.
+        return TileText.title(item);
     }
 
     private record Snapshot(Material material, String name) {}

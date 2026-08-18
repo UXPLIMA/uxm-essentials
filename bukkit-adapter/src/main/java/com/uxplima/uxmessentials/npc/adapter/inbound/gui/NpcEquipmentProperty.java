@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickH
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -138,12 +139,14 @@ final class NpcEquipmentProperty implements EditableProperty {
             ClickContext context, EquipmentSlot slot, @org.jspecify.annotations.Nullable String token) {
         Material material = iconFor(token);
         return ItemBuilder.of(material)
-                .name(guiText.text(
-                        context.viewer(), NpcMessageKey.NPC_GUI_EQUIP_SLOT_NAME, Map.of("slot", label(slot))))
-                .lore(guiText.text(
-                        context.viewer(),
-                        NpcMessageKey.NPC_GUI_EQUIP_SLOT_HINTS,
-                        Map.of("item", describe(context.viewer(), token))))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(
+                                context.viewer(), NpcMessageKey.NPC_GUI_EQUIP_SLOT_NAME, Map.of("slot", label(slot))),
+                        guiText.text(
+                                context.viewer(),
+                                NpcMessageKey.NPC_GUI_EQUIP_SLOT_HINTS,
+                                Map.of("item", describe(context.viewer(), token)))))
                 .build();
     }
 

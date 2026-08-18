@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -133,8 +134,8 @@ public final class SnapshotListView {
                         viewer, InvrollbackMessageKey.INVROLLBACK_GUI_LOCATION, SnapshotDisplay.location(position))));
         lore.add(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_VIEW, base));
         return ItemBuilder.of(iconMaterial(snapshot.cause()))
-                .name(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_SNAPSHOT, base))
-                .lore(lore)
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(guiText.text(viewer, InvrollbackMessageKey.INVROLLBACK_GUI_SNAPSHOT, base), lore))
                 .build();
     }
 

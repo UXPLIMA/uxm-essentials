@@ -227,8 +227,7 @@ class MenuEnumSelectorTest {
 
     /** The first lore line of an item rendered as plain text — the value-lore the editor wrote. */
     private static String valueLoreOf(ItemStack item) {
-        List<Component> lore = item.lore();
-        assertThat(lore).isNotNull();
+        List<Component> lore = TileText.body(item);
         return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
                 .serialize(lore.get(0));
     }

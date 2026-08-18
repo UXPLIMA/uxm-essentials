@@ -9,19 +9,16 @@ from lore import action, lore, row
 
 BLOCKS = {
     "vaults.selector.entry.lore": lore(
-        "Vault",
         "your item storage",
         ["storage that lives in the database, so it survives deaths and rollbacks."],
         actions=[action("click", "to open this vault")],
     ),
     "vaults.selector.locked.lore": lore(
-        "Locked Vault",
         "not unlocked yet",
         ["a slot you have not claimed: unlock it and it is yours for good."],
         actions=[action("run", "/vault {index} to unlock it")],
     ),
     "communication.gui.announcer.entry-lore": lore(
-        "Announcement",
         "an automatic message",
         ["a message the server posts by itself, on its own schedule."],
         [
@@ -30,7 +27,6 @@ BLOCKS = {
         ],
     ),
     "communication.announce.editor.entry-lore": lore(
-        "Announcement",
         "announcement editor",
         ["a scheduled message, as it is configured now."],
         [
@@ -41,7 +37,6 @@ BLOCKS = {
         [action("click", "to edit it")],
     ),
     "ranks.gui-current-lore": lore(
-        "Your Rank",
         "where you stand",
         ["the rank you hold now, and how many times you have started over."],
         [
@@ -50,7 +45,6 @@ BLOCKS = {
         ],
     ),
     "ranks.gui-next-lore": lore(
-        "Next Rank",
         "what is ahead",
         ["the rank you climb to next, and what it takes to get there."],
         [
@@ -60,7 +54,6 @@ BLOCKS = {
         ],
     ),
     "invrollback.gui.shulker-lore": lore(
-        "Snapshot",
         "a saved inventory",
         ["what this player was carrying at the moment it was taken."],
         [

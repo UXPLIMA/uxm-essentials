@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -506,11 +507,13 @@ public final class ItemEditView {
             boolean on = meta != null && meta.hasItemFlag(flag);
             String token = flag.name().toLowerCase(Locale.ROOT);
             ItemStack icon = ItemBuilder.of(on ? Material.LIME_DYE : Material.GRAY_DYE)
-                    .name(text(viewer, ItemworldMessageKey.ITEMEDIT_GUI_FLAG_ENTRY, Map.of("flag", token)))
-                    .lore(List.of(text(
-                            viewer,
-                            ItemworldMessageKey.ITEMEDIT_GUI_FLAG_STATE,
-                            Map.of("state", onOffWord(viewer, on)))))
+                    .name(Tiles.blankName())
+                    .lore(Tiles.titled(
+                            text(viewer, ItemworldMessageKey.ITEMEDIT_GUI_FLAG_ENTRY, Map.of("flag", token)),
+                            List.of(text(
+                                    viewer,
+                                    ItemworldMessageKey.ITEMEDIT_GUI_FLAG_STATE,
+                                    Map.of("state", onOffWord(viewer, on))))))
                     .build();
             buttons.add(SelectorButton.of(slot++, icon, () -> toggleFlag(player, viewer, expected, flag, token)));
         }

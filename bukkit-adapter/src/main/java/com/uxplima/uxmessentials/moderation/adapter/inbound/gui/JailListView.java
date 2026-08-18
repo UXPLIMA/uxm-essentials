@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAct
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -134,8 +135,10 @@ public final class JailListView {
     private ItemStack icon(PlayerRef viewer, String name) {
         Map<String, String> placeholders = placeholders(viewer, name);
         return ItemBuilder.of(JAIL_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_LIST_ENTRY_NAME, placeholders))
-                .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_LIST_ENTRY_LORE, placeholders))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_LIST_ENTRY_NAME, placeholders),
+                        guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_LIST_ENTRY_LORE, placeholders)))
                 .build();
     }
 

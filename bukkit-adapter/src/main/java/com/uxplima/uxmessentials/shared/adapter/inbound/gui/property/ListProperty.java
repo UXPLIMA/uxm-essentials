@@ -13,6 +13,7 @@ import org.bukkit.inventory.ItemStack;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -139,8 +140,10 @@ public final class ListProperty implements EditableProperty {
 
     private ItemStack entryIcon(ClickContext context, String entry) {
         return ItemBuilder.of(layout.entryIcon())
-                .name(guiText.text(context.viewer(), keys.entryName(), Map.of("entry", entry)))
-                .lore(guiText.text(context.viewer(), keys.entryHints()))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(context.viewer(), keys.entryName(), Map.of("entry", entry)),
+                        guiText.text(context.viewer(), keys.entryHints())))
                 .build();
     }
 

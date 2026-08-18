@@ -9,7 +9,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -226,21 +225,23 @@ class ScoreboardSettingsGoldenTest {
     }
 
     private static String plainName(ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        // The title reads off the tile wherever the canon puts it: the display name of a bare button, or the
+        // first lore line of a titled tile, whose display name is deliberately blank.
+        return TileText.title(item);
     }
 
     private static String valueLoreOrEmpty(ItemStack item) {
-        List<Component> lore = item.lore();
-        if (lore == null || lore.isEmpty()) {
+        // Under the title line the canon puts at the top of a titled tile: the body is what the value-lore is.
+        List<Component> lore = TileText.body(item);
+        if (lore.isEmpty()) {
             return "";
         }
         return PlainTextComponentSerializer.plainText().serialize(lore.get(0));
     }
 
     private static String valueLoreOf(ItemStack item) {
-        List<Component> lore = item.lore();
-        assertThat(lore).isNotNull();
+        List<Component> lore = TileText.body(item);
+        assertThat(lore).isNotEmpty();
         return PlainTextComponentSerializer.plainText().serialize(lore.get(0));
     }
 

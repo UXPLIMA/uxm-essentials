@@ -9,7 +9,6 @@ from lore import action, lore, note, row
 
 BLOCKS = {
     "pwarp.gui.list.entry-lore": lore(
-        "Player Warp",
         "a warp another player opened",
         ["a public spot someone put on the map."],
         [
@@ -21,121 +20,101 @@ BLOCKS = {
         [action("click", "to edit this warp")],
     ),
     "pwarp.gui.browse.sort-lore": lore(
-        "Sort",
         "browse control",
         ["reorder the grid by rating, newest, visits, favourites, name or distance."],
         actions=[action("click", "to cycle the sort")],
     ),
     "pwarp.gui.browse.search-lore": lore(
-        "Search",
         "browse control",
         ["narrow the grid to the warps whose name matches what you type."],
         actions=[action("click", "to type a name")],
     ),
     "pwarp.gui.browse.mine-lore": lore(
-        "My Warps",
         "browse filter",
         ["show only the warps you opened yourself."],
         actions=[action("click", "to filter to yours")],
     ),
     "pwarp.gui.browse.favourites-lore": lore(
-        "Favourites",
         "browse filter",
         ["show only the warps you have starred."],
         actions=[action("click", "to filter to favourites")],
     ),
     "pwarp.gui.browse.all-lore": lore(
-        "Every Warp",
         "browse filter",
         ["drop the filter and show every public warp on the server."],
         actions=[action("click", "to clear the filter")],
     ),
     "pwarp.gui.browse.create-lore": lore(
-        "New Warp",
         "browse control",
         ["open a warp of your own where you are standing."],
         actions=[action("click", "to create a warp here")],
     ),
     "pwarp.gui.browse.categories-lore": lore(
-        "Categories",
         "browse control",
         ["browse by category, or jump straight to a shortcut."],
         actions=[action("click", "to open the categories hub")],
     ),
     "pwarp.gui.browse.empty-lore": lore(
-        "Nothing Here",
         "empty directory",
         ["nobody has opened a warp yet.", "stand where you want yours and make the first one."],
         actions=[action("run", "/pwarp set to create one")],
     ),
     "pwarp.gui.view.teleport-lore": lore(
-        "Travel",
         "warp action",
         ["leave where you are and arrive at this warp."],
         actions=[action("click", "to warp here")],
     ),
     "pwarp.gui.view.teleport-locked-lore": lore(
-        "Locked",
         "warp action",
         ["this warp is password protected: the owner set a word you have to know."],
         actions=[action("click", "to enter the password")],
     ),
     "pwarp.gui.view.favourite-lore": lore(
-        "Favourite",
         "warp action",
         ["star this warp so it is one click away from the favourites filter."],
         actions=[action("click", "to add to favourites")],
     ),
     "pwarp.gui.view.unfavourite-lore": lore(
-        "Unfavourite",
         "warp action",
         ["take this warp off your favourites list."],
         actions=[action("click", "to remove from favourites")],
     ),
     "pwarp.gui.view.rate-lore": lore(
-        "Rate",
         "warp action",
         ["award this warp one to five stars: the average decides where it sits in the top list."],
         actions=[action("click", "to rate")],
     ),
     "pwarp.gui.view.manage-lore": lore(
-        "Manage",
         "owner tools",
         ["edit this warp's settings, its members and who may enter."],
         actions=[action("click", "to manage")],
     ),
     "pwarp.gui.rate.star-1-lore": lore(
-        "One Star",
         "rating",
         ["the lowest rating: this warp was not worth the trip."],
         actions=[action("click", "to rate 1 star")],
     ),
     "pwarp.gui.rate.star-2-lore": lore(
-        "Two Stars",
         "rating",
         ["below average: something here, but not much."],
         actions=[action("click", "to rate 2 stars")],
     ),
     "pwarp.gui.rate.star-3-lore": lore(
-        "Three Stars",
         "rating",
         ["a fair warp: worth a visit."],
         actions=[action("click", "to rate 3 stars")],
     ),
     "pwarp.gui.rate.star-4-lore": lore(
-        "Four Stars",
         "rating",
         ["a good warp: you would go back."],
         actions=[action("click", "to rate 4 stars")],
     ),
     "pwarp.gui.rate.star-5-lore": lore(
-        "Five Stars",
         "rating",
         ["the highest rating: one of the best on the server."],
         actions=[action("click", "to rate 5 stars")],
     ),
     "pwarp.gui.categories.header-lore": lore(
-        "Directory",
         "player warps",
         [
             "every warp here was opened by a player, not by staff.",
@@ -144,57 +123,48 @@ BLOCKS = {
         actions=[action("pick", "a shortcut or a category below")],
     ),
     "pwarp.gui.categories.browse-all-lore": lore(
-        "Every Warp",
         "shortcut",
         ["the full grid: every public warp on the server."],
         actions=[action("click", "to browse them all")],
     ),
     "pwarp.gui.categories.mine-lore": lore(
-        "My Warps",
         "shortcut",
         ["the warps you opened, with the tools to manage them."],
         actions=[action("click", "to see your warps")],
     ),
     "pwarp.gui.categories.favourites-lore": lore(
-        "Favourites",
         "shortcut",
         ["the warps you starred, in one grid."],
         actions=[action("click", "to see your favourites")],
     ),
     "pwarp.gui.categories.top-lore": lore(
-        "Top Rated",
         "shortcut",
         ["the warps other players rated highest."],
         actions=[action("click", "to see the best")],
     ),
     "pwarp.gui.categories.entry-lore": lore(
-        "Category",
         "warp directory",
         ["one theme of the directory: the warps their owners filed here."],
         actions=[action("click", "to browse {pwarp_category_name} warps")],
     ),
     "pwarp.gui.categories.sponsor-lore": lore(
-        "Sponsored",
         "featured warp",
         ["its owner paid to keep this warp on the front page."],
         [row("owner", "{pwarp_sponsor_owner}")],
         [action("click", "to visit")],
     ),
     "pwarp.gui.members.entry-lore": lore(
-        "Member",
         "warp access",
         ["a player who may use this warp beyond what the public may."],
         [row("role", "{pwarp_member_role}")],
         [action("click", "to remove this member")],
     ),
     "pwarp.gui.whitelist.entry-lore": lore(
-        "Whitelisted",
         "warp access",
         ["a player allowed in while the warp is closed to everyone else."],
         actions=[action("click", "to remove from the whitelist")],
     ),
     "pwarp.gui.bans.entry-lore": lore(
-        "Banned",
         "warp access",
         ["a player the owner shut out of this warp."],
         [
@@ -204,7 +174,6 @@ BLOCKS = {
         [action("click", "to lift the ban")],
     ),
     "pwarp.gui.editor.value-lore": lore(
-        "Setting",
         "warp editor",
         ["one of this warp's settings, as it stands now."],
         [row("current", "{value}")],

@@ -14,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -118,17 +117,16 @@ class DataPlaceholderGoldenTest {
     }
 
     private static String plainName(ItemStack item) {
-        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
-        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+        // The title reads off the tile wherever the canon puts it: the display name of a bare button, or the
+        // first lore line of a titled tile, whose display name is deliberately blank.
+        return TileText.title(item);
     }
 
     private static List<String> plainLore(ItemStack item) {
-        List<Component> lore = Objects.requireNonNull(item.getItemMeta()).lore();
-        return lore == null
-                ? List.of()
-                : lore.stream()
-                        .map(line -> PlainTextComponentSerializer.plainText().serialize(line))
-                        .toList();
+        // The body only: the title line the canon puts above it is asserted where the title is asserted.
+        return TileText.body(item).stream()
+                .map(line -> PlainTextComponentSerializer.plainText().serialize(line))
+                .toList();
     }
 
     private static final class FakePlayerDataStore implements PlayerDataStore {

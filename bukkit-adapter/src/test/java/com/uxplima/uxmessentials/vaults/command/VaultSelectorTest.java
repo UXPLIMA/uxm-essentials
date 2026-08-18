@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.event.inventory.ClickType;
@@ -37,6 +38,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.menu.TileText;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
@@ -183,8 +185,7 @@ class VaultSelectorTest {
         openSelector(4);
 
         Inventory menu = player.getOpenInventory().getTopInventory();
-        String rendered = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                .serialize(menu.getItem(0).getItemMeta().displayName());
+        String rendered = TileText.title(Objects.requireNonNull(menu.getItem(0), "vault tile"));
         assertThat(rendered).contains("Treasure");
     }
 
@@ -196,8 +197,7 @@ class VaultSelectorTest {
 
         Inventory menu = player.getOpenInventory().getTopInventory();
         // The literal tag text survives (escaped) rather than being parsed into a colour, so no injection.
-        String rendered = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                .serialize(menu.getItem(0).getItemMeta().displayName());
+        String rendered = TileText.title(Objects.requireNonNull(menu.getItem(0), "vault tile"));
         assertThat(rendered).contains("<red>").contains("hax");
     }
 

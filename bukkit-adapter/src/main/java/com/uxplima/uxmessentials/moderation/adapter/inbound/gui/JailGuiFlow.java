@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -132,8 +133,10 @@ public final class JailGuiFlow {
     private ItemStack chooserIcon(PlayerRef viewer, String jail) {
         Map<String, String> ph = Map.of("jail", jail);
         return ItemBuilder.of(JAIL_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_CHOOSE_ENTRY_NAME, ph))
-                .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_CHOOSE_ENTRY_LORE, ph))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(
+                        guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_CHOOSE_ENTRY_NAME, ph),
+                        guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_CHOOSE_ENTRY_LORE, ph)))
                 .build();
     }
 

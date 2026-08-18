@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -66,16 +67,16 @@ final class KitIconRenderer {
         }
 
         return ItemBuilder.of(categoryMaterial(category))
-                .name(name)
-                .lore(loreLines)
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(name, loreLines))
                 .build();
     }
 
     ItemStack icon(PlayerRef viewer, KitDefinition base) {
         KitDefinition kit = access.resolveVariant(viewer, base);
         return ItemBuilder.of(resolveMaterial(viewer, kit))
-                .name(resolveName(viewer, kit))
-                .lore(resolveLore(viewer, kit))
+                .name(Tiles.blankName())
+                .lore(Tiles.titled(resolveName(viewer, kit), resolveLore(viewer, kit)))
                 .build();
     }
 
