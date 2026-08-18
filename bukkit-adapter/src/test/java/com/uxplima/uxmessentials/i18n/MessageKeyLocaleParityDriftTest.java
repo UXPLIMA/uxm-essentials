@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.skin.application.SkinMessageKey;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
@@ -133,7 +134,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(RanksMessageKey.values(), List.of("ranks")),
                 Map.entry(SecurityMessageKey.values(), List.of("security")),
                 Map.entry(VillagersMessageKey.values(), List.of("villagers")),
-                Map.entry(InvrollbackMessageKey.values(), List.of("invrollback")));
+                Map.entry(InvrollbackMessageKey.values(), List.of("invrollback")),
+                Map.entry(SkinMessageKey.values(), List.of("skin")));
     }
 
     @Test

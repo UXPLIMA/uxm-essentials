@@ -213,6 +213,7 @@ settpr settpr -
 setworth setworth -
 showitem showitem -
 sit sit -
+skin skin skins
 skull skull -
 smithingtable smithingtable -
 socialspy socialspy -

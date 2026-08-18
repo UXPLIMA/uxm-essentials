@@ -34,6 +34,17 @@ public interface SkinTextures {
      */
     Optional<SkinTexture> fetchNow(String username);
 
+    /**
+     * Forget whatever is cached for {@code username}, so the next lookup goes back to the source.
+     *
+     * <p>The cache is what keeps a busy server from hammering Mojang, but it also means a player who changed
+     * their skin there keeps wearing the old one here until it expires. This is the door out of that: staff drop
+     * one name and the next lookup is fresh. The default is a no-op, for a lookup that caches nothing.
+     */
+    default void purge(String username) {
+        // Nothing cached, nothing to forget.
+    }
+
     /** A lookup that resolves nothing: the default in tests and wherever no real source has been wired. */
     static SkinTextures none() {
         return NoSkinTextures.INSTANCE;

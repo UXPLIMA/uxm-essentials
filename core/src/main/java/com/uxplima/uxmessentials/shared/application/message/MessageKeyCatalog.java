@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
 import com.uxplima.uxmessentials.regions.application.RegionsMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
+import com.uxplima.uxmessentials.skin.application.SkinMessageKey;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
@@ -85,7 +86,8 @@ public final class MessageKeyCatalog {
             TradeMessageKey.values(),
             VillagersMessageKey.values(),
             InvrollbackMessageKey.values(),
-            RegionsMessageKey.values());
+            RegionsMessageKey.values(),
+            SkinMessageKey.values());
 
     private MessageKeyCatalog() {}
 

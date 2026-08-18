@@ -459,10 +459,57 @@ final class ContentPermissions {
     }
 
     private static List<PermissionSpec> skin() {
-        return List.of(PermissionSpec.of(
-                "uxmessentials.module.skin",
-                "Hot-reload / inspect the skin module (the skin a player wears).",
-                PermissionDefault.OP,
-                SKIN));
+        return List.of(
+                PermissionSpec.of(
+                        "uxmessentials.module.skin",
+                        "Hot-reload / inspect the skin module (the skin a player wears).",
+                        PermissionDefault.OP,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.use",
+                        "/skin <name> and /skin clear: wear another account's skin, or go back to your own.",
+                        PermissionDefault.TRUE,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.url",
+                        "/skin url <link>: wear the skin drawn in an image published on the web.",
+                        PermissionDefault.TRUE,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.file",
+                        "/skin file <name>: wear one of the skins the operator dropped in the server's skin folder.",
+                        PermissionDefault.OP,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.update",
+                        "/skin update: re-fetch your skin, for an account whose skin changed at the source.",
+                        PermissionDefault.TRUE,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.other",
+                        "/skin set <name> <player> and /skin clear <player>: dress or undress somebody else.",
+                        PermissionDefault.OP,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.drop",
+                        "/skin drop <player>: delete a stored skin, so their next join derives one afresh.",
+                        PermissionDefault.OP,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.info",
+                        "/skin info <player>: which skin somebody wears, from where, and when it was set.",
+                        PermissionDefault.OP,
+                        SKIN),
+                PermissionSpec.of(
+                        "uxmessentials.skin.purge",
+                        "/skin purge <name>: forget a cached texture so the next lookup goes back to the source.",
+                        PermissionDefault.OP,
+                        SKIN),
+                PermissionSpec.family(
+                        "uxmessentials.skin.name.<skin>",
+                        "Wear the skin of one named account; only checked for the skins the operator restricted.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.LABEL,
+                        SKIN));
     }
 }

@@ -123,6 +123,12 @@ public final class MojangSkins implements SkinTextures {
         }
     }
 
+    @Override
+    public void purge(String username) {
+        Objects.requireNonNull(username, "username");
+        cache.invalidate(key(username));
+    }
+
     private static String key(String username) {
         return username.strip().toLowerCase(Locale.ROOT);
     }
