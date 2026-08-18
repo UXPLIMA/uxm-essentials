@@ -37,6 +37,7 @@ import com.uxplima.uxmessentials.api.view.UxmRegion;
 import com.uxplima.uxmessentials.api.view.UxmSanction;
 import com.uxplima.uxmessentials.api.view.UxmSanctionRecord;
 import com.uxplima.uxmessentials.api.view.UxmSecurityStatus;
+import com.uxplima.uxmessentials.api.view.UxmSkin;
 import com.uxplima.uxmessentials.api.view.UxmSnapshot;
 import com.uxplima.uxmessentials.api.view.UxmTeleportRequest;
 import com.uxplima.uxmessentials.api.view.UxmTrade;
@@ -325,6 +326,15 @@ public final class Views {
         json.addProperty("owner-id", snapshot.ownerId().toString());
         json.addProperty("cause", snapshot.cause().name());
         json.addProperty("taken-at", snapshot.takenAt().toString());
+        return json;
+    }
+
+    public static JsonElement skin(UxmSkin skin) {
+        JsonObject json = new JsonObject();
+        json.addProperty("source-type", skin.sourceType());
+        json.addProperty("source-value", skin.sourceValue());
+        json.addProperty("slim", skin.slim());
+        json.addProperty("applied-at", skin.appliedAt().toString());
         return json;
     }
 

@@ -50,6 +50,7 @@ public final class PlaceholderContexts {
     private final @Nullable ItemworldPlaceholders itemworld;
     private final @Nullable NpcPlaceholders npc;
     private final @Nullable RegionsPlaceholders regions;
+    private final @Nullable SkinPlaceholders skin;
     private final @Nullable SecurityPlaceholders security;
     private final @Nullable ModulesPlaceholders modules;
     private final @Nullable RanksPlaceholders ranks;
@@ -91,6 +92,7 @@ public final class PlaceholderContexts {
         this.itemworld = builder.itemworld;
         this.npc = builder.npc;
         this.regions = builder.regions;
+        this.skin = builder.skin;
         this.security = builder.security;
         this.modules = builder.modules;
         this.ranks = builder.ranks;
@@ -243,6 +245,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(invrollback);
     }
 
+    public Optional<SkinPlaceholders> skin() {
+        return Optional.ofNullable(skin);
+    }
+
     public Optional<ItemworldPlaceholders> itemworld() {
         return Optional.ofNullable(itemworld);
     }
@@ -326,6 +332,7 @@ public final class PlaceholderContexts {
         private @Nullable ItemworldPlaceholders itemworld;
         private @Nullable NpcPlaceholders npc;
         private @Nullable RegionsPlaceholders regions;
+        private @Nullable SkinPlaceholders skin;
         private @Nullable SecurityPlaceholders security;
         private @Nullable ModulesPlaceholders modules;
         private @Nullable RanksPlaceholders ranks;
@@ -499,6 +506,11 @@ public final class PlaceholderContexts {
 
         public Builder invrollback(InvrollbackPlaceholders seam) {
             this.invrollback = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder skin(SkinPlaceholders seam) {
+            this.skin = java.util.Objects.requireNonNull(seam, "seam");
             return this;
         }
 

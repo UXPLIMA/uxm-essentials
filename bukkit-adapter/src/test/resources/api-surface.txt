@@ -208,6 +208,7 @@ interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional regions()
   Optional scoreboard()
   Optional security()
+  Optional skin()
   Optional staff()
   Optional teleport()
   Optional trade()
@@ -995,6 +996,8 @@ interface com.uxplima.uxmessentials.api.query.UxmScoreboardQuery
 interface com.uxplima.uxmessentials.api.query.UxmSecurityQuery
   CompletableFuture of(UUID)
   boolean isLockedOut(UUID)
+interface com.uxplima.uxmessentials.api.query.UxmSkinQuery
+  CompletableFuture of(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmStaffQuery
   Optional modeOf(UUID)
   Set inStaffMode()
@@ -1414,6 +1417,15 @@ record com.uxplima.uxmessentials.api.view.UxmSecurityStatus
   boolean lockedOut()
   boolean pinSet()
   boolean totpEnabled()
+  int hashCode()
+record com.uxplima.uxmessentials.api.view.UxmSkin
+  <init>(String, String, boolean, Instant)
+  Instant appliedAt()
+  String sourceType()
+  String sourceValue()
+  String toString()
+  boolean equals(Object)
+  boolean slim()
   int hashCode()
 record com.uxplima.uxmessentials.api.view.UxmSnapshot
   <init>(UUID, UUID, com.uxplima.uxmessentials.api.view.UxmSnapshotCause, Instant)

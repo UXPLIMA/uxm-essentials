@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.rest.route.RanksRoutes;
 import com.uxplima.uxmessentials.rest.route.RegionsRoutes;
 import com.uxplima.uxmessentials.rest.route.ScoreboardRoutes;
 import com.uxplima.uxmessentials.rest.route.SecurityRoutes;
+import com.uxplima.uxmessentials.rest.route.SkinRoutes;
 import com.uxplima.uxmessentials.rest.route.StaffRoutes;
 import com.uxplima.uxmessentials.rest.route.TeleportRoutes;
 import com.uxplima.uxmessentials.rest.route.TradeRoutes;
@@ -98,6 +99,7 @@ public final class Routes {
                 .addAll(RegionsRoutes.of(api))
                 .addAll(ScoreboardRoutes.of(api, actions))
                 .addAll(SecurityRoutes.of(api, actions))
+                .addAll(SkinRoutes.of(api))
                 .addAll(StaffRoutes.of(api))
                 .addAll(TeleportRoutes.of(api, actions))
                 .addAll(TradeRoutes.of(api))
@@ -160,6 +162,7 @@ public final class Routes {
         present.put("regions", api.regions().isPresent());
         present.put("invrollback", api.invRollback().isPresent());
         present.put("security", api.security().isPresent());
+        present.put("skin", api.skin().isPresent());
         present.put("npc", api.npc().isPresent());
         present.put("holograms", api.holograms().isPresent());
         present.put("staff", api.staff().isPresent());

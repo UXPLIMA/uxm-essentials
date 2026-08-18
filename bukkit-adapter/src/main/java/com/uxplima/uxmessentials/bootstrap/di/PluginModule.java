@@ -47,6 +47,7 @@ import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
+import com.uxplima.uxmessentials.api.query.UxmSkinQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
 import com.uxplima.uxmessentials.api.query.UxmVanishQuery;
@@ -244,6 +245,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RegistryModulesPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHologramsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryPlayerwarpsPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositorySkinPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWarpsPlaceholders;
@@ -282,6 +284,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.skin.adapter.SkinWiring;
+import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinQueries;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
@@ -1296,12 +1299,16 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("skin"))) {
-            wireSkin(plugin, ctx, persistence, resources);
+            wireSkin(plugin, ctx, persistence, resources, links);
         }
     }
 
     private static void wireSkin(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
         // skin builds its jOOQ repository over persistence.dsl() and registers the /skin command plus the pre-login
         // listener that dresses a joining player before their entity exists (no respawn, no re-send, no flicker).
         // Every lookup that leaves the server - a name at Mojang, an image at MineSkin, a Bedrock skin at the Geyser
@@ -1319,6 +1326,13 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired.stop());
+        // The published read is the player's own choice rather than the texture they wear: the blob means nothing
+        // outside a client, while the source is what a consumer can act on. Same cached store /skin info reads.
+        links.queries.register(
+                UxmSkinQuery.class,
+                new SkinQueries(wired.repository(), ctx.kernel().scheduler()));
+        // A HUD that shows what somebody chose reads the same cache, so a scoreboard refresh costs no query.
+        links.placeholders.skin(new RepositorySkinPlaceholders(wired.repository()));
     }
 
     private static void wireServerTweaks(

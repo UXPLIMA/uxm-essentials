@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.query.UxmScoreboardQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
+import com.uxplima.uxmessentials.api.query.UxmSkinQuery;
 import com.uxplima.uxmessentials.api.query.UxmStaffQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
@@ -201,6 +202,11 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmInvRollbackQuery> invRollback() {
         return queries.find(UxmInvRollbackQuery.class);
+    }
+
+    @Override
+    public Optional<UxmSkinQuery> skin() {
+        return queries.find(UxmSkinQuery.class);
     }
 
     @Override

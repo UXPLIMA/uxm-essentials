@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.query.UxmScoreboardQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
+import com.uxplima.uxmessentials.api.query.UxmSkinQuery;
 import com.uxplima.uxmessentials.api.query.UxmStaffQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
@@ -178,6 +179,9 @@ public interface UxmEssentialsApi {
 
     /** Reading the inventory snapshots held for a player, or empty when the invrollback module is switched off. */
     Optional<UxmInvRollbackQuery> invRollback();
+
+    /** Reading the skin a player chose, or empty when the skin module is switched off. */
+    Optional<UxmSkinQuery> skin();
 
     /** Reading which accounts hold a second factor, or empty when the security module is switched off. */
     Optional<UxmSecurityQuery> security();

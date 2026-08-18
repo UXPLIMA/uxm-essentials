@@ -11,11 +11,14 @@ final class ContentPlaceholderKeys {
     private static final ModuleId KITS = ModuleId.of("kits");
     private static final ModuleId VAULTS = ModuleId.of("vaults");
     private static final ModuleId VOTE = ModuleId.of("vote");
+    private static final ModuleId SKIN = ModuleId.of("skin");
 
     private ContentPlaceholderKeys() {}
 
     static List<PlaceholderSpec> all() {
-        return Stream.of(kits(), vaults(), votes()).flatMap(List::stream).toList();
+        return Stream.of(kits(), vaults(), votes(), skin())
+                .flatMap(List::stream)
+                .toList();
     }
 
     private static List<PlaceholderSpec> kits() {
@@ -110,5 +113,33 @@ final class ContentPlaceholderKeys {
                         "voteparty_required", "How many votes the party needs to fire.", PlaceholderScope.GLOBAL, VOTE),
                 PlaceholderSpec.of(
                         "voteparty_remaining", "How many votes the party still needs.", PlaceholderScope.GLOBAL, VOTE));
+    }
+
+    /**
+     * What the player chose, not what they happen to be wearing: a player who chose nothing reads the dash, since
+     * the join order's answer (their premium skin, their Bedrock skin, one of the pool) is not a choice of theirs.
+     */
+    private static List<PlaceholderSpec> skin() {
+        return List.of(
+                PlaceholderSpec.of(
+                        "skin_source",
+                        "Where the player's chosen skin came from: by-name, by-url, by-file, bedrock or fallback.",
+                        PlaceholderScope.PLAYER,
+                        SKIN),
+                PlaceholderSpec.of(
+                        "skin_value",
+                        "What that source names: the account, the link, the file or the Bedrock id.",
+                        PlaceholderScope.PLAYER,
+                        SKIN),
+                PlaceholderSpec.of(
+                        "skin_model",
+                        "The player model the skin was cut for: classic or slim.",
+                        PlaceholderScope.PLAYER,
+                        SKIN),
+                PlaceholderSpec.of(
+                        "skin_chosen",
+                        "Whether the player chose a skin of their own (yes/no).",
+                        PlaceholderScope.PLAYER,
+                        SKIN));
     }
 }

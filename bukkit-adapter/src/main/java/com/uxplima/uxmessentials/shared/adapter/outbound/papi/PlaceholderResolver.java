@@ -95,6 +95,7 @@ public final class PlaceholderResolver {
     private static final String COMMANDCONTROL_PREFIX = "commandcontrol_";
     private static final String COMMANDCONTROL_ALLOWED_PREFIX = "allowed_";
     private static final String INVROLLBACK_PREFIX = "invrollback_";
+    private static final String SKIN_PREFIX = "skin_";
     private static final String POSES_PREFIX = "poses_";
     private static final String WORLDS_PREFIX = "worlds_";
     private static final String MENU_PREFIX = "menu_";
@@ -266,6 +267,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(INVROLLBACK_PREFIX)) {
             return Optional.of(invrollback(who, normalized.substring(INVROLLBACK_PREFIX.length())));
+        }
+        if (normalized.startsWith(SKIN_PREFIX)) {
+            return Optional.of(skin(who, normalized.substring(SKIN_PREFIX.length())));
         }
         if (normalized.startsWith(POSES_PREFIX)) {
             return Optional.of(poses(who, online, normalized.substring(POSES_PREFIX.length())));
@@ -1714,6 +1718,25 @@ public final class PlaceholderResolver {
                         .orElse(EMPTY);
             case "last_cause" -> seam.get().lastCause(who).orElse(EMPTY);
             case "captured" -> bool(seam.get().lastCapture(who).isPresent());
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code skin_}-stripped key: which skin the player chose, where it came from and which model it was
+     * cut for. A player who chose nothing reads the dash rather than a guess at what the join order dressed them
+     * in, because only the choice is theirs.
+     */
+    private String skin(PlayerRef who, String key) {
+        Optional<SkinPlaceholders> seam = contexts.skin();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        return switch (key) {
+            case "source" -> seam.get().source(who).orElse(EMPTY);
+            case "value" -> seam.get().value(who).orElse(EMPTY);
+            case "model" -> seam.get().model(who).orElse(EMPTY);
+            case "chosen" -> bool(seam.get().source(who).isPresent());
             default -> EMPTY;
         };
     }

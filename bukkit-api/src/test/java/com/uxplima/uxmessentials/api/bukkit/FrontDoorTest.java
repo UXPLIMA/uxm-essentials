@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.query.UxmSecurityQuery;
+import com.uxplima.uxmessentials.api.query.UxmSkinQuery;
 import com.uxplima.uxmessentials.api.query.UxmStaffQuery;
 import com.uxplima.uxmessentials.api.query.UxmTeleportQuery;
 import com.uxplima.uxmessentials.api.query.UxmTradeQuery;
@@ -207,6 +208,11 @@ class FrontDoorTest {
 
         @Override
         public Optional<UxmInvRollbackQuery> invRollback() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<UxmSkinQuery> skin() {
             return Optional.empty();
         }
 

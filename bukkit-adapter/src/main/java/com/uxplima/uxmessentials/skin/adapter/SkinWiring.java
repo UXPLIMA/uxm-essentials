@@ -67,7 +67,7 @@ public final class SkinWiring {
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
 
-        SkinRepository repository = SkinRepositories.jooq(persistence);
+        SkinRepository repository = SkinRepositories.cached(persistence);
         SkinView view = new PaperSkinView(server, kernel.scheduler());
         MineSkinService mineSkins = new MineSkinService(
                 kernel.scheduler(),
