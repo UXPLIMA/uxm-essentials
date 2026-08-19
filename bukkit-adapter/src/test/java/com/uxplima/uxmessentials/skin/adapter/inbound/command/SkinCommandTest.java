@@ -19,6 +19,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestion;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -76,6 +77,7 @@ class SkinCommandTest {
     private Names names;
     private Gate cooldowns;
     private SkinConfig config;
+    private List<String> skinFiles = List.of();
 
     @BeforeEach
     void setUp() {
@@ -253,6 +255,35 @@ class SkinCommandTest {
         assertThat(lines(player)).contains("skin.usage");
     }
 
+    @Test
+    void theNameFormCompletesAgainstThePlayersWhoAreOnline() {
+        PlayerMock player = allowed("Wearer");
+        server.addPlayer("Notch");
+
+        assertThat(suggestions(player, "skin ")).contains("Notch", "Wearer");
+        assertThat(suggestions(player, "skin set No")).containsExactly("Notch");
+    }
+
+    @Test
+    void theStaffFormCompletesTheTargetTheSameWay() {
+        PlayerMock staff = allowed("Staff");
+        server.addPlayer("Wearer");
+
+        assertThat(suggestions(staff, "skin set Notch ")).contains("Wearer", "Staff");
+        assertThat(suggestions(staff, "skin info Wea")).containsExactly("Wearer");
+        assertThat(suggestions(staff, "skin drop Wea")).containsExactly("Wearer");
+        assertThat(suggestions(staff, "skin clear Wea")).containsExactly("Wearer");
+    }
+
+    @Test
+    void theFileFormCompletesTheSkinsTheOperatorDropped() {
+        skinFiles = List.of("knight", "pirate");
+        PlayerMock player = allowed("Wearer");
+
+        assertThat(suggestions(player, "skin file ")).containsExactly("knight", "pirate");
+        assertThat(suggestions(player, "skin file kn")).containsExactly("knight");
+    }
+
     /** A player holding every {@code uxmessentials.skin.*} node the command gates on. */
     private PlayerMock allowed(String name) {
         PlayerMock player = server.addPlayer(name);
@@ -269,6 +300,15 @@ class SkinCommandTest {
         } catch (CommandSyntaxException failure) {
             throw new AssertionError(failure.getMessage(), failure);
         }
+    }
+
+    /** What the client would show after {@code input}, in the order the command offers it. */
+    private List<String> suggestions(PlayerMock player, String input) {
+        CommandSourceStack source = CommandSourceStackMock.from(player);
+        CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
+        return dispatcher.getCompletionSuggestions(dispatcher.parse(input, source)).join().getList().stream()
+                .map(Suggestion::getText)
+                .toList();
     }
 
     private CommandDispatcher<CommandSourceStack> dispatcher() {
@@ -291,6 +331,7 @@ class SkinCommandTest {
                 new DescribeSkin(repository),
                 new PurgeSkinCache(textures),
                 names,
+                () -> skinFiles,
                 new InlineScheduler(),
                 new KeyMessages());
     }

@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.skin.adapter.inbound.listener.SkinLoginListener
 import com.uxplima.uxmessentials.skin.adapter.outbound.GeyserBedrockSkins;
 import com.uxplima.uxmessentials.skin.adapter.outbound.MineSkinUploads;
 import com.uxplima.uxmessentials.skin.adapter.outbound.PaperSkinView;
+import com.uxplima.uxmessentials.skin.adapter.outbound.SkinFolderNames;
 import com.uxplima.uxmessentials.skin.application.ClearSkin;
 import com.uxplima.uxmessentials.skin.application.DescribeSkin;
 import com.uxplima.uxmessentials.skin.application.DressLogin;
@@ -74,7 +75,9 @@ public final class SkinWiring {
                 kernel.log(),
                 new HttpClientFetcher(kernel.log(), MineSkinService.GENERATE_TIMEOUT),
                 config.mineskinApiKey());
-        MineSkinUploads uploads = new MineSkinUploads(mineSkins, dataFolder.resolve(config.skinFolder()), kernel.log());
+        Path skinFolder = dataFolder.resolve(config.skinFolder());
+        MineSkinUploads uploads = new MineSkinUploads(mineSkins, skinFolder, kernel.log());
+        SkinFolderNames skinFiles = new SkinFolderNames(skinFolder, kernel.scheduler(), kernel.log(), clock);
         BedrockSkins bedrockSkins = new GeyserBedrockSkins(
                 GeyserBedrockSkins.XuidLookup.of(bedrock::xuid),
                 new HttpClientFetcher(kernel.log()),
@@ -101,6 +104,7 @@ public final class SkinWiring {
                 new DescribeSkin(repository),
                 new PurgeSkinCache(kernel.skins()),
                 kernel.playerLookup(),
+                skinFiles::get,
                 kernel.scheduler(),
                 kernel.messages());
 

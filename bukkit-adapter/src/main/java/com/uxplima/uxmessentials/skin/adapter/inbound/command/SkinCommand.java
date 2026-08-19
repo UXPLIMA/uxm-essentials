@@ -3,10 +3,12 @@ package com.uxplima.uxmessentials.skin.adapter.inbound.command;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -16,10 +18,12 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -77,6 +81,7 @@ public final class SkinCommand implements CommandRegistration {
     private final DescribeSkin describeSkin;
     private final PurgeSkinCache purgeCache;
     private final PlayerLookup names;
+    private final Supplier<Collection<String>> skinFiles;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
 
@@ -88,6 +93,7 @@ public final class SkinCommand implements CommandRegistration {
             DescribeSkin describeSkin,
             PurgeSkinCache purgeCache,
             PlayerLookup names,
+            Supplier<Collection<String>> skinFiles,
             Scheduler scheduler,
             Messages messages) {
         this.setSkin = Objects.requireNonNull(setSkin, "setSkin");
@@ -97,6 +103,7 @@ public final class SkinCommand implements CommandRegistration {
         this.describeSkin = Objects.requireNonNull(describeSkin, "describeSkin");
         this.purgeCache = Objects.requireNonNull(purgeCache, "purgeCache");
         this.names = Objects.requireNonNull(names, "names");
+        this.skinFiles = Objects.requireNonNull(skinFiles, "skinFiles");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
@@ -109,9 +116,9 @@ public final class SkinCommand implements CommandRegistration {
                         || src.getSender().hasPermission(INFO))
                 .then(Commands.literal("set")
                         .requires(src -> src.getSender().hasPermission(USE))
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(nameArgument()
                                 .executes(ctx -> byName(ctx, null))
-                                .then(Commands.argument("player", StringArgumentType.word())
+                                .then(CommandSuggestions.playerArgument("player")
                                         .requires(src -> src.getSender().hasPermission(OTHER))
                                         .executes(ctx -> byName(ctx, StringArgumentType.getString(ctx, "player"))))))
                 .then(Commands.literal("url")
@@ -122,12 +129,13 @@ public final class SkinCommand implements CommandRegistration {
                 .then(Commands.literal("file")
                         .requires(src -> src.getSender().hasPermission(FILE))
                         .then(Commands.argument("file", StringArgumentType.word())
+                                .suggests(CommandSuggestions.fromStrings(skinFiles))
                                 .executes(ctx -> fromUpload(ctx, false, false))
                                 .then(Commands.literal(SLIM).executes(ctx -> fromUpload(ctx, false, true)))))
                 .then(Commands.literal("clear")
                         .requires(src -> src.getSender().hasPermission(USE))
                         .executes(ctx -> clear(ctx, null))
-                        .then(Commands.argument("player", StringArgumentType.word())
+                        .then(CommandSuggestions.playerArgument("player")
                                 .requires(src -> src.getSender().hasPermission(OTHER))
                                 .executes(ctx -> clear(ctx, StringArgumentType.getString(ctx, "player")))))
                 .then(Commands.literal("update")
@@ -135,21 +143,27 @@ public final class SkinCommand implements CommandRegistration {
                         .executes(this::update))
                 .then(Commands.literal("drop")
                         .requires(src -> src.getSender().hasPermission(DROP))
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .executes(this::drop)))
+                        .then(CommandSuggestions.playerArgument("player").executes(this::drop)))
                 .then(Commands.literal("info")
                         .requires(src -> src.getSender().hasPermission(INFO))
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .executes(this::info)))
+                        .then(CommandSuggestions.playerArgument("player").executes(this::info)))
                 .then(Commands.literal("purge")
                         .requires(src -> src.getSender().hasPermission(PURGE))
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::purge)))
-                .then(Commands.argument("name", StringArgumentType.word())
+                        .then(nameArgument().executes(this::purge)))
+                .then(nameArgument()
                         .requires(src -> src.getSender().hasPermission(USE))
                         .executes(ctx -> byName(ctx, null)))
                 .executes(this::usage)
                 .build();
+    }
+
+    /**
+     * The account-name argument every by-name branch shares. A skin is named after the account wearing it, so the
+     * completion offers the players online right now; any other name still parses, since most skins belong to an
+     * account nobody on this server is logged in as.
+     */
+    private static RequiredArgumentBuilder<CommandSourceStack, String> nameArgument() {
+        return Commands.argument("name", StringArgumentType.word()).suggests(CommandSuggestions.onlinePlayers());
     }
 
     @Override
