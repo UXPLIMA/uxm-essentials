@@ -1,16 +1,25 @@
 # uxmEssentials
 
-[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Java 25](https://img.shields.io/badge/Java-25-orange.svg)](https://adoptium.net/)
-[![Paper 26.2](https://img.shields.io/badge/Paper-26.2-brightgreen.svg)](https://papermc.io/)
-[![Folia](https://img.shields.io/badge/Folia-ready-success.svg)](https://docs.papermc.io/folia)
-[![Modules](https://img.shields.io/badge/modules-34-blueviolet.svg)](#modules)
-[![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)](#)
+<div align="center">
+
+[![Read the Documentation](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/documentation/gitbook_vector.svg)](https://docs.uxplima.com/minecraft/plugins/uxmessentials/getting-started/welcome)
+[![Chat with us on Discord](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/social/discord-plural_vector.svg)](https://discord.gg/uxplima)
+[![Available on Modrinth](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/available/modrinth_vector.svg)](https://modrinth.com/plugin/uxmessentials)
+[![Available on Hangar](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/available/hangar_vector.svg)](https://hangar.papermc.io/UXPLIMA/uxmEssentials)
+
+![Available for Paper](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/paper_vector.svg)
+![Available for Purpur](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/purpur_vector.svg)
+![Available for Velocity](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/velocity_vector.svg)
+![Built with Java 25](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/built-with/java25_vector.svg)
+
+**Paper 26.2+ &nbsp;·&nbsp; Folia ready &nbsp;·&nbsp; 35 modules &nbsp;·&nbsp; [GPL-3.0](LICENSE)**
+
+</div>
 
 The all-in-one essentials suite for **Paper 26.2** servers, on **Java 25**. Homes, warps, teleports, a
 real economy, kits, vaults, ranks, cross-server trade, moderation, a staff mode, vanish, holograms, NPCs,
 scoreboards, a vote engine, multi-world management (the entire day-to-day toolkit a survival or network server
-needs), built as **34 independent feature modules** behind one clean, fully configurable plugin.
+needs), built as **35 independent feature modules** behind one clean, fully configurable plugin.
 
 Every module is its own bounded context: turn one off and it wires *nothing*: no commands, no listeners, no
 database tables, no runtime cost. Everything a player ever sees resolves through a per-locale message catalog,
@@ -56,7 +65,7 @@ extensive MockBukkit/JUnit test suite.
 
 - **One platform, done well.** Paper 26.2 and Java 25 only: no legacy cross-version reflection to drag
   around, just the current server API used natively.
-- **Genuinely modular.** Thirty-four feature modules, each toggled on its own. A disabled module instantiates
+- **Genuinely modular.** Thirty-five feature modules, each toggled on its own. A disabled module instantiates
   zero adapters, registers zero commands and listeners, runs zero migrations, and holds zero state.
 - **Configure in-game.** Every module has a management GUI reachable from `/uxmess gui`: edit a hologram, an
   NPC, a warp, a vault, or a punishment by clicking. Every screen in the plugin renders through one data-driven
@@ -88,20 +97,21 @@ extensive MockBukkit/JUnit test suite.
 
 ## Installation
 
-1. Download `uxmEssentials-0.5.0.jar` and drop it in your server's `plugins/` folder.
+1. Download `uxmEssentials-0.8.0.jar` and drop it in your server's `plugins/` folder.
 2. Start the server once. uxmEssentials creates `plugins/uxmEssentials/` with a shared `config.conf`, a
    `commands.conf`, a `config.conf` per module under `modules/`, the message catalogs, and the GUI layouts.
 3. Edit what you want, then `/uxmess reload <module>` (or restart). That's it.
 
-Three optional companion jars extend the suite onto other platforms; see
+Four optional companion jars extend the suite onto other platforms; see
 [Cross-server & Discord add-ons](#cross-server--discord-add-ons):
 
 | Jar | Where it goes | What it adds |
 | --- | --- | --- |
-| `uxmEssentials-0.5.0.jar` | Paper `plugins/` | The plugin itself (required). |
-| `uxmEssentials-velocity-0.5.0.jar` | Velocity `plugins/` | Proxy-side bus broker: relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
-| `uxmEssentials-redis-0.5.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus: the same sync over Redis pub/sub, with no proxy required. |
-| `uxmEssentials-discord-0.5.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
+| `uxmEssentials-0.8.0.jar` | Paper `plugins/` | The plugin itself (required). |
+| `uxmEssentials-velocity-0.8.0.jar` | Velocity `plugins/` | Proxy-side bus broker: relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
+| `uxmEssentials-redis-0.8.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus: the same sync over Redis pub/sub, with no proxy required. |
+| `uxmEssentials-discord-0.8.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
+| `uxmEssentials-rest-0.8.0.jar` | Paper `plugins/` | An HTTP + WebSocket API over the developer API: read and write every context from outside the server, with in-game token management. |
 
 ## Modules
 
@@ -131,6 +141,7 @@ database-backed so they survive rollbacks.
 | **invrollback** | Snapshots every death and logout (main, armor, offhand, ender-chest) with a configurable retention window; `/invrestore` opens a GUI of a player's past snapshots to restore from. |
 | **messaging** | Private messages (`/msg`, `/r`), a mailbox (`/mail`) with offline-message fallback and `/mail sendall`, AFK notices, and a per-player ignore list. |
 | **communication** | Public chat formatting (LuckPerms prefix / suffix + MiniMessage + PAPI), per-cause death and per-rank join messages, a first-join welcome and MOTD, a killer-weapon placeholder, plus multi-channel scheduled announcements (conditional, with placeholders), broadcasts, clear-chat, custom advancement notifications, and `/info` pages. |
+| **skin** | Player skins on any server, premium or cracked: `/skin set <name|url>`, `/skin clear`, a skin picker GUI, saved custom skins, per-rank cooldowns, and MineSkin-signed uploads, applied without a relog. |
 | **presence** | Nicknames, presence status, and display-name management. |
 | **playerstate** | Gamemode / heal / feed / fly / god / speed, and inventory inspection: `/invsee` and `/endersee`, offline-capable through a quarantined NMS seam. |
 | **holograms** | `Display`-entity holograms: multi-line, multi-page (per-viewer click-to-cycle), provider-driven leaderboards, click-action chains, inline animations, per-player visibility and per-hologram blacklists, glow colour and opacity, link-to-NPC follow, plus FancyHolograms and DecentHolograms importers. |
@@ -158,6 +169,7 @@ Ranks & trade    /rankup /prestige /ranks /setrank      /trade
 Kits & vaults    /kit /kits        /vault
 Survival         /treefeller /veinminer /autopickup /autosmelt /autosell /autotool /farmprotect
 Player state     /gm(s/c/sp/a) /heal /feed /fly /god /speed /more /repair   /invsee /endersee
+Appearance       /skin /nick
 Messaging        /msg (/w /tell) /reply (/r)  /mail   /afk   /ignore
 Moderation       /ban /tempban /unban /mute /kick /warn /jail /history /checkban   /banip   /invrestore
 Staff & security /staff /vanish /freeze /staffchat (/sc) /stafflist   /2fa /pin /ipalts
@@ -218,7 +230,9 @@ commands {
 ### Messages & localisation
 
 Every player-facing line is a key in `messages/messages_<lang>.conf`, written in MiniMessage and resolved
-through a shared style theme (one palette, consistent titles and prefixes). Ship a new locale by dropping in
+through a shared style theme (one palette, consistent titles and prefixes). Twelve catalogs ship in the jar
+(English, Turkish, German, Russian, Spanish, Portuguese, French, Polish, Ukrainian, Chinese, Japanese, Korean);
+a key a translation has not reached yet falls back to English on its own. Ship another locale by dropping in
 `messages_<lang>.conf`; per-player locale is honoured automatically.
 
 ```hocon
@@ -311,9 +325,9 @@ network {
 }
 ```
 
-- **Velocity**: drop `uxmEssentials-velocity-0.5.0.jar` on the proxy and the bus rides a proxy-side broker
+- **Velocity**: drop `uxmEssentials-velocity-0.8.0.jar` on the proxy and the bus rides a proxy-side broker
   over plugin messaging.
-- **Redis**: drop `uxmEssentials-redis-0.5.0.jar` on each backend and point `network.redis` at a Redis
+- **Redis**: drop `uxmEssentials-redis-0.8.0.jar` on each backend and point `network.redis` at a Redis
   server; the same bus then runs over Redis pub/sub with **no Velocity proxy required**: a plain set of
   backends sharing a database and a Redis instance sync directly.
 - **both**: run both transports at once (handy mid-migration); a frame goes out on each.
@@ -322,8 +336,11 @@ Either way the sync covers homes, warps, player-warps, economy, vaults, trade, v
 NPCs, the vote party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
 local-only; the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
 
-- **Discord**: drop `uxmEssentials-discord-0.5.0.jar` on a Paper node to bridge account linking and push
+- **Discord**: drop `uxmEssentials-discord-0.8.0.jar` on a Paper node to bridge account linking and push
   audit and economy notifications through JDA.
+
+- **REST**: drop `uxmEssentials-rest-0.8.0.jar` on a Paper node to expose the developer API over HTTP and a
+  WebSocket event stream, with tokens created and revoked in game.
 
 ## Permissions
 
@@ -373,7 +390,7 @@ Requires a JDK 25 toolchain (Gradle provisions one via the Foojay resolver if ne
 ## Versioning
 
 uxmEssentials follows semantic versioning. Pre-1.0 (`0.x`) releases may still adjust configuration and
-behaviour between minor versions as the surface settles; the current release is **0.5.0**.
+behaviour between minor versions as the surface settles; the current release is **0.8.0**.
 
 ## Contributing
 
