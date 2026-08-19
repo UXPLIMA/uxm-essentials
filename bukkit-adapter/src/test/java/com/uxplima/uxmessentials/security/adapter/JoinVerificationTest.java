@@ -86,6 +86,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.testing.DamageEvents;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -457,7 +458,7 @@ class JoinVerificationTest {
         PlayerMock player = joinedPlayerWithPin();
         double before = player.getHealth();
 
-        EntityDamageEvent damage = new EntityDamageEvent(
+        EntityDamageEvent damage = DamageEvents.of(
                 player, DamageCause.FALL, DamageSource.builder(DamageType.FALL).build(), 5.0);
         server.getPluginManager().callEvent(damage);
 
@@ -506,7 +507,7 @@ class JoinVerificationTest {
                         plugin);
         PlayerMock player = joinedPlayerWithPin();
 
-        EntityDamageEvent damage = new EntityDamageEvent(
+        EntityDamageEvent damage = DamageEvents.of(
                 player, DamageCause.FALL, DamageSource.builder(DamageType.FALL).build(), 5.0);
         server.getPluginManager().callEvent(damage);
         assertThat(damage.isCancelled()).isFalse();

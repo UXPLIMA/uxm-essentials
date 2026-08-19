@@ -21,7 +21,7 @@ dependencies {
     // One coordinate. The pure view types in uxmessentials-api arrive with it, through the POM, which is
     // exactly the arrangement this build exists to prove.
     compileOnly("com.uxplima.uxmessentials:uxmessentials-bukkit-api:$uxmVersion")
-    compileOnly("io.papermc.paper:paper-api:26.1.2.build.71-stable")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.112-stable")
 }
 
 java {

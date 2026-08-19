@@ -16,6 +16,7 @@ import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.entity.EntityTransformEvent.TransformReason;
 
 import com.destroystokyo.paper.event.entity.EntityAddToWorldEvent;
+import com.uxplima.uxmessentials.testing.DamageEvents;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.listener.VillagerProtectionListener;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.PdcVillagerFlags;
 import com.uxplima.uxmessentials.villagers.domain.VillagerProtectionPolicy;
@@ -197,6 +198,6 @@ class VillagerProtectionListenerTest {
     }
 
     private EntityDamageEvent damage(DamageCause cause, DamageType type) {
-        return new EntityDamageEvent(villager, cause, DamageSource.builder(type).build(), 100.0);
+        return DamageEvents.of(villager, cause, DamageSource.builder(type).build(), 100.0);
     }
 }

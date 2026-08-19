@@ -47,7 +47,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
  * Golden renders of the lore-append modes and the three native icon sources — a serialized {@code b64:} stack, the
  * {@code water_bottle} keyword, and {@code light:<n>}. Each item is rendered through the real {@link ItemRenderer}
  * (built with the composition root's {@link IconProviders#full full} chain, where those providers live) against
- * MockBukkit so the outcome is asserted on a concrete {@link ItemStack}. MockBukkit v26.1.2 round-trips a stack's
+ * MockBukkit so the outcome is asserted on a concrete {@link ItemStack}. MockBukkit v26.2 round-trips a stack's
  * lore through the {@code b64:} codec, so the append/prepend/replace merge is asserted concretely; the potion
  * base-type and block-data level it does not fully model are asserted as a valid item that never throws (they still
  * apply on real Paper), the same fail-soft split the rich-meta tests take.

@@ -53,7 +53,8 @@ public final class BukkitWorldSettingApplier implements WorldSettingApplier {
         }
         world.setPVP(settings.get(WorldProperties.PVP));
         world.setDifficulty(toBukkit(settings.get(WorldProperties.DIFFICULTY)));
-        world.setSpawnFlags(settings.get(WorldProperties.SPAWN_MONSTERS), settings.get(WorldProperties.SPAWN_ANIMALS));
+        world.setAllowMonsterSpawning(settings.get(WorldProperties.SPAWN_MONSTERS));
+        // Paper 26.2 removed the animal half of the old spawn flags; AnimalSpawnListener holds that setting now.
         applyTime(world, settings);
         applyWeather(world, settings);
         applySpawn(world, settings);

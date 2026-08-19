@@ -178,7 +178,7 @@ jobs:
                  changelog: $changelog,
                  version_type: "alpha",
                  loaders: $loaders,
-                 game_versions: ["26.1", "26.1.1", "26.1.2", "26.2"],
+                 game_versions: ["26.2"],
                  dependencies: [],
                  featured: true,
                  file_parts: ["file"],
@@ -294,7 +294,7 @@ jobs:
             fi
           }
 
-          PAPER_VERSIONS='["26.1", "26.1.1", "26.1.2", "26.2"]'
+          PAPER_VERSIONS='["26.2"]'
 
           publish uxmEssentials PAPER "$PAPER_VERSIONS" \
             "bukkit-adapter/build/libs/uxmEssentials-${version}.jar" "$MAIN_DEPS"

@@ -17,6 +17,7 @@ import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.testing.DamageEvents;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.PdcVanishPickup;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
@@ -167,7 +168,7 @@ class VanishProtectionListenerTest {
     }
 
     private static EntityDamageEvent damage(PlayerMock player) {
-        return new EntityDamageEvent(
+        return DamageEvents.of(
                 player,
                 DamageCause.CUSTOM,
                 DamageSource.builder(DamageType.GENERIC).build(),

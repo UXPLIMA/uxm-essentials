@@ -60,17 +60,16 @@ class BukkitWorldSettingApplierTest {
     }
 
     @Test
-    void appliesSpawnFlagsAndIntegerGamerule() {
+    void appliesMonsterSpawningAndIntegerGamerule() {
         World world = server.getWorld("w");
         var settings = WorldSettings.defaults()
                 .with(WorldProperties.SPAWN_MONSTERS, false)
-                .with(WorldProperties.SPAWN_ANIMALS, false)
                 .withRaw(WorldSettings.gameruleKey(GameRule.RANDOM_TICK_SPEED.getName()), "7");
 
         applier.apply(WorldName.of("w"), settings);
 
+        // The animal half of the old spawn flags is gone from the server API; AnimalSpawnListener holds it.
         assertThat(world.getAllowMonsters()).isFalse();
-        assertThat(world.getAllowAnimals()).isFalse();
         assertThat(world.getGameRuleValue(GameRule.RANDOM_TICK_SPEED)).isEqualTo(7);
     }
 

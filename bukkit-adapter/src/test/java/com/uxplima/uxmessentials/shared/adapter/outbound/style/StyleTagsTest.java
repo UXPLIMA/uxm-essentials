@@ -42,7 +42,7 @@ class StyleTagsTest {
             Component node = queue.removeFirst();
             if (node instanceof net.kyori.adventure.text.TextComponent textNode
                     && textNode.content().equals(text)) {
-                return node.color();
+                return java.util.Objects.requireNonNull(node.color(), "run '" + text + "' carries no colour");
             }
             queue.addAll(node.children());
         }

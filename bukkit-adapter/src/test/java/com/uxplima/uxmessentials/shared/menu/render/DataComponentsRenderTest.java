@@ -120,7 +120,7 @@ class DataComponentsRenderTest {
 
     @Test
     void tooltipStyleFoodAndToolNeverAbortTheRender() {
-        // These three lean on components MockBukkit-v26.1.2 drops on a stack copy (its ItemMeta copy constructor
+        // These three lean on components MockBukkit-v26.2 drops on a stack copy (its ItemMeta copy constructor
         // carries rarity/hide-tooltip/glint/enchantable/attribute-modifiers but not tooltip-style/food/tool), so the
         // contract here is a valid item with no throw; they apply on real Paper, where the copy preserves them.
         assertThatCode(() -> render("DIAMOND", "tooltip-style = \"minecraft:fancy\""))

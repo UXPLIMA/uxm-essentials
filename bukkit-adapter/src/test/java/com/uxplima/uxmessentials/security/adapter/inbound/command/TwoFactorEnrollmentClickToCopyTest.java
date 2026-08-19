@@ -36,7 +36,7 @@ class TwoFactorEnrollmentClickToCopyTest {
     void theEnrolmentSecretComponentCopiesTheRawSecret(@TempDir Path dir) {
         String secret = "JBSWY3DPEHPK3PXP";
 
-        ClickEvent click = copyClick(render(dir, SETUP_SECRET, "secret", secret));
+        ClickEvent<?> click = copyClick(render(dir, SETUP_SECRET, "secret", secret));
 
         assertThat(click.action()).isEqualTo(ClickEvent.Action.COPY_TO_CLIPBOARD);
         assertThat(copiedText(click)).isEqualTo(secret);
@@ -47,14 +47,14 @@ class TwoFactorEnrollmentClickToCopyTest {
         String uri = "otpauth://totp/uxmEssentials:Steve?secret=JBSWY3DPEHPK3PXP"
                 + "&issuer=uxmEssentials&algorithm=SHA1&digits=6&period=30";
 
-        ClickEvent click = copyClick(render(dir, SETUP_URI, "uri", uri));
+        ClickEvent<?> click = copyClick(render(dir, SETUP_URI, "uri", uri));
 
         assertThat(click.action()).isEqualTo(ClickEvent.Action.COPY_TO_CLIPBOARD);
         assertThat(copiedText(click)).isEqualTo(uri);
     }
 
     /** The raw string the click event copies, read through the non-deprecated text payload. */
-    private static String copiedText(ClickEvent click) {
+    private static String copiedText(ClickEvent<?> click) {
         assertThat(click.payload()).isInstanceOf(ClickEvent.Payload.Text.class);
         return ((ClickEvent.Payload.Text) click.payload()).value();
     }
@@ -67,17 +67,17 @@ class TwoFactorEnrollmentClickToCopyTest {
     }
 
     /** The first copy-to-clipboard click event anywhere in the component tree, or a failed assertion. */
-    private static ClickEvent copyClick(Component component) {
+    private static ClickEvent<?> copyClick(Component component) {
         return firstCopyClick(component).orElseThrow(() -> new AssertionError("no copy-to-clipboard click event"));
     }
 
-    private static Optional<ClickEvent> firstCopyClick(Component component) {
-        ClickEvent click = component.clickEvent();
+    private static Optional<ClickEvent<?>> firstCopyClick(Component component) {
+        ClickEvent<?> click = component.clickEvent();
         if (click != null && click.action() == ClickEvent.Action.COPY_TO_CLIPBOARD) {
             return Optional.of(click);
         }
         for (Component child : component.children()) {
-            Optional<ClickEvent> found = firstCopyClick(child);
+            Optional<ClickEvent<?>> found = firstCopyClick(child);
             if (found.isPresent()) {
                 return found;
             }

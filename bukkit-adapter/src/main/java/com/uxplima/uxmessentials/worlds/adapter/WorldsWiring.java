@@ -37,6 +37,7 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGridMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainMenu;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.AnimalSpawnListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
@@ -285,8 +286,11 @@ public final class WorldsWiring {
         };
         events.subscribe(applySubscriber);
 
-        List<Listener> listeners =
-                List.of(new ForceGamemodeListener(repository, kernel.scheduler()), accessListener, portalListener);
+        List<Listener> listeners = List.of(
+                new ForceGamemodeListener(repository, kernel.scheduler()),
+                new AnimalSpawnListener(repository),
+                accessListener,
+                portalListener);
         List<CommandRegistration> commands = WorldCommands.all(services, kernel.messages());
         Runnable startReconcile = () -> kernel.scheduler().onGlobal(() -> {
             reconcile.run();

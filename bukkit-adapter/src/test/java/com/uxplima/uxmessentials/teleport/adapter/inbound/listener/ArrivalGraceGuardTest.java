@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.domain.ArrivalGraceSettings;
+import com.uxplima.uxmessentials.testing.DamageEvents;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,7 +92,7 @@ class ArrivalGraceGuardTest {
         ArrivalGraceGuard guard = guard(ON);
         guard.applyOnArrival(ref(player));
 
-        EntityDamageEvent lava = new EntityDamageEvent(
+        EntityDamageEvent lava = DamageEvents.of(
                 player, DamageCause.LAVA, DamageSource.builder(DamageType.LAVA).build(), 4.0);
         guard.onDamage(lava);
 
@@ -103,7 +104,7 @@ class ArrivalGraceGuardTest {
     }
 
     private static EntityDamageEvent fallDamage(PlayerMock player) {
-        return new EntityDamageEvent(
+        return DamageEvents.of(
                 player, DamageCause.FALL, DamageSource.builder(DamageType.FALL).build(), 6.0);
     }
 
