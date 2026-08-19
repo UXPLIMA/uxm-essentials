@@ -35,7 +35,41 @@ class HoconLocaleCatalogTest {
         // The bundled default is the base layer, so a key only the bundled catalog carries resolves to real text
         // (not the raw key name it would fall back to if only the disk file were read).
         assertThat(catalog.template(Locale.ENGLISH, BUNDLED_ONLY)).isNotEqualTo(BUNDLED_ONLY.key());
-        // The operator's on-disk value still wins for a key the disk file declares.
-        assertThat(catalog.template(Locale.ENGLISH, DISK_ONLY)).isEqualTo("on disk only");
+        // The operator's on-disk value still wins for a key the disk file declares. English asks for the
+        // small-capital typography, so the value the operator wrote is rendered in it.
+        assertThat(catalog.template(Locale.ENGLISH, DISK_ONLY)).isEqualTo("ᴏɴ ᴅɪꜱᴋ ᴏɴʟʏ");
+    }
+
+    @Test
+    void aCatalogThatDeclinesSmallCapitalsKeepsItsOwnLetters(@TempDir Path dir) throws Exception {
+        Files.writeString(
+                dir.resolve("messages_tr.conf"),
+                "\"meta.small-caps\" = \"false\"\n\"custom.disk.key\" = \"yetkin yok\"\n",
+                StandardCharsets.UTF_8);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+
+        assertThat(catalog.template(Locale.forLanguageTag("tr"), DISK_ONLY)).isEqualTo("yetkin yok");
+    }
+
+    @Test
+    void aCatalogMayAskForSmallCapitalsItself(@TempDir Path dir) throws Exception {
+        Files.writeString(
+                dir.resolve("messages_de.conf"),
+                "\"meta.small-caps\" = \"true\"\n\"custom.disk.key\" = \"nur auf der platte\"\n",
+                StandardCharsets.UTF_8);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+
+        assertThat(catalog.template(Locale.GERMAN, DISK_ONLY)).isEqualTo("ɴᴜʀ ᴀᴜꜰ ᴅᴇʀ ᴘʟᴀᴛᴛᴇ");
+    }
+
+    @Test
+    void aMetaSettingIsNotAMessage(@TempDir Path dir) throws Exception {
+        Files.writeString(
+                dir.resolve("messages_en.conf"),
+                "\"meta.small-caps\" = \"false\"\n\"custom.disk.key\" = \"on disk only\"\n",
+                StandardCharsets.UTF_8);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+
+        assertThat(catalog.template(Locale.ENGLISH, () -> "meta.small-caps")).isEqualTo("meta.small-caps");
     }
 }

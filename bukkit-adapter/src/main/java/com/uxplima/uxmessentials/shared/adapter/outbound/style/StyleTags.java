@@ -109,6 +109,9 @@ public final class StyleTags {
                         Placeholder.styling("rank", RANK),
                         Placeholder.styling("event", EVENT),
                         Placeholder.styling("title", BODY),
+                        // Carries no style of its own: it marks the text a catalog line wants left in
+                        // ordinary letters, which the typography pass reads before MiniMessage sees it.
+                        Placeholder.styling("plain"),
                         categoryPrefix("tag"),
                         errorPrefix("etag"),
                         labelledPrefix("helpop", "helpop"),

@@ -23,6 +23,10 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 final class CatalogKeys {
 
     static final String PREFIX_KEY = "prefix";
+
+    /** Keys under this prefix configure the catalog (its typography); they are not player-facing messages. */
+    static final String META_PREFIX = "meta.";
+
     private static final String RESOURCE_DIR = "messages/";
 
     private CatalogKeys() {}
@@ -47,7 +51,7 @@ final class CatalogKeys {
             ConfigurationNode root = load(in);
             for (Object key : root.childrenMap().keySet()) {
                 String name = String.valueOf(key);
-                if (!PREFIX_KEY.equals(name)) {
+                if (!PREFIX_KEY.equals(name) && !name.startsWith(META_PREFIX)) {
                     keys.add(name);
                 }
             }
@@ -63,7 +67,7 @@ final class CatalogKeys {
         languages.add(Locale.ENGLISH.getLanguage());
         // The shipped extra locales are enumerated here so the gate has a deterministic set to check
         // without scanning the jar; adding a locale file means adding its code to this list.
-        for (String candidate : new String[] {"tr", "de", "fr", "es"}) {
+        for (String candidate : new String[] {"tr", "de", "ru", "es", "pt", "fr", "pl", "uk", "zh", "ja", "ko"}) {
             if (exists(candidate)) {
                 languages.add(candidate);
             }

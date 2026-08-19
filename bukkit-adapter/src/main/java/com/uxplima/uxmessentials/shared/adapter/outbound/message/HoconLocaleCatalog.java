@@ -43,6 +43,12 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
 
     private static final String RESOURCE_DIR = "messages/";
 
+    /** Keys under this prefix configure the catalog itself; they are not messages and are never handed out. */
+    private static final String META_PREFIX = "meta.";
+
+    /** Whether a catalog's own text is written in small capitals when it is rendered. */
+    private static final String SMALL_CAPS_KEY = META_PREFIX + "small-caps";
+
     private final Logger log;
     private final Path messagesDir;
     private final ConcurrentHashMap<String, Map<String, String>> byLanguage = new ConcurrentHashMap<>();
@@ -98,17 +104,30 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     private Map<String, String> loadLanguage(String language) {
         Map<String, String> bundled = loadBundled(language);
         Map<String, String> onDisk = loadOnDisk(language);
-        if (onDisk.isEmpty()) {
-            return bundled;
-        }
-        if (bundled.isEmpty()) {
-            return onDisk;
-        }
         // Bundled default is the base; the operator's on-disk file overrides it per key. A key the operator kept
         // resolves from disk; a key an update added but the disk file never had resolves from the bundled default.
         Map<String, String> merged = new java.util.HashMap<>(bundled);
         merged.putAll(onDisk);
-        return Map.copyOf(merged);
+        return styled(merged, language);
+    }
+
+    /**
+     * The table a caller sees: the {@code meta.} settings are consumed here, and when this catalog asks for the
+     * small-capital typography its text is converted once, now, rather than on every message it renders. A
+     * catalog whose language has no small capitals (Cyrillic, Chinese, Japanese, Korean) or whose letters would
+     * only half convert (Turkish, German, Polish) simply leaves the setting off and keeps its own letters.
+     */
+    private static Map<String, String> styled(Map<String, String> merged, String language) {
+        boolean smallCaps = Boolean.parseBoolean(merged.getOrDefault(
+                SMALL_CAPS_KEY, String.valueOf(Locale.ENGLISH.getLanguage().equals(language))));
+        Map<String, String> table = new java.util.HashMap<>(merged.size());
+        for (Map.Entry<String, String> entry : merged.entrySet()) {
+            if (entry.getKey().startsWith(META_PREFIX)) {
+                continue;
+            }
+            table.put(entry.getKey(), smallCaps ? SmallCapsTemplates.apply(entry.getValue()) : entry.getValue());
+        }
+        return Map.copyOf(table);
     }
 
     /** The bundled classpath default for {@code language}, the base layer, or empty when the jar ships none. */
