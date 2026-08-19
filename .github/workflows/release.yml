@@ -57,6 +57,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Both this build and the uxmLib build it includes ask paperweight for the same Mojang-mapped dev
+      # bundle. Run in parallel from a cold cache they reach for the same lock at the same moment and the
+      # second one fails outright, so the bundle is unpacked once, on its own, before anything else runs.
+      - name: Warm the Mojang-mapped dev bundle
+        working-directory: uxmEssentials
+        run: ./gradlew :bukkit-adapter:paperweightUserdevSetup --no-parallel
+
       - name: Verify
         working-directory: uxmEssentials
         run: ./gradlew check
