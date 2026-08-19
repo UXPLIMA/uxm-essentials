@@ -186,7 +186,18 @@ final class DefaultResources {
             "modules/worlds/gui/world-main.conf",
             "menus/example.conf",
             "text-input.conf",
-            "messages/messages_en.conf");
+            "messages/messages_de.conf",
+            "messages/messages_en.conf",
+            "messages/messages_es.conf",
+            "messages/messages_fr.conf",
+            "messages/messages_ja.conf",
+            "messages/messages_ko.conf",
+            "messages/messages_pl.conf",
+            "messages/messages_pt.conf",
+            "messages/messages_ru.conf",
+            "messages/messages_tr.conf",
+            "messages/messages_uk.conf",
+            "messages/messages_zh.conf");
 
     private DefaultResources() {}
 
