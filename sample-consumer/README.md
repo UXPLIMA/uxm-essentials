@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.uxplima.uxmessentials:uxmessentials-bukkit-api:0.7.0")
+    compileOnly("com.uxplima.uxmessentials:uxmessentials-bukkit-api:0.8.0")
 }
 ```
 
