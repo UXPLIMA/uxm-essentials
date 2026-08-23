@@ -20,4 +20,14 @@ public interface UxmScoreboardQuery {
      * here, which is why somebody who is away is an empty answer rather than a default.
      */
     CompletableFuture<Optional<Boolean>> hidden(UUID playerId);
+
+    /** The named board currently painted for this online player, empty while hidden, unmatched or yielded. */
+    default CompletableFuture<Optional<String>> activeBoard(UUID playerId) {
+        return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    /** Whether UXM has yielded the sidebar slot to a foreign objective, empty while the player is offline. */
+    default CompletableFuture<Optional<Boolean>> yielded(UUID playerId) {
+        return CompletableFuture.completedFuture(Optional.empty());
+    }
 }

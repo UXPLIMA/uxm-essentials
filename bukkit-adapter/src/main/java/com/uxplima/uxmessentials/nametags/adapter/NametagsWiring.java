@@ -92,10 +92,15 @@ public final class NametagsWiring {
                 settings::hideVanillaName);
         NametagRenderTask renderTask = new NametagRenderTask(
                 kernel.scheduler(), presenter, animations, kernel.log(), settings::refreshInterval, running::get);
+        Runnable reload = () -> {
+            settings.reload();
+            animations.replace(settings.animations());
+            renderTask.refreshNow();
+        };
 
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new NametagLifecycleListener(presenter, kernel.scheduler()));
-        return new Wired(commands, listeners, presenter, renderTask, running);
+        return new Wired(commands, listeners, presenter, renderTask, running, reload);
     }
 
     /**
@@ -115,7 +120,8 @@ public final class NametagsWiring {
             List<Listener> listeners,
             PacketNametagPresenter presenter,
             NametagRenderTask renderTask,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            Runnable reload) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -123,6 +129,7 @@ public final class NametagsWiring {
             Objects.requireNonNull(presenter, "presenter");
             Objects.requireNonNull(renderTask, "renderTask");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(reload, "reload");
         }
 
         /** Arm the reconcile timer. */

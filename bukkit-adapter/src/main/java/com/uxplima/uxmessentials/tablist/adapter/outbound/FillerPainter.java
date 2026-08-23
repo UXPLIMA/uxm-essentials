@@ -18,6 +18,9 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoEntry;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoGameMode;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoPackets;
 import com.uxplima.uxmlib.packet.tablist.TabEntry;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
@@ -55,12 +58,13 @@ final class FillerPainter {
     }
 
     private final TabListPackets packets;
+    private final @Nullable PlayerInfoPackets batchPackets;
     private final TablistSkinResolver skinResolver;
     private final TextRenderer textRenderer;
 
     /**
      * The filler grid currently painted for each viewer, keyed by viewer UUID then by 1-based slot. The value remembers
-     * what was last sent for that (viewer, slot) cell — the rendered text, list order, skin source, and whether the skin
+     * what was last sent for that (viewer, slot) cell — the rendered text, list order, resolved skin, and whether the skin
      * was still resolving — so a steady-state tick whose cell is unchanged re-sends nothing (no flicker), while a switch
      * to a format with different/fewer fillers removes the cells that fell away by their deterministic {@link #fillerId}
      * UUIDs. An absent viewer key means no fillers are painted for that viewer. The inner map is a {@link LinkedHashMap}
@@ -71,6 +75,7 @@ final class FillerPainter {
 
     FillerPainter(TabListPackets packets, TablistSkinResolver skinResolver, TextRenderer textRenderer) {
         this.packets = Objects.requireNonNull(packets, "packets");
+        this.batchPackets = packets instanceof PlayerInfoPackets supported ? supported : null;
         this.skinResolver = Objects.requireNonNull(skinResolver, "skinResolver");
         this.textRenderer = Objects.requireNonNull(textRenderer, "textRenderer");
     }
@@ -93,9 +98,13 @@ final class FillerPainter {
             return;
         }
         Map<Integer, AppliedFiller> next = new LinkedHashMap<>();
-        for (TablistFiller filler : layout.fillers()) {
-            paintFiller(viewer, layout, filler, tick, previous, next);
+        List<PlayerInfoEntry> changed = new ArrayList<>();
+        List<UUID> replacedProfiles = new ArrayList<>();
+        for (TablistFiller filler : materializedFillers(layout)) {
+            paintFiller(viewer, layout, filler, tick, previous, next, changed, replacedProfiles);
         }
+        removeIds(viewer, replacedProfiles);
+        sendChanged(viewer, changed);
         removeStaleFillers(viewer, previous, next.keySet());
         appliedFillers.put(viewerId, next);
     }
@@ -119,14 +128,16 @@ final class FillerPainter {
             TablistFiller filler,
             long tick,
             @Nullable Map<Integer, AppliedFiller> previous,
-            Map<Integer, AppliedFiller> next) {
+            Map<Integer, AppliedFiller> next,
+            List<PlayerInfoEntry> changed,
+            List<UUID> replacedProfiles) {
         int slot = filler.slot();
         int order = TablistLayout.slotToListOrder(slot, layout.direction(), layout.gridRows());
         Optional<TablistSkinSource> skinSource = filler.skin();
         Optional<TabSkin> skin = skinSource.flatMap(skinResolver::resolve);
         boolean pending = skinSource.isPresent() && skin.isEmpty();
-        Component text = textRenderer.render(viewer, filler.text(), tick);
-        AppliedFiller desired = new AppliedFiller(text, order, skinSource.orElse(null), pending);
+        Component text = filler.text().isEmpty() ? Component.empty() : textRenderer.render(viewer, filler.text(), tick);
+        AppliedFiller desired = new AppliedFiller(text, order, skin.orElse(null), pending);
         AppliedFiller current = previous == null ? null : previous.get(slot);
         if (current != null && desired.equals(current)) {
             // Unchanged, fully-resolved cell: keep the entry as-is, send nothing this tick (the flicker guard). A
@@ -135,8 +146,56 @@ final class FillerPainter {
             return;
         }
         UUID id = fillerId(viewer.getUniqueId(), slot);
-        packets.send(viewer, packets.addOrUpdate(new TabEntry(id, text, order, skin.orElse(null), "")));
+        if (current != null && !Objects.equals(current.skin(), desired.skin())) {
+            // A profile texture is part of ADD_PLAYER's GameProfile, not a mutable player-info field. Remove the old
+            // profile before re-adding it or the client is allowed to retain the stale skin.
+            replacedProfiles.add(id);
+        }
+        String profileName = layout.exact() ? "uxm_slot_" + slot : "";
+        changed.add(new PlayerInfoEntry(
+                id, text, order, skin.orElse(null), profileName, true, 0, PlayerInfoGameMode.SURVIVAL, true));
         next.put(slot, desired);
+    }
+
+    private void removeIds(Player viewer, List<UUID> ids) {
+        if (!ids.isEmpty()) {
+            packets.send(viewer, packets.remove(ids));
+        }
+    }
+
+    /** Send all changed cells in one packet when the complete uxmLib port is available. */
+    private void sendChanged(Player viewer, List<PlayerInfoEntry> changed) {
+        if (changed.isEmpty()) {
+            return;
+        }
+        if (batchPackets != null) {
+            batchPackets.sendPacket(viewer, batchPackets.addOrUpdate(changed));
+            return;
+        }
+        // Source-compatible fallback for third-party/test implementations of the historical single-entry port.
+        for (PlayerInfoEntry entry : changed) {
+            packets.send(
+                    viewer,
+                    packets.addOrUpdate(new TabEntry(
+                            entry.id(), entry.displayName(), entry.listOrder(), entry.skin(), entry.name())));
+        }
+    }
+
+    /** Expand an exact layout to every declared client cell; sparse layouts keep only authored fillers. */
+    private static List<TablistFiller> materializedFillers(TablistLayout layout) {
+        if (!layout.exact()) {
+            return layout.fillers();
+        }
+        Map<Integer, TablistFiller> fixed = new java.util.HashMap<>();
+        for (TablistFiller filler : layout.fillers()) {
+            fixed.put(filler.slot(), filler);
+        }
+        List<TablistFiller> cells = new ArrayList<>(layout.capacity());
+        for (int slot = 1; slot <= layout.capacity(); slot++) {
+            TablistFiller authored = fixed.get(slot);
+            cells.add(authored != null ? authored : new TablistFiller(slot, "", Optional.empty()));
+        }
+        return cells;
     }
 
     /** Remove the filler entries whose slots are no longer in {@code keptSlots} — the cells the new layout dropped. */
@@ -196,8 +255,9 @@ final class FillerPainter {
         if (layout.isEmpty()) {
             return Set.of();
         }
-        Set<UUID> ids = new java.util.HashSet<>(layout.fillers().size());
-        for (TablistFiller filler : layout.fillers()) {
+        List<TablistFiller> planned = materializedFillers(layout);
+        Set<UUID> ids = new java.util.HashSet<>(planned.size());
+        for (TablistFiller filler : planned) {
             ids.add(fillerId(viewer.getUniqueId(), filler.slot()));
         }
         return ids;
@@ -229,7 +289,7 @@ final class FillerPainter {
     }
 
     /**
-     * The filler cell last painted for a (viewer, slot): its <em>rendered</em> text component, list order, skin source
+     * The filler cell last painted for a (viewer, slot): its <em>rendered</em> text component, list order, resolved skin
      * (or {@code null} for no skin), and whether the skin was still resolving when the cell was painted. Two paints with
      * an equal tuple are the same cell, so the entry is not re-sent — the per-cell flicker guard. Keying on the rendered
      * component (not the raw source) means an animated or relational filler re-sends as its frame/placeholder changes —
@@ -239,5 +299,5 @@ final class FillerPainter {
      * as the steady state. {@link Component} has a value-based {@code equals}.
      */
     private record AppliedFiller(
-            Component text, int order, @Nullable TablistSkinSource skinSource, boolean pending) {}
+            Component text, int order, @Nullable TabSkin skin, boolean pending) {}
 }

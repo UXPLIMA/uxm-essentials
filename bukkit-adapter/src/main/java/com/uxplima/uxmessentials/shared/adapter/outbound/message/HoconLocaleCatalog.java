@@ -11,7 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
@@ -35,8 +35,8 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  * key's own name so a message is never blank. English is always loaded; additional locales load on demand and cache.
  *
  * <h2>Concurrency</h2>
- * Ownership: <b>concurrent-collection</b>. Per-locale tables are immutable maps held in a
- * {@link ConcurrentHashMap}; a locale loads at most once and is read lock-free thereafter.
+ * Ownership: <b>immutable-snapshot</b>. Every locale table and the outer language map are immutable and the complete
+ * generation is held in an {@link AtomicReference}; reload publishes all loaded languages in one swap.
  */
 @NullMarked
 public final class HoconLocaleCatalog implements LocaleCatalog {
@@ -51,7 +51,7 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
 
     private final Logger log;
     private final Path messagesDir;
-    private final ConcurrentHashMap<String, Map<String, String>> byLanguage = new ConcurrentHashMap<>();
+    private final AtomicReference<Map<String, Map<String, String>>> byLanguage;
 
     /**
      * @param messagesDir the on-disk {@code messages} directory; a {@code messages_<lang>.conf}
@@ -61,7 +61,8 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     public HoconLocaleCatalog(Logger log, Path messagesDir) {
         this.log = Objects.requireNonNull(log, "log");
         this.messagesDir = Objects.requireNonNull(messagesDir, "messagesDir");
-        byLanguage.put(Locale.ENGLISH.getLanguage(), loadLanguage(Locale.ENGLISH.getLanguage()));
+        this.byLanguage = new AtomicReference<>(
+                Map.of(Locale.ENGLISH.getLanguage(), loadLanguage(Locale.ENGLISH.getLanguage(), false)));
     }
 
     @Override
@@ -80,7 +81,7 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     public Set<Locale> loadedLocales() {
         Set<Locale> locales = new LinkedHashSet<>();
         locales.add(Locale.ENGLISH);
-        for (String language : byLanguage.keySet()) {
+        for (String language : snapshot().keySet()) {
             locales.add(Locale.forLanguageTag(language));
         }
         return Set.copyOf(locales);
@@ -88,22 +89,40 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
 
     @Override
     public void reload() {
-        // Re-read every language that is already loaded rather than clearing the map: a concurrent lookup then
-        // always finds a complete table (the old one or the new one) instead of racing an empty map back through
-        // the lazy load. English stays loaded because it is the fallback layer for every other locale.
-        for (String language : Set.copyOf(byLanguage.keySet())) {
-            byLanguage.put(language, loadLanguage(language));
+        // Parse every currently loaded locale into a private candidate first. One malformed disk catalog rejects
+        // the whole pass, leaving every language on the same last-known-good generation.
+        Map<String, Map<String, String>> current = snapshot();
+        Map<String, Map<String, String>> candidate = new java.util.HashMap<>();
+        for (String language : current.keySet()) {
+            candidate.put(language, loadLanguage(language, true));
         }
-        byLanguage.computeIfAbsent(Locale.ENGLISH.getLanguage(), this::loadLanguage);
+        candidate.computeIfAbsent(Locale.ENGLISH.getLanguage(), language -> loadLanguage(language, true));
+        byLanguage.set(Map.copyOf(candidate));
     }
 
     private Map<String, String> tableFor(String language) {
-        return byLanguage.computeIfAbsent(language, this::loadLanguage);
+        while (true) {
+            Map<String, Map<String, String>> current = snapshot();
+            Map<String, String> found = current.get(language);
+            if (found != null) {
+                return found;
+            }
+            Map<String, String> loaded = loadLanguage(language, false);
+            Map<String, Map<String, String>> expanded = new java.util.HashMap<>(current);
+            expanded.put(language, loaded);
+            if (byLanguage.compareAndSet(current, Map.copyOf(expanded))) {
+                return loaded;
+            }
+        }
     }
 
-    private Map<String, String> loadLanguage(String language) {
-        Map<String, String> bundled = loadBundled(language);
-        Map<String, String> onDisk = loadOnDisk(language);
+    private Map<String, Map<String, String>> snapshot() {
+        return Objects.requireNonNull(byLanguage.get(), "byLanguage");
+    }
+
+    private Map<String, String> loadLanguage(String language, boolean failOnReadError) {
+        Map<String, String> bundled = loadBundled(language, failOnReadError);
+        Map<String, String> onDisk = loadOnDisk(language, failOnReadError);
         // Bundled default is the base; the operator's on-disk file overrides it per key. A key the operator kept
         // resolves from disk; a key an update added but the disk file never had resolves from the bundled default.
         Map<String, String> merged = new java.util.HashMap<>(bundled);
@@ -131,7 +150,7 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     }
 
     /** The bundled classpath default for {@code language}, the base layer, or empty when the jar ships none. */
-    private Map<String, String> loadBundled(String language) {
+    private Map<String, String> loadBundled(String language, boolean failOnReadError) {
         String resource = RESOURCE_DIR + "messages_" + language + ".conf";
         if (getClass().getClassLoader().getResource(resource) == null) {
             return Map.of();
@@ -140,24 +159,28 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
                 HoconConfigurationLoader.builder()
                         .source(() -> openReader(resource))
                         .build(),
-                resource);
+                resource,
+                failOnReadError);
     }
 
     /** The operator's on-disk file for {@code language}, the override layer, or empty when it is absent. */
-    private Map<String, String> loadOnDisk(String language) {
+    private Map<String, String> loadOnDisk(String language, boolean failOnReadError) {
         Path onDisk = messagesDir.resolve("messages_" + language + ".conf");
         if (!Files.isRegularFile(onDisk)) {
             return Map.of();
         }
-        return parse(HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString());
+        return parse(HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString(), failOnReadError);
     }
 
-    private Map<String, String> parse(HoconConfigurationLoader loader, String origin) {
+    private Map<String, String> parse(HoconConfigurationLoader loader, String origin, boolean failOnReadError) {
         ConfigurationNode root;
         try {
             root = loader.load();
         } catch (ConfigurateException failure) {
             log.error("failed to load message catalog " + origin, failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse message catalog " + origin, failure);
+            }
             return Map.of();
         }
         Map<String, String> table = new java.util.HashMap<>();

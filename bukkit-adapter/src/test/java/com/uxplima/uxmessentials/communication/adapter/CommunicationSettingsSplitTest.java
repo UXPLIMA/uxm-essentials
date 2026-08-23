@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.communication.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -133,6 +134,18 @@ class CommunicationSettingsSplitTest {
 
         assertThat(firstAnnouncement(settings).lines()).containsExactly("fresh tip");
         assertThat(settings.announcerConfig().defaultInterval().toSeconds()).isEqualTo(120L);
+    }
+
+    @Test
+    void malformedSiblingReloadKeepsTheWholePreviousContentGeneration(@TempDir Path dir) throws Exception {
+        writeSplitFiles(dir);
+        CommunicationSettings settings = new CommunicationSettings(dir, new NoopLogger());
+
+        Files.writeString(dir.resolve("announcer.conf"), "announcer { lines = [ \"broken\"\n");
+
+        assertThatThrownBy(settings::reload).isInstanceOf(IllegalStateException.class);
+        assertThat(firstAnnouncement(settings).lines()).containsExactly("tip a", "tip b");
+        assertThat(settings.infoRegistry().find("rules")).isPresent();
     }
 
     @Test

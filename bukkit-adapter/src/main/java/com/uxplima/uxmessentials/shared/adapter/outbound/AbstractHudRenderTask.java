@@ -2,6 +2,9 @@ package com.uxplima.uxmessentials.shared.adapter.outbound;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -11,6 +14,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -37,6 +41,7 @@ public abstract class AbstractHudRenderTask {
     private final Logger log;
     private final Supplier<Duration> interval;
     private final BooleanSupplier running;
+    private final Set<UUID> pendingPlayers = ConcurrentHashMap.newKeySet();
 
     protected AbstractHudRenderTask(
             Scheduler scheduler,
@@ -56,6 +61,24 @@ public abstract class AbstractHudRenderTask {
         scheduleNext();
     }
 
+    /**
+     * Bring one roster-wide render pass forward, used after a successful live reload. Roster enumeration happens on
+     * the global region and each render is still de-duplicated and hopped to the player's entity thread.
+     */
+    public final void refreshNow() {
+        if (!running.getAsBoolean()) {
+            return;
+        }
+        scheduler.onGlobal(() -> {
+            if (!running.getAsBoolean()) {
+                return;
+            }
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                enqueue(player);
+            }
+        });
+    }
+
     private void scheduleNext() {
         if (!running.getAsBoolean()) {
             return;
@@ -72,13 +95,33 @@ public abstract class AbstractHudRenderTask {
             // render below then reads the same frame for this tick.
             animations.advance();
             for (Player player : Bukkit.getOnlinePlayers()) {
-                scheduler.onEntity(BukkitRefs.toRef(player), () -> renderFor(player));
+                enqueue(player);
             }
         } catch (RuntimeException failure) {
             // A throwing tick must not skip the reschedule below, or the HUD would freeze until a reload.
             log.error(tickFailureMessage(), failure);
         }
         scheduleNext();
+    }
+
+    private void enqueue(Player player) {
+        PlayerRef ref = BukkitRefs.toRef(player);
+        if (pendingPlayers.add(ref.uuid())) {
+            scheduler.onEntity(ref, () -> renderPending(ref));
+        }
+    }
+
+    private void renderPending(PlayerRef ref) {
+        try {
+            Player live = Bukkit.getPlayer(ref.uuid());
+            if (live != null && live.isOnline() && running.getAsBoolean()) {
+                renderFor(live);
+            }
+        } catch (RuntimeException failure) {
+            log.error(tickFailureMessage(), failure);
+        } finally {
+            pendingPlayers.remove(ref.uuid());
+        }
     }
 
     /** Render the HUD for one online player, already hopped onto that player's entity thread. */

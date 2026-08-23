@@ -103,10 +103,15 @@ public final class TablistWiring {
                 suppression);
         TablistRenderTask renderTask = new TablistRenderTask(
                 kernel.scheduler(), renderer, animations, kernel.log(), settings::refreshInterval, running::get);
+        Runnable reload = () -> {
+            settings.reload();
+            animations.replace(settings.animations());
+            renderTask.refreshNow();
+        };
 
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new TablistConnectionListener(renderer));
-        return new Wired(commands, listeners, renderer, renderTask, running, kernel.scheduler());
+        return new Wired(commands, listeners, renderer, renderTask, running, kernel.scheduler(), reload);
     }
 
     /** Bridges {@link TablistSuppression}'s connection seam onto uxmLib's {@link PacketPipeline} inject/eject. */
@@ -147,7 +152,8 @@ public final class TablistWiring {
             TablistRenderer renderer,
             TablistRenderTask renderTask,
             AtomicBoolean running,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            Runnable reload) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -156,6 +162,7 @@ public final class TablistWiring {
             Objects.requireNonNull(renderTask, "renderTask");
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(scheduler, "scheduler");
+            Objects.requireNonNull(reload, "reload");
         }
 
         /** Arm the render timer. */

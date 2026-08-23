@@ -992,7 +992,9 @@ interface com.uxplima.uxmessentials.api.query.UxmRegionsQuery
   CompletableFuture region(String, String)
   boolean available()
 interface com.uxplima.uxmessentials.api.query.UxmScoreboardQuery
+  CompletableFuture activeBoard(UUID)
   CompletableFuture hidden(UUID)
+  CompletableFuture yielded(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmSecurityQuery
   CompletableFuture of(UUID)
   boolean isLockedOut(UUID)

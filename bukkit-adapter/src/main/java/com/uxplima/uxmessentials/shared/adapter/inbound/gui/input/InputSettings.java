@@ -36,7 +36,7 @@ public final class InputSettings {
     public InputSettings(Path configFile, Logger log) {
         this.configFile = Objects.requireNonNull(configFile, "configFile");
         this.log = Objects.requireNonNull(log, "log");
-        this.parsed = new AtomicReference<>(InputContentCodec.read(load(configFile, log), log));
+        this.parsed = new AtomicReference<>(InputContentCodec.read(load(configFile, log, false), log));
     }
 
     /** The configured mode for {@code key} — its per-key override if set, otherwise the global default. */
@@ -70,14 +70,14 @@ public final class InputSettings {
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        parsed.set(InputContentCodec.read(load(configFile, log), log));
+        parsed.set(InputContentCodec.read(load(configFile, log, true), log));
     }
 
     private InputContentCodec.Parsed current() {
         return Objects.requireNonNull(parsed.get(), "parsed");
     }
 
-    private static ConfigurationNode load(Path file, Logger log) {
+    private static ConfigurationNode load(Path file, Logger log, boolean failOnReadError) {
         if (!Files.exists(file)) {
             return CommentedConfigurationNode.root();
         }
@@ -87,6 +87,9 @@ public final class InputSettings {
             log.error(
                     "failed to load " + file + "; text input falls back to anvil with default cancel keywords",
                     failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse text-input config " + file, failure);
+            }
             return CommentedConfigurationNode.root();
         }
     }

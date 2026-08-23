@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilit
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.scoreboard.support.RecordingScoreboardPackets;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
@@ -43,13 +44,13 @@ import org.mockbukkit.mockbukkit.world.WorldMock;
 class ScoreboardConnectionListenerTest {
 
     private ServerMock server;
-    private com.uxplima.uxmlib.hud.scoreboard.SidebarManager sidebars;
+    private RecordingScoreboardPackets packets;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         MockBukkit.createMockPlugin();
-        sidebars = new com.uxplima.uxmlib.hud.scoreboard.SidebarManager(server.getScoreboardManager());
+        packets = new RecordingScoreboardPackets();
     }
 
     @AfterEach
@@ -64,17 +65,20 @@ class ScoreboardConnectionListenerTest {
         WorldMock blacklisted = server.addSimpleWorld("world_blacklisted");
         // Start with nothing blacklisted so the board paints, then move into a world the live content blacklists.
         AtomicReference<SidebarConfig> live = new AtomicReference<>(config(Set.of()));
-        ScoreboardRenderer renderer = new ScoreboardRenderer(sidebars, alwaysShown(), live::get, noAnimations());
+        ScoreboardRenderer renderer = new ScoreboardRenderer(packets, alwaysShown(), live::get, noAnimations());
 
         renderer.renderFor(player);
-        assertThat(sidebars.count()).isEqualTo(1);
+        assertThat(packets.operations()).isNotEmpty();
 
         player.teleport(blacklisted.getSpawnLocation());
         live.set(config(Set.of(blacklisted.getName())));
         ScoreboardConnectionListener listener = new ScoreboardConnectionListener(renderer, new SyncScheduler());
         listener.onWorldChange(new PlayerChangedWorldEvent(player, origin));
 
-        assertThat(sidebars.count()).isZero();
+        assertThat(packets.operations())
+                .anyMatch(
+                        com.uxplima.uxmessentials.scoreboard.support.RecordingScoreboardPackets.RemoveObjective.class
+                                ::isInstance);
     }
 
     @Test
@@ -86,12 +90,12 @@ class ScoreboardConnectionListenerTest {
         PlayerGameModeChangeEvent event = new PlayerGameModeChangeEvent(
                 player, GameMode.CREATIVE, PlayerGameModeChangeEvent.Cause.PLUGIN, Component.empty());
         assertThatCode(() -> listener.onGameModeChange(event)).doesNotThrowAnyException();
-        assertThat(sidebars.count()).isEqualTo(1);
+        assertThat(packets.operations()).isNotEmpty();
     }
 
     private ScoreboardRenderer renderer(Set<String> blacklist) {
         AtomicReference<SidebarConfig> ref = new AtomicReference<>(config(blacklist));
-        return new ScoreboardRenderer(sidebars, alwaysShown(), ref::get, noAnimations());
+        return new ScoreboardRenderer(packets, alwaysShown(), ref::get, noAnimations());
     }
 
     private static AnimationRegistry noAnimations() {

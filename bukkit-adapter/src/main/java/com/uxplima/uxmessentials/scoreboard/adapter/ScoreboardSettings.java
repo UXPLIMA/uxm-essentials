@@ -42,7 +42,7 @@ public final class ScoreboardSettings {
     public ScoreboardSettings(Path moduleDir, Logger log) {
         this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.parsed = new AtomicReference<>(ScoreboardContentCodec.read(load(moduleDir, log), log));
+        this.parsed = new AtomicReference<>(ScoreboardContentCodec.read(load(moduleDir, log, false), log));
     }
 
     /** The live named-board set; read fresh by the renderer each tick to select a board per viewer. */
@@ -51,9 +51,7 @@ public final class ScoreboardSettings {
     }
 
     /**
-     * The named animations parsed at load. These are read once at wiring time to build the
-     * {@link com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry} — the registry holds the stateful
-     * uxmLib animators, so it is not rebuilt on a content reload (the animation catalog is fixed for a session).
+     * The live animation definitions. Reload replaces the renderer's stateful animation catalog from this snapshot.
      */
     public List<AnimationDef> animations() {
         return Objects.requireNonNull(parsed.get(), "parsed").animations();
@@ -66,10 +64,10 @@ public final class ScoreboardSettings {
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        parsed.set(ScoreboardContentCodec.read(load(moduleDir, log), log));
+        parsed.set(ScoreboardContentCodec.read(load(moduleDir, log, true), log));
     }
 
-    private static ConfigurationNode load(Path moduleDir, Logger log) {
+    private static ConfigurationNode load(Path moduleDir, Logger log, boolean failOnReadError) {
         Path file = moduleDir.resolve(CONTENT_FILE);
         if (!Files.exists(file)) {
             return CommentedConfigurationNode.root();
@@ -78,6 +76,9 @@ public final class ScoreboardSettings {
             return HoconConfigurationLoader.builder().path(file).build().load();
         } catch (ConfigurateException failure) {
             log.error("failed to load " + file + "; scoreboard runs inert", failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse scoreboard config " + file, failure);
+            }
             return CommentedConfigurationNode.root();
         }
     }

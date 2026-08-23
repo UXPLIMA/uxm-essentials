@@ -29,6 +29,12 @@ public final class HudText {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
         String expanded = PlaceholderApiSupport.messageBridge(viewer).apply(miniMessageSource);
-        return MINI_MESSAGE.deserialize(expanded, StyleTags.resolver());
+        return parse(expanded);
+    }
+
+    /** Parse already-expanded operator MiniMessage without running PlaceholderAPI a second time. */
+    public static Component parse(String miniMessageSource) {
+        Objects.requireNonNull(miniMessageSource, "miniMessageSource");
+        return MINI_MESSAGE.deserialize(miniMessageSource, StyleTags.resolver());
     }
 }

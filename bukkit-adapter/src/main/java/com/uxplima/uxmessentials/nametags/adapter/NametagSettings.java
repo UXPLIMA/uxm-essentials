@@ -24,8 +24,8 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  * nametag.
  *
  * <p>The {@link #formats()} and {@link #refreshInterval()} suppliers read the live parse on each call, so a reload
- * takes effect on the next render tick with no re-wiring. The {@link #animations()} are read once at wiring time to
- * build the {@code AnimationRegistry} (which holds the stateful animators, fixed for the session). The content is
+ * takes effect on the next render tick with no re-wiring. The {@link #animations()} definitions replace the live
+ * {@code AnimationRegistry} on reload. The content is
  * operator data the renderer parses through MiniMessage and the placeholder pipeline; nothing here is a
  * {@code MessageKey} or parity-checked.
  */
@@ -41,7 +41,7 @@ public final class NametagSettings {
     public NametagSettings(Path moduleDir, Logger log) {
         this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.parsed = new AtomicReference<>(NametagContentCodec.read(load(moduleDir, log), log));
+        this.parsed = new AtomicReference<>(NametagContentCodec.read(load(moduleDir, log, false), log));
     }
 
     /** The live named-format set; read fresh by the renderer each tick to select a format per wearer. */
@@ -49,7 +49,7 @@ public final class NametagSettings {
         return Objects.requireNonNull(parsed.get(), "parsed").formats();
     }
 
-    /** The named animations parsed at load, read once at wiring time to build the {@code AnimationRegistry}. */
+    /** The live animation definitions, used to replace the stateful registry on reload. */
     public List<AnimationDef> animations() {
         return Objects.requireNonNull(parsed.get(), "parsed").animations();
     }
@@ -66,10 +66,10 @@ public final class NametagSettings {
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        parsed.set(NametagContentCodec.read(load(moduleDir, log), log));
+        parsed.set(NametagContentCodec.read(load(moduleDir, log, true), log));
     }
 
-    private static ConfigurationNode load(Path moduleDir, Logger log) {
+    private static ConfigurationNode load(Path moduleDir, Logger log, boolean failOnReadError) {
         Path file = moduleDir.resolve(CONTENT_FILE);
         if (!Files.exists(file)) {
             return CommentedConfigurationNode.root();
@@ -78,6 +78,9 @@ public final class NametagSettings {
             return HoconConfigurationLoader.builder().path(file).build().load();
         } catch (ConfigurateException failure) {
             log.error("failed to load " + file + "; nametags runs inert", failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse nametags config " + file, failure);
+            }
             return CommentedConfigurationNode.root();
         }
     }

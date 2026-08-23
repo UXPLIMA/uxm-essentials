@@ -118,11 +118,9 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // other hard dependency edge (its only collaborators are the shared persistence DSL, the Permissions
         // reducer, and the teleport engine), and like warps/holograms it ships ENABLED, so it lands last.
         delegate.register(new PlayerwarpsModule());
-        // scoreboard is the 15th context — a per-player sidebar rendered from operator-authored MiniMessage content on
-        // the Scheduler refresh timer, dogfooding uxmlib-hud's SidebarManager (already used for the teleport arrival
-        // title). Like communication it carries no hard dependency edge (its only collaborators are the shared
-        // Scheduler, messages, and event ports) and ships DISABLED by default — operators author the lines before
-        // enabling — so it wires nothing until enabled in modules.conf.
+        // scoreboard is the 15th context — a per-player packet sidebar rendered from operator-authored MiniMessage
+        // content on the Scheduler refresh timer. Like communication it carries no hard dependency edge (its only
+        // collaborators are the shared Scheduler, messages, and event ports) and ships with a working default board.
         delegate.register(new ScoreboardModule());
         // tablist is the 16th context — the per-player tab-list header/footer split out of scoreboard so the sidebar
         // and the tablist enable, author, and refresh independently. It owns its own Scheduler refresh timer over

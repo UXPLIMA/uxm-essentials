@@ -26,6 +26,10 @@ import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoEntry;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoGameMode;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoPackets;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoValue;
 import com.uxplima.uxmlib.packet.tablist.TabEntry;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
@@ -293,7 +297,7 @@ class TablistRendererTest {
         assertThat(painted.textureValue()).isEqualTo("dmFsdWU=");
         assertThat(painted.signature()).isEqualTo("sig");
         // The packet was broadcast to the one online viewer.
-        assertThat(packets.sends).isEqualTo(1);
+        assertThat(packets.sendCount()).isEqualTo(1);
         // The native list name was not touched for the skinned row.
         assertThat(plain(player.playerListName())).isEqualTo(player.getName());
     }
@@ -327,7 +331,7 @@ class TablistRendererTest {
         renderer.renderFor(player);
 
         assertThat(packets.added).hasSize(1);
-        assertThat(packets.sends).isEqualTo(1);
+        assertThat(packets.sendCount()).isEqualTo(1);
     }
 
     @Test
@@ -514,6 +518,44 @@ class TablistRendererTest {
         assertThat(entry.name()).isEmpty();
         assertThat(skinOf(entry).textureValue()).isEqualTo("ZmlsbA==");
         assertThat(skinOf(entry).signature()).isEqualTo("fsig");
+    }
+
+    @Test
+    void exactLayoutMaterializesEveryCellIncludingMissingAndBlankOnes() {
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistLayout exact = new TablistLayout(
+                List.of(
+                        new TablistFiller(1, "<gold>Title", Optional.empty()),
+                        new TablistFiller(2, " ", Optional.empty())),
+                TablistLayout.Direction.COLUMNS,
+                20,
+                true);
+        TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
+
+        renderer.renderFor(viewer);
+
+        List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
+        assertThat(entries).hasSize(80);
+        assertThat(plain(entries.get(0).displayName())).isEqualTo("Title");
+        assertThat(plain(entries.get(1).displayName())).isBlank();
+        assertThat(plain(entries.get(79).displayName())).isEmpty();
+        assertThat(entries.get(79).id()).isEqualTo(fillerId(viewer.getUniqueId(), 80));
+        assertThat(entries).extracting(TabEntry::name).doesNotContain("");
+    }
+
+    @Test
+    void completePacketPortBatchesAnExactInitialPaintIntoOneAddPacket() {
+        PlayerMock viewer = server.addPlayer();
+        BatchRecordingPackets packets = new BatchRecordingPackets();
+        TablistLayout exact = new TablistLayout(List.of(), TablistLayout.Direction.COLUMNS, 20, true);
+        TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
+
+        renderer.renderFor(viewer);
+
+        assertThat(packets.addBatches).hasSize(1);
+        assertThat(packets.addBatches.get(0)).hasSize(80);
+        assertThat(packets.sendCount()).isEqualTo(1);
     }
 
     @Test
@@ -705,6 +747,7 @@ class TablistRendererTest {
         // Two paints to the same cell id: the first skinless, the second carrying the resolved texture.
         assertThat(all).hasSize(2);
         assertThat(skinOf(all.get(1)).textureValue()).isEqualTo("notchtex");
+        assertThat(packets.removedFrom(viewer.getUniqueId())).contains(id);
     }
 
     @Test
@@ -926,11 +969,67 @@ class TablistRendererTest {
             return ids;
         }
 
+        int sendCount() {
+            return sends;
+        }
+
         private record Sent(UUID viewer, Object packet) {}
 
         private record Removal(List<UUID> ids) {}
 
         private record Relist(List<UUID> ids, boolean listed) {}
+    }
+
+    /** The production-shaped dual port: complete player-info batches plus the compatibility facade. */
+    private static final class BatchRecordingPackets extends RecordingPackets implements PlayerInfoPackets {
+        private final List<List<PlayerInfoEntry>> addBatches = new ArrayList<>();
+
+        @Override
+        public Object addOrUpdate(List<PlayerInfoEntry> entries) {
+            List<PlayerInfoEntry> batch = List.copyOf(entries);
+            addBatches.add(batch);
+            return batch;
+        }
+
+        @Override
+        public Object displayNames(List<PlayerInfoValue<Component>> entries) {
+            return List.copyOf(entries);
+        }
+
+        @Override
+        public Object listOrders(List<PlayerInfoValue<Integer>> entries) {
+            return List.copyOf(entries);
+        }
+
+        @Override
+        public Object listed(List<PlayerInfoValue<Boolean>> entries) {
+            return List.copyOf(entries);
+        }
+
+        @Override
+        public Object latencies(List<PlayerInfoValue<Integer>> entries) {
+            return List.copyOf(entries);
+        }
+
+        @Override
+        public Object gameModes(List<PlayerInfoValue<PlayerInfoGameMode>> entries) {
+            return List.copyOf(entries);
+        }
+
+        @Override
+        public Object showHat(List<PlayerInfoValue<Boolean>> entries) {
+            return List.copyOf(entries);
+        }
+
+        @Override
+        public Object removeEntries(List<UUID> ids) {
+            return List.copyOf(ids);
+        }
+
+        @Override
+        public void sendPacket(org.bukkit.entity.Player viewer, Object packet) {
+            send(viewer, packet);
+        }
     }
 
     /**

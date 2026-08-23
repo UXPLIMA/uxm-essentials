@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,6 +55,17 @@ class ConfigLayoutTest {
         Files.writeString(homes.resolve("config.conf"), "default-limit = 9\n");
         store.reload();
         assertThat(store.getInt("modules.homes.default-limit", 0)).isEqualTo(9);
+    }
+
+    @Test
+    void malformedReloadKeepsTheLastKnownGoodTree(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("config.conf"), "storage { backend = \"sqlite\" }\n");
+        ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
+
+        Files.writeString(dir.resolve("config.conf"), "storage { backend = \"broken\"\n");
+
+        assertThatThrownBy(store::reload).isInstanceOf(IllegalStateException.class);
+        assertThat(store.getString("storage.backend", "missing")).isEqualTo("sqlite");
     }
 
     @Test

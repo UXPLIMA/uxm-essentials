@@ -12,45 +12,99 @@ import java.util.Set;
  * is raw MiniMessage source the adapter renders per viewer through the placeholder pipeline; the domain never parses
  * or localises them — it only guards the structural invariants.
  *
- * <p>A sidebar shows at most {@link #MAX_LINES} lines (the vanilla scoreboard limit uxmLib's {@code Sidebar}
- * enforces), so {@code lines} over that bound is rejected at construction rather than silently truncated downstream.
- * The refresh interval must be strictly positive — a zero or negative cadence would busy-spin the render timer.
+ * <p>The authored catalog may contain more than the vanilla {@link #MAX_LINES} visible rows because conditions and
+ * empty-value filtering are evaluated per viewer. The renderer applies the visible limit after those filters. The
+ * refresh interval must be strictly positive — a zero or negative cadence would busy-spin the render timer.
  *
  * <p>{@code hideScoreNumbers} hides the red per-line score numbers vanilla draws down the right edge of the sidebar
- * (the adapter applies a blank number format to the objective). It defaults on — the clean, modern look operators
+ * (the adapter applies a blank number format to each line unless that line overrides it). It defaults on — the clean, modern look operators
  * expect — and is purely a render concern, not a structural one, so it never affects {@link #isBlank()}.
  *
- * @param title the sidebar title source, empty when the operator left it blank (the sidebar then has no heading)
- * @param lines the sidebar line sources, top to bottom, at most {@link #MAX_LINES}
- * @param hideScoreNumbers whether to suppress the red right-edge score numbers; on for the modern look
- * @param refreshInterval how often the render timer re-renders every viewer; strictly positive
- * @param worldBlacklist world names where the sidebar is suppressed entirely
  */
-public record DisplayContent(
-        Optional<String> title,
-        List<String> lines,
-        boolean hideScoreNumbers,
-        Duration refreshInterval,
-        Set<String> worldBlacklist) {
+public final class DisplayContent {
 
     /** The maximum number of sidebar lines a vanilla scoreboard can show; mirrors uxmLib {@code Sidebar.MAX_LINES}. */
     public static final int MAX_LINES = 15;
 
     private static final Duration DEFAULT_INTERVAL = Duration.ofSeconds(1L);
 
-    public DisplayContent {
-        Objects.requireNonNull(title, "title");
+    /** Defensive ceiling for authored candidates; the frame planner applies the vanilla 15 visible-line limit later. */
+    public static final int MAX_CANDIDATE_LINES = 128;
+
+    private final Optional<String> title;
+    private final List<SidebarLine> lineDefinitions;
+    private final boolean hideScoreNumbers;
+    private final Duration refreshInterval;
+    private final Set<String> worldBlacklist;
+
+    public DisplayContent(
+            Optional<String> title,
+            List<String> lines,
+            boolean hideScoreNumbers,
+            Duration refreshInterval,
+            Set<String> worldBlacklist) {
+        this(title, legacyLines(lines, hideScoreNumbers), hideScoreNumbers, refreshInterval, worldBlacklist, true);
+    }
+
+    private DisplayContent(
+            Optional<String> title,
+            List<SidebarLine> lines,
+            boolean hideScoreNumbers,
+            Duration refreshInterval,
+            Set<String> worldBlacklist,
+            boolean unused) {
+        this.title = Objects.requireNonNull(title, "title");
         Objects.requireNonNull(lines, "lines");
-        Objects.requireNonNull(refreshInterval, "refreshInterval");
+        this.refreshInterval = Objects.requireNonNull(refreshInterval, "refreshInterval");
         Objects.requireNonNull(worldBlacklist, "worldBlacklist");
-        if (lines.size() > MAX_LINES) {
-            throw new IllegalArgumentException("a sidebar shows at most " + MAX_LINES + " lines, got " + lines.size());
+        if (lines.size() > MAX_CANDIDATE_LINES) {
+            throw new IllegalArgumentException(
+                    "a sidebar accepts at most " + MAX_CANDIDATE_LINES + " candidate lines, got " + lines.size());
         }
         if (refreshInterval.isZero() || refreshInterval.isNegative()) {
             throw new IllegalArgumentException("refresh interval must be positive, got " + refreshInterval);
         }
-        lines = List.copyOf(lines);
-        worldBlacklist = Set.copyOf(worldBlacklist);
+        long distinctIds = lines.stream().map(SidebarLine::id).distinct().count();
+        if (distinctIds != lines.size()) {
+            throw new IllegalArgumentException("sidebar line ids must be unique within a board");
+        }
+        this.lineDefinitions = List.copyOf(lines);
+        this.hideScoreNumbers = hideScoreNumbers;
+        this.worldBlacklist = Set.copyOf(worldBlacklist);
+    }
+
+    public static DisplayContent typed(
+            Optional<String> title,
+            List<SidebarLine> lines,
+            boolean hideScoreNumbers,
+            Duration refreshInterval,
+            Set<String> worldBlacklist) {
+        return new DisplayContent(title, lines, hideScoreNumbers, refreshInterval, worldBlacklist, true);
+    }
+
+    public Optional<String> title() {
+        return title;
+    }
+
+    /** Back-compatible raw text view. New renderers should use {@link #lineDefinitions()}. */
+    public List<String> lines() {
+        return lineDefinitions.stream().map(SidebarLine::text).toList();
+    }
+
+    public List<SidebarLine> lineDefinitions() {
+        return lineDefinitions;
+    }
+
+    public boolean hideScoreNumbers() {
+        return hideScoreNumbers;
+    }
+
+    public Duration refreshInterval() {
+        return refreshInterval;
+    }
+
+    public Set<String> worldBlacklist() {
+        return worldBlacklist;
     }
 
     /**
@@ -64,11 +118,27 @@ public record DisplayContent(
     /** True when {@code worldName} is on the blacklist and the sidebar must be suppressed there. */
     public boolean suppressedIn(String worldName) {
         Objects.requireNonNull(worldName, "worldName");
-        return worldBlacklist.contains(worldName);
+        return worldBlacklist.stream().anyMatch(candidate -> candidate.equalsIgnoreCase(worldName));
     }
 
     /** True when nothing is configured to show — no title and no lines. */
     public boolean isBlank() {
-        return title.isEmpty() && lines.isEmpty();
+        return title.isEmpty() && lineDefinitions.isEmpty();
+    }
+
+    private static List<SidebarLine> legacyLines(List<String> lines, boolean hideScoreNumbers) {
+        Objects.requireNonNull(lines, "lines");
+        SidebarNumberFormat format =
+                hideScoreNumbers ? SidebarNumberFormat.blank() : SidebarNumberFormat.defaultFormat();
+        java.util.ArrayList<SidebarLine> result = new java.util.ArrayList<>(lines.size());
+        for (int i = 0; i < lines.size(); i++) {
+            result.add(new SidebarLine(
+                    "line-" + (i + 1),
+                    Objects.requireNonNull(lines.get(i), "line"),
+                    com.uxplima.uxmessentials.shared.display.DisplayCondition.always(),
+                    format,
+                    false));
+        }
+        return List.copyOf(result);
     }
 }

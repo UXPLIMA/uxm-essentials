@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.message;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import java.nio.charset.StandardCharsets;
@@ -71,5 +72,17 @@ class HoconLocaleCatalogTest {
         HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
 
         assertThat(catalog.template(Locale.ENGLISH, () -> "meta.small-caps")).isEqualTo("meta.small-caps");
+    }
+
+    @Test
+    void malformedReloadKeepsEveryLastKnownGoodCatalog(@TempDir Path dir) throws Exception {
+        Path english = dir.resolve("messages_en.conf");
+        Files.writeString(english, "\"meta.small-caps\" = \"false\"\n\"custom.disk.key\" = \"before\"\n");
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+
+        Files.writeString(english, "\"custom.disk.key\" = \"broken\n");
+
+        assertThatThrownBy(catalog::reload).isInstanceOf(IllegalStateException.class);
+        assertThat(catalog.template(Locale.ENGLISH, DISK_ONLY)).isEqualTo("before");
     }
 }

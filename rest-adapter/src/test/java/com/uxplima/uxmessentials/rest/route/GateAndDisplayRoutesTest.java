@@ -82,12 +82,32 @@ class GateAndDisplayRoutesTest {
     void aSidebarPreferenceNobodyCanReadIsNullRatherThanAGuess() {
         UxmScoreboardQuery scoreboard = mock(UxmScoreboardQuery.class);
         when(scoreboard.hidden(PLAYER)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+        when(scoreboard.activeBoard(PLAYER)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+        when(scoreboard.yielded(PLAYER)).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         UxmEssentialsApi api = mock(UxmEssentialsApi.class);
         when(api.scoreboard()).thenReturn(Optional.of(scoreboard));
 
         Calls.Answer answer = Calls.get(api, PLAYER_PATH + "/scoreboard");
 
         assertThat(answer.object().get("hidden").isJsonNull()).isTrue();
+        assertThat(answer.object().get("active-board").isJsonNull()).isTrue();
+        assertThat(answer.object().get("yielded").isJsonNull()).isTrue();
+    }
+
+    @Test
+    void aLiveSidebarReadCarriesItsSelectedBoardAndOwnershipState() {
+        UxmScoreboardQuery scoreboard = mock(UxmScoreboardQuery.class);
+        when(scoreboard.hidden(PLAYER)).thenReturn(CompletableFuture.completedFuture(Optional.of(false)));
+        when(scoreboard.activeBoard(PLAYER)).thenReturn(CompletableFuture.completedFuture(Optional.of("lobby")));
+        when(scoreboard.yielded(PLAYER)).thenReturn(CompletableFuture.completedFuture(Optional.of(false)));
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.scoreboard()).thenReturn(Optional.of(scoreboard));
+
+        Calls.Answer answer = Calls.get(api, PLAYER_PATH + "/scoreboard");
+
+        assertThat(answer.object().get("hidden").getAsBoolean()).isFalse();
+        assertThat(answer.object().get("active-board").getAsString()).isEqualTo("lobby");
+        assertThat(answer.object().get("yielded").getAsBoolean()).isFalse();
     }
 
     @Test

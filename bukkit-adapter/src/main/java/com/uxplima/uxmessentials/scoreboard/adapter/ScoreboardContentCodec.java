@@ -13,6 +13,8 @@ import java.util.Set;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.scoreboard.domain.SidebarLine;
+import com.uxplima.uxmessentials.scoreboard.domain.SidebarNumberFormat;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
@@ -93,17 +95,17 @@ final class ScoreboardContentCodec {
         List<AnimationDef> animations = AnimationDef.parseAll(root.node("animations"), log);
         ConfigurationNode boards = root.node("boards");
         if (!boards.virtual() && boards.isMap()) {
-            return new Parsed(readBoards(boards), animations, refreshInterval(root.node("refresh-ticks")));
+            return new Parsed(readBoards(boards, log), animations, refreshInterval(root.node("refresh-ticks")));
         }
-        Parsed single = readSingleBoard(root.node("scoreboard"));
+        Parsed single = readSingleBoard(root.node("scoreboard"), log);
         return new Parsed(single.boards(), animations, single.refreshInterval());
     }
 
-    private static SidebarConfig readBoards(ConfigurationNode boards) {
+    private static SidebarConfig readBoards(ConfigurationNode boards, Logger log) {
         List<SidebarBoard> parsed = new ArrayList<>();
         for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                 boards.childrenMap().entrySet()) {
-            readBoard(String.valueOf(entry.getKey()), entry.getValue()).ifPresent(parsed::add);
+            readBoard(String.valueOf(entry.getKey()), entry.getValue(), log).ifPresent(parsed::add);
         }
         // HOCON does not preserve the order map keys are declared in, so we cannot rely on declaration order to break a
         // priority tie. Sort by name to give SidebarConfig.select a deterministic, documented tie-break: on equal
@@ -113,11 +115,11 @@ final class ScoreboardContentCodec {
         return new SidebarConfig(parsed);
     }
 
-    private static Optional<SidebarBoard> readBoard(String name, ConfigurationNode node) {
+    private static Optional<SidebarBoard> readBoard(String name, ConfigurationNode node, Logger log) {
         if (node.virtual() || !node.isMap()) {
             return Optional.empty();
         }
-        DisplayContent content = displayContent(node);
+        DisplayContent content = displayContent(node, log);
         if (content.isBlank()) {
             return Optional.empty();
         }
@@ -132,9 +134,9 @@ final class ScoreboardContentCodec {
      * always-true condition and priority {@code 0}. A blank block yields no boards. Animations are read separately by
      * {@link #read} and merged in there, so the returned {@code animations} list is always empty.
      */
-    private static Parsed readSingleBoard(ConfigurationNode board) {
+    private static Parsed readSingleBoard(ConfigurationNode board, Logger log) {
         Duration interval = refreshInterval(board.node("refresh-ticks"));
-        DisplayContent content = displayContent(board);
+        DisplayContent content = displayContent(board, log);
         if (content.isBlank()) {
             return new Parsed(SidebarConfig.empty(), List.of(), interval);
         }
@@ -142,11 +144,12 @@ final class ScoreboardContentCodec {
         return new Parsed(new SidebarConfig(List.of(single)), List.of(), interval);
     }
 
-    private static DisplayContent displayContent(ConfigurationNode board) {
-        return new DisplayContent(
+    private static DisplayContent displayContent(ConfigurationNode board, Logger log) {
+        boolean hideScoreNumbers = board.node("hide-score-numbers").getBoolean(true);
+        return DisplayContent.typed(
                 optionalString(board.node("title")),
-                cappedLines(strings(board.node("lines"))),
-                board.node("hide-score-numbers").getBoolean(true),
+                lines(board.node("lines"), hideScoreNumbers, log),
+                hideScoreNumbers,
                 refreshInterval(board.node("refresh-ticks")),
                 worldBlacklist(board.node("world-blacklist")));
     }
@@ -157,13 +160,6 @@ final class ScoreboardContentCodec {
             ticks = DEFAULT_REFRESH_TICKS;
         }
         return Duration.ofMillis(ticks * MILLIS_PER_TICK);
-    }
-
-    private static List<String> cappedLines(List<String> lines) {
-        if (lines.size() <= DisplayContent.MAX_LINES) {
-            return lines;
-        }
-        return List.copyOf(lines.subList(0, DisplayContent.MAX_LINES));
     }
 
     private static Set<String> worldBlacklist(ConfigurationNode node) {
@@ -183,6 +179,100 @@ final class ScoreboardContentCodec {
             }
         }
         return List.copyOf(values);
+    }
+
+    private static List<SidebarLine> lines(ConfigurationNode node, boolean hideScoreNumbers, Logger log) {
+        if (node.virtual() || !node.isList()) {
+            return List.of();
+        }
+        List<SidebarLine> values = new ArrayList<>();
+        Set<String> ids = new LinkedHashSet<>();
+        int sourceIndex = 0;
+        for (ConfigurationNode child : node.childrenList()) {
+            sourceIndex++;
+            Optional<SidebarLine> parsed = child.isMap()
+                    ? typedLine(child, sourceIndex, hideScoreNumbers)
+                    : legacyLine(child.getString(), sourceIndex, hideScoreNumbers);
+            if (parsed.isEmpty()) {
+                log.warn("scoreboard_line_skipped index={} reason=missing_or_invalid", sourceIndex);
+                continue;
+            }
+            SidebarLine line = parsed.orElseThrow();
+            if (!ids.add(line.id())) {
+                log.warn("scoreboard_line_skipped index={} id={} reason=duplicate_id", sourceIndex, line.id());
+                continue;
+            }
+            if (values.size() == DisplayContent.MAX_CANDIDATE_LINES) {
+                log.warn("scoreboard_lines_truncated limit={}", DisplayContent.MAX_CANDIDATE_LINES);
+                break;
+            }
+            values.add(line);
+        }
+        return List.copyOf(values);
+    }
+
+    private static Optional<SidebarLine> legacyLine(String source, int sourceIndex, boolean hideScoreNumbers) {
+        if (source == null) {
+            return Optional.empty();
+        }
+        String conditionSource = "";
+        String textAndRight = source;
+        int conditionAt = source.indexOf(" | ");
+        if (conditionAt >= 0) {
+            conditionSource = source.substring(0, conditionAt);
+            textAndRight = source.substring(conditionAt + 3);
+        }
+        int rightAt = textAndRight.indexOf("||");
+        String text = rightAt < 0 ? textAndRight : textAndRight.substring(0, rightAt);
+        SidebarNumberFormat format = rightAt < 0
+                ? defaultNumberFormat(hideScoreNumbers)
+                : SidebarNumberFormat.fixed(textAndRight.substring(rightAt + 2));
+        return Optional.of(
+                new SidebarLine("line-" + sourceIndex, text, ConditionParser.parse(conditionSource), format, false));
+    }
+
+    private static Optional<SidebarLine> typedLine(ConfigurationNode node, int sourceIndex, boolean hideScoreNumbers) {
+        String text = node.node("text").getString();
+        if (text == null) {
+            return Optional.empty();
+        }
+        String id = node.node("id").getString("line-" + sourceIndex);
+        try {
+            return Optional.of(new SidebarLine(
+                    id,
+                    text,
+                    ConditionParser.parse(node.node("condition").getString()),
+                    numberFormat(node.node("number-format"), hideScoreNumbers),
+                    node.node("hide-when-empty").getBoolean(false)));
+        } catch (IllegalArgumentException invalid) {
+            return Optional.empty();
+        }
+    }
+
+    private static SidebarNumberFormat numberFormat(ConfigurationNode node, boolean hideScoreNumbers) {
+        if (node.virtual()) {
+            return defaultNumberFormat(hideScoreNumbers);
+        }
+        if (node.isMap()) {
+            String type = node.node("type").getString("fixed");
+            if (type.equalsIgnoreCase("fixed")) {
+                return SidebarNumberFormat.fixed(node.node("text").getString(""));
+            }
+            return namedNumberFormat(type, hideScoreNumbers);
+        }
+        return namedNumberFormat(node.getString(""), hideScoreNumbers);
+    }
+
+    private static SidebarNumberFormat namedNumberFormat(String value, boolean hideScoreNumbers) {
+        return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+            case "default", "score" -> SidebarNumberFormat.defaultFormat();
+            case "blank", "hidden", "hide" -> SidebarNumberFormat.blank();
+            default -> defaultNumberFormat(hideScoreNumbers);
+        };
+    }
+
+    private static SidebarNumberFormat defaultNumberFormat(boolean hideScoreNumbers) {
+        return hideScoreNumbers ? SidebarNumberFormat.blank() : SidebarNumberFormat.defaultFormat();
     }
 
     private static Optional<String> optionalString(ConfigurationNode node) {

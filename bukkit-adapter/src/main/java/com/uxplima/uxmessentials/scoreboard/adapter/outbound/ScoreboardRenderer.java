@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.scoreboard.adapter.outbound;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -10,10 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-
-import io.papermc.paper.scoreboard.numbers.NumberFormat;
 
 import net.kyori.adventure.text.Component;
 
@@ -21,6 +18,8 @@ import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilit
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.scoreboard.domain.SidebarLine;
+import com.uxplima.uxmessentials.scoreboard.domain.SidebarNumberFormat;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
@@ -28,150 +27,257 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
-import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.hud.scoreboard.Sidebar;
-import com.uxplima.uxmlib.hud.scoreboard.SidebarManager;
+import com.uxplima.uxmlib.packet.scoreboard.ScoreboardDisplaySlot;
+import com.uxplima.uxmlib.packet.scoreboard.ScoreboardNumberFormat;
+import com.uxplima.uxmlib.packet.scoreboard.ScoreboardObjective;
+import com.uxplima.uxmlib.packet.scoreboard.ScoreboardPacketEvent;
+import com.uxplima.uxmlib.packet.scoreboard.ScoreboardPackets;
+import com.uxplima.uxmlib.packet.scoreboard.ScoreboardScore;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Renders the per-player sidebar from the live {@link SidebarConfig}, dogfooding uxmLib's {@link SidebarManager}. Each
- * viewer is offered the board {@link SidebarConfig#select selected} for them: the highest-priority {@link SidebarBoard}
- * whose {@link com.uxplima.uxmessentials.shared.display.DisplayCondition condition} matches. The condition is evaluated
- * against a {@link ConditionContext} built from the live player — their permission check, world, gamemode, and the
- * per-viewer PlaceholderAPI bridge — so a {@code %papi% >= 10} or {@code permission:uxmessentials.staff} condition sees
- * real values. When no board matches, the sidebar is torn down.
+ * Packet-native, ownership-aware modern sidebar renderer. It never replaces {@link Player#getScoreboard()}, so
+ * nametag, glow and other plugins' server-side scoreboard state remain intact. Stable line ids are used as protocol
+ * holders while the visible text travels independently in the modern score packet; conditional lines can therefore
+ * move without changing identity and literal empty spacer rows remain distinct.
  *
- * <p>Each source string of the selected board is first run through the {@link AnimationRegistry} — expanding any
- * {@code %anim_<name>%} token to the named animation's current frame at the global render tick — then through
- * {@link BuiltinTokens} — resolving the built-in {@code {player}} / {@code {online}} / {@code {world}} style tokens off
- * the live player so the board shows real values with or without PlaceholderAPI — and finally through {@link HudText} —
- * the per-viewer PlaceholderAPI bridge ({@code %papi%} expansion, identity without PlaceholderAPI) then
- * {@code MiniMessage} parse, the same two-step transform the message sink uses — so operator content may embed
- * animations, built-in tokens, and third-party placeholders. The animation token is expanded <em>before</em> the
- * built-in tokens and PlaceholderAPI so an animation frame may itself carry tokens or placeholders. The sidebar is reused across ticks
- * when it already exists (its {@code lines}/{@code title} diff flicker-free), created on first render, and torn down
- * when the player has hidden it, no board matches, or the selected board blacklists their world.
- *
- * <p>A line source may carry a per-viewer condition with the literal {@code " | "} separator —
- * {@code "<condition> | <text>"}. The condition (parsed by {@link ConditionParser}) is evaluated against the same
- * per-viewer {@link ConditionContext}; when it does not match, the line is dropped from that viewer's board entirely
- * rather than rendered blank. Only the first {@code " | "} splits — a line that legitimately contains {@code " | "} in
- * its text keeps everything after the first separator as the text. Lines without the separator render unconditionally.
- * The title is never conditional: a selected board always shows its title.
- *
- * <p>When the selected board's {@link DisplayContent#hideScoreNumbers()} is set the renderer drops the red per-line
- * score numbers vanilla draws down the right edge by applying a {@linkplain NumberFormat#blank() blank number format} to
- * the sidebar objective; when it is unset the format is reset to the vanilla default ({@code numberFormat(null)}) so the
- * red numbers show again. uxmLib's {@code Sidebar} owns its objective on its own native scoreboard and does not expose
- * it, so the objective is reached through the player's now-active scoreboard ({@code getObjective(DisplaySlot.SIDEBAR)}).
- * Because the same sidebar is reused across ticks and even across a board switch — a viewer can move from a board that
- * hides numbers to one that shows them with no teardown in between — the format must track the <em>currently</em>
- * selected board, not the one the sidebar was created for. The renderer remembers the last value it applied per player
- * ({@link #appliedHideNumbers}) and re-applies only when the sidebar is freshly created or the selected board's choice
- * changed; a steady-state tick with no switch never re-calls the setter (re-applying sends a client update and risks
- * flicker). The remembered value is dropped on tear-down so a recreated board re-applies from scratch.
- *
- * <p>The tablist header/footer is a separate context now: {@code tablist} owns it through its own renderer and refresh
- * timer, so this renderer touches only the sidebar.
- *
- * <p>{@link #renderFor(Player)} touches the live player, so the caller must invoke it on the player's region/entity
- * thread — the render timer and the connection listener both hop there first. An empty {@link SidebarConfig} (nothing
- * authored) or a viewer no board matches renders nothing and clears any board left over from a prior config or a prior
- * selection.
+ * <p>The authored catalog may contain up to 128 candidates. Conditions and optional empty-value suppression run per
+ * viewer first, then the first 15 visible rows form the frame. Reconciliation emits only objective/title/row changes
+ * and bundles a frame into one outbound write. A foreign sidebar display packet puts the session into yielded state;
+ * rendering pauses until that objective is cleared or removed, at which point the caller schedules one fresh paint.
  */
 @NullMarked
 public final class ScoreboardRenderer {
 
-    /** The literal separator between a per-line condition and its text: {@code "<condition> | <text>"}. */
+    public static final String OBJECTIVE_NAME = "uxmsb";
+    private static final int MAX_VISIBLE_LINES = 15;
     private static final String CONDITION_SEPARATOR = " | ";
 
-    private final SidebarManager sidebars;
+    private final ScoreboardPackets packets;
     private final ScoreboardVisibilityStore visibility;
     private final Supplier<SidebarConfig> boards;
     private final AnimationRegistry animations;
-
-    /**
-     * The last {@link DisplayContent#hideScoreNumbers()} value applied to each player's live sidebar objective, keyed by
-     * player UUID. Owned by the player's region/entity thread (every mutation runs there), so a plain map under
-     * {@code compute}/{@code remove} would suffice; a {@link ConcurrentHashMap} guards the connect-while-rendering race
-     * and keeps the project's "every player-keyed map is concurrent" convention. An absent key means no format has been
-     * applied for the player's current board, so the next render applies from scratch.
-     */
-    private final Map<UUID, Boolean> appliedHideNumbers = new ConcurrentHashMap<>();
-
-    /**
-     * The name of the board each player is currently being drawn from, keyed by player UUID, or absent when they
-     * have none (hidden, suppressed in this world, or matching no board). Written on the same region thread as the
-     * paint it describes and read by the {@code scoreboard_format} placeholder, which is why it records what was
-     * applied rather than re-running the selector: re-selecting would evaluate the board conditions a second time,
-     * and a condition may itself expand a placeholder.
-     */
+    private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, String> appliedBoard = new ConcurrentHashMap<>();
-
-    /** The board {@code who} is currently drawn from, or empty when no sidebar is being shown to them. */
-    public Optional<String> appliedBoard(PlayerRef who) {
-        Objects.requireNonNull(who, "who");
-        return Optional.ofNullable(appliedBoard.get(who.uuid()));
-    }
+    private final Map<UUID, String> foreignObjectives = new ConcurrentHashMap<>();
 
     public ScoreboardRenderer(
-            SidebarManager sidebars,
+            ScoreboardPackets packets,
             ScoreboardVisibilityStore visibility,
             Supplier<SidebarConfig> boards,
             AnimationRegistry animations) {
-        this.sidebars = Objects.requireNonNull(sidebars, "sidebars");
+        this.packets = Objects.requireNonNull(packets, "packets");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
         this.boards = Objects.requireNonNull(boards, "boards");
         this.animations = Objects.requireNonNull(animations, "animations");
     }
 
-    /** Render (or tear down) {@code player}'s sidebar from the selected board. Must run on the player's region thread. */
+    public Optional<String> appliedBoard(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        return Optional.ofNullable(appliedBoard.get(who.uuid()));
+    }
+
+    /** Render or reconcile one player's sidebar. Must run on the player's owning thread. */
     public void renderFor(Player player) {
         Objects.requireNonNull(player, "player");
+        UUID uuid = player.getUniqueId();
         PlayerRef who = BukkitRefs.toRef(player);
-        // The same per-viewer context decides board selection and per-line conditions; build it once. The animation
-        // tick is captured once here too, so every line of this paint reads the same global animation frame.
-        ConditionContext ctx = conditionContext(player);
-        long tick = animations.tick();
-        Optional<SidebarBoard> selected = boards.get().select(ctx);
+        ConditionContext context = conditionContext(player);
+        Optional<SidebarBoard> selected = boards.get().select(context);
         if (selected.isEmpty() || visibility.hidden(who)) {
             clear(player);
             return;
         }
-        DisplayContent live = selected.get().content();
-        if (live.isBlank() || live.suppressedIn(player.getWorld().getName())) {
+        SidebarBoard board = selected.orElseThrow();
+        DisplayContent content = board.content();
+        if (content.isBlank() || content.suppressedIn(player.getWorld().getName())) {
             clear(player);
             return;
         }
-        appliedBoard.put(player.getUniqueId(), selected.get().name());
-        renderSidebar(player, live, ctx, tick);
+        Session previous = sessions.get(uuid);
+        if (foreignObjectives.containsKey(uuid)) {
+            return;
+        }
+        ScoreboardFrame desired = frame(player, content, context, animations.tick());
+        apply(player, previous, desired);
+        sessions.put(uuid, new Session(desired, null, false));
+        appliedBoard.put(uuid, board.name());
     }
 
-    /** Tear down {@code player}'s sidebar — on hide, on quit, or when the display is suppressed. */
+    /** Clear only this renderer's client-side objective; a yielded foreign sidebar is never disturbed. */
     public void clear(Player player) {
         Objects.requireNonNull(player, "player");
-        appliedHideNumbers.remove(player.getUniqueId());
-        appliedBoard.remove(player.getUniqueId());
-        if (sidebars.get(player.getUniqueId()) != null) {
-            sidebars.remove(player);
+        UUID uuid = player.getUniqueId();
+        Session previous = sessions.remove(uuid);
+        appliedBoard.remove(uuid);
+        if (previous == null) {
+            return;
         }
+        List<Object> updates = new ArrayList<>();
+        if (!foreignObjectives.containsKey(uuid)) {
+            updates.add(packets.clearDisplay(ScoreboardDisplaySlot.SIDEBAR));
+        }
+        updates.add(packets.removeObjective(OBJECTIVE_NAME));
+        packets.sendPackets(player, updates);
     }
 
-    /** Drop {@code uuid}'s sidebar bookkeeping without restoring a prior board — on quit. */
+    /** Forget disconnected client state without sending packets to its closed connection. */
     public void forget(Player player) {
         Objects.requireNonNull(player, "player");
-        appliedHideNumbers.remove(player.getUniqueId());
+        sessions.remove(player.getUniqueId());
         appliedBoard.remove(player.getUniqueId());
-        sidebars.forget(player.getUniqueId());
+        foreignObjectives.remove(player.getUniqueId());
     }
 
     /**
-     * Gather everything a board's condition needs from the live player: their permission check, world and gamemode
-     * names, and the per-viewer PlaceholderAPI bridge so a {@code %papi%}-comparison condition expands the same way the
-     * rendered lines do.
+     * Observe one ownership-relevant outbound event on the Netty thread. Returns true when a region-thread repaint
+     * should be scheduled. This method mutates only concurrent immutable session state and never touches Bukkit.
      */
-    private ConditionContext conditionContext(Player player) {
+    public boolean observe(UUID viewer, ScoreboardPacketEvent event) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(event, "event");
+        if (event instanceof ScoreboardPacketEvent.Display display && display.slot() == ScoreboardDisplaySlot.SIDEBAR) {
+            Optional<String> objective = display.objectiveName();
+            if (objective.filter(OBJECTIVE_NAME::equals).isPresent()) {
+                return false;
+            }
+            if (objective.isPresent()) {
+                foreignObjectives.put(viewer, objective.orElseThrow());
+                appliedBoard.remove(viewer);
+                sessions.computeIfPresent(viewer, (ignored, state) -> state.withForeign(objective.orElseThrow()));
+                return false;
+            }
+            return resume(viewer, null);
+        }
+        if (event instanceof ScoreboardPacketEvent.Objective objective
+                && objective.action() == com.uxplima.uxmlib.packet.scoreboard.ScoreboardObjectiveAction.REMOVE) {
+            return resume(viewer, objective.objectiveName());
+        }
+        return false;
+    }
+
+    public boolean yielded(UUID viewer) {
+        return foreignObjectives.containsKey(Objects.requireNonNull(viewer, "viewer"));
+    }
+
+    private boolean resume(UUID viewer, @Nullable String removedObjective) {
+        @Nullable String foreign = foreignObjectives.get(viewer);
+        if (foreign == null || (removedObjective != null && !removedObjective.equals(foreign))) {
+            return false;
+        }
+        if (!foreignObjectives.remove(viewer, foreign)) {
+            return false;
+        }
+        sessions.computeIfPresent(viewer, (ignored, state) -> {
+            return state.resume();
+        });
+        return true;
+    }
+
+    private void apply(Player player, @Nullable Session previousSession, ScoreboardFrame desired) {
+        @Nullable ScoreboardFrame previous = previousSession == null ? null : previousSession.frame();
+        List<Object> updates = new ArrayList<>();
+        if (previous == null) {
+            updates.add(packets.createObjective(objective(desired.title())));
+            addChangedRows(updates, Map.of(), desired);
+            updates.add(packets.displayObjective(ScoreboardDisplaySlot.SIDEBAR, OBJECTIVE_NAME));
+        } else {
+            if (!previous.title().equals(desired.title())) {
+                updates.add(packets.updateObjective(objective(desired.title())));
+            }
+            Map<String, ScoreboardFrame.Line> desiredById = byId(desired.lines());
+            for (ScoreboardFrame.Line oldLine : previous.lines()) {
+                if (!desiredById.containsKey(oldLine.id())) {
+                    updates.add(packets.removeScore(OBJECTIVE_NAME, oldLine.holder()));
+                }
+            }
+            addChangedRows(updates, indexed(previous), desired);
+            if (previousSession != null && previousSession.redisplay()) {
+                updates.add(packets.displayObjective(ScoreboardDisplaySlot.SIDEBAR, OBJECTIVE_NAME));
+            }
+        }
+        packets.sendPackets(player, updates);
+    }
+
+    private void addChangedRows(List<Object> updates, Map<String, PositionedLine> previous, ScoreboardFrame desired) {
+        int lineCount = desired.lines().size();
+        for (int index = 0; index < lineCount; index++) {
+            ScoreboardFrame.Line line = desired.lines().get(index);
+            int score = lineCount - index;
+            PositionedLine old = previous.get(line.id());
+            if (old == null || old.score() != score || !old.line().equals(line)) {
+                updates.add(packets.setScore(
+                        new ScoreboardScore(OBJECTIVE_NAME, line.holder(), score, line.text(), line.numberFormat())));
+            }
+        }
+    }
+
+    private ScoreboardFrame frame(Player player, DisplayContent content, ConditionContext context, long tick) {
+        Component title = content.title()
+                .map(source -> component(expand(player, source, tick)))
+                .orElse(Component.empty());
+        List<ScoreboardFrame.Line> lines = new ArrayList<>();
+        for (SidebarLine candidate : content.lineDefinitions()) {
+            if (!candidate.condition().matches(context)) {
+                continue;
+            }
+            String expanded = expand(player, candidate.text(), tick);
+            if (candidate.hideWhenEmpty() && expanded.isBlank()) {
+                continue;
+            }
+            lines.add(new ScoreboardFrame.Line(
+                    candidate.id(), component(expanded), numberFormat(player, candidate.numberFormat(), tick)));
+            if (lines.size() == MAX_VISIBLE_LINES) {
+                break;
+            }
+        }
+        return new ScoreboardFrame(title, lines);
+    }
+
+    private String expand(Player player, String source, long tick) {
+        String animated = animations.resolve(source, tick);
+        String builtins = BuiltinTokens.apply(player, animated);
+        return PlaceholderApiSupport.messageBridge(player.getUniqueId()).apply(builtins);
+    }
+
+    private static Component component(String expanded) {
+        return HudText.parse(expanded);
+    }
+
+    private ScoreboardNumberFormat numberFormat(Player player, SidebarNumberFormat format, long tick) {
+        return switch (format) {
+            case SidebarNumberFormat.Default ignored -> ScoreboardNumberFormat.defaultFormat();
+            case SidebarNumberFormat.Blank ignored -> ScoreboardNumberFormat.blank();
+            case SidebarNumberFormat.Fixed fixed ->
+                ScoreboardNumberFormat.fixed(component(expand(player, fixed.source(), tick)));
+        };
+    }
+
+    private static ScoreboardObjective objective(Component title) {
+        return new ScoreboardObjective(OBJECTIVE_NAME, title, ScoreboardNumberFormat.defaultFormat());
+    }
+
+    private static Map<String, ScoreboardFrame.Line> byId(List<ScoreboardFrame.Line> lines) {
+        Map<String, ScoreboardFrame.Line> result = new LinkedHashMap<>();
+        for (ScoreboardFrame.Line line : lines) {
+            result.put(line.id(), line);
+        }
+        return result;
+    }
+
+    private static Map<String, PositionedLine> indexed(ScoreboardFrame frame) {
+        Map<String, PositionedLine> result = new LinkedHashMap<>();
+        int lineCount = frame.lines().size();
+        for (int index = 0; index < lineCount; index++) {
+            ScoreboardFrame.Line line = frame.lines().get(index);
+            result.put(line.id(), new PositionedLine(line, lineCount - index));
+        }
+        return result;
+    }
+
+    private static ConditionContext conditionContext(Player player) {
         return new ConditionContext(
                 player::hasPermission,
                 player.getWorld().getName(),
@@ -179,71 +285,9 @@ public final class ScoreboardRenderer {
                 PlaceholderApiSupport.messageBridge(player.getUniqueId()));
     }
 
-    private void renderSidebar(Player player, DisplayContent live, ConditionContext ctx, long tick) {
-        Component title =
-                live.title().map(source -> render(player, source, tick)).orElse(Component.empty());
-        Sidebar existing = sidebars.get(player.getUniqueId());
-        boolean created = existing == null;
-        Sidebar sidebar;
-        if (existing == null) {
-            sidebar = sidebars.create(player, title);
-        } else {
-            sidebar = existing;
-            sidebar.title(title);
-        }
-        applyNumberFormat(player, live, created);
-        sidebar.lines(renderLines(player, live.lines(), ctx, tick));
-    }
-
-    /**
-     * Reconcile the live sidebar objective's number format with the currently selected board's
-     * {@link DisplayContent#hideScoreNumbers()} choice. uxmLib's {@code Sidebar} keeps its objective private and shows
-     * its own scoreboard on creation, so the live objective is read back from the player's now-active scoreboard.
-     *
-     * <p>A freshly {@code created} objective already shows the vanilla red numbers, so a brand-new board that does not
-     * hide them needs no setter call at all — the baseline is simply recorded. Otherwise the format is touched only when
-     * the desired choice differs from the last value applied for this player: a steady-state tick with no board switch
-     * leaves the objective alone (re-applying sends a client update and risks flicker), while a switch between two reused
-     * boards re-applies. On a hide-numbers board the format is set blank; on a show-numbers board it is reset to the
-     * vanilla default with {@code numberFormat(null)} so the red numbers reappear after a switch back.
-     */
-    private void applyNumberFormat(Player player, DisplayContent live, boolean created) {
-        UUID uuid = player.getUniqueId();
-        boolean desired = live.hideScoreNumbers();
-        Boolean lastApplied = appliedHideNumbers.get(uuid);
-        if (created) {
-            lastApplied = Boolean.FALSE; // a new objective shows the vanilla numbers until told otherwise
-        }
-        if (Boolean.valueOf(desired).equals(lastApplied)) {
-            appliedHideNumbers.put(uuid, desired);
-            return;
-        }
-        Objective objective = player.getScoreboard().getObjective(DisplaySlot.SIDEBAR);
-        if (objective == null) {
-            return;
-        }
-        objective.numberFormat(desired ? NumberFormat.blank() : null);
-        appliedHideNumbers.put(uuid, desired);
-    }
-
-    private List<Component> renderLines(Player player, List<String> sources, ConditionContext ctx, long tick) {
-        List<Component> rendered = new ArrayList<>(sources.size());
-        for (String source : visibleLines(sources, ctx)) {
-            rendered.add(render(player, source, tick));
-        }
-        return rendered;
-    }
-
-    /**
-     * Drop the lines whose per-line condition does not match {@code ctx} and strip the condition prefix off the rest,
-     * leaving only the text each viewer should render. A line carrying the {@code " | "} separator splits on the first
-     * occurrence into {@code (condition, text)}; the condition is parsed by {@link ConditionParser} and the line is kept
-     * only when it {@link DisplayCondition#matches matches}. A line without the separator is always kept verbatim. Pure
-     * over {@code ctx}, so it is unit-testable without a live board.
-     */
-    static List<String> visibleLines(List<String> sources, ConditionContext ctx) {
+    static List<String> visibleLines(List<String> sources, ConditionContext context) {
         Objects.requireNonNull(sources, "sources");
-        Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(context, "context");
         List<String> visible = new ArrayList<>(sources.size());
         for (String source : sources) {
             int separator = source.indexOf(CONDITION_SEPARATOR);
@@ -253,18 +297,22 @@ public final class ScoreboardRenderer {
             }
             String conditionPart = source.substring(0, separator);
             String text = source.substring(separator + CONDITION_SEPARATOR.length());
-            if (ConditionParser.parse(conditionPart).matches(ctx)) {
+            if (ConditionParser.parse(conditionPart).matches(context)) {
                 visible.add(text);
             }
         }
         return visible;
     }
 
-    private Component render(Player player, String source, long tick) {
-        // Built-in {tokens} (e.g. {player}, {online}, {world}) resolve here off the live player, BEFORE the
-        // PlaceholderAPI bridge and MiniMessage, so the shipped sidebar shows real values with or without
-        // PlaceholderAPI. The animation %anim_<name>% pass runs first so an animation frame may itself carry tokens.
-        String withTokens = BuiltinTokens.apply(player, animations.resolve(source, tick));
-        return HudText.render(player.getUniqueId(), withTokens);
+    private record PositionedLine(ScoreboardFrame.Line line, int score) {}
+
+    private record Session(ScoreboardFrame frame, @Nullable String foreignObjective, boolean redisplay) {
+        private Session withForeign(@Nullable String value) {
+            return new Session(frame, value, false);
+        }
+
+        private Session resume() {
+            return new Session(frame, null, true);
+        }
     }
 }

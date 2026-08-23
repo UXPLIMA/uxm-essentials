@@ -64,6 +64,27 @@ public final class NametagRenderTask {
         scheduleNext();
     }
 
+    /** Force every online wearer onto the newly loaded config generation immediately. */
+    public void refreshNow() {
+        if (!running.getAsBoolean()) {
+            return;
+        }
+        scheduler.onGlobal(() -> {
+            if (!running.getAsBoolean()) {
+                return;
+            }
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                com.uxplima.uxmessentials.shared.domain.PlayerRef ref = BukkitRefs.toRef(player);
+                scheduler.onEntity(ref, () -> {
+                    Player live = Bukkit.getPlayer(ref.uuid());
+                    if (live != null && live.isOnline() && running.getAsBoolean()) {
+                        presenter.refresh(live);
+                    }
+                });
+            }
+        });
+    }
+
     private void scheduleNext() {
         if (!running.getAsBoolean()) {
             return;

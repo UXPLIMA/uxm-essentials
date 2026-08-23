@@ -52,14 +52,15 @@ class DisplayContentTest {
     }
 
     @Test
-    void rejectsMoreThanTheSidebarLineLimit() {
+    void acceptsMoreCandidatesThanTheVisibleSidebarLimit() {
         List<String> tooMany = IntStream.range(0, DisplayContent.MAX_LINES + 1)
                 .mapToObj(i -> "line " + i)
                 .collect(Collectors.toList());
 
-        assertThatThrownBy(() -> new DisplayContent(Optional.empty(), tooMany, true, Duration.ofSeconds(1L), Set.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(String.valueOf(DisplayContent.MAX_LINES));
+        DisplayContent content = new DisplayContent(Optional.empty(), tooMany, true, Duration.ofSeconds(1L), Set.of());
+
+        assertThat(content.lines()).hasSize(DisplayContent.MAX_LINES + 1);
+        assertThat(content.lineDefinitions()).extracting(SidebarLine::id).doesNotHaveDuplicates();
     }
 
     @Test
@@ -74,6 +75,7 @@ class DisplayContentTest {
                 new DisplayContent(Optional.empty(), List.of(), true, Duration.ofSeconds(1L), Set.of("world_the_end"));
 
         assertThat(content.suppressedIn("world_the_end")).isTrue();
+        assertThat(content.suppressedIn("WORLD_THE_END")).isTrue();
         assertThat(content.suppressedIn("world")).isFalse();
     }
 

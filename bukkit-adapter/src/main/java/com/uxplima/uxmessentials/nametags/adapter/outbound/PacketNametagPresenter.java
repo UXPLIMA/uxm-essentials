@@ -193,6 +193,17 @@ public final class PacketNametagPresenter {
     }
 
     /**
+     * Force a wearer onto a freshly parsed config generation. Unlike {@link #update}, this always re-shows an existing
+     * handle because line text, visibility and refresh cadence may have changed while format name/appearance stayed
+     * equal. Must run on the wearer's region thread.
+     */
+    public void refresh(Player wearer) {
+        Objects.requireNonNull(wearer, "wearer");
+        remove(wearer.getUniqueId());
+        show(wearer);
+    }
+
+    /**
      * Remove {@code uuid}'s nametag if it has one, sending the lib's remove packets to every viewer. Clears the
      * vanilla-name-hide bookkeeping (a pure map mutation) but does <em>not</em> touch the board, so it is safe from any
      * thread and is used where a re-show follows that re-hides on the player's region thread (a world change). It does

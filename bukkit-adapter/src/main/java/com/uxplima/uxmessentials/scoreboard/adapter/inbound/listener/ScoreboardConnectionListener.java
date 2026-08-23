@@ -12,6 +12,7 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardOwnership;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -34,21 +35,32 @@ public final class ScoreboardConnectionListener implements Listener {
 
     private final ScoreboardRenderer renderer;
     private final Scheduler scheduler;
+    private final java.util.Optional<ScoreboardOwnership> ownership;
 
     public ScoreboardConnectionListener(ScoreboardRenderer renderer, Scheduler scheduler) {
+        this(renderer, scheduler, null);
+    }
+
+    public ScoreboardConnectionListener(
+            ScoreboardRenderer renderer,
+            Scheduler scheduler,
+            @org.jspecify.annotations.Nullable ScoreboardOwnership ownership) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.ownership = java.util.Optional.ofNullable(ownership);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        ownership.ifPresent(value -> value.inject(player));
         renderer.renderFor(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        ownership.ifPresent(value -> value.eject(player));
         renderer.forget(player);
     }
 

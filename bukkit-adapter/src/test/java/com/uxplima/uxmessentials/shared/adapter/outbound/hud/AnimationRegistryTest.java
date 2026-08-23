@@ -100,6 +100,17 @@ class AnimationRegistryTest {
         assertThat(registry.tick()).isEqualTo(before + 1);
     }
 
+    @Test
+    void replacingTheCatalogIsAtomicAndRestartsItsClock() {
+        AnimationRegistry registry = new AnimationRegistry(List.of(frames("old", List.of("OLD"), 1)));
+        registry.advance();
+
+        registry.replace(List.of(frames("new", List.of("NEW"), 1)));
+
+        assertThat(registry.tick()).isZero();
+        assertThat(registry.resolve("%anim_old%/%anim_new%", registry.tick())).isEqualTo("%anim_old%/NEW");
+    }
+
     private static AnimationDef frames(String name, List<String> frames, int interval) {
         return AnimationDef.frames(new AnimationSpec(name, AnimationSpec.AnimationType.FRAMES, frames, interval));
     }

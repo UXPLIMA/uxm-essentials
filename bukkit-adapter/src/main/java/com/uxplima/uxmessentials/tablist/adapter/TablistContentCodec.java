@@ -136,9 +136,9 @@ final class TablistContentCodec {
         Optional<String> nameFormat = optionalString(node.node("name-format"));
         OptionalInt sortOrder = sortOrder(node.node("sort-order"));
         Optional<TablistSkinSource> skin = skinSource(node.node("skin"));
-        TablistLayout layout = layout(node.node("layout"), name, log);
         // Default false, so an unauthored or malformed value leaves the tab unchanged (real players show as before).
         boolean suppressRealPlayers = node.node("suppress-real-players").getBoolean(false);
+        TablistLayout layout = layout(node.node("layout"), name, suppressRealPlayers, log);
         // A format that neither shows header/footer nor sets a name, order, skin, paints fillers, nor suppresses real
         // players does nothing; drop. A suppress-only format still alters the tab, so it survives.
         if (content.isBlank()
@@ -170,15 +170,12 @@ final class TablistContentCodec {
      * }
      * }</pre>
      *
-     * <p>Tolerant like the rest of the codec: an absent {@code layout} or an empty/absent {@code fillers} list yields
-     * {@link TablistLayout#empty()} (no fillers, the native tab grid untouched), a filler with a non-positive or absent
-     * {@code slot} or a blank {@code text} is skipped and logged, an unrecognised {@code direction} falls back to
-     * {@code COLUMNS}, and a non-positive {@code rows} falls back to the standard twenty. A duplicate slot keeps the
-     * first and logs the rest, and a slot past the grid's capacity ({@link TablistLayout#COLUMNS} columns by {@code rows})
-     * is rejected and logged, so the grid never paints two rows into one cell — an out-of-grid slot would otherwise
-     * wrap onto an in-grid cell in {@code ROWS} mode and collide with the filler genuinely placed there.
+     * <p>{@code exact=true} materializes every cell, including empty cells, and is accepted only together with
+     * {@code suppress-real-players=true}; otherwise the native roster plus a complete synthetic grid would exceed and
+     * reshape the client grid. Sparse mode keeps the historical behaviour and still ignores blank filler text.
      */
-    private static TablistLayout layout(ConfigurationNode node, String formatName, Logger log) {
+    private static TablistLayout layout(
+            ConfigurationNode node, String formatName, boolean suppressRealPlayers, Logger log) {
         if (node.virtual() || !node.isMap()) {
             return TablistLayout.empty();
         }
@@ -187,28 +184,47 @@ final class TablistContentCodec {
         if (rows <= 0) {
             rows = TablistLayout.DEFAULT_GRID_ROWS;
         }
+        boolean exact = node.node("exact").getBoolean(false);
+        if (exact && !suppressRealPlayers) {
+            log.warn("tablist_exact_layout_disabled format={} reason=suppress-real-players-required", formatName);
+            exact = false;
+        }
+        if (exact && TablistLayout.COLUMNS * rows > TablistLayout.MAX_EXACT_SLOTS) {
+            log.warn(
+                    "tablist_exact_layout_rows_reset format={} rows={} max-slots={}",
+                    formatName,
+                    rows,
+                    TablistLayout.MAX_EXACT_SLOTS);
+            rows = TablistLayout.DEFAULT_GRID_ROWS;
+        }
         int capacity = TablistLayout.COLUMNS * rows;
-        List<TablistFiller> fillers = fillers(node.node("fillers"), formatName, capacity, log);
-        return fillers.isEmpty() ? TablistLayout.empty() : new TablistLayout(fillers, direction, rows);
+        List<TablistFiller> fillers = fillers(node.node("fillers"), formatName, capacity, exact, log);
+        return fillers.isEmpty() && !exact ? TablistLayout.empty() : new TablistLayout(fillers, direction, rows, exact);
     }
 
-    private static List<TablistFiller> fillers(ConfigurationNode node, String formatName, int capacity, Logger log) {
+    private static List<TablistFiller> fillers(
+            ConfigurationNode node, String formatName, int capacity, boolean allowBlank, Logger log) {
         if (node.virtual() || !node.isList()) {
             return List.of();
         }
         List<TablistFiller> parsed = new ArrayList<>();
         Set<Integer> seenSlots = new LinkedHashSet<>();
         for (ConfigurationNode child : node.childrenList()) {
-            filler(child, formatName, capacity, seenSlots, log).ifPresent(parsed::add);
+            filler(child, formatName, capacity, allowBlank, seenSlots, log).ifPresent(parsed::add);
         }
         return parsed;
     }
 
     private static Optional<TablistFiller> filler(
-            ConfigurationNode node, String formatName, int capacity, Set<Integer> seenSlots, Logger log) {
+            ConfigurationNode node,
+            String formatName,
+            int capacity,
+            boolean allowBlank,
+            Set<Integer> seenSlots,
+            Logger log) {
         int slot = node.node("slot").getInt(0);
         String text = node.node("text").getString("");
-        if (slot <= 0 || text.isBlank()) {
+        if (slot <= 0 || (!allowBlank && text.isBlank())) {
             log.warn("tablist_filler_skipped format={} slot={} reason=invalid-slot-or-text", formatName, slot);
             return Optional.empty();
         }

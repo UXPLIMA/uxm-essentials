@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.scoreboard.adapter.inbound.gui.ScoreboardSettin
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
+import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -48,18 +49,21 @@ public final class ScoreboardCommand
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
     private final ScoreboardSettingsView view;
+    private final ScoreboardVisibilityStore visibility;
 
     public ScoreboardCommand(
             ToggleScoreboard toggle,
             ScoreboardRenderer renderer,
             Scheduler scheduler,
             Messages messages,
-            ScoreboardSettingsView view) {
+            ScoreboardSettingsView view,
+            ScoreboardVisibilityStore visibility) {
         this.toggle = Objects.requireNonNull(toggle, "toggle");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
         this.view = Objects.requireNonNull(view, "view");
+        this.visibility = Objects.requireNonNull(visibility, "visibility");
     }
 
     @Override
@@ -69,6 +73,10 @@ public final class ScoreboardCommand
                 .then(Commands.literal("gui")
                         .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
                         .executes(this::openGui))
+                .then(Commands.literal("toggle").executes(this::run))
+                .then(Commands.literal("on").executes(ctx -> set(ctx, false)))
+                .then(Commands.literal("off").executes(ctx -> set(ctx, true)))
+                .then(Commands.literal("refresh").executes(this::refresh))
                 .executes(this::run)
                 .build();
     }
@@ -100,6 +108,31 @@ public final class ScoreboardCommand
         PlayerRef who = BukkitRefs.toRef(sender);
         boolean hidden = toggle.toggle(who);
         scheduler.onEntity(who, () -> apply(sender, hidden));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int set(CommandContext<CommandSourceStack> ctx, boolean hidden) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        boolean current = visibility.hidden(who);
+        if (current != hidden) {
+            hidden = toggle.toggle(who);
+        }
+        boolean target = hidden;
+        scheduler.onEntity(who, () -> apply(sender, target));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int refresh(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        scheduler.onEntity(who, () -> renderer.renderFor(sender));
         return Command.SINGLE_SUCCESS;
     }
 

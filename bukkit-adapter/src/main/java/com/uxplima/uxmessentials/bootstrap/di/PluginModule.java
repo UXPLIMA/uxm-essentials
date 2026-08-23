@@ -1005,6 +1005,8 @@ public final class PluginModule {
                 resolvedBedrock == null ? BedrockDetector.NONE : resolvedBedrock,
                 resolvedScreen == null ? BedrockScreen.NONE : resolvedScreen);
         resources.onClose(input.uninstall());
+        resources.addReloadTask(ReloadTask.kernel(
+                "text-input", input.settings()::reload, "input modes and cancel keywords re-read from disk"));
         TextInput textInput = input.textInput();
         // Hand the just-built seam to the menu listener's deferred reference so an input: menu step can prompt. Set
         // here, on enable, before any menu can be clicked — the listener was constructed earlier (it installs before
@@ -2702,19 +2704,20 @@ public final class PluginModule {
             ManagementGuiRegistry guiRegistry,
             Menus menus) {
         // scoreboard persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the sidebar /
-        // tablist content is config-authored under modules/scoreboard/config.conf. Its one cross-context handle is the
-        // shared PlayerTeamCoordinator: the SidebarManager re-applies the vanilla-name-hide team after every board
-        // switch through it (the setScoreboard team-registry reset would otherwise drop it), so a nametag wearer keeps
-        // their name hidden across board switches. The renderer dogfoods uxmlib-hud's SidebarManager; the render timer
-        // on the Scheduler port is stopped and every active board torn down on disable. The settings panel consumes
+        // tablist content is config-authored under modules/scoreboard/config.conf. The renderer owns only its packet
+        // objective and never replaces Bukkit's per-player scoreboard, so nametag teams and other scoreboard data stay
+        // intact. The render timer on the Scheduler port is stopped and every owned objective torn down on disable.
+        // The settings panel consumes
         // the SP0 GUI framework (a GuiText over the shared catalog, the data-folder layout loader) and registers its
         // /uxmess gui hub entry; /scoreboard gui opens the same single-toggle panel, gated on the GUI node.
-        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.teams, guiLayouts, menus);
+        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, guiLayouts, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The scoreboard PAPI seam reads the same PDC-backed "hidden" bit the /scoreboard toggle flips, so the
         // scoreboard_visible placeholder matches whether the player actually sees the sidebar in game.
         links.placeholders.scoreboard(new StoreScoreboardPlaceholders(wired.visibility(), wired.renderer()));
+        resources.addReloadTask(ReloadTask.forModule(
+                ctx.moduleId(), wired.reload(), "boards and animations re-read; online sidebars refreshed"));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         // Register the scoreboard settings panel on the /uxmess gui hub, gated by the player-facing GUI node.
@@ -2731,7 +2734,8 @@ public final class PluginModule {
                 new com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardQueries(
                         wired.visibility(),
                         ctx.kernel().playerLookup(),
-                        ctx.kernel().scheduler()));
+                        ctx.kernel().scheduler(),
+                        wired.renderer()));
         links.actions.register(
                 com.uxplima.uxmessentials.api.action.UxmScoreboardActions.class,
                 source -> new com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardActions(
@@ -2763,6 +2767,8 @@ public final class PluginModule {
         // Which format a player's tab is drawn from, read off what the renderer last painted so a chat prefix or a
         // hologram line can agree with the tab the player is looking at.
         links.placeholders.tablist(new RendererTablistPlaceholders(wired.renderer()));
+        resources.addReloadTask(ReloadTask.forModule(
+                ctx.moduleId(), wired.reload(), "formats, layout rows and animations re-read; online tabs refreshed"));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
     }
@@ -2772,8 +2778,7 @@ public final class PluginModule {
         // nametags persists nothing: the per-wearer formats are config-authored under modules/nametags/config.conf. It
         // soft-couples to presence (vanish-aware viewer culling through Bukkit's canSee graph, degrading to "everyone
         // can see everyone" with presence off). Its one cross-context handle is the shared PlayerTeamCoordinator:
-        // the presenter hides a wearer's vanilla above-head name through it while the custom nametag is live (and the
-        // scoreboard SidebarManager re-applies that hide-team after every board switch through the same instance). The
+        // the presenter hides a wearer's vanilla above-head name through it while the custom nametag is live. The
         // nametag is always-on (no per-player toggle) so it publishes no command. Rendering goes through uxmLib's
         // packet NametagRenderer: per-viewer spawn/metadata/remove bundles with no real entity, and a per-wearer
         // refresh loop the lib owns. On disable the reconcile timer on the Scheduler port is stopped and
@@ -2800,6 +2805,8 @@ public final class PluginModule {
         // The same read for the nametag: the format the wearer is actually shown from, not the one a re-selection
         // would pick.
         links.placeholders.nametags(new PresenterNametagsPlaceholders(wired.presenter()));
+        resources.addReloadTask(ReloadTask.forModule(
+                ctx.moduleId(), wired.reload(), "formats and animations re-read; online nametags refreshed"));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
     }
@@ -3092,10 +3099,7 @@ public final class PluginModule {
             this.queries = queries;
             this.actions = actions;
         }
-        // Built once and shared by the scoreboard and nametags wirings (in either registry order): the nametags
-        // presenter hides a wearer's vanilla name through it, the scoreboard SidebarManager re-applies the hide-team
-        // after every board switch through it. Inert until a nametags hide call marks a player, so it costs nothing
-        // when either module is off.
+        // Built once for packet-backed nametag presenters. Inert until a nametag hide call marks a player.
         private final PlayerTeamCoordinator teams = new PlayerTeamCoordinator();
     }
 

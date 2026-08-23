@@ -54,7 +54,7 @@ public final class CommunicationSettings {
     public CommunicationSettings(Path moduleDir, Logger log) {
         this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.content = new AtomicReference<>(CommunicationContentCodec.read(mergedContent(moduleDir, log)));
+        this.content = new AtomicReference<>(CommunicationContentCodec.read(mergedContent(moduleDir, log, false)));
     }
 
     /** The live join-channel per-group policy table; read fresh by {@code ResolveJoinMessage} each connection. */
@@ -137,22 +137,22 @@ public final class CommunicationSettings {
 
     /** Re-read the content sibling files and swap the parsed content atomically. */
     public void reload() {
-        content.set(CommunicationContentCodec.read(mergedContent(moduleDir, log)));
+        content.set(CommunicationContentCodec.read(mergedContent(moduleDir, log, true)));
     }
 
     private CommunicationContent current() {
         return Objects.requireNonNull(content.get(), "content");
     }
 
-    private static ConfigurationNode mergedContent(Path moduleDir, Logger log) {
+    private static ConfigurationNode mergedContent(Path moduleDir, Logger log, boolean failOnReadError) {
         ConfigurationNode merged = CommentedConfigurationNode.root();
         for (String name : CONTENT_FILES) {
-            mergeFile(merged, moduleDir.resolve(name), log);
+            mergeFile(merged, moduleDir.resolve(name), log, failOnReadError);
         }
         return merged;
     }
 
-    private static void mergeFile(ConfigurationNode target, Path file, Logger log) {
+    private static void mergeFile(ConfigurationNode target, Path file, Logger log, boolean failOnReadError) {
         if (!Files.exists(file)) {
             return;
         }
@@ -161,6 +161,9 @@ public final class CommunicationSettings {
                     HoconConfigurationLoader.builder().path(file).build().load());
         } catch (ConfigurateException failure) {
             log.error("failed to load " + file + "; communication runs inert", failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse communication config " + file, failure);
+            }
         }
     }
 }

@@ -6,8 +6,14 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.tree.CommandNode;
 import com.uxplima.uxmessentials.bootstrap.di.DefaultModuleRegistry;
@@ -27,6 +33,7 @@ import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 /**
@@ -87,10 +94,54 @@ class ReloadCommandSurfaceTest {
         assertThat(result).isEqualTo(com.mojang.brigadier.Command.SINGLE_SUCCESS);
     }
 
-    private static UxmessCommand command(List<ReloadTask> tasks) {
-        ModuleRegistry registry = new DefaultModuleRegistry();
+    @Test
+    void overlappingReloadIsRejectedInsteadOfStartingASecondDiskPass() throws Exception {
+        HoldingScheduler scheduler = new HoldingScheduler();
+        AtomicInteger runs = new AtomicInteger();
+        UxmessCommand command =
+                command(List.of(ReloadTask.kernel("config", runs::incrementAndGet, "re-read")), scheduler);
+        CommandNode<CommandSourceStack> reload = command.build().getChild("reload");
+
+        reload.getCommand().run(contextFor(sourceStack()));
+        reload.getCommand().run(contextFor(sourceStack()));
+
+        assertThat(scheduler.pending()).hasSize(1);
+        scheduler.runPending();
+        assertThat(runs).hasValue(1);
+    }
+
+    @Test
+    void aggregateRestartWarningParticipatesInTheSummaryStatus() throws Exception {
         ConfigStore config = Mockito.mock(ConfigStore.class);
         Mockito.when(config.scoped(Mockito.anyString())).thenReturn(config);
+        Mockito.when(config.getBoolean(Mockito.anyString(), Mockito.anyBoolean()))
+                .thenReturn(true);
+        UxmessCommand command = command(List.of(), new InlineScheduler(), config);
+        CommandSender sender = Mockito.mock(CommandSender.class);
+
+        command.build().getChild("reload").getCommand().run(contextFor(sourceStack(sender)));
+
+        ArgumentCaptor<Component> lines = ArgumentCaptor.forClass(Component.class);
+        Mockito.verify(sender, Mockito.atLeastOnce()).sendMessage(lines.capture());
+        List<String> plain = lines.getAllValues().stream()
+                .map(PlainTextComponentSerializer.plainText()::serialize)
+                .toList();
+        assertThat(plain).anyMatch(line -> line.startsWith("[RESTART] module wiring:"));
+        assertThat(plain).anyMatch(line -> line.contains("1 restart-required"));
+    }
+
+    private static UxmessCommand command(List<ReloadTask> tasks) {
+        return command(tasks, new InlineScheduler());
+    }
+
+    private static UxmessCommand command(List<ReloadTask> tasks, Scheduler scheduler) {
+        ConfigStore config = Mockito.mock(ConfigStore.class);
+        Mockito.when(config.scoped(Mockito.anyString())).thenReturn(config);
+        return command(tasks, scheduler, config);
+    }
+
+    private static UxmessCommand command(List<ReloadTask> tasks, Scheduler scheduler, ConfigStore config) {
+        ModuleRegistry registry = new DefaultModuleRegistry();
         MigrationImportService service = Mockito.mock(MigrationImportService.class);
         return new UxmessCommand(
                 registry,
@@ -99,7 +150,7 @@ class ReloadCommandSurfaceTest {
                 guiNode(),
                 permissionsNode(),
                 placeholdersNode(),
-                new InlineScheduler(),
+                scheduler,
                 List.of(),
                 tasks);
     }
@@ -139,8 +190,11 @@ class ReloadCommandSurfaceTest {
     }
 
     private static CommandSourceStack sourceStack() {
+        return sourceStack(Mockito.mock(org.bukkit.command.CommandSender.class));
+    }
+
+    private static CommandSourceStack sourceStack(CommandSender sender) {
         CommandSourceStack source = Mockito.mock(CommandSourceStack.class);
-        org.bukkit.command.CommandSender sender = Mockito.mock(org.bukkit.command.CommandSender.class);
         Mockito.when(source.getSender()).thenReturn(sender);
         return source;
     }
@@ -170,6 +224,46 @@ class ReloadCommandSurfaceTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+    }
+
+    /** Holds async work so two command invocations overlap deterministically. */
+    private static final class HoldingScheduler implements Scheduler {
+        private final List<Runnable> pending = new ArrayList<>();
+
+        List<Runnable> pending() {
+            return List.copyOf(pending);
+        }
+
+        void runPending() {
+            List<Runnable> tasks = List.copyOf(pending);
+            pending.clear();
+            tasks.forEach(Runnable::run);
+        }
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            pending.add(task);
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            pending.add(task);
         }
     }
 }

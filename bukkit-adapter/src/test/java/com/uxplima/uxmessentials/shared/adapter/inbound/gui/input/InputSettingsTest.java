@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.input;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -62,6 +63,18 @@ class InputSettingsTest {
         write("default-mode = chat\n");
         settings.reload();
         assertThat(settings.modeFor("x")).isEqualTo(InputMode.CHAT);
+    }
+
+    @Test
+    void malformedReloadKeepsThePreviousInputPolicy() throws IOException {
+        write("default-mode = chat\ncancel-keywords = [\"stop\"]\n");
+        InputSettings settings = new InputSettings(dir.resolve("text-input.conf"), new SilentLogger());
+
+        write("cancel-keywords = [\"broken\"\n");
+
+        assertThatThrownBy(settings::reload).isInstanceOf(IllegalStateException.class);
+        assertThat(settings.modeFor("x")).isEqualTo(InputMode.CHAT);
+        assertThat(settings.cancelKeywords()).containsExactly("stop");
     }
 
     private void write(String content) throws IOException {

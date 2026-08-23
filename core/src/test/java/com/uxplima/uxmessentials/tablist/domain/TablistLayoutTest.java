@@ -18,6 +18,16 @@ class TablistLayoutTest {
         assertThat(layout.fillers()).isEmpty();
         assertThat(layout.direction()).isEqualTo(Direction.COLUMNS);
         assertThat(layout.gridRows()).isEqualTo(TablistLayout.DEFAULT_GRID_ROWS);
+        assertThat(layout.exact()).isFalse();
+    }
+
+    @Test
+    void anExactLayoutIsActiveEvenWithoutAuthoredFixedSlots() {
+        TablistLayout layout = new TablistLayout(List.of(), Direction.COLUMNS, 20, true);
+
+        assertThat(layout.isEmpty()).isFalse();
+        assertThat(layout.exact()).isTrue();
+        assertThat(layout.capacity()).isEqualTo(80);
     }
 
     @Test

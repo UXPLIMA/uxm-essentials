@@ -54,6 +54,16 @@ public final class ScoreboardRoutes {
                 Reads.await(query.hidden(playerId))
                         .<JsonElement>map(JsonPrimitive::new)
                         .orElse(JsonNull.INSTANCE));
+        payload.add(
+                "active-board",
+                Reads.await(query.activeBoard(playerId))
+                        .<JsonElement>map(JsonPrimitive::new)
+                        .orElse(JsonNull.INSTANCE));
+        payload.add(
+                "yielded",
+                Reads.await(query.yielded(playerId))
+                        .<JsonElement>map(JsonPrimitive::new)
+                        .orElse(JsonNull.INSTANCE));
         return Json.ok(payload);
     }
 

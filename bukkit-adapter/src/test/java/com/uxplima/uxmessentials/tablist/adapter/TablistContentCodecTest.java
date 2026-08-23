@@ -257,6 +257,60 @@ class TablistContentCodecTest {
     }
 
     @Test
+    void exactLayoutKeepsBlankFixedCellsWhenRealPlayersAreSuppressed(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(dir, """
+                formats {
+                  default {
+                    condition = ""
+                    priority = 0
+                    suppress-real-players = true
+                    layout {
+                      exact = true
+                      rows = 20
+                      fillers = [
+                        { slot = 1, text = "<gold>Title" }
+                        { slot = 2, text = " " }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistLayout layout =
+                select(TablistContentCodec.read(root, LOG), n -> true, "world").layout();
+
+        assertThat(layout.exact()).isTrue();
+        assertThat(layout.capacity()).isEqualTo(80);
+        assertThat(layout.fillers()).extracting(TablistFiller::slot).containsExactly(1, 2);
+        assertThat(layout.fillers().get(1).text()).isEqualTo(" ");
+    }
+
+    @Test
+    void exactLayoutFailsSafeToSparseWithoutRealPlayerSuppression(@TempDir Path dir) throws Exception {
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(dir, """
+                formats {
+                  default {
+                    condition = ""
+                    priority = 0
+                    header = [ "safe" ]
+                    layout {
+                      exact = true
+                      fillers = [ { slot = 2, text = " " } ]
+                    }
+                  }
+                }
+                """);
+
+        TablistLayout layout =
+                select(TablistContentCodec.read(root, log), n -> true, "world").layout();
+
+        assertThat(layout.isEmpty()).isTrue();
+        assertThat(layout.exact()).isFalse();
+        assertThat(log.warnings).anyMatch(w -> w.contains("tablist_exact_layout_disabled"));
+    }
+
+    @Test
     void rejectsAnOutOfGridFillerSlotButKeepsInGridSlots(@TempDir Path dir) throws Exception {
         // In ROWS mode an out-of-grid slot wraps onto an in-grid cell (raw slot 2 and 81 both map to cell 21 in a 4x20
         // grid), so two fillers would collide on one client cell. The codec bounds the slot to the grid capacity

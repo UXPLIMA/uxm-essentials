@@ -1,7 +1,11 @@
 package com.uxplima.uxmessentials.bootstrap.command;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.command.CommandSender;
 
@@ -24,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadReport;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadResult;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadStatus;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import org.jspecify.annotations.NullMarked;
@@ -80,10 +85,11 @@ public final class UxmessCommand implements CommandRegistration {
     private static final String DOCTOR_FAIL = "[FAIL] ";
     private static final String WARN = "<#ffcc66>";
     private static final String RELOAD_HEADER = "uxmEssentials reload";
+    private static final String RELOAD_RUNNING = "Reload is already running; this request was not started.";
+    private static final String RELOAD_STARTED = "Reading and validating files off-tick…";
     private static final String RELOAD_RESTART = "[RESTART] ";
-    private static final String RELOAD_WAITING =
-            " enabled module(s) keep their current wiring; restart the server to apply config changes to them.";
-    private static final String RELOAD_FAILURE = "One or more steps FAILED; the previous values are still in force.";
+    private static final String RELOAD_FAILURE =
+            "One or more steps FAILED; each failed step kept its last-known-good values.";
     private static final String RELOAD_UNKNOWN = "Unknown module: ";
     private static final String STATE_ENABLED = " — enabled";
     private static final String STATE_DISABLED = " — disabled";
@@ -104,6 +110,7 @@ public final class UxmessCommand implements CommandRegistration {
     private final Scheduler scheduler;
     private final List<HealthCheck> healthChecks;
     private final List<ReloadTask> reloadTasks;
+    private final AtomicBoolean reloadInProgress = new AtomicBoolean();
 
     public UxmessCommand(
             ModuleRegistry registry,
@@ -166,7 +173,16 @@ public final class UxmessCommand implements CommandRegistration {
         return Commands.literal("reload")
                 .requires(src -> src.getSender().hasPermission(PERMISSION_RELOAD))
                 .executes(this::runReloadAll)
-                .then(Commands.argument("module", StringArgumentType.word()).executes(this::runReloadOne));
+                .then(Commands.argument("module", StringArgumentType.word())
+                        .suggests((context, builder) -> {
+                            String remaining = builder.getRemainingLowerCase();
+                            registry.all().stream()
+                                    .map(module -> module.id().value())
+                                    .filter(id -> id.startsWith(remaining))
+                                    .forEach(builder::suggest);
+                            return builder.buildFuture();
+                        })
+                        .executes(this::runReloadOne));
     }
 
     private int runStatus(CommandContext<CommandSourceStack> ctx) {
@@ -262,15 +278,95 @@ public final class UxmessCommand implements CommandRegistration {
      * region for delivery.
      */
     private int runReload(CommandSender sender, @Nullable ModuleId only) {
+        if (!reloadInProgress.compareAndSet(false, true)) {
+            send(sender, WARN, RELOAD_RUNNING);
+            return 0;
+        }
         sendHeader(sender, RELOAD_HEADER);
-        scheduler.async(() -> {
-            ReloadReport report = ReloadReport.run(reloadTasks, only);
-            scheduler.onGlobal(() -> renderReload(sender, report, only));
-        });
+        sendBody(sender, RELOAD_STARTED);
+        long startedNanos = System.nanoTime();
+        Map<ModuleId, Boolean> enabledBefore = enabledStates();
+        try {
+            scheduler.async(() -> {
+                ReloadReport report = withRestartBoundCoverage(
+                        withStructuralChanges(ReloadReport.run(reloadTasks, only), enabledBefore, only), only);
+                long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000L;
+                try {
+                    scheduler.onGlobal(() -> {
+                        try {
+                            renderReload(sender, report, elapsedMillis);
+                        } finally {
+                            reloadInProgress.set(false);
+                        }
+                    });
+                } catch (RuntimeException schedulingFailure) {
+                    reloadInProgress.set(false);
+                    throw schedulingFailure;
+                }
+            });
+        } catch (RuntimeException schedulingFailure) {
+            reloadInProgress.set(false);
+            throw schedulingFailure;
+        }
         return Command.SINGLE_SUCCESS;
     }
 
-    private void renderReload(CommandSender sender, ReloadReport report, @Nullable ModuleId only) {
+    private Map<ModuleId, Boolean> enabledStates() {
+        Map<ModuleId, Boolean> states = new LinkedHashMap<>();
+        for (FeatureModule module : registry.all()) {
+            states.put(module.id(), module.enabled(config));
+        }
+        return Map.copyOf(states);
+    }
+
+    /**
+     * Module start/stop, listener ownership and Brigadier publication are structural. The shared config snapshot may
+     * observe an edited enabled flag during reload, but changing the already-wired runtime in place is deliberately
+     * unsupported; surface that boundary as restart-required instead of claiming the module was toggled.
+     */
+    private ReloadReport withStructuralChanges(
+            ReloadReport report, Map<ModuleId, Boolean> enabledBefore, @Nullable ModuleId only) {
+        List<ReloadReport.Entry> entries = new ArrayList<>(report.entries());
+        for (FeatureModule module : registry.all()) {
+            if (only != null && !only.equals(module.id())) {
+                continue;
+            }
+            Boolean before = enabledBefore.get(module.id());
+            boolean after = module.enabled(config);
+            if (before != null && before.booleanValue() != after) {
+                entries.add(new ReloadReport.Entry(
+                        module.id().value() + ".enabled",
+                        ReloadResult.restartRequired(
+                                "enabled state changed; restart required to rebuild commands, listeners and tasks")));
+            }
+        }
+        return new ReloadReport(entries);
+    }
+
+    /** Add the aggregate restart boundary to the report itself so the final status counts agree with its detail. */
+    private ReloadReport withRestartBoundCoverage(ReloadReport report, @Nullable ModuleId only) {
+        if (only != null) {
+            return report;
+        }
+        long waiting = registry.all().stream()
+                .filter(module -> module.enabled(config))
+                .filter(module -> reloadTasks.stream()
+                        .noneMatch(task -> task.module()
+                                .filter(id -> id.equals(module.id()))
+                                .isPresent()))
+                .count();
+        if (waiting == 0) {
+            return report;
+        }
+        List<ReloadReport.Entry> entries = new ArrayList<>(report.entries());
+        entries.add(new ReloadReport.Entry(
+                "module wiring",
+                ReloadResult.restartRequired(
+                        waiting + " enabled module(s) have no live hook; restart to apply structural config changes")));
+        return new ReloadReport(entries);
+    }
+
+    private void renderReload(CommandSender sender, ReloadReport report, long elapsedMillis) {
         for (ReloadReport.Entry entry : report.entries()) {
             ReloadStatus status = entry.result().status();
             send(
@@ -278,21 +374,24 @@ public final class UxmessCommand implements CommandRegistration {
                     reloadPalette(status),
                     reloadTag(status) + entry.name() + ": " + entry.result().message());
         }
-        if (only == null) {
-            long waiting = registry.all().stream()
-                    .filter(module -> module.enabled(config))
-                    .filter(module -> reloadTasks.stream()
-                            .noneMatch(task -> task.module()
-                                    .filter(id -> id.equals(module.id()))
-                                    .isPresent()))
-                    .count();
-            if (waiting > 0) {
-                send(sender, WARN, waiting + RELOAD_WAITING);
-            }
-        }
         if (report.hasFailure()) {
             send(sender, ERROR, RELOAD_FAILURE);
         }
+        long applied = count(report, ReloadStatus.APPLIED);
+        long restart = count(report, ReloadStatus.RESTART_REQUIRED);
+        long failed = count(report, ReloadStatus.FAILED);
+        String palette = failed > 0 ? ERROR : restart > 0 ? WARN : SUCCESS;
+        send(
+                sender,
+                palette,
+                "Summary: %d applied, %d restart-required, %d failed — %d ms."
+                        .formatted(applied, restart, failed, elapsedMillis));
+    }
+
+    private static long count(ReloadReport report, ReloadStatus status) {
+        return report.entries().stream()
+                .filter(entry -> entry.result().status() == status)
+                .count();
     }
 
     private static String reloadTag(ReloadStatus status) {

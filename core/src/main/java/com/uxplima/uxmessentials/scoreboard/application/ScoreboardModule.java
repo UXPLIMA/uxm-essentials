@@ -77,9 +77,7 @@ public final class ScoreboardModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // The module ships DISABLED: a sidebar is a display surface most servers already own (a dedicated
-        // scoreboard plugin draws its own), and two of them fight over the same slot. A fresh install still bundles
-        // a working example board, so turning this on is one line and shows something immediately.
+        // The bundled configuration enables a working example. Missing configuration still fails safe to disabled.
         return config.getBoolean(configRoot() + ".enabled", false);
     }
 
@@ -87,7 +85,7 @@ public final class ScoreboardModule implements FeatureModule {
     public void start(ModuleContext ctx) {
         this.running = true;
         // The ToggleScoreboard use case, the render timer on the Scheduler port, the connection listener, the
-        // renderer over uxmLib's SidebarManager, and the PDC visibility store are constructed over
+        // packet renderer over uxmLib, and the PDC visibility store are constructed over
         // ctx.kernel() in the adapter wiring; the lifecycle bookkeeping (running flag, in-flight counter) is armed
         // here so stop() is already honest.
     }

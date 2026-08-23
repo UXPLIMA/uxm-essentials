@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -55,7 +56,7 @@ public final class AnimationRegistry {
     private static final char SUFFIX = '%';
 
     private final MiniMessage miniMessage;
-    private final Map<String, Bound> animations;
+    private final AtomicReference<Map<String, Bound>> animations;
     private final AtomicLong tick = new AtomicLong(0L);
 
     public AnimationRegistry(List<AnimationDef> defs) {
@@ -65,16 +66,12 @@ public final class AnimationRegistry {
     AnimationRegistry(List<AnimationDef> defs, MiniMessage miniMessage) {
         Objects.requireNonNull(defs, "defs");
         this.miniMessage = Objects.requireNonNull(miniMessage, "miniMessage");
-        Map<String, Bound> built = new LinkedHashMap<>();
-        for (AnimationDef def : defs) {
-            built.put(def.spec().name(), bind(def));
-        }
-        this.animations = Map.copyOf(built);
+        this.animations = new AtomicReference<>(bindAll(defs));
     }
 
     /** True when nothing is configured — no token will ever expand. */
     public boolean isEmpty() {
-        return animations.isEmpty();
+        return snapshot().isEmpty();
     }
 
     /** The current global animation tick, the value the renderer passes to {@link #resolve(String, long)}. */
@@ -89,7 +86,7 @@ public final class AnimationRegistry {
      */
     public void advance() {
         long now = tick.incrementAndGet();
-        for (Bound bound : animations.values()) {
+        for (Bound bound : snapshot().values()) {
             bound.advanceTo(now);
         }
     }
@@ -106,6 +103,7 @@ public final class AnimationRegistry {
             return source;
         }
         StringBuilder out = new StringBuilder(source.length());
+        Map<String, Bound> current = snapshot();
         int cursor = 0;
         while (start >= 0) {
             int close = source.indexOf(SUFFIX, start + PREFIX.length());
@@ -113,7 +111,7 @@ public final class AnimationRegistry {
                 break;
             }
             String name = source.substring(start + PREFIX.length(), close);
-            Bound bound = animations.get(name);
+            Bound bound = current.get(name);
             out.append(source, cursor, start);
             if (bound == null) {
                 // Unknown animation: leave the token verbatim so the operator sees their typo.
@@ -126,6 +124,25 @@ public final class AnimationRegistry {
         }
         out.append(source, cursor, source.length());
         return out.toString();
+    }
+
+    /** Atomically replace the complete animation catalog and restart its global clock. */
+    public void replace(List<AnimationDef> defs) {
+        Map<String, Bound> replacement = bindAll(Objects.requireNonNull(defs, "defs"));
+        tick.set(0L);
+        animations.set(replacement);
+    }
+
+    private Map<String, Bound> bindAll(List<AnimationDef> defs) {
+        Map<String, Bound> built = new LinkedHashMap<>();
+        for (AnimationDef def : defs) {
+            built.put(def.spec().name(), bind(def));
+        }
+        return Map.copyOf(built);
+    }
+
+    private Map<String, Bound> snapshot() {
+        return Objects.requireNonNull(animations.get(), "animations");
     }
 
     private Bound bind(AnimationDef def) {

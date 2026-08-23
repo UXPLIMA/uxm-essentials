@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import org.bukkit.Bukkit;
 
 import com.uxplima.uxmessentials.api.query.UxmScoreboardQuery;
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.AsyncQueries;
@@ -30,11 +31,47 @@ public final class ScoreboardQueries implements UxmScoreboardQuery {
     private final ScoreboardVisibilityStore visibility;
     private final PlayerLookup players;
     private final Scheduler scheduler;
+    private final Optional<ScoreboardRenderer> renderer;
 
     public ScoreboardQueries(ScoreboardVisibilityStore visibility, PlayerLookup players, Scheduler scheduler) {
+        this(visibility, players, scheduler, null);
+    }
+
+    public ScoreboardQueries(
+            ScoreboardVisibilityStore visibility,
+            PlayerLookup players,
+            Scheduler scheduler,
+            @org.jspecify.annotations.Nullable ScoreboardRenderer renderer) {
         this.visibility = Objects.requireNonNull(visibility, "visibility");
         this.players = Objects.requireNonNull(players, "players");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.renderer = Optional.ofNullable(renderer);
+    }
+
+    @Override
+    public CompletableFuture<Optional<String>> activeBoard(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        PlayerRef who = ApiValues.subject(players, playerId);
+        return AsyncQueries.onPlayer(
+                scheduler,
+                who,
+                () -> Bukkit.getPlayer(who.uuid()) == null
+                        ? Optional.empty()
+                        : renderer.flatMap(value -> value.appliedBoard(who)),
+                Optional.empty());
+    }
+
+    @Override
+    public CompletableFuture<Optional<Boolean>> yielded(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        PlayerRef who = ApiValues.subject(players, playerId);
+        return AsyncQueries.onPlayer(
+                scheduler,
+                who,
+                () -> Bukkit.getPlayer(who.uuid()) == null
+                        ? Optional.empty()
+                        : renderer.map(value -> value.yielded(who.uuid())),
+                Optional.empty());
     }
 
     @Override

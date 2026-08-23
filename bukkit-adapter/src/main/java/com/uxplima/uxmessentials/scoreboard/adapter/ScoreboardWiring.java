@@ -9,12 +9,12 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scoreboard.ScoreboardManager;
 
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.command.ScoreboardCommand;
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.gui.ScoreboardSettingsView;
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.listener.ScoreboardConnectionListener;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.PdcScoreboardVisibilityStore;
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardOwnership;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderTask;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
@@ -25,13 +25,14 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
-import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.hud.scoreboard.SidebarManager;
+import com.uxplima.uxmlib.npc.ChannelResolver;
+import com.uxplima.uxmlib.npc.PacketSender;
+import com.uxplima.uxmlib.packet.scoreboard.internal.NmsScoreboardPackets;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,12 +42,11 @@ import org.jspecify.annotations.NullMarked;
  * self-rescheduling render timer on the {@code Scheduler} port. This is the one place the scoreboard context is wired.
  *
  * <p>The context persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the display content
- * is config-authored. The renderer dogfoods uxmLib's {@link SidebarManager} (built over the server's
- * {@code ScoreboardManager}). The tablist header/footer is a separate module now, so this context owns only the
- * sidebar. The {@code /scoreboard} confirmations are {@code MessageKey}s through the {@link Notifier}; the
- * sidebar content is raw operator MiniMessage, keeping the parity-checked keys and the unchecked operator content
- * apart. On stop the render timer is halted and every active board is restored so a disable or reload tears down
- * cleanly.
+ * is config-authored. The renderer sends modern scoreboard packets through uxmLib, keeping its objective isolated
+ * from the server scoreboard and from nametag teams. The tablist header/footer is a separate module now, so this
+ * context owns only the sidebar. The {@code /scoreboard} confirmations are {@code MessageKey}s through the
+ * {@link Notifier}; sidebar content is raw operator MiniMessage, keeping parity-checked keys and unchecked operator
+ * content apart. On stop the render timer is halted and every UXM-owned objective is removed cleanly.
  */
 @NullMarked
 public final class ScoreboardWiring {
@@ -55,18 +55,10 @@ public final class ScoreboardWiring {
 
     private ScoreboardWiring() {}
 
-    /**
-     * Build the scoreboard adapters and use case from {@code plugin} and {@code ctx}, ready to register. The shared
-     * {@code teams} coordinator (built once in the bootstrap and also handed to the nametags wiring) is
-     * re-applied after every per-player board switch through the {@code SidebarManager} board-switch callback, so a
-     * wearer whose vanilla name is hidden keeps the hide-team after the {@code setScoreboard} that resets the client
-     * team registry.
-     */
-    public static Wired wire(
-            Plugin plugin, ModuleContext ctx, PlayerTeamCoordinator teams, GuiLayouts guiLayouts, Menus menus) {
+    /** Build the scoreboard adapters and use case from {@code plugin} and {@code ctx}, ready to register. */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
-        Objects.requireNonNull(teams, "teams");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
@@ -75,11 +67,12 @@ public final class ScoreboardWiring {
         AtomicBoolean running = new AtomicBoolean(true);
 
         ScoreboardVisibilityStore visibility = new PdcScoreboardVisibilityStore(plugin);
-        // The animation registry holds the stateful uxmLib animators, so it is built once from the load-time catalog,
-        // shared by the renderer (which reads frames) and the render task (which advances the clock once a tick).
+        // The animation registry is shared by the renderer and clock, and its catalog is replaced on reload.
         AnimationRegistry animations = new AnimationRegistry(settings.animations());
-        ScoreboardRenderer renderer =
-                new ScoreboardRenderer(sidebarManager(teams), visibility, settings::boards, animations);
+        ChannelResolver channels = new ChannelResolver();
+        ScoreboardRenderer renderer = new ScoreboardRenderer(
+                new NmsScoreboardPackets(new PacketSender(channels)), visibility, settings::boards, animations);
+        ScoreboardOwnership ownership = new ScoreboardOwnership(renderer, kernel.scheduler(), kernel.log(), channels);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         ToggleScoreboard toggle = new ToggleScoreboard(visibility, notifier, kernel.events());
         ScoreboardRenderTask renderTask = new ScoreboardRenderTask(
@@ -93,9 +86,14 @@ public final class ScoreboardWiring {
         ScoreboardSettingsView settingsView = new ScoreboardSettingsView(
                 guiText, kernel.scheduler(), guiLayouts, kernel.messages(), visibility, toggle, menus);
 
-        List<CommandRegistration> commands =
-                List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages(), settingsView));
-        List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer, kernel.scheduler()));
+        List<CommandRegistration> commands = List.of(new ScoreboardCommand(
+                toggle, renderer, kernel.scheduler(), kernel.messages(), settingsView, visibility));
+        List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer, kernel.scheduler(), ownership));
+        Runnable reload = () -> {
+            settings.reload();
+            animations.replace(settings.animations());
+            renderTask.refreshNow();
+        };
         return new Wired(
                 commands,
                 listeners,
@@ -105,18 +103,9 @@ public final class ScoreboardWiring {
                 visibility,
                 toggle,
                 settingsView,
-                kernel.scheduler());
-    }
-
-    private static SidebarManager sidebarManager(PlayerTeamCoordinator teams) {
-        ScoreboardManager manager =
-                Objects.requireNonNull(Bukkit.getScoreboardManager(), "the server scoreboard manager is unavailable");
-        SidebarManager sidebars = new SidebarManager(manager);
-        // After every board switch (create/show or remove/restore) the client's team registry is reset, so re-apply
-        // the vanilla-name-hide team on the player's new current board — survival of the per-player board switch is the
-        // whole reason the lib exposes this callback. A no-op for any player without an active hidden nametag.
-        sidebars.onBoardSwitch(teams::reapply);
-        return sidebars;
+                kernel.scheduler(),
+                ownership,
+                reload);
     }
 
     /**
@@ -144,7 +133,9 @@ public final class ScoreboardWiring {
             ScoreboardVisibilityStore visibility,
             ToggleScoreboard toggle,
             ScoreboardSettingsView settingsView,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            ScoreboardOwnership ownership,
+            Runnable reload) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -156,17 +147,24 @@ public final class ScoreboardWiring {
             Objects.requireNonNull(toggle, "toggle");
             Objects.requireNonNull(settingsView, "settingsView");
             Objects.requireNonNull(scheduler, "scheduler");
+            Objects.requireNonNull(ownership, "ownership");
+            Objects.requireNonNull(reload, "reload");
         }
 
         /** Arm the render timer. */
         public void startBackgroundWork() {
+            scheduler.onGlobal(() -> {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    ownership.inject(player);
+                }
+            });
             renderTask.start();
         }
 
         /**
          * Stop the render timer and tear down every active board so a disable/reload leaves no stale display. The
          * roster is enumerated on the global region thread (Folia forbids iterating {@code Bukkit.getOnlinePlayers()}
-         * off it) and each board is cleared on its owner's entity thread, where {@code setScoreboard} is valid.
+         * off it) and each board is cleared on its owner's entity thread before its packet listener is removed.
          */
         public void stop() {
             running.set(false);
@@ -177,6 +175,7 @@ public final class ScoreboardWiring {
                         Player live = Bukkit.getPlayer(ref.uuid());
                         if (live != null && live.isOnline()) {
                             renderer.clear(live);
+                            ownership.eject(live);
                         }
                     });
                 }

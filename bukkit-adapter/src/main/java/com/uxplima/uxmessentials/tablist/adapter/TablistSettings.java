@@ -41,7 +41,7 @@ public final class TablistSettings {
     public TablistSettings(Path moduleDir, Logger log) {
         this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.parsed = new AtomicReference<>(TablistContentCodec.read(load(moduleDir, log), log));
+        this.parsed = new AtomicReference<>(TablistContentCodec.read(load(moduleDir, log, false), log));
     }
 
     /** The live named-format set; read fresh by the renderer each tick to select a format per viewer. */
@@ -50,9 +50,7 @@ public final class TablistSettings {
     }
 
     /**
-     * The named animations parsed at load. These are read once at wiring time to build the
-     * {@link com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry} — the registry holds the stateful
-     * uxmLib animators, so it is not rebuilt on a content reload (the animation catalog is fixed for a session).
+     * The live animation definitions. Reload replaces the renderer's stateful animation catalog from this snapshot.
      */
     public List<AnimationDef> animations() {
         return Objects.requireNonNull(parsed.get(), "parsed").animations();
@@ -65,10 +63,10 @@ public final class TablistSettings {
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        parsed.set(TablistContentCodec.read(load(moduleDir, log), log));
+        parsed.set(TablistContentCodec.read(load(moduleDir, log, true), log));
     }
 
-    private static ConfigurationNode load(Path moduleDir, Logger log) {
+    private static ConfigurationNode load(Path moduleDir, Logger log, boolean failOnReadError) {
         Path file = moduleDir.resolve(CONTENT_FILE);
         if (!Files.exists(file)) {
             return CommentedConfigurationNode.root();
@@ -77,6 +75,9 @@ public final class TablistSettings {
             return HoconConfigurationLoader.builder().path(file).build().load();
         } catch (ConfigurateException failure) {
             log.error("failed to load " + file + "; tablist runs inert", failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse tablist config " + file, failure);
+            }
             return CommentedConfigurationNode.root();
         }
     }

@@ -124,7 +124,8 @@ class ScoreboardContentCodecTest {
     }
 
     @Test
-    void tooManyLinesAreTruncatedAndANonPositiveCadenceFallsBack(@TempDir Path dir) throws Exception {
+    void candidateLinesAreRetainedUntilViewerFilteringAndANonPositiveCadenceFallsBack(@TempDir Path dir)
+            throws Exception {
         StringBuilder lines = new StringBuilder("lines = [ ");
         for (int i = 0; i < DisplayContent.MAX_LINES + 5; i++) {
             lines.append("\"line ").append(i).append("\", ");
@@ -136,11 +137,68 @@ class ScoreboardContentCodecTest {
         ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root, LOG);
 
         SidebarBoard board = parsed.boards().boards().get(0);
-        assertThat(board.content().lines()).hasSize(DisplayContent.MAX_LINES);
+        assertThat(board.content().lines()).hasSize(DisplayContent.MAX_LINES + 5);
         // An absent hide-score-numbers defaults to true — the modern look.
         assertThat(board.content().hideScoreNumbers()).isTrue();
         // A non-positive refresh-ticks falls back to one second (20 ticks) rather than busy-spinning.
         assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(1L));
+    }
+
+    @Test
+    void parsesTypedLinesWithStableIdsConditionsAndPerLineFormats(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(dir, """
+                scoreboard {
+                  title = "<gold>Server"
+                  lines = [
+                    { id = "heading", text = "<yellow>Profile", number-format = "blank" },
+                    {
+                      id = "balance"
+                      text = "<gray>Balance"
+                      condition = "permission:uxmessentials.balance"
+                      hide-when-empty = true
+                      number-format = { type = "fixed", text = "<gold>{coins}" }
+                    }
+                  ]
+                }
+                """);
+
+        DisplayContent content = ScoreboardContentCodec.read(root, LOG)
+                .boards()
+                .boards()
+                .getFirst()
+                .content();
+
+        assertThat(content.lineDefinitions()).extracting(l -> l.id()).containsExactly("heading", "balance");
+        assertThat(content.lineDefinitions().get(1).hideWhenEmpty()).isTrue();
+        assertThat(content.lineDefinitions().get(1).numberFormat())
+                .isEqualTo(new com.uxplima.uxmessentials.scoreboard.domain.SidebarNumberFormat.Fixed("<gold>{coins}"));
+        assertThat(content.lineDefinitions()
+                        .get(1)
+                        .condition()
+                        .matches(ctx("uxmessentials.balance"::equals, "world", "SURVIVAL")))
+                .isTrue();
+    }
+
+    @Test
+    void legacyRightTextShorthandBecomesAFixedNumberFormat(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(dir, """
+                scoreboard {
+                  title = "T"
+                  lines = [ "<gray>Balance||<gold>{coins}", "" ]
+                }
+                """);
+
+        DisplayContent content = ScoreboardContentCodec.read(root, LOG)
+                .boards()
+                .boards()
+                .getFirst()
+                .content();
+
+        assertThat(content.lineDefinitions().getFirst().text()).isEqualTo("<gray>Balance");
+        assertThat(content.lineDefinitions().getFirst().numberFormat())
+                .isEqualTo(new com.uxplima.uxmessentials.scoreboard.domain.SidebarNumberFormat.Fixed("<gold>{coins}"));
+        assertThat(content.lineDefinitions().get(1).text()).isEmpty();
+        assertThat(content.lineDefinitions().get(1).hideWhenEmpty()).isFalse();
     }
 
     @Test

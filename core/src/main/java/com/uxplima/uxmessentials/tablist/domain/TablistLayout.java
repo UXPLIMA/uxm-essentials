@@ -22,14 +22,18 @@ import java.util.Objects;
  * @param fillers the filler entries this layout paints, in codec order (defensively copied)
  * @param direction how a 1-based slot maps to a grid cell
  * @param gridRows the number of rows per column the client renders (twenty for a standard 80-slot tab list)
+ * @param exact whether every grid cell must be materialized as a synthetic entry, including visually empty cells
  */
-public record TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows) {
+public record TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows, boolean exact) {
 
     /** The vanilla tab list is four columns wide; the slot arithmetic mirrors the client's fill order. */
     public static final int COLUMNS = 4;
 
     /** The standard tab list is four columns of twenty cells — eighty slots. */
     public static final int DEFAULT_GRID_ROWS = 20;
+
+    /** Modern clients accept at most eighty player-list entries in the conventional four-column grid. */
+    public static final int MAX_EXACT_SLOTS = 80;
 
     /**
      * The list-order key real players are given so they sort above every filler. A filler's order is
@@ -52,17 +56,31 @@ public record TablistLayout(List<TablistFiller> fillers, Direction direction, in
         if (gridRows <= 0) {
             throw new IllegalArgumentException("a tablist layout grid must have a positive row count, got " + gridRows);
         }
+        if (exact && COLUMNS * gridRows > MAX_EXACT_SLOTS) {
+            throw new IllegalArgumentException(
+                    "an exact tablist layout cannot exceed " + MAX_EXACT_SLOTS + " cells, got " + COLUMNS * gridRows);
+        }
         fillers = List.copyOf(fillers);
+    }
+
+    /** Backwards-compatible sparse layout constructor. */
+    public TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows) {
+        this(fillers, direction, gridRows, false);
     }
 
     /** The inert layout a format with no fillers carries: no rows painted, the native name/order path untouched. */
     public static TablistLayout empty() {
-        return new TablistLayout(List.of(), Direction.COLUMNS, DEFAULT_GRID_ROWS);
+        return new TablistLayout(List.of(), Direction.COLUMNS, DEFAULT_GRID_ROWS, false);
     }
 
     /** True when this layout paints no filler rows — the format renders exactly as it did before fillers existed. */
     public boolean isEmpty() {
-        return fillers.isEmpty();
+        return fillers.isEmpty() && !exact;
+    }
+
+    /** Number of client cells this layout declares. */
+    public int capacity() {
+        return COLUMNS * gridRows;
     }
 
     /**

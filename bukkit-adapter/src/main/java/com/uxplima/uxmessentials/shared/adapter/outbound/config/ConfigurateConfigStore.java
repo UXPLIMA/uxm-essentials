@@ -55,7 +55,7 @@ public final class ConfigurateConfigStore implements ConfigStore {
     public static ConfigurateConfigStore load(Path file, Logger log) {
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(log, "log");
-        return new ConfigurateConfigStore(file, null, log, merged(file, null, log));
+        return new ConfigurateConfigStore(file, null, log, merged(file, null, log, false));
     }
 
     /** Layout load: root {@code config.conf} plus every {@code modules/<module>/} file under {@code dataFolder}. */
@@ -64,7 +64,7 @@ public final class ConfigurateConfigStore implements ConfigStore {
         Objects.requireNonNull(log, "log");
         Path root = dataFolder.resolve("config.conf");
         Path modules = dataFolder.resolve("modules");
-        return new ConfigurateConfigStore(root, modules, log, merged(root, modules, log));
+        return new ConfigurateConfigStore(root, modules, log, merged(root, modules, log, false));
     }
 
     @Override
@@ -111,7 +111,9 @@ public final class ConfigurateConfigStore implements ConfigStore {
 
     @Override
     public void reload() {
-        tree.set(merged(rootFile, modulesDir, log));
+        // Build the complete candidate before publishing it. A malformed sibling must never replace the running
+        // tree with an empty/partial one: callers keep observing the last-known-good snapshot when this throws.
+        tree.set(merged(rootFile, modulesDir, log, true));
     }
 
     @Override
@@ -136,19 +138,23 @@ public final class ConfigurateConfigStore implements ConfigStore {
     }
 
     /** Build the merged tree: the root file, then each module file mounted at its path. */
-    private static ConfigurationNode merged(Path rootFile, @Nullable Path modulesDir, Logger log) {
-        ConfigurationNode tree = readFile(rootFile, log);
+    private static ConfigurationNode merged(
+            Path rootFile, @Nullable Path modulesDir, Logger log, boolean failOnReadError) {
+        ConfigurationNode tree = readFile(rootFile, log, failOnReadError);
         if (modulesDir != null && Files.isDirectory(modulesDir)) {
             try (Stream<Path> dirs = Files.list(modulesDir)) {
-                dirs.filter(Files::isDirectory).sorted().forEach(dir -> mountModule(tree, dir, log));
+                dirs.filter(Files::isDirectory).sorted().forEach(dir -> mountModule(tree, dir, log, failOnReadError));
             } catch (IOException failure) {
                 log.error("could not list module config dir " + modulesDir, failure);
+                if (failOnReadError) {
+                    throw new IllegalStateException("could not list module config directory " + modulesDir, failure);
+                }
             }
         }
         return tree;
     }
 
-    private static void mountModule(ConfigurationNode tree, Path moduleDir, Logger log) {
+    private static void mountModule(ConfigurationNode tree, Path moduleDir, Logger log, boolean failOnReadError) {
         String module = moduleDir.getFileName().toString();
         try (Stream<Path> files = Files.list(moduleDir)) {
             files.filter(p -> p.getFileName().toString().endsWith(".conf"))
@@ -158,23 +164,29 @@ public final class ConfigurateConfigStore implements ConfigStore {
                         ConfigurationNode target = name.equals("config.conf")
                                 ? tree.node("modules", module)
                                 : tree.node("modules", module, name.substring(0, name.length() - ".conf".length()));
-                        mergeInto(target, file, log);
+                        mergeInto(target, file, log, failOnReadError);
                     });
         } catch (IOException failure) {
             log.error("could not list module config files in " + moduleDir, failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("could not list module config files in " + moduleDir, failure);
+            }
         }
     }
 
-    private static void mergeInto(ConfigurationNode target, Path file, Logger log) {
+    private static void mergeInto(ConfigurationNode target, Path file, Logger log, boolean failOnReadError) {
         try {
             target.mergeFrom(
                     HoconConfigurationLoader.builder().path(file).build().load());
         } catch (ConfigurateException failure) {
             log.error("failed to load config " + file, failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse config " + file, failure);
+            }
         }
     }
 
-    private static ConfigurationNode readFile(Path file, Logger log) {
+    private static ConfigurationNode readFile(Path file, Logger log, boolean failOnReadError) {
         if (!Files.exists(file)) {
             return CommentedConfigurationNode.root();
         }
@@ -182,6 +194,9 @@ public final class ConfigurateConfigStore implements ConfigStore {
             return HoconConfigurationLoader.builder().path(file).build().load();
         } catch (ConfigurateException failure) {
             log.error("failed to load config " + file + "; keeping defaults", failure);
+            if (failOnReadError) {
+                throw new IllegalStateException("failed to parse config " + file, failure);
+            }
             return CommentedConfigurationNode.root();
         }
     }
