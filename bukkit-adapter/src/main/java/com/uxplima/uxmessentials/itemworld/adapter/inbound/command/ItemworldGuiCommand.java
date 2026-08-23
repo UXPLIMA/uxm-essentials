@@ -60,7 +60,7 @@ public final class ItemworldGuiCommand implements CommandRegistration {
     private int open(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (!(sender instanceof Player player)) {
-            PlayerRef console = new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
+            PlayerRef console = PlayerRef.system(sender.getName());
             sink.deliver(console, messages.resolve(console, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of()));
             return 0;
         }

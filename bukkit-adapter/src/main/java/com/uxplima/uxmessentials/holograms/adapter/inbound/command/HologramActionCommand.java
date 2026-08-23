@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -115,15 +116,12 @@ final class HologramActionCommand extends HologramCommandSupport {
     }
 
     private int add(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
         }
-        services.addAction().add(ref(sender), nameArg(ctx), action);
+        services.addAction().add(actor(ctx), nameArg(ctx), action);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -136,29 +134,23 @@ final class HologramActionCommand extends HologramCommandSupport {
     }
 
     private int insertAt(CommandContext<CommandSourceStack> ctx, boolean after) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
         }
         services.insertAction()
-                .insert(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class), after, action);
+                .insert(actor(ctx), nameArg(ctx), ctx.getArgument("index", Integer.class), after, action);
         return Command.SINGLE_SUCCESS;
     }
 
     private int set(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
         }
-        services.setAction().set(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class), action);
+        services.setAction().set(actor(ctx), nameArg(ctx), ctx.getArgument("index", Integer.class), action);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -171,11 +163,7 @@ final class HologramActionCommand extends HologramCommandSupport {
     }
 
     private int move(CommandContext<CommandSourceStack> ctx, boolean up) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.moveAction().move(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class), up);
+        services.moveAction().move(actor(ctx), nameArg(ctx), ctx.getArgument("index", Integer.class), up);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -184,7 +172,7 @@ final class HologramActionCommand extends HologramCommandSupport {
      * validation feedback and returning {@code null} when any part is invalid (or a {@code give hand} capture
      * failed). Shared by {@code add}, {@code add_before}/{@code add_after} and {@code set}.
      */
-    private @Nullable ClickAction parseAction(Player sender, CommandContext<CommandSourceStack> ctx) {
+    private @Nullable ClickAction parseAction(CommandSender sender, CommandContext<CommandSourceStack> ctx) {
         String triggerWord = ctx.getArgument("trigger", String.class);
         ClickTrigger trigger = parseTrigger(triggerWord);
         if (trigger == null) {
@@ -217,11 +205,15 @@ final class HologramActionCommand extends HologramCommandSupport {
      * token (a clone with all its NBT), failing with feedback on an empty hand; every other case stores the raw
      * value as typed. Returns {@code null} when the capture failed, signalling the handler to stop.
      */
-    private @Nullable String resolveValue(Player sender, ClickActionType type, String rawValue) {
+    private @Nullable String resolveValue(CommandSender sender, ClickActionType type, String rawValue) {
         if (type != ClickActionType.GIVE || !rawValue.strip().equalsIgnoreCase(HAND_KEYWORD)) {
             return rawValue;
         }
-        ItemStack hand = sender.getInventory().getItemInMainHand();
+        if (!(sender instanceof Player player)) {
+            feedback.send(sender, HologramsMessageKey.HOLOGRAM_PLAYERS_ONLY, Map.of());
+            return null;
+        }
+        ItemStack hand = player.getInventory().getItemInMainHand();
         if (hand.getType().isAir()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_ACTION_GIVE_EMPTY_HAND, Map.of());
             return null;
@@ -230,29 +222,17 @@ final class HologramActionCommand extends HologramCommandSupport {
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listActions().list(ref(sender), nameArg(ctx));
+        services.listActions().list(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int remove(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.removeAction().remove(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class));
+        services.removeAction().remove(actor(ctx), nameArg(ctx), ctx.getArgument("index", Integer.class));
         return Command.SINGLE_SUCCESS;
     }
 
     private int clear(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.clearActions().clear(ref(sender), nameArg(ctx));
+        services.clearActions().clear(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 

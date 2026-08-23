@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
-import org.bukkit.entity.Player;
-
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
@@ -65,21 +63,13 @@ final class HologramNpcCommand extends HologramCommandSupport {
     }
 
     private int link(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         String npc = ctx.getArgument("npc", String.class);
-        services.linkNpc().link(ref(sender), nameArg(ctx), npc);
+        services.linkNpc().link(actor(ctx), nameArg(ctx), npc);
         return Command.SINGLE_SUCCESS;
     }
 
     private int unlink(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.unlinkNpc().unlink(ref(sender), nameArg(ctx));
+        services.unlinkNpc().unlink(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 

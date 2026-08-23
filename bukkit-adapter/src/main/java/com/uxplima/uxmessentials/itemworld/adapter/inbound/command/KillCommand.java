@@ -67,23 +67,23 @@ public final class KillCommand extends ItemworldCommandSupport implements Comman
         if (!enabled(ctx)) {
             return Command.SINGLE_SUCCESS;
         }
-        Player self = player(ctx);
-        if (self == null) {
-            return Command.SINGLE_SUCCESS;
-        }
+        PlayerRef actor = actor(ctx);
         List<Player> victims = PlayerTargets.resolveAll(ctx, "player");
         if (victims.isEmpty()) {
             reply(ctx, ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", typedTarget(ctx)));
             return Command.SINGLE_SUCCESS;
         }
         for (Player victim : victims) {
-            kill(ctx, self, victim);
+            kill(ctx, actor, victim);
         }
         return Command.SINGLE_SUCCESS;
     }
 
     private void kill(CommandContext<CommandSourceStack> ctx, Player actor, Player victim) {
-        PlayerRef actorRef = ref(actor);
+        kill(ctx, ref(actor), victim);
+    }
+
+    private void kill(CommandContext<CommandSourceStack> ctx, PlayerRef actorRef, Player victim) {
         String targetName = victim.getName();
         services.kernel().scheduler().onEntity(ref(victim), () -> {
             victim.setHealth(0.0);

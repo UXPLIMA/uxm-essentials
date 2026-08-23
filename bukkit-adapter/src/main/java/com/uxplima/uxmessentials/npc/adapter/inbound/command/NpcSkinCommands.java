@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -74,37 +75,31 @@ final class NpcSkinCommands extends NpcCommandSupport {
     }
 
     private int skin(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
+        com.uxplima.uxmessentials.shared.domain.PlayerRef actor = actor(ctx);
         String spec = value(ctx);
         if (spec.strip().equalsIgnoreCase(NONE_KEYWORD) || spec.strip().equalsIgnoreCase("none")) {
-            services.skin().clearSkin(ref(sender), nameArg(ctx));
+            services.skin().clearSkin(actor, nameArg(ctx));
             return Command.SINGLE_SUCCESS;
         }
         if (spec.regionMatches(true, 0, NAME_PREFIX, 0, NAME_PREFIX.length())) {
             // The username path resolves off-thread (a Mojang round-trip), so it dispatches its own async flow
             // and reports success straight away rather than blocking the command thread on the lookup.
             skinByName.apply(
-                    ref(sender),
-                    nameArg(ctx),
-                    spec.substring(NAME_PREFIX.length()).strip());
+                    actor, nameArg(ctx), spec.substring(NAME_PREFIX.length()).strip());
             return Command.SINGLE_SUCCESS;
         }
         if (spec.regionMatches(true, 0, URL_PREFIX, 0, URL_PREFIX.length())) {
             // The image-URL path generates off-thread through MineSkin, the same fire-and-forget async shape.
             skinByName.applyFromUrl(
-                    ref(sender),
-                    nameArg(ctx),
-                    spec.substring(URL_PREFIX.length()).strip());
+                    actor, nameArg(ctx), spec.substring(URL_PREFIX.length()).strip());
             return Command.SINGLE_SUCCESS;
         }
         NpcSkin skin = resolveSkin(sender, spec);
         if (skin == null) {
             return 0; // the unresolvable-skin feedback was already sent
         }
-        services.skin().setSkin(ref(sender), nameArg(ctx), skin);
+        services.skin().setSkin(actor, nameArg(ctx), skin);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -119,7 +114,7 @@ final class NpcSkinCommands extends NpcCommandSupport {
      * raw strings directly with no fetch. Returns {@code null} after sending feedback when the spec cannot be
      * resolved. The {@code name:}/{@code url:} async forms are dispatched by the caller before reaching here.
      */
-    private @Nullable NpcSkin resolveSkin(Player sender, String spec) {
+    private @Nullable NpcSkin resolveSkin(CommandSender sender, String spec) {
         if (spec.regionMatches(true, 0, PLAYER_PREFIX, 0, PLAYER_PREFIX.length())) {
             return skinFromPlayer(sender, spec.substring(PLAYER_PREFIX.length()).strip());
         }
@@ -129,7 +124,7 @@ final class NpcSkinCommands extends NpcCommandSupport {
         return skinFromTexture(sender, raw.strip());
     }
 
-    private @Nullable NpcSkin skinFromPlayer(Player sender, String targetName) {
+    private @Nullable NpcSkin skinFromPlayer(CommandSender sender, String targetName) {
         Player target = Bukkit.getPlayerExact(targetName);
         if (target == null) {
             feedback.send(sender, NpcMessageKey.NPC_SKIN_PLAYER_OFFLINE, Map.of("player", targetName));
@@ -148,7 +143,7 @@ final class NpcSkinCommands extends NpcCommandSupport {
      * renders on our packet NPC — but a one-line note recommends a signature, since a strict client may show an
      * unsigned skin from another account as the default Steve/Alex.
      */
-    private @Nullable NpcSkin skinFromTexture(Player sender, String raw) {
+    private @Nullable NpcSkin skinFromTexture(CommandSender sender, String raw) {
         int separator = raw.indexOf(':');
         String texture = separator < 0 ? raw : raw.substring(0, separator);
         String signature = separator < 0 ? null : raw.substring(separator + 1);

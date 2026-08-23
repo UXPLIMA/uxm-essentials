@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.Optional;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -55,15 +55,12 @@ public final class PingCommand extends PlayerstateCommandSupport implements Comm
     }
 
     private int show(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<PlayerRef> target = resolveNamedTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
-        services.showPing().showFor(ref(sender), target.get());
+        services.showPing().showFor(actor(ctx), target.get());
         return Command.SINGLE_SUCCESS;
     }
 }

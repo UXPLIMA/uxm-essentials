@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 import java.util.List;
 import java.util.Objects;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -76,17 +76,14 @@ public final class SpeedCommand extends PlayerstateCommandSupport implements Com
     }
 
     private int set(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
         }
         SpeedValue value = SpeedValue.of(ctx.getArgument("value", Double.class));
         for (PlayerRef target : targets) {
-            apply(ref(sender), target, value);
+            apply(actor(ctx), target, value);
         }
         return Command.SINGLE_SUCCESS;
     }

@@ -66,16 +66,13 @@ abstract class KitCommandSupport {
 
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
-        Player sender = player(ctx);
-        if (sender != null) {
-            feedback.send(
-                    sender,
-                    SharedMessageKey.COMMAND_USAGE,
-                    Map.of(
-                            "command", command,
-                            "usage", usage,
-                            "description", description));
-        }
+        feedback.send(
+                ctx.getSource().getSender(),
+                SharedMessageKey.COMMAND_USAGE,
+                Map.of(
+                        "command", command,
+                        "usage", usage,
+                        "description", description));
         return 0;
     }
 

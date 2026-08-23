@@ -113,21 +113,13 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
     }
 
     private int copy(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         HologramName dest = HologramName.of(ctx.getArgument("dest", String.class));
-        services.copy().copy(ref(sender), nameArg(ctx), dest);
+        services.copy().copy(actor(ctx), nameArg(ctx), dest);
         return Command.SINGLE_SUCCESS;
     }
 
     private int info(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.info().describe(ref(sender), nameArg(ctx));
+        services.info().describe(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -141,11 +133,7 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
     }
 
     private int center(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.center().center(ref(sender), nameArg(ctx));
+        services.center().center(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -159,52 +147,36 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
     }
 
     private int rotate(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         float yaw = ctx.getArgument("yaw", Float.class);
         float pitch = pitchOr(ctx);
-        services.rotate().rotate(ref(sender), nameArg(ctx), Rotation.of(yaw, pitch));
+        services.rotate().rotate(actor(ctx), nameArg(ctx), Rotation.of(yaw, pitch));
         return Command.SINGLE_SUCCESS;
     }
 
     private int insertLine(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         int index = ctx.getArgument("index", Integer.class) - 1;
         HologramLine line = HologramLine.of(ctx.getArgument("text", String.class));
-        services.insertLine().insert(ref(sender), nameArg(ctx), index, line);
+        services.insertLine().insert(actor(ctx), nameArg(ctx), index, line);
         return Command.SINGLE_SUCCESS;
     }
 
     private int leaderboard(CommandContext<CommandSourceStack> ctx, int limit) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         String provider = ctx.getArgument("provider", String.class).strip();
         com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec spec =
                 provider.equalsIgnoreCase("none") || provider.equalsIgnoreCase("clear")
                         ? null
                         : new com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec(provider, limit);
-        services.leaderboard().set(ref(sender), nameArg(ctx), spec);
+        services.leaderboard().set(actor(ctx), nameArg(ctx), spec);
         return Command.SINGLE_SUCCESS;
     }
 
     private int clickCommand(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         String raw = ctx.getArgument("command", String.class).strip();
         // A leading slash is optional; a 'none'/'clear' keyword removes the click action.
         String command = raw.equalsIgnoreCase("none") || raw.equalsIgnoreCase("clear")
                 ? null
                 : (raw.startsWith("/") ? raw.substring(1) : raw);
-        services.clickCommand().set(ref(sender), nameArg(ctx), command);
+        services.clickCommand().set(actor(ctx), nameArg(ctx), command);
         return Command.SINGLE_SUCCESS;
     }
 

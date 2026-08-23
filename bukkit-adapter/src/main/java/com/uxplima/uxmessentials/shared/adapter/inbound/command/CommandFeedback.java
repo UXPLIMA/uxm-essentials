@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -36,9 +35,6 @@ public final class CommandFeedback {
 
     /** The catalog key for the shared chat prefix the {@code <prefix>} tag expands to. */
     private static final MessageKey PREFIX = () -> "prefix";
-
-    /** The synthetic ref for a non-player sender: a zero uuid carrying the console name. */
-    private static final UUID CONSOLE_UUID = new UUID(0L, 0L);
 
     private final Messages messages;
     private final MiniMessage miniMessage;
@@ -78,12 +74,10 @@ public final class CommandFeedback {
 
     /**
      * The locale-bearing {@link PlayerRef} for {@code sender}: the player's own ref, or a synthetic
-     * console ref (a zero uuid carrying the console name) for a non-player. Exposed so a caller that
+     * system ref (the reserved system uuid carrying the sender name) for a non-player. Exposed so a caller that
      * pre-resolves a message fragment for inlining still resolves it in the sender's locale.
      */
     public static PlayerRef refOf(CommandSender sender) {
-        return sender instanceof Player player
-                ? BukkitRefs.toRef(player)
-                : new PlayerRef(CONSOLE_UUID, sender.getName());
+        return sender instanceof Player player ? BukkitRefs.toRef(player) : PlayerRef.system(sender.getName());
     }
 }

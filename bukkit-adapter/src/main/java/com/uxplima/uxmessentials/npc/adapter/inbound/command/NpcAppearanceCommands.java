@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -93,17 +94,14 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int type(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String word = ctx.getArgument("type", String.class);
         EntityType entityType = parseRenderableType(word);
         if (entityType == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, Map.of("type", word));
             return 0;
         }
-        services.type().setEntityType(ref(sender), nameArg(ctx), entityType.name());
+        services.type().setEntityType(actor(ctx), nameArg(ctx), entityType.name());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -148,28 +146,17 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int equipClear(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.equip().clearAll(ref(sender), nameArg(ctx));
+        services.equip().clearAll(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int equipList(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listEquip().list(ref(sender), nameArg(ctx));
+        services.listEquip().list(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int equip(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<EquipmentSlot> slot = EquipmentSlot.parse(ctx.getArgument("slot", String.class));
         if (slot.isEmpty()) {
             feedback.send(
@@ -180,7 +167,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
         if (INVALID_MATERIAL.equals(material)) {
             return 0; // the invalid-material feedback was already sent
         }
-        services.equip().setEquipment(ref(sender), nameArg(ctx), slot.get(), material);
+        services.equip().setEquipment(actor(ctx), nameArg(ctx), slot.get(), material);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -196,17 +183,14 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int glow(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         boolean glowing = ctx.getArgument("value", Boolean.class);
         String color = colorArg(ctx);
         if (glowing && color != null && !isKnownColor(color)) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_COLOR, Map.of("color", color));
             return 0;
         }
-        services.glow().setGlowing(ref(sender), nameArg(ctx), glowing, color == null ? "" : color);
+        services.glow().setGlowing(actor(ctx), nameArg(ctx), glowing, color == null ? "" : color);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -219,17 +203,14 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int pose(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String word = ctx.getArgument("pose", String.class);
         NpcPose pose = parsePose(word);
         if (pose == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_POSE, Map.of("pose", word));
             return 0;
         }
-        services.pose().setPose(ref(sender), nameArg(ctx), pose.name());
+        services.pose().setPose(actor(ctx), nameArg(ctx), pose.name());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -241,16 +222,13 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int scale(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         double value = ctx.getArgument("value", Double.class);
         if (!Double.isFinite(value) || value < MIN_SCALE || value > MAX_SCALE) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_SCALE, Map.of("scale", Double.toString(value)));
             return 0;
         }
-        services.scale().setScale(ref(sender), nameArg(ctx), value);
+        services.scale().setScale(actor(ctx), nameArg(ctx), value);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -281,13 +259,17 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
      * bare Material name (human-readable, resolved to a plain item at render). Returns the {@link #INVALID_MATERIAL}
      * sentinel after sending feedback when the word names no known item material.
      */
-    private String resolveMaterial(Player sender, String word) {
+    private String resolveMaterial(CommandSender sender, String word) {
         String normalized = word.strip().toLowerCase(Locale.ROOT);
         if (normalized.equals("air") || normalized.equals("none")) {
             return "";
         }
         if (normalized.equals(HAND_KEYWORD)) {
-            return handToken(sender);
+            if (!(sender instanceof Player player)) {
+                feedback.send(sender, NpcMessageKey.NPC_PLAYERS_ONLY, Map.of());
+                return INVALID_MATERIAL;
+            }
+            return handToken(player);
         }
         Material material = Material.matchMaterial(word.strip());
         if (material == null || !material.isItem()) {

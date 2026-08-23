@@ -158,15 +158,12 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private int give(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<PlayerRef> target = resolveSelectorTarget(ctx, ctx.getSource().getSender());
         if (target.isEmpty()) {
             return 0;
         }
-        PlayerRef actor = ref(sender);
+        PlayerRef actor = actorRef(sender);
         PlayerRef recipient = target.get();
         KitId kit = KitId.of(ctx.getArgument("name", String.class));
         // The grant mutates the RECIPIENT's inventory/world (BukkitKitGranter) and spawns effects in their world,
@@ -199,34 +196,28 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private int runChatList(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listKits().list(ref(sender));
+        services.listKits().list(actorRef(ctx.getSource().getSender()));
         return Command.SINGLE_SUCCESS;
     }
 
     private int show(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
+        PlayerRef actor = actorRef(sender);
         KitId id = KitId.of(ctx.getArgument("name", String.class));
-        services.showKit().show(ref(sender), id).asValue().ifPresent(definition -> present(sender, definition));
+        services.showKit().show(actor, id).asValue().ifPresent(definition -> present(sender, actor, definition));
         return Command.SINGLE_SUCCESS;
     }
 
     /** Open the GUI preview in {@code gui} mode, or print the chat preview in {@code chat} mode. */
-    private void present(Player sender, KitDefinition definition) {
-        if (previewDisplay.get() == ListDisplayMode.GUI) {
-            services.kitPreview().open(sender, ref(sender), definition);
+    private void present(CommandSender sender, PlayerRef actor, KitDefinition definition) {
+        if (previewDisplay.get() == ListDisplayMode.GUI && sender instanceof Player player) {
+            services.kitPreview().open(player, actor, definition);
         } else {
             renderPreview(sender, definition);
         }
     }
 
-    private void renderPreview(Player sender, KitDefinition definition) {
+    private void renderPreview(CommandSender sender, KitDefinition definition) {
         feedback.send(
                 sender,
                 KitsMessageKey.KIT_PREVIEW_HEADER,
@@ -256,11 +247,8 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private int delete(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.delKit().delete(ref(sender), KitId.of(ctx.getArgument("name", String.class)));
+        services.delKit()
+                .delete(actorRef(ctx.getSource().getSender()), KitId.of(ctx.getArgument("name", String.class)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -334,9 +322,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private static PlayerRef actorRef(CommandSender sender) {
-        return sender instanceof Player player
-                ? ref(player)
-                : new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
+        return sender instanceof Player player ? ref(player) : PlayerRef.system(sender.getName());
     }
 
     /** A readable name for a kit item: its custom display name when set, else the prettified material name. */

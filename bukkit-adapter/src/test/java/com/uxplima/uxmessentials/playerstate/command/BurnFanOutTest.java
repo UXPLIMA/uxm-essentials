@@ -10,6 +10,8 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Map;
 
+import org.bukkit.command.CommandSender;
+
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -125,6 +127,15 @@ class BurnFanOutTest {
         verify(burn, times(1)).burnFor(any(), eq(BukkitRefs.toRef(sender)), any(BurnDuration.class));
     }
 
+    @Test
+    void consoleCanBurnAnExplicitTarget() {
+        PlayerMock target = server.addPlayer("Bob");
+
+        execute(server.getConsoleSender(), "burn 5 Bob");
+
+        verify(burn).burnFor(eq(PlayerRef.system("CONSOLE")), eq(BukkitRefs.toRef(target)), any(BurnDuration.class));
+    }
+
     private PlayerMock staff(String name) {
         PlayerMock player = server.addPlayer(name);
         player.addAttachment(MockBukkit.createMockPlugin(), BASE, true);
@@ -136,7 +147,7 @@ class BurnFanOutTest {
         return PLAIN.serialize(player.nextComponentMessage());
     }
 
-    private void execute(PlayerMock sender, String input) {
+    private void execute(CommandSender sender, String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(command.build());
         try {

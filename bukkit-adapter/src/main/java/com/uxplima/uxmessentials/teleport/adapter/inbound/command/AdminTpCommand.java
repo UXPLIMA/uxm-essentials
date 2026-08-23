@@ -74,14 +74,25 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
+        var player = Commands.argument("player", ArgumentTypes.player())
+                .suggests(CommandSuggestions.singlePlayerTarget())
+                .executes(this::run);
+        if (pull == Pull.GO) {
+            player.then(Commands.argument("destination", ArgumentTypes.player())
+                    .suggests(CommandSuggestions.singlePlayerTarget())
+                    .executes(this::runBetweenPlayers));
+        }
         var root = Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
-                .then(Commands.argument("player", ArgumentTypes.player())
-                        .suggests(CommandSuggestions.singlePlayerTarget())
-                        .executes(this::run));
+                .then(player);
         // The coordinate form mirrors /tppos and only makes sense for the GO variants (/tp, /tpo) —
         // moving the actor to a raw point — so /tphere and /tpohere keep the player-only argument.
         if (pull == Pull.GO) {
+            root.then(Commands.literal("at")
+                    .requires(src -> src.getSender().hasPermission(POSITION_PERMISSION))
+                    .then(Commands.argument("player", ArgumentTypes.player())
+                            .suggests(CommandSuggestions.singlePlayerTarget())
+                            .then(positionArguments(this::runTargetPosition))));
             root.then(Commands.argument("x", DoubleArgumentType.doubleArg())
                     .requires(src -> src.getSender().hasPermission(POSITION_PERMISSION))
                     .then(Commands.argument("y", DoubleArgumentType.doubleArg())
@@ -136,6 +147,38 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         services.executor().teleport(who, Destination.at(to), TeleportKind.ADMIN);
     }
 
+    /** {@code /tp <player> <destination>}: move an explicit subject, so console does not need a body. */
+    private int runBetweenPlayers(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        Optional<Player> subject = resolveTarget(ctx, "player");
+        Optional<Player> destination = resolveTarget(ctx, "destination");
+        if (subject.isEmpty() || destination.isEmpty()) {
+            return 0;
+        }
+        PlayerRef subjectRef = ref(subject.get());
+        PlayerRef destinationRef = ref(destination.get());
+        PlayerRef feedbackActor = actor(ctx);
+        services.scheduler().onEntity(destinationRef, () -> {
+            Player live = org.bukkit.Bukkit.getPlayer(destinationRef.uuid());
+            if (live != null && live.isOnline()) {
+                hop(subjectRef, TeleportRefs.positionOf(live));
+                services.notifier().send(feedbackActor, TeleportMessageKey.TP_DONE);
+            }
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** {@code /tp at <player> <world> <x> <y> <z> [yaw pitch]} for deterministic console automation. */
+    private int runTargetPosition(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        Optional<Player> subject = resolveTarget(ctx, "player");
+        Position destination = explicitPosition(ctx);
+        if (subject.isEmpty() || destination == null) {
+            return 0;
+        }
+        hop(ref(subject.get()), destination);
+        services.notifier().send(actor(ctx), TeleportMessageKey.TP_DONE);
+        return Command.SINGLE_SUCCESS;
+    }
+
     private int runPosition(CommandContext<CommandSourceStack> ctx, @Nullable String worldName) {
         Player sender = player(ctx);
         if (sender == null) {
@@ -173,7 +216,12 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
     // rejects a multi-match selector at parse time, so a present value resolves to at most one player; a single
     // resolved element is taken. A selector like @p or a name still resolves the way it always has.
     private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+        return resolveTarget(ctx, "player");
+    }
+
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx, String argument)
+            throws CommandSyntaxException {
+        PlayerSelectorArgumentResolver resolver = ctx.getArgument(argument, PlayerSelectorArgumentResolver.class);
         List<Player> resolved = resolver.resolve(ctx.getSource());
         return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
     }

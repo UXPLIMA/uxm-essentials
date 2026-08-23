@@ -46,6 +46,6 @@ abstract class DiscordLinkCommandSupport {
     }
 
     private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
+        return PlayerRef.system(sender.getName());
     }
 }

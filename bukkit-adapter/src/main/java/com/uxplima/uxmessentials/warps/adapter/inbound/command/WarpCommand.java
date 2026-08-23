@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -13,14 +14,18 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.Warp;
@@ -86,6 +91,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                         .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(this::runSet)))
+                .then(explicitPositionNode("createat", SET_PERMISSION, this::runSetAt))
                 // Hidden alias of `create` so existing `/warp set <name>` muscle-memory and docs keep working.
                 .then(Commands.literal("set")
                         .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
@@ -100,6 +106,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                 .then(Commands.literal("move")
                         .requires(src -> src.getSender().hasPermission(MOVE_PERMISSION))
                         .then(warpNameArgument().executes(this::runMove)))
+                .then(explicitPositionNode("moveat", MOVE_PERMISSION, this::runMoveAt))
                 .then(Commands.literal("lock")
                         .requires(src -> src.getSender().hasPermission(LOCK_PERMISSION))
                         .then(Commands.argument("name", StringArgumentType.word())
@@ -232,11 +239,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int runChatList(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listWarps().list(ref(sender));
+        services.listWarps().list(actor(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -252,20 +255,12 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int runDelete(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.delWarp().delete(ref(sender), WarpName.of(ctx.getArgument("name", String.class)));
+        services.delWarp().delete(actor(ctx), WarpName.of(ctx.getArgument("name", String.class)));
         return Command.SINGLE_SUCCESS;
     }
 
     private int runInfo(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.warpInfo().show(ref(sender), WarpName.of(ctx.getArgument("name", String.class)));
+        services.warpInfo().show(actor(ctx), WarpName.of(ctx.getArgument("name", String.class)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -280,14 +275,11 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int toggleLock(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String warpName = ctx.getArgument("name", String.class);
         Optional<Warp> opt = services.repository().find(WarpName.of(warpName));
         if (opt.isEmpty()) {
-            services.useWarp().use(ref(sender), WarpName.of(warpName));
+            services.warpInfo().show(actor(ctx), WarpName.of(warpName));
             return 0;
         }
         Warp warp = opt.get();
@@ -302,14 +294,11 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int setPasswordClear(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String warpName = ctx.getArgument("name", String.class);
         Optional<Warp> opt = services.repository().find(WarpName.of(warpName));
         if (opt.isEmpty()) {
-            services.useWarp().use(ref(sender), WarpName.of(warpName));
+            services.warpInfo().show(actor(ctx), WarpName.of(warpName));
             return 0;
         }
         Warp warp = opt.get();
@@ -321,15 +310,12 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int setPassword(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String warpName = ctx.getArgument("name", String.class);
         String password = ctx.getArgument("password", String.class);
         Optional<Warp> opt = services.repository().find(WarpName.of(warpName));
         if (opt.isEmpty()) {
-            services.useWarp().use(ref(sender), WarpName.of(warpName));
+            services.warpInfo().show(actor(ctx), WarpName.of(warpName));
             return 0;
         }
         Warp warp = opt.get();
@@ -368,10 +354,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int getWarpRating(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String warpName = ctx.getArgument("name", String.class);
 
         // The existence check is in-memory; the average rating is an aggregate query against the database, so
@@ -380,7 +363,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
             feedback.send(sender, WarpsMessageKey.WARP_NOT_FOUND, Map.of("warp", warpName));
             return 0;
         }
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         services.scheduler().async(() -> {
             double avg = services.repository().averageRating(WarpName.of(warpName));
             onPlayer(
@@ -395,5 +378,58 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         return java.math.BigDecimal.valueOf(value)
                 .setScale(1, java.math.RoundingMode.HALF_UP)
                 .toPlainString();
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> explicitPositionNode(
+            String literal, String permission, Command<CommandSourceStack> action) {
+        return Commands.literal(literal)
+                .requires(src -> src.getSender().hasPermission(permission))
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("world", StringArgumentType.word())
+                                .suggests(CommandSuggestions.loadedWorlds())
+                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                                        .executes(action))))));
+    }
+
+    private int runSetAt(CommandContext<CommandSourceStack> ctx) {
+        Position at = explicitPosition(ctx);
+        if (at == null) {
+            return 0;
+        }
+        services.setWarp().set(actor(ctx), WarpName.of(ctx.getArgument("name", String.class)), at);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runMoveAt(CommandContext<CommandSourceStack> ctx) {
+        Position at = explicitPosition(ctx);
+        if (at == null) {
+            return 0;
+        }
+        services.moveWarp().move(actor(ctx), WarpName.of(ctx.getArgument("name", String.class)), at);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private @org.jspecify.annotations.Nullable Position explicitPosition(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        World world = sender.getServer().getWorld(ctx.getArgument("world", String.class));
+        double x = ctx.getArgument("x", Double.class);
+        double y = ctx.getArgument("y", Double.class);
+        double z = ctx.getArgument("z", Double.class);
+        if (world == null) {
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
+                    Map.of("world", ctx.getArgument("world", String.class)));
+            return null;
+        }
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_INVALID_POSITION);
+            return null;
+        }
+        return Position.of(BukkitRefs.toRef(world), x, y, z);
     }
 }

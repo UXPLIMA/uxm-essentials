@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 import java.util.List;
 import java.util.Optional;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -62,15 +62,12 @@ public final class ClearInventoryCommand extends PlayerstateCommandSupport imple
     }
 
     private int clear(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<PlayerRef> target = resolveTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
-        services.clearInventory().clearFor(ref(sender), target.get());
+        services.clearInventory().clearFor(actor(ctx), target.get());
         return Command.SINGLE_SUCCESS;
     }
 }

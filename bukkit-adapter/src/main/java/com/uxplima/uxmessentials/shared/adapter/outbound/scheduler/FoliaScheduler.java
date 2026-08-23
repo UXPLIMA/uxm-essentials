@@ -74,6 +74,10 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         if (disabled()) {
             return;
         }
+        if (player.isSystem()) {
+            onGlobal(task);
+            return;
+        }
         Player bukkit = Bukkit.getPlayer(player.uuid());
         if (bukkit == null || !bukkit.isOnline()) {
             return; // the entity scheduler refuses a despawned entity, silent no-op (docs/02 §2.4)
@@ -87,6 +91,10 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         Objects.requireNonNull(task, "task");
         Objects.requireNonNull(retired, "retired");
         if (disabled()) {
+            return;
+        }
+        if (player.isSystem()) {
+            onGlobal(task);
             return;
         }
         Player bukkit = Bukkit.getPlayer(player.uuid());

@@ -96,7 +96,7 @@ abstract class ItemworldCommandSupport {
         if (sender instanceof Player player) {
             return player;
         }
-        reply(ctx, ItemworldMessageKey.NO_ITEM_IN_HAND, Map.of());
+        reply(ctx, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of());
         return null;
     }
 
@@ -119,6 +119,11 @@ abstract class ItemworldCommandSupport {
         return BukkitRefs.toRef(player);
     }
 
+    /** The command actor: a live player ref, or the stable system ref used by console automation. */
+    final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
+        return viewer(ctx);
+    }
+
     /**
      * Whether {@code player} may act on the given {@code type} for this command, using the common per-type
      * gating: after the base {@code uxmessentials.<cmd>.use} node passes, the resolved registry type ({@code zombie},
@@ -132,8 +137,17 @@ abstract class ItemworldCommandSupport {
      * @param type the resolved registry key path, already namespace-stripped and lower-cased by the caller
      */
     final boolean allowsType(CommandContext<CommandSourceStack> ctx, Player player, String command, String type) {
+        return allowsType(ctx, (CommandSender) player, command, type);
+    }
+
+    /** Console-capable variant of the common per-type permission gate. */
+    final boolean allowsType(
+            CommandContext<CommandSourceStack> ctx, CommandSender sender, String command, String type) {
         String node = "uxmessentials.itemworld." + command + "." + type.toLowerCase(Locale.ROOT);
-        if (services.kernel().permissions().has(ref(player), node)) {
+        boolean allowed = sender instanceof Player player
+                ? services.kernel().permissions().has(ref(player), node)
+                : sender.hasPermission(node);
+        if (allowed) {
             return true;
         }
         reply(ctx, SharedMessageKey.COMMAND_NO_PERMISSION);
@@ -167,9 +181,7 @@ abstract class ItemworldCommandSupport {
 
     private PlayerRef viewer(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        return sender instanceof Player player
-                ? BukkitRefs.toRef(player)
-                : new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
+        return sender instanceof Player player ? BukkitRefs.toRef(player) : PlayerRef.system(sender.getName());
     }
 
     /**

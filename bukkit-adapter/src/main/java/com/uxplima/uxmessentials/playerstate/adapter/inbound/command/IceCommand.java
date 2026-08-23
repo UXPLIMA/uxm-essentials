@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.List;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -61,17 +61,14 @@ public final class IceCommand extends PlayerstateCommandSupport implements Comma
     }
 
     private int ice(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
         }
         FreezeDuration duration = FreezeDuration.ofSeconds(seconds(ctx));
         for (PlayerRef target : targets) {
-            services.freeze().freezeFor(ref(sender), target, duration);
+            services.freeze().freezeFor(actor(ctx), target, duration);
         }
         return Command.SINGLE_SUCCESS;
     }

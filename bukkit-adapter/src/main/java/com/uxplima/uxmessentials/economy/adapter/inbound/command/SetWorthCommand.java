@@ -102,21 +102,15 @@ public final class SetWorthCommand extends EconomyCommandSupport implements Comm
     }
 
     private int runNamed(CommandContext<CommandSourceStack> ctx, String raw, double price, String currencyId) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        namedId(sender, raw)
-                .ifPresent(id -> offTick(() -> services.setWorth().set(ref(sender), id, decimal(price), currencyId)));
+        PlayerRef actor = actor(ctx);
+        namedId(actor, raw)
+                .ifPresent(id -> offTick(() -> services.setWorth().set(actor, id, decimal(price), currencyId)));
         return Command.SINGLE_SUCCESS;
     }
 
     private int clearNamed(CommandContext<CommandSourceStack> ctx, String raw) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        namedId(sender, raw).ifPresent(id -> offTick(() -> services.setWorth().clear(ref(sender), id)));
+        PlayerRef actor = actor(ctx);
+        namedId(actor, raw).ifPresent(id -> offTick(() -> services.setWorth().clear(actor, id)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -129,11 +123,10 @@ public final class SetWorthCommand extends EconomyCommandSupport implements Comm
         return Optional.of(held.getType().name().toLowerCase(Locale.ROOT));
     }
 
-    private Optional<String> namedId(Player sender, String raw) {
+    private Optional<String> namedId(PlayerRef actor, String raw) {
         Material material = Material.matchMaterial(raw);
         if (material == null) {
-            PlayerRef viewer = ref(sender);
-            services.notifier().send(viewer, EconomyMessageKey.SETWORTH_UNKNOWN_ITEM, Map.of("item", raw));
+            services.notifier().send(actor, EconomyMessageKey.SETWORTH_UNKNOWN_ITEM, Map.of("item", raw));
             return Optional.empty();
         }
         return Optional.of(material.name().toLowerCase(Locale.ROOT));

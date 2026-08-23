@@ -67,17 +67,19 @@ abstract class PlayerWarpCommandSupport {
 
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
-        Player sender = player(ctx);
-        if (sender != null) {
-            feedback.send(
-                    sender,
-                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
-                    Map.of(
-                            "command", command,
-                            "usage", usage,
-                            "description", description));
-        }
+        feedback.send(
+                ctx.getSource().getSender(),
+                com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
+                Map.of(
+                        "command", command,
+                        "usage", usage,
+                        "description", description));
         return 0;
+    }
+
+    /** The invoking player, or the reserved system identity for console and command-block sources. */
+    final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
+        return CommandFeedback.refOf(ctx.getSource().getSender());
     }
 
     /** Tell {@code sender} the named target was not found, in their locale. */
@@ -131,7 +133,7 @@ abstract class PlayerWarpCommandSupport {
      * malformed. Keeping the {@link PlayerWarpName#of} guard here means no command handler ever turns a bad name
      * into a stack trace; the rejected text is echoed back so the player sees what failed.
      */
-    final @Nullable PlayerWarpName warpName(Player sender, String raw) {
+    final @Nullable PlayerWarpName warpName(CommandSender sender, String raw) {
         try {
             return PlayerWarpName.of(raw);
         } catch (IllegalArgumentException invalid) {

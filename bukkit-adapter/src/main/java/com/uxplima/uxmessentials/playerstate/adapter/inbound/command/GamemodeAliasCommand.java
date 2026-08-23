@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 import java.util.List;
 import java.util.Objects;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -61,16 +61,13 @@ public final class GamemodeAliasCommand extends PlayerstateCommandSupport implem
     }
 
     private int set(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
         }
         for (PlayerRef target : targets) {
-            services.setGamemode().setFor(ref(sender), target, mode);
+            services.setGamemode().setFor(actor(ctx), target, mode);
         }
         return Command.SINGLE_SUCCESS;
     }

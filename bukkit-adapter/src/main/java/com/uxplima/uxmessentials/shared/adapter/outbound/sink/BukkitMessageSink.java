@@ -23,8 +23,9 @@ import org.jspecify.annotations.NullMarked;
  * The {@link MessageSink} implementation: parse an already-resolved MiniMessage source string into a
  * {@code Component} exactly once, then deliver it to the viewer on the viewer's region thread via the
  * injected {@link Scheduler}. The shared {@code <prefix>} tag (which catalog templates reference but
- * never inline) is supplied here as a parsed resolver, so a missing or offline viewer is a silent
- * no-op (the entity scheduler refuses a despawned entity).
+ * never inline) is supplied here as a parsed resolver. A system viewer is delivered to the console on the global
+ * region thread; a missing or offline player viewer is a silent no-op (the entity scheduler refuses a despawned
+ * entity).
  *
  * <p>A single {@link MiniMessage} instance handles parsing; production does not split trusted /
  * untrusted at this layer (docs/03-paper-api §4.1) — all templates are operator-owned catalog
@@ -67,6 +68,10 @@ public final class BukkitMessageSink implements MessageSink {
         String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
         Component component = miniMessage.deserialize(expanded, prefix, StyleTags.resolver());
+        if (viewer.isSystem()) {
+            scheduler.onGlobal(() -> Bukkit.getConsoleSender().sendMessage(component));
+            return;
+        }
         scheduler.onEntity(viewer, () -> sendTo(viewer, component));
     }
 

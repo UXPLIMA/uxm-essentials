@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.List;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -56,17 +56,14 @@ public final class AirCommand extends PlayerstateCommandSupport implements Comma
     }
 
     private int set(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
         }
         AirAmount air = AirAmount.ofSeconds(ctx.getArgument("seconds", Integer.class), Integer.MAX_VALUE);
         for (PlayerRef target : targets) {
-            services.air().setFor(ref(sender), target, air);
+            services.air().setFor(actor(ctx), target, air);
         }
         return Command.SINGLE_SUCCESS;
     }

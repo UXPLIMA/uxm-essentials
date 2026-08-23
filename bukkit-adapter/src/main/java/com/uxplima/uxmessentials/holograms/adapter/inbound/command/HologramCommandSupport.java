@@ -62,17 +62,19 @@ abstract class HologramCommandSupport {
 
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
-        Player sender = player(ctx);
-        if (sender != null) {
-            feedback.send(
-                    sender,
-                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
-                    Map.of(
-                            "command", command,
-                            "usage", usage,
-                            "description", description));
-        }
+        feedback.send(
+                ctx.getSource().getSender(),
+                com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
+                Map.of(
+                        "command", command,
+                        "usage", usage,
+                        "description", description));
         return 0;
+    }
+
+    /** The command actor: a live player ref, or the stable system ref used by console automation. */
+    final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
+        return CommandFeedback.refOf(ctx.getSource().getSender());
     }
 
     /** The suggestion provider over the current hologram names, reusable for any {@code name} argument. */

@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -118,56 +118,44 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
     }
 
     private int billboard(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<Billboard> billboard = Billboard.parse(ctx.getArgument("value", String.class));
         if (billboard.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_BILLBOARD_INVALID, Map.of());
             return 0;
         }
-        return applyAppearance(ctx, sender, current -> current.withBillboard(billboard.orElseThrow()));
+        return applyAppearance(ctx, current -> current.withBillboard(billboard.orElseThrow()));
     }
 
     private int background(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<Integer> argb = HologramColors.parse(ctx.getArgument("value", String.class));
         if (argb.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_BACKGROUND_INVALID, Map.of());
             return 0;
         }
-        return applyAppearance(ctx, sender, current -> current.withBackgroundArgb(argb.orElseThrow()));
+        return applyAppearance(ctx, current -> current.withBackgroundArgb(argb.orElseThrow()));
     }
 
     private int glow(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String value = ctx.getArgument("value", String.class);
         if (isClear(value)) {
-            return applyAppearance(ctx, sender, current -> current.withGlowArgb(Appearance.DEFAULT_GLOW));
+            return applyAppearance(ctx, current -> current.withGlowArgb(Appearance.DEFAULT_GLOW));
         }
         Optional<Integer> argb = HologramColors.parse(value);
         if (argb.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_GLOW_INVALID, Map.of());
             return 0;
         }
-        return applyAppearance(ctx, sender, current -> current.withGlowArgb(argb.orElseThrow()));
+        return applyAppearance(ctx, current -> current.withGlowArgb(argb.orElseThrow()));
     }
 
     private int opacity(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String value = ctx.getArgument("value", String.class);
         if (isClear(value)) {
-            return applyAppearance(ctx, sender, current -> current.withTextOpacity(Appearance.DEFAULT_OPACITY));
+            return applyAppearance(ctx, current -> current.withTextOpacity(Appearance.DEFAULT_OPACITY));
         }
         Integer parsed = parseInt(value);
         if (parsed == null) {
@@ -175,7 +163,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
             return 0;
         }
         int opacity = Appearance.clampOpacity(parsed);
-        return applyAppearance(ctx, sender, current -> current.withTextOpacity(opacity));
+        return applyAppearance(ctx, current -> current.withTextOpacity(opacity));
     }
 
     /** Whether {@code value} is a keyword that clears the override back to the appearance default. */
@@ -195,138 +183,86 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
     }
 
     private int shadow(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         boolean shadow = ctx.getArgument("value", Boolean.class);
-        return applyAppearance(ctx, sender, current -> current.withTextShadow(shadow));
+        return applyAppearance(ctx, current -> current.withTextShadow(shadow));
     }
 
     private int brightness(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         int block = ctx.getArgument("block", Integer.class);
         int sky = ctx.getArgument("sky", Integer.class);
-        return applyAppearance(ctx, sender, current -> current.withBrightness(block, sky));
+        return applyAppearance(ctx, current -> current.withBrightness(block, sky));
     }
 
     private int scale(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         float scale = Appearance.clampScale(ctx.getArgument("x", Float.class));
-        return applyAppearance(ctx, sender, current -> current.withScale(scale));
+        return applyAppearance(ctx, current -> current.withScale(scale));
     }
 
     private int scalePerAxis(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         float x = Appearance.clampScale(ctx.getArgument("x", Float.class));
         float y = Appearance.clampScale(ctx.getArgument("y", Float.class));
         float z = Appearance.clampScale(ctx.getArgument("z", Float.class));
-        return applyAppearance(ctx, sender, current -> current.withScale(x, y, z));
+        return applyAppearance(ctx, current -> current.withScale(x, y, z));
     }
 
     private int translation(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         float x = Appearance.clampTranslation(ctx.getArgument("x", Float.class));
         float y = Appearance.clampTranslation(ctx.getArgument("y", Float.class));
         float z = Appearance.clampTranslation(ctx.getArgument("z", Float.class));
-        return applyAppearance(ctx, sender, current -> current.withTranslation(x, y, z));
+        return applyAppearance(ctx, current -> current.withTranslation(x, y, z));
     }
 
     private int alignment(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<TextAlignment> alignment = TextAlignment.parse(ctx.getArgument("value", String.class));
         if (alignment.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_ALIGNMENT_INVALID, Map.of());
             return 0;
         }
-        return applyAppearance(ctx, sender, current -> current.withAlignment(alignment.orElseThrow()));
+        return applyAppearance(ctx, current -> current.withAlignment(alignment.orElseThrow()));
     }
 
     private int seeThrough(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         boolean seeThrough = ctx.getArgument("value", Boolean.class);
-        return applyAppearance(ctx, sender, current -> current.withSeeThrough(seeThrough));
+        return applyAppearance(ctx, current -> current.withSeeThrough(seeThrough));
     }
 
     private int growUp(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         // Grow direction is a hologram-level positioning flag (a spawn offset), not an Appearance property, so it
         // routes to its own use case rather than applyAppearance.
         boolean growUp = ctx.getArgument("value", Boolean.class);
-        services.growUp().set(ref(sender), nameArg(ctx), growUp);
+        services.growUp().set(actor(ctx), nameArg(ctx), growUp);
         return Command.SINGLE_SUCCESS;
     }
 
     private int shadowRadius(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         float radius = Appearance.clampShadow(ctx.getArgument("value", Float.class));
-        return applyAppearance(ctx, sender, current -> current.withShadowRadius(radius));
+        return applyAppearance(ctx, current -> current.withShadowRadius(radius));
     }
 
     private int shadowStrength(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         float strength = Appearance.clampShadow(ctx.getArgument("value", Float.class));
-        return applyAppearance(ctx, sender, current -> current.withShadowStrength(strength));
+        return applyAppearance(ctx, current -> current.withShadowStrength(strength));
     }
 
     private int lineWidth(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         int width = Appearance.clampLineWidth(ctx.getArgument("value", Integer.class));
-        return applyAppearance(ctx, sender, current -> current.withLineWidth(width));
+        return applyAppearance(ctx, current -> current.withLineWidth(width));
     }
 
     private int viewRange(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         float range = Appearance.clampViewRange(ctx.getArgument("value", Float.class));
-        return applyAppearance(ctx, sender, current -> current.withViewRange(range));
+        return applyAppearance(ctx, current -> current.withViewRange(range));
     }
 
     private int refreshInterval(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         int ticks = ctx.getArgument("value", Integer.class);
-        services.refresh().set(ref(sender), nameArg(ctx), ticks);
+        services.refresh().set(actor(ctx), nameArg(ctx), ticks);
         return Command.SINGLE_SUCCESS;
     }
 
-    private int applyAppearance(
-            CommandContext<CommandSourceStack> ctx, Player sender, UnaryOperator<Appearance> mutation) {
-        services.appearance().apply(ref(sender), nameArg(ctx), mutation);
+    private int applyAppearance(CommandContext<CommandSourceStack> ctx, UnaryOperator<Appearance> mutation) {
+        services.appearance().apply(actor(ctx), nameArg(ctx), mutation);
         return Command.SINGLE_SUCCESS;
     }
 

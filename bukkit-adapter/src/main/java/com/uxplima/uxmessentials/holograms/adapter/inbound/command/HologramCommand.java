@@ -8,12 +8,14 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -25,6 +27,7 @@ import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
@@ -64,6 +67,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
      */
     private static final Map<String, String> CAPABILITIES = Map.ofEntries(
             Map.entry("create", CREATE),
+            Map.entry("createat", CREATE),
             Map.entry("copy", CREATE),
             Map.entry("delete", DELETE),
             Map.entry("list", VIEW),
@@ -71,6 +75,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
             Map.entry("nearby", VIEW),
             Map.entry("movehere", MOVE),
             Map.entry("moveto", MOVE),
+            Map.entry("moveat", MOVE),
             Map.entry("center", MOVE),
             Map.entry("teleport", MOVE),
             Map.entry("rotate", MOVE),
@@ -122,13 +127,15 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 .executes(this::openGui);
         List<LiteralArgumentBuilder<CommandSourceStack>> verbs = new ArrayList<>(List.of(
                 createNode(),
+                createAtNode(),
                 name("delete", this::delete),
                 Commands.literal("list").executes(this::list),
                 textNode("addline", this::addLine),
                 setLineNode(),
                 indexNode("removeline", this::removeLine),
                 name("movehere", this::move),
-                moveToNode()));
+                moveToNode(),
+                moveAtNode()));
         verbs.addAll(new HologramAppearanceCommand(services, messages, hologramNames).nodes());
         verbs.addAll(new HologramVisibilityCommand(services, messages, hologramNames).nodes());
         verbs.addAll(new HologramModelCommand(services, messages, hologramNames).nodes());
@@ -212,9 +219,9 @@ public final class HologramCommand extends HologramCommandSupport implements Com
      * hub entry uses.
      */
     private int openGui(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
+        if (!(ctx.getSource().getSender() instanceof Player sender)) {
+            services.list().list(actor(ctx));
+            return Command.SINGLE_SUCCESS;
         }
         if (sender.hasPermission(GUI_PERMISSION)) {
             listMenu.open(ref(sender));
@@ -234,47 +241,27 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     }
 
     private int delete(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.delete().delete(ref(sender), nameArg(ctx));
+        services.delete().delete(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.list().list(ref(sender));
+        services.list().list(actor(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int addLine(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.addLine().add(ref(sender), nameArg(ctx), HologramLine.of(text(ctx)));
+        services.addLine().add(actor(ctx), nameArg(ctx), HologramLine.of(text(ctx)));
         return Command.SINGLE_SUCCESS;
     }
 
     private int setLine(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.setLine().set(ref(sender), nameArg(ctx), zeroBasedIndex(ctx), HologramLine.of(text(ctx)));
+        services.setLine().set(actor(ctx), nameArg(ctx), zeroBasedIndex(ctx), HologramLine.of(text(ctx)));
         return Command.SINGLE_SUCCESS;
     }
 
     private int removeLine(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.removeLine().remove(ref(sender), nameArg(ctx), zeroBasedIndex(ctx));
+        services.removeLine().remove(actor(ctx), nameArg(ctx), zeroBasedIndex(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -327,6 +314,87 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         }
         services.move().move(ref(sender), nameArg(ctx), Position.of(base.world(), x, y, z));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> createAtNode() {
+        return Commands.literal("createat")
+                .executes(ctx -> usage(
+                        ctx,
+                        "hologram createat",
+                        "<name> <world> <x> <y> <z> <text>",
+                        "Create a hologram at an explicit location"))
+                .then(Commands.argument("name", StringArgumentType.string())
+                        .then(Commands.argument("world", StringArgumentType.word())
+                                .suggests(
+                                        com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions
+                                                .loadedWorlds())
+                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                                        .then(Commands.argument(
+                                                                        "text", StringArgumentType.greedyString())
+                                                                .executes(this::createAt)))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> moveAtNode() {
+        return Commands.literal("moveat")
+                .executes(ctx -> usage(
+                        ctx,
+                        "hologram moveat",
+                        "<name> <world> <x> <y> <z>",
+                        "Move a hologram to an explicit location"))
+                .then(nameArgument("name")
+                        .then(Commands.argument("world", StringArgumentType.word())
+                                .suggests(
+                                        com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions
+                                                .loadedWorlds())
+                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                                        .executes(this::moveAt))))));
+    }
+
+    private int createAt(CommandContext<CommandSourceStack> ctx) {
+        Position at = explicitPosition(ctx);
+        if (at == null) {
+            return 0;
+        }
+        services.create().create(actor(ctx), nameArg(ctx), at, HologramLine.of(text(ctx)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int moveAt(CommandContext<CommandSourceStack> ctx) {
+        Position at = explicitPosition(ctx);
+        if (at == null) {
+            return 0;
+        }
+        services.move().move(actor(ctx), nameArg(ctx), at);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private @Nullable Position explicitPosition(CommandContext<CommandSourceStack> ctx) {
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        World world = sender.getServer().getWorld(ctx.getArgument("world", String.class));
+        double x = ctx.getArgument("x", Double.class);
+        double y = ctx.getArgument("y", Double.class);
+        double z = ctx.getArgument("z", Double.class);
+        if (world == null) {
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
+                    Map.of("world", ctx.getArgument("world", String.class)));
+            return null;
+        }
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+            feedback.send(sender, HologramsMessageKey.HOLOGRAM_INVALID_COORDS, Map.of("coords", explicitCoords(ctx)));
+            return null;
+        }
+        return Position.of(BukkitRefs.toRef(world), x, y, z);
+    }
+
+    private static String explicitCoords(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getArgument("world", String.class) + " " + ctx.getArgument("x", Double.class) + " "
+                + ctx.getArgument("y", Double.class) + " " + ctx.getArgument("z", Double.class);
     }
 
     /**

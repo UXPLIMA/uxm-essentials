@@ -87,6 +87,19 @@ public final class CommandSuggestions {
         };
     }
 
+    /** Suggest every currently loaded world name; the list is an in-memory Bukkit registry read. */
+    public static SuggestionProvider<CommandSourceStack> loadedWorlds() {
+        return (ctx, builder) -> {
+            String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
+            for (org.bukkit.World world : Bukkit.getWorlds()) {
+                if (matches(world.getName(), prefix)) {
+                    builder.suggest(world.getName());
+                }
+            }
+            return builder.buildFuture();
+        };
+    }
+
     /** The selectors that resolve to one or more PLAYERS for a multi-target argument. Never @e/@n (entities). */
     private static final List<String> MULTI_PLAYER_SELECTORS = List.of("@a", "@p", "@r", "@s");
 

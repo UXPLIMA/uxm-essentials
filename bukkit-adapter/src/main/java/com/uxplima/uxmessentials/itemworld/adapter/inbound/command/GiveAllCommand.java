@@ -133,8 +133,7 @@ public final class GiveAllCommand extends ItemworldCommandSupport implements Com
     private PlayerRef actorOf(CommandContext<CommandSourceStack> ctx) {
         return ctx.getSource().getSender() instanceof Player player
                 ? BukkitRefs.toRef(player)
-                : new PlayerRef(
-                        new java.util.UUID(0L, 0L), ctx.getSource().getSender().getName());
+                : PlayerRef.system(ctx.getSource().getSender().getName());
     }
 
     private static Map<String, String> placeholders(String item, int amount, int count) {

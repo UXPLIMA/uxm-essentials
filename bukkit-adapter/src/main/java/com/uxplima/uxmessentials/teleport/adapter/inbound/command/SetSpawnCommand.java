@@ -38,6 +38,10 @@ public final class SetSpawnCommand extends TeleportCommandSupport implements Com
         return Commands.literal("setspawn")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runDefault)
+                .then(Commands.literal("location").then(positionArguments(this::runDefaultAt)))
+                .then(Commands.literal("named")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(positionArguments(this::runNamedAt))))
                 .then(Commands.argument("name", StringArgumentType.word()).executes(this::runNamed))
                 .build();
     }
@@ -65,6 +69,26 @@ public final class SetSpawnCommand extends TeleportCommandSupport implements Com
         }
         services.resolveSpawn().setNamedSpawn(ctx.getArgument("name", String.class), position(sender));
         services.notifier().send(ref(sender), TeleportMessageKey.SPAWN_SET);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runDefaultAt(CommandContext<CommandSourceStack> ctx) {
+        Position at = explicitPosition(ctx);
+        if (at == null) {
+            return 0;
+        }
+        services.resolveSpawn().setDefaultSpawn(at.world(), at);
+        services.notifier().send(actor(ctx), TeleportMessageKey.SPAWN_SET);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runNamedAt(CommandContext<CommandSourceStack> ctx) {
+        Position at = explicitPosition(ctx);
+        if (at == null) {
+            return 0;
+        }
+        services.resolveSpawn().setNamedSpawn(ctx.getArgument("name", String.class), at);
+        services.notifier().send(actor(ctx), TeleportMessageKey.SPAWN_SET);
         return Command.SINGLE_SUCCESS;
     }
 

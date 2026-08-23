@@ -6,8 +6,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import org.bukkit.entity.Player;
-
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
@@ -80,10 +78,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int moveTo(CommandContext<CommandSourceStack> ctx, float yaw, float pitch) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         double x = ctx.getArgument("x", Double.class);
         double y = ctx.getArgument("y", Double.class);
         double z = ctx.getArgument("z", Double.class);
@@ -91,7 +86,7 @@ final class NpcStateCommands extends NpcCommandSupport {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_COORDS, Map.of("coords", x + " " + y + " " + z));
             return 0;
         }
-        services.moveTo().moveTo(ref(sender), nameArg(ctx), x, y, z, yaw, pitch);
+        services.moveTo().moveTo(actor(ctx), nameArg(ctx), x, y, z, yaw, pitch);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -113,13 +108,9 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int displayName(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         String text = ctx.getArgument("text", String.class).strip();
         String resolved = text.equalsIgnoreCase("none") || text.isBlank() ? null : text;
-        services.displayName().setDisplayName(ref(sender), nameArg(ctx), resolved);
+        services.displayName().setDisplayName(actor(ctx), nameArg(ctx), resolved);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -133,17 +124,14 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int cooldown(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         String word = ctx.getArgument("duration", String.class).strip();
         Long millis = word.equalsIgnoreCase(DEFAULT_KEYWORD) ? 0L : parseFriendlyMillis(word);
         if (millis == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_COOLDOWN, Map.of("cooldown", word));
             return 0;
         }
-        services.cooldown().setCooldown(ref(sender), nameArg(ctx), millis);
+        services.cooldown().setCooldown(actor(ctx), nameArg(ctx), millis);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -164,13 +152,10 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int distance(CommandContext<CommandSourceStack> ctx, SetNpcRange.Kind kind) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         String word = ctx.getArgument("blocks", String.class).strip();
         if (word.equalsIgnoreCase(DEFAULT_KEYWORD)) {
-            services.range().setRange(ref(sender), nameArg(ctx), kind, null);
+            services.range().setRange(actor(ctx), nameArg(ctx), kind, null);
             return Command.SINGLE_SUCCESS;
         }
         Double sentinel = sentinelBlocks(word);
@@ -179,7 +164,7 @@ final class NpcStateCommands extends NpcCommandSupport {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_DISTANCE, Map.of("distance", word));
             return 0;
         }
-        services.range().setRange(ref(sender), nameArg(ctx), kind, blocks);
+        services.range().setRange(actor(ctx), nameArg(ctx), kind, blocks);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -205,10 +190,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int state(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         String word = ctx.getArgument("state", String.class).strip().toUpperCase(Locale.ROOT);
         SetNpcState.Flag flag = parseFlag(word);
         if (flag == null) {
@@ -216,43 +198,27 @@ final class NpcStateCommands extends NpcCommandSupport {
                     sender, NpcMessageKey.NPC_INVALID_STATE, Map.of("state", ctx.getArgument("state", String.class)));
             return 0;
         }
-        services.state().setState(ref(sender), nameArg(ctx), flag, ctx.getArgument("value", Boolean.class));
+        services.state().setState(actor(ctx), nameArg(ctx), flag, ctx.getArgument("value", Boolean.class));
         return Command.SINGLE_SUCCESS;
     }
 
     private int mirror(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.mirror().setMirror(ref(sender), nameArg(ctx), ctx.getArgument("value", Boolean.class));
+        services.mirror().setMirror(actor(ctx), nameArg(ctx), ctx.getArgument("value", Boolean.class));
         return Command.SINGLE_SUCCESS;
     }
 
     private int collidable(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.collidable().setCollidable(ref(sender), nameArg(ctx), ctx.getArgument("value", Boolean.class));
+        services.collidable().setCollidable(actor(ctx), nameArg(ctx), ctx.getArgument("value", Boolean.class));
         return Command.SINGLE_SUCCESS;
     }
 
     private int showInTab(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.showInTab().setShowInTab(ref(sender), nameArg(ctx), ctx.getArgument("value", Boolean.class));
+        services.showInTab().setShowInTab(actor(ctx), nameArg(ctx), ctx.getArgument("value", Boolean.class));
         return Command.SINGLE_SUCCESS;
     }
 
     private int skinSlim(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.skinSlim().setSlim(ref(sender), nameArg(ctx), ctx.getArgument("value", Boolean.class));
+        services.skinSlim().setSlim(actor(ctx), nameArg(ctx), ctx.getArgument("value", Boolean.class));
         return Command.SINGLE_SUCCESS;
     }
 

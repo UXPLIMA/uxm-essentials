@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -111,9 +110,7 @@ public final class UsageBinding {
     }
 
     private static PlayerRef refOf(CommandSender sender) {
-        return sender instanceof Player player
-                ? BukkitRefs.toRef(player)
-                : new PlayerRef(new UUID(0L, 0L), sender.getName());
+        return sender instanceof Player player ? BukkitRefs.toRef(player) : PlayerRef.system(sender.getName());
     }
 
     /** A {@link CommandRegistration} whose built tree gains a usage root executor when it lacks one. */

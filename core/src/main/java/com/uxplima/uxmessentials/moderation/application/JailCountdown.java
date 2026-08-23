@@ -90,5 +90,5 @@ public final class JailCountdown {
         audit.unjailed(SYSTEM_ACTOR, who, true, java.util.Optional.of("served"));
     }
 
-    private static final PlayerRef SYSTEM_ACTOR = new PlayerRef(new java.util.UUID(0L, 0L), "system");
+    private static final PlayerRef SYSTEM_ACTOR = PlayerRef.system("system");
 }

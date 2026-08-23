@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.List;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -56,17 +56,14 @@ public final class BurnCommand extends PlayerstateCommandSupport implements Comm
     }
 
     private int burn(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
         }
         BurnDuration duration = BurnDuration.ofSeconds(ctx.getArgument("seconds", Integer.class));
         for (PlayerRef target : targets) {
-            services.burn().burnFor(ref(sender), target, duration);
+            services.burn().burnFor(actor(ctx), target, duration);
         }
         return Command.SINGLE_SUCCESS;
     }

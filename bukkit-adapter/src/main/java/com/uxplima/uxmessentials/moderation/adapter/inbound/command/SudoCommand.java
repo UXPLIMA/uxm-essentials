@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -97,7 +96,7 @@ public final class SudoCommand implements CommandRegistration {
         CommandSender sender = ctx.getSource().getSender();
         return sender instanceof Player player
                 ? new PlayerRef(player.getUniqueId(), player.getName())
-                : new PlayerRef(new UUID(0L, 0L), sender.getName());
+                : PlayerRef.system(sender.getName());
     }
 
     private void send(PlayerRef actor, ModerationMessageKey key, Map<String, String> placeholders) {

@@ -111,11 +111,30 @@ class SpawnMobCommandTest {
         assertThat(sink.keys).contains(ItemworldMessageKey.SPAWNMOB_SPAWNED);
     }
 
+    @Test
+    void consoleCanSpawnAtAnExplicitPosition() {
+        executeFromConsole("spawnmob zombie at world 12 65 -4 2");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.SPAWNMOB_SPAWNED);
+        assertThat(audit.spawnedMobs).isEqualTo(2);
+        assertThat(audit.lastActor).contains(PlayerRef.system("CONSOLE"));
+    }
+
     private void execute(String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(new SpawnMobCommand(services()).build());
         try {
             dispatcher.execute(input, CommandSourceStackMock.from(player));
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            throw new AssertionError("command did not parse: " + input, e);
+        }
+    }
+
+    private void executeFromConsole(String input) {
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        dispatcher.getRoot().addChild(new SpawnMobCommand(services()).build());
+        try {
+            dispatcher.execute(input, CommandSourceStackMock.from(server.getConsoleSender()));
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
             throw new AssertionError("command did not parse: " + input, e);
         }
@@ -306,12 +325,14 @@ class SpawnMobCommandTest {
     /** Counts successful spawns so the deny path is asserted to have spawned nothing. */
     private static final class RecordingAudit implements ItemworldAudit {
         private int spawnedMobs;
+        private Optional<PlayerRef> lastActor = Optional.empty();
 
         @Override
         public void gave(PlayerRef actor, PlayerRef target, String itemKey, int amount) {}
 
         @Override
         public void spawnedMob(PlayerRef actor, MobSpec spec, int spawned) {
+            lastActor = Optional.of(actor);
             spawnedMobs += spawned;
         }
 

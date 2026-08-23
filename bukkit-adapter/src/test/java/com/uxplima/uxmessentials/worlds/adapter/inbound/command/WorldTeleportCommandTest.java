@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.bukkit.command.CommandSender;
+
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
@@ -111,15 +113,28 @@ class WorldTeleportCommandTest {
         verify(teleport).forced(refFor(alice), refFor(bob), eq(WorldName.of("nether")));
     }
 
+    @Test
+    void consoleCanForceANamedTargetToAWorld() {
+        PlayerMock bob = server.addPlayer("Bob");
+
+        execute(server.getConsoleSender(), "worlds tp nether Bob");
+
+        verify(teleport).forced(eq(PlayerRef.system("CONSOLE")), refFor(bob), eq(WorldName.of("nether")));
+    }
+
     private static PlayerRef refFor(PlayerMock player) {
         return eq(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(player));
     }
 
     private void execute(String input) {
+        execute(alice, input);
+    }
+
+    private void execute(CommandSender sender, String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(new WorldCommand(services, mock(Messages.class)).build());
         try {
-            dispatcher.execute(input, CommandSourceStackMock.from(alice));
+            dispatcher.execute(input, CommandSourceStackMock.from(sender));
         } catch (CommandSyntaxException e) {
             throw new AssertionError("command did not parse: " + input, e);
         }

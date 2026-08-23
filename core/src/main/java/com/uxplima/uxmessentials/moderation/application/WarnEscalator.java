@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.moderation.application;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
@@ -26,7 +25,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class WarnEscalator {
 
     /** The stable system actor an escalated sanction is attributed to. */
-    private static final PlayerRef SYSTEM_ACTOR = new PlayerRef(new UUID(0L, 0L), "system");
+    private static final PlayerRef SYSTEM_ACTOR = PlayerRef.system("system");
 
     private final WarnEscalation ladder;
     private final Mute mute;

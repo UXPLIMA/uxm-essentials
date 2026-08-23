@@ -39,7 +39,7 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
     private static final String RECEIVE_NODE = "uxmessentials.moderation.broadcast.receive";
 
     /** The locale dimension the console line is resolved against — the console has no per-viewer locale. */
-    private static final PlayerRef CONSOLE = new PlayerRef(new java.util.UUID(0L, 0L), "console");
+    private static final PlayerRef CONSOLE = PlayerRef.system("console");
 
     private final Server server;
     private final Scheduler scheduler;

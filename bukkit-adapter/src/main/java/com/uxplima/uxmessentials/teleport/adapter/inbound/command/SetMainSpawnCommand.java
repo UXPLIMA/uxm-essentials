@@ -34,6 +34,7 @@ public final class SetMainSpawnCommand extends TeleportCommandSupport implements
         return Commands.literal("setmainspawn")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::run)
+                .then(positionArguments(this::runAt))
                 .build();
     }
 
@@ -48,6 +49,15 @@ public final class SetMainSpawnCommand extends TeleportCommandSupport implements
             return 0;
         }
         services.resolveSpawn().setMain(ref(sender), TeleportRefs.positionOf(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runAt(CommandContext<CommandSourceStack> ctx) {
+        com.uxplima.uxmessentials.shared.domain.Position at = explicitPosition(ctx);
+        if (at == null) {
+            return 0;
+        }
+        services.resolveSpawn().setMain(actor(ctx), at);
         return Command.SINGLE_SUCCESS;
     }
 }

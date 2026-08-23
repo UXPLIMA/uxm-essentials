@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.List;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -58,17 +58,14 @@ public final class HealthCommand extends PlayerstateCommandSupport implements Co
     }
 
     private int set(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
         }
         HealthLevel level = HealthLevel.of(ctx.getArgument("amount", Integer.class));
         for (PlayerRef target : targets) {
-            services.health().setFor(ref(sender), target, level);
+            services.health().setFor(actor(ctx), target, level);
         }
         return Command.SINGLE_SUCCESS;
     }

@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import org.bukkit.entity.Player;
-
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
@@ -55,10 +53,7 @@ final class HologramPageCommand extends HologramCommandSupport {
     }
 
     private int add(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         List<HologramLine> lines = LINE_SPLITTER.splitToList(ctx.getArgument("text", String.class)).stream()
                 .map(String::strip)
                 .filter(segment -> !segment.isBlank())
@@ -68,25 +63,17 @@ final class HologramPageCommand extends HologramCommandSupport {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_MIN_ONE_LINE, Map.of());
             return 0;
         }
-        services.addPage().add(ref(sender), nameArg(ctx), lines);
+        services.addPage().add(actor(ctx), nameArg(ctx), lines);
         return Command.SINGLE_SUCCESS;
     }
 
     private int remove(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.removePage().remove(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class) - 1);
+        services.removePage().remove(actor(ctx), nameArg(ctx), ctx.getArgument("index", Integer.class) - 1);
         return Command.SINGLE_SUCCESS;
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listPages().list(ref(sender), nameArg(ctx));
+        services.listPages().list(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 

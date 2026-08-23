@@ -225,36 +225,31 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private int runExport(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        PlayerRef actor = actor(ctx);
         offTick(() -> {
             try {
                 String file = services.backupManager().exportCsv();
-                feedback.send(sender, EconomyMessageKey.ECO_ADMIN_EXPORT_CREATED, java.util.Map.of("file", file));
+                services.notifier()
+                        .send(actor, EconomyMessageKey.ECO_ADMIN_EXPORT_CREATED, java.util.Map.of("file", file));
             } catch (Exception e) {
-                feedback.send(
-                        sender,
-                        EconomyMessageKey.ECO_ADMIN_BACKUP_FAILED,
-                        java.util.Map.of("error", String.valueOf(e.getMessage())));
+                services.notifier()
+                        .send(
+                                actor,
+                                EconomyMessageKey.ECO_ADMIN_BACKUP_FAILED,
+                                java.util.Map.of("error", String.valueOf(e.getMessage())));
             }
         });
         return Command.SINGLE_SUCCESS;
     }
 
     private int runReset(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
-            rejectUnknownCurrency(ref(sender));
+            rejectUnknownCurrency(actor);
             return Command.SINGLE_SUCCESS;
         }
         String targetName = ctx.getArgument("player", String.class);
-        PlayerRef actor = ref(sender);
         offTick(() -> resolveAndReset(actor, targetName, currency.get()));
         return Command.SINGLE_SUCCESS;
     }
@@ -269,16 +264,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private int runBulk(CommandContext<CommandSourceStack> ctx, String verb) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
-            rejectUnknownCurrency(ref(sender));
+            rejectUnknownCurrency(actor);
             return Command.SINGLE_SUCCESS;
         }
-        PlayerRef actor = ref(sender);
         Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
         if (amount.isEmpty()) {
             return Command.SINGLE_SUCCESS;
@@ -298,16 +289,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private int runResetAll(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
-            rejectUnknownCurrency(ref(sender));
+            rejectUnknownCurrency(actor);
             return Command.SINGLE_SUCCESS;
         }
-        PlayerRef actor = ref(sender);
         Currency resolved = currency.get();
         List<PlayerRef> online = EcoTargets.online();
         offTick(() -> services.ecoAdmin().resetAll(actor, online, resolved));
@@ -315,16 +302,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private int runGiveRandomRange(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
-            rejectUnknownCurrency(ref(sender));
+            rejectUnknownCurrency(actor);
             return Command.SINGLE_SUCCESS;
         }
-        PlayerRef actor = ref(sender);
         Optional<Money> minAmount = amount(ctx.getArgument("min", String.class), currency.get(), actor);
         Optional<Money> maxAmount = amount(ctx.getArgument("max", String.class), currency.get(), actor);
         if (minAmount.isEmpty() || maxAmount.isEmpty()) {
@@ -379,16 +362,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private int runNoteGive(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
-            rejectUnknownCurrency(ref(sender));
+            rejectUnknownCurrency(actor);
             return Command.SINGLE_SUCCESS;
         }
-        PlayerRef actor = ref(sender);
         Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
         if (amount.isEmpty()) {
             return Command.SINGLE_SUCCESS;
@@ -440,16 +419,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private @org.jspecify.annotations.Nullable Resolved resolveTargeted(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return null;
-        }
+        PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
-            rejectUnknownCurrency(ref(sender));
+            rejectUnknownCurrency(actor);
             return null;
         }
-        PlayerRef actor = ref(sender);
         Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
         if (amount.isEmpty()) {
             return null;
@@ -463,52 +438,57 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private int runBackup(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) return 0;
+        PlayerRef actor = actor(ctx);
         offTick(() -> {
             try {
                 String timestamp = services.backupManager().backupAll();
-                feedback.send(
-                        sender, EconomyMessageKey.ECO_ADMIN_BACKUP_CREATED, java.util.Map.of("timestamp", timestamp));
+                services.notifier()
+                        .send(
+                                actor,
+                                EconomyMessageKey.ECO_ADMIN_BACKUP_CREATED,
+                                java.util.Map.of("timestamp", timestamp));
             } catch (Exception e) {
-                feedback.send(
-                        sender,
-                        EconomyMessageKey.ECO_ADMIN_BACKUP_FAILED,
-                        java.util.Map.of("error", String.valueOf(e.getMessage())));
+                services.notifier()
+                        .send(
+                                actor,
+                                EconomyMessageKey.ECO_ADMIN_BACKUP_FAILED,
+                                java.util.Map.of("error", String.valueOf(e.getMessage())));
             }
         });
         return Command.SINGLE_SUCCESS;
     }
 
     private int runRestore(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) return 0;
+        PlayerRef actor = actor(ctx);
         String targetName = ctx.getArgument("player", String.class);
         String date = ctx.getArgument("date", String.class);
         offTick(() -> {
             Optional<PlayerRef> target = services.players().findByName(targetName);
             if (target.isEmpty()) {
-                feedback.send(
-                        sender,
-                        EconomyMessageKey.ECO_ADMIN_RESTORE_TARGET_UNKNOWN,
-                        java.util.Map.of("player", targetName));
+                services.notifier()
+                        .send(
+                                actor,
+                                EconomyMessageKey.ECO_ADMIN_RESTORE_TARGET_UNKNOWN,
+                                java.util.Map.of("player", targetName));
                 return;
             }
             try {
                 boolean success = services.backupManager().restorePlayer(target.get(), date);
                 if (success) {
-                    feedback.send(
-                            sender,
-                            EconomyMessageKey.ECO_ADMIN_RESTORE_SUCCESS,
-                            java.util.Map.of("player", targetName, "date", date));
+                    services.notifier()
+                            .send(
+                                    actor,
+                                    EconomyMessageKey.ECO_ADMIN_RESTORE_SUCCESS,
+                                    java.util.Map.of("player", targetName, "date", date));
                 } else {
-                    feedback.send(sender, EconomyMessageKey.ECO_ADMIN_RESTORE_NOT_FOUND);
+                    services.notifier().send(actor, EconomyMessageKey.ECO_ADMIN_RESTORE_NOT_FOUND);
                 }
             } catch (Exception e) {
-                feedback.send(
-                        sender,
-                        EconomyMessageKey.ECO_ADMIN_RESTORE_FAILED,
-                        java.util.Map.of("error", String.valueOf(e.getMessage())));
+                services.notifier()
+                        .send(
+                                actor,
+                                EconomyMessageKey.ECO_ADMIN_RESTORE_FAILED,
+                                java.util.Map.of("error", String.valueOf(e.getMessage())));
             }
         });
         return Command.SINGLE_SUCCESS;

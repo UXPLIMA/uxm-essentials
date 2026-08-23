@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -54,7 +53,7 @@ abstract class ModerationCommandSupport {
         CommandSender sender = ctx.getSource().getSender();
         return sender instanceof Player player
                 ? new PlayerRef(player.getUniqueId(), player.getName())
-                : new PlayerRef(new UUID(0L, 0L), sender.getName());
+                : PlayerRef.system(sender.getName());
     }
 
     /** The target by name, online or known offline, or empty (after a feedback line) when never seen. */

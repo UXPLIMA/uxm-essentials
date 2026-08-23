@@ -382,7 +382,7 @@ public final class VaultCommand implements CommandRegistration {
         if (sender instanceof Player player) {
             return player;
         }
-        notifier.playersOnly(new PlayerRef(new java.util.UUID(0L, 0L), sender.getName()));
+        notifier.playersOnly(PlayerRef.system(sender.getName()));
         return null;
     }
 }

@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.List;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -58,16 +58,13 @@ public final class NightVisionCommand extends PlayerstateCommandSupport implemen
     }
 
     private int toggle(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
         }
         for (PlayerRef target : targets) {
-            services.toggleNightVision().toggleFor(ref(sender), target);
+            services.toggleNightVision().toggleFor(actor(ctx), target);
         }
         return Command.SINGLE_SUCCESS;
     }

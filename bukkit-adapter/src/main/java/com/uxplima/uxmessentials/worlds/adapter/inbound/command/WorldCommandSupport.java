@@ -37,6 +37,11 @@ abstract class WorldCommandSupport {
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
+    /** The command actor: a live player ref, or the stable system ref used by console automation. */
+    final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
+        return CommandFeedback.refOf(ctx.getSource().getSender());
+    }
+
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
     final @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();

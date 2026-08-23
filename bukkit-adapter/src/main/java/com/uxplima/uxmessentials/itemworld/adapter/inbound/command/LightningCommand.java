@@ -82,10 +82,7 @@ public final class LightningCommand extends ItemworldCommandSupport implements C
         if (!enabled(ctx)) {
             return Command.SINGLE_SUCCESS;
         }
-        Player self = player(ctx);
-        if (self == null) {
-            return Command.SINGLE_SUCCESS;
-        }
+        PlayerRef actor = actor(ctx);
         List<Player> targets = PlayerTargets.resolveAll(ctx, "player");
         if (targets.isEmpty()) {
             reply(ctx, ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", typedTarget(ctx)));
@@ -93,7 +90,7 @@ public final class LightningCommand extends ItemworldCommandSupport implements C
         }
         for (Player target : targets) {
             // A named/selected target is struck at its own position, not where the caller is looking.
-            strikeAt(ctx, self, target, false);
+            strikeAt(ctx, actor, target, false);
         }
         return Command.SINGLE_SUCCESS;
     }
@@ -104,9 +101,12 @@ public final class LightningCommand extends ItemworldCommandSupport implements C
      * the target's region thread (where the position is owned on Folia), never from the command thread.
      */
     private void strikeAt(CommandContext<CommandSourceStack> ctx, Player actor, Player at, boolean aimAtLook) {
-        PlayerRef actorRef = ref(actor);
+        strikeAt(ctx, ref(actor), at, aimAtLook);
+    }
+
+    private void strikeAt(CommandContext<CommandSourceStack> ctx, PlayerRef actorRef, Player at, boolean aimAtLook) {
         String label = at.getName();
-        boolean self = at == actor;
+        boolean self = actorRef.equals(ref(at));
         services.kernel().scheduler().onEntity(ref(at), () -> {
             Location where = aimAtLook ? lookCentre(at) : selfLocation(at);
             at.getWorld().strikeLightning(where);

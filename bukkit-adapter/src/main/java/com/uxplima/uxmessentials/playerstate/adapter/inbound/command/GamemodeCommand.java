@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -67,10 +67,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
     }
 
     private int setMode(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<GameModeRef> mode = GameModeRef.parse(ctx.getArgument("mode", String.class));
         if (mode.isEmpty()) {
             feedback.send(sender, PlayerstateMessageKey.GAMEMODE_INVALID, Map.of());
@@ -81,7 +78,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
             return 0;
         }
         for (PlayerRef target : targets) {
-            services.setGamemode().setFor(ref(sender), target, mode.get());
+            services.setGamemode().setFor(actor(ctx), target, mode.get());
         }
         return Command.SINGLE_SUCCESS;
     }

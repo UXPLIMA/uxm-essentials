@@ -131,7 +131,7 @@ public final class ModerationWiring {
 
     /** The locale dimension the shared chat prefix is resolved against — the console has no per-viewer locale. */
     private static final com.uxplima.uxmessentials.shared.domain.PlayerRef BROADCAST_PREFIX_VIEWER =
-            new com.uxplima.uxmessentials.shared.domain.PlayerRef(new java.util.UUID(0L, 0L), "console");
+            com.uxplima.uxmessentials.shared.domain.PlayerRef.system("console");
 
     private ModerationWiring() {}
 

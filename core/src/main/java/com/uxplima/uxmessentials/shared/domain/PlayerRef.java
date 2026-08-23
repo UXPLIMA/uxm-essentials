@@ -17,9 +17,22 @@ import java.util.UUID;
  */
 public record PlayerRef(UUID uuid, String name) {
 
+    /** Reserved UUID used for the server console and other non-player system actors. */
+    public static final UUID SYSTEM_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
     public PlayerRef {
         Objects.requireNonNull(uuid, "uuid");
         Objects.requireNonNull(name, "name");
+    }
+
+    /** Build a non-player actor reference suitable for attribution and console-facing notifications. */
+    public static PlayerRef system(String name) {
+        return new PlayerRef(SYSTEM_UUID, name);
+    }
+
+    /** Whether this reference identifies a non-player system actor rather than a Minecraft account. */
+    public boolean isSystem() {
+        return SYSTEM_UUID.equals(uuid);
     }
 
     /** Two refs are the same player when their UUIDs match; the name is informational only. */

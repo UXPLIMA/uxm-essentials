@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.Optional;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -126,41 +127,32 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
      * shared {@code .others} node inside {@link #resolveNamedTarget}.
      */
     private int showNamed(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<PlayerRef> target = resolveNamedTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
-        if (view != null) {
-            view.open(sender, ref(sender), target.get());
+        PlayerRef viewer = actor(ctx);
+        if (view != null && sender instanceof Player player) {
+            view.open(player, viewer, target.get());
         } else {
-            services.showPlaytime().showFor(ref(sender), target.get());
+            services.showPlaytime().showFor(viewer, target.get());
         }
         return Command.SINGLE_SUCCESS;
     }
 
     private int reset(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<PlayerRef> target = resolveNamedTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
-        services.resetPlaytime().resetFor(ref(sender), target.get());
+        services.resetPlaytime().resetFor(actor(ctx), target.get());
         return Command.SINGLE_SUCCESS;
     }
 
     private int resetAll(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.resetPlaytime().resetAll(ref(sender));
+        services.resetPlaytime().resetAll(actor(ctx));
         return Command.SINGLE_SUCCESS;
     }
 }

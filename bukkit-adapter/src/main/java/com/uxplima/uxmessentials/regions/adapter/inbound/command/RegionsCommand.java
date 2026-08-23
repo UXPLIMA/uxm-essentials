@@ -16,6 +16,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -37,6 +38,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -115,6 +117,9 @@ public final class RegionsCommand implements CommandRegistration {
                 .then(Commands.literal("create")
                         .requires(p(CREATE_PERMISSION))
                         .then(Commands.argument("id", StringArgumentType.word()).executes(this::create)))
+                .then(Commands.literal("createat")
+                        .requires(p(CREATE_PERMISSION))
+                        .then(Commands.argument("id", StringArgumentType.word()).then(createAtArguments())))
                 .then(Commands.literal("flags")
                         .requires(p(FLAGS_PERMISSION))
                         .then(Commands.argument("id", StringArgumentType.word()).executes(this::openFlags)))
@@ -125,21 +130,23 @@ public final class RegionsCommand implements CommandRegistration {
                         .requires(p(MEMBERS_PERMISSION))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .then(Commands.argument("player", StringArgumentType.word())
-                                        .executes(ctx -> add(ctx, RegionMemberChange.Role.MEMBER)))))
+                                        .executes(ctx -> add(ctx, RegionMemberChange.Role.MEMBER))
+                                        .then(worldArgument()
+                                                .executes(ctx -> add(ctx, RegionMemberChange.Role.MEMBER))))))
                 .then(Commands.literal("addowner")
                         .requires(p(MEMBERS_PERMISSION))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .then(Commands.argument("player", StringArgumentType.word())
-                                        .executes(ctx -> add(ctx, RegionMemberChange.Role.OWNER)))))
+                                        .executes(ctx -> add(ctx, RegionMemberChange.Role.OWNER))
+                                        .then(worldArgument()
+                                                .executes(ctx -> add(ctx, RegionMemberChange.Role.OWNER))))))
                 .then(Commands.literal("priority")
                         .requires(p(ADMIN_PERMISSION))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .then(Commands.argument("value", IntegerArgumentType.integer())
-                                        .executes(this::setPriority))))
-                .then(Commands.argument("world", StringArgumentType.word())
-                        .suggests(CommandSuggestions.fromStrings(() ->
-                                server.getWorlds().stream().map(World::getName).toList()))
-                        .executes(this::openNamedWorld))
+                                        .executes(this::setPriority)
+                                        .then(worldArgument().executes(this::setPriority)))))
+                .then(worldArgument().executes(this::openNamedWorld))
                 .build();
     }
 
@@ -223,25 +230,69 @@ public final class RegionsCommand implements CommandRegistration {
         }
         String id = StringArgumentType.getString(ctx, "id").toLowerCase(Locale.ROOT);
         WorldRef world = BukkitRefs.toRef(staff.getWorld());
-        scheduler.onGlobal(() -> createOnGlobal(staff, world, id, bounds.get()));
+        PlayerRef viewer = BukkitRefs.toRef(staff);
+        scheduler.onGlobal(() -> createOnGlobal(staff, viewer, world, id, bounds.get()));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String> createAtArguments() {
+        return worldArgument()
+                .then(Commands.argument("x1", DoubleArgumentType.doubleArg())
+                        .then(Commands.argument("y1", DoubleArgumentType.doubleArg())
+                                .then(Commands.argument("z1", DoubleArgumentType.doubleArg())
+                                        .then(Commands.argument("x2", DoubleArgumentType.doubleArg())
+                                                .then(Commands.argument("y2", DoubleArgumentType.doubleArg())
+                                                        .then(Commands.argument("z2", DoubleArgumentType.doubleArg())
+                                                                .executes(this::createAt)))))));
+    }
+
+    private int createAt(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!service.available()) {
+            feedback.send(sender, RegionsMessageKey.REGIONS_NO_WORLDGUARD);
+            return Command.SINGLE_SUCCESS;
+        }
+        World world = commandWorld(ctx, sender);
+        if (world == null) {
+            return 0;
+        }
+        double x1 = DoubleArgumentType.getDouble(ctx, "x1");
+        double y1 = DoubleArgumentType.getDouble(ctx, "y1");
+        double z1 = DoubleArgumentType.getDouble(ctx, "z1");
+        double x2 = DoubleArgumentType.getDouble(ctx, "x2");
+        double y2 = DoubleArgumentType.getDouble(ctx, "y2");
+        double z2 = DoubleArgumentType.getDouble(ctx, "z2");
+        if (!Double.isFinite(x1)
+                || !Double.isFinite(y1)
+                || !Double.isFinite(z1)
+                || !Double.isFinite(x2)
+                || !Double.isFinite(y2)
+                || !Double.isFinite(z2)) {
+            feedback.send(sender, SharedMessageKey.COMMAND_INVALID_POSITION);
+            return 0;
+        }
+        String id = StringArgumentType.getString(ctx, "id").toLowerCase(Locale.ROOT);
+        WorldRef worldRef = BukkitRefs.toRef(world);
+        RegionBounds bounds = RegionBounds.of(Position.of(worldRef, x1, y1, z1), Position.of(worldRef, x2, y2, z2));
+        PlayerRef viewer = CommandFeedback.refOf(sender);
+        scheduler.onGlobal(() -> createOnGlobal(sender, viewer, worldRef, id, bounds));
         return Command.SINGLE_SUCCESS;
     }
 
     /** On the global region thread: reject a duplicate id, else create the region and report the outcome. */
-    private void createOnGlobal(Player staff, WorldRef world, String id, RegionBounds bounds) {
-        PlayerRef ref = BukkitRefs.toRef(staff);
+    private void createOnGlobal(CommandSender staff, PlayerRef viewer, WorldRef world, String id, RegionBounds bounds) {
         if (service.region(world, id).isPresent()) {
             scheduler.onEntity(
-                    ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_CREATE_DUPLICATE, Map.of("id", id)));
+                    viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_CREATE_DUPLICATE, Map.of("id", id)));
             return;
         }
         try {
             service.create(world, id, bounds.min(), bounds.max());
             scheduler.onEntity(
-                    ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_CREATE_DONE, Map.of("id", id)));
+                    viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_CREATE_DONE, Map.of("id", id)));
         } catch (RegionServiceException failure) {
             scheduler.onEntity(
-                    ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_CREATE_FAILED, Map.of("id", id)));
+                    viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_CREATE_FAILED, Map.of("id", id)));
         }
     }
 
@@ -300,45 +351,55 @@ public final class RegionsCommand implements CommandRegistration {
     }
 
     private int add(CommandContext<CommandSourceStack> ctx, RegionMemberChange.Role role) {
-        Player staff = playerOrReject(ctx);
-        if (staff == null) {
-            return 0;
-        }
+        CommandSender staff = ctx.getSource().getSender();
         if (!service.available()) {
             feedback.send(staff, RegionsMessageKey.REGIONS_NO_WORLDGUARD);
             return Command.SINGLE_SUCCESS;
         }
+        World resolvedWorld = commandWorld(ctx, staff);
+        if (resolvedWorld == null) {
+            return 0;
+        }
         String id = StringArgumentType.getString(ctx, "id").toLowerCase(Locale.ROOT);
         String targetName = StringArgumentType.getString(ctx, "player");
-        WorldRef world = BukkitRefs.toRef(staff.getWorld());
+        WorldRef world = BukkitRefs.toRef(resolvedWorld);
+        PlayerRef viewer = CommandFeedback.refOf(staff);
         // Offline-safe name resolution can hit the profile cache, so it runs off the tick thread before the write.
-        scheduler.async(() -> resolveAndAdd(staff, world, id, targetName, role));
+        scheduler.async(() -> resolveAndAdd(staff, viewer, world, id, targetName, role));
         return Command.SINGLE_SUCCESS;
     }
 
     /** Off-thread: resolve the target by name; if found, apply the add on the region thread, else refuse. */
     private void resolveAndAdd(
-            Player staff, WorldRef world, String id, String targetName, RegionMemberChange.Role role) {
-        PlayerRef ref = BukkitRefs.toRef(staff);
+            CommandSender staff,
+            PlayerRef viewer,
+            WorldRef world,
+            String id,
+            String targetName,
+            RegionMemberChange.Role role) {
         Optional<PlayerRef> target = playerLookup.findByName(targetName);
         if (target.isEmpty()) {
             scheduler.onEntity(
-                    ref,
+                    viewer,
                     () -> feedback.send(
                             staff, RegionsMessageKey.REGIONS_MEMBERS_UNKNOWN_PLAYER, Map.of("name", targetName)));
             return;
         }
-        scheduler.onGlobal(() -> applyAddOnGlobal(staff, world, id, target.get(), role));
+        scheduler.onGlobal(() -> applyAddOnGlobal(staff, viewer, world, id, target.get(), role));
     }
 
     /** On the global region thread: reject an unknown region, else add the resolved player and report the outcome. */
     private void applyAddOnGlobal(
-            Player staff, WorldRef world, String id, PlayerRef target, RegionMemberChange.Role role) {
-        PlayerRef ref = BukkitRefs.toRef(staff);
+            CommandSender staff,
+            PlayerRef viewer,
+            WorldRef world,
+            String id,
+            PlayerRef target,
+            RegionMemberChange.Role role) {
         Optional<RegionRef> region = service.region(world, id);
         if (region.isEmpty()) {
             scheduler.onEntity(
-                    ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_UNKNOWN_REGION, Map.of("id", id)));
+                    viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_UNKNOWN_REGION, Map.of("id", id)));
             return;
         }
         Map<String, String> placeholders = Map.of("name", target.name(), "id", id);
@@ -347,38 +408,39 @@ public final class RegionsCommand implements CommandRegistration {
                     new RegionMemberChange(region.get(), target.uuid(), role, RegionMemberChange.Action.ADD));
         } catch (RegionServiceException failure) {
             scheduler.onEntity(
-                    ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_MEMBERS_FAILED, Map.of("id", id)));
+                    viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_MEMBERS_FAILED, Map.of("id", id)));
             return;
         }
         RegionsMessageKey done = role == RegionMemberChange.Role.OWNER
                 ? RegionsMessageKey.REGIONS_MEMBERS_ADDED_OWNER
                 : RegionsMessageKey.REGIONS_MEMBERS_ADDED_MEMBER;
-        scheduler.onEntity(ref, () -> feedback.send(staff, done, placeholders));
+        scheduler.onEntity(viewer, () -> feedback.send(staff, done, placeholders));
     }
 
     private int setPriority(CommandContext<CommandSourceStack> ctx) {
-        Player staff = playerOrReject(ctx);
-        if (staff == null) {
-            return 0;
-        }
+        CommandSender staff = ctx.getSource().getSender();
         if (!service.available()) {
             feedback.send(staff, RegionsMessageKey.REGIONS_NO_WORLDGUARD);
             return Command.SINGLE_SUCCESS;
         }
+        World resolvedWorld = commandWorld(ctx, staff);
+        if (resolvedWorld == null) {
+            return 0;
+        }
         String id = StringArgumentType.getString(ctx, "id").toLowerCase(Locale.ROOT);
         int value = IntegerArgumentType.getInteger(ctx, "value");
-        WorldRef world = BukkitRefs.toRef(staff.getWorld());
-        scheduler.onGlobal(() -> setPriorityOnGlobal(staff, world, id, value));
+        WorldRef world = BukkitRefs.toRef(resolvedWorld);
+        PlayerRef viewer = CommandFeedback.refOf(staff);
+        scheduler.onGlobal(() -> setPriorityOnGlobal(staff, viewer, world, id, value));
         return Command.SINGLE_SUCCESS;
     }
 
     /** On the global region thread: reject an unknown region, else set the priority and report the outcome. */
-    private void setPriorityOnGlobal(Player staff, WorldRef world, String id, int value) {
-        PlayerRef ref = BukkitRefs.toRef(staff);
+    private void setPriorityOnGlobal(CommandSender staff, PlayerRef viewer, WorldRef world, String id, int value) {
         Optional<RegionRef> region = service.region(world, id);
         if (region.isEmpty()) {
             scheduler.onEntity(
-                    ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_UNKNOWN_REGION, Map.of("id", id)));
+                    viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_UNKNOWN_REGION, Map.of("id", id)));
             return;
         }
         Map<String, String> placeholders = Map.of("id", id, "priority", Integer.toString(value));
@@ -386,10 +448,32 @@ public final class RegionsCommand implements CommandRegistration {
             service.setPriority(region.get(), value);
         } catch (RegionServiceException failure) {
             scheduler.onEntity(
-                    ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_PRIORITY_FAILED, Map.of("id", id)));
+                    viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_PRIORITY_FAILED, Map.of("id", id)));
             return;
         }
-        scheduler.onEntity(ref, () -> feedback.send(staff, RegionsMessageKey.REGIONS_PRIORITY_SET, placeholders));
+        scheduler.onEntity(viewer, () -> feedback.send(staff, RegionsMessageKey.REGIONS_PRIORITY_SET, placeholders));
+    }
+
+    private com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String> worldArgument() {
+        return Commands.argument("world", StringArgumentType.word()).suggests(CommandSuggestions.loadedWorlds());
+    }
+
+    /** Explicit world wins; otherwise a live player's current world supplies the context. */
+    private @Nullable World commandWorld(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
+        try {
+            String name = StringArgumentType.getString(ctx, "world");
+            World world = server.getWorld(name);
+            if (world == null) {
+                feedback.send(sender, RegionsMessageKey.REGIONS_UNKNOWN_WORLD, Map.of("world", name));
+            }
+            return world;
+        } catch (IllegalArgumentException absent) {
+            if (sender instanceof Player player) {
+                return player.getWorld();
+            }
+            feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
+            return null;
+        }
     }
 
     private @Nullable Player playerOrReject(CommandContext<CommandSourceStack> ctx) {

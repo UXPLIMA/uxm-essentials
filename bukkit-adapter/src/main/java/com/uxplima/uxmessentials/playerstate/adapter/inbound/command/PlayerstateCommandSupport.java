@@ -84,10 +84,14 @@ abstract class PlayerstateCommandSupport {
      * thread for each. A single name still resolves to a one-element list, leaving the single-target path
      * unchanged.
      */
-    final List<PlayerRef> resolveTargets(CommandContext<CommandSourceStack> ctx, Player sender) {
+    final List<PlayerRef> resolveTargets(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         Optional<PlayerSelectorArgumentResolver> resolver = selector(ctx);
         if (resolver.isEmpty()) {
-            return List.of(BukkitRefs.toRef(sender));
+            if (sender instanceof Player player) {
+                return List.of(BukkitRefs.toRef(player));
+            }
+            reply(sender, PLAYERS_ONLY, Map.of());
+            return List.of();
         }
         if (!mayTargetOthers(sender)) {
             reply(sender, NO_PERMISSION, Map.of());
@@ -111,7 +115,7 @@ abstract class PlayerstateCommandSupport {
      * chooses the breadth: one node for a full administrator, {@code uxmessentials.heal.others} alone for a medic
      * who must not also empty an inventory.
      */
-    final boolean mayTargetOthers(Player sender) {
+    final boolean mayTargetOthers(CommandSender sender) {
         return sender.hasPermission(OTHERS_PERMISSION) || sender.hasPermission(othersNode());
     }
 
@@ -124,7 +128,7 @@ abstract class PlayerstateCommandSupport {
      * {@link #resolveNamedTarget} so they never surface the {@code @a} selector on a read where a fan-out is
      * nonsensical. Empty means the rejection (no-permission or unknown-player) was already sent.
      */
-    final Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
+    final Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         return targets.isEmpty() ? Optional.empty() : Optional.of(targets.get(0));
     }
@@ -143,10 +147,14 @@ abstract class PlayerstateCommandSupport {
      * selector syntax: showing one player's stats is a single-target read where fanning out to every player is
      * nonsensical. Empty means the rejection (no-permission or unknown-player) was already sent.
      */
-    final Optional<PlayerRef> resolveNamedTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
+    final Optional<PlayerRef> resolveNamedTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         String typed = typedPlayerArg(ctx);
         if (typed.isEmpty()) {
-            return Optional.of(BukkitRefs.toRef(sender));
+            if (sender instanceof Player player) {
+                return Optional.of(BukkitRefs.toRef(player));
+            }
+            reply(sender, PLAYERS_ONLY, Map.of());
+            return Optional.empty();
         }
         if (!mayTargetOthers(sender)) {
             reply(sender, NO_PERMISSION, Map.of());
@@ -168,10 +176,14 @@ abstract class PlayerstateCommandSupport {
      * rejection. Unlike {@link #resolveTarget}, the argument is a plain word so an offline name can be typed (an
      * online-player selector resolves online names only).
      */
-    final Optional<PlayerRef> resolveStorageTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
+    final Optional<PlayerRef> resolveStorageTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         String typed = typedPlayerArg(ctx);
         if (typed.isEmpty()) {
-            return Optional.of(BukkitRefs.toRef(sender));
+            if (sender instanceof Player player) {
+                return Optional.of(BukkitRefs.toRef(player));
+            }
+            reply(sender, PLAYERS_ONLY, Map.of());
+            return Optional.empty();
         }
         if (!mayTargetOthers(sender)) {
             reply(sender, NO_PERMISSION, Map.of());
@@ -211,7 +223,7 @@ abstract class PlayerstateCommandSupport {
     }
 
     private List<PlayerRef> resolveSelector(
-            PlayerSelectorArgumentResolver resolver, CommandContext<CommandSourceStack> ctx, Player sender) {
+            PlayerSelectorArgumentResolver resolver, CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         try {
             List<Player> resolved = resolver.resolve(ctx.getSource());
             if (resolved.isEmpty()) {
@@ -246,5 +258,10 @@ abstract class PlayerstateCommandSupport {
 
     private void reply(CommandSender sender, MessageKey key, Map<String, String> placeholders) {
         feedback.send(sender, key, placeholders);
+    }
+
+    /** The live player actor, or the reserved system actor for console and command-block invocations. */
+    final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
+        return CommandFeedback.refOf(ctx.getSource().getSender());
     }
 }

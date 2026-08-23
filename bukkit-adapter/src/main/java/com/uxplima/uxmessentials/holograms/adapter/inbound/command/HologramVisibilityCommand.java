@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -99,103 +100,83 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     }
 
     private int visibility(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<Visibility.Mode> mode = parseMode(ctx.getArgument("mode", String.class));
         if (mode.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_VISIBILITY_MODE_INVALID, Map.of());
             return 0;
         }
         return switch (mode.orElseThrow()) {
-            case ALL -> setMode(ctx, sender, Visibility::toEveryone);
-            case MANUAL -> setMode(ctx, sender, Visibility::toManual);
+            case ALL -> setMode(ctx, Visibility::toEveryone);
+            case MANUAL -> setMode(ctx, Visibility::toManual);
             case PERMISSION -> permissionMode(ctx, sender);
         };
     }
 
-    private int setMode(
-            CommandContext<CommandSourceStack> ctx, Player sender, java.util.function.UnaryOperator<Visibility> mode) {
-        services.visibility().setMode(ref(sender), nameArg(ctx), mode);
+    private int setMode(CommandContext<CommandSourceStack> ctx, java.util.function.UnaryOperator<Visibility> mode) {
+        services.visibility().setMode(actor(ctx), nameArg(ctx), mode);
         return Command.SINGLE_SUCCESS;
     }
 
-    private int permissionMode(CommandContext<CommandSourceStack> ctx, Player sender) {
+    private int permissionMode(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         Optional<String> node = optionalArgument(ctx, "permission");
         if (node.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_VISIBILITY_NEEDS_NODE, Map.of());
             return 0;
         }
-        services.visibility().setMode(ref(sender), nameArg(ctx), current -> current.toPermission(node.orElseThrow()));
+        services.visibility().setMode(actor(ctx), nameArg(ctx), current -> current.toPermission(node.orElseThrow()));
         return Command.SINGLE_SUCCESS;
     }
 
     private int visibilityDistance(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
         int blocks = ctx.getArgument("blocks", Integer.class);
-        services.visibility().setDistance(ref(sender), nameArg(ctx), blocks);
+        services.visibility().setDistance(actor(ctx), nameArg(ctx), blocks);
         return Command.SINGLE_SUCCESS;
     }
 
     private int show(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;
         }
-        services.viewers().show(ref(sender), nameArg(ctx), ref(target));
+        services.viewers().show(actor(ctx), nameArg(ctx), ref(target));
         return Command.SINGLE_SUCCESS;
     }
 
     private int hide(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;
         }
-        services.viewers().hide(ref(sender), nameArg(ctx), ref(target));
+        services.viewers().hide(actor(ctx), nameArg(ctx), ref(target));
         return Command.SINGLE_SUCCESS;
     }
 
     private int blacklist(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;
         }
-        services.blacklist().blacklist(ref(sender), nameArg(ctx), ref(target));
+        services.blacklist().blacklist(actor(ctx), nameArg(ctx), ref(target));
         return Command.SINGLE_SUCCESS;
     }
 
     private int unblacklist(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;
         }
-        services.blacklist().unblacklist(ref(sender), nameArg(ctx), ref(target));
+        services.blacklist().unblacklist(actor(ctx), nameArg(ctx), ref(target));
         return Command.SINGLE_SUCCESS;
     }
 
     /** Resolve the {@code player} argument to an online player, or send the not-found reply and return null. */
     private @org.jspecify.annotations.Nullable Player onlineTarget(
-            CommandContext<CommandSourceStack> ctx, Player sender) {
+            CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         Player target = Bukkit.getPlayerExact(ctx.getArgument("player", String.class));
         if (target == null) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_PLAYER_NOT_FOUND, Map.of());

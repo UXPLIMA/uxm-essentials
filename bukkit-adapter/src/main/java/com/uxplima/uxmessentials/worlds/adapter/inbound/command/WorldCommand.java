@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -17,8 +18,10 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -28,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
@@ -121,9 +125,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                                         .suggests(CommandSuggestions.fromStrings(services::gameRuleNames))
                                         .then(Commands.argument("value", StringArgumentType.word())
                                                 .executes(this::runGamerule)))))
-                .then(Commands.literal("setspawn")
-                        .requires(p(SETSPAWN))
-                        .then(nameArg().executes(this::runSetSpawn)))
+                .then(setSpawnNode())
                 .then(Commands.literal("spawn")
                         .requires(p(SPAWN))
                         .executes(this::runSpawnCurrent)
@@ -216,11 +218,25 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         CommandSuggestions.fromStrings(() -> List.of(BuiltInGenerators.VOID, BuiltInGenerators.FLAT)));
     }
 
+    private LiteralArgumentBuilder<CommandSourceStack> setSpawnNode() {
+        return Commands.literal("setspawn")
+                .requires(p(SETSPAWN))
+                .then(nameArg()
+                        .executes(this::runSetSpawn)
+                        .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                                .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                        .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                                .executes(ctx -> runSetSpawnAt(ctx, 0f, 0f))
+                                                .then(Commands.argument("yaw", DoubleArgumentType.doubleArg())
+                                                        .then(Commands.argument("pitch", DoubleArgumentType.doubleArg())
+                                                                .executes(ctx -> runSetSpawnAt(
+                                                                        ctx,
+                                                                        floatArg(ctx, "yaw"),
+                                                                        floatArg(ctx, "pitch")))))))));
+    }
+
     private int runCreate(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -232,7 +248,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 parseGenerator(ctx),
                 true,
                 Optional.empty());
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_CREATING, Map.of("world", name.value()));
         onGlobal(() -> services.createWorld().create(who, name, spec, true));
         return Command.SINGLE_SUCCESS;
@@ -254,17 +270,14 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runImport(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("folder", String.class));
         if (name == null) {
             return 0;
         }
         WorldEnvironment env = arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL);
         Optional<GeneratorRef> gen = optionalString(ctx, "generator").map(GeneratorRef::of);
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_IMPORTING, Map.of("world", name.value()));
         onGlobal(() -> services.importWorld().importWorld(who, name, env, gen));
         return Command.SINGLE_SUCCESS;
@@ -283,39 +296,30 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runDelete(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
-        services.deleteWorld().request(ref(sender), name); // inline: validation + staging, no I/O
+        services.deleteWorld().request(actor(ctx), name); // inline: validation + staging, no I/O
         return Command.SINGLE_SUCCESS;
     }
 
     // The target of the delete-confirmation prompt's click. Kept under the root as `/worlds confirm <name>`
     // rather than a separate top-level command so the whole world surface lives behind one literal.
     private int runConfirm(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> services.deleteWorld().confirm(who, name)); // unload + off-tick file delete
         return Command.SINGLE_SUCCESS;
     }
 
     private int runList(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         var entries = services.listWorlds().all();
         if (entries.isEmpty()) {
             feedback.send(sender, WorldsMessageKey.WORLD_LIST_EMPTY, Map.of());
@@ -335,10 +339,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runInfo(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -375,17 +376,14 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runSet(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
         String property = ctx.getArgument("property", String.class);
         String value = ctx.getArgument("value", String.class);
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         if (property.equalsIgnoreCase("alias")) {
             onGlobal(() -> services.setWorldAlias().set(who, name, Optional.of(value)));
         } else {
@@ -395,17 +393,14 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runGamerule(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
         String rule = ctx.getArgument("rule", String.class);
         String value = ctx.getArgument("value", String.class);
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> services.setGamerule().set(who, name, rule, value));
         return Command.SINGLE_SUCCESS;
     }
@@ -423,6 +418,51 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         Position spawn = position(sender);
         onGlobal(() -> services.setWorldSpawn().set(who, name, spawn));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSetSpawnAt(CommandContext<CommandSourceStack> ctx, float yaw, float pitch) {
+        CommandSender sender = ctx.getSource().getSender();
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        Optional<ManagedWorld> managed = services.repository().find(name);
+        if (managed.isEmpty()) {
+            feedback.send(sender, WorldsMessageKey.WORLD_NOT_FOUND, Map.of("world", name.value()));
+            return 0;
+        }
+        Optional<java.util.UUID> uid = managed.orElseThrow().knownUid();
+        if (uid.isEmpty()) {
+            org.bukkit.World loaded = sender.getServer().getWorld(name.value());
+            if (loaded != null) {
+                uid = Optional.of(loaded.getUID());
+            }
+        }
+        double x = ctx.getArgument("x", Double.class);
+        double y = ctx.getArgument("y", Double.class);
+        double z = ctx.getArgument("z", Double.class);
+        if (uid.isEmpty()) {
+            feedback.send(sender, WorldsMessageKey.WORLD_NOT_LOADED, Map.of("world", name.value()));
+            return 0;
+        }
+        if (!Double.isFinite(x)
+                || !Double.isFinite(y)
+                || !Double.isFinite(z)
+                || !Float.isFinite(yaw)
+                || !Float.isFinite(pitch)) {
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_INVALID_POSITION);
+            return 0;
+        }
+        Position spawn = new Position(new WorldRef(uid.orElseThrow(), name.value()), x, y, z, yaw, pitch);
+        PlayerRef who = actor(ctx);
+        onGlobal(() -> services.setWorldSpawn().set(who, name, spawn));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static float floatArg(CommandContext<CommandSourceStack> ctx, String name) {
+        return (float) (double) ctx.getArgument(name, Double.class);
     }
 
     private int runSpawnCurrent(CommandContext<CommandSourceStack> ctx) {
@@ -466,10 +506,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runTpOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
             return 0;
@@ -478,7 +515,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (name == null) {
             return 0;
         }
-        PlayerRef actor = ref(sender);
+        PlayerRef actor = actor(ctx);
         PlayerRef subject = ref(target.get());
         onGlobal(() -> services.worldTeleport().forced(actor, subject, name));
         return Command.SINGLE_SUCCESS;
@@ -511,53 +548,41 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runPregen(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
         int radius = ctx.getArgument("radius", Integer.class);
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> services.pregen().start(who, name, radius));
         return Command.SINGLE_SUCCESS;
     }
 
     private int runPregenCancel(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> services.pregen().cancel(who, name));
         return Command.SINGLE_SUCCESS;
     }
 
     private int runBackup(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> services.backupWorld().backup(who, name));
         return Command.SINGLE_SUCCESS;
     }
 
     private int runBackups(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -569,7 +594,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     /** Render a world's stored backups (header + one row each, or the empty notice) to the sender. */
-    private void renderBackups(Player sender, WorldName name) {
+    private void renderBackups(CommandSender sender, WorldName name) {
         List<BackupRef> refs = services.listBackups().list(name);
         if (refs.isEmpty()) {
             feedback.send(sender, WorldsMessageKey.WORLD_BACKUP_LIST_EMPTY, Map.of("world", name.value()));
@@ -597,10 +622,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runRestore(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -609,13 +631,13 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (id == null) {
             return 0;
         }
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> services.restoreWorld().request(who, name, id));
         return Command.SINGLE_SUCCESS;
     }
 
     /** Parse a raw token into a {@link BackupId}, or {@code null} (after sending the not-found reply). */
-    private @Nullable BackupId parseBackupId(Player sender, String raw) {
+    private @Nullable BackupId parseBackupId(CommandSender sender, String raw) {
         try {
             return BackupId.of(raw);
         } catch (IllegalArgumentException invalid) {
@@ -625,15 +647,12 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runRestoreConfirm(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> services.restoreWorld().confirm(who, name));
         return Command.SINGLE_SUCCESS;
     }
@@ -646,15 +665,12 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int mutate(CommandContext<CommandSourceStack> ctx, Mutation mutation) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
         }
-        PlayerRef who = ref(sender);
+        PlayerRef who = actor(ctx);
         onGlobal(() -> mutation.run(who, name));
         return Command.SINGLE_SUCCESS;
     }

@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -49,17 +50,14 @@ final class HologramModelCommand extends HologramCommandSupport {
     }
 
     private int entity(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String raw = content(ctx).strip();
         org.bukkit.entity.EntityType type = parseEntityType(raw);
         if (type == null) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_ENTITY_INVALID, Map.of("value", raw));
             return 0;
         }
-        services.model().setEntity(ref(sender), nameArg(ctx), type.name());
+        services.model().setEntity(actor(ctx), nameArg(ctx), type.name());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -84,46 +82,37 @@ final class HologramModelCommand extends HologramCommandSupport {
     }
 
     private int item(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String raw = content(ctx);
         Material material = Material.matchMaterial(raw.strip().toUpperCase(Locale.ROOT));
         if (material == null || !material.isItem()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_ITEM_INVALID, Map.of("value", raw));
             return 0;
         }
-        services.model().setItem(ref(sender), nameArg(ctx), material.name());
+        services.model().setItem(actor(ctx), nameArg(ctx), material.name());
         return Command.SINGLE_SUCCESS;
     }
 
     private int block(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String raw = content(ctx).strip();
         if (!isValidBlockData(raw)) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_BLOCK_INVALID, Map.of("value", raw));
             return 0;
         }
-        services.model().setBlock(ref(sender), nameArg(ctx), raw);
+        services.model().setBlock(actor(ctx), nameArg(ctx), raw);
         return Command.SINGLE_SUCCESS;
     }
 
     private int head(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String raw = content(ctx).strip();
         String texture = resolveTexture(raw, sender);
         if (texture == null) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_HEAD_INVALID, Map.of("value", raw));
             return 0;
         }
-        services.model().setHead(ref(sender), nameArg(ctx), texture);
+        services.model().setHead(actor(ctx), nameArg(ctx), texture);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -133,12 +122,13 @@ final class HologramModelCommand extends HologramCommandSupport {
      * Returns {@code null} when the source is unusable (blank texture, unknown/offline player, no skin property) —
      * an offline-name Mojang lookup is a network call and is intentionally not done here.
      */
-    private static @org.jspecify.annotations.Nullable String resolveTexture(String raw, Player sender) {
+    private static @org.jspecify.annotations.Nullable String resolveTexture(String raw, CommandSender sender) {
         if (raw.toLowerCase(Locale.ROOT).startsWith("texture:")) {
             String base64 = raw.substring("texture:".length()).strip();
             return base64.isBlank() ? null : base64;
         }
-        Player target = raw.equalsIgnoreCase("self") ? sender : Bukkit.getPlayerExact(raw);
+        Player target =
+                raw.equalsIgnoreCase("self") && sender instanceof Player player ? player : Bukkit.getPlayerExact(raw);
         return target == null ? null : textureOf(target);
     }
 

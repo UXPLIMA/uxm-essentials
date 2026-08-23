@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 import java.util.List;
 import java.util.Optional;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -75,27 +76,26 @@ public final class BalanceCommand extends EconomyCommandSupport implements Comma
     }
 
     private int runOther(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         if (!sender.hasPermission(OTHERS_PERMISSION)) {
             return runOwn(ctx);
         }
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
-            return unknownCurrency(sender);
+            rejectUnknownCurrency(actor(ctx));
+            return Command.SINGLE_SUCCESS;
         }
-        if (!currencyPermitted(sender, currency.get())) {
+        if (sender instanceof Player player && !currencyPermitted(player, currency.get())) {
             return Command.SINGLE_SUCCESS;
         }
         String targetName = ctx.getArgument("player", String.class);
-        offTick(() -> resolveAndShow(ref(sender), targetName, currency.get()));
+        PlayerRef viewer = actor(ctx);
+        offTick(() -> resolveAndShow(viewer, targetName, currency.get()));
         return Command.SINGLE_SUCCESS;
     }
 
     private void resolveAndShow(PlayerRef viewer, String targetName, Currency currency) {
-        Optional<PlayerRef> target = services.players().findOnlineByName(targetName);
+        Optional<PlayerRef> target = services.players().findByName(targetName);
         if (target.isEmpty()) {
             rejectUnknownTarget(viewer, targetName);
             return;

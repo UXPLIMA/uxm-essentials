@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import org.bukkit.World;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 
@@ -14,6 +15,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -27,7 +29,9 @@ import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -64,6 +68,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
      */
     private static final Map<String, String> CAPABILITIES = Map.ofEntries(
             Map.entry("create", CREATE),
+            Map.entry("createat", CREATE),
             Map.entry("copy", CREATE),
             Map.entry("delete", DELETE),
             Map.entry("list", VIEW),
@@ -120,6 +125,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                                 .executes(this::create)
                                 .then(Commands.argument("type", StringArgumentType.word())
                                         .executes(this::createTyped))),
+                createAtNode(),
                 name("delete", this::delete),
                 Commands.literal("list")
                         .executes(this::list)
@@ -177,9 +183,9 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
      * node is checked through the live sender's permissions, the same gate the {@code /uxmess gui} hub entry uses.
      */
     private int openGui(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
+        if (!(ctx.getSource().getSender() instanceof Player sender)) {
+            feedback.send(ctx.getSource().getSender(), NpcMessageKey.NPC_HELP, java.util.Map.of());
+            return Command.SINGLE_SUCCESS;
         }
         if (sender.hasPermission(GUI_PERMISSION)) {
             listView.open(sender, ref(sender));
@@ -216,29 +222,17 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     }
 
     private int delete(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.delete().delete(ref(sender), nameArg(ctx));
+        services.delete().delete(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.list().list(ref(sender));
+        services.list().list(actor(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int listFiltered(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.list().list(ref(sender), ctx.getArgument("type", String.class));
+        services.list().list(actor(ctx), ctx.getArgument("type", String.class));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -266,11 +260,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     }
 
     private int info(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.info().describe(ref(sender), nameArg(ctx));
+        services.info().describe(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -294,38 +284,105 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     }
 
     private int center(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.center().center(ref(sender), nameArg(ctx));
+        services.center().center(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int fix(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.fix().fix(ref(sender), nameArg(ctx));
+        services.fix().fix(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int command(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.command().setCommand(ref(sender), nameArg(ctx), value(ctx));
+        services.command().setCommand(actor(ctx), nameArg(ctx), value(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
     private int lookAtPlayer(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
+        services.look().setLookAtPlayer(actor(ctx), nameArg(ctx), ctx.getArgument("value", Boolean.class));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Explicit-location create form for console/build automation. */
+    private LiteralArgumentBuilder<CommandSourceStack> createAtNode() {
+        return Commands.literal("createat")
+                .executes(ctx -> usage(
+                        ctx,
+                        "npc createat",
+                        "<name> <world> <x> <y> <z> [yaw pitch [type]]",
+                        "Create an NPC at an explicit location"))
+                .then(Commands.argument("name", StringArgumentType.string())
+                        .then(Commands.argument("world", StringArgumentType.word())
+                                .suggests(
+                                        com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions
+                                                .loadedWorlds())
+                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                                        .executes(ctx -> createAt(ctx, 0f, 0f, null))
+                                                        .then(Commands.argument("yaw", DoubleArgumentType.doubleArg())
+                                                                .then(Commands.argument(
+                                                                                "pitch", DoubleArgumentType.doubleArg())
+                                                                        .executes(ctx -> createAt(
+                                                                                ctx,
+                                                                                floatArg(ctx, "yaw"),
+                                                                                floatArg(ctx, "pitch"),
+                                                                                null))
+                                                                        .then(Commands.argument(
+                                                                                        "type",
+                                                                                        StringArgumentType.word())
+                                                                                .executes(ctx -> createAt(
+                                                                                        ctx,
+                                                                                        floatArg(ctx, "yaw"),
+                                                                                        floatArg(ctx, "pitch"),
+                                                                                        ctx.getArgument(
+                                                                                                "type",
+                                                                                                String.class)))))))))));
+    }
+
+    private int createAt(
+            CommandContext<CommandSourceStack> ctx,
+            float yaw,
+            float pitch,
+            @org.jspecify.annotations.Nullable String typeWord) {
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        World world = sender.getServer().getWorld(ctx.getArgument("world", String.class));
+        double x = ctx.getArgument("x", Double.class);
+        double y = ctx.getArgument("y", Double.class);
+        double z = ctx.getArgument("z", Double.class);
+        if (world == null) {
+            feedback.send(
+                    sender,
+                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
+                    Map.of("world", ctx.getArgument("world", String.class)));
             return 0;
         }
-        services.look().setLookAtPlayer(ref(sender), nameArg(ctx), ctx.getArgument("value", Boolean.class));
+        if (!Double.isFinite(x)
+                || !Double.isFinite(y)
+                || !Double.isFinite(z)
+                || !Float.isFinite(yaw)
+                || !Float.isFinite(pitch)) {
+            feedback.send(sender, NpcMessageKey.NPC_INVALID_COORDS, Map.of("coords", explicitCoords(ctx)));
+            return 0;
+        }
+        EntityType type = typeWord == null ? null : parseRenderableType(typeWord);
+        if (typeWord != null && type == null) {
+            feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, Map.of("type", typeWord));
+            return 0;
+        }
+        NpcSkin skin =
+                sender instanceof Player player ? BukkitNpcSkins.of(player).orElse(null) : null;
+        Position at = new Position(BukkitRefs.toRef(world), x, y, z, yaw, pitch);
+        services.create().create(actor(ctx), nameArg(ctx), at, skin, type == null ? null : type.name());
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static float floatArg(CommandContext<CommandSourceStack> ctx, String name) {
+        return (float) (double) ctx.getArgument(name, Double.class);
+    }
+
+    private static String explicitCoords(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getArgument("world", String.class) + " " + ctx.getArgument("x", Double.class) + " "
+                + ctx.getArgument("y", Double.class) + " " + ctx.getArgument("z", Double.class);
     }
 }

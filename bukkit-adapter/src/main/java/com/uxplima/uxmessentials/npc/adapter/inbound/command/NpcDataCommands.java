@@ -8,7 +8,6 @@ import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.DyeColor;
 import org.bukkit.entity.Horse;
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -199,40 +198,30 @@ final class NpcDataCommands extends NpcCommandSupport {
     }
 
     private int dataSet(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
         String value = value(ctx);
         if (!NpcTypeData.isKnownKey(key) || !NpcTypeData.isValidValue(key, value)) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_DATA, Map.of("key", key, "value", value));
             return 0;
         }
-        services.setData().set(ref(sender), nameArg(ctx), key, value);
+        services.setData().set(actor(ctx), nameArg(ctx), key, value);
         return Command.SINGLE_SUCCESS;
     }
 
     private int dataClear(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
         if (!NpcTypeData.isKnownKey(key)) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_DATA, Map.of("key", key, "value", ""));
             return 0;
         }
-        services.setData().set(ref(sender), nameArg(ctx), key, null);
+        services.setData().set(actor(ctx), nameArg(ctx), key, null);
         return Command.SINGLE_SUCCESS;
     }
 
     private int dataList(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listData().list(ref(sender), nameArg(ctx));
+        services.listData().list(actor(ctx), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 

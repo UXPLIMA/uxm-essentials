@@ -9,6 +9,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -553,10 +554,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
 
     /** First {@code purge}/{@code delete} invocation: warn the operator and require the {@code confirm} step (invariant 5). */
     private int runAdminPurgePrompt(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         long id = ctx.getArgument("id", Long.class);
         feedback.send(sender, PlayerwarpsMessageKey.PWARP_ADMIN_PURGE_CONFIRM, Map.of("id", Long.toString(id)));
         return Command.SINGLE_SUCCESS;
@@ -568,13 +566,10 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     }
 
     private int runAdminSetOwner(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         long id = ctx.getArgument("id", Long.class);
         String playerName = ctx.getArgument("player", String.class);
-        PlayerRef admin = ref(sender);
+        PlayerRef admin = actor(ctx);
         services.scheduler().async(() -> {
             Optional<PlayerRef> newOwner = services.players().findByName(playerName);
             if (newOwner.isEmpty()) {
@@ -598,10 +593,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
      * so point the operator there rather than reimplementing a hot-reload the services holder cannot reach.
      */
     private int runAdminReload(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         feedback.send(sender, PlayerwarpsMessageKey.PWARP_ADMIN_RELOAD_HINT, Map.of());
         return Command.SINGLE_SUCCESS;
     }
@@ -614,12 +606,9 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
             CommandContext<CommandSourceStack> ctx,
             Function<PlayerWarpId, Result<Unit, PlayerWarpError>> action,
             PlayerwarpsMessageKey okKey) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         long id = ctx.getArgument("id", Long.class);
-        PlayerRef admin = ref(sender);
+        PlayerRef admin = actor(ctx);
         Map<String, String> placeholders = Map.of("id", Long.toString(id));
         services.scheduler().async(() -> {
             Result<Unit, PlayerWarpError> result = action.apply(PlayerWarpId.of(id));
@@ -696,11 +685,8 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     }
 
     private int runListOther(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        PlayerRef viewer = ref(sender);
+        CommandSender sender = ctx.getSource().getSender();
+        PlayerRef viewer = actor(ctx);
         String ownerName = ctx.getArgument("player", String.class);
         services.scheduler().async(() -> {
             Optional<PlayerRef> owner = services.players().findByName(ownerName);

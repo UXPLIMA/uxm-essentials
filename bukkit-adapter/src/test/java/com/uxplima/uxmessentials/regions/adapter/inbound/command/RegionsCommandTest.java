@@ -183,6 +183,24 @@ class RegionsCommandTest {
     }
 
     @Test
+    void consoleCanCreateARegionFromExplicitWorldAndCorners() {
+        FakeRegionService service = new FakeRegionService(true);
+        RegionsCommand command = command(service);
+        server.addSimpleWorld("world");
+
+        dispatch(
+                command,
+                CommandSourceStackMock.from(server.getConsoleSender()),
+                "regions createat arena world 20 70 30 10 64 10");
+
+        FakeRegionService.Created created = Objects.requireNonNull(service.lastCreate());
+        assertThat(created.id()).isEqualTo("arena");
+        assertThat(created.world().name()).isEqualTo("world");
+        assertThat(blockCoords(created.min())).containsExactly(10, 64, 10);
+        assertThat(blockCoords(created.max())).containsExactly(20, 70, 30);
+    }
+
+    @Test
     void createWithoutASelectionIsRejected() {
         FakeRegionService service = new FakeRegionService(true);
         RegionsCommand command = command(service);

@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -67,10 +69,7 @@ public final class FlyCommand extends PlayerstateCommandSupport implements Comma
     }
 
     private int toggle(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         List<PlayerRef> targets = resolveTargets(ctx, sender);
         if (targets.isEmpty()) {
             return 0;
@@ -78,17 +77,17 @@ public final class FlyCommand extends PlayerstateCommandSupport implements Comma
         for (PlayerRef target : targets) {
             // The no-fly-world refusal is per target: a player standing in a forbidden world is skipped (and
             // told why) while the rest of an @a fan-out still toggle.
-            Player live = sender.getServer().getPlayer(target.uuid());
+            Player live = Bukkit.getPlayer(target.uuid());
             if (live != null && refusedByNoFlyWorld(sender, live)) {
                 continue;
             }
-            services.toggleFly().toggleFor(ref(sender), target);
+            services.toggleFly().toggleFor(actor(ctx), target);
         }
         return Command.SINGLE_SUCCESS;
     }
 
     /** True when the toggle would grant plugin flight in a no-fly world for a player without the bypass. */
-    private boolean refusedByNoFlyWorld(Player sender, Player target) {
+    private boolean refusedByNoFlyWorld(CommandSender sender, Player target) {
         if (noFlyWorlds.isEmpty()
                 || target.getAllowFlight()
                 || target.hasPermission(NoFlyWorldListener.BYPASS_NODE)

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -82,10 +83,7 @@ public final class GlowCommand extends PlayerstateCommandSupport implements Comm
     }
 
     private int colour(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = ctx.getSource().getSender();
         String typed = StringArgumentType.getString(ctx, "color");
         Optional<GlowColor> colour = GlowColor.fromId(typed);
         if (colour.isEmpty()) {
@@ -101,7 +99,7 @@ public final class GlowCommand extends PlayerstateCommandSupport implements Comm
             return 0;
         }
         for (PlayerRef target : targets) {
-            services.toggleGlow().colourFor(ref(sender), target, colour.get());
+            services.toggleGlow().colourFor(actor(ctx), target, colour.get());
         }
         return Command.SINGLE_SUCCESS;
     }
