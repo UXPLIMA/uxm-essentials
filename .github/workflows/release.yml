@@ -45,7 +45,8 @@ jobs:
       - name: Check out uxmLib
         uses: actions/checkout@v4
         with:
-          repository: UXPLIMA/uxmLib
+          repository: UXPLIMA/uxm-lib
+          ref: 0.4.0
           path: uxmLib
 
       - name: Set up JDK 25
