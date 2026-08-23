@@ -44,7 +44,7 @@ public final class PinKeypadCloseListener implements Listener {
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (menus.menuIdOf(event.getInventory())
-                .filter(PinKeypadView.SPEC_ID::equals)
+                .filter(PinKeypadView::isKeypadSpec)
                 .isEmpty()) {
             return;
         }

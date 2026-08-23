@@ -160,6 +160,7 @@ public final class SecurityWiring {
         // command uses, so a PIN made here obeys the same length and blocked-list rules.
         PinEnrolmentController enrolment = new PinEnrolmentController(
                 setPin,
+                twoFactor.pinPolicy(),
                 enrolmentSessions,
                 sessions,
                 keypad,

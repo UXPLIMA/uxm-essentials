@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.application.PinSetResult;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.security.application.SetPin;
+import com.uxplima.uxmessentials.security.domain.PinPolicy;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -39,6 +40,7 @@ import org.jspecify.annotations.NullMarked;
 public final class PinEnrolmentController implements KeypadActions {
 
     private final SetPin setPin;
+    private final PinPolicy pinPolicy;
     private final PinEnrolmentSessions sessions;
     private final VerificationSessions freezes;
     private final PinKeypadView keypad;
@@ -50,6 +52,7 @@ public final class PinEnrolmentController implements KeypadActions {
 
     public PinEnrolmentController(
             SetPin setPin,
+            PinPolicy pinPolicy,
             PinEnrolmentSessions sessions,
             VerificationSessions freezes,
             PinKeypadView keypad,
@@ -59,6 +62,7 @@ public final class PinEnrolmentController implements KeypadActions {
             Messages messages,
             MessageSink sink) {
         this.setPin = Objects.requireNonNull(setPin, "setPin");
+        this.pinPolicy = Objects.requireNonNull(pinPolicy, "pinPolicy");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.freezes = Objects.requireNonNull(freezes, "freezes");
         this.keypad = Objects.requireNonNull(keypad, "keypad");
@@ -107,7 +111,7 @@ public final class PinEnrolmentController implements KeypadActions {
     private void takeFirst(Player player, PlayerRef viewer, String candidate) {
         MessageKey refusal = refusalFor(candidate);
         if (refusal != null) {
-            notify(viewer, refusal);
+            notifyRefusal(viewer, refusal);
             restart(player, viewer);
             return;
         }
@@ -132,7 +136,7 @@ public final class PinEnrolmentController implements KeypadActions {
 
     private void applyResult(Player player, PlayerRef viewer, PinSetResult result) {
         if (result != PinSetResult.SET && result != PinSetResult.ALREADY_SET) {
-            notify(viewer, refusalKey(result));
+            notifyRefusal(viewer, refusalKey(result));
             restart(player, viewer);
             return;
         }
@@ -170,5 +174,18 @@ public final class PinEnrolmentController implements KeypadActions {
 
     private void notify(PlayerRef viewer, MessageKey key) {
         sink.deliver(viewer, messages.resolve(viewer, key, Map.of()));
+    }
+
+    /** Resolve policy refusals with the bounds their catalog entries promise to render. */
+    private void notifyRefusal(PlayerRef viewer, MessageKey key) {
+        Map<String, String> placeholders;
+        if (key == SecurityMessageKey.SECURITY_PIN_TOO_SHORT) {
+            placeholders = Map.of("min", Integer.toString(pinPolicy.minLength()));
+        } else if (key == SecurityMessageKey.SECURITY_PIN_TOO_LONG) {
+            placeholders = Map.of("max", Integer.toString(pinPolicy.maxLength()));
+        } else {
+            placeholders = Map.of();
+        }
+        sink.deliver(viewer, messages.resolve(viewer, key, placeholders));
     }
 }

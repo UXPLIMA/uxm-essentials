@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
@@ -50,6 +52,8 @@ import org.junit.jupiter.api.TestFactory;
  */
 class MessageKeyLocaleParityDriftTest {
 
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-zA-Z_][a-zA-Z0-9_-]*)}");
+
     /** Each owning module's key enum and the prefixes it is allowed to declare (docs/13-i18n §6). */
     private static final Map<MessageKey[], List<String>> OWNERSHIP = ownershipTable();
 
@@ -83,6 +87,47 @@ class MessageKeyLocaleParityDriftTest {
                     .as("catalog key '%s' must be lower kebab-case, dot-separated", key)
                     .matches("[a-z0-9]+(?:[.-][a-z0-9]+)*");
         }
+    }
+
+    @TestFactory
+    Iterable<DynamicTest> remainingAttemptsIsAPlaceholderRatherThanAnUnknownMiniMessageTag() {
+        return CatalogKeys.shippedLanguages().stream()
+                .map(language -> DynamicTest.dynamicTest("messages_" + language + ".conf remaining", () -> {
+                    String value = CatalogKeys.value(language, "security.verify.failed-subtitle");
+                    assertThat(value).contains("{remaining}").doesNotContain("<remaining>");
+                }))
+                .collect(Collectors.toList());
+    }
+
+    @TestFactory
+    Iterable<DynamicTest> translationsPreserveEveryRuntimePlaceholder() {
+        Map<String, Set<String>> english = placeholderSignature("en");
+        return CatalogKeys.shippedLanguages().stream()
+                .filter(language -> !language.equals("en"))
+                .map(language -> DynamicTest.dynamicTest(
+                        "messages_" + language + ".conf placeholders",
+                        () -> assertThat(placeholderSignature(language))
+                                .as("translations must neither drop nor invent runtime placeholders")
+                                .isEqualTo(english)))
+                .collect(Collectors.toList());
+    }
+
+    private static Map<String, Set<String>> placeholderSignature(String language) {
+        return CatalogKeys.values(language).entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> placeholdersIn(entry.getValue()),
+                        (left, right) -> left,
+                        java.util.LinkedHashMap::new));
+    }
+
+    private static Set<String> placeholdersIn(String value) {
+        Matcher matcher = PLACEHOLDER.matcher(value);
+        Set<String> found = new java.util.LinkedHashSet<>();
+        while (matcher.find()) {
+            found.add(matcher.group(1));
+        }
+        return found;
     }
 
     @TestFactory

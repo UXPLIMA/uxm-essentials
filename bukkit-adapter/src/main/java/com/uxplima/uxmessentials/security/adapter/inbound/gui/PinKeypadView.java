@@ -51,6 +51,11 @@ public final class PinKeypadView {
     /** The engine spec id of the create-a-PIN pad: the same buttons, its own title and no authenticator handoff. */
     public static final String CREATE_SPEC_ID = "pin-create";
 
+    /** Whether {@code specId} belongs to either security keypad surface. */
+    public static boolean isKeypadSpec(String specId) {
+        return SPEC_ID.equals(specId) || CREATE_SPEC_ID.equals(specId);
+    }
+
     private static final String SPEC_RESOURCE = "modules/security/gui/pin-keypad.conf";
 
     private static final String CREATE_SPEC_RESOURCE = "modules/security/gui/pin-create.conf";

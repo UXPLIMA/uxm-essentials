@@ -49,6 +49,7 @@ import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
+import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.security.application.SetPin;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
@@ -127,6 +128,7 @@ class JoinVerificationTest {
     private AttemptLimiter limiter;
     private ReauthState reauthState;
     private RecordingSink sink;
+    private RecordingMessages messages;
     private VerificationFeedback feedback;
     private PinEnrolmentSessions enrolmentSessions;
     private PinEnrolmentController enrolment;
@@ -154,7 +156,7 @@ class JoinVerificationTest {
         reauthState = new ReauthState();
         sink = new RecordingSink();
         Scheduler scheduler = new InlineScheduler();
-        Messages messages = new KeyMessages();
+        messages = new RecordingMessages();
         // The keypad renders through the real menu engine here, so a keypad click routes through the engine to the
         // registered security:pin-* actions exactly as it does in production: the click/drag cancel that locks the
         // window is the engine's, and the digit/submit buttons are its actions.
@@ -172,6 +174,7 @@ class JoinVerificationTest {
         permissions = new HeldPermissions();
         enrolment = new PinEnrolmentController(
                 new SetPin(repository, new PinPolicy(4, 8)),
+                new PinPolicy(4, 8),
                 enrolmentSessions,
                 sessions,
                 keypad,
@@ -316,6 +319,23 @@ class JoinVerificationTest {
 
         assertThat(sessions.isPending(player.getUniqueId())).isTrue(); // still frozen
         assertThat(opens.count).isEqualTo(2); // and the keypad was reopened
+    }
+
+    @SuppressWarnings("removal")
+    @Test
+    void escapingTheRequiredPinCreationPadReopensIt() {
+        OpenCounter opens = new OpenCounter();
+        server.getPluginManager().registerEvents(opens, plugin);
+        permissions.grant(VerificationController.PIN_REQUIRED_PERMISSION);
+        PlayerMock player = addPlayer();
+        controller.onJoin(player);
+        assertThat(opens.count).isEqualTo(1);
+
+        player.closeInventory();
+
+        assertThat(sessions.isPending(player.getUniqueId())).isTrue();
+        assertThat(enrolmentSessions.isPending(player.getUniqueId())).isTrue();
+        assertThat(opens.count).isEqualTo(2);
     }
 
     // The counterpart: once a deliberate close is flagged (the TOTP handoff, a verify success, a lockout, a stop), the
@@ -696,6 +716,21 @@ class JoinVerificationTest {
         assertThat(repository.find(player.getUniqueId())).isEmpty();
     }
 
+    @Test
+    void pinPolicyRefusalsRenderTheirConfiguredBounds() {
+        permissions.grant(VerificationController.PIN_REQUIRED_PERMISSION);
+        PlayerMock player = addPlayer();
+        controller.onJoin(player);
+
+        enrolment.submit(player, ref(player), "123");
+        enrolment.submit(player, ref(player), "123456789");
+
+        assertThat(messages.placeholdersFor(SecurityMessageKey.SECURITY_PIN_TOO_SHORT))
+                .containsEntry("min", "4");
+        assertThat(messages.placeholdersFor(SecurityMessageKey.SECURITY_PIN_TOO_LONG))
+                .containsEntry("max", "8");
+    }
+
     // C-18: a network that verifies on a lobby and plays elsewhere gets what it is for — the transfer happens only
     // after the proof, so nothing unverified ever lands on the server worth reaching.
     @Test
@@ -932,6 +967,7 @@ class JoinVerificationTest {
     private PinEnrolmentController blockedEnrolment() {
         return new PinEnrolmentController(
                 new SetPin(repository, new PinPolicy(4, 8, Set.of("1234"))),
+                new PinPolicy(4, 8, Set.of("1234")),
                 enrolmentSessions,
                 sessions,
                 keypad,
@@ -1192,7 +1228,7 @@ class JoinVerificationTest {
         @SuppressWarnings("UnusedMethod")
         @EventHandler
         public void onOpen(MenuOpenEvent event) {
-            if (event.getMenuId().equals(PinKeypadView.SPEC_ID)) {
+            if (PinKeypadView.isKeypadSpec(event.getMenuId())) {
                 count++;
             }
         }
@@ -1308,6 +1344,21 @@ class JoinVerificationTest {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             return key.key();
+        }
+    }
+
+    /** Resolves to key ids while retaining the latest placeholder map supplied for each message. */
+    private static final class RecordingMessages implements Messages {
+        private final Map<String, Map<String, String>> placeholders = new HashMap<>();
+
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> values) {
+            placeholders.put(key.key(), Map.copyOf(values));
+            return key.key();
+        }
+
+        Map<String, String> placeholdersFor(MessageKey key) {
+            return placeholders.getOrDefault(key.key(), Map.of());
         }
     }
 

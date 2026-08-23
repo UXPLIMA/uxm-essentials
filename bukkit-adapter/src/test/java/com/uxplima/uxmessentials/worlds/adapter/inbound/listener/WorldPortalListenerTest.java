@@ -95,6 +95,31 @@ class WorldPortalListenerTest {
     }
 
     @Test
+    void cancelsNetherPortalWhenTheServerDisablesNether() {
+        server.setAllowNether(false);
+        repository.save(linked(OVERWORLD, WorldSpec.normal(), WorldProperties.PORTAL_NETHER_LINK, "thenether"));
+        repository.save(world(NETHER, netherSpec()));
+        server.addSimpleWorld("thenether");
+        PlayerMock player = server.addPlayer("NoNether");
+        PlayerPortalEvent event = portal(player, new Location(overworld, 80, 64, -16), TeleportCause.NETHER_PORTAL);
+
+        listener().onPortal(event);
+
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    void cancelsEndPortalWhenTheServerDisablesEnd() {
+        server.setAllowEnd(false);
+        PlayerMock player = server.addPlayer("NoEnd");
+        PlayerPortalEvent event = portal(player, new Location(overworld, 0, 64, 0), TeleportCause.END_PORTAL);
+
+        listener().onPortal(event);
+
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
     void leavesPortalUntouchedAndWarnsOnceWhenLinkedTargetIsNotLoaded() {
         repository.save(linked(OVERWORLD, WorldSpec.normal(), WorldProperties.PORTAL_NETHER_LINK, "thenether"));
         repository.save(world(NETHER, netherSpec()));

@@ -6,8 +6,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.spongepowered.configurate.ConfigurateException;
@@ -43,7 +46,12 @@ final class CatalogKeys {
 
     /** The catalog key set for {@code language}, excluding the {@code prefix} tag. Never null. */
     static Set<String> read(String language) {
-        Set<String> keys = new LinkedHashSet<>();
+        return new LinkedHashSet<>(values(language).keySet());
+    }
+
+    /** All player-facing catalog entries for {@code language}, preserving their file order. */
+    static Map<String, String> values(String language) {
+        Map<String, String> values = new LinkedHashMap<>();
         try (InputStream in = CatalogKeys.class.getClassLoader().getResourceAsStream(resource(language))) {
             if (in == null) {
                 throw new IllegalStateException("missing catalog: " + resource(language));
@@ -52,13 +60,26 @@ final class CatalogKeys {
             for (Object key : root.childrenMap().keySet()) {
                 String name = String.valueOf(key);
                 if (!PREFIX_KEY.equals(name) && !name.startsWith(META_PREFIX)) {
-                    keys.add(name);
+                    values.put(name, Objects.requireNonNull(root.node(key).getString(), "non-string key " + name));
                 }
             }
         } catch (IOException failure) {
             throw new UncheckedIOException("failed to read catalog " + resource(language), failure);
         }
-        return keys;
+        return values;
+    }
+
+    /** The raw catalog value for one key, before MiniMessage and runtime placeholder resolution. */
+    static String value(String language, String key) {
+        try (InputStream in = CatalogKeys.class.getClassLoader().getResourceAsStream(resource(language))) {
+            if (in == null) {
+                throw new IllegalStateException("missing catalog: " + resource(language));
+            }
+            return Objects.requireNonNull(
+                    load(in).node(key).getString(), "missing catalog key " + key + " in " + resource(language));
+        } catch (IOException failure) {
+            throw new UncheckedIOException("failed to read catalog " + resource(language), failure);
+        }
     }
 
     /** The language codes of every shipped locale catalog beyond {@code en}, in sorted order. */

@@ -22,8 +22,10 @@ import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Redirects nether and end portals to the destination configured by the source world's per-kind link, leaving
- * every other teleport cause — and every world without a link — to vanilla. The {@link ResolvePortalDestination}
+ * Redirects permitted nether and end portals to the destination configured by the source world's per-kind link,
+ * leaving every other teleport cause — and every world without a link — to vanilla. A disabled server dimension is
+ * cancelled before link resolution, so a managed link can never bypass Bukkit's allow-nether / allow-end policy. The
+ * {@link ResolvePortalDestination}
  * use case owns the link lookup and coordinate scaling; this adapter only translates the live Bukkit
  * {@link PlayerPortalEvent} into and out of that decision. When the linked world is unloaded or missing the
  * portal is left to vanilla and a single warning is logged per offending target name.
@@ -44,12 +46,24 @@ public final class WorldPortalListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPortal(PlayerPortalEvent event) {
+        if (!dimensionAllowed(event.getCause())) {
+            event.setCancelled(true);
+            return;
+        }
         Location relocated = destinationFor(event.getCause(), event.getFrom()).orElse(null);
         if (relocated == null) {
             return;
         }
         event.setTo(relocated);
         event.setCanCreatePortal(true);
+    }
+
+    private boolean dimensionAllowed(PlayerTeleportEvent.TeleportCause cause) {
+        return switch (cause) {
+            case NETHER_PORTAL -> server.getAllowNether();
+            case END_PORTAL -> server.getAllowEnd();
+            default -> true;
+        };
     }
 
     /**
