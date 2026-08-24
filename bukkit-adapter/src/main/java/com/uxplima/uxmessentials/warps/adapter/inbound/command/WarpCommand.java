@@ -17,6 +17,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -90,7 +91,8 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                 .then(Commands.literal("create")
                         .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
                         .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::runSet)))
+                                .executes(this::runSet)
+                                .then(Commands.literal("at").then(explicitPositionArguments(this::runSetAt)))))
                 .then(explicitPositionNode("createat", SET_PERMISSION, this::runSetAt))
                 // Hidden alias of `create` so existing `/warp set <name>` muscle-memory and docs keep working.
                 .then(Commands.literal("set")
@@ -105,7 +107,9 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                         .then(warpNameArgument().executes(this::runInfo)))
                 .then(Commands.literal("move")
                         .requires(src -> src.getSender().hasPermission(MOVE_PERMISSION))
-                        .then(warpNameArgument().executes(this::runMove)))
+                        .then(warpNameArgument()
+                                .executes(this::runMove)
+                                .then(Commands.literal("at").then(explicitPositionArguments(this::runMoveAt)))))
                 .then(explicitPositionNode("moveat", MOVE_PERMISSION, this::runMoveAt))
                 .then(Commands.literal("lock")
                         .requires(src -> src.getSender().hasPermission(LOCK_PERMISSION))
@@ -384,13 +388,17 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
             String literal, String permission, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("world", StringArgumentType.word())
-                                .suggests(CommandSuggestions.loadedWorlds())
-                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
-                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
-                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
-                                                        .executes(action))))));
+                .then(Commands.argument("name", StringArgumentType.word()).then(explicitPositionArguments(action)));
+    }
+
+    private RequiredArgumentBuilder<CommandSourceStack, String> explicitPositionArguments(
+            Command<CommandSourceStack> action) {
+        return Commands.argument("world", StringArgumentType.word())
+                .suggests(CommandSuggestions.loadedWorlds())
+                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                        .executes(action))));
     }
 
     private int runSetAt(CommandContext<CommandSourceStack> ctx) {

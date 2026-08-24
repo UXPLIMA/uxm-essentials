@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -18,6 +19,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthResult;
+import com.uxplima.uxmessentials.shared.application.health.RepairResult;
+import com.uxplima.uxmessentials.shared.application.health.RepairableHealthCheck;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -48,6 +51,8 @@ class DoctorCommandSurfaceTest {
                 .as("/uxmess doctor must be a child literal of the root")
                 .isNotNull();
         assertThat(doctor.getName()).isEqualTo("doctor");
+        assertThat(doctor.getChild("repair")).isNotNull();
+        assertThat(doctor.getChild("repair").getChild("confirm")).isNotNull();
     }
 
     @Test
@@ -77,6 +82,37 @@ class DoctorCommandSurfaceTest {
         int result = command.build().getChild("doctor").getCommand().run(contextFor(source));
 
         assertThat(result).isEqualTo(com.mojang.brigadier.Command.SINGLE_SUCCESS);
+    }
+
+    @Test
+    void repairPreviewMutatesNothingAndConfirmRunsTheIdempotentRepair() throws Exception {
+        AtomicInteger repairs = new AtomicInteger();
+        RepairableHealthCheck repairable = new RepairableHealthCheck() {
+            @Override
+            public String name() {
+                return "data-integrity";
+            }
+
+            @Override
+            public HealthResult check() {
+                return HealthResult.warn("orphanRows=1");
+            }
+
+            @Override
+            public RepairResult repair() {
+                repairs.incrementAndGet();
+                return RepairResult.repaired("changedRows=1");
+            }
+        };
+        UxmessCommand command = command(List.of(repairable));
+        CommandNode<CommandSourceStack> repair =
+                command.build().getChild("doctor").getChild("repair");
+
+        repair.getCommand().run(contextFor(sourceStack()));
+        assertThat(repairs).hasValue(0);
+
+        repair.getChild("confirm").getCommand().run(contextFor(sourceStack()));
+        assertThat(repairs).hasValue(1);
     }
 
     private static UxmessCommand command(List<HealthCheck> checks) {

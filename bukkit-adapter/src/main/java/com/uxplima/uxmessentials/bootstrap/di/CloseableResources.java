@@ -50,6 +50,7 @@ public final class CloseableResources implements AutoCloseable {
     private final List<Listener> listeners = new ArrayList<>();
     private final List<ReloadTask> reloadTasks = new ArrayList<>();
     private final Logger log;
+    private boolean closed;
     private @Nullable LocaleBinding localeBinding;
     private @Nullable CatalogBinding catalogBinding;
     private @Nullable GuiRootBinding guiRootBinding;
@@ -273,11 +274,27 @@ public final class CloseableResources implements AutoCloseable {
 
     @Override
     public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
         while (!stopHooks.isEmpty()) {
             runGuarded(stopHooks.pop());
         }
         commands.clear();
         listeners.clear();
+        reloadTasks.clear();
+        localeBinding = null;
+        catalogBinding = null;
+        guiRootBinding = null;
+        usageBinding = null;
+        worldGeneratorResolver = null;
+        hooks = null;
+        currencies = null;
+        playerData = null;
+        serverConnector = null;
+        bedrock = null;
+        bedrockScreen = null;
     }
 
     /**

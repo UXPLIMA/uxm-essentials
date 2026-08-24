@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.health.RepairableHealthCheck;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.zaxxer.hikari.HikariDataSource;
@@ -71,6 +72,11 @@ public final class Persistence implements AutoCloseable {
     /** The active backend, for diagnostics and backend-specific repository decisions. */
     public DatabaseBackend backend() {
         return backend;
+    }
+
+    /** Build the cross-context integrity check without leaking jOOQ into the bootstrap adapter. */
+    public RepairableHealthCheck integrityCheck(Path worldContainer) {
+        return new PersistenceIntegrityHealthCheck(dsl, worldContainer);
     }
 
     /**

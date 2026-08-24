@@ -19,6 +19,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
@@ -76,6 +77,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             Map.entry("nearby", VIEW),
             Map.entry("help", VIEW),
             Map.entry("movehere", MOVE),
+            Map.entry("move", MOVE),
             Map.entry("moveto", MOVE),
             Map.entry("teleport", MOVE),
             Map.entry("center", MOVE),
@@ -123,6 +125,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                         .executes(ctx -> usage(ctx, "npc create", "<name> [type]", "Create a new NPC"))
                         .then(nameArgument()
                                 .executes(this::create)
+                                .then(Commands.literal("at").then(createAtArguments()))
                                 .then(Commands.argument("type", StringArgumentType.word())
                                         .executes(this::createTyped))),
                 createAtNode(),
@@ -137,6 +140,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, NearbyNpcs.MAX_RADIUS))
                                 .executes(ctx -> nearby(ctx, ctx.getArgument("radius", Integer.class)))),
                 name("movehere", this::move),
+                moveNode(),
                 name("info", this::info),
                 name("teleport", this::teleport),
                 Commands.literal("copy")
@@ -311,33 +315,50 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                         "npc createat",
                         "<name> <world> <x> <y> <z> [yaw pitch [type]]",
                         "Create an NPC at an explicit location"))
-                .then(Commands.argument("name", StringArgumentType.string())
-                        .then(Commands.argument("world", StringArgumentType.word())
-                                .suggests(
-                                        com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions
-                                                .loadedWorlds())
-                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
-                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
-                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
-                                                        .executes(ctx -> createAt(ctx, 0f, 0f, null))
-                                                        .then(Commands.argument("yaw", DoubleArgumentType.doubleArg())
-                                                                .then(Commands.argument(
-                                                                                "pitch", DoubleArgumentType.doubleArg())
-                                                                        .executes(ctx -> createAt(
-                                                                                ctx,
-                                                                                floatArg(ctx, "yaw"),
-                                                                                floatArg(ctx, "pitch"),
-                                                                                null))
-                                                                        .then(Commands.argument(
-                                                                                        "type",
-                                                                                        StringArgumentType.word())
-                                                                                .executes(ctx -> createAt(
-                                                                                        ctx,
-                                                                                        floatArg(ctx, "yaw"),
-                                                                                        floatArg(ctx, "pitch"),
-                                                                                        ctx.getArgument(
-                                                                                                "type",
-                                                                                                String.class)))))))))));
+                .then(Commands.argument("name", StringArgumentType.string()).then(createAtArguments()));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> moveNode() {
+        return Commands.literal("move")
+                .executes(ctx -> usage(ctx, "npc move", "<name> [at <world> <x> <y> <z>]", "Move an NPC"))
+                .then(nameArgument()
+                        .executes(this::move)
+                        .then(Commands.literal("at").then(explicitPositionArguments(this::moveAt, false))));
+    }
+
+    private RequiredArgumentBuilder<CommandSourceStack, String> createAtArguments() {
+        return explicitPositionArguments(ctx -> createAt(ctx, 0f, 0f, null), true);
+    }
+
+    private RequiredArgumentBuilder<CommandSourceStack, String> explicitPositionArguments(
+            Command<CommandSourceStack> at, boolean rotationAndType) {
+        RequiredArgumentBuilder<CommandSourceStack, Double> z =
+                Commands.argument("z", DoubleArgumentType.doubleArg()).executes(at);
+        if (rotationAndType) {
+            z.then(Commands.argument("yaw", DoubleArgumentType.doubleArg())
+                    .then(Commands.argument("pitch", DoubleArgumentType.doubleArg())
+                            .executes(ctx -> createAt(ctx, floatArg(ctx, "yaw"), floatArg(ctx, "pitch"), null))
+                            .then(Commands.argument("type", StringArgumentType.word())
+                                    .executes(ctx -> createAt(
+                                            ctx,
+                                            floatArg(ctx, "yaw"),
+                                            floatArg(ctx, "pitch"),
+                                            ctx.getArgument("type", String.class))))));
+        }
+        return Commands.argument("world", StringArgumentType.word())
+                .suggests(com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.loadedWorlds())
+                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                .then(z)));
+    }
+
+    private int moveAt(CommandContext<CommandSourceStack> ctx) {
+        Position at = explicitPosition(ctx, 0f, 0f);
+        if (at == null) {
+            return 0;
+        }
+        services.move().move(actor(ctx), nameArg(ctx), at);
+        return Command.SINGLE_SUCCESS;
     }
 
     private int createAt(
@@ -345,6 +366,24 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             float yaw,
             float pitch,
             @org.jspecify.annotations.Nullable String typeWord) {
+        Position at = explicitPosition(ctx, yaw, pitch);
+        if (at == null) {
+            return 0;
+        }
+        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        EntityType type = typeWord == null ? null : parseRenderableType(typeWord);
+        if (typeWord != null && type == null) {
+            feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, Map.of("type", typeWord));
+            return 0;
+        }
+        NpcSkin skin =
+                sender instanceof Player player ? BukkitNpcSkins.of(player).orElse(null) : null;
+        services.create().create(actor(ctx), nameArg(ctx), at, skin, type == null ? null : type.name());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private @org.jspecify.annotations.Nullable Position explicitPosition(
+            CommandContext<CommandSourceStack> ctx, float yaw, float pitch) {
         org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
         World world = sender.getServer().getWorld(ctx.getArgument("world", String.class));
         double x = ctx.getArgument("x", Double.class);
@@ -355,7 +394,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                     sender,
                     com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
                     Map.of("world", ctx.getArgument("world", String.class)));
-            return 0;
+            return null;
         }
         if (!Double.isFinite(x)
                 || !Double.isFinite(y)
@@ -363,18 +402,9 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                 || !Float.isFinite(yaw)
                 || !Float.isFinite(pitch)) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_COORDS, Map.of("coords", explicitCoords(ctx)));
-            return 0;
+            return null;
         }
-        EntityType type = typeWord == null ? null : parseRenderableType(typeWord);
-        if (typeWord != null && type == null) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, Map.of("type", typeWord));
-            return 0;
-        }
-        NpcSkin skin =
-                sender instanceof Player player ? BukkitNpcSkins.of(player).orElse(null) : null;
-        Position at = new Position(BukkitRefs.toRef(world), x, y, z, yaw, pitch);
-        services.create().create(actor(ctx), nameArg(ctx), at, skin, type == null ? null : type.name());
-        return Command.SINGLE_SUCCESS;
+        return new Position(BukkitRefs.toRef(world), x, y, z, yaw, pitch);
     }
 
     private static float floatArg(CommandContext<CommandSourceStack> ctx, String name) {

@@ -19,6 +19,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
@@ -74,6 +75,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
             Map.entry("info", VIEW),
             Map.entry("nearby", VIEW),
             Map.entry("movehere", MOVE),
+            Map.entry("move", MOVE),
             Map.entry("moveto", MOVE),
             Map.entry("moveat", MOVE),
             Map.entry("center", MOVE),
@@ -134,6 +136,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 setLineNode(),
                 indexNode("removeline", this::removeLine),
                 name("movehere", this::move),
+                moveNode(),
                 moveToNode(),
                 moveAtNode()));
         verbs.addAll(new HologramAppearanceCommand(services, messages, hologramNames).nodes());
@@ -172,6 +175,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 .executes(ctx -> usage(ctx, "hologram create", "<name> <text>", "Create a new hologram"))
                 .then(Commands.argument("name", StringArgumentType.string())
                         .executes(ctx -> usage(ctx, "hologram create", "<name> <text>", "Create a new hologram"))
+                        .then(Commands.literal("at").then(createAtArguments()))
                         .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(this::create)));
     }
@@ -323,17 +327,15 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                         "hologram createat",
                         "<name> <world> <x> <y> <z> <text>",
                         "Create a hologram at an explicit location"))
-                .then(Commands.argument("name", StringArgumentType.string())
-                        .then(Commands.argument("world", StringArgumentType.word())
-                                .suggests(
-                                        com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions
-                                                .loadedWorlds())
-                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
-                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
-                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
-                                                        .then(Commands.argument(
-                                                                        "text", StringArgumentType.greedyString())
-                                                                .executes(this::createAt)))))));
+                .then(Commands.argument("name", StringArgumentType.string()).then(createAtArguments()));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> moveNode() {
+        return Commands.literal("move")
+                .executes(ctx -> usage(ctx, "hologram move", "<name> [at <world> <x> <y> <z>]", "Move a hologram"))
+                .then(nameArgument("name")
+                        .executes(this::move)
+                        .then(Commands.literal("at").then(moveAtArguments())));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> moveAtNode() {
@@ -343,15 +345,30 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                         "hologram moveat",
                         "<name> <world> <x> <y> <z>",
                         "Move a hologram to an explicit location"))
-                .then(nameArgument("name")
-                        .then(Commands.argument("world", StringArgumentType.word())
-                                .suggests(
-                                        com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions
-                                                .loadedWorlds())
-                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
-                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
-                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
-                                                        .executes(this::moveAt))))));
+                .then(nameArgument("name").then(moveAtArguments()));
+    }
+
+    private RequiredArgumentBuilder<CommandSourceStack, String> createAtArguments() {
+        return explicitPositionArguments(this::createAt, true);
+    }
+
+    private RequiredArgumentBuilder<CommandSourceStack, String> moveAtArguments() {
+        return explicitPositionArguments(this::moveAt, false);
+    }
+
+    private RequiredArgumentBuilder<CommandSourceStack, String> explicitPositionArguments(
+            Command<CommandSourceStack> action, boolean textRequired) {
+        RequiredArgumentBuilder<CommandSourceStack, Double> z = Commands.argument("z", DoubleArgumentType.doubleArg());
+        if (textRequired) {
+            z.then(Commands.argument("text", StringArgumentType.greedyString()).executes(action));
+        } else {
+            z.executes(action);
+        }
+        return Commands.argument("world", StringArgumentType.word())
+                .suggests(com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.loadedWorlds())
+                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                                .then(z)));
     }
 
     private int createAt(CommandContext<CommandSourceStack> ctx) {

@@ -128,6 +128,21 @@ class ReloadCommandSurfaceTest {
                 .toList();
         assertThat(plain).anyMatch(line -> line.startsWith("[RESTART] module wiring:"));
         assertThat(plain).anyMatch(line -> line.contains("1 restart-required"));
+        assertThat(plain).anyMatch(line -> line.startsWith("Result: RESTART_REQUIRED command=reload"));
+    }
+
+    @Test
+    void queuedReloadDoesNotRunAfterTheCommandRuntimeCloses() throws Exception {
+        HoldingScheduler scheduler = new HoldingScheduler();
+        AtomicInteger runs = new AtomicInteger();
+        UxmessCommand command =
+                command(List.of(ReloadTask.kernel("config", runs::incrementAndGet, "re-read")), scheduler);
+
+        command.build().getChild("reload").getCommand().run(contextFor(sourceStack()));
+        command.close();
+        scheduler.runPending();
+
+        assertThat(runs).hasValue(0);
     }
 
     private static UxmessCommand command(List<ReloadTask> tasks) {

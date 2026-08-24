@@ -37,6 +37,10 @@ final class SharedPermissions {
                         PermissionDefault.OP),
                 PermissionSpec.shared(
                         "uxmessentials.admin.reload", "Reload all modules via /uxmess reload.", PermissionDefault.OP),
+                PermissionSpec.shared(
+                        "uxmessentials.admin.doctor.repair",
+                        "/uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows.",
+                        PermissionDefault.OP),
                 PermissionSpec.sharedFamily(
                         "uxmessentials.cooldown.<feature>.<seconds>",
                         "The wait between uses of one rate-limited feature, in seconds; the shortest tier held wins and 0 removes the wait.",

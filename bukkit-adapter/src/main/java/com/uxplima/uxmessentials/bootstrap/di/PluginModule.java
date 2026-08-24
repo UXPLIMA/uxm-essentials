@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -382,6 +383,26 @@ public final class PluginModule {
     /** Wires the plugin and returns the resources to close on disable. */
     public static CloseableResources wire(JavaPlugin plugin) {
         Logger log = plugin.getLogger();
+        CloseableResources resources = new CloseableResources(log);
+        return closeOnFailure(resources, () -> wireUnchecked(plugin, resources));
+    }
+
+    /**
+     * Owns the partially built runtime from the first acquired resource onward. A bootstrap failure therefore
+     * tears down the same reverse-order hook chain as a normal disable instead of leaking a pool, scheduler,
+     * channel or half-started module until the server process exits.
+     */
+    static CloseableResources closeOnFailure(CloseableResources resources, Supplier<CloseableResources> wiring) {
+        try {
+            return wiring.get();
+        } catch (RuntimeException | Error failure) {
+            resources.close();
+            throw failure;
+        }
+    }
+
+    private static CloseableResources wireUnchecked(JavaPlugin plugin, CloseableResources resources) {
+        Logger log = plugin.getLogger();
         com.uxplima.uxmessentials.shared.application.port.Logger kernelLog = KernelWiring.logger(plugin);
         ConfigStore config = KernelWiring.loadConfig(plugin, kernelLog);
         KernelWiring.Kernel wiredKernel = KernelWiring.wire(plugin, config, kernelLog);
@@ -390,7 +411,6 @@ public final class PluginModule {
         // The hand-wired hub registry every module's management GUI plugs into. Built once here and handed to
         // the hub command below; module wiring (SP1+) registers each module's opener into it. Empty until then.
         ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
-        CloseableResources resources = new CloseableResources(log);
         // The two things every /uxmess reload re-reads, registered before any module wiring so they always run
         // first: the config tree (swapped atomically behind the ConfigStore) and the message catalogs. A module
         // step registered later therefore reads the fresh tree, never the one it was wired from. Both are pure
@@ -777,7 +797,7 @@ public final class PluginModule {
         ManagementHubView hub =
                 new ManagementHubView(menus, guiText, kernel.scheduler(), kernel.permissions(), guiRegistry, hubLayout);
         GuiSubcommand guiNode = new GuiSubcommand(guiRegistry, hub, kernel.permissions(), kernel.messages());
-        resources.addCommand(new UxmessCommand(
+        UxmessCommand uxmessCommand = new UxmessCommand(
                 registry,
                 config,
                 importNode,
@@ -786,7 +806,9 @@ public final class PluginModule {
                 new PlaceholdersSubcommand(plugin.getDataFolder().toPath(), kernel.log()),
                 kernel.scheduler(),
                 healthChecks,
-                resources.reloadTasks()));
+                resources.reloadTasks());
+        resources.addCommand(uxmessCommand);
+        resources.onClose(uxmessCommand::close);
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
@@ -886,6 +908,8 @@ public final class PluginModule {
         // throws becomes a FAIL line rather than aborting the run).
         List<HealthCheck> checks = new ArrayList<>();
         checks.add(new DatabaseHealthCheck(persistence));
+        checks.add(persistence.integrityCheck(
+                plugin.getServer().getWorldContainer().toPath()));
         if (economyEnabled(registry, config)) {
             checks.add(new EconomyProviderHealthCheck(plugin.getServer().getServicesManager(), plugin));
         }

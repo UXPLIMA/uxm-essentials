@@ -223,16 +223,19 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .requires(p(SETSPAWN))
                 .then(nameArg()
                         .executes(this::runSetSpawn)
-                        .then(Commands.argument("x", DoubleArgumentType.doubleArg())
-                                .then(Commands.argument("y", DoubleArgumentType.doubleArg())
-                                        .then(Commands.argument("z", DoubleArgumentType.doubleArg())
-                                                .executes(ctx -> runSetSpawnAt(ctx, 0f, 0f))
-                                                .then(Commands.argument("yaw", DoubleArgumentType.doubleArg())
-                                                        .then(Commands.argument("pitch", DoubleArgumentType.doubleArg())
-                                                                .executes(ctx -> runSetSpawnAt(
-                                                                        ctx,
-                                                                        floatArg(ctx, "yaw"),
-                                                                        floatArg(ctx, "pitch")))))))));
+                        .then(setSpawnCoordinates())
+                        .then(Commands.literal("at").then(setSpawnCoordinates())));
+    }
+
+    private RequiredArgumentBuilder<CommandSourceStack, Double> setSpawnCoordinates() {
+        return Commands.argument("x", DoubleArgumentType.doubleArg())
+                .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                        .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                .executes(ctx -> runSetSpawnAt(ctx, 0f, 0f))
+                                .then(Commands.argument("yaw", DoubleArgumentType.doubleArg())
+                                        .then(Commands.argument("pitch", DoubleArgumentType.doubleArg())
+                                                .executes(ctx -> runSetSpawnAt(
+                                                        ctx, floatArg(ctx, "yaw"), floatArg(ctx, "pitch")))))));
     }
 
     private int runCreate(CommandContext<CommandSourceStack> ctx) {

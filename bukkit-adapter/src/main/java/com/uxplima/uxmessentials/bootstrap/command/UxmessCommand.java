@@ -22,6 +22,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthReport;
 import com.uxplima.uxmessentials.shared.application.health.HealthStatus;
+import com.uxplima.uxmessentials.shared.application.health.RepairResult;
+import com.uxplima.uxmessentials.shared.application.health.RepairStatus;
+import com.uxplima.uxmessentials.shared.application.health.RepairableHealthCheck;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
@@ -53,7 +56,7 @@ import org.jspecify.annotations.Nullable;
  * to the global region for delivery, exactly as the other off-tick bootstrap commands reply.
  */
 @NullMarked
-public final class UxmessCommand implements CommandRegistration {
+public final class UxmessCommand implements CommandRegistration, AutoCloseable {
 
     private static final String ROOT_LITERAL = "uxmess";
     private static final List<String> ALIASES = List.of("uxmessentials", "uxe");
@@ -61,12 +64,14 @@ public final class UxmessCommand implements CommandRegistration {
 
     private static final String PERMISSION_ADMIN = "uxmessentials.admin";
     private static final String PERMISSION_RELOAD = "uxmessentials.admin.reload";
+    private static final String PERMISSION_DOCTOR_REPAIR = "uxmessentials.admin.doctor.repair";
 
     private static final String STATUS_HEADER = "uxmEssentials — modules";
     private static final String STATUS_NO_MODULES = "No feature modules are registered yet.";
     private static final String HELP_HEADER = "uxmEssentials commands:";
     private static final String HELP_STATUS = "/uxmess status — list modules and their enable state";
-    private static final String HELP_DOCTOR = "/uxmess doctor — run runtime health checks";
+    private static final String HELP_DOCTOR =
+            "/uxmess doctor [repair [confirm]] — inspect health; confirmed repair fixes only safe orphan data";
     private static final String HELP_HELP = "/uxmess help — show this help";
     private static final String HELP_GUI = "/uxmess gui — open the module management hub";
     private static final String HELP_RELOAD =
@@ -80,9 +85,19 @@ public final class UxmessCommand implements CommandRegistration {
     private static final String DOCTOR_HEADER = "uxmEssentials — health checks";
     private static final String DOCTOR_RUNNING = "Running health checks off-tick…";
     private static final String DOCTOR_FAILURE = "One or more checks FAILED — see the lines above.";
+    private static final String DOCTOR_RUNNING_ALREADY =
+            "A doctor or repair run is already active; this request was not started.";
+    private static final String DOCTOR_REPAIR_PREVIEW =
+            "Preview only: no data changed. Review /uxmess doctor, then run /uxmess doctor repair confirm.";
+    private static final String DOCTOR_REPAIR_HEADER = "uxmEssentials — safe data repair";
+    private static final String DOCTOR_REPAIR_STARTED =
+            "Running confirmed repairs off-tick; parent and missing-world location records are retained.";
+    private static final String DOCTOR_CLOSED = "Plugin shutdown is in progress; this request was not started.";
     private static final String DOCTOR_OK = "[OK] ";
     private static final String DOCTOR_WARN = "[WARN] ";
     private static final String DOCTOR_FAIL = "[FAIL] ";
+    private static final String DOCTOR_REPAIRED = "[REPAIRED] ";
+    private static final String DOCTOR_UNCHANGED = "[UNCHANGED] ";
     private static final String WARN = "<#ffcc66>";
     private static final String RELOAD_HEADER = "uxmEssentials reload";
     private static final String RELOAD_RUNNING = "Reload is already running; this request was not started.";
@@ -111,6 +126,8 @@ public final class UxmessCommand implements CommandRegistration {
     private final List<HealthCheck> healthChecks;
     private final List<ReloadTask> reloadTasks;
     private final AtomicBoolean reloadInProgress = new AtomicBoolean();
+    private final AtomicBoolean doctorInProgress = new AtomicBoolean();
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     public UxmessCommand(
             ModuleRegistry registry,
@@ -139,7 +156,7 @@ public final class UxmessCommand implements CommandRegistration {
                 .requires(src -> src.getSender().hasPermission(PERMISSION_ADMIN))
                 .executes(this::runHelp)
                 .then(Commands.literal("status").executes(this::runStatus))
-                .then(Commands.literal("doctor").executes(this::runDoctor))
+                .then(doctorNode())
                 .then(Commands.literal("help").executes(this::runHelp))
                 .then(guiNode.build())
                 .then(reloadNode())
@@ -147,6 +164,15 @@ public final class UxmessCommand implements CommandRegistration {
                 .then(permissionsNode.build())
                 .then(placeholdersNode.build())
                 .build();
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> doctorNode() {
+        return Commands.literal("doctor")
+                .executes(this::runDoctor)
+                .then(Commands.literal("repair")
+                        .requires(src -> src.getSender().hasPermission(PERMISSION_DOCTOR_REPAIR))
+                        .executes(this::runRepairPreview)
+                        .then(Commands.literal("confirm").executes(this::runRepairConfirmed)));
     }
 
     @Override
@@ -201,15 +227,88 @@ public final class UxmessCommand implements CommandRegistration {
 
     private int runDoctor(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
+        if (closed.get()) {
+            send(sender, ERROR, DOCTOR_CLOSED);
+            return 0;
+        }
+        if (!doctorInProgress.compareAndSet(false, true)) {
+            send(sender, WARN, DOCTOR_RUNNING_ALREADY);
+            return 0;
+        }
         sendHeader(sender, DOCTOR_HEADER);
         sendBody(sender, DOCTOR_RUNNING);
         // The database probe acquires a connection, so the whole run goes off-tick; the rendered lines bridge
         // back to the global region for delivery, mirroring the other off-tick bootstrap commands.
-        scheduler.async(() -> {
-            HealthReport report = HealthReport.run(healthChecks);
-            scheduler.onGlobal(() -> renderReport(sender, report));
-        });
+        try {
+            scheduler.async(() -> {
+                if (closed.get()) {
+                    doctorInProgress.set(false);
+                    return;
+                }
+                HealthReport report = HealthReport.run(healthChecks);
+                scheduleDoctorRender(() -> renderReport(sender, report));
+            });
+        } catch (RuntimeException schedulingFailure) {
+            doctorInProgress.set(false);
+            throw schedulingFailure;
+        }
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int runRepairPreview(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        sendHeader(sender, DOCTOR_REPAIR_HEADER);
+        sendBody(sender, DOCTOR_REPAIR_PREVIEW);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runRepairConfirmed(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (closed.get()) {
+            send(sender, ERROR, DOCTOR_CLOSED);
+            return 0;
+        }
+        if (!doctorInProgress.compareAndSet(false, true)) {
+            send(sender, WARN, DOCTOR_RUNNING_ALREADY);
+            return 0;
+        }
+        sendHeader(sender, DOCTOR_REPAIR_HEADER);
+        sendBody(sender, DOCTOR_REPAIR_STARTED);
+        try {
+            scheduler.async(() -> {
+                if (closed.get()) {
+                    doctorInProgress.set(false);
+                    return;
+                }
+                List<RepairEntry> results = healthChecks.stream()
+                        .filter(RepairableHealthCheck.class::isInstance)
+                        .map(RepairableHealthCheck.class::cast)
+                        .map(check -> new RepairEntry(check.name(), check.repairSafely()))
+                        .toList();
+                scheduleDoctorRender(() -> renderRepairs(sender, results));
+            });
+        } catch (RuntimeException schedulingFailure) {
+            doctorInProgress.set(false);
+            throw schedulingFailure;
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void scheduleDoctorRender(Runnable render) {
+        try {
+            scheduler.onGlobal(() -> {
+                try {
+                    if (!closed.get()) {
+                        render.run();
+                    }
+                } finally {
+                    doctorInProgress.set(false);
+                }
+            });
+        } catch (RuntimeException schedulingFailure) {
+            doctorInProgress.set(false);
+            throw schedulingFailure;
+        }
     }
 
     private void renderReport(CommandSender sender, HealthReport report) {
@@ -219,6 +318,53 @@ public final class UxmessCommand implements CommandRegistration {
         if (report.hasFailure()) {
             send(sender, ERROR, DOCTOR_FAILURE);
         }
+        long ok = healthCount(report, HealthStatus.OK);
+        long warn = healthCount(report, HealthStatus.WARN);
+        long failed = healthCount(report, HealthStatus.FAIL);
+        String result = failed > 0 ? "FAILED" : warn > 0 ? "WARN" : "SUCCESS";
+        send(
+                sender,
+                failed > 0 ? ERROR : warn > 0 ? WARN : SUCCESS,
+                "Result: " + result + " command=doctor ok=" + ok + " warn=" + warn + " failed=" + failed);
+    }
+
+    private static long healthCount(HealthReport report, HealthStatus status) {
+        return report.entries().stream()
+                .filter(entry -> entry.result().status() == status)
+                .count();
+    }
+
+    private void renderRepairs(CommandSender sender, List<RepairEntry> entries) {
+        for (RepairEntry entry : entries) {
+            String tag =
+                    switch (entry.result().status()) {
+                        case REPAIRED -> DOCTOR_REPAIRED;
+                        case UNCHANGED -> DOCTOR_UNCHANGED;
+                        case FAILED -> DOCTOR_FAIL;
+                    };
+            String colour =
+                    switch (entry.result().status()) {
+                        case REPAIRED -> SUCCESS;
+                        case UNCHANGED -> BODY;
+                        case FAILED -> ERROR;
+                    };
+            send(sender, colour, tag + entry.name() + " — " + entry.result().message());
+        }
+        long repaired = repairCount(entries, RepairStatus.REPAIRED);
+        long unchanged = repairCount(entries, RepairStatus.UNCHANGED);
+        long failed = repairCount(entries, RepairStatus.FAILED);
+        String result = failed > 0 ? "FAILED" : "SUCCESS";
+        send(
+                sender,
+                failed > 0 ? ERROR : SUCCESS,
+                "Result: " + result + " command=doctor.repair repaired=" + repaired + " unchanged=" + unchanged
+                        + " failed=" + failed);
+    }
+
+    private static long repairCount(List<RepairEntry> entries, RepairStatus status) {
+        return entries.stream()
+                .filter(entry -> entry.result().status() == status)
+                .count();
     }
 
     private static void sendCheckLine(CommandSender sender, HealthReport.Entry entry) {
@@ -278,6 +424,10 @@ public final class UxmessCommand implements CommandRegistration {
      * region for delivery.
      */
     private int runReload(CommandSender sender, @Nullable ModuleId only) {
+        if (closed.get()) {
+            send(sender, ERROR, DOCTOR_CLOSED);
+            return 0;
+        }
         if (!reloadInProgress.compareAndSet(false, true)) {
             send(sender, WARN, RELOAD_RUNNING);
             return 0;
@@ -288,13 +438,19 @@ public final class UxmessCommand implements CommandRegistration {
         Map<ModuleId, Boolean> enabledBefore = enabledStates();
         try {
             scheduler.async(() -> {
+                if (closed.get()) {
+                    reloadInProgress.set(false);
+                    return;
+                }
                 ReloadReport report = withRestartBoundCoverage(
                         withStructuralChanges(ReloadReport.run(reloadTasks, only), enabledBefore, only), only);
                 long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000L;
                 try {
                     scheduler.onGlobal(() -> {
                         try {
-                            renderReload(sender, report, elapsedMillis);
+                            if (!closed.get()) {
+                                renderReload(sender, report, elapsedMillis);
+                            }
                         } finally {
                             reloadInProgress.set(false);
                         }
@@ -386,6 +542,12 @@ public final class UxmessCommand implements CommandRegistration {
                 palette,
                 "Summary: %d applied, %d restart-required, %d failed — %d ms."
                         .formatted(applied, restart, failed, elapsedMillis));
+        String result = failed > 0 ? "FAILED" : restart > 0 ? "RESTART_REQUIRED" : "SUCCESS";
+        send(
+                sender,
+                palette,
+                "Result: " + result + " command=reload applied=" + applied + " restart=" + restart + " failed=" + failed
+                        + " elapsedMs=" + elapsedMillis);
     }
 
     private static long count(ReloadReport report, ReloadStatus status) {
@@ -442,4 +604,12 @@ public final class UxmessCommand implements CommandRegistration {
             return null;
         }
     }
+
+    /** Prevent off-tick doctor/reload completions from touching the server after plugin disable. */
+    @Override
+    public void close() {
+        closed.set(true);
+    }
+
+    private record RepairEntry(String name, RepairResult result) {}
 }

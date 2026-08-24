@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.bootstrap.di;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Handler;
@@ -14,6 +15,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -82,6 +84,45 @@ class CloseableResourcesTest {
         assertThat(survivor).hasValue(1);
         assertThat(resources.commands()).isEmpty();
         assertThat(logger.severeCount()).isEqualTo(1);
+    }
+
+    @Test
+    void closeIsIdempotentAndDropsReloadWorkForTheStoppedRuntime() {
+        RecordingLogger logger = new RecordingLogger();
+        CloseableResources resources = new CloseableResources(logger.logger());
+        AtomicInteger closes = new AtomicInteger();
+        resources.onClose(closes::incrementAndGet);
+        resources.addReloadTask(ReloadTask.kernel("config", () -> {}, "reload"));
+
+        resources.close();
+        resources.close();
+
+        assertThat(closes).hasValue(1);
+        assertThat(resources.reloadTasks()).isEmpty();
+    }
+
+    @Test
+    void bootstrapFailureClosesEverythingAcquiredBeforeTheFailure() {
+        RecordingLogger logger = new RecordingLogger();
+        CloseableResources resources = new CloseableResources(logger.logger());
+        AtomicInteger first = new AtomicInteger();
+        AtomicInteger second = new AtomicInteger();
+        resources.onClose(first::incrementAndGet);
+        resources.onClose(second::incrementAndGet);
+        resources.addReloadTask(ReloadTask.kernel("partial", () -> {}, "partial startup"));
+
+        assertThatThrownBy(() -> PluginModule.closeOnFailure(resources, () -> {
+                    throw new IllegalStateException("bootstrap boom");
+                }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("bootstrap boom");
+
+        assertThat(first).hasValue(1);
+        assertThat(second).hasValue(1);
+        assertThat(resources.reloadTasks()).isEmpty();
+        resources.close();
+        assertThat(first).hasValue(1);
+        assertThat(second).hasValue(1);
     }
 
     private record FakeCommand(String id) implements CommandRegistration {

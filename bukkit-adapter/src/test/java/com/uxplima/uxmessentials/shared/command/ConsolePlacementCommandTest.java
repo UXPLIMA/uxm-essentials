@@ -37,6 +37,10 @@ import com.uxplima.uxmessentials.teleport.adapter.inbound.command.AdminTpCommand
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.warps.adapter.WarpServices;
+import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommand;
+import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,7 +73,8 @@ class ConsolePlacementCommandTest {
         NpcCommand command = new NpcCommand(
                 services, List::of, mock(NpcSkinByName.class), mock(Messages.class), mock(NpcListMenu.class));
 
-        execute(command.build(), "npc createat guide world 10 65 -4");
+        assertParses(command.build(), "npc createat legacy world 10 65 -4");
+        execute(command.build(), "npc create guide at world 10 65 -4");
 
         ArgumentCaptor<PlayerRef> actor = ArgumentCaptor.forClass(PlayerRef.class);
         ArgumentCaptor<Position> position = ArgumentCaptor.forClass(Position.class);
@@ -92,7 +97,8 @@ class ConsolePlacementCommandTest {
         HologramCommand command =
                 new HologramCommand(services, mock(Messages.class), List::of, List::of, mock(HologramListMenu.class));
 
-        execute(command.build(), "hologram createat welcome world 1 70 2 Hello world");
+        assertParses(command.build(), "hologram createat legacy world 1 70 2 Legacy text");
+        execute(command.build(), "hologram create welcome at world 1 70 2 Hello world");
 
         ArgumentCaptor<PlayerRef> actor = ArgumentCaptor.forClass(PlayerRef.class);
         ArgumentCaptor<Position> position = ArgumentCaptor.forClass(Position.class);
@@ -140,6 +146,21 @@ class ConsolePlacementCommandTest {
         assertSystemPosition(destination.getValue().position(), 5, 70, -2);
     }
 
+    @Test
+    void canonicalWarpAndWorldPlacementFormsParseForConsoleAutomation() {
+        WarpCommand warp = new WarpCommand(
+                mock(WarpServices.class),
+                mock(Messages.class),
+                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.CHAT);
+        assertParses(warp.build(), "warp create spawn at world 0 64 0");
+        assertParses(warp.build(), "warp move spawn at world 1 65 1");
+        assertParses(warp.build(), "warp createat legacy world 0 64 0");
+
+        WorldCommand worlds = new WorldCommand(mock(WorldsServices.class), mock(Messages.class));
+        assertParses(worlds.build(), "worlds setspawn world at 0 64 0 90 0");
+        assertParses(worlds.build(), "worlds setspawn world 0 64 0");
+    }
+
     private void execute(com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> node, String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(node);
@@ -148,6 +169,14 @@ class ConsolePlacementCommandTest {
         } catch (CommandSyntaxException syntax) {
             throw new AssertionError("command did not parse: " + input, syntax);
         }
+    }
+
+    private void assertParses(com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> node, String input) {
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        dispatcher.getRoot().addChild(node);
+        var parsed = dispatcher.parse(input, CommandSourceStackMock.from(server.getConsoleSender()));
+        assertThat(parsed.getReader().getRemaining()).as(input).isEmpty();
+        assertThat(parsed.getContext().getCommand()).as(input).isNotNull();
     }
 
     private static void assertSystemPosition(Position actual, double x, double y, double z) {
