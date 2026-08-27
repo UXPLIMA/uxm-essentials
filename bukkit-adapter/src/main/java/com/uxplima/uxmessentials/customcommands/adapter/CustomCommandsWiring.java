@@ -10,10 +10,12 @@ import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.customcommands.adapter.inbound.command.CustomCommandCommand;
 import com.uxplima.uxmessentials.customcommands.adapter.inbound.command.CustomCommandRegistration;
+import com.uxplima.uxmessentials.customcommands.adapter.inbound.listener.CommandWarmupTracker;
 import com.uxplima.uxmessentials.customcommands.adapter.outbound.CurrenciesCommandFee;
 import com.uxplima.uxmessentials.customcommands.adapter.outbound.MenuActionRunner;
 import com.uxplima.uxmessentials.customcommands.adapter.outbound.MenuRequirementCheck;
 import com.uxplima.uxmessentials.customcommands.adapter.outbound.MessageRunFeedback;
+import com.uxplima.uxmessentials.customcommands.adapter.outbound.TrackingCommandWarmups;
 import com.uxplima.uxmessentials.customcommands.application.CustomCommandsConfig;
 import com.uxplima.uxmessentials.customcommands.application.RunCustomCommand;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
@@ -75,10 +77,13 @@ public final class CustomCommandsWiring {
                 ctx.kernel().log(),
                 () -> new MenuActionRunner.PrivilegedActions(
                         config.allowConsoleActions(), config.allowOpActions(), config.logPrivilegedActions()));
+        // The warmup a definition declares is cancelled by movement, the same rule teleports live under. The tracker
+        // is this context's own, because a command warmup has one axis to reconcile and no toggles to consult.
+        CommandWarmupTracker warmups = new CommandWarmupTracker();
         RunCustomCommand runner = new RunCustomCommand(
                 ctx.kernel().permissions(),
                 ctx.kernel().cooldowns(),
-                ctx.kernel().warmups(),
+                new TrackingCommandWarmups(ctx.kernel().warmups(), warmups),
                 actions,
                 new MenuRequirementCheck(menus),
                 fee,
@@ -105,6 +110,6 @@ public final class CustomCommandsWiring {
                 runner,
                 ctx.kernel().scheduler(),
                 ctx.kernel().messages()));
-        return new Wired(commands, List.of());
+        return new Wired(commands, List.of(warmups));
     }
 }
