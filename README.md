@@ -97,7 +97,7 @@ extensive MockBukkit/JUnit test suite.
 
 ## Installation
 
-1. Download `uxmEssentials-0.8.0.jar` and drop it in your server's `plugins/` folder.
+1. Download `uxmEssentials-0.8.1.jar` and drop it in your server's `plugins/` folder.
 2. Start the server once. uxmEssentials creates `plugins/uxmEssentials/` with a shared `config.conf`, a
    `commands.conf`, a `config.conf` per module under `modules/`, the message catalogs, and the GUI layouts.
 3. Edit what you want, then `/uxmess reload <module>` (or restart). That's it.
@@ -107,11 +107,11 @@ Four optional companion jars extend the suite onto other platforms; see
 
 | Jar | Where it goes | What it adds |
 | --- | --- | --- |
-| `uxmEssentials-0.8.0.jar` | Paper `plugins/` | The plugin itself (required). |
-| `uxmEssentials-velocity-0.8.0.jar` | Velocity `plugins/` | Proxy-side bus broker: relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
-| `uxmEssentials-redis-0.8.0.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus: the same sync over Redis pub/sub, with no proxy required. |
-| `uxmEssentials-discord-0.8.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
-| `uxmEssentials-rest-0.8.0.jar` | Paper `plugins/` | An HTTP + WebSocket API over the developer API: read and write every context from outside the server, with in-game token management. |
+| `uxmEssentials-0.8.1.jar` | Paper `plugins/` | The plugin itself (required). |
+| `uxmEssentials-velocity-0.8.1.jar` | Velocity `plugins/` | Proxy-side bus broker: relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
+| `uxmEssentials-redis-0.8.1.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus: the same sync over Redis pub/sub, with no proxy required. |
+| `uxmEssentials-discord-0.8.1.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
+| `uxmEssentials-rest-0.8.1.jar` | Paper `plugins/` | An HTTP + WebSocket API over the developer API: read and write every context from outside the server, with in-game token management. |
 
 ## Modules
 
@@ -325,9 +325,9 @@ network {
 }
 ```
 
-- **Velocity**: drop `uxmEssentials-velocity-0.8.0.jar` on the proxy and the bus rides a proxy-side broker
+- **Velocity**: drop `uxmEssentials-velocity-0.8.1.jar` on the proxy and the bus rides a proxy-side broker
   over plugin messaging.
-- **Redis**: drop `uxmEssentials-redis-0.8.0.jar` on each backend and point `network.redis` at a Redis
+- **Redis**: drop `uxmEssentials-redis-0.8.1.jar` on each backend and point `network.redis` at a Redis
   server; the same bus then runs over Redis pub/sub with **no Velocity proxy required**: a plain set of
   backends sharing a database and a Redis instance sync directly.
 - **both**: run both transports at once (handy mid-migration); a frame goes out on each.
@@ -336,10 +336,10 @@ Either way the sync covers homes, warps, player-warps, economy, vaults, trade, v
 NPCs, the vote party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
 local-only; the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
 
-- **Discord**: drop `uxmEssentials-discord-0.8.0.jar` on a Paper node to bridge account linking and push
+- **Discord**: drop `uxmEssentials-discord-0.8.1.jar` on a Paper node to bridge account linking and push
   audit and economy notifications through JDA.
 
-- **REST**: drop `uxmEssentials-rest-0.8.0.jar` on a Paper node to expose the developer API over HTTP and a
+- **REST**: drop `uxmEssentials-rest-0.8.1.jar` on a Paper node to expose the developer API over HTTP and a
   WebSocket event stream, with tokens created and revoked in game.
 
 ## Permissions
@@ -390,7 +390,7 @@ Requires a JDK 25 toolchain (Gradle provisions one via the Foojay resolver if ne
 ## Versioning
 
 uxmEssentials follows semantic versioning. Pre-1.0 (`0.x`) releases may still adjust configuration and
-behaviour between minor versions as the surface settles; the current release is **0.8.0**.
+behaviour between minor versions as the surface settles; the current release is **0.8.1**.
 
 ## Contributing
 
