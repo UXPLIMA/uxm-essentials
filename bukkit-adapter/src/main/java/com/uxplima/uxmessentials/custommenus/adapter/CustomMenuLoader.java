@@ -11,9 +11,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;

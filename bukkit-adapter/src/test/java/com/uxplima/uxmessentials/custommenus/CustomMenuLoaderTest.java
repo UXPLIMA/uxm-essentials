@@ -9,9 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;

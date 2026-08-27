@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;

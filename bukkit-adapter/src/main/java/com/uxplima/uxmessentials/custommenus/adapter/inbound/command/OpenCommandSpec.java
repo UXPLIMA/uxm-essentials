@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import org.jspecify.annotations.NullMarked;
 
 /**

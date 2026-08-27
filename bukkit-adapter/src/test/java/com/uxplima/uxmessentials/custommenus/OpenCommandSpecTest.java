@@ -6,9 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 import java.util.Optional;
 
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec.ArgType;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec.ArgType;
 import org.junit.jupiter.api.Test;
 
 /** Pure validation coverage for the parsed {@code command {}} block value object. */

@@ -3,8 +3,8 @@ package com.uxplima.uxmessentials.custommenus;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec;
-import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.ArgumentSpec.ArgType;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec.ArgType;
 import org.junit.jupiter.api.Test;
 
 /** Pure coverage for the typed command-argument value object and its config type parsing. */
