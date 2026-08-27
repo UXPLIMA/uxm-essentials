@@ -14,10 +14,10 @@ import java.util.Set;
  *
  * <p>The authored catalog may contain more than the vanilla {@link #MAX_LINES} visible rows because conditions and
  * empty-value filtering are evaluated per viewer. The renderer applies the visible limit after those filters. The
- * refresh interval must be strictly positive — a zero or negative cadence would busy-spin the render timer.
+ * refresh interval must be strictly positive; a zero or negative cadence would busy-spin the render timer.
  *
  * <p>{@code hideScoreNumbers} hides the red per-line score numbers vanilla draws down the right edge of the sidebar
- * (the adapter applies a blank number format to each line unless that line overrides it). It defaults on — the clean, modern look operators
+ * (the adapter applies a blank number format to each line unless that line overrides it). It defaults on, the clean, modern look operators
  * expect — and is purely a render concern, not a structural one, so it never affects {@link #isBlank()}.
  *
  */

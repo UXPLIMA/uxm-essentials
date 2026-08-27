@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Redirects permitted nether and end portals to the destination configured by the source world's per-kind link,
- * leaving every other teleport cause — and every world without a link — to vanilla. A disabled server dimension is
+ * leaving every other teleport cause (and every world without a link) to vanilla. A disabled server dimension is
  * cancelled before link resolution, so a managed link can never bypass Bukkit's allow-nether / allow-end policy. The
  * {@link ResolvePortalDestination}
  * use case owns the link lookup and coordinate scaling; this adapter only translates the live Bukkit

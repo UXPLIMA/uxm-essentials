@@ -49,9 +49,9 @@ import org.jspecify.annotations.Nullable;
  * rather than acknowledged as done. Re-reading files is I/O, so the run is dispatched off the tick thread and the
  * lines bridge back to the global region, exactly like {@code doctor}.
  *
- * <p>{@code doctor} goes deeper than {@code status}: it runs the wired {@link HealthCheck}s — a database
+ * <p>{@code doctor} goes deeper than {@code status}: it runs the wired {@link HealthCheck}s (a database
  * liveness probe, the economy-provider ownership check, the soft-depend presence/reachability scan, and the
- * threading/update lines — and prints each as {@code OK}/{@code WARN}/{@code FAIL}. The checks do I/O, so the
+ * threading/update lines) and prints each as {@code OK}/{@code WARN}/{@code FAIL}. The checks do I/O, so the
  * run is dispatched off the tick thread through the kernel {@link Scheduler} and the rendered lines bridge back
  * to the global region for delivery, exactly as the other off-tick bootstrap commands reply.
  */
@@ -66,30 +66,30 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private static final String PERMISSION_RELOAD = "uxmessentials.admin.reload";
     private static final String PERMISSION_DOCTOR_REPAIR = "uxmessentials.admin.doctor.repair";
 
-    private static final String STATUS_HEADER = "uxmEssentials — modules";
+    private static final String STATUS_HEADER = "uxmEssentials: modules";
     private static final String STATUS_NO_MODULES = "No feature modules are registered yet.";
     private static final String HELP_HEADER = "uxmEssentials commands:";
-    private static final String HELP_STATUS = "/uxmess status — list modules and their enable state";
+    private static final String HELP_STATUS = "/uxmess status: list modules and their enable state";
     private static final String HELP_DOCTOR =
-            "/uxmess doctor [repair [confirm]] — inspect health; confirmed repair fixes only safe orphan data";
-    private static final String HELP_HELP = "/uxmess help — show this help";
-    private static final String HELP_GUI = "/uxmess gui — open the module management hub";
+            "/uxmess doctor [repair [confirm]]: inspect health; confirmed repair fixes only safe orphan data";
+    private static final String HELP_HELP = "/uxmess help: show this help";
+    private static final String HELP_GUI = "/uxmess gui: open the module management hub";
     private static final String HELP_RELOAD =
-            "/uxmess reload [module] — re-read the config and message files, all or scoped to one module";
-    private static final String HELP_IMPORT = "/uxmess import <source> [--dry-run] — import legacy data";
+            "/uxmess reload [module]: re-read the config and message files, all or scoped to one module";
+    private static final String HELP_IMPORT = "/uxmess import <source> [--dry-run]: import legacy data";
     private static final String HELP_PERMISSIONS =
             "/uxmess permissions [area] [page]: read the permission catalogue, export writes it to a file";
     private static final String HELP_PLACEHOLDERS =
             "/uxmess placeholders [area] [page]: read the placeholder catalogue, export writes it to a file";
 
-    private static final String DOCTOR_HEADER = "uxmEssentials — health checks";
+    private static final String DOCTOR_HEADER = "uxmEssentials: health checks";
     private static final String DOCTOR_RUNNING = "Running health checks off-tick…";
-    private static final String DOCTOR_FAILURE = "One or more checks FAILED — see the lines above.";
+    private static final String DOCTOR_FAILURE = "One or more checks FAILED; see the lines above.";
     private static final String DOCTOR_RUNNING_ALREADY =
             "A doctor or repair run is already active; this request was not started.";
     private static final String DOCTOR_REPAIR_PREVIEW =
             "Preview only: no data changed. Review /uxmess doctor, then run /uxmess doctor repair confirm.";
-    private static final String DOCTOR_REPAIR_HEADER = "uxmEssentials — safe data repair";
+    private static final String DOCTOR_REPAIR_HEADER = "uxmEssentials: safe data repair";
     private static final String DOCTOR_REPAIR_STARTED =
             "Running confirmed repairs off-tick; parent and missing-world location records are retained.";
     private static final String DOCTOR_CLOSED = "Plugin shutdown is in progress; this request was not started.";
@@ -106,8 +106,8 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private static final String RELOAD_FAILURE =
             "One or more steps FAILED; each failed step kept its last-known-good values.";
     private static final String RELOAD_UNKNOWN = "Unknown module: ";
-    private static final String STATE_ENABLED = " — enabled";
-    private static final String STATE_DISABLED = " — disabled";
+    private static final String STATE_ENABLED = ": enabled";
+    private static final String STATE_DISABLED = ": disabled";
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final String HEADER = "<gradient:#4aa3ff:#9b6bff>";
@@ -186,7 +186,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     /**
-     * Bare {@code /uxmess} opens the management hub — the same screen {@code /uxmess gui} opens. Installed on
+     * Bare {@code /uxmess} opens the management hub, the same screen {@code /uxmess gui} opens. Installed on
      * the root only when the command's catalog {@code gui} flag is on; with it off the root keeps its
      * {@code runHelp} fallback, which the {@code GuiRootBinding} leaves in place rather than replacing.
      */
@@ -348,7 +348,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
                         case UNCHANGED -> BODY;
                         case FAILED -> ERROR;
                     };
-            send(sender, colour, tag + entry.name() + " — " + entry.result().message());
+            send(sender, colour, tag + entry.name() + ": " + entry.result().message());
         }
         long repaired = repairCount(entries, RepairStatus.REPAIRED);
         long unchanged = repairCount(entries, RepairStatus.UNCHANGED);
@@ -369,7 +369,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
 
     private static void sendCheckLine(CommandSender sender, HealthReport.Entry entry) {
         HealthStatus status = entry.result().status();
-        String line = tag(status) + entry.name() + " — " + entry.result().message();
+        String line = tag(status) + entry.name() + ": " + entry.result().message();
         send(sender, palette(status), line);
     }
 
@@ -540,7 +540,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         send(
                 sender,
                 palette,
-                "Summary: %d applied, %d restart-required, %d failed — %d ms."
+                "Summary: %d applied, %d restart-required, %d failed in %d ms."
                         .formatted(applied, restart, failed, elapsedMillis));
         String result = failed > 0 ? "FAILED" : restart > 0 ? "RESTART_REQUIRED" : "SUCCESS";
         send(

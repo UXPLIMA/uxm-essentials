@@ -64,7 +64,7 @@ final class FillerPainter {
 
     /**
      * The filler grid currently painted for each viewer, keyed by viewer UUID then by 1-based slot. The value remembers
-     * what was last sent for that (viewer, slot) cell — the rendered text, list order, resolved skin, and whether the skin
+     * what was last sent for that (viewer, slot) cell: the rendered text, list order, resolved skin, and whether the skin
      * was still resolving — so a steady-state tick whose cell is unchanged re-sends nothing (no flicker), while a switch
      * to a format with different/fewer fillers removes the cells that fell away by their deterministic {@link #fillerId}
      * UUIDs. An absent viewer key means no fillers are painted for that viewer. The inner map is a {@link LinkedHashMap}

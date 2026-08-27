@@ -118,7 +118,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // other hard dependency edge (its only collaborators are the shared persistence DSL, the Permissions
         // reducer, and the teleport engine), and like warps/holograms it ships ENABLED, so it lands last.
         delegate.register(new PlayerwarpsModule());
-        // scoreboard is the 15th context — a per-player packet sidebar rendered from operator-authored MiniMessage
+        // scoreboard is the 15th context: a per-player packet sidebar rendered from operator-authored MiniMessage
         // content on the Scheduler refresh timer. Like communication it carries no hard dependency edge (its only
         // collaborators are the shared Scheduler, messages, and event ports) and ships with a working default board.
         delegate.register(new ScoreboardModule());
