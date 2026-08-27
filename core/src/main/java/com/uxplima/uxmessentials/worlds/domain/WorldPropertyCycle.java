@@ -61,8 +61,9 @@ public final class WorldPropertyCycle {
         BigDecimal base = current.isEmpty() ? BigDecimal.ZERO : new BigDecimal(current);
         BigDecimal step = big(action) ? BigDecimal.TEN : BigDecimal.ONE;
         BigDecimal moved = forward(action) ? base.add(step) : base.subtract(step);
-        BigDecimal clamped = moved.max(BigDecimal.ZERO).stripTrailingZeros();
-        String encoded = clamped.toPlainString();
+        // No floor of its own: the property's decode is the gate, so an unsigned property stops at zero while
+        // a signed one (a void-rescue trigger height) steps below it.
+        String encoded = moved.stripTrailingZeros().toPlainString();
         return property.decode(encoded).isPresent() ? encoded : current;
     }
 

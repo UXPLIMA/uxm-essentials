@@ -451,6 +451,11 @@ final class DestinationPermissions {
                         "uxmessentials.world.unregister",
                         "/world unregister <name>: drop a world from the registry, leaving its folder on disk.",
                         PermissionDefault.OP,
+                        WORLDS),
+                PermissionSpec.of(
+                        "uxmessentials.world.voidrescue.exempt",
+                        "Keep falling in a world that catches players out of the void.",
+                        PermissionDefault.FALSE,
                         WORLDS));
     }
 

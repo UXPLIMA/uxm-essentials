@@ -22,6 +22,9 @@ public final class WorldProperties {
     public static final WorldProperty<BigDecimal> ENTRY_FEE = WorldProperty.ofDecimal("entry-fee");
     public static final WorldProperty<String> PORTAL_NETHER_LINK = WorldProperty.ofString("portal-nether-link", "");
     public static final WorldProperty<String> PORTAL_END_LINK = WorldProperty.ofString("portal-end-link", "");
+    public static final WorldProperty<VoidRescueChain> VOID_RESCUE = WorldProperty.ofChain("void-rescue");
+    public static final WorldProperty<Optional<Integer>> VOID_RESCUE_Y =
+            WorldProperty.ofOptionalInteger("void-rescue-y");
 
     public static final List<WorldProperty<?>> ALL = List.of(
             PVP,
@@ -35,7 +38,9 @@ public final class WorldProperties {
             PLAYER_LIMIT,
             ENTRY_FEE,
             PORTAL_NETHER_LINK,
-            PORTAL_END_LINK);
+            PORTAL_END_LINK,
+            VOID_RESCUE,
+            VOID_RESCUE_Y);
 
     private WorldProperties() {}
 

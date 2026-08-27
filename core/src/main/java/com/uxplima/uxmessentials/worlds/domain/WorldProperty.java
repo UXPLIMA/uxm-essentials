@@ -127,6 +127,39 @@ public final class WorldProperty<T> {
         return new WorldProperty<>(key, def, Optional::of, Function.identity(), List.of());
     }
 
+    /**
+     * A void-rescue chain property: any value the {@link VoidRescueChain} grammar accepts, with {@code ""}
+     * meaning the world is unmanaged. Validating here is what makes {@code /worlds set} refuse a typo at the
+     * moment it is typed rather than storing a chain that never fires.
+     */
+    static WorldProperty<VoidRescueChain> ofChain(String key) {
+        return new WorldProperty<>(
+                key, VoidRescueChain.none(), VoidRescueChain::parse, VoidRescueChain::encode, List.of());
+    }
+
+    /**
+     * A signed integer that may be left unset. {@code ""} decodes to an absent value and encodes back to
+     * {@code ""}, so clearing the property in the GUI or with {@code /worlds set <world> <key> ""} restores
+     * the "not configured" state rather than storing a number that happens to mean it.
+     */
+    static WorldProperty<Optional<Integer>> ofOptionalInteger(String key) {
+        return new WorldProperty<>(
+                key,
+                Optional.empty(),
+                raw -> {
+                    if (raw.isEmpty()) {
+                        return Optional.of(Optional.empty());
+                    }
+                    try {
+                        return Optional.of(Optional.of(Integer.valueOf(raw)));
+                    } catch (NumberFormatException notANumber) {
+                        return Optional.empty();
+                    }
+                },
+                value -> value.map(String::valueOf).orElse(""),
+                List.of());
+    }
+
     static WorldProperty<BigDecimal> ofDecimal(String key) {
         return new WorldProperty<>(
                 key,

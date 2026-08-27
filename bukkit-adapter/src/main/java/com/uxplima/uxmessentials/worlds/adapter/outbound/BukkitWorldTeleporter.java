@@ -33,10 +33,17 @@ public final class BukkitWorldTeleporter implements WorldTeleporter {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(cause, "cause");
+        if (cause == WorldTeleportCause.VOID_RESCUE) {
+            // A rescue is involuntary: the player is already inside the world, so the access policy has nothing
+            // left to decide, and the hop must land at once with no warmup to walk out of and no /back point.
+            marker.mark(who.uuid());
+            engine.relocateImmediately(who, Destination.at(to));
+            return true;
+        }
         TeleportKind kind =
                 switch (cause) {
                     case SPAWN -> TeleportKind.SPAWN;
-                    case ADMIN -> TeleportKind.ADMIN;
+                    case ADMIN, VOID_RESCUE -> TeleportKind.ADMIN;
                 };
         if (cause == WorldTeleportCause.ADMIN) {
             // A staff /worlds tp (or login redirect) bypasses the access policy in WorldTeleportService;

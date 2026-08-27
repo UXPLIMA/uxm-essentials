@@ -7,6 +7,27 @@ import org.junit.jupiter.api.Test;
 class WorldPropertiesTest {
 
     @Test
+    void voidRescueDecodesAChainAndRefusesATypo() {
+        assertThat(WorldProperties.VOID_RESCUE.decode("warp:hub;spawn"))
+                .contains(VoidRescueChain.parse("warp:hub;spawn").orElseThrow());
+        assertThat(WorldProperties.VOID_RESCUE.decode("")).contains(VoidRescueChain.none());
+        assertThat(WorldProperties.VOID_RESCUE.decode("bed")).isEmpty();
+        assertThat(WorldProperties.VOID_RESCUE.encode(
+                        VoidRescueChain.parse("at:lobby,0,80,0").orElseThrow()))
+                .isEqualTo("at:lobby,0,80,0");
+    }
+
+    @Test
+    void voidRescueTriggerHeightIsSignedAndClearable() {
+        assertThat(WorldProperties.VOID_RESCUE_Y.decode("-24")).contains(java.util.Optional.of(-24));
+        assertThat(WorldProperties.VOID_RESCUE_Y.decode("")).contains(java.util.Optional.empty());
+        assertThat(WorldProperties.VOID_RESCUE_Y.decode("deep")).isEmpty();
+        assertThat(WorldProperties.VOID_RESCUE_Y.encode(java.util.Optional.empty()))
+                .isEmpty();
+        assertThat(WorldProperties.VOID_RESCUE_Y.defaultValue()).isEmpty();
+    }
+
+    @Test
     void byKeyResolvesEveryRegisteredProperty() {
         for (WorldProperty<?> property : WorldProperties.ALL) {
             assertThat(WorldProperties.byKey(property.key())).containsSame(property);

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -70,6 +71,18 @@ class BukkitWorldTeleporterTest {
         teleporter.teleport(who, to, WorldTeleportCause.SPAWN);
 
         assertThat(marker.consume(who.uuid())).isFalse();
+    }
+
+    @Test
+    void voidRescueRelocatesImmediatelyAndMarksTheEntry() {
+        boolean accepted = teleporter.teleport(who, to, WorldTeleportCause.VOID_RESCUE);
+
+        assertThat(accepted).isTrue();
+        ArgumentCaptor<Destination> destination = ArgumentCaptor.forClass(Destination.class);
+        verify(engine).relocateImmediately(eq(who), destination.capture());
+        verify(engine, never()).launch(any(), any(), any());
+        assertThat(destination.getValue().position()).isEqualTo(to);
+        assertThat(marker.consume(who.uuid())).isTrue();
     }
 
     @Test

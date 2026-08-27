@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.AnimalSpawnListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.VoidRescueListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitChunkGenSource;
@@ -68,6 +69,7 @@ import com.uxplima.uxmessentials.worlds.application.LoadWorld;
 import com.uxplima.uxmessentials.worlds.application.PregenWorld;
 import com.uxplima.uxmessentials.worlds.application.ReconcileWorldsOnEnable;
 import com.uxplima.uxmessentials.worlds.application.ResolvePortalDestination;
+import com.uxplima.uxmessentials.worlds.application.ResolveVoidRescue;
 import com.uxplima.uxmessentials.worlds.application.RestoreWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
@@ -80,6 +82,7 @@ import com.uxplima.uxmessentials.worlds.application.WorldInfo;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
+import com.uxplima.uxmessentials.worlds.application.port.RescueTargets;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmessentials.worlds.application.port.WorldPregen;
 import com.uxplima.uxmessentials.worlds.application.port.WorldSettingApplier;
@@ -116,6 +119,7 @@ public final class WorldsWiring {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings,
+            RescueTargets rescueTargets,
             Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -127,6 +131,7 @@ public final class WorldsWiring {
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(rescueTargets, "rescueTargets");
         Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
 
@@ -173,6 +178,9 @@ public final class WorldsWiring {
                 notifier,
                 forcedEntries,
                 settings.redirectOnRestrictedJoin());
+        ResolveVoidRescue voidRescue =
+                new ResolveVoidRescue(repository, rescueTargets, kernel.worldLookup(), kernel.log(), clock);
+        VoidRescueListener voidRescueListener = new VoidRescueListener(voidRescue, teleporter, kernel.permissions());
         ResolvePortalDestination resolvePortal = new ResolvePortalDestination(repository);
         WorldPortalListener portalListener = new WorldPortalListener(resolvePortal, server, server.getLogger());
 
@@ -290,6 +298,7 @@ public final class WorldsWiring {
                 new ForceGamemodeListener(repository, kernel.scheduler()),
                 new AnimalSpawnListener(repository),
                 accessListener,
+                voidRescueListener,
                 portalListener);
         List<CommandRegistration> commands = WorldCommands.all(services, kernel.messages());
         Runnable startReconcile = () -> kernel.scheduler().onGlobal(() -> {

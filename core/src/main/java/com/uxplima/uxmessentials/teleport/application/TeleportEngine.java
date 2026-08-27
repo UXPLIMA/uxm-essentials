@@ -251,6 +251,17 @@ public final class TeleportEngine {
         executor.relocate(who, destination, TeleportKind.RANDOM, () -> grace.applyOnArrival(who));
     }
 
+    /**
+     * Move a player who did not ask to move: the void rescue a world performs when someone falls out of it.
+     * No warmup, no cooldown, no charge, and no {@code /back} point, since a rescue is not a place the player
+     * chose to leave. The arrival grace still applies, which is what stops the fall damage the drop earned.
+     */
+    public void relocateImmediately(PlayerRef who, Destination destination) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(destination, "destination");
+        executor.relocate(who, destination, TeleportKind.RESPAWN, () -> grace.applyOnArrival(who));
+    }
+
     private void onRandomArrived(PlayerRef who) {
         BigDecimal cost = settings.rtpCost();
         if (cost.signum() > 0) {

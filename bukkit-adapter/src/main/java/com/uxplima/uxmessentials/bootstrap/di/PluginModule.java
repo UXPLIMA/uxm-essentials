@@ -319,7 +319,9 @@ import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpQueries;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.TeleportRescueTargets;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldQueries;
+import com.uxplima.uxmessentials.worlds.application.port.RescueTargets;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmlib.advancement.Toasts;
 import com.uxplima.uxmlib.gui.Guis;
@@ -1819,6 +1821,8 @@ public final class PluginModule {
         // Captured for homes, which lands later and rebinds this seam so the respawn chain's HOME step resolves.
         links.homeRespawnLocator = wired.homeRespawnLocator();
         links.warpRespawnLocator = wired.warpRespawnLocator();
+        // Captured for the worlds void rescue, whose "spawn" step must land exactly where /spawn would.
+        links.spawnResolver = wired.services().resolveSpawn()::resolveDefault;
     }
 
     private static void wireWorlds(
@@ -1849,6 +1853,15 @@ public final class PluginModule {
         WorldEntryFee entryFee = new LinkedWorldEntryFee(() -> links.economyProvider, () -> links.economyCurrency);
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
+        // The void rescue resolves its "spawn" step through the same /spawn resolution the teleport context uses
+        // and its "warp:" step through the warps snapshot, both captured as seams so worlds keeps its single
+        // documented teleport dependency and a disabled warps module simply resolves no warp step.
+        var spawnResolver = Objects.requireNonNull(
+                links.spawnResolver,
+                "the worlds void rescue resolves spawns through the teleport context but it is unavailable");
+        MutableWarpRespawnLocator warpLocator = links.warpRespawnLocator;
+        RescueTargets rescueTargets = new TeleportRescueTargets(
+                spawnResolver, name -> warpLocator == null ? Optional.empty() : warpLocator.respawnWarp(name));
         WorldsWiring.Wired wired = WorldsWiring.wire(
                 ctx,
                 persistence,
@@ -1860,6 +1873,7 @@ public final class PluginModule {
                 textInput,
                 menus,
                 menuBindings,
+                rescueTargets,
                 plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -3096,6 +3110,10 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
         private @org.jspecify.annotations.Nullable MutableHomeRespawnLocator homeRespawnLocator;
         private @org.jspecify.annotations.Nullable MutableWarpRespawnLocator warpRespawnLocator;
+        private java.util.function.@org.jspecify.annotations.Nullable Function<
+                        com.uxplima.uxmessentials.shared.domain.WorldRef,
+                        Optional<com.uxplima.uxmessentials.shared.domain.Position>>
+                spawnResolver;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                 warpEditorView;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
