@@ -3,9 +3,12 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -20,20 +23,21 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
- * Reads the {@code commands/<module>.conf} files into the override map the
+ * Reads the root {@code commands.conf} file into the override map the
  * {@link com.uxplima.uxmessentials.shared.application.command.CommandCatalog} resolves against. Each file
- * holds a {@code commands { <id> { ... } }} block; ids are taken as raw HOCON map keys and merged across
- * files, so the per-module split is purely an operator convenience.
+ * holds a {@code commands { <id> { ... } }} block; ids are taken as raw HOCON map keys.
  *
- * <p>Files are read in name order for a deterministic merge, an absent {@code commands} directory yields
- * an empty map (so an untouched install simply uses code defaults), and a single unparseable file is
- * logged and skipped rather than failing the whole load — one bad edit must not silence every command's
- * overrides. Validating the id shape is the resolver's job, so the map is keyed by the raw string.
+ * <p>The historical {@code commands/commands.conf} layout is moved to the root atomically on first load when
+ * it is the directory's only config file. Installations that deliberately split the catalog across several
+ * {@code commands/*.conf} files remain readable as a deprecated fallback rather than losing operator edits.
+ * A root file is always authoritative when both layouts exist. A malformed file is logged and skipped rather
+ * than failing plugin enable; validating the id shape is the resolver's job.
  */
 @NullMarked
 public final class CommandCatalogConfig {
 
-    private static final String COMMANDS_DIR = "commands";
+    private static final String COMMANDS_FILE = "commands.conf";
+    private static final String LEGACY_COMMANDS_DIR = "commands";
     private static final String CONF_SUFFIX = ".conf";
     private static final String GUI_DEFAULT_KEY = "gui-default";
     private static final boolean GUI_DEFAULT = true;
@@ -56,27 +60,107 @@ public final class CommandCatalogConfig {
         }
     }
 
-    /** Merge every {@code commands/*.conf} override into a single map keyed by command id. */
+    /** Load the root catalog (or the deprecated split-file fallback) into a map keyed by command id. */
     public Map<String, CommandOverride> load() {
         return loadAll().overrides();
     }
 
-    /** Merge every {@code commands/*.conf} file into the override map plus the global {@code gui-default}. */
+    /** Load the catalog into the override map plus the global {@code gui-default}. */
     public Loaded loadAll() {
-        Path dir = dataFolder.resolve(COMMANDS_DIR);
+        Path rootFile = dataFolder.resolve(COMMANDS_FILE);
+        Path dir = dataFolder.resolve(LEGACY_COMMANDS_DIR);
+        if (Files.isRegularFile(rootFile)) {
+            warnIfLegacyAlsoExists(dir, rootFile);
+            return readFiles(List.of(rootFile));
+        }
         if (!Files.isDirectory(dir)) {
             return new Loaded(Map.of(), GUI_DEFAULT);
         }
-        Map<String, CommandOverride> result = new HashMap<>();
-        boolean[] guiDefault = {GUI_DEFAULT};
-        try (Stream<Path> files = Files.list(dir)) {
-            files.filter(CommandCatalogConfig::isConfFile)
+        if (removeEmptyLegacyDirectory(dir)) {
+            return new Loaded(Map.of(), GUI_DEFAULT);
+        }
+        if (migrateSingleLegacyFile(dir, rootFile)) {
+            return readFiles(List.of(rootFile));
+        }
+        log.warn("legacy command catalog directory {} is deprecated; move its files into {}", dir, rootFile);
+        return readLegacyDirectory(dir);
+    }
+
+    private Loaded readLegacyDirectory(Path dir) {
+        List<Path> files;
+        try (Stream<Path> listed = Files.list(dir)) {
+            files = listed.filter(CommandCatalogConfig::isConfFile)
                     .sorted(Comparator.comparing(Path::getFileName))
-                    .forEach(file -> readFile(file, result, guiDefault));
+                    .toList();
         } catch (IOException failure) {
             log.error("failed to list command override directory " + dir, failure);
+            return new Loaded(Map.of(), GUI_DEFAULT);
         }
+        return readFiles(files);
+    }
+
+    private Loaded readFiles(List<Path> files) {
+        Map<String, CommandOverride> result = new HashMap<>();
+        boolean[] guiDefault = {GUI_DEFAULT};
+        files.forEach(file -> readFile(file, result, guiDefault));
         return new Loaded(result, guiDefault[0]);
+    }
+
+    private boolean migrateSingleLegacyFile(Path dir, Path rootFile) {
+        Path legacyFile = dir.resolve(COMMANDS_FILE);
+        List<Path> configFiles;
+        try (Stream<Path> listed = Files.list(dir)) {
+            configFiles = listed.filter(CommandCatalogConfig::isConfFile).toList();
+        } catch (IOException failure) {
+            log.error("failed to inspect legacy command catalog directory " + dir, failure);
+            return false;
+        }
+        if (configFiles.size() != 1 || !configFiles.get(0).equals(legacyFile)) {
+            return false;
+        }
+        try {
+            movePreferAtomic(legacyFile, rootFile);
+            tryDeleteEmpty(dir);
+            log.info("migrated command catalog from {} to {}", legacyFile, rootFile);
+            return true;
+        } catch (IOException failure) {
+            log.error("failed to migrate command catalog from " + legacyFile + " to " + rootFile, failure);
+            return false;
+        }
+    }
+
+    private static void movePreferAtomic(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+            Files.move(source, target);
+        }
+    }
+
+    private static void tryDeleteEmpty(Path dir) {
+        try {
+            Files.delete(dir);
+        } catch (IOException ignored) {
+            // A non-empty legacy directory may contain an operator's unrelated files; retain it untouched.
+        }
+    }
+
+    private static boolean removeEmptyLegacyDirectory(Path dir) {
+        try (Stream<Path> children = Files.list(dir)) {
+            if (children.findAny().isPresent()) {
+                return false;
+            }
+        } catch (IOException ignored) {
+            return false;
+        }
+        tryDeleteEmpty(dir);
+        return !Files.exists(dir);
+    }
+
+    private void warnIfLegacyAlsoExists(Path dir, Path rootFile) {
+        if (Files.isDirectory(dir)) {
+            log.warn("ignoring legacy command catalog directory {} because {} is authoritative", dir, rootFile);
+        }
     }
 
     private static boolean isConfFile(Path file) {
@@ -108,7 +192,12 @@ public final class CommandCatalogConfig {
         Optional<String> name = (rawName == null || rawName.isBlank()) ? Optional.empty() : Optional.of(rawName);
         ConfigurationNode guiNode = node.node("gui");
         Optional<Boolean> gui = guiNode.virtual() ? Optional.empty() : Optional.of(guiNode.getBoolean());
-        return new CommandOverride(enabled, name, parseAliases(node.node("aliases")), gui);
+        return new CommandOverride(
+                enabled,
+                name,
+                parseAliases(node.node("aliases")),
+                gui,
+                parseLocalizedAliases(node.node("localized-aliases")));
     }
 
     private static List<String> parseAliases(ConfigurationNode node) {
@@ -123,5 +212,14 @@ public final class CommandCatalogConfig {
             }
         }
         return List.copyOf(aliases);
+    }
+
+    private static Map<String, List<String>> parseLocalizedAliases(ConfigurationNode node) {
+        if (!node.isMap()) {
+            return Map.of();
+        }
+        Map<String, List<String>> localized = new LinkedHashMap<>();
+        node.childrenMap().forEach((locale, aliases) -> localized.put(String.valueOf(locale), parseAliases(aliases)));
+        return Collections.unmodifiableMap(localized);
     }
 }

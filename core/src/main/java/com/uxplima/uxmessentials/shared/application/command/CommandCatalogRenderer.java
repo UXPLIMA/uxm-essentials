@@ -1,10 +1,11 @@
 package com.uxplima.uxmessentials.shared.application.command;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
- * Renders the resolved command surface into the HOCON an operator edits in {@code commands/commands.conf}.
+ * Renders the resolved command surface into the HOCON an operator edits in the root {@code commands.conf}.
  *
  * <p>This is the write half of the catalog: {@link CommandCatalogConfig} reads the same shape back. The
  * file is keyed by the stable {@link CommandId} rather than the renameable name, because the permission
@@ -38,6 +39,8 @@ public final class CommandCatalogRenderer {
                 .append(NL);
         out.append("# permission node stays the same even after you rename the command below.")
                 .append(NL);
+        out.append("# Command-surface edits take effect on the next server restart.")
+                .append(NL);
         out.append("#").append(NL);
         out.append("#   enabled = false   drops the command entirely (it registers nothing).")
                 .append(NL);
@@ -45,12 +48,14 @@ public final class CommandCatalogRenderer {
                 .append(NL);
         out.append("#   aliases           extra literals that map to the same command.")
                 .append(NL);
+        out.append("#   localized-aliases extra literals by locale (Unicode is supported), e.g. tr=[\"ev\"].")
+                .append(NL);
         out.append("#   gui               running the command bare opens its GUI; false falls back to usage text.")
                 .append(NL);
         out.append("#").append(NL);
         out.append("# This file was generated from the live command surface on first run and is left")
                 .append(NL);
-        out.append("# untouched afterwards; split it into several files under commands/ if you prefer.")
+        out.append("# untouched afterwards; later edits remain operator-owned across upgrades.")
                 .append(NL);
         out.append(NL);
     }
@@ -60,8 +65,25 @@ public final class CommandCatalogRenderer {
         out.append("    enabled = ").append(command.enabled()).append(NL);
         out.append("    name = ").append(quote(command.name())).append(NL);
         out.append("    aliases = ").append(renderAliases(command.aliases())).append(NL);
+        appendLocalizedAliases(out, command.localizedAliases());
         out.append("    gui = ").append(command.gui()).append(NL);
         out.append("  }").append(NL);
+    }
+
+    private static void appendLocalizedAliases(StringBuilder out, Map<String, List<String>> localized) {
+        if (localized.isEmpty()) {
+            out.append("    localized-aliases = {}").append(NL);
+            return;
+        }
+        out.append("    localized-aliases {").append(NL);
+        localized.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> out.append("      ")
+                        .append(quote(entry.getKey()))
+                        .append(" = ")
+                        .append(renderAliases(entry.getValue()))
+                        .append(NL));
+        out.append("    }").append(NL);
     }
 
     private static String renderAliases(List<String> aliases) {

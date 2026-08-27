@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
  *
  * <p>The value is the command's default English literal ({@code "home"}, {@code "tpa"}) and is the
  * single source of truth for config keying and the permission node. It never changes when an operator
- * renames the command in {@code commands/<module>.conf}, which is what keeps permissions stable across
+ * renames the command in {@code commands.conf}, which is what keeps permissions stable across
  * a rename. Constrained to the same lowercase, no-spaces shape a command literal allows.
  */
 public record CommandId(String value) {

@@ -32,7 +32,7 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 
 /**
  * The registration chokepoint must apply the catalog (rename/realias/drop) before it wraps survivors in
- * the locale binding, so an operator's {@code commands/*.conf} edits change what gets published. MockBukkit
+ * the locale binding, so an operator's {@code commands.conf} edits change what gets published. MockBukkit
  * boots Paper's Brigadier so the rename rebuild through {@link Commands#literal} is wired before the nodes
  * are built.
  */

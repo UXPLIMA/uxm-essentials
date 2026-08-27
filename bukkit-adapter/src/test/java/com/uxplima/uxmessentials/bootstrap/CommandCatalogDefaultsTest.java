@@ -19,7 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Proves the generated default file is round-trip-compatible with the shipped loader: rendering the
- * resolved surface into {@code commands/commands.conf} and reading it back through the real
+ * resolved surface into root {@code commands.conf} and reading it back through the real
  * {@link CommandCatalogConfig} reconstructs each command's name, aliases and enabled flag. This is the
  * contract that keeps the write half ({@link CommandCatalogRenderer}) and the read half in lockstep.
  */
@@ -28,16 +28,21 @@ class CommandCatalogDefaultsTest {
     @Test
     void generatedFileLoadsBackThroughTheRealLoader(@TempDir Path dataFolder) throws Exception {
         List<EffectiveCommand> surface = List.of(
-                new EffectiveCommand(new CommandId("home"), "home", List.of("h"), true, true),
+                new EffectiveCommand(
+                        new CommandId("home"), "home", List.of("h"), Map.of("tr", List.of("ev", "yuvam")), true, true),
                 new EffectiveCommand(new CommandId("tpa"), "call", List.of("tpask", "summon"), true, false),
                 new EffectiveCommand(new CommandId("spawn"), "spawn", List.of(), false, true));
-        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
-        Files.writeString(commands.resolve("commands.conf"), CommandCatalogRenderer.render(surface));
+        Files.writeString(dataFolder.resolve("commands.conf"), CommandCatalogRenderer.render(surface));
 
         Map<String, CommandOverride> loaded = new CommandCatalogConfig(dataFolder, new NoopLogger()).load();
 
         assertThat(loaded.get("home"))
-                .isEqualTo(new CommandOverride(true, Optional.of("home"), List.of("h"), Optional.of(true)));
+                .isEqualTo(new CommandOverride(
+                        true,
+                        Optional.of("home"),
+                        List.of("h"),
+                        Optional.of(true),
+                        Map.of("tr", List.of("ev", "yuvam"))));
         assertThat(loaded.get("tpa"))
                 .isEqualTo(
                         new CommandOverride(true, Optional.of("call"), List.of("tpask", "summon"), Optional.of(false)));

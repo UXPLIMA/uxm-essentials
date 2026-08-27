@@ -110,4 +110,69 @@ class CommandCatalogResolveTest {
         assertThat(res.effective().get(0).enabled()).isFalse();
         assertThat(res.effective().get(0).gui()).isTrue();
     }
+
+    @Test
+    void unicodeLocalizedAliasesAreRegisteredWithoutReplacingCanonicalAliases() {
+        CommandOverride home = new CommandOverride(
+                true,
+                Optional.empty(),
+                List.of("h"),
+                Optional.empty(),
+                Map.of("tr_TR", List.of("ev", "yuvam"), "de", List.of("zuhause")));
+
+        EffectiveCommand effective = CommandCatalog.resolve(List.of(def("home", "home")), Map.of("home", home), true)
+                .effective()
+                .get(0);
+
+        assertThat(effective.name()).isEqualTo("home");
+        assertThat(effective.aliases()).containsExactly("h");
+        assertThat(effective.localizedAliases().get("tr-tr")).containsExactly("ev", "yuvam");
+        assertThat(effective.localizedAliases().get("de")).containsExactly("zuhause");
+        assertThat(effective.registrationAliases()).containsExactlyInAnyOrder("h", "ev", "yuvam", "zuhause");
+    }
+
+    @Test
+    void sharedLocalizedAliasCanBelongToMultipleLocalesOfTheSameCommand() {
+        CommandOverride home = new CommandOverride(
+                true, Optional.empty(), List.of(), Optional.empty(), Map.of("tr", List.of("ev"), "az", List.of("ev")));
+
+        EffectiveCommand effective = CommandCatalog.resolve(List.of(def("home", "home")), Map.of("home", home), true)
+                .effective()
+                .get(0);
+
+        assertThat(effective.localizedAliases().get("tr")).containsExactly("ev");
+        assertThat(effective.localizedAliases().get("az")).containsExactly("ev");
+        assertThat(effective.registrationAliases()).containsExactly("ev");
+    }
+
+    @Test
+    void localizedAliasCollisionAcrossCommandsIsDroppedDeterministically() {
+        CommandOverride home =
+                new CommandOverride(true, Optional.empty(), List.of(), Optional.empty(), Map.of("tr", List.of("ev")));
+        CommandOverride warp =
+                new CommandOverride(true, Optional.empty(), List.of(), Optional.empty(), Map.of("tr", List.of("ev")));
+
+        CommandCatalog.Resolution result = CommandCatalog.resolve(
+                List.of(def("home", "home"), def("warp", "warp")), Map.of("home", home, "warp", warp), true);
+
+        assertThat(result.effective().get(0).localizedAliases().get("tr")).containsExactly("ev");
+        assertThat(result.effective().get(1).localizedAliases()).isEmpty();
+        assertThat(result.warnings()).anyMatch(warning -> warning.message().contains("collides"));
+    }
+
+    @Test
+    void invalidLocaleAndWhitespaceAliasAreDroppedButUnicodeLiteralSurvives() {
+        CommandOverride spawn = new CommandOverride(
+                true,
+                Optional.empty(),
+                List.of(),
+                Optional.empty(),
+                Map.of("???", List.of("nope"), "tr", List.of("başlangıç", "iki kelime", "/doğma")));
+
+        CommandCatalog.Resolution result =
+                CommandCatalog.resolve(List.of(def("spawn", "spawn")), Map.of("spawn", spawn), true);
+
+        assertThat(result.effective().get(0).localizedAliases().get("tr")).containsExactly("başlangıç");
+        assertThat(result.warnings()).hasSize(3);
+    }
 }

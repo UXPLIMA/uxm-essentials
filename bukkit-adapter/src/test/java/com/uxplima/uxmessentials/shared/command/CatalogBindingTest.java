@@ -89,6 +89,23 @@ class CatalogBindingTest {
         assertThat(wrapped.build().getLiteral()).isEqualTo("home");
     }
 
+    @Test
+    void localizedAliasesJoinTheGlobalPaperRegistrationSurface() {
+        EffectiveCommand effective = new EffectiveCommand(
+                new CommandId("home"),
+                "home",
+                List.of("h"),
+                Map.of("tr", List.of("ev", "yuvam"), "de", List.of("zuhause")),
+                true,
+                true);
+        CatalogBinding binding = new CatalogBinding(Map.of("home", effective));
+
+        CommandRegistration wrapped =
+                binding.apply(List.of(new StubRegistration("home"))).get(0);
+
+        assertThat(wrapped.aliases()).containsExactlyInAnyOrder("h", "ev", "yuvam", "zuhause");
+    }
+
     private record StubRegistration(String id) implements CommandRegistration {
         @Override
         public LiteralCommandNode<CommandSourceStack> build() {

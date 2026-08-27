@@ -69,7 +69,7 @@ public final class CatalogBinding {
 
         @Override
         public List<String> aliases() {
-            return effective.aliases();
+            return effective.registrationAliases();
         }
 
         @Override

@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
  * The curated muscle-memory aliases we ship turned on by default ({@code /m}, {@code /tell}, {@code /v},
  * {@code /gm}, {@code /h}, {@code /eat}, {@code /godmode}, {@code /lore}, …). These augment each command's code-side defaults before the catalog
  * resolves the operator's overrides, so the short forms people reach for from other plugins answer out
- * of the box without anyone editing {@code commands/<module>.conf}.
+ * of the box without anyone editing {@code commands.conf}.
  *
  * <p>The plural forms {@code homes}/{@code warps}/{@code kits} are shipped as aliases of
  * {@code home}/{@code warp}/{@code kit}: there are no standalone commands under those literals, so the

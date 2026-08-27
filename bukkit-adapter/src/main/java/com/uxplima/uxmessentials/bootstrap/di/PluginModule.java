@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -163,6 +164,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocalizedCommandVisibilityListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -281,6 +283,7 @@ import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
@@ -826,11 +829,16 @@ public final class PluginModule {
         resources.addCommand(new HelpCommand(resources::commands, kernel.messages()));
         // Resolved last, once every module and the bootstrap commands have contributed, so the catalog sees
         // the full default surface before it applies the operator's rename/alias/disable choices.
-        applyCatalog(plugin, kernel, resources);
+        applyCatalog(plugin, kernel, wiredKernel.localeStore(), wiredKernel.serverDefault(), resources);
         return resources;
     }
 
-    private static void applyCatalog(JavaPlugin plugin, KernelPorts kernel, CloseableResources resources) {
+    private static void applyCatalog(
+            JavaPlugin plugin,
+            KernelPorts kernel,
+            LocaleStore localeStore,
+            Locale serverDefault,
+            CloseableResources resources) {
         List<CommandDefinition> defs = CommandAliasDefaults.augment(resources.registered().stream()
                 .map(r -> new CommandDefinition(new CommandId(r.commandId()), r.defaultName(), r.defaultAliases()))
                 .toList());
@@ -838,12 +846,17 @@ public final class PluginModule {
                 new CommandCatalogConfig(plugin.getDataFolder().toPath(), kernel.log()).loadAll();
         CommandCatalog.Resolution resolution = CommandCatalog.resolve(defs, loaded.overrides(), loaded.guiDefault());
         resolution.warnings().forEach(w -> kernel.log().warn("command catalog: {}", w.message()));
-        // Seed the editable file from the resolved surface so a fresh install lands a self-documenting
-        // commands.conf instead of an empty folder the catalog would silently ignore.
+        // Seed the editable root file from the resolved surface so a fresh install lands a self-documenting
+        // commands.conf. The loader above first migrates the historical commands/commands.conf location.
         writeDefaultCatalog(plugin, resolution.effective(), kernel.log());
         Map<String, EffectiveCommand> byId =
                 resolution.effective().stream().collect(Collectors.toMap(e -> e.id().value(), e -> e));
         resources.catalogBinding(new CatalogBinding(byId));
+        resources.addListener(new LocalizedCommandVisibilityListener(
+                resolution.effective(),
+                localeStore,
+                serverDefault,
+                plugin.getPluginMeta().getName().toLowerCase(Locale.ROOT)));
         // The GUI binding reuses the same resolved map so a command's gui flag and rename agree on one entry.
         resources.guiRootBinding(new GuiRootBinding(byId));
     }
@@ -852,18 +865,19 @@ public final class PluginModule {
             JavaPlugin plugin,
             List<EffectiveCommand> effective,
             com.uxplima.uxmessentials.shared.application.port.Logger log) {
-        // Skip if any commands/ directory already exists: an operator who created or split the file keeps
-        // full control, and renames/alias edits survive every restart and upgrade untouched.
-        Path dir = plugin.getDataFolder().toPath().resolve("commands");
-        if (Files.exists(dir)) {
+        Path dataFolder = plugin.getDataFolder().toPath();
+        Path file = dataFolder.resolve("commands.conf");
+        // A split legacy catalog remains supported as a deprecated fallback. Do not silently flatten it because
+        // preserving operator comments and unknown future command ids matters more than forcing the new layout.
+        if (Files.exists(file) || Files.exists(dataFolder.resolve("commands"))) {
             return;
         }
         try {
-            Files.createDirectories(dir);
-            Files.writeString(dir.resolve("commands.conf"), CommandCatalogRenderer.render(effective));
+            Files.createDirectories(dataFolder);
+            Files.writeString(file, CommandCatalogRenderer.render(effective));
             log.info("wrote default command catalog with {} commands", effective.size());
         } catch (IOException failure) {
-            log.error("failed to write default command catalog to " + dir, failure);
+            log.error("failed to write default command catalog to " + file, failure);
         }
     }
 

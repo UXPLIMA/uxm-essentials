@@ -101,6 +101,7 @@ public final class LangCommand implements CommandRegistration {
         PlayerRef viewer = BukkitRefs.toRef(player);
         overrides.clearOverride(viewer);
         sink.deliver(viewer, messages.resolve(viewer, SharedMessageKey.LANG_RESET, Map.of()));
+        player.updateCommands();
         return Command.SINGLE_SUCCESS;
     }
 
@@ -126,6 +127,7 @@ public final class LangCommand implements CommandRegistration {
                 viewer,
                 messages.resolve(
                         viewer, SharedMessageKey.LANG_SET, Map.of("locale", requested.getDisplayLanguage(requested))));
+        player.updateCommands();
         return Command.SINGLE_SUCCESS;
     }
 

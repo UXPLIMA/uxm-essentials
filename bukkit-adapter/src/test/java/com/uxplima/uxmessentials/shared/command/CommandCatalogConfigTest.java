@@ -16,10 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Covers the outbound adapter that reads {@code commands/<module>.conf} files into the override map the
+ * Covers the outbound adapter that reads root {@code commands.conf} into the override map the
  * {@link com.uxplima.uxmessentials.shared.application.command.CommandCatalog} resolves against. The map
- * is keyed by the raw command id string; field defaults (enabled true, no rename, no aliases) mirror the
- * {@link CommandOverride} contract.
+ * is keyed by the raw command id string; the historical split directory remains a migration fallback.
  */
 class CommandCatalogConfigTest {
 
@@ -51,8 +50,7 @@ class CommandCatalogConfigTest {
 
     @Test
     void absentFieldsFallBackToDefaults(@TempDir Path dataFolder) throws Exception {
-        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
-        Files.writeString(commands.resolve("teleport.conf"), "commands { tpa { } }\n");
+        Files.writeString(dataFolder.resolve("commands.conf"), "commands { tpa { } }\n");
 
         Map<String, CommandOverride> map = new CommandCatalogConfig(dataFolder, new NoopLogger()).load();
 
@@ -65,9 +63,8 @@ class CommandCatalogConfigTest {
 
     @Test
     void readsPerCommandGuiAndGlobalDefault(@TempDir Path dataFolder) throws Exception {
-        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
         Files.writeString(
-                commands.resolve("commands.conf"),
+                dataFolder.resolve("commands.conf"),
                 "gui-default = false\ncommands { kit { gui = true }, pay { gui = false }, msg { } }\n");
 
         CommandCatalogConfig.Loaded loaded = new CommandCatalogConfig(dataFolder, new NoopLogger()).loadAll();
@@ -80,13 +77,50 @@ class CommandCatalogConfigTest {
 
     @Test
     void guiDefaultDefaultsToTrueWhenAbsent(@TempDir Path dataFolder) throws Exception {
-        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
-        Files.writeString(commands.resolve("commands.conf"), "commands { kit { } }\n");
+        Files.writeString(dataFolder.resolve("commands.conf"), "commands { kit { } }\n");
 
         assertThat(new CommandCatalogConfig(dataFolder, new NoopLogger())
                         .loadAll()
                         .guiDefault())
                 .isTrue();
+    }
+
+    @Test
+    void migratesTheHistoricalSingleCatalogToTheRoot(@TempDir Path dataFolder) throws Exception {
+        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
+        Path legacy = commands.resolve("commands.conf");
+        Files.writeString(legacy, "commands { home { name=\"ev\" } }\n");
+
+        Map<String, CommandOverride> loaded = new CommandCatalogConfig(dataFolder, new NoopLogger()).load();
+
+        assertThat(loaded.get("home").name()).contains("ev");
+        assertThat(Files.readString(dataFolder.resolve("commands.conf"))).contains("name=\"ev\"");
+        assertThat(legacy).doesNotExist();
+        assertThat(commands).doesNotExist();
+    }
+
+    @Test
+    void rootCatalogIsAuthoritativeWhenTheLegacyDirectoryAlsoExists(@TempDir Path dataFolder) throws Exception {
+        Files.writeString(dataFolder.resolve("commands.conf"), "commands { home { name=\"root\" } }\n");
+        Path legacy = Files.createDirectories(dataFolder.resolve("commands"));
+        Files.writeString(legacy.resolve("commands.conf"), "commands { home { name=\"legacy\" } }\n");
+
+        Map<String, CommandOverride> loaded = new CommandCatalogConfig(dataFolder, new NoopLogger()).load();
+
+        assertThat(loaded.get("home").name()).contains("root");
+    }
+
+    @Test
+    void readsUnicodeLocalizedAliasesFromTheRootCatalog(@TempDir Path dataFolder) throws Exception {
+        Files.writeString(
+                dataFolder.resolve("commands.conf"),
+                "commands { spawn { localized-aliases { tr=[\"doğma\",\"başlangıç\"], de=[\"startpunkt\"] } } }\n");
+
+        CommandOverride spawn =
+                new CommandCatalogConfig(dataFolder, new NoopLogger()).load().get("spawn");
+
+        assertThat(spawn.localizedAliases().get("tr")).containsExactly("doğma", "başlangıç");
+        assertThat(spawn.localizedAliases().get("de")).containsExactly("startpunkt");
     }
 
     @Test
