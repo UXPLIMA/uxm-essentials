@@ -79,6 +79,7 @@ import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlWiring;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.RulesCommandControlPlaceholders;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
+import com.uxplima.uxmessentials.customcommands.adapter.CustomCommandsWiring;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.outbound.api.DiscordLinkActions;
@@ -1313,6 +1314,8 @@ public final class PluginModule {
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
             wireCustomMenus(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
+        } else if (module.id().equals(ModuleId.of("customcommands"))) {
+            wireCustomCommands(plugin, ctx, resources, menus);
         } else if (module.id().equals(ModuleId.of("poses"))) {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
         } else if (module.id().equals(ModuleId.of("survival"))) {
@@ -1756,6 +1759,24 @@ public final class PluginModule {
                 guiLayouts,
                 textInput,
                 guiRegistry);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+    }
+
+    private static void wireCustomCommands(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, Menus menus) {
+        // customcommands consumes the always-on menu engine the same way custommenus does: it reads the operator's
+        // commands/custom/*.conf into the domain and registers one Brigadier command per definition. Registering
+        // here, inside module wiring, is what puts the registrations in front of applyCatalog, so a custom command
+        // lands in commands.conf beside the built-in ones and inherits its rename, alias and per-locale alias
+        // handling. The multi-currency facade built above prices a definition that declares a cost.
+        Currencies currencies = resources.currencies();
+        if (currencies == null) {
+            ctx.kernel().log().warn("custom commands wired before the currency facade; priced commands will run free");
+            return;
+        }
+        CustomCommandsWiring.Wired wired = CustomCommandsWiring.wire(
+                ctx, menus, currencies, plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }

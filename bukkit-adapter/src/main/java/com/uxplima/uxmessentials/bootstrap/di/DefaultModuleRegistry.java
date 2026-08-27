@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlModule;
 import com.uxplima.uxmessentials.communication.application.CommunicationModule;
+import com.uxplima.uxmessentials.customcommands.application.CustomCommandsModule;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusModule;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
@@ -164,6 +165,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // built in bootstrap), and like the steady-state features ships ENABLED but inert until an operator authors a
         // menu, so it lands last after npc.
         delegate.register(new CustomMenusModule());
+        // customcommands is a new bounded context: operator-declared Brigadier commands (commands/custom/*.conf) that
+        // run the same action and requirement vocabulary the menu engine already speaks. Like custommenus it consumes
+        // the engine bindings rather than owning an aggregate, carries no hard dependency edge, and ships ENABLED but
+        // inert until an operator writes a definition file, so it lands right after custommenus.
+        delegate.register(new CustomCommandsModule());
         // poses is the 23rd context — built-in GSit-parity sitting and posing (/sit, player-sit, /lay, /bellyflop,
         // /spin, /crawl). It carries no hard dependency edge (its collaborators are the shared Scheduler, messages,
         // permissions, and event ports, plus the claim/region gate it consults through a soft-couple in a later

@@ -14,6 +14,7 @@ final class ContentPermissions {
     private static final ModuleId NPC = ModuleId.of("npc");
     private static final ModuleId HOLOGRAMS = ModuleId.of("holograms");
     private static final ModuleId CUSTOMMENUS = ModuleId.of("custommenus");
+    private static final ModuleId CUSTOMCOMMANDS = ModuleId.of("customcommands");
     private static final ModuleId REGIONS = ModuleId.of("regions");
     private static final ModuleId VILLAGERS = ModuleId.of("villagers");
     private static final ModuleId SURVIVAL = ModuleId.of("survival");
@@ -31,6 +32,7 @@ final class ContentPermissions {
                         npc(),
                         holograms(),
                         custommenus(),
+                        customcommands(),
                         regions(),
                         villagers(),
                         survival(),
@@ -190,6 +192,36 @@ final class ContentPermissions {
                         "Hot-reload / inspect the custommenus module (operator custom menus behind /menu).",
                         PermissionDefault.OP,
                         CUSTOMMENUS));
+    }
+
+    private static List<PermissionSpec> customcommands() {
+        return List.of(
+                PermissionSpec.of(
+                        "uxmessentials.module.customcommands",
+                        "Hot-reload / inspect the customcommands module (operator-defined commands behind"
+                                + " /customcmd).",
+                        PermissionDefault.OP,
+                        CUSTOMCOMMANDS),
+                PermissionSpec.of(
+                        "uxmessentials.customcommand.admin",
+                        "/customcmd to list, inspect, reload, test and run operator-defined commands.",
+                        PermissionDefault.OP,
+                        CUSTOMCOMMANDS),
+                PermissionSpec.of(
+                        "uxmessentials.customcommand.run.others",
+                        "/customcmd run <id> <player>: run an operator-defined command for somebody else.",
+                        PermissionDefault.OP,
+                        CUSTOMCOMMANDS),
+                PermissionSpec.of(
+                        "uxmessentials.customcommand.cooldown.bypass",
+                        "Run an operator-defined command without waiting out its cooldown.",
+                        PermissionDefault.OP,
+                        CUSTOMCOMMANDS),
+                PermissionSpec.of(
+                        "uxmessentials.customcommand.cost.bypass",
+                        "Run an operator-defined command that costs money without paying for it.",
+                        PermissionDefault.OP,
+                        CUSTOMCOMMANDS));
     }
 
     private static List<PermissionSpec> regions() {

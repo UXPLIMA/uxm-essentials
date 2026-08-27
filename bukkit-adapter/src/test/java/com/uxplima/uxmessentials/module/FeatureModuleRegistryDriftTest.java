@@ -109,6 +109,7 @@ class FeatureModuleRegistryDriftTest {
                         "staff",
                         "npc",
                         "custommenus",
+                        "customcommands",
                         "poses",
                         "survival",
                         "ranks",

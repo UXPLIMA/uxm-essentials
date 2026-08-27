@@ -314,9 +314,20 @@ public final class Menus {
      * matching {@link #runActions}.
      */
     public void execute(PlayerRef target, Ref action) {
+        execute(target, action, Map.of());
+    }
+
+    /**
+     * Run one menu {@code action} for {@code target} with {@code arguments} bound, so an {@code %argument_<name>%}
+     * token inside the action resolves from a caller-supplied map rather than from an open window. This is what lets
+     * a config-declared command (a custom command, or a menu's own open command) run the shared action vocabulary
+     * with its typed arguments in hand and no inventory in sight.
+     */
+    public void execute(PlayerRef target, Ref action, Map<String, String> arguments) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(action, "action");
-        scheduler.onEntity(target, () -> runActions(MenuContext.of(target, null, 0), List.of(action)));
+        Objects.requireNonNull(arguments, "arguments");
+        scheduler.onEntity(target, () -> runActions(MenuContext.of(target, null, 0, arguments), List.of(action)));
     }
 
     /**
@@ -1151,22 +1162,34 @@ public final class Menus {
     }
 
     /**
-     * Whether this menu may open for {@code viewer} given its {@code open-requirement}. The gate is open — the open
-     * proceeds — when the engine was wired without a condition registry (every list/spec-only test engine) or the
-     * spec names no requirement, so an engine that predates this seam behaves byte-identically. Otherwise every
-     * requirement ref is an AND gate: each is resolved against the condition registry (the same registry-aware split
-     * the click path uses, so a valued token like {@code has-money:100} reaches its handler with {@code value=100}),
-     * has its {@code %argument_<name>%} tokens expanded from the arguments the menu was opened with (so a gate can read
-     * a typed open-command's argument, e.g. {@code expr:%argument_amount% > 0}), and must test true. An unregistered or
-     * false condition fails the gate closed, so a wiring gap keeps the window
-     * shut rather than showing it — a deny message is a later, DeluxeMenus-style concern, not this simple gate.
+     * Whether this menu may open for {@code viewer} given its {@code open-requirement}, evaluated by the shared
+     * {@link #passes} gate so the open path and a command's own requirements read a token identically.
      */
     private boolean gateOpen(MenuSpec spec, MenuContext ctx) {
+        return passes(ctx.viewer(), spec.openRequirement(), ctx.arguments());
+    }
+
+    /**
+     * Whether every requirement in {@code requirements} tests true for {@code viewer}, with {@code arguments} bound.
+     * The gate is open (the open proceeds, the command runs) when the engine was wired without a condition registry
+     * (every list/spec-only test engine) or nothing is required, so an engine that predates this seam behaves
+     * byte-identically. Otherwise every requirement ref is an AND gate: each is resolved against the condition
+     * registry (the same registry-aware split the click path uses, so a valued token like {@code has-money:100}
+     * reaches its handler with {@code value=100}), has its {@code %argument_<name>%} tokens expanded from
+     * {@code arguments} (so a gate can read a typed command argument, for example {@code expr:%argument_amount% > 0}),
+     * and must test true. An unregistered or false condition fails the gate closed, so a wiring gap keeps the window
+     * shut rather than showing it.
+     */
+    public boolean passes(PlayerRef viewer, List<Ref> requirements, Map<String, String> arguments) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(requirements, "requirements");
+        Objects.requireNonNull(arguments, "arguments");
         ConditionRegistry conditions = openConditionRegistry;
-        if (conditions == null || spec.openRequirement().isEmpty()) {
+        if (conditions == null || requirements.isEmpty()) {
             return true;
         }
-        for (Ref ref : spec.openRequirement()) {
+        MenuContext ctx = MenuContext.of(viewer, null, 0, arguments);
+        for (Ref ref : requirements) {
             Ref eff = ref.resolve(conditions::has);
             boolean pass = conditions
                     .get(eff.id())

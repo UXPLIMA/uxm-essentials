@@ -50,6 +50,7 @@ class ManagementHubCoverageDriftTest {
             "nametags",
             "commandcontrol",
             "servertweaks",
+            "customcommands", // a definition is a .conf file the operator writes; the module ships no GUI
             "vanish",
             "skin", // a skin is chosen by name or url through /skin, so there is no catalogue to browse
             // GUIs that only open onto a subject the viewer names first.

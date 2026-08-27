@@ -54,6 +54,7 @@ compass compass -
 condense condense compact
 copyinv copyinv -
 crawl crawl -
+customcmd customcmd customcommand
 day day -
 deathback deathback dback
 deposit deposit -

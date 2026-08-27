@@ -79,12 +79,18 @@ public final class PdcCooldowns implements Cooldowns {
 
     @Override
     public void stampLabel(PlayerRef who, String label) {
+        stampLabel(who, label, Duration.ZERO);
+    }
+
+    @Override
+    public void stampLabel(PlayerRef who, String label, Duration configDefault) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(label, "label");
+        Objects.requireNonNull(configDefault, "configDefault");
         if (permissions.has(who, "uxmessentials.cooldown.bypass." + label)) {
             return;
         }
-        long seconds = resolveSeconds(who, "uxmessentials.cooldown." + label, 0L);
+        long seconds = resolveSeconds(who, "uxmessentials.cooldown." + label, configDefault.toSeconds());
         writeStamp(who, keys.forName(LABEL_FEATURE_PREFIX + label), seconds);
     }
 

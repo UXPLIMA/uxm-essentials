@@ -38,6 +38,16 @@ public interface Cooldowns {
     void stampLabel(PlayerRef who, String label);
 
     /**
+     * Start the generic per-command cooldown clock keyed by {@code label}, using {@code configDefault} as the wait
+     * when the player holds no matching {@code uxmessentials.cooldown.<label>.<seconds>} node. A custom command
+     * declares its own cooldown in its file, and this is how that declared value reaches the stamp; the
+     * label-only form keeps meaning "whatever the permission nodes say, else no wait".
+     */
+    default void stampLabel(PlayerRef who, String label, Duration configDefault) {
+        stampLabel(who, label);
+    }
+
+    /**
      * When a teleport cooldown begins, configured per {@code teleport.conf} (default
      * {@link #TELEPORT}). Choosing {@link #TELEPORT} or {@link #ACCEPT} means a denied, expired, or
      * self-cancelled request never burns the requester's cooldown — a subtlety most plugins get
