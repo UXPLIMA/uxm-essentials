@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
+import com.uxplima.uxmessentials.customcommands.application.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
@@ -78,6 +79,7 @@ public final class MessageKeyCatalog {
             StaffMessageKey.values(),
             NpcMessageKey.values(),
             CustomMenusMessageKey.values(),
+            CustomCommandsMessageKey.values(),
             PosesMessageKey.values(),
             SurvivalMessageKey.values(),
             RanksMessageKey.values(),

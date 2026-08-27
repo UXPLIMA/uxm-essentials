@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
+import com.uxplima.uxmessentials.customcommands.application.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
@@ -174,6 +175,7 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(HologramsMessageKey.values(), List.of("hologram")),
                 Map.entry(StaffMessageKey.values(), List.of("staff")),
                 Map.entry(CustomMenusMessageKey.values(), List.of("menu")),
+                Map.entry(CustomCommandsMessageKey.values(), List.of("customcommand")),
                 Map.entry(PosesMessageKey.values(), List.of("poses")),
                 Map.entry(SurvivalMessageKey.values(), List.of("survival")),
                 Map.entry(RanksMessageKey.values(), List.of("ranks")),
