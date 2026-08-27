@@ -5,9 +5,12 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.TeleportNamedSpa
 import static com.uxplima.uxmessentials.persistence.jooq.tables.TeleportSpawnMirrors.TELEPORT_SPAWN_MIRRORS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.TeleportSpawns.TELEPORT_SPAWNS;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportMainSpawnRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportNamedSpawnsRecord;
@@ -37,6 +40,33 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
 
     public JooqSpawnDirectory(DSLContext dsl) {
         super(dsl);
+    }
+
+    /** Load the complete small spawn dataset in one bootstrap repository pass for the authoritative runtime cache. */
+    SpawnDirectorySnapshot snapshot() {
+        return read(dsl -> {
+            Map<UUID, Position> worlds = new LinkedHashMap<>();
+            for (TeleportSpawnsRecord row : dsl.selectFrom(TELEPORT_SPAWNS).fetch()) {
+                Position position = SpawnRows.toPosition(row);
+                worlds.put(position.world().uid(), position);
+            }
+            Map<String, Position> named = new LinkedHashMap<>();
+            for (TeleportNamedSpawnsRecord row :
+                    dsl.selectFrom(TELEPORT_NAMED_SPAWNS).fetch()) {
+                named.put(row.getName(), SpawnRows.toPosition(row));
+            }
+            Map<UUID, SpawnMirror> mirrors = new LinkedHashMap<>();
+            for (TeleportSpawnMirrorsRecord row :
+                    dsl.selectFrom(TELEPORT_SPAWN_MIRRORS).fetch()) {
+                SpawnMirror mirror = SpawnRows.toMirror(row);
+                mirrors.put(mirror.sourceWorld(), mirror);
+            }
+            Optional<Position> main = dsl.selectFrom(TELEPORT_MAIN_SPAWN)
+                    .where(TELEPORT_MAIN_SPAWN.ID.eq(0))
+                    .fetchOptional()
+                    .map(SpawnRows::toPosition);
+            return new SpawnDirectorySnapshot(worlds, named, mirrors, main);
+        });
     }
 
     @Override

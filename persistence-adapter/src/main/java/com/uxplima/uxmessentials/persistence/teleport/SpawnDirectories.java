@@ -11,8 +11,8 @@ import org.jspecify.annotations.NullMarked;
  * {@link SpawnDirectory} from the {@link Persistence} handle it already holds without ever naming a jOOQ type
  * (jOOQ is an {@code implementation} dependency of this module, kept off the consumer's compile classpath).
  *
- * <p>Left uncached: a {@code /spawn} read is a single keyed lookup on a primary-key index, already cheap, and
- * the bukkit-adapter decorates this store with the vanilla-world last-resort the embedded backend cannot know.
+ * <p>The production binding is wrapped by {@link CachedSpawnDirectory}; loaded worlds are warmed before listeners
+ * are registered, keeping automatic join/respawn reads off the database.
  */
 @NullMarked
 public final class SpawnDirectories {
@@ -23,5 +23,12 @@ public final class SpawnDirectories {
     public static SpawnDirectory jooq(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqSpawnDirectory(persistence.dsl());
+    }
+
+    /** A write-through cached jOOQ directory, exposed concretely so bootstrap can warm loaded worlds. */
+    public static CachedSpawnDirectory cachedConcrete(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        JooqSpawnDirectory durable = new JooqSpawnDirectory(persistence.dsl());
+        return new CachedSpawnDirectory(durable, () -> java.util.Optional.of(durable.snapshot()));
     }
 }

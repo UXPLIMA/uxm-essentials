@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.teleport.adapter.inbound.listener;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.bukkit.Location;
@@ -21,7 +22,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.SafeLocationQueue;
-import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
+import com.uxplima.uxmessentials.teleport.application.port.WarpRespawnLocator;
 import com.uxplima.uxmessentials.teleport.domain.RespawnStep;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import org.jspecify.annotations.NullMarked;
@@ -29,38 +30,37 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Drives the per-world {@link com.uxplima.uxmessentials.teleport.domain.RespawnChain} on death: walks the
- * configured chain for the world the player respawns into and, when a step resolves, redirects the
- * {@link PlayerRespawnEvent} to that position. A world that configures no chain resolves to nothing, so the
- * event is left untouched and the player respawns vanilla — the chain is strictly opt-in per world.
+ * configured chain for the world the player died in and, when a step resolves, redirects the
+ * {@link PlayerRespawnEvent} to that position. The shipped default preserves a valid bed/anchor and otherwise
+ * uses the resolved server spawn; the master switch or an explicit empty world override restores vanilla behavior.
  *
  * <p>Wired step kinds:
  *
  * <ul>
- *   <li>{@code SPAWN} — the teleport spawn directory's resolved spawn for the respawn world.
- *   <li>{@code HOME} — the player's lowest-slot home through the homes {@link HomeRespawnLocator} seam (a
+ *   <li>{@code SPAWN}: the same mirror → world spawn → main spawn → vanilla chain as {@code /spawn}.
+ *   <li>{@code HOME}: the player's lowest-slot home through the homes {@link HomeRespawnLocator} seam (a
  *       non-blocking cache read; empty on a cold cache or no homes).
- *   <li>{@code BED} — the player's stored bed/anchor respawn position ({@link Player#getRespawnLocation()}),
- *       or empty when none is set.
+ *   <li>{@code BED}/{@code ANCHOR}: the vanilla landing, distinguished by Paper's respawn flags.
+ *   <li>{@code WARP}: a named warp from the warps module's warmed snapshot.
+ *   <li>{@code RANDOM}: an immediate O(1) serve from the pre-warmed RTP pool.
  * </ul>
  *
- * <p>The remaining chain kinds — {@code ANCHOR}, {@code WARP}, {@code RANDOM} — return empty here (the chain
- * falls through to the next step). {@code BED} already covers the common anchor case, and the warp directory
- * is not handed to this listener. Respawn RTP is instead driven by the {@code rtp-on-respawn} config toggle
+ * <p>The legacy {@code rtp-on-respawn} config toggle remains supported
  * (a set of world names): when the chain resolves nothing for such a world, the listener serves a location
- * from the pre-warmed pool ({@link SafeLocationQueue#poll}) — an O(1) serve, never a synchronous search — and
+ * from the pre-warmed pool ({@link SafeLocationQueue#poll}): an O(1) serve, never a synchronous search, and
  * applies the arrival grace, so a random respawn is immediate and never generates a chunk on the death screen.
  *
  * <p>The listener runs at {@link EventPriority#NORMAL} and only ever <em>sets</em> a location when the chain
  * or the RTP toggle resolves; otherwise it leaves whatever bed/anchor location another plugin or the server
- * already chose. Because the default chain is empty and {@code rtp-on-respawn} defaults to no worlds,
- * installing this listener changes nothing until an operator opts a world in.
+ * already chose.
  */
 @NullMarked
 public final class RespawnListener implements Listener {
 
     private final ResolveRespawn resolveRespawn;
-    private final SpawnDirectory spawns;
+    private final Function<WorldRef, Optional<Position>> resolveSpawn;
     private final HomeRespawnLocator homeLocator;
+    private final WarpRespawnLocator warpLocator;
     private final Server server;
     private final SafeLocationQueue rtpQueue;
     private final ArrivalGrace grace;
@@ -68,15 +68,17 @@ public final class RespawnListener implements Listener {
 
     public RespawnListener(
             ResolveRespawn resolveRespawn,
-            SpawnDirectory spawns,
+            Function<WorldRef, Optional<Position>> resolveSpawn,
             HomeRespawnLocator homeLocator,
+            WarpRespawnLocator warpLocator,
             Server server,
             SafeLocationQueue rtpQueue,
             ArrivalGrace grace,
             Supplier<Set<String>> rtpOnRespawnWorlds) {
         this.resolveRespawn = Objects.requireNonNull(resolveRespawn, "resolveRespawn");
-        this.spawns = Objects.requireNonNull(spawns, "spawns");
+        this.resolveSpawn = Objects.requireNonNull(resolveSpawn, "resolveSpawn");
         this.homeLocator = Objects.requireNonNull(homeLocator, "homeLocator");
+        this.warpLocator = Objects.requireNonNull(warpLocator, "warpLocator");
         this.server = Objects.requireNonNull(server, "server");
         this.rtpQueue = Objects.requireNonNull(rtpQueue, "rtpQueue");
         this.grace = Objects.requireNonNull(grace, "grace");
@@ -86,43 +88,51 @@ public final class RespawnListener implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
-        WorldRef respawnWorld =
-                BukkitRefs.toPosition(event.getRespawnLocation()).world();
+        WorldRef deathWorld = BukkitRefs.toRef(player.getWorld());
         Optional<Position> resolved =
-                resolveRespawn.resolve(respawnWorld, (world, step) -> resolveStep(player, world, step));
+                resolveRespawn.resolve(deathWorld, (world, step) -> resolveStep(player, event, world, step));
         if (resolved.isPresent()) {
             resolved.flatMap(this::toLocation).ifPresent(event::setRespawnLocation);
             return;
         }
-        if (rtpOnRespawnWorlds.get().contains(respawnWorld.name())) {
-            serveRtpRespawn(player, respawnWorld, event);
+        if (rtpOnRespawnWorlds.get().contains(deathWorld.name())) {
+            serveRtpRespawn(player, deathWorld, event);
         }
     }
 
     private void serveRtpRespawn(Player player, WorldRef respawnWorld, PlayerRespawnEvent event) {
         Optional<RtpSafeLocation> location = rtpQueue.poll(respawnWorld);
         rtpQueue.requestRefill(respawnWorld);
-        // A drained pool leaves the vanilla respawn location and warms for next time — never a blocking search.
+        // A drained pool leaves the vanilla respawn location and warms for next time, never a blocking search.
         location.flatMap(l -> toLocation(l.position())).ifPresent(at -> {
             event.setRespawnLocation(at);
             grace.applyOnArrival(BukkitRefs.toRef(player));
         });
     }
 
-    private Optional<Position> resolveStep(Player player, WorldRef respawnWorld, RespawnStep step) {
+    private Optional<Position> resolveStep(
+            Player player, PlayerRespawnEvent event, WorldRef deathWorld, RespawnStep step) {
         return switch (step.kind()) {
-            case SPAWN -> spawns.defaultSpawn(respawnWorld);
+            case SPAWN -> resolveSpawn.apply(deathWorld);
             case HOME -> homeLocator.respawnHome(BukkitRefs.toRef(player));
-            case BED -> bedSpawn(player);
-            // ANCHOR/WARP/RANDOM are not wired into the respawn listener yet (see the class Javadoc); the
-            // chain falls through to the next step rather than blocking on a missing port.
-            case ANCHOR, WARP, RANDOM -> Optional.empty();
+            case BED -> vanillaRespawn(event.isBedSpawn(), event);
+            case ANCHOR -> vanillaRespawn(event.isAnchorSpawn(), event);
+            case WARP -> step.argumentValue().flatMap(warpLocator::respawnWarp);
+            case RANDOM -> randomRespawn(player, deathWorld);
         };
     }
 
-    private static Optional<Position> bedSpawn(Player player) {
-        Location respawn = player.getRespawnLocation();
-        return respawn == null ? Optional.empty() : Optional.of(BukkitRefs.toPosition(respawn));
+    private Optional<Position> randomRespawn(Player player, WorldRef world) {
+        Optional<RtpSafeLocation> location = rtpQueue.poll(world);
+        rtpQueue.requestRefill(world);
+        if (location.isPresent()) {
+            grace.applyOnArrival(BukkitRefs.toRef(player));
+        }
+        return location.map(RtpSafeLocation::position);
+    }
+
+    private static Optional<Position> vanillaRespawn(boolean matchingKind, PlayerRespawnEvent event) {
+        return matchingKind ? Optional.of(BukkitRefs.toPosition(event.getRespawnLocation())) : Optional.empty();
     }
 
     private Optional<Location> toLocation(Position position) {

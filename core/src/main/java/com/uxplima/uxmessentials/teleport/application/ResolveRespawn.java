@@ -17,7 +17,8 @@ import com.uxplima.uxmessentials.teleport.domain.RespawnStep;
  * adapter supplies, since those targets live behind ports — the urgent RTP path is used for the
  * {@code tpr} step so a respawn never blocks on a queue refill.
  *
- * <p>An empty result means no step resolved and the caller defers to vanilla respawn.
+ * <p>An empty result means no step resolved and the caller defers to vanilla respawn. The settings view supplies
+ * the global default chain unless death handling is disabled or a world explicitly overrides it.
  */
 public final class ResolveRespawn {
 

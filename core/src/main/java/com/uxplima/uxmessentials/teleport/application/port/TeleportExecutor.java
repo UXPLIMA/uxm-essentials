@@ -37,4 +37,13 @@ public interface TeleportExecutor {
         teleport(who, destination, kind);
         onLanded.run();
     }
+
+    /**
+     * Perform an involuntary relocation without creating a {@code /back} point. Join-spawn and first-join RTP use
+     * this path: logging in must not overwrite the last meaningful teleport/death location. Simple test executors
+     * fall back to their normal hop; the production adapter overrides this with an untracked async teleport.
+     */
+    default void relocate(PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded) {
+        teleport(who, destination, kind, onLanded);
+    }
 }

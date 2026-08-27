@@ -111,6 +111,11 @@ final class TeleportPermissions {
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
+                        "uxmessentials.spawn.join.exempt",
+                        "Exempt the player from automatic first-join/every-join spawn movement.",
+                        PermissionDefault.FALSE,
+                        TELEPORT),
+                PermissionSpec.of(
                         "uxmessentials.spawn.named",
                         "/spawn <name> to teleport to a named spawn.",
                         PermissionDefault.TRUE,

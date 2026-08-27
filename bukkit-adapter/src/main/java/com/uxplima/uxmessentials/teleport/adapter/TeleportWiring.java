@@ -11,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.teleport.CachedSpawnDirectory;
 import com.uxplima.uxmessentials.persistence.teleport.RtpPoolStores;
 import com.uxplima.uxmessentials.persistence.teleport.SpawnDirectories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -39,9 +40,9 @@ import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.ArrivalGraceGuard;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.BiomeHotspotListener;
-import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.FirstJoinRtpListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpirySweep;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.SpawnJoinListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.TeleportListeners;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.AsyncTeleportExecutor;
@@ -163,6 +164,7 @@ public final class TeleportWiring {
         // The home-respawn seam resolves to empty until the homes context lands and rebinds it (soft couple),
         // so a HOME step in a configured respawn chain falls through whenever homes is disabled.
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
+        MutableWarpRespawnLocator warpRespawnLocator = new MutableWarpRespawnLocator();
         SpawnDirectory spawns = spawns(plugin, persistence);
         RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running, claimProviders);
         // The post-arrival grace shields an /rtp landing (Resistance + Slow-Falling + a no-fall-damage window);
@@ -186,14 +188,15 @@ public final class TeleportWiring {
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener = new RespawnListener(
                 new ResolveRespawn(settings),
-                spawns,
+                services.resolveSpawn()::resolveDefault,
                 homeRespawnLocator,
+                warpRespawnLocator,
                 plugin.getServer(),
                 services.rtpQueue(),
                 graceGuard,
                 settings::rtpOnRespawnWorlds);
-        FirstJoinRtpListener firstJoinListener =
-                new FirstJoinRtpListener(services.resolveRtp(), settings::rtpOnFirstJoin);
+        SpawnJoinListener joinListener = new SpawnJoinListener(
+                settings, services.resolveSpawn(), services.resolveRtp(), services.executor(), kernel.permissions());
         // The per-player settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder
         // layout loader. It reads and writes the same TeleportFlags the /tptoggle and /tpauto commands do, so
         // /tpsettings, the panel, and the commands all see one switch. The teleport entry on the /uxmess gui hub
@@ -221,10 +224,11 @@ public final class TeleportWiring {
         return new Wired(
                 services,
                 commands,
-                listeners(services, config, respawnListener, firstJoinListener, graceGuard, rtp.hotspotListener()),
+                listeners(services, config, respawnListener, joinListener, graceGuard, rtp.hotspotListener()),
                 sweep,
                 jailGate,
                 homeRespawnLocator,
+                warpRespawnLocator,
                 running,
                 rtp.warmup(),
                 graceGuard);
@@ -437,7 +441,9 @@ public final class TeleportWiring {
         // The durable jOOQ store holds the per-world spawns, the main spawn, named spawns and mirror
         // redirects; the decorator adds the vanilla world spawn as the bottom-of-chain last resort so
         // /spawn answers on a fresh server before any /setspawn.
-        return new VanillaFallbackSpawnDirectory(SpawnDirectories.jooq(persistence), plugin.getServer());
+        CachedSpawnDirectory cached = SpawnDirectories.cachedConcrete(persistence);
+        cached.warmAll();
+        return new VanillaFallbackSpawnDirectory(cached, plugin.getServer());
     }
 
     /**
@@ -461,7 +467,7 @@ public final class TeleportWiring {
             TeleportServices services,
             ConfigStore config,
             RespawnListener respawnListener,
-            FirstJoinRtpListener firstJoinListener,
+            SpawnJoinListener joinListener,
             ArrivalGraceGuard graceGuard,
             @Nullable Listener hotspotListener) {
         List<Listener> listeners = new java.util.ArrayList<>(List.of(
@@ -471,7 +477,7 @@ public final class TeleportWiring {
                         config,
                         services.settings()::backCapturePolicy),
                 respawnListener,
-                firstJoinListener,
+                joinListener,
                 graceGuard));
         if (hotspotListener != null) {
             // Registered only when biome-targeting is on, so a disabled feature wires no ChunkLoadEvent listener.
@@ -491,6 +497,7 @@ public final class TeleportWiring {
      * @param expirySweep the self-rescheduling TTL sweep, armed by the caller
      * @param jailGate the rebindable jail gate moderation rebinds when it lands
      * @param homeRespawnLocator the rebindable home-respawn seam homes rebinds when it lands
+     * @param warpRespawnLocator the rebindable warp-respawn seam warps rebinds when it lands
      * @param running the flag flipped false on stop so the sweep and refill loops exit
      * @param poolWarmup the enable-time RTP pool pre-warm, or {@code null} when the persisted pool is disabled
      * @param graceGuard the post-arrival grace / fall-damage guard, cleared on stop
@@ -502,6 +509,7 @@ public final class TeleportWiring {
             RequestExpirySweep expirySweep,
             MutableJailGate jailGate,
             MutableHomeRespawnLocator homeRespawnLocator,
+            MutableWarpRespawnLocator warpRespawnLocator,
             AtomicBoolean running,
             @Nullable RtpPoolWarmup poolWarmup,
             ArrivalGraceGuard graceGuard) {
@@ -513,6 +521,7 @@ public final class TeleportWiring {
             Objects.requireNonNull(expirySweep, "expirySweep");
             Objects.requireNonNull(jailGate, "jailGate");
             Objects.requireNonNull(homeRespawnLocator, "homeRespawnLocator");
+            Objects.requireNonNull(warpRespawnLocator, "warpRespawnLocator");
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(graceGuard, "graceGuard");
         }

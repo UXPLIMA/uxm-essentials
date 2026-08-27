@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -27,7 +29,9 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemorySpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
+import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
@@ -38,6 +42,7 @@ import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,18 +50,13 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-/**
- * MockBukkit coverage of the first-join RTP path: a genuinely first-time join, when the toggle is on, serves
- * a location O(1) from the pre-warmed pool through the async engine (a plain poll — never a synchronous
- * search) and teleports immediately; a drained pool kicks a refill and leaves the player at spawn; and the
- * toggle being off is a no-op.
- */
-class FirstJoinRtpListenerTest {
+class SpawnJoinListenerTest {
 
     private ServerMock server;
     private FakeQueue queue;
     private RecordingExecutor executor;
-    private ResolveRtp resolveRtp;
+    private Notifier notifier;
+    private TeleportEngine engine;
 
     @BeforeEach
     void setUp() {
@@ -64,19 +64,18 @@ class FirstJoinRtpListenerTest {
         server.addSimpleWorld("world");
         queue = new FakeQueue();
         executor = new RecordingExecutor();
-        TeleportSettings settings = new TeleportSettings(new EmptyConfig());
-        Notifier notifier = new Notifier(new NoopMessages(), new NoopSink());
-        TeleportEngine engine = new TeleportEngine(
+        notifier = new Notifier(new NoopMessages(), new NoopSink());
+        TeleportSettings defaults = new TeleportSettings(new JoinConfig());
+        engine = new TeleportEngine(
                 new NoopCooldowns(),
                 new ImmediateWarmups(),
                 executor,
                 notifier,
                 new NoopEvents(),
-                settings,
+                defaults,
                 JailGate.NEVER,
                 TeleportFee.FREE,
                 ArrivalGrace.NONE);
-        resolveRtp = new ResolveRtp(queue, new AnyWorldLookup(), engine, notifier, settings);
     }
 
     @AfterEach
@@ -85,53 +84,105 @@ class FirstJoinRtpListenerTest {
     }
 
     @Test
-    void aFirstTimeJoinServesFromThePoolAndTeleportsImmediately() {
+    void firstJoinRtpTakesPrecedenceOverSpawn() {
         PlayerMock player = server.addPlayer();
         queue.next =
                 Optional.of(new RtpSafeLocation(Position.of(worldRef(player), 200, 70, 260), 320.0, Instant.EPOCH));
 
-        listener(true).onJoin(new PlayerJoinEvent(player, Component.empty()));
-
-        assertThat(queue.polls).isEqualTo(1); // O(1) serve from the pool, never a synchronous search
-        assertThat(executor.hops).isEqualTo(1); // immediate hop, no warmup
-    }
-
-    @Test
-    void aDrainedPoolKicksARefillAndLeavesThePlayerPut() {
-        PlayerMock player = server.addPlayer();
-        queue.next = Optional.empty();
-
-        listener(true).onJoin(new PlayerJoinEvent(player, Component.empty()));
+        listener(config(true, true, false), false).onJoin(new PlayerJoinEvent(player, Component.empty()));
 
         assertThat(queue.polls).isEqualTo(1);
-        assertThat(queue.refills).isEqualTo(1);
-        assertThat(executor.hops).isZero();
+        assertThat(executor.hops).isEqualTo(1);
+        assertThat(executor.lastKind).isEqualTo(TeleportKind.RANDOM);
     }
 
     @Test
-    void theToggleBeingOffIsANoOp() {
+    void defaultFirstJoinPolicyUsesResolvedSetspawn() {
         PlayerMock player = server.addPlayer();
-        queue.next =
-                Optional.of(new RtpSafeLocation(Position.of(worldRef(player), 200, 70, 260), 320.0, Instant.EPOCH));
 
-        listener(false).onJoin(new PlayerJoinEvent(player, Component.empty()));
+        listener(config(false, true, false), false).onJoin(new PlayerJoinEvent(player, Component.empty()));
+
+        assertThat(queue.polls).isZero();
+        assertThat(executor.hops).isEqualTo(1);
+        assertThat(executor.lastKind).isEqualTo(TeleportKind.SPAWN);
+        assertThat(java.util.Objects.requireNonNull(executor.lastDestination)
+                        .position()
+                        .x())
+                .isEqualTo(12);
+    }
+
+    @Test
+    void disabledJoinPoliciesLeaveThePlayerUntouched() {
+        PlayerMock player = server.addPlayer();
+
+        listener(config(false, false, false), false).onJoin(new PlayerJoinEvent(player, Component.empty()));
 
         assertThat(queue.polls).isZero();
         assertThat(executor.hops).isZero();
     }
 
-    private FirstJoinRtpListener listener(boolean enabled) {
-        return new FirstJoinRtpListener(resolveRtp, () -> enabled);
+    @Test
+    void exemptionPermissionSuppressesAllAutomaticJoinMovement() {
+        PlayerMock player = server.addPlayer();
+        queue.next =
+                Optional.of(new RtpSafeLocation(Position.of(worldRef(player), 200, 70, 260), 320.0, Instant.EPOCH));
+
+        listener(config(true, true, true), true).onJoin(new PlayerJoinEvent(player, Component.empty()));
+
+        assertThat(queue.polls).isZero();
+        assertThat(executor.hops).isZero();
+    }
+
+    private SpawnJoinListener listener(JoinConfig config, boolean exempt) {
+        TeleportSettings settings = new TeleportSettings(config);
+        WorldLookup worlds = new AnyWorldLookup();
+        InMemorySpawnDirectory spawns = new InMemorySpawnDirectory();
+        WorldRef world = new WorldRef(server.getWorld("world").getUID(), "world");
+        spawns.setDefaultSpawn(world, Position.of(world, 12, 70, 13));
+        ResolveSpawn resolveSpawn = new ResolveSpawn(spawns, worlds, engine, notifier);
+        ResolveRtp resolveRtp = new ResolveRtp(queue, worlds, engine, notifier, settings);
+        return new SpawnJoinListener(settings, resolveSpawn, resolveRtp, executor, new FixedPermissions(exempt));
+    }
+
+    private static JoinConfig config(boolean rtp, boolean firstJoin, boolean everyJoin) {
+        JoinConfig config = new JoinConfig();
+        config.booleans.put("rtp.rtp-on-first-join", rtp);
+        config.booleans.put("spawn.first-join", firstJoin);
+        config.booleans.put("spawn.every-join", everyJoin);
+        return config;
     }
 
     private static WorldRef worldRef(PlayerMock player) {
         return new WorldRef(player.getWorld().getUID(), player.getWorld().getName());
     }
 
+    private static final class JoinConfig implements ConfigStore {
+        private final Map<String, Boolean> booleans = new HashMap<>();
+
+        @Override
+        public boolean getBoolean(String path, boolean fallback) {
+            return booleans.getOrDefault(path, fallback);
+        }
+
+        @Override
+        public String getString(String path, String fallback) {
+            return fallback;
+        }
+
+        @Override
+        public int getInt(String path, int fallback) {
+            return fallback;
+        }
+
+        @Override
+        public List<String> getStringList(String path, List<String> fallback) {
+            return fallback;
+        }
+    }
+
     private static final class FakeQueue implements SafeLocationQueue {
         private Optional<RtpSafeLocation> next = Optional.empty();
         private int polls;
-        private int refills;
 
         @Override
         public Optional<RtpSafeLocation> poll(WorldRef world) {
@@ -150,17 +201,38 @@ class FirstJoinRtpListenerTest {
         }
 
         @Override
-        public void requestRefill(WorldRef world) {
-            refills++;
-        }
+        public void requestRefill(WorldRef world) {}
     }
 
     private static final class RecordingExecutor implements TeleportExecutor {
         private int hops;
+        private @Nullable TeleportKind lastKind;
+        private @Nullable Destination lastDestination;
 
         @Override
         public void teleport(PlayerRef who, Destination destination, TeleportKind kind) {
             hops++;
+            lastKind = kind;
+            lastDestination = destination;
+        }
+    }
+
+    private static final class FixedPermissions implements Permissions {
+        private final boolean exempt;
+
+        private FixedPermissions(boolean exempt) {
+            this.exempt = exempt;
+        }
+
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return exempt;
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+            return QuotaResult.limited(configDefault);
         }
     }
 
@@ -217,27 +289,5 @@ class FirstJoinRtpListenerTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
-    }
-
-    private record EmptyConfig() implements ConfigStore {
-        @Override
-        public boolean getBoolean(String path, boolean fallback) {
-            return fallback;
-        }
-
-        @Override
-        public String getString(String path, String fallback) {
-            return fallback;
-        }
-
-        @Override
-        public int getInt(String path, int fallback) {
-            return fallback;
-        }
-
-        @Override
-        public List<String> getStringList(String path, List<String> fallback) {
-            return fallback;
-        }
     }
 }

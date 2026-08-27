@@ -82,10 +82,25 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         Objects.requireNonNull(destination, "destination");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(onLanded, "onLanded");
-        scheduler.onEntity(who, () -> hop(who, destination, kind, onLanded));
+        scheduler.onEntity(who, () -> hop(who, destination, kind, onLanded, true, true));
     }
 
-    private void hop(PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded) {
+    @Override
+    public void relocate(PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(onLanded, "onLanded");
+        scheduler.onEntity(who, () -> hop(who, destination, kind, onLanded, false, false));
+    }
+
+    private void hop(
+            PlayerRef who,
+            Destination destination,
+            TeleportKind kind,
+            Runnable onLanded,
+            boolean captureBack,
+            boolean showArrival) {
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null || !player.isOnline()) {
             return; // despawned between launch and hop — nothing to move
@@ -97,11 +112,13 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             return;
         }
         Position from = TeleportRefs.positionOf(player);
-        captureBack(who, from);
+        if (captureBack) {
+            captureBack(who, from);
+        }
         // teleportAsync retains passengers and vehicles by default and performs the region hop and async
         // chunk load internally; the entity scheduler is already on the player's region thread.
         var ignored = player.teleportAsync(to)
-                .whenComplete((ok, err) -> onArrival(who, kind, from, target, ok, err, onLanded));
+                .whenComplete((ok, err) -> onArrival(who, kind, from, target, ok, err, onLanded, showArrival));
     }
 
     private void onArrival(
@@ -111,7 +128,8 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             Position to,
             Boolean ok,
             Throwable err,
-            Runnable onLanded) {
+            Runnable onLanded,
+            boolean showArrival) {
         if (err != null) {
             log.warn("teleport failed for {}: {}", who.name(), String.valueOf(err.getMessage()));
             return;
@@ -121,8 +139,10 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         }
         scheduler.onEntity(who, () -> {
             events.publish(new PlayerTeleported(who, kind, from, to));
-            arrivalHud.arrived(who, kind);
-            arrivalEffects.arrived(who, kind);
+            if (showArrival) {
+                arrivalHud.arrived(who, kind);
+                arrivalEffects.arrived(who, kind);
+            }
             // The cooldown stamp / RTP charge / arrival grace hang off a real landing only — never a refusal.
             onLanded.run();
         });

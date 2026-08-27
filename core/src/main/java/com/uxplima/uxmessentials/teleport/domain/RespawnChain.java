@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * The {@code DEATH_MANAGEMENT} respawn-chain value object: a per-world <em>ordered</em> list of
  * {@link RespawnStep}s walked on death until one resolves to a valid location. The first resolvable
  * target wins, so an operator composes respawn behaviour declaratively per world
- * ({@code teleport.respawn.chain.<world>} = {@code tpr;spawn;home;bed;warp:hub;anchor}).
+ * ({@code respawn.chain.<world>} = {@code ["rtp", "spawn", "home", "bed", "warp:hub", "anchor"]}).
  *
  * <p>The chain itself is pure ordering and the walk algorithm; <em>resolving</em> a step to a concrete
  * {@link Position} (reading the world spawn, the player's home, the warp directory, the urgent RTP

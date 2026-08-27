@@ -252,15 +252,42 @@ public final class TeleportSettings {
         return new YBand(minY, maxY);
     }
 
+    /** Whether a genuinely new player is moved to the resolved spawn on first join; default on. */
+    public boolean spawnOnFirstJoin() {
+        return config.getBoolean("spawn.first-join", true);
+    }
+
+    /** Whether every join is moved to the resolved spawn; default off. */
+    public boolean spawnOnEveryJoin() {
+        return config.getBoolean("spawn.every-join", false);
+    }
+
+    /** Permission which exempts a player from automatic join-spawn movement. */
+    public String joinSpawnExemptPermission() {
+        return config.getString("spawn.exempt-permission", "uxmessentials.spawn.join.exempt")
+                .strip();
+    }
+
+    /** Whether deaths are managed by the configured/default respawn chain; default on. */
+    public boolean spawnOnRespawn() {
+        return config.getBoolean("spawn.respawn", true);
+    }
+
     /**
-     * The per-world respawn chain parsed from {@code respawn.chain.<world>}, or an empty chain when the
-     * world configures none. An empty chain resolves to nothing, so the respawn listener leaves the event
-     * untouched and the player respawns vanilla — the chain is opt-in per world, never overriding a death
-     * landing an operator has not asked us to manage.
+     * The per-world respawn chain. {@code respawn.chain.<world>} remains the highest-priority, backwards-compatible
+     * override; otherwise {@code spawn.respawn-chain} is used. An explicitly empty per-world list opts that world
+     * back into vanilla respawning.
      */
     public RespawnChain respawnChain(WorldRef world) {
         Objects.requireNonNull(world, "world");
-        List<String> tokens = config.getStringList("respawn.chain." + world.name(), List.of());
+        if (!spawnOnRespawn()) {
+            return RespawnChain.parse(List.of());
+        }
+        List<String> missing = List.of("__uxmessentials_missing_respawn_chain__");
+        List<String> tokens = config.getStringList("respawn.chain." + world.name(), missing);
+        if (tokens.equals(missing)) {
+            tokens = config.getStringList("spawn.respawn-chain", List.of("bed", "anchor", "spawn"));
+        }
         return RespawnChain.parse(tokens);
     }
 

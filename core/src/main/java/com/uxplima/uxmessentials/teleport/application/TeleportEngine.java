@@ -248,7 +248,7 @@ public final class TeleportEngine {
     public void arriveRandomImmediately(PlayerRef who, Destination destination) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(destination, "destination");
-        executor.teleport(who, destination, TeleportKind.RANDOM, () -> grace.applyOnArrival(who));
+        executor.relocate(who, destination, TeleportKind.RANDOM, () -> grace.applyOnArrival(who));
     }
 
     private void onRandomArrived(PlayerRef who) {

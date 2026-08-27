@@ -293,6 +293,7 @@ import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.RendererTablistPlaceholders;
 import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
+import com.uxplima.uxmessentials.teleport.adapter.MutableWarpRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.LinkedTeleportFee;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportQueries;
@@ -310,6 +311,7 @@ import com.uxplima.uxmessentials.villagers.adapter.VillagersWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteQueries;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
+import com.uxplima.uxmessentials.warps.adapter.outbound.RepositoryWarpRespawnLocator;
 import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpQueries;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
@@ -1802,6 +1804,7 @@ public final class PluginModule {
         links.jailGate = wired.jailGate();
         // Captured for homes, which lands later and rebinds this seam so the respawn chain's HOME step resolves.
         links.homeRespawnLocator = wired.homeRespawnLocator();
+        links.warpRespawnLocator = wired.warpRespawnLocator();
     }
 
     private static void wireWorlds(
@@ -2018,6 +2021,13 @@ public final class PluginModule {
                 .toList();
     }
 
+    private static void bindWarpRespawn(ContextLinks links, RepositoryWarpRespawnLocator locator) {
+        MutableWarpRespawnLocator holder = links.warpRespawnLocator;
+        if (holder != null) {
+            holder.bind(locator);
+        }
+    }
+
     private static void wireWarps(
             ModuleContext ctx,
             Persistence persistence,
@@ -2048,6 +2058,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        bindWarpRespawn(links, new RepositoryWarpRespawnLocator(wired.repository()));
         links.placeholders.warps(new RepositoryWarpsPlaceholders(wired.listWarps()));
         links.queries.register(
                 UxmWarpsQuery.class,
@@ -3070,6 +3081,7 @@ public final class PluginModule {
                 playtimeAfkStatus;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
         private @org.jspecify.annotations.Nullable MutableHomeRespawnLocator homeRespawnLocator;
+        private @org.jspecify.annotations.Nullable MutableWarpRespawnLocator warpRespawnLocator;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                 warpEditorView;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
