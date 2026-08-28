@@ -9,7 +9,7 @@ val uxmRepo: String = (project.findProperty("uxmRepo") as String?)
         ?: "https://raw.githubusercontent.com/UXPLIMA/uxmEssentials/maven"
 
 // Which version to resolve. A release pins this; CI passes the version the tree currently builds.
-val uxmVersion: String = (project.findProperty("uxmVersion") as String?) ?: "0.8.1"
+val uxmVersion: String = (project.findProperty("uxmVersion") as String?) ?: "0.8.2"
 
 repositories {
     maven(uxmRepo) { name = "uxmEssentials" }
