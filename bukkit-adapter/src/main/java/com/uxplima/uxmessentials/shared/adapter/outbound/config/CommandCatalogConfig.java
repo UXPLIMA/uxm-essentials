@@ -32,6 +32,12 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  * {@code commands/*.conf} files remain readable as a deprecated fallback rather than losing operator edits.
  * A root file is always authoritative when both layouts exist. A malformed file is logged and skipped rather
  * than failing plugin enable; validating the id shape is the resolver's job.
+ *
+ * <p>Only {@code .conf} files sitting directly in {@code commands/} were ever part of that old layout, and
+ * that is exactly what this looks for. The directory itself is no longer ours alone: the customcommands
+ * module keeps its definitions in {@code commands/custom/}, so on a fresh install the directory exists and
+ * holds nothing of ours. Treating its mere presence as a legacy catalog is what made every first boot print a
+ * deprecation notice telling the operator to move files that were not there.
  */
 @NullMarked
 public final class CommandCatalogConfig {
@@ -79,6 +85,11 @@ public final class CommandCatalogConfig {
         if (removeEmptyLegacyDirectory(dir)) {
             return new Loaded(Map.of(), GUI_DEFAULT);
         }
+        if (legacyConfFiles(dir).isEmpty()) {
+            // The directory belongs to something else now (customcommands writes commands/custom/). There is no
+            // catalog here to deprecate, so there is nothing to say.
+            return new Loaded(Map.of(), GUI_DEFAULT);
+        }
         if (migrateSingleLegacyFile(dir, rootFile)) {
             return readFiles(List.of(rootFile));
         }
@@ -87,16 +98,22 @@ public final class CommandCatalogConfig {
     }
 
     private Loaded readLegacyDirectory(Path dir) {
-        List<Path> files;
+        return readFiles(legacyConfFiles(dir));
+    }
+
+    /**
+     * The {@code .conf} files directly inside {@code commands/}, in name order. Subdirectories are not part of
+     * the old layout and belong to whoever put them there, so they are not descended into.
+     */
+    private List<Path> legacyConfFiles(Path dir) {
         try (Stream<Path> listed = Files.list(dir)) {
-            files = listed.filter(CommandCatalogConfig::isConfFile)
+            return listed.filter(CommandCatalogConfig::isConfFile)
                     .sorted(Comparator.comparing(Path::getFileName))
                     .toList();
         } catch (IOException failure) {
             log.error("failed to list command override directory " + dir, failure);
-            return new Loaded(Map.of(), GUI_DEFAULT);
+            return List.of();
         }
-        return readFiles(files);
     }
 
     private Loaded readFiles(List<Path> files) {
@@ -108,13 +125,7 @@ public final class CommandCatalogConfig {
 
     private boolean migrateSingleLegacyFile(Path dir, Path rootFile) {
         Path legacyFile = dir.resolve(COMMANDS_FILE);
-        List<Path> configFiles;
-        try (Stream<Path> listed = Files.list(dir)) {
-            configFiles = listed.filter(CommandCatalogConfig::isConfFile).toList();
-        } catch (IOException failure) {
-            log.error("failed to inspect legacy command catalog directory " + dir, failure);
-            return false;
-        }
+        List<Path> configFiles = legacyConfFiles(dir);
         if (configFiles.size() != 1 || !configFiles.get(0).equals(legacyFile)) {
             return false;
         }
@@ -157,8 +168,12 @@ public final class CommandCatalogConfig {
         return !Files.exists(dir);
     }
 
+    /**
+     * Say something only when there is a real split-layout catalog being ignored. The directory holding a
+     * {@code custom/} subfolder and nothing else is the normal shape of a fresh install, not a conflict.
+     */
     private void warnIfLegacyAlsoExists(Path dir, Path rootFile) {
-        if (Files.isDirectory(dir)) {
+        if (Files.isDirectory(dir) && !legacyConfFiles(dir).isEmpty()) {
             log.warn("ignoring legacy command catalog directory {} because {} is authoritative", dir, rootFile);
         }
     }

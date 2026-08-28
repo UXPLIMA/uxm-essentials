@@ -136,12 +136,79 @@ class CommandCatalogConfigTest {
         assertThat(map.get("home").name()).contains("casa");
     }
 
+    @Test
+    void aCommandsDirectoryHoldingOnlyCustomCommandsIsNotALegacyCatalog(@TempDir Path dataFolder) throws Exception {
+        // The shape of a fresh install since the customcommands module shipped: commands/ exists, but everything
+        // in it belongs to that module. Warning here told operators to move files that were not there.
+        Path custom = Files.createDirectories(dataFolder.resolve("commands").resolve("custom"));
+        Files.writeString(custom.resolve("example.conf"), "hello { permission = \"uxmessentials.custom.hello\" }\n");
+        RecordingLogger log = new RecordingLogger();
+
+        Map<String, CommandOverride> map = new CommandCatalogConfig(dataFolder, log).load();
+
+        assertThat(map).isEmpty();
+        assertThat(log.warnings).isEmpty();
+        assertThat(custom.resolve("example.conf"))
+                .as("the custom command definitions are not ours to read, move or delete")
+                .exists();
+    }
+
+    @Test
+    void aRootCatalogBesideOnlyCustomCommandsSaysNothingAboutBeingOverridden(@TempDir Path dataFolder)
+            throws Exception {
+        Files.writeString(dataFolder.resolve("commands.conf"), "commands { home { enabled=false } }\n");
+        Files.createDirectories(dataFolder.resolve("commands").resolve("custom"));
+        RecordingLogger log = new RecordingLogger();
+
+        Map<String, CommandOverride> map = new CommandCatalogConfig(dataFolder, log).load();
+
+        assertThat(map.get("home").enabled()).isFalse();
+        assertThat(log.warnings)
+                .as("there is no competing catalog to ignore, so there is nothing to report")
+                .isEmpty();
+    }
+
+    @Test
+    void aRealSplitCatalogIsStillReportedAsDeprecated(@TempDir Path dataFolder) throws Exception {
+        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
+        Files.writeString(commands.resolve("teleport.conf"), "commands { tpa { enabled=true } }\n");
+        Files.writeString(commands.resolve("homes.conf"), "commands { home { enabled=false } }\n");
+        RecordingLogger log = new RecordingLogger();
+
+        Map<String, CommandOverride> map = new CommandCatalogConfig(dataFolder, log).load();
+
+        assertThat(map).containsKeys("tpa", "home");
+        assertThat(log.warnings)
+                .as("an operator who really did split the catalog still needs telling")
+                .anyMatch(warning -> warning.contains("deprecated"));
+    }
+
     private static final class NoopLogger implements Logger {
         @Override
         public void info(String message, Object... args) {}
 
         @Override
         public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
+    /** Keeps the warnings so a test can assert on what an operator would actually see in the log. */
+    private static final class RecordingLogger implements Logger {
+
+        private final List<String> warnings = new java.util.ArrayList<>();
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {
+            warnings.add(message);
+        }
 
         @Override
         public void error(String message, Throwable cause) {}
