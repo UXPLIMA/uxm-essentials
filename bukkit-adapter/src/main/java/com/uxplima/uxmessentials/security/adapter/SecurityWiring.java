@@ -148,8 +148,11 @@ public final class SecurityWiring {
         // The module's own two teleports (into the holding area and back out) announce themselves here, because the
         // freeze cancels teleports and a teleport event names a cause, never an author.
         FreezeTeleports ownTeleports = new FreezeTeleports();
+        // Resolved lazily: the plugin enables before the worlds exist, so parsing here would look up a world that
+        // is not there yet and turn a good configured value into an "unknown world" warning. Bootstrap warms it
+        // once the worlds are up, which is where the warning for a genuinely bad value belongs.
         FreezeHoldingArea holdingArea = new FreezeHoldingArea(
-                FreezeHoldingArea.parse(config.joinVerification().holdingArea(), kernel.log())
+                () -> FreezeHoldingArea.parse(config.joinVerification().holdingArea(), kernel.log())
                         .orElse(null),
                 ownTeleports,
                 kernel.log());

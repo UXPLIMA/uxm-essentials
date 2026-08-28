@@ -4,6 +4,13 @@ main: com.uxplima.uxmessentials.bootstrap.UxmEssentialsPlugin
 bootstrapper: com.uxplima.uxmessentials.bootstrap.UxmEssentialsBootstrap
 loader: com.uxplima.uxmessentials.bootstrap.UxmEssentialsLoader
 api-version: '1.21'
+
+# Enabled before the worlds are created, which is the only way CraftServer.getGenerator will accept
+# `generator: uxmEssentials:void` for the default world: it refuses a generator whose plugin is not
+# enabled yet, and the default world is built before a POSTWORLD plugin enables. The cost is that
+# onLoad and onEnable both run with no worlds in existence, so wiring that needs one hands its work
+# to WorldPhase and it runs at ServerLoadEvent instead.
+load: STARTUP
 authors: ['UXPLIMA']
 description: 'All-in-one essentials: homes, warps, teleport, DB-backed economy, kits, player-state, private messages + mail, presence, lightweight moderation, item/world utilities — organised as first-class hot-reloadable feature modules with an EssentialsX migration path.'
 website: 'https://github.com/UXPLIMA/uxmEssentials'

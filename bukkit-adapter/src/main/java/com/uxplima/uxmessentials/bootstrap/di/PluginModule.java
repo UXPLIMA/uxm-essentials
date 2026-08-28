@@ -392,6 +392,10 @@ public final class PluginModule {
     public static CloseableResources wire(JavaPlugin plugin) {
         Logger log = plugin.getLogger();
         CloseableResources resources = new CloseableResources(log);
+        // Assigned before any module is wired: the plugin loads at STARTUP so that the default world can reach
+        // getDefaultWorldGenerator, which means every wiring step below runs with no worlds loaded. Anything that
+        // needs one hands its work to this phase (see WorldPhase).
+        resources.worldPhase(new WorldPhase(plugin.getServer(), log));
         return closeOnFailure(resources, () -> wireUnchecked(plugin, resources));
     }
 
@@ -1545,6 +1549,7 @@ public final class PluginModule {
                 ipCapture.recorder());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.worldPhase().run("security holding area", wired.holdingArea()::warmUp);
         resources.onClose(wired::stop);
         // The read reports the shape of a registration and never its material, and the two writes both go in the
         // safe direction: make somebody prove themselves again, or let somebody back in early.
@@ -1807,6 +1812,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
+        resources.worldPhase().run("rtp pool warmup", wired::warmRtpPool);
         resources.onClose(wired::stop);
         links.teleportEngine = wired.services().engine();
         // The teleport PAPI seam reads the same cooldown gate, warmup tracker, /back store, tpa registry and
@@ -2679,6 +2685,7 @@ public final class PluginModule {
                 menus,
                 menuBindings);
         wired.commands().forEach(resources::addCommand);
+        resources.worldPhase().run("hologram spawn", wired::spawnStored);
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
         links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));
@@ -2753,6 +2760,7 @@ public final class PluginModule {
                 links.economyBackends);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.worldPhase().run("player-warp legacy migration", wired.legacyMigration());
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands
         // hold, so a placeholder matches what /setpwarp enforces and the /pwarps list shows.
         links.placeholders.playerwarps(new RepositoryPlayerwarpsPlaceholders(wired.repository(), wired.quota()));

@@ -56,6 +56,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable GuiRootBinding guiRootBinding;
     private @Nullable UsageBinding usageBinding;
     private @Nullable WorldGeneratorResolver worldGeneratorResolver;
+    private @Nullable WorldPhase worldPhase;
     private @Nullable Hooks hooks;
     private @Nullable Currencies currencies;
     private @Nullable PlayerDataStore playerData;
@@ -136,9 +137,11 @@ public final class CloseableResources implements AutoCloseable {
 
     /**
      * Captures the worlds context's built-in generator resolver so the plugin's
-     * {@code getDefaultWorldGenerator} hook can serve {@code uxmEssentials:void|flat} worlds loaded from
-     * server.properties. Set during {@code wireWorlds}; stays null when worlds is disabled (the module never
-     * wires), which the hook reads as "fall back to vanilla generation".
+     * {@code getDefaultWorldGenerator} hook can serve {@code uxmEssentials:void|flat} to any world configured
+     * with {@code generator: uxmEssentials:<id>} in {@code bukkit.yml}, the default world included. Set during
+     * {@code wireWorlds}; stays null when worlds is disabled (the module never wires), which the hook reads as
+     * "fall back to vanilla generation" and says so in the log rather than leaving an operator to wonder why
+     * they got terrain.
      */
     public void worldGeneratorResolver(WorldGeneratorResolver resolver) {
         this.worldGeneratorResolver = Objects.requireNonNull(resolver, "resolver");
@@ -147,6 +150,29 @@ public final class CloseableResources implements AutoCloseable {
     /** The captured worlds generator resolver, or null when worlds is disabled (vanilla fallback). */
     public @Nullable WorldGeneratorResolver worldGeneratorResolver() {
         return worldGeneratorResolver;
+    }
+
+    /**
+     * Sets the phase that holds enable-time work back until the worlds exist. Assigned once, at the top of
+     * {@link PluginModule#wire}, before any module is wired.
+     */
+    public void worldPhase(WorldPhase phase) {
+        this.worldPhase = Objects.requireNonNull(phase, "phase");
+    }
+
+    /**
+     * The phase wiring hands world-dependent work to (see {@link WorldPhase} for why any of this is needed).
+     *
+     * @throws IllegalStateException when the phase has not been set, which means a caller reached this before
+     *     {@link PluginModule#wire} assigned it
+     */
+    public WorldPhase worldPhase() {
+        WorldPhase phase = this.worldPhase;
+        if (phase == null) {
+            throw new IllegalStateException("the world phase is set at the top of PluginModule.wire; "
+                    + "a caller reached it before that, which means the wiring order changed");
+        }
+        return phase;
     }
 
     /**

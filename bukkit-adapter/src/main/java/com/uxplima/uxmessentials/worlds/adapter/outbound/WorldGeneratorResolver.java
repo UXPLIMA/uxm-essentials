@@ -20,8 +20,8 @@ import org.jspecify.annotations.NullMarked;
  * parallel, off-tick worldgen threads.
  *
  * <p>This is the single handle both {@code BukkitWorldEngine} (internal {@code /worlds create}) and the
- * plugin's {@code getDefaultWorldGenerator} hook (server.properties / foreign plugins) call, so a
- * {@code uxmEssentials:void|flat} ref resolves identically on either path.
+ * plugin's {@code getDefaultWorldGenerator} hook ({@code bukkit.yml}, the default world included, and worlds
+ * another plugin creates) call, so a {@code uxmEssentials:void|flat} ref resolves identically on either path.
  */
 @NullMarked
 public final class WorldGeneratorResolver {

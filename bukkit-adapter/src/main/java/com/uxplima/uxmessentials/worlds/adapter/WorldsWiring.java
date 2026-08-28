@@ -411,7 +411,7 @@ public final class WorldsWiring {
      * in-flight off-tick writes), the built-in generator resolver, and the worlds placeholder seam. The
      * resolver is non-null whenever worlds wires (it is always built from the config); bootstrap captures it
      * onto the holder the plugin retains so {@code getDefaultWorldGenerator} can serve {@code generator:
-     * uxmEssentials:void|flat} worlds loaded from server.properties. The placeholder seam is registered onto
+     * uxmEssentials:void|flat} to any world configured in {@code bukkit.yml}, the default world included. The placeholder seam is registered onto
      * the shared placeholder contexts so the {@code worlds_*} tokens resolve while the module is enabled. The
      * open-world-list seam opens the engine-rendered {@code /world gui} world picker the management hub also opens.
      * The register, the engine and the entry gate are handed back so bootstrap can build the published worlds query

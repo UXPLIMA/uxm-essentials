@@ -434,6 +434,54 @@ class ArchitectureTest {
         });
     }
 
+    /**
+     * Wiring runs before the worlds exist, so it may not ask for them.
+     *
+     * <p>The plugin declares {@code load: STARTUP} in {@code paper-plugin.yml}, because that is the only way
+     * {@code getDefaultWorldGenerator} is ever reached for the default world: {@code CraftServer.getGenerator}
+     * refuses a generator whose plugin is not enabled yet. The price is that {@code onEnable}, and therefore
+     * every {@code wire} method below it, runs at a point where the server has no worlds at all.
+     *
+     * <p>What that breaks is quiet rather than loud. {@code getWorlds()} returns an empty list, so a warmup or a
+     * migration keyed on it does nothing and says nothing; {@code createWorld} builds a world before the server
+     * has made its own. Four wiring paths were doing exactly this before the STARTUP switch, and none of them
+     * would have failed a test. Enumerating or creating worlds during wiring is therefore banned outright:
+     * hand the work to {@code WorldPhase} instead and it runs at {@code ServerLoadEvent}, which is the first
+     * moment the worlds are up on a boot and immediately on a runtime re-wire.
+     *
+     * <p>Reads of a single world through a player or a stored position are untouched, because a wiring class
+     * also holds the callbacks it registers, and those run later with a real player in hand.
+     */
+    @ArchTest
+    static final ArchRule wiringDoesNotEnumerateOrCreateWorlds = noClasses()
+            .that()
+            .resideInAPackage("..uxmessentials..")
+            .and(areProductionClasses())
+            .and(areWiringClasses())
+            .should(callMethodWhere(enumeratesOrCreatesWorlds()))
+            .because("the plugin enables before the worlds exist (load: STARTUP), so wiring that counts or makes "
+                    + "worlds silently does nothing; hand it to WorldPhase and it runs once they are up");
+
+    /** The classes that run during enable: bootstrap's own wiring and each context's {@code *Wiring}. */
+    private static DescribedPredicate<JavaClass> areWiringClasses() {
+        return DescribedPredicate.describe("are wiring classes", javaClass -> {
+            String name = javaClass.getName();
+            return name.startsWith("com.uxplima.uxmessentials.bootstrap.di.PluginModule")
+                    || name.matches(".*\\.[A-Za-z]+Wiring(\\$.*)?$");
+        });
+    }
+
+    /** Matches the whole-server world calls: listing every world, or making and unmaking one. */
+    private static DescribedPredicate<JavaMethodCall> enumeratesOrCreatesWorlds() {
+        return DescribedPredicate.describe(
+                "enumerate or create worlds",
+                call -> WHOLE_SERVER_WORLD_CALLS.contains(call.getName())
+                        && (call.getTargetOwner().getName().equals("org.bukkit.Bukkit")
+                                || call.getTargetOwner().getName().equals("org.bukkit.Server")));
+    }
+
+    private static final List<String> WHOLE_SERVER_WORLD_CALLS = List.of("getWorlds", "createWorld", "unloadWorld");
+
     private static final List<String> ALLOWED_BY_NAME_RESOLVERS = List.of(
             "com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup",
             "com.uxplima.uxmessentials.shared.adapter.outbound.claim.",

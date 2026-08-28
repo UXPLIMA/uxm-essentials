@@ -220,7 +220,6 @@ public final class HologramsWiring {
         events.subscribe(npcSubscriber);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         HologramServices services = assemble(kernel, repository, renderer, notifier, npcLocator);
-        spawnStored(repository, renderer);
         // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
         // refresh tick; this listener re-evaluates only the gated holograms for that one player.
         plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
@@ -406,14 +405,6 @@ public final class HologramsWiring {
                 new ListHologramActions(repository, notifier));
     }
 
-    private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {
-        // Each render hops onto the hologram's own region thread inside the renderer, so this is safe to call
-        // straight from the enable path; a world that is not yet loaded is skipped with a warning there.
-        for (Hologram hologram : repository.all()) {
-            renderer.render(hologram);
-        }
-    }
-
     /**
      * Everything the holograms module contributes once wired: the single Brigadier command and the renderer
      * whose live display entities must be despawned on stop so a reload re-spawns cleanly.
@@ -448,6 +439,20 @@ public final class HologramsWiring {
             Objects.requireNonNull(npcSubscriber, "npcSubscriber");
             Objects.requireNonNull(connector, "connector");
             Objects.requireNonNull(listMenu, "listMenu");
+        }
+
+        /**
+         * Spawn every stored hologram.
+         *
+         * <p>Called once the worlds exist, not during wiring. The plugin enables at {@code load: STARTUP}, so on
+         * the wiring thread {@code Bukkit.getWorld(uid)} answers null for every hologram on the server and the
+         * renderer would skip each one with a "world not loaded" warning that blames the operator's data rather
+         * than the startup order. Each render still hops onto the hologram's own region thread inside the renderer.
+         */
+        public void spawnStored() {
+            for (Hologram hologram : repository.all()) {
+                renderer.render(hologram);
+            }
         }
 
         /**

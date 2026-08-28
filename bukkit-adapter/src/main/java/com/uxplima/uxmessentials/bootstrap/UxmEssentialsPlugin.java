@@ -100,6 +100,10 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         });
 
         getLogger().info("[5/5] Registering listener hooks...");
+        // The plugin enables at STARTUP (paper-plugin.yml) so the default world can reach
+        // getDefaultWorldGenerator, which means everything above ran with no worlds loaded. This listener
+        // releases the work the wiring held back until they exist (see WorldPhase).
+        getServer().getPluginManager().registerEvents(new WorldPhaseListener(wired.worldPhase(), getLogger()), this);
         // Same isolation on the listener side: one listener that throws on registration must not stop the rest.
         wired.listeners().forEach(listener -> {
             try {
@@ -125,15 +129,37 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
     }
 
     /**
-     * Serves our built-in {@code uxmEssentials:void|flat} generators to worlds whose
-     * {@code generator:} is configured in server.properties or requested by another plugin. Reads the
-     * resolver the worlds module captured during wiring; null (worlds disabled or an unknown id) falls
-     * back to vanilla generation.
+     * Serves our built-in {@code uxmEssentials:void|flat} generators to any world configured with
+     * {@code generator: uxmEssentials:<id>}, including the default world.
+     *
+     * <p>The default world is the case this hook exists for and the case that used to be impossible.
+     * {@code CraftServer.getGenerator} refuses a generator whose plugin is not enabled yet, and the default
+     * world is created before a {@code POSTWORLD} plugin enables, so the hook was simply never called and the
+     * world generated as vanilla terrain with a SEVERE nobody could act on. The plugin therefore declares
+     * {@code load: STARTUP}; {@link com.uxplima.uxmessentials.bootstrap.di.WorldPhase} carries the cost of that.
+     *
+     * <p>A null return means vanilla generation, so the two ways of getting there are logged rather than left
+     * silent: an operator who asked for our generator and got terrain instead deserves to be told which of the
+     * two happened.
      */
     @Override
     public @Nullable ChunkGenerator getDefaultWorldGenerator(String worldName, @Nullable String id) {
         CloseableResources wired = this.resources;
-        return resolveGenerator(wired == null ? null : wired.worldGeneratorResolver(), id);
+        WorldGeneratorResolver resolver = wired == null ? null : wired.worldGeneratorResolver();
+        if (resolver == null) {
+            getLogger()
+                    .warning("World '" + worldName + "' asked for our generator, but the worlds module is off,"
+                            + " so it will generate as normal terrain. Enable the worlds module in"
+                            + " modules.conf, or drop the generator line for this world.");
+            return null;
+        }
+        ChunkGenerator generator = resolveGenerator(resolver, id);
+        if (generator == null) {
+            getLogger()
+                    .warning("World '" + worldName + "' asked for generator '" + id + "', which is not one of"
+                            + " ours, so it will generate as normal terrain. The built-in ids are void and flat.");
+        }
+        return generator;
     }
 
     /** The pure resolve step behind {@link #getDefaultWorldGenerator}, factored out for unit testing. */

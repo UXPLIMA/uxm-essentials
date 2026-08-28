@@ -88,9 +88,9 @@ public final class BukkitWorldEngine implements WorldEngine {
     /**
      * Routes a generator ref onto the {@link WorldCreator}: our own {@code uxmEssentials:void|flat} refs
      * take the object overload (the resolver's {@code ChunkGenerator}), so they behave identically across
-     * every path that supplies the spec — an internal {@link #create}, a {@link #load} of a registered
-     * world (the spec is re-applied), and a world loaded via {@code server.properties} through the plugin's
-     * {@code getDefaultWorldGenerator} hook. Any other token — an unknown built-in id or an external
+     * every path that supplies the spec: an internal {@link #create}, a {@link #load} of a registered
+     * world (the spec is re-applied), and a world configured in {@code bukkit.yml} and served through the
+     * plugin's {@code getDefaultWorldGenerator} hook. Any other token, an unknown built-in id or an external
      * {@code plugin[:args]} ref — takes Bukkit's String overload unchanged.
      */
     void applyGenerator(WorldCreator creator, GeneratorRef g) {

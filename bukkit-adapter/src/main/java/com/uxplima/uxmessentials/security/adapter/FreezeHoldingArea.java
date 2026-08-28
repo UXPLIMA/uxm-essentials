@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -37,7 +38,22 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class FreezeHoldingArea {
 
-    private final @Nullable Location destination;
+    /**
+     * Where the holding area is, resolved on first use rather than at construction.
+     *
+     * <p>The plugin enables at {@code load: STARTUP}, so during wiring the server has no worlds and
+     * {@code Bukkit.getWorld(name)} answers null for a perfectly good configured value. Resolving eagerly there
+     * would turn every configured holding area into an "unknown world" warning and silently disable the feature.
+     * {@link #warmUp()} does the resolution once the worlds are up, so a genuinely bad value is still reported at
+     * startup rather than on the first freeze.
+     */
+    private final Supplier<@Nullable Location> source;
+
+    /** The resolved destination, and whether the resolution has happened. Written under {@code this}. */
+    private @Nullable Location destination;
+
+    private boolean resolved;
+
     private final FreezeTeleports ownTeleports;
     private final Logger log;
 
@@ -47,10 +63,27 @@ public final class FreezeHoldingArea {
     /** Players currently in the holding area, kept apart from {@link #origins} so a missing origin is still tracked. */
     private final Set<UUID> held = ConcurrentHashMap.newKeySet();
 
-    public FreezeHoldingArea(@Nullable Location destination, FreezeTeleports ownTeleports, Logger log) {
-        this.destination = destination;
+    public FreezeHoldingArea(Supplier<@Nullable Location> source, FreezeTeleports ownTeleports, Logger log) {
+        this.source = Objects.requireNonNull(source, "source");
         this.ownTeleports = Objects.requireNonNull(ownTeleports, "ownTeleports");
         this.log = Objects.requireNonNull(log, "log");
+    }
+
+    /**
+     * Resolve the configured destination now, so a bad value is logged at startup instead of on the first freeze.
+     * Called once the worlds exist; resolving twice is a no-op.
+     */
+    public void warmUp() {
+        destination();
+    }
+
+    /** The destination, resolved on the first call and remembered after that. */
+    private synchronized @Nullable Location destination() {
+        if (!resolved) {
+            destination = source.get();
+            resolved = true;
+        }
+        return destination;
     }
 
     /**
@@ -95,19 +128,20 @@ public final class FreezeHoldingArea {
 
     /** Whether a holding area is configured at all; false makes every other method a no-op. */
     public boolean isConfigured() {
-        return destination != null;
+        return destination() != null;
     }
 
     /** Remember where {@code player} is and move them to the holding area. Must run on their own region thread. */
     public void hold(Player player) {
         Objects.requireNonNull(player, "player");
-        if (destination == null) {
+        Location target = destination();
+        if (target == null) {
             return;
         }
         UUID id = player.getUniqueId();
         origins.putIfAbsent(id, player.getLocation());
         held.add(id);
-        if (!ownTeleports.teleport(player, destination)) {
+        if (!ownTeleports.teleport(player, target)) {
             // They are still standing where they were, so there is nothing to hand back later. Forgetting the origin
             // now is what stops the verification from "returning" them to a place they never left.
             origins.remove(id);

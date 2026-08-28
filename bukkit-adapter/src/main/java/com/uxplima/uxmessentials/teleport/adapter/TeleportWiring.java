@@ -527,11 +527,22 @@ public final class TeleportWiring {
         }
 
         /**
-         * Arm the expiry sweep and, when the persisted pool is enabled, pre-warm each world's RTP queue from disk;
-         * call after the listeners and commands are registered.
+         * Arm the expiry sweep; call after the listeners and commands are registered. Touches no world, so it is
+         * safe on the enable thread even though the plugin enables before the worlds exist.
          */
         public void startBackgroundWork() {
             expirySweep.start();
+        }
+
+        /**
+         * Pre-warm each world's RTP queue from the persisted pool, when the pool is enabled.
+         *
+         * <p>Split out of {@link #startBackgroundWork()} because it enumerates {@code getWorlds()}: at
+         * {@code load: STARTUP} that list is empty during enable, so pre-warming there would quietly warm
+         * nothing and leave the first {@code /rtp} of every session to search from cold. It runs through
+         * {@code WorldPhase} instead, once the worlds are up.
+         */
+        public void warmRtpPool() {
             if (poolWarmup != null) {
                 poolWarmup.start();
             }

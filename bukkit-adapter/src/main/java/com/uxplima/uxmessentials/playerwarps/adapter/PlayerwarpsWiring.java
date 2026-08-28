@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -17,8 +16,6 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.JooqPlayerWarpEconomy;
-import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpDataMigration;
-import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRenameNotice;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommands;
@@ -35,6 +32,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.Playerwarp
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitCrossServerTeleport;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitRatingRewardGranter;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.PlayerWarpLegacyMigration;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.ReceiptedPlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RentSweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.SponsorExpirySweep;
@@ -159,7 +157,10 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
-        runLegacyMigration(plugin, persistence, kernel, bus.publisher().serverId());
+        // Handed back on Wired rather than run here: it needs the world list, and at load: STARTUP the wiring
+        // thread has none. Bootstrap releases it through WorldPhase once the worlds are up.
+        Runnable legacyMigration = new PlayerWarpLegacyMigration(
+                plugin, persistence, kernel, bus.publisher().serverId())::run;
         // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
         // wraps that same cache so a local write announces it to peers (the homes seam, copied for player-warps).
         com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository cached =
@@ -450,7 +451,8 @@ public final class PlayerwarpsWiring {
                 editPlayerWarp,
                 archivePlayerWarp,
                 rentSweep,
-                sponsorSweep);
+                sponsorSweep,
+                legacyMigration);
     }
 
     /**
@@ -638,57 +640,6 @@ public final class PlayerwarpsWiring {
     }
 
     /**
-     * Copy the shipped player-warp data from the V70 {@code _v1_legacy} tables into the new surrogate-id schema,
-     * once, off the tick thread, then claim this backend's {@code server_id} onto the NULL-{@code server_id} rows
-     * (the migrated ones and any left by the basic create path) in the same pass. The routine self-disables by
-     * dropping the legacy tables after a successful copy, so scheduling it on every enable is safe: after the first
-     * run there is nothing left to migrate and it returns immediately. It stays off the tick thread because the whole
-     * scan and its writes must never block enable.
-     *
-     * <p>A now-duplicate name is renamed on the way in, and the owner is told through a callback so the migration
-     * itself need not know about the messaging module. Reaching the offline-mailbox from here would mean threading
-     * the messaging context's send-mail port through this wiring, which it does not yet carry, so a rename is
-     * recorded in the operator log for now; delivering it as mail to the owner is a follow-up.
-     *
-     * <p>The world list is read here, on the enable thread, because {@code Server#getWorlds()} is a main-thread read;
-     * the immutable uid snapshot is then handed to the off-tick task. A world loaded after enable stays NULL until
-     * the next enable's claim, which is acceptable — the cross-server phase only needs a stable home tag, and P4's
-     * rich-create can stamp a warp on create.
-     */
-    private static void runLegacyMigration(
-            Plugin plugin, Persistence persistence, KernelPorts kernel, String serverId) {
-        Consumer<PlayerWarpRenameNotice> onRename = notice -> kernel.log()
-                .info(
-                        "event=playerwarp_renamed owner={} from={} to={}",
-                        notice.owner(),
-                        notice.oldName(),
-                        notice.newName());
-        List<String> localWorldUids = plugin.getServer().getWorlds().stream()
-                .map(world -> world.getUID().toString())
-                .toList();
-        kernel.scheduler().async(() -> {
-            PlayerWarpDataMigration.run(persistence, onRename, kernel.log());
-            claimServerId(persistence, kernel, serverId, localWorldUids);
-        });
-    }
-
-    /**
-     * Stamp this backend's {@code network.server-id} onto the freshly-migrated (and any other) NULL-{@code server_id}
-     * rows living in this backend's worlds, logging the affected-row count. A blank server-id is a misconfiguration
-     * that must not crash enable, so the claim is skipped with a debug line and the rows are left for the next pass.
-     */
-    private static void claimServerId(
-            Persistence persistence, KernelPorts kernel, String serverId, List<String> localWorldUids) {
-        if (serverId.isBlank()) {
-            kernel.log().debug("event=playerwarp_server_claim_skipped reason=blank_server_id");
-            return;
-        }
-        int claimed = com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpServerClaimer.claim(
-                persistence, serverId, localWorldUids);
-        kernel.log().info("event=playerwarp_server_claim server={} claimed={}", serverId, claimed);
-    }
-
-    /**
      * Build the player-warp management list (now an engine menu) and editor over the shared GUI framework. The
      * editor's back button reopens the list, so a one-slot holder breaks the list↔editor construction cycle (the
      * editor is built first, the list second, and the holder is filled before either is shown) — the same pattern
@@ -871,7 +822,8 @@ public final class PlayerwarpsWiring {
             EditPlayerWarp editPlayerWarp,
             ArchivePlayerWarp archivePlayerWarp,
             @org.jspecify.annotations.Nullable RentSweep rentSweep,
-            @org.jspecify.annotations.Nullable SponsorExpirySweep sponsorSweep) {
+            @org.jspecify.annotations.Nullable SponsorExpirySweep sponsorSweep,
+            Runnable legacyMigration) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -882,6 +834,7 @@ public final class PlayerwarpsWiring {
             Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
             Objects.requireNonNull(editPlayerWarp, "editPlayerWarp");
             Objects.requireNonNull(archivePlayerWarp, "archivePlayerWarp");
+            Objects.requireNonNull(legacyMigration, "legacyMigration");
         }
 
         /** Arm the rent and sponsor sweeps, when they were wired; a no-op for a sub-group that is off. */
