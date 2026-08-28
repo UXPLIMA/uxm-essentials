@@ -17,6 +17,17 @@ class CommandModelTest {
     }
 
     @Test
+    void acceptsANamespacedIdForACommandThatIsNotOurOwn() {
+        // An operator's own definition out of commands/custom/ is keyed custom:<file name>, and that file name takes
+        // the wider shape a file name may have: a leading digit, a hyphen, an underscore.
+        assertThat(new CommandId("custom:welcome").value()).isEqualTo("custom:welcome");
+        assertThat(new CommandId("custom:daily-reward_2").value()).isEqualTo("custom:daily-reward_2");
+        assertThatThrownBy(() -> new CommandId("custom:")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new CommandId("custom:Welcome")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new CommandId("custom:a:b")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void effectiveCommandRejectsBlankName() {
         assertThatThrownBy(() -> new EffectiveCommand(new CommandId("home"), " ", List.of(), true, true))
                 .isInstanceOf(IllegalArgumentException.class);

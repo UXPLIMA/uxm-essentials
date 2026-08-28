@@ -74,4 +74,13 @@ class CommandCatalogRenderTest {
         assertThat(rendered).contains("name = \"te\\\"ll\"");
         assertThat(rendered).contains("aliases = [\"wh\\\\isper\"]");
     }
+
+    @Test
+    void quotesANamespacedIdSoHoconDoesNotReadTheColonAsASeparator() {
+        String rendered = CommandCatalogRenderer.render(
+                List.of(new EffectiveCommand(new CommandId("custom:welcome"), "welcome", List.of("hi"), true, false)));
+
+        assertThat(rendered).contains("\"custom:welcome\" {");
+        assertThat(rendered).doesNotContain("  custom:welcome {");
+    }
 }

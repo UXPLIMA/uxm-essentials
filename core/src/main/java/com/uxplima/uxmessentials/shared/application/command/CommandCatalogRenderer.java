@@ -17,6 +17,9 @@ public final class CommandCatalogRenderer {
 
     private static final String NL = "\n";
 
+    /** An id that needs no quoting: the shape every built-in command carries. */
+    private static final java.util.regex.Pattern PLAIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9]*");
+
     private CommandCatalogRenderer() {}
 
     /** Render every command into a single {@code commands { <id> { ... } }} document. */
@@ -33,7 +36,7 @@ public final class CommandCatalogRenderer {
     }
 
     private static void appendHeader(StringBuilder out) {
-        out.append("# Command catalog — rename, realias or disable any command without touching code.")
+        out.append("# Command catalog: rename, realias or disable any command without touching code.")
                 .append(NL);
         out.append("# Each block is keyed by the command's stable id. The id never changes, so the")
                 .append(NL);
@@ -61,13 +64,22 @@ public final class CommandCatalogRenderer {
     }
 
     private static void appendCommand(StringBuilder out, EffectiveCommand command) {
-        out.append("  ").append(command.id().value()).append(" {").append(NL);
+        out.append("  ").append(key(command.id().value())).append(" {").append(NL);
         out.append("    enabled = ").append(command.enabled()).append(NL);
         out.append("    name = ").append(quote(command.name())).append(NL);
         out.append("    aliases = ").append(renderAliases(command.aliases())).append(NL);
         appendLocalizedAliases(out, command.localizedAliases());
         out.append("    gui = ").append(command.gui()).append(NL);
         out.append("  }").append(NL);
+    }
+
+    /**
+     * The block key for a command id. A plain id is written bare, the way every hand-written catalog entry reads. A
+     * namespaced one ({@code custom:welcome}) is quoted, because HOCON reads an unquoted colon as the separator
+     * between a key and its value and would otherwise split the id in half.
+     */
+    private static String key(String id) {
+        return PLAIN_ID.matcher(id).matches() ? id : quote(id);
     }
 
     private static void appendLocalizedAliases(StringBuilder out, Map<String, List<String>> localized) {
