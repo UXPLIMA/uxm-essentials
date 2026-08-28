@@ -44,8 +44,8 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadCloseListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
+import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadWindowListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.VerificationFreezeListener;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
@@ -220,7 +220,7 @@ class JoinVerificationTest {
                 messages,
                 sink);
         server.getPluginManager().registerEvents(freezeListener, plugin);
-        server.getPluginManager().registerEvents(new PinKeypadCloseListener(menus, keypad, sessions), plugin);
+        server.getPluginManager().registerEvents(new PinKeypadWindowListener(menus, keypad, sessions), plugin);
     }
 
     /** The bundled spec directory under the source tree, so the test loads the shipped keypad spec from disk. */

@@ -16,8 +16,8 @@ import com.uxplima.uxmessentials.security.adapter.inbound.command.IpAltsCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.PinCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.SecurityCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
-import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadCloseListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
+import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadWindowListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityGuardListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityJoinListener;
@@ -278,7 +278,7 @@ public final class SecurityWiring {
                                 .isPresent(),
                         kernel.messages(),
                         kernel.messageSink()),
-                new PinKeypadCloseListener(menus, keypad, sessions),
+                new PinKeypadWindowListener(menus, keypad, sessions),
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
                 new SecurityGuardListener(clientGuard, brands));

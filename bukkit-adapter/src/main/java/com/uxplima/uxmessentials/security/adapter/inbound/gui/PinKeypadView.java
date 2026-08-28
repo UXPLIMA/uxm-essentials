@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Security is preserved end to end: the engine's blanket click/drag cancel is the pad's lock; the entered digits
  * live only in the {@link PinSession} subject server-side and never leave as a component (only a mask of asterisks is
- * ever rendered); and while a player is still frozen the {@link PinKeypadCloseListener} reopens the window on any
+ * ever rendered); and while a player is still frozen the {@link PinKeypadWindowListener} reopens the window on any
  * escape, so verification cannot be skipped. A deliberate close (a successful verify, a lockout kick, the TOTP
  * handoff, or a module stop) is flagged through {@link #suppressNextClose} / {@link #closeFor} so it is not fought.
  * Every live-player touch runs on the viewer's own region thread through the engine and the injected {@link Scheduler},
@@ -77,8 +77,17 @@ public final class PinKeypadView {
     /** Viewers whose next keypad close is a deliberate handoff or teardown, so it must not reopen. */
     private final Set<UUID> suppressReopen = ConcurrentHashMap.newKeySet();
 
-    /** Viewers whose reopen is in flight, so the transient close that reopen fires cannot recurse into another reopen. */
-    private final Set<UUID> reopening = ConcurrentHashMap.newKeySet();
+    /**
+     * How many opens this view has asked the engine for per viewer and not yet seen land. An engine open is not
+     * synchronous: it hops off the tick thread to resolve the spec and back to the viewer's entity thread to show the
+     * window, so the {@code openInventory} that ends it happens long after {@link #show} returns. Opening a window
+     * over an open one makes the server close the old one first, and that close is an ordinary
+     * {@link org.bukkit.event.inventory.InventoryCloseEvent} carrying this very keypad: without this counter the
+     * listener reads it as the player escaping, reopens, and the reopen fires the next close. The counter is raised
+     * before the open is asked for and lowered by {@link #openLanded} when the window actually appears, so the whole
+     * in-flight window is covered rather than only the synchronous part of it.
+     */
+    private final Map<UUID, Integer> inFlight = new ConcurrentHashMap<>();
 
     public PinKeypadView(Menus menus, Messages messages, VerificationFeedback feedback, Scheduler scheduler) {
         this.menus = Objects.requireNonNull(menus, "menus");
@@ -123,7 +132,27 @@ public final class PinKeypadView {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         open.put(viewer.uuid(), new Tracked(viewer, false, true));
+        markOpening(viewer.uuid());
         menus.open(viewer, CREATE_SPEC_ID, new PinSession(viewer, false));
+    }
+
+    /**
+     * Put {@code viewer} at the create pad only if they are not already there. The enrolment flow moves between its
+     * steps without leaving the window: the submit action clears the entry and redraws the pad in place, so the next
+     * step is already on screen and opening a second one would only tear down a window to build the same window
+     * again. An open already in flight counts as being there, so two steps in quick succession still open one pad.
+     */
+    public void ensureCreateOpen(Player player, PlayerRef viewer) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        UUID id = viewer.uuid();
+        if (inFlight.containsKey(id)
+                || menus.currentMenu(id)
+                        .filter(info -> CREATE_SPEC_ID.equals(info.specId()))
+                        .isPresent()) {
+            return;
+        }
+        openCreate(player, viewer);
     }
 
     /** Close the viewer's keypad, flagging the close so it is not reopened; the deliberate-close path (the close
@@ -142,7 +171,7 @@ public final class PinKeypadView {
         }
         open.clear();
         suppressReopen.clear();
-        reopening.clear();
+        inFlight.clear();
     }
 
     /** Flag the viewer's next keypad close as a deliberate handoff (to the TOTP prompt), so it is not reopened. */
@@ -157,37 +186,49 @@ public final class PinKeypadView {
 
     /**
      * Reopen the keypad for a still-frozen viewer who escaped their window; a fresh window with an empty entry, keeping
-     * the viewer's tracked totp flag. Guarded against re-entrancy so the transient close the reopen's own
-     * {@code openInventory} may fire cannot recurse into a second reopen.
+     * the viewer's tracked totp flag. The caller checks {@link #hasOpenInFlight} first, so a close this view's own
+     * pending open caused never reaches here.
      */
     void reopen(UUID viewer) {
-        if (!reopening.add(viewer)) {
+        Tracked tracked = open.get(viewer);
+        if (tracked == null) {
             return;
         }
-        try {
-            Tracked tracked = open.get(viewer);
-            if (tracked == null) {
-                return;
-            }
-            Player live = Bukkit.getPlayer(viewer);
-            if (tracked.creating() && live != null) {
-                openCreate(live, tracked.viewer());
-                return;
-            }
-            show(tracked.viewer(), tracked.totpEnabled());
-        } finally {
-            reopening.remove(viewer);
+        Player live = Bukkit.getPlayer(viewer);
+        if (tracked.creating() && live != null) {
+            openCreate(live, tracked.viewer());
+            return;
         }
+        show(tracked.viewer(), tracked.totpEnabled());
+    }
+
+    /**
+     * Whether an open this view asked for has not yet put its window on the viewer's screen. A keypad close arriving
+     * while that is true is the server closing the old window to make room for the new one, not the player leaving.
+     */
+    boolean hasOpenInFlight(UUID viewer) {
+        return inFlight.containsKey(viewer);
+    }
+
+    /** One of this view's opens has landed: the window is on screen, so it is no longer in flight. */
+    void openLanded(UUID viewer) {
+        inFlight.computeIfPresent(viewer, (id, count) -> count <= 1 ? null : count - 1);
     }
 
     /** Drop the tracking for a keypad that closed without needing a reopen (a deliberate close, a re-auth escape, a quit). */
     void forget(UUID viewer) {
         open.remove(viewer);
+        inFlight.remove(viewer);
     }
 
     private void show(PlayerRef viewer, boolean totpEnabled) {
         open.put(viewer.uuid(), new Tracked(viewer, totpEnabled, false));
+        markOpening(viewer.uuid());
         menus.open(viewer, SPEC_ID, new PinSession(viewer, totpEnabled));
+    }
+
+    private void markOpening(UUID viewer) {
+        inFlight.merge(viewer, 1, Integer::sum);
     }
 
     private void closeLive(UUID viewer) {

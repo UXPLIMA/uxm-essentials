@@ -27,6 +27,10 @@ import org.jspecify.annotations.NullMarked;
  * twice is not ceremony; it is the only thing standing between a mistyped PIN and an account whose owner cannot get
  * past the keypad tomorrow.
  *
+ * <p>The two entries happen at one window. The submit button clears the entry and redraws the pad in place, so each
+ * step is already on screen when it begins; putting up a second pad would only make the server tear down the first,
+ * which the keypad's own window listener would then have to tell apart from the player walking away.
+ *
  * <p>Nothing is stored until both entries agree and the policy accepts them, so a player who gets it wrong loses the
  * attempt and not the account. A refusal (too short, too common) explains itself and puts them back at the first step
  * rather than dropping them out of a freeze they are not allowed to leave. The plaintext lives only in
@@ -117,7 +121,7 @@ public final class PinEnrolmentController implements KeypadActions {
         }
         sessions.rememberFirst(viewer.uuid(), candidate);
         notify(viewer, SecurityMessageKey.SECURITY_PIN_CREATE_CONFIRM);
-        keypad.openCreate(player, viewer);
+        keypad.ensureCreateOpen(player, viewer);
     }
 
     /** The second entry. Only a match writes anything; a mismatch costs the attempt and starts over. */
@@ -150,10 +154,14 @@ public final class PinEnrolmentController implements KeypadActions {
         feedback.success(viewer);
     }
 
-    /** Put the player back at the first step with a fresh pad, still held until they produce a PIN. */
+    /**
+     * Put the player back at the first step, still held until they produce a PIN. The submit that brought them here
+     * already emptied the entry and redrew the pad, so the window they are looking at is the fresh one; it is only
+     * reopened if they are somehow no longer at it.
+     */
     private void restart(Player player, PlayerRef viewer) {
         sessions.restart(viewer.uuid());
-        keypad.openCreate(player, viewer);
+        keypad.ensureCreateOpen(player, viewer);
     }
 
     /** The refusal for {@code candidate} before it is ever stored, or null when the policy accepts it. */
