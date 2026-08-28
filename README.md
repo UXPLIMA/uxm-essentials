@@ -156,6 +156,7 @@ database-backed so they survive rollbacks.
 | **regions** | A WorldGuard region-management GUI (`/regions`): list, create (two-position selection), edit flags, manage members / owners, and set priority. WorldGuard is a soft-dependency; without it the module stays inert. |
 | **servertweaks** | Small opt-in infrastructure toggles: a custom F3 server brand, console-spam filtering, no-chat-reports, and SignedVelocity coordination; each ships off. |
 | **custommenus** | Operator-authored menus over the built-in menu engine: drop a `menus/<name>.conf` and open it with `/menu open <name>`, built from a generic action / condition / placeholder vocabulary (close, open another menu, run a command, send a message, …). Custom GUIs with no code, hot-reloadable with `/menu reload`; the privileged console action is config-gated and off by default. |
+| **customcommands** | Operator-authored commands over the same vocabulary: drop a `commands/custom/<id>.conf` and the plugin registers a real command with typed arguments, tab completion, a usage line and a place in `commands.conf`. Permission, console access, requirements, cooldown, warmup and a money cost are all declared in the file; a one-line `alias = "/gamemode creative"` covers the rename case, and `/customcmd create` writes a definition from questions in chat. |
 
 ## Command cheat-sheet
 
@@ -173,7 +174,7 @@ Appearance       /skin /nick
 Messaging        /msg (/w /tell) /reply (/r)  /mail   /afk   /ignore
 Moderation       /ban /tempban /unban /mute /kick /warn /jail /history /checkban   /banip   /invrestore
 Staff & security /staff /vanish /freeze /staffchat (/sc) /stafflist   /2fa /pin /ipalts
-Worlds & more    /world /worlds /regions   /hologram   /npc   /villager   /vote   /menu
+Worlds & more    /world /worlds /regions   /hologram   /npc   /villager   /vote   /menu /customcmd
 Admin root       /uxmess  (aliases /uxmessentials /uxe)
 ```
 
