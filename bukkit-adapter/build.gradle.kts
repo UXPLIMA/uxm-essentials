@@ -78,37 +78,37 @@ dependencies {
 
     // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
     // transitively. Configurate is loaded at runtime via Paper library loader.
-    implementation("com.uxplima.uxmlib:uxmlib-gui:0.1.0-SNAPSHOT") {
+    implementation("com.uxplima.uxmlib:uxmlib-gui:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
     // uxmLib item toolkit (dogfood) — the PdcFlag helper backing the per-player boolean-flag PDC stores.
     // Arrives transitively via uxmlib-gui, but declared directly so the PdcFlag use is explicit.
-    implementation("com.uxplima.uxmlib:uxmlib-item:0.1.0-SNAPSHOT") { isTransitive = false }
+    implementation("com.uxplima.uxmlib:uxmlib-item:0.5.0-SNAPSHOT") { isTransitive = false }
     // uxmLib HUD toolkit (dogfood) — Titles for the teleport arrival banner. Pulls uxmlib-common only.
-    implementation("com.uxplima.uxmlib:uxmlib-hud:0.1.0-SNAPSHOT") {
+    implementation("com.uxplima.uxmlib:uxmlib-hud:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
     // uxmLib integration toolkit (dogfood) — native-Display holograms for the holograms context.
-    implementation("com.uxplima.uxmlib:uxmlib-integration:0.1.0-SNAPSHOT") {
+    implementation("com.uxplima.uxmlib:uxmlib-integration:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
     // uxmLib packet-nametag toolkit (dogfood) — the per-viewer packet renderer the nametags context draws on. It is a
     // Mojang-mapped NMS module (rides along Mojang-mapped in the shaded jar, like the offline-inventory adapter), and
     // it sends through uxmlib-npc's channel sender.
-    implementation("com.uxplima.uxmlib:uxmlib-nametags:0.1.0-SNAPSHOT") {
+    implementation("com.uxplima.uxmlib:uxmlib-nametags:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
     // uxmLib packet-tablist toolkit (dogfood) — the per-viewer player-info packet builder the tablist context uses to
     // paint a custom skin on a tab row (the one tab thing native Paper cannot do). Same Mojang-mapped NMS module shape
     // as uxmlib-nametags; sends through uxmlib-npc's channel sender.
-    implementation("com.uxplima.uxmlib:uxmlib-packet:0.1.0-SNAPSHOT") {
+    implementation("com.uxplima.uxmlib:uxmlib-packet:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
-    implementation("com.uxplima.uxmlib:uxmlib-npc:0.1.0-SNAPSHOT") {
+    implementation("com.uxplima.uxmlib:uxmlib-npc:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
     // uxmLib update toolkit (dogfood) — the opt-in release update-checker. Pulls uxmlib-common only.
-    implementation("com.uxplima.uxmlib:uxmlib-update:0.1.0-SNAPSHOT") {
+    implementation("com.uxplima.uxmlib:uxmlib-update:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
 

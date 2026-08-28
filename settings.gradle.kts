@@ -12,9 +12,14 @@ plugins {
 // Local development: when uxmLib is checked out as a sibling directory, build against it directly as a
 // composite build so library changes are picked up without a publish step. Without the sibling checkout the
 // published com.uxplima.uxmlib artifacts resolve from mavenLocal normally.
-val uxmLibDir = file("../uxmLib")
+//
+// Both directory names are accepted. The GitHub repository was renamed from uxmLib to uxm-lib, so a fresh
+// clone lands in ../uxm-lib while older checkouts (and CI, which clones into a fixed path) are still ../uxmLib.
+// Matching only one of them would drop the composite silently and fall back to whatever mavenLocal happens to
+// hold, which reads as a stale library rather than a missing one.
+val uxmLibDir = listOf("../uxmLib", "../uxm-lib").map(::file).firstOrNull { it.isDirectory }
 
-if (uxmLibDir.isDirectory) {
+if (uxmLibDir != null) {
     includeBuild(uxmLibDir)
 }
 
