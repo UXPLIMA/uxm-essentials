@@ -1315,7 +1315,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
             wireCustomMenus(plugin, ctx, resources, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("customcommands"))) {
-            wireCustomCommands(plugin, ctx, resources, menus);
+            wireCustomCommands(plugin, ctx, resources, menus, textInput);
         } else if (module.id().equals(ModuleId.of("poses"))) {
             wirePoses(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus, claimProviders);
         } else if (module.id().equals(ModuleId.of("survival"))) {
@@ -1764,7 +1764,7 @@ public final class PluginModule {
     }
 
     private static void wireCustomCommands(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, Menus menus) {
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, Menus menus, TextInput textInput) {
         // customcommands consumes the always-on menu engine the same way custommenus does: it reads the operator's
         // commands/custom/*.conf into the domain and registers one Brigadier command per definition. Registering
         // here, inside module wiring, is what puts the registrations in front of applyCatalog, so a custom command
@@ -1776,7 +1776,7 @@ public final class PluginModule {
             return;
         }
         CustomCommandsWiring.Wired wired = CustomCommandsWiring.wire(
-                ctx, menus, currencies, plugin.getDataFolder().toPath());
+                ctx, menus, currencies, plugin.getDataFolder().toPath(), textInput::prompt);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }

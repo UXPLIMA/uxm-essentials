@@ -18,12 +18,14 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.customcommands.adapter.CustomCommandLoader;
+import com.uxplima.uxmessentials.customcommands.adapter.inbound.command.CreateWizard;
 import com.uxplima.uxmessentials.customcommands.adapter.inbound.command.CustomCommandCommand;
 import com.uxplima.uxmessentials.customcommands.application.RunCustomCommand;
 import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -229,7 +231,15 @@ class CustomCommandCommandTest {
                                 id -> loader.loadOne(folder.resolve(id + ".conf"), ActionChain.ChainLimits.defaults()),
                                 runner,
                                 new SyncScheduler(),
-                                new TokenMessages())
+                                new TokenMessages(),
+                                new CreateWizard(
+                                        (player, viewer, request, onSubmit, onCancel) -> onCancel.run(),
+                                        folder,
+                                        () -> Set.copyOf(state.get().catalog().ids()),
+                                        new CommandFeedback(new TokenMessages()),
+                                        id -> {},
+                                        new SilentLogger()),
+                                id -> "")
                         .build());
         return dispatcher.execute(input, CommandSourceStackMock.from(operator));
     }

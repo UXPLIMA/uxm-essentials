@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -31,6 +32,8 @@ import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -57,6 +60,8 @@ public final class CustomCommandCommand implements CommandRegistration {
     private final RunCustomCommand runner;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
+    private final CreateWizard wizard;
+    private final UnaryOperator<String> deleteDefinition;
 
     public CustomCommandCommand(
             AtomicReference<CustomCommandLoader.LoadResult> state,
@@ -64,13 +69,17 @@ public final class CustomCommandCommand implements CommandRegistration {
             Function<String, CustomCommandLoader.LoadResult> reloadOne,
             RunCustomCommand runner,
             Scheduler scheduler,
-            Messages messages) {
+            Messages messages,
+            CreateWizard wizard,
+            UnaryOperator<String> deleteDefinition) {
         this.state = Objects.requireNonNull(state, "state");
         this.reloadAll = Objects.requireNonNull(reloadAll, "reloadAll");
         this.reloadOne = Objects.requireNonNull(reloadOne, "reloadOne");
         this.runner = Objects.requireNonNull(runner, "runner");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.wizard = Objects.requireNonNull(wizard, "wizard");
+        this.deleteDefinition = Objects.requireNonNull(deleteDefinition, "deleteDefinition");
     }
 
     @Override
@@ -84,6 +93,12 @@ public final class CustomCommandCommand implements CommandRegistration {
                         .executes(this::reloadAll)
                         .then(idArgument().executes(this::reloadOne)))
                 .then(Commands.literal("test").then(idArgument().executes(this::test)))
+                .then(Commands.literal("create")
+                        .then(Commands.argument("id", StringArgumentType.word()).executes(this::create)))
+                .then(Commands.literal("delete")
+                        .then(idArgument()
+                                .executes(this::deleteAsk)
+                                .then(Commands.literal("confirm").executes(this::deleteConfirm))))
                 .then(Commands.literal("run")
                         .then(idArgument()
                                 .executes(this::runForSelf)
@@ -269,6 +284,43 @@ public final class CustomCommandCommand implements CommandRegistration {
                 sender,
                 CustomCommandsMessageKey.CUSTOMCOMMAND_RUN_DISPATCHED,
                 Map.of("id", id, "player", actor.name()));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int create(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player player)) {
+            // The wizard is a conversation: it needs somebody to ask, and the console cannot answer a prompt.
+            feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
+            return 0;
+        }
+        String id = StringArgumentType.getString(ctx, "id");
+        return wizard.start(player, BukkitRefs.toRef(player), id) ? Command.SINGLE_SUCCESS : 0;
+    }
+
+    private int deleteAsk(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String id = StringArgumentType.getString(ctx, "id");
+        if (loaded().catalog().byId(id).isEmpty()) {
+            return notFound(sender, id);
+        }
+        feedback.send(sender, CustomCommandsMessageKey.CUSTOMCOMMAND_DELETE_CONFIRM, Map.of("id", id));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int deleteConfirm(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String id = StringArgumentType.getString(ctx, "id");
+        if (loaded().catalog().byId(id).isEmpty()) {
+            return notFound(sender, id);
+        }
+        String failure = deleteDefinition.apply(id);
+        if (!failure.isEmpty()) {
+            feedback.send(sender, CustomCommandsMessageKey.CUSTOMCOMMAND_NOT_FOUND, Map.of("id", id));
+            return 0;
+        }
+        feedback.send(sender, CustomCommandsMessageKey.CUSTOMCOMMAND_DELETED, Map.of("id", id));
+        feedback.send(sender, CustomCommandsMessageKey.CUSTOMCOMMAND_RESTART_REQUIRED);
         return Command.SINGLE_SUCCESS;
     }
 
