@@ -16,42 +16,42 @@ gson           = "2.11.0"
 jspecify       = "1.0.0"
 slf4j          = "2.0.16"
 
-# persistence drivers — Essentials default is embedded SQLite (file db);
+# persistence drivers: Essentials default is embedded SQLite (file db);
 # MySQL/MariaDB and PostgreSQL are network options (see docs/adr/0003).
-sqlite-jdbc    = "3.49.1.0"     # org.xerial:sqlite-jdbc — Maven Central (verified 2026-05-30)
-mariadb-jdbc   = "3.5.3"        # org.mariadb.jdbc:mariadb-java-client — Maven Central; also speaks the MySQL wire protocol (verified 2026-05-30)
-h2             = "2.4.240"       # com.h2database:h2 — latest stable on Maven Central (verified 2026-06-14); LiteBans-importer JDBC source only
+sqlite-jdbc    = "3.49.1.0"     # org.xerial:sqlite-jdbc: Maven Central (verified 2026-05-30)
+mariadb-jdbc   = "3.5.3"        # org.mariadb.jdbc:mariadb-java-client: Maven Central; also speaks the MySQL wire protocol (verified 2026-05-30)
+h2             = "2.4.240"       # com.h2database:h2: latest stable on Maven Central (verified 2026-06-14); LiteBans-importer JDBC source only
 
 # adapter integrations
 velocity       = "3.4.0"
 luckperms      = "5.5"
 jda            = "5.6.1"
-lettuce        = "7.6.0.RELEASE" # io.lettuce:lettuce-core — Maven Central; the Redis bus transport ships in the uxmEssentials-redis companion jar
+lettuce        = "7.6.0.RELEASE" # io.lettuce:lettuce-core: Maven Central; the Redis bus transport ships in the uxmEssentials-redis companion jar
 
 # uxmLib (sibling toolkit; built via composite in dev, resolved from mavenLocal otherwise)
 uxmlib         = "0.5.0-SNAPSHOT"
 
 # economy provider integrations (see docs/11-economy-integration.md, docs/adr/0004)
-treasury       = "1.2.0"        # me.lokka30:treasury-api — CodeMC repo, NOT Maven Central (verified 2026-05-30)
-vault          = "1.7.1"        # com.github.MilkBowl:VaultAPI — JitPack, NOT Maven Central (verified 2026-05-30)
+treasury       = "1.2.0"        # me.lokka30:treasury-api: CodeMC repo, NOT Maven Central (verified 2026-05-30)
+vault          = "1.7.1"        # com.github.MilkBowl:VaultAPI: JitPack, NOT Maven Central (verified 2026-05-30)
 
-# claim-plugin hook integrations — compileOnly soft-depends; adapters bind only when the plugin is present
-lands          = "6.26.18"      # com.github.angeschossen:LandsAPI — JitPack, NOT Maven Central (verified 2026-06-13)
-griefprevention = "16.18"       # com.github.TechFortress:GriefPrevention — JitPack (verified 2026-06-13)
-simpleclaimsystem = "1.13.1"    # com.github.Xyness:SimpleClaimSystem — JitPack, NOT Maven Central (verified 2026-06-13)
-rclaim         = "2.6.0"        # com.github.Weesli:RClaim — JitPack, NOT Maven Central (verified 2026-06-13)
+# claim-plugin hook integrations: compileOnly soft-depends; adapters bind only when the plugin is present
+lands          = "6.26.18"      # com.github.angeschossen:LandsAPI: JitPack, NOT Maven Central (verified 2026-06-13)
+griefprevention = "16.18"       # com.github.TechFortress:GriefPrevention: JitPack (verified 2026-06-13)
+simpleclaimsystem = "1.13.1"    # com.github.Xyness:SimpleClaimSystem: JitPack, NOT Maven Central (verified 2026-06-13)
+rclaim         = "2.6.0"        # com.github.Weesli:RClaim: JitPack, NOT Maven Central (verified 2026-06-13)
 
 # placeholder integration (see docs/11-economy-integration.md soft-depend pattern, ADR 0004)
-placeholderapi = "2.11.6"       # me.clip:placeholderapi — extendedclip repo, NOT Maven Central (verified 2026-05-31)
-miniplaceholders = "3.2.0"      # io.github.miniplaceholders:miniplaceholders-api — Maven Central (3.2.0 targets Java 25; matches the Paper-26/Java-25 base, verified 2026-06-19)
+placeholderapi = "2.11.6"       # me.clip:placeholderapi: extendedclip repo, NOT Maven Central (verified 2026-05-31)
+miniplaceholders = "3.2.0"      # io.github.miniplaceholders:miniplaceholders-api: Maven Central (3.2.0 targets Java 25; matches the Paper-26/Java-25 base, verified 2026-06-19)
 
-# map-plugin marker integrations — compileOnly soft-depends; the host map plugin provides them at runtime
-squaremap      = "1.3.13"       # xyz.jpenilla:squaremap-api — Maven Central (verified 2026-06-10)
-dynmap         = "3.7-beta-6"   # us.dynmap:dynmap-api + :DynmapCoreAPI — repo.mikeprimm.com, NOT Maven Central (verified 2026-06-10)
+# map-plugin marker integrations: compileOnly soft-depends; the host map plugin provides them at runtime
+squaremap      = "1.3.13"       # xyz.jpenilla:squaremap-api: Maven Central (verified 2026-06-10)
+dynmap         = "3.7-beta-6"   # us.dynmap:dynmap-api + :DynmapCoreAPI: repo.mikeprimm.com, NOT Maven Central (verified 2026-06-10)
 
-# Bedrock-form integration — compileOnly soft-depend; the detector binds only when Floodgate is present. Cumulus
+# Bedrock-form integration: compileOnly soft-depend; the detector binds only when Floodgate is present. Cumulus
 # (org.geysermc.cumulus.form.*) arrives transitively (compile scope) with floodgate:api, so no separate coordinate.
-floodgate      = "2.2.5-SNAPSHOT" # org.geysermc.floodgate:api — repo.opencollab.dev, NOT Maven Central (verified 2026-07-01 via rakipler/BedrockGUI + opencollab maven-metadata)
+floodgate      = "2.2.5-SNAPSHOT" # org.geysermc.floodgate:api: repo.opencollab.dev, NOT Maven Central (verified 2026-07-01 via rakipler/BedrockGUI + opencollab maven-metadata)
 
 # tests
 junit          = "5.12.1"
@@ -60,7 +60,7 @@ mockito        = "5.23.0"
 mockbukkit     = "4.116.1"      # org.mockbukkit.mockbukkit:mockbukkit-v26.2 (Maven Central, verified 2026-08-19); MC-version-specific artifact, see [libraries]
 testcontainers = "1.20.4"
 jqwik          = "1.9.3"
-archunit       = "1.4.2"      # com.tngtech.archunit — Maven Central (verified 2026-06-24); 1.3.0's bundled ASM rejects Java 25 (class v69) bytecode and silently imports zero classes, defeating every fence; 1.4.2 bundles ASM 9.8 (supports V25)
+archunit       = "1.4.2"      # com.tngtech.archunit: Maven Central (verified 2026-06-24); 1.3.0's bundled ASM rejects Java 25 (class v69) bytecode and silently imports zero classes, defeating every fence; 1.4.2 bundles ASM 9.8 (supports V25)
 
 # tooling
 errorprone     = "2.50.0"       # JDK 25 support (verified 2026-06-19, Maven Central)
@@ -72,7 +72,7 @@ paperweight    = "2.0.0-beta.22"
 run-paper      = "3.0.2"
 minotaur       = "2.9.0"
 hangar-publish = "0.1.3"
-jmh            = "1.37"         # org.openjdk.jmh:jmh-core + :jmh-generator-annprocess — Maven Central (verified 2026-05-30)
+jmh            = "1.37"         # org.openjdk.jmh:jmh-core + :jmh-generator-annprocess: Maven Central (verified 2026-05-30)
 
 [libraries]
 paper-api         = { module = "io.papermc.paper:paper-api",                     version.ref = "paper" }
@@ -104,28 +104,28 @@ jda               = { module = "net.dv8tion:JDA",                               
 lettuce           = { module = "io.lettuce:lettuce-core",                        version.ref = "lettuce" }
 uxmlib-redis      = { module = "com.uxplima.uxmlib:uxmlib-redis",                version.ref = "uxmlib" }
 
-# economy provider APIs — compileOnly soft-depends (see §9 + §16)
+# economy provider APIs: compileOnly soft-depends (see §9 + §16)
 treasury-api      = { module = "me.lokka30:treasury-api",                        version.ref = "treasury" }
 vault-api         = { module = "com.github.MilkBowl:VaultAPI",                   version.ref = "vault" }
 
-# claim-plugin hook APIs — compileOnly soft-depends; adapters bind only when the plugin is present
+# claim-plugin hook APIs: compileOnly soft-depends; adapters bind only when the plugin is present
 hook-lands        = { module = "com.github.angeschossen:LandsAPI",               version.ref = "lands" }
 hook-griefprevention = { module = "com.github.TechFortress:GriefPrevention",     version.ref = "griefprevention" }
 hook-simpleclaimsystem = { module = "com.github.Xyness:SimpleClaimSystem",       version.ref = "simpleclaimsystem" }
 hook-rclaim       = { module = "com.github.Weesli:RClaim",                        version.ref = "rclaim" }
 
-# placeholder API — compileOnly soft-depend; the expansion registers only when the plugin is present
+# placeholder API: compileOnly soft-depend; the expansion registers only when the plugin is present
 placeholderapi    = { module = "me.clip:placeholderapi",                         version.ref = "placeholderapi" }
-# MiniPlaceholders — compileOnly soft-depend; its MiniMessage tag resolvers merge in only when the plugin is present
+# MiniPlaceholders: compileOnly soft-depend; its MiniMessage tag resolvers merge in only when the plugin is present
 miniplaceholders  = { module = "io.github.miniplaceholders:miniplaceholders-api", version.ref = "miniplaceholders" }
 
-# map-plugin marker APIs — compileOnly soft-depends; the marker publishers bind to these only past the
+# map-plugin marker APIs: compileOnly soft-depends; the marker publishers bind to these only past the
 # plugin-present guard, so the plugin runs fully without Dynmap or squaremap installed.
 squaremap-api     = { module = "xyz.jpenilla:squaremap-api",                     version.ref = "squaremap" }
 dynmap-api        = { module = "us.dynmap:dynmap-api",                           version.ref = "dynmap" }
 dynmap-core-api   = { module = "us.dynmap:DynmapCoreAPI",                        version.ref = "dynmap" }
 
-# Bedrock-form API — compileOnly soft-depend; the Bedrock detector binds to Floodgate only past a plugin-present
+# Bedrock-form API: compileOnly soft-depend; the Bedrock detector binds to Floodgate only past a plugin-present
 # guard, and Cumulus's form classes arrive transitively, so the plugin runs fully without Floodgate installed.
 floodgate-api     = { module = "org.geysermc.floodgate:api",                     version.ref = "floodgate" }
 
@@ -155,7 +155,7 @@ adventure  = ["adventure-api", "adventure-mini"]
 # The db bundle is backend-selectable: the SQLite driver is the default-on
 # coordinate; MySQL/MariaDB and PostgreSQL drivers ship in the jar but are only
 # activated when modules.conf selects that backend. jOOQ/Flyway/Hikari are
-# backend-agnostic. SQLite is single-writer — the persistence adapter serialises
+# backend-agnostic. SQLite is single-writer: the persistence adapter serialises
 # writes and runs WAL mode with a size-1 write pool (see docs/02-concurrency.md).
 db         = ["hikari", "sqlite-jdbc", "flyway-core", "jooq"]
 db-mysql   = ["mariadb-jdbc", "flyway-mysql"]

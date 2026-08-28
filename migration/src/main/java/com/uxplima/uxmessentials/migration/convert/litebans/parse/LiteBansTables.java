@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Resolves the three LiteBans table names from the configured {@code table_prefix} (default
  * {@code litebans_}) and builds the {@code SELECT} statements the reader runs against them. A table name
- * cannot be a JDBC bind parameter, so the prefix is interpolated into the SQL text — which makes it the one
+ * cannot be a JDBC bind parameter, so the prefix is interpolated into the SQL text, which makes it the one
  * place a malicious or malformed prefix could become an injection. It is therefore <em>strictly</em>
  * whitelisted to {@code [a-z0-9_]+} before any SQL is built; anything else is rejected at construction, long
  * before a statement is prepared. Every value the reader binds afterwards travels as a bind parameter, never

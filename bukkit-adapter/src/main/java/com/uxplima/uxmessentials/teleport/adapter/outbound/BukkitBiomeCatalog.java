@@ -52,6 +52,7 @@ public final class BukkitBiomeCatalog implements BiomeCatalog {
         return Registry.BIOME.get(key);
     }
 
+    // Same deprecated-but-live Registry.BIOME surface as lookup above; see the note there.
     @SuppressWarnings("deprecation")
     private static java.util.stream.Stream<Biome> biomes() {
         return Registry.BIOME.stream();
