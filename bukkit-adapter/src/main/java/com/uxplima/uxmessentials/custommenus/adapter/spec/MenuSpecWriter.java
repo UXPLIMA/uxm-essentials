@@ -270,6 +270,10 @@ public final class MenuSpecWriter {
         setIfPresent(node.node("rarity"), components.rarity().orElse(null));
         setIfPresent(node.node("tooltip-style"), components.tooltipStyle().orElse(null));
         setBoxed(node.node("hide-tooltip"), components.hideTooltip().orElse(null));
+        setBoxed(
+                node.node("hide-vanilla-tooltip"),
+                components.hideVanillaTooltip().orElse(null));
+        writeStringsIfAny(node.node("hidden-components"), components.hiddenComponents());
         setBoxed(node.node("enchant-glint"), components.enchantGlint().orElse(null));
         setBoxed(node.node("enchantable"), components.enchantable().orElse(null));
         writeStringsIfAny(node.node("attribute-modifiers"), components.attributeModifiers());

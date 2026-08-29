@@ -1,12 +1,15 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.bukkit.Color;
 import org.bukkit.DyeColor;
@@ -31,6 +34,8 @@ import org.bukkit.inventory.meta.trim.TrimPattern;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+import io.papermc.paper.datacomponent.DataComponentType;
+import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 
@@ -53,6 +58,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.item.Tooltips;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -212,7 +218,11 @@ public final class ItemRenderer {
         // Tag every tile the engine renders — including an equipment/self-inventory icon, which is already a clone of
         // the viewer's real item — so any display copy that escapes into a real inventory is strippable. The mark rides
         // on the display copy only; the player's own items are never touched here (MenuItemMark, MenuAntiDupeListener).
-        return MenuItemMark.mark(built);
+        ItemStack marked = MenuItemMark.mark(built);
+        // Last, and on the finished stack rather than through the builder: the tooltip display is a data component
+        // and not item meta, so anything that copies the stack afterwards could drop it.
+        hideVanillaLines(marked, item.decor().meta());
+        return marked;
     }
 
     /**
@@ -512,7 +522,6 @@ public final class ItemRenderer {
                 .flatMap(ItemRenderer::parseRarity)
                 .ifPresent(rarity -> safely(() -> builder.rarity(rarity)));
         components.tooltipStyle().ifPresent(raw -> applyTooltipStyle(builder, raw));
-        components.hideTooltip().ifPresent(hide -> safely(() -> builder.hideTooltip(hide)));
         components
                 .enchantGlint()
                 .ifPresent(glint -> safely(() -> builder.editMeta(meta -> meta.setEnchantmentGlintOverride(glint))));
@@ -520,6 +529,83 @@ public final class ItemRenderer {
         applyAttributeModifiers(builder, components.attributeModifiers());
         components.food().ifPresent(food -> applyFood(builder, food));
         components.tool().ifPresent(tool -> applyTool(builder, tool));
+    }
+
+    /**
+     * Decide which components the client may write a tooltip line for, and hide the rest.
+     *
+     * <p>A menu icon is a button and the client does not know that: left alone it writes the mining speed under an
+     * IRON_PICKAXE, "Dyed" under a tinted chestplate and the flight duration under a firework, beneath a lore that
+     * already said what the button does. So the default silences {@link Tooltips#VANILLA_COMPONENTS}, minus
+     * whatever the {@code decor} block asked for: an operator who wrote {@code enchantments} or {@code trim} meant
+     * that line to be read, and the line the client added by itself is the one nobody chose. {@code
+     * hide-vanilla-tooltip=false} gives every line back, and {@code hidden-components} names an exact set and wins
+     * over both.
+     *
+     * <p>This is about drawing and not about behaviour: hiding {@code EQUIPPABLE} removes the line, not the equip.
+     * A menu stops the equip by cancelling the click, which is where that belongs.
+     */
+    private static void hideVanillaLines(ItemStack item, RichMeta meta) {
+        Set<DataComponentType> hidden = hiddenFor(meta);
+        safely(() -> Tooltips.hide(item, hidden));
+        // After, not before: both live on the same component, and hiding the client's lines must not hand back a
+        // tooltip the spec asked to take away entirely.
+        meta.components()
+                .hideTooltip()
+                .ifPresent(whole -> safely(() -> item.editMeta(edited -> edited.setHideTooltip(whole))));
+    }
+
+    /** The components to silence for {@code meta}: the decision this class owns, split out so a test can read it. */
+    static Set<DataComponentType> hiddenFor(RichMeta meta) {
+        DataComponents components = meta.components();
+        if (!components.hiddenComponents().isEmpty()) {
+            return components.hiddenComponents().stream()
+                    .map(token -> fromRegistry(RegistryKey.DATA_COMPONENT_TYPE, keyOf(token)))
+                    .flatMap(Optional::stream)
+                    .collect(Collectors.toUnmodifiableSet());
+        }
+        if (!components.hideVanillaTooltip().orElse(true)) {
+            return Set.of();
+        }
+        Set<DataComponentType> hidden = new HashSet<>(Tooltips.VANILLA_COMPONENTS);
+        hidden.removeAll(declaredByTheOperator(meta));
+        return Set.copyOf(hidden);
+    }
+
+    /**
+     * The components the {@code decor} block filled in itself, whose tooltip lines are therefore content rather
+     * than noise. Everything else in {@link Tooltips#VANILLA_COMPONENTS} comes from the material alone.
+     */
+    private static Set<DataComponentType> declaredByTheOperator(RichMeta meta) {
+        Set<DataComponentType> declared = new HashSet<>();
+        if (meta.unbreakable()) {
+            declared.add(DataComponentTypes.UNBREAKABLE);
+        }
+        if (!meta.enchantments().isEmpty()) {
+            declared.add(DataComponentTypes.ENCHANTMENTS);
+        }
+        if (!meta.storedEnchantments().isEmpty()) {
+            declared.add(DataComponentTypes.STORED_ENCHANTMENTS);
+        }
+        if (meta.leatherColor().isPresent()) {
+            declared.add(DataComponentTypes.DYED_COLOR);
+        }
+        if (!meta.potion().equals(RichMeta.PotionSpec.NONE)) {
+            declared.add(DataComponentTypes.POTION_CONTENTS);
+        }
+        if (!meta.bannerPatterns().isEmpty()) {
+            declared.add(DataComponentTypes.BANNER_PATTERNS);
+        }
+        if (meta.trim().isPresent()) {
+            declared.add(DataComponentTypes.TRIM);
+        }
+        if (!meta.components().attributeModifiers().isEmpty()) {
+            declared.add(DataComponentTypes.ATTRIBUTE_MODIFIERS);
+        }
+        if (meta.components().tool().isPresent()) {
+            declared.add(DataComponentTypes.TOOL);
+        }
+        return declared;
     }
 
     /** Override the tooltip-style with a resource-pack key, skipping a malformed or unsupported key. */

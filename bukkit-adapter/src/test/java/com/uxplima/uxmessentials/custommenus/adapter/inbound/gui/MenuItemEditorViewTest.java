@@ -81,9 +81,10 @@ class MenuItemEditorViewTest {
     private static final int CAPTURE_SLOT = 11; // PROPERTY_SLOTS[1]
     private static final int AMOUNT_SLOT = 15; // PROPERTY_SLOTS[5]
     private static final int GLOW_SLOT = 20; // PROPERTY_SLOTS[8]
-    private static final int LORE_MODE_SLOT = 21; // PROPERTY_SLOTS[9]
-    private static final int CLICK_ACTIONS_SLOT = 23; // PROPERTY_SLOTS[11]
-    private static final int REQUIREMENTS_SLOT = 24; // PROPERTY_SLOTS[12]
+    private static final int VANILLA_TOOLTIP_SLOT = 21; // PROPERTY_SLOTS[9]
+    private static final int LORE_MODE_SLOT = 22; // PROPERTY_SLOTS[10]
+    private static final int CLICK_ACTIONS_SLOT = 24; // PROPERTY_SLOTS[12]
+    private static final int REQUIREMENTS_SLOT = 25; // PROPERTY_SLOTS[13]
     private static final int GESTURE_LEFT_SLOT = 10; // MenuClickActionsView.GESTURE_SLOTS[0] (ClickKind.LEFT)
     private static final int REF_ADD_SLOT = 48; // MenuRefListEditor.ADD_SLOT
     private static final int REQ_CONDITIONS_SLOT = 11; // MenuRequirementsView.PROPERTY_SLOTS[0]
@@ -211,6 +212,9 @@ class MenuItemEditorViewTest {
         assertThat(itemEditor.propertyAt(13, session, "x")).get().isInstanceOf(ListProperty.class); // lore
         assertThat(itemEditor.propertyAt(AMOUNT_SLOT, session, "x")).get().isInstanceOf(NumberProperty.class);
         assertThat(itemEditor.propertyAt(GLOW_SLOT, session, "x")).get().isInstanceOf(ToggleProperty.class);
+        assertThat(itemEditor.propertyAt(VANILLA_TOOLTIP_SLOT, session, "x"))
+                .get()
+                .isInstanceOf(ToggleProperty.class);
         assertThat(itemEditor.propertyAt(LORE_MODE_SLOT, session, "x")).get().isInstanceOf(EnumProperty.class);
     }
 
@@ -232,6 +236,19 @@ class MenuItemEditorViewTest {
         fireClick(GLOW_SLOT, ClickType.LEFT);
 
         assertThat(session().item("x").orElseThrow().decor().glow()).isTrue();
+    }
+
+    @Test
+    void turningTheVanillaTooltipToggleOffWritesTheKeyIntoTheSession() {
+        // The toggle reads as on by default because that is what a menu icon wants, so the only thing worth
+        // writing to the file is the operator asking for the client's lines back.
+        grid.open(player, viewer, "alpha");
+        fireClick(0, ClickType.LEFT);
+
+        fireClick(VANILLA_TOOLTIP_SLOT, ClickType.LEFT);
+
+        assertThat(session().item("x").orElseThrow().decor().meta().components().hideVanillaTooltip())
+                .contains(false);
     }
 
     @Test

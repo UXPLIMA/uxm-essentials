@@ -885,7 +885,8 @@ public final class MenuSpecLoader {
      * {@code banner{ patterns=["stripe_top:red"] }}, {@code trim{ material=diamond, pattern=sentry }},
      * {@code damage=100}, {@code item-model="minecraft:diamond_sword"}. It also reads the native
      * {@link DataComponents}: {@code rarity=EPIC}, {@code tooltip-style="minecraft:fancy"},
-     * {@code hide-tooltip=true}, {@code enchant-glint=true}, {@code enchantable=10},
+     * {@code hide-tooltip=true}, {@code hide-vanilla-tooltip=false},
+     * {@code hidden-components=["dyed_color","equippable"]}, {@code enchant-glint=true}, {@code enchantable=10},
      * {@code attribute-modifiers=["generic.attack_damage:5:add_number:hand"]},
      * {@code food{ nutrition=4, saturation=2.4, can-always-eat=true }},
      * {@code tool{ default-mining-speed=1.0, damage-per-block=2 }}. The {@code amount} and {@code model-data} values
@@ -928,6 +929,8 @@ public final class MenuSpecLoader {
                 optionalString(node.node("rarity")),
                 optionalString(node.node("tooltip-style")),
                 optionalBoolean(node.node("hide-tooltip")),
+                optionalBoolean(node.node("hide-vanilla-tooltip")),
+                strings(node.node("hidden-components")),
                 optionalBoolean(node.node("enchant-glint")),
                 optionalInt(node.node("enchantable")),
                 strings(node.node("attribute-modifiers")),

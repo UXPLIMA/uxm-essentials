@@ -42,6 +42,11 @@ public record ItemDecor(int amount, Optional<Integer> modelData, boolean glow, L
         return new ItemDecor(amount, modelData, glow, flagTokens, meta);
     }
 
+    /** A copy carrying new native metadata, every other field unchanged: the item editor's tooltip toggle. */
+    public ItemDecor withMeta(RichMeta meta) {
+        return new ItemDecor(amount, modelData, glow, flagTokens, meta);
+    }
+
     /** A copy carrying a new item-flag token list, every other field unchanged — the item editor's flag toggles. */
     public ItemDecor withFlagTokens(List<String> flagTokens) {
         return new ItemDecor(amount, modelData, glow, flagTokens, meta);

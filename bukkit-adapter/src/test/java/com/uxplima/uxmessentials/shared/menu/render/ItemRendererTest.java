@@ -6,19 +6,26 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+
+import io.papermc.paper.datacomponent.DataComponentType;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.TooltipDisplay;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -147,6 +154,104 @@ class ItemRendererTest {
         // The operator's spacing carries over: a blank lore line stays a blank line in the flat label.
         assertThat(renderer.buttonText(itemNamedWithLore("Shop", List.of("top", "", "bottom")), ctx))
                 .isEqualTo("Shop\ntop\n\nbottom");
+    }
+
+    @Test
+    void aButtonHidesTheLinesTheClientWritesByItself() {
+        // The reason this exists: an IRON_PICKAXE used as a menu button drew its mining speed and attack damage
+        // under the lore that already said what the button does, in a colour the menu never chose.
+        ItemStack it = renderer.render(item("IRON_PICKAXE", new ItemDecor(1, Optional.empty(), false, List.of())), ctx);
+
+        assertThat(hidden(it)).contains(DataComponentTypes.TOOL, DataComponentTypes.ATTRIBUTE_MODIFIERS);
+    }
+
+    @Test
+    void aLineTheDecorBlockAskedForIsKept() {
+        // Authorship decides: the client added the mining speed, the operator added the enchantment, and only the
+        // one nobody chose is noise. A shop tile selling a sharpness book must still show what it sells.
+        ItemDecor decor = enchanted("sharpness:5");
+        ItemStack it = renderer.render(item("DIAMOND_SWORD", decor), ctx);
+
+        assertThat(hidden(it)).doesNotContain(DataComponentTypes.ENCHANTMENTS);
+        assertThat(hidden(it)).contains(DataComponentTypes.WEAPON);
+    }
+
+    @Test
+    void hideVanillaTooltipFalseGivesEveryLineBack() {
+        ItemStack it = renderer.render(item("IRON_PICKAXE", tooltip(Optional.of(false), List.of())), ctx);
+
+        assertThat(hidden(it)).isEmpty();
+    }
+
+    @Test
+    void hiddenComponentsNamesAnExactSet() {
+        // The tile that wants the usual silence with one line back names its own set instead of taking the default.
+        ItemStack it = renderer.render(
+                item("LEATHER_CHESTPLATE", tooltip(Optional.empty(), List.of("dyed_color", "not_a_component"))), ctx);
+
+        // The unresolvable token is skipped rather than aborting the render, as every other decor token is.
+        assertThat(hidden(it)).containsExactly(DataComponentTypes.DYED_COLOR);
+    }
+
+    @Test
+    void hidingTheClientsLinesDoesNotHandBackAWholeTooltipTheSpecTookAway() {
+        // Both settings live on the same component, so the order they are written in decides whether hide-tooltip
+        // survives. It has to: a spec that asked for no tooltip at all means it.
+        DataComponents whole = new DataComponents(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(true),
+                Optional.empty(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty());
+        ItemStack it = renderer.render(item("STONE", decorWith(RichMeta.NONE.withComponents(whole))), ctx);
+
+        assertThat(it.getItemMeta().isHideTooltip()).isTrue();
+    }
+
+    /** The components the client may not draw a line for, as the rendered stack carries them. */
+    private static Set<DataComponentType> hidden(ItemStack item) {
+        TooltipDisplay display = item.getData(DataComponentTypes.TOOLTIP_DISPLAY);
+        return display == null ? Set.of() : display.hiddenComponents();
+    }
+
+    /** A decor block whose operator declared one enchantment, and nothing else. */
+    private static ItemDecor decorWith(RichMeta meta) {
+        return new ItemDecor(1, Optional.empty(), false, List.of(), meta);
+    }
+
+    private static ItemDecor enchanted(String token) {
+        return decorWith(new RichMeta(
+                false,
+                List.of(token),
+                List.of(),
+                Optional.empty(),
+                RichMeta.PotionSpec.NONE,
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty()));
+    }
+
+    private static ItemDecor tooltip(Optional<Boolean> hideVanilla, List<String> hiddenComponents) {
+        DataComponents components = new DataComponents(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                hideVanilla,
+                hiddenComponents,
+                Optional.empty(),
+                Optional.empty(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty());
+        return decorWith(RichMeta.NONE.withComponents(components));
     }
 
     private static MenuItemSpec item(String material, ItemDecor decor) {

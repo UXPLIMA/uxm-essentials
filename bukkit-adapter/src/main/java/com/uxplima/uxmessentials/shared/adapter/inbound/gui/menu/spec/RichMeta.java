@@ -101,6 +101,24 @@ public record RichMeta(
                 Optional.empty());
     }
 
+    /** A copy carrying new native data-components, every other value unchanged. */
+    public RichMeta withComponents(DataComponents components) {
+        return new RichMeta(
+                unbreakable,
+                enchantments,
+                storedEnchantments,
+                leatherColor,
+                potion,
+                bannerPatterns,
+                trim,
+                damage,
+                dynamicAmount,
+                dynamicModelData,
+                itemModel,
+                components,
+                dynamicGlow);
+    }
+
     /**
      * The original eleven-argument form, retained so every existing call site keeps compiling unchanged: it carries
      * no data-components ({@link DataComponents#NONE}). Only the loader builds the twelve-argument canonical form

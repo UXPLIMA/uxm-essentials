@@ -84,7 +84,6 @@ public final class MenuItemEditorView {
             "HIDE_ENCHANTS",
             "HIDE_ATTRIBUTES",
             "HIDE_UNBREAKABLE",
-            "HIDE_ADDITIONAL_TOOLTIP",
             "HIDE_DYE",
             "HIDE_ARMOR_TRIM",
             "HIDE_DESTROYS",
@@ -95,7 +94,6 @@ public final class MenuItemEditorView {
             "HIDE_ENCHANTS", CustomMenusMessageKey.MENU_ITEM_EDITOR_FLAG_HIDE_ENCHANTS,
             "HIDE_ATTRIBUTES", CustomMenusMessageKey.MENU_ITEM_EDITOR_FLAG_HIDE_ATTRIBUTES,
             "HIDE_UNBREAKABLE", CustomMenusMessageKey.MENU_ITEM_EDITOR_FLAG_HIDE_UNBREAKABLE,
-            "HIDE_ADDITIONAL_TOOLTIP", CustomMenusMessageKey.MENU_ITEM_EDITOR_FLAG_HIDE_ADDITIONAL_TOOLTIP,
             "HIDE_DYE", CustomMenusMessageKey.MENU_ITEM_EDITOR_FLAG_HIDE_DYE,
             "HIDE_ARMOR_TRIM", CustomMenusMessageKey.MENU_ITEM_EDITOR_FLAG_HIDE_ARMOR_TRIM,
             "HIDE_DESTROYS", CustomMenusMessageKey.MENU_ITEM_EDITOR_FLAG_HIDE_DESTROYS,
@@ -216,6 +214,7 @@ public final class MenuItemEditorView {
         props.add(priorityProperty(target));
         props.add(modelDataProperty(target));
         props.add(glowProperty(target));
+        props.add(vanillaTooltipProperty(target));
         props.add(loreModeProperty(target));
         props.add(typeProperty(target));
         props.add(clickActions.row(target.session(), target.itemId()));
@@ -397,6 +396,27 @@ public final class MenuItemEditorView {
                 () -> current(target).decor().glow(),
                 this::onOff,
                 on -> target.session().setGlow(target.itemId(), on),
+                scheduler);
+    }
+
+    /**
+     * Whether the client writes its own lines under this icon's lore. On is the default, because a menu icon is a
+     * button: an IRON_PICKAXE otherwise carries its mining speed and an armour piece says what it is worn as,
+     * under a lore that already said what the button does. This replaced the HIDE_ADDITIONAL_TOOLTIP flag, which
+     * Paper 26.2 deprecates and which never covered the dyed/equippable/trim/firework lines at all.
+     */
+    private EditableProperty vanillaTooltipProperty(ItemTarget target) {
+        return ToggleProperty.ofBoolean(
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_HIDE_VANILLA_TOOLTIP,
+                Material.PAPER,
+                () -> current(target)
+                        .decor()
+                        .meta()
+                        .components()
+                        .hideVanillaTooltip()
+                        .orElse(true),
+                this::onOff,
+                hidden -> target.session().setVanillaTooltipHidden(target.itemId(), hidden),
                 scheduler);
     }
 

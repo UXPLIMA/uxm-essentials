@@ -260,8 +260,12 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Label of the hide-unbreakable flag toggle. */
     MENU_ITEM_EDITOR_FLAG_HIDE_UNBREAKABLE("menu.item-editor.flag.hide-unbreakable"),
 
-    /** Label of the hide-extra-tooltip flag toggle. */
-    MENU_ITEM_EDITOR_FLAG_HIDE_ADDITIONAL_TOOLTIP("menu.item-editor.flag.hide-additional-tooltip"),
+    /**
+     * Label of the toggle that decides whether the client may write its own tooltip lines under the item's lore.
+     * It replaced a HIDE_ADDITIONAL_TOOLTIP flag toggle: that flag is deprecated on Paper 26.2 and never covered
+     * the components the client has gained since (dyed colour, equippable, trim, firework, tool, and the rest).
+     */
+    MENU_ITEM_EDITOR_HIDE_VANILLA_TOOLTIP("menu.item-editor.hide-vanilla-tooltip"),
 
     /** Label of the hide-dye flag toggle. */
     MENU_ITEM_EDITOR_FLAG_HIDE_DYE("menu.item-editor.flag.hide-dye"),

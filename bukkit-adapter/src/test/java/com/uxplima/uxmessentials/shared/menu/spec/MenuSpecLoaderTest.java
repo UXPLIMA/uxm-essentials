@@ -278,6 +278,33 @@ class MenuSpecLoaderTest {
                 .contains(new DataComponents.ToolSpec(java.util.Optional.of(1.0), java.util.Optional.of(2)));
     }
 
+    @Test
+    void parsesTheTooltipKeysAndLeavesThemUnsetWhenAbsent() {
+        DataComponents declared =
+                new MenuSpecLoader().parse("""
+                        rows = 1
+                        items { t { slot = 0, decor {
+                          hide-vanilla-tooltip = false
+                          hidden-components = ["dyed_color", "equippable"]
+                        } } }
+                        """).items().get("t").decor().meta().components();
+
+        assertThat(declared.hideVanillaTooltip()).contains(false);
+        assertThat(declared.hiddenComponents()).containsExactly("dyed_color", "equippable");
+
+        // Unset is not the same as false: the renderer reads an absent key as "this is a button, silence the
+        // client", and an operator who never writes the key must not be forced either way by the loader.
+        DataComponents silent = new MenuSpecLoader()
+                .parse("rows=1\nitems{ t{ slot=0 } }")
+                .items()
+                .get("t")
+                .decor()
+                .meta()
+                .components();
+        assertThat(silent.hideVanillaTooltip()).isEmpty();
+        assertThat(silent.hiddenComponents()).isEmpty();
+    }
+
     private static final String MODIFIERS = """
             rows = 1
             items {

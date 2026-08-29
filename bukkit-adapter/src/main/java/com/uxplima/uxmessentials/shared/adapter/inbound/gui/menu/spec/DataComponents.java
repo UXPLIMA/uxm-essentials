@@ -11,9 +11,12 @@ import java.util.Optional;
  * — never a Bukkit type — so this model stays in the pure, Bukkit-free spec core; the renderer resolves each token
  * against the live registries at draw time and silently skips anything that does not resolve.
  *
- * <p>The three toggles are {@link Optional}{@code <Boolean>} rather than a bare {@code boolean} on purpose: an unset
+ * <p>The toggles are {@link Optional}{@code <Boolean>} rather than a bare {@code boolean} on purpose: an unset
  * toggle leaves the item's natural value alone, so an operator who never writes {@code hide-tooltip} does not force
- * it false. Each attribute-modifier token is {@code attribute:amount:operation:slot} (the operation and slot are
+ * it false. {@code hideVanillaTooltip} is the exception with a meaning of its own when unset, described on the
+ * renderer: a menu icon is a button, so the lines the client writes by itself are silenced unless the decor block
+ * asked for them, and {@code hide-vanilla-tooltip=false} gives them all back. {@code hiddenComponents} names an
+ * exact set instead, for the tile that wants the usual silence with one line kept. Each attribute-modifier token is {@code attribute:amount:operation:slot} (the operation and slot are
  * optional, defaulting to {@code add_number} and {@code any}); the renderer derives a unique key per modifier so
  * repeated entries on one item never collide.
  */
@@ -21,6 +24,8 @@ public record DataComponents(
         Optional<String> rarity,
         Optional<String> tooltipStyle,
         Optional<Boolean> hideTooltip,
+        Optional<Boolean> hideVanillaTooltip,
+        List<String> hiddenComponents,
         Optional<Boolean> enchantGlint,
         Optional<Integer> enchantable,
         List<String> attributeModifiers,
@@ -33,6 +38,8 @@ public record DataComponents(
             Optional.empty(),
             Optional.empty(),
             Optional.empty(),
+            List.of(),
+            Optional.empty(),
             Optional.empty(),
             List.of(),
             Optional.empty(),
@@ -42,11 +49,28 @@ public record DataComponents(
         Objects.requireNonNull(rarity, "rarity");
         Objects.requireNonNull(tooltipStyle, "tooltipStyle");
         Objects.requireNonNull(hideTooltip, "hideTooltip");
+        Objects.requireNonNull(hideVanillaTooltip, "hideVanillaTooltip");
+        hiddenComponents = List.copyOf(Objects.requireNonNull(hiddenComponents, "hiddenComponents"));
         Objects.requireNonNull(enchantGlint, "enchantGlint");
         Objects.requireNonNull(enchantable, "enchantable");
         attributeModifiers = List.copyOf(Objects.requireNonNull(attributeModifiers, "attributeModifiers"));
         Objects.requireNonNull(food, "food");
         Objects.requireNonNull(tool, "tool");
+    }
+
+    /** A copy whose vanilla-tooltip toggle is {@code hide}, every other component unchanged: the editor's toggle. */
+    public DataComponents withHideVanillaTooltip(Optional<Boolean> hide) {
+        return new DataComponents(
+                rarity,
+                tooltipStyle,
+                hideTooltip,
+                hide,
+                hiddenComponents,
+                enchantGlint,
+                enchantable,
+                attributeModifiers,
+                food,
+                tool);
     }
 
     /**

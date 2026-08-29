@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import org.jspecify.annotations.Nullable;
 
@@ -191,6 +192,19 @@ public final class MenuEditSession {
     /** Turn the enchant glow of the item under {@code id} on or off. */
     public MenuEditSession setGlow(String id, boolean glow) {
         return updateItem(id, item -> item.withDecor(item.decor().withGlow(glow)));
+    }
+
+    /**
+     * Whether the client may write its own tooltip lines under the item's lore: the item editor's toggle. Off is
+     * the default a menu icon wants, so this writes the key only to say something other than the default.
+     */
+    public MenuEditSession setVanillaTooltipHidden(String id, boolean hidden) {
+        return updateItem(id, item -> {
+            RichMeta meta = item.decor().meta();
+            return item.withDecor(item.decor()
+                    .withMeta(meta.withComponents(
+                            meta.components().withHideVanillaTooltip(hidden ? Optional.empty() : Optional.of(false)))));
+        });
     }
 
     /** Replace the item-flag tokens of the item under {@code id} — the item editor's per-flag toggles. */
