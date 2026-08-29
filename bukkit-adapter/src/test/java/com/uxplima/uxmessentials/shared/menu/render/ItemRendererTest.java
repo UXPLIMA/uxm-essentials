@@ -213,7 +213,13 @@ class ItemRendererTest {
         assertThat(it.getItemMeta().isHideTooltip()).isTrue();
     }
 
-    /** The components the client may not draw a line for, as the rendered stack carries them. */
+    /**
+     * The components the client may not draw a line for, as the rendered stack carries them.
+     *
+     * <p>Only read this from a stack the renderer returned. A tooltip display survives {@code new ItemStack(other)}
+     * on a real server (the copy constructor keeps the delegate) but not under MockBukkit, whose clone does not
+     * model data components, so an assertion taken across a copy here proves nothing either way.
+     */
     private static Set<DataComponentType> hidden(ItemStack item) {
         TooltipDisplay display = item.getData(DataComponentTypes.TOOLTIP_DISPLAY);
         return display == null ? Set.of() : display.hiddenComponents();

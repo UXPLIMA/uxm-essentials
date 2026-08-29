@@ -219,8 +219,8 @@ public final class ItemRenderer {
         // the viewer's real item — so any display copy that escapes into a real inventory is strippable. The mark rides
         // on the display copy only; the player's own items are never touched here (MenuItemMark, MenuAntiDupeListener).
         ItemStack marked = MenuItemMark.mark(built);
-        // Last, and on the finished stack rather than through the builder: the tooltip display is a data component
-        // and not item meta, so anything that copies the stack afterwards could drop it.
+        // Last, and on the finished stack: the whole-tooltip flag and the hidden set live on one component, so
+        // whichever is written second decides, and a spec that asked for no tooltip must not get one back.
         hideVanillaLines(marked, item.decor().meta());
         return marked;
     }
