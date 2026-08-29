@@ -222,7 +222,15 @@ public final class EconomyWiring {
         }
         EconomyProviderRegistrar registrar = new EconomyProviderRegistrar(
                 plugin.getServer().getServicesManager(), plugin, kernel.log(), settings.registerPriority());
-        return new ResolvedEconomy(registrar.registerOrDefer(nativeProvider), backends);
+        EconomyProvider resolved = registrar.registerOrDefer(nativeProvider);
+        if (resolved == nativeProvider) {
+            // A third-party plugin asks Vault for an economy, not this plugin for its own port. Registering
+            // only the port left every one of them finding nothing and paying nothing, however much this
+            // ledger was holding.
+            ForeignEconomyProviders.publishNative(
+                    plugin, resolved, currencies, settings.registerPriority(), kernel.log());
+        }
+        return new ResolvedEconomy(resolved, backends);
     }
 
     /** The provider the plugin talks through and the backend set it routes over, resolved together at start. */
@@ -765,6 +773,7 @@ public final class EconomyWiring {
                                         plugin.getSLF4JLogger()),
                                 org.bukkit.plugin.ServicePriority.Normal)
                         .unregister(provider);
+                ForeignEconomyProviders.withdrawNative(plugin);
             }
         }
     }

@@ -6,9 +6,11 @@ import java.util.Optional;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import org.bukkit.plugin.ServicePriority;
 
 import com.uxplima.uxmessentials.economy.adapter.treasury.TreasuryEconomyAdapter;
 import com.uxplima.uxmessentials.economy.adapter.vault.VaultEconomyAdapter;
+import com.uxplima.uxmessentials.economy.adapter.vault.VaultEconomyPublisher;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
@@ -43,6 +45,36 @@ final class ForeignEconomyProviders {
             return treasury;
         }
         return vault(plugin, currencies, log);
+    }
+
+    /**
+     * Publish the native ledger as the server's Vault economy, when Vault is installed.
+     *
+     * <p>The other direction of the same integration. It lives beside {@link #discover} rather than in the
+     * adapter it delegates to, because one optional plugin gets one presence seam: the Vault probe is spelled
+     * in this file and nowhere else ({@code SoftDependSeamDriftTest}).
+     */
+    static void publishNative(
+            Plugin plugin,
+            EconomyProvider provider,
+            CurrencyRegistry currencies,
+            ServicePriority priority,
+            Logger log) {
+        Objects.requireNonNull(plugin, "plugin");
+        if (plugin.getServer().getPluginManager().getPlugin("Vault") == null) {
+            log.info("event=vault_economy_not_published reason=vault_absent");
+            return;
+        }
+        VaultEconomyPublisher.publish(plugin, provider, currencies.defaultCurrency(), priority, log);
+    }
+
+    /** Take that registration back on disable, so a reload publishes once rather than twice. */
+    static void withdrawNative(Plugin plugin) {
+        Objects.requireNonNull(plugin, "plugin");
+        if (plugin.getServer().getPluginManager().getPlugin("Vault") == null) {
+            return;
+        }
+        VaultEconomyPublisher.withdraw(plugin);
     }
 
     private static Optional<EconomyProvider> treasury(Plugin plugin, CurrencyRegistry currencies, Logger log) {
