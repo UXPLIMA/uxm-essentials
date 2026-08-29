@@ -36,8 +36,13 @@ import org.jspecify.annotations.Nullable;
  * cached, and refuse otherwise, because the alternative is a blocking profile lookup on whichever thread the
  * caller happens to hold. A UUID-keyed caller is never refused.
  *
- * <p>Every method is synchronous, because Vault's contract is. The wallet read behind it must therefore stay
- * cheap enough to answer on the calling thread.
+ * <p>Every method is synchronous, because Vault's contract is: a caller wants a number back, so there is no
+ * seam to hand the work to the scheduler through. The rule that every provider call runs off the tick thread
+ * governs calling a foreign economy and cannot govern answering one. So the wallet read behind this view has
+ * to stay cheap enough to answer inline, which is what the repository cache is for, and this class does as
+ * little of it as it can: a movement reads the balance once, before the write, and derives the figure Vault
+ * wants by arithmetic rather than reading again. Reading afterwards would be a guaranteed database round trip
+ * on the caller's thread, because the write has just dropped that owner from the cache.
  */
 @NullMarked
 // Vault deprecated its name-keyed half and never removed it. An implementation still has to answer every
@@ -163,11 +168,12 @@ public final class NativeVaultEconomy implements Economy {
             return failure(0d, getBalance(player), NEGATIVE_AMOUNT);
         }
         PlayerRef owner = ref(player);
-        if (provider.debit(owner, Money.of(currency, BigDecimal.valueOf(amount)))
-                .isErr()) {
-            return failure(amount, getBalance(player), "insufficient funds");
+        Money moved = Money.of(currency, BigDecimal.valueOf(amount));
+        Money before = provider.balance(owner, currency);
+        if (provider.debit(owner, moved).isErr()) {
+            return failure(amount, before.amount().doubleValue(), "insufficient funds");
         }
-        return success(amount, getBalance(player));
+        return success(amount, before.minus(moved).amount().doubleValue());
     }
 
     @Override
@@ -192,12 +198,15 @@ public final class NativeVaultEconomy implements Economy {
             return failure(0d, getBalance(player), NEGATIVE_AMOUNT);
         }
         PlayerRef owner = ref(player);
-        provider.ensureAccount(owner, currency);
-        if (provider.credit(owner, Money.of(currency, BigDecimal.valueOf(amount)))
-                .isErr()) {
-            return failure(amount, getBalance(player), "the balance ceiling would be passed");
+        Money moved = Money.of(currency, BigDecimal.valueOf(amount));
+        Money before = provider.balance(owner, currency);
+        // No ensureAccount here: a native credit opens the account itself, and against a foreign backend the
+        // call does nothing at all. Asking for it separately is a database write per reward paid, on whichever
+        // thread the caller holds.
+        if (provider.credit(owner, moved).isErr()) {
+            return failure(amount, before.amount().doubleValue(), "the balance ceiling would be passed");
         }
-        return success(amount, getBalance(player));
+        return success(amount, before.plus(moved).amount().doubleValue());
     }
 
     @Override

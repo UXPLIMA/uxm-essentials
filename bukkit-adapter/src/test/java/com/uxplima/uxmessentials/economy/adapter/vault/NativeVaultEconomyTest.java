@@ -44,6 +44,9 @@ class NativeVaultEconomyTest {
 
         private final Map<PlayerRef, BigDecimal> balances = new HashMap<>();
 
+        /** Reads served. The real repository answers a miss from the database, so the count is not free. */
+        private int reads;
+
         @Override
         public boolean hasAccount(PlayerRef owner, Currency currency) {
             return balances.containsKey(owner);
@@ -56,11 +59,14 @@ class NativeVaultEconomyTest {
 
         @Override
         public Money balance(PlayerRef owner, Currency currency) {
+            reads++;
             return Money.of(currency, balances.getOrDefault(owner, BigDecimal.ZERO));
         }
 
         @Override
         public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
+            // As the native ledger does: a credit opens the account, so the caller never has to ask first.
+            ensureAccount(owner, amount.currency());
             balances.merge(owner, amount.amount(), BigDecimal::add);
             return Result.ok();
         }
@@ -127,6 +133,24 @@ class NativeVaultEconomyTest {
         economy.depositPlayer(player, 10);
 
         assertThat(economy.hasAccount(player)).isTrue();
+    }
+
+    @Test
+    @DisplayName("a movement reads the wallet once, and answers Vault by arithmetic rather than reading again")
+    void aMovementReadsTheWalletOnce() {
+        // Vault is synchronous, so this runs on whichever thread the paying plugin holds, usually the tick
+        // thread. A read after the write is the expensive one: the write drops that owner from the repository
+        // cache, so it is a guaranteed database round trip. Reading before and adding costs nothing extra and
+        // is exact, because a credit that succeeds moved precisely the amount asked for.
+        economy.depositPlayer(player, 20);
+        int afterFirst = ledger.reads;
+
+        assertThat(economy.depositPlayer(player, 30).balance).isEqualTo(50d);
+        assertThat(ledger.reads - afterFirst).isEqualTo(1);
+
+        int beforeWithdrawal = ledger.reads;
+        assertThat(economy.withdrawPlayer(player, 5).balance).isEqualTo(45d);
+        assertThat(ledger.reads - beforeWithdrawal).isEqualTo(1);
     }
 
     @Test
