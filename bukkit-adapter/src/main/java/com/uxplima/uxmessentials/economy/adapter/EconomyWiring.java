@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.economy.adapter;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -216,6 +217,7 @@ public final class EconomyWiring {
             kernel.log().info("event=economy_provider_deferred (consuming foreign economy)");
             return new ResolvedEconomy(foreign.get(), backends);
         }
+        logBackendsInUse(currencies, kernel.log());
         if (!settings.registerProvider()) {
             kernel.log().info("native economy provider registration disabled by config; using it locally");
             return new ResolvedEconomy(nativeProvider, backends);
@@ -231,6 +233,30 @@ public final class EconomyWiring {
                     plugin, resolved, currencies, settings.registerPriority(), kernel.log());
         }
         return new ResolvedEconomy(resolved, backends);
+    }
+
+    /**
+     * Say which backends the configured currencies actually live on, which is not what the available list says.
+     * A server with an empty {@code backends} block still sees three backends discovered, and without this line
+     * there is nothing in the log to tell an operator that every currency is on the plugin's own ledger. Only
+     * reached when the routing provider is the one in play: a foreign economy bypasses these backends entirely
+     * and says so on its own line.
+     */
+    private static void logBackendsInUse(CurrencyRegistry currencies, Logger log) {
+        List<Currency> foreign = currencies.all().stream()
+                .filter(currency -> !"native".equals(currency.backendId()))
+                .sorted(Comparator.comparing(currency -> currency.id().value()))
+                .toList();
+        if (foreign.isEmpty()) {
+            log.info(
+                    "event=currency_backends_in_use backends=native currencies={}",
+                    currencies.all().size());
+            return;
+        }
+        foreign.forEach(currency -> log.info(
+                "event=currency_backend_in_use currency={} backend={}",
+                currency.id().value(),
+                currency.backendId()));
     }
 
     /** The provider the plugin talks through and the backend set it routes over, resolved together at start. */

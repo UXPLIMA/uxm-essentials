@@ -64,7 +64,10 @@ public final class CurrencyBackends {
         for (String name : config.getKeys("backends.placeholder")) {
             backends.add(wrap(PlaceholderCurrencyBackend.fromConfig(name, config, server, log, scheduler)));
         }
-        backends.forEach(backend -> log.info("event=currency_backend_registered id={}", backend.id()));
+        // Available, not in use. Every one of these is a backend a currency may name; native and exp are always
+        // here and Vault/PlayerPoints join whenever those plugins are, so a fresh server with no `backends`
+        // block still prints three lines. Which of them a currency actually lives on is logged by the wiring.
+        backends.forEach(backend -> log.info("event=currency_backend_available id={}", backend.id()));
         return CurrencyBackendRegistry.of(backends);
     }
 
