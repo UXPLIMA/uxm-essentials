@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.tablist.domain;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A fixed-slot tab-list layout a {@link TablistFormat} may carry: the operator-authored {@link TablistFiller} entries and
@@ -25,8 +26,13 @@ import java.util.Objects;
  * every cell; the codec drops a group authored without one. With groups the grid is planned per viewer by
  * {@link VirtualTabPlanner}, which decides which candidate sits in which cell and leaves every unclaimed cell empty.
  *
+ * <p>The layout's own {@code skin} is what a cell wears when it names no skin of its own: the head the client draws
+ * beside every row it lists. A grid of written rows wants no head at all, which is a fully transparent texture. A
+ * roster row is never given it, because that row wears the player it is about.
+ *
  * @param fillers the filler entries this layout paints, in codec order (defensively copied)
  * @param groups the roster groups the live players are drawn into, in codec order (defensively copied)
+ * @param skin the texture a cell with no skin of its own wears, or empty for the client's default head
  * @param direction how a 1-based slot maps to a grid cell
  * @param gridRows the number of rows per column the client renders (twenty for a standard 80-slot tab list)
  * @param exact whether every grid cell must be materialized as a synthetic entry, including visually empty cells
@@ -34,6 +40,7 @@ import java.util.Objects;
 public record TablistLayout(
         List<TablistFiller> fillers,
         List<TablistRosterGroup> groups,
+        Optional<TablistSkinSource> skin,
         Direction direction,
         int gridRows,
         boolean exact) {
@@ -65,6 +72,7 @@ public record TablistLayout(
     public TablistLayout {
         Objects.requireNonNull(fillers, "fillers");
         Objects.requireNonNull(groups, "groups");
+        Objects.requireNonNull(skin, "skin");
         Objects.requireNonNull(direction, "direction");
         if (gridRows <= 0) {
             throw new IllegalArgumentException("a tablist layout grid must have a positive row count, got " + gridRows);
@@ -82,17 +90,27 @@ public record TablistLayout(
 
     /** Backwards-compatible sparse layout constructor. */
     public TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows) {
-        this(fillers, List.of(), direction, gridRows, false);
+        this(fillers, List.of(), Optional.empty(), direction, gridRows, false);
     }
 
     /** A layout with fillers only: the historical shape, sparse or exact, with no roster group. */
     public TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows, boolean exact) {
-        this(fillers, List.of(), direction, gridRows, exact);
+        this(fillers, List.of(), Optional.empty(), direction, gridRows, exact);
+    }
+
+    /** A layout with roster groups and no default skin. */
+    public TablistLayout(
+            List<TablistFiller> fillers,
+            List<TablistRosterGroup> groups,
+            Direction direction,
+            int gridRows,
+            boolean exact) {
+        this(fillers, groups, Optional.empty(), direction, gridRows, exact);
     }
 
     /** The inert layout a format with no fillers carries: no rows painted, the native name/order path untouched. */
     public static TablistLayout empty() {
-        return new TablistLayout(List.of(), List.of(), Direction.COLUMNS, DEFAULT_GRID_ROWS, false);
+        return new TablistLayout(List.of(), List.of(), Optional.empty(), Direction.COLUMNS, DEFAULT_GRID_ROWS, false);
     }
 
     /** True when this layout paints no filler rows — the format renders exactly as it did before fillers existed. */

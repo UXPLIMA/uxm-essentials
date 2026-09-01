@@ -619,6 +619,39 @@ class TablistRendererTest {
     }
 
     @Test
+    void theLayoutSkinDressesEveryCellExceptTheRosterRows() {
+        PlayerMock viewer = server.addPlayer("Alexia");
+        RecordingPackets packets = new RecordingPackets();
+        FakeProfiles profiles = new FakeProfiles();
+        profiles.online.put("Alexia", new TabSkin("alexiatex", "alexiasig"));
+        TablistRosterGroup group = new TablistRosterGroup(
+                "players", List.of(new TablistSlotRange(21, 22)), DisplayCondition.always(), "<white>{player}");
+        TablistLayout exact = new TablistLayout(
+                List.of(new TablistFiller(1, "<gold>Players", Optional.empty())),
+                List.of(group),
+                Optional.of(new TablistSkinSource.Texture("blanktex", Optional.of("blanksig"))),
+                TablistLayout.Direction.COLUMNS,
+                20,
+                true);
+        TablistRenderer renderer = new TablistRenderer(
+                new AtomicReference<>(new TablistFormatConfig(List.of(suppressFillerFormat("default", exact))))::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                new TablistSkinResolver(profiles, new InlineScheduler()),
+                server::getOnlinePlayers,
+                new InlineScheduler());
+
+        renderer.renderFor(viewer);
+
+        List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
+        // A written cell wears the layout's skin, and so does a cell nobody claimed, so no cell shows a default head.
+        assertThat(skinOf(entries.get(0)).textureValue()).isEqualTo("blanktex");
+        assertThat(skinOf(entries.get(79)).textureValue()).isEqualTo("blanktex");
+        // A roster row wears the player it is about.
+        assertThat(skinOf(entries.get(20)).textureValue()).isEqualTo("alexiatex");
+    }
+
+    @Test
     void completePacketPortBatchesAnExactInitialPaintIntoOneAddPacket() {
         PlayerMock viewer = server.addPlayer();
         BatchRecordingPackets packets = new BatchRecordingPackets();

@@ -225,8 +225,8 @@ final class FillerPainter {
             @Nullable Player subject,
             int latency) {
 
-        static PlannedCell of(TablistFiller filler) {
-            return new PlannedCell(filler.slot(), filler.text(), filler.skin(), null, 0);
+        static PlannedCell of(TablistFiller filler, Optional<TablistSkinSource> fallbackSkin) {
+            return new PlannedCell(filler.slot(), filler.text(), filler.skin().or(() -> fallbackSkin), null, 0);
         }
 
         static PlannedCell of(int slot, TablistRosterGroup group, Player occupant) {
@@ -239,8 +239,8 @@ final class FillerPainter {
                     latencyBars(occupant.getPing()));
         }
 
-        static PlannedCell empty(int slot) {
-            return new PlannedCell(slot, "", Optional.empty(), null, 0);
+        static PlannedCell empty(int slot, Optional<TablistSkinSource> fallbackSkin) {
+            return new PlannedCell(slot, "", fallbackSkin, null, 0);
         }
     }
 
@@ -252,18 +252,11 @@ final class FillerPainter {
      */
     private List<PlannedCell> plannedCells(
             TablistLayout layout, Map<String, ? extends List<? extends Player>> occupants) {
-        if (!layout.hasGroups()) {
-            List<PlannedCell> cells = new ArrayList<>();
-            for (TablistFiller filler : materializedFillers(layout)) {
-                cells.add(PlannedCell.of(filler));
-            }
-            return cells;
-        }
-        TablistLayoutDesign design = designOf(layout);
+        TablistLayoutDesign design = layout.hasGroups() ? designOf(layout) : null;
         if (design == null) {
             List<PlannedCell> cells = new ArrayList<>();
             for (TablistFiller filler : materializedFillers(layout)) {
-                cells.add(PlannedCell.of(filler));
+                cells.add(PlannedCell.of(filler, layout.skin()));
             }
             return cells;
         }
@@ -274,21 +267,24 @@ final class FillerPainter {
         VirtualTabGrid<Player> grid = VirtualTabPlanner.plan(design, occupants, Player::getUniqueId);
         List<PlannedCell> cells = new ArrayList<>(grid.slotCount());
         for (VirtualTabCell<Player> cell : grid.cells()) {
-            cells.add(plannedCell(cell, groups));
+            cells.add(plannedCell(cell, groups, layout.skin()));
         }
         return cells;
     }
 
-    private static PlannedCell plannedCell(VirtualTabCell<Player> cell, Map<String, TablistRosterGroup> groups) {
+    private static PlannedCell plannedCell(
+            VirtualTabCell<Player> cell,
+            Map<String, TablistRosterGroup> groups,
+            Optional<TablistSkinSource> fallbackSkin) {
         return switch (cell.content()) {
-            case VirtualTabCell.Fixed<Player> fixed -> PlannedCell.of(fixed.filler());
+            case VirtualTabCell.Fixed<Player> fixed -> PlannedCell.of(fixed.filler(), fallbackSkin);
             case VirtualTabCell.Player<Player> occupied -> {
                 TablistRosterGroup group = groups.get(occupied.groupId());
                 yield group == null
-                        ? PlannedCell.empty(cell.slot())
+                        ? PlannedCell.empty(cell.slot(), fallbackSkin)
                         : PlannedCell.of(cell.slot(), group, occupied.occupant());
             }
-            case VirtualTabCell.Empty<Player> ignored -> PlannedCell.empty(cell.slot());
+            case VirtualTabCell.Empty<Player> ignored -> PlannedCell.empty(cell.slot(), fallbackSkin);
         };
     }
 

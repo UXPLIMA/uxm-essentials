@@ -50,6 +50,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  *       direction = "COLUMNS"
  *       fillers = [ { slot = 5, text = "<gray>play.example.net", skin = "player:Notch" } ]
  *       groups = [ { id = "players", slots = [ "21-40" ], text = "<white>{player}" } ]   # needs exact = true
+ *       skin = "texture:<b64>"                       # the head every cell wears unless it names its own
  *     }
  *   }
  *   default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
@@ -207,10 +208,11 @@ final class TablistContentCodec {
         int capacity = TablistLayout.COLUMNS * rows;
         List<TablistFiller> fillers = fillers(node.node("fillers"), formatName, capacity, exact, log);
         List<TablistRosterGroup> groups = groups(node.node("groups"), formatName, capacity, exact, log);
+        Optional<TablistSkinSource> skin = skinSource(node.node("skin"));
         if (fillers.isEmpty() && groups.isEmpty() && !exact) {
             return TablistLayout.empty();
         }
-        TablistLayout layout = new TablistLayout(fillers, groups, direction, rows, exact);
+        TablistLayout layout = new TablistLayout(fillers, groups, skin, direction, rows, exact);
         if (groups.isEmpty()) {
             return layout;
         }
