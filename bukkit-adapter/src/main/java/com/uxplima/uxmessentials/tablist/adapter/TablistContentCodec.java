@@ -20,7 +20,9 @@ import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
+import com.uxplima.uxmessentials.tablist.domain.TablistRosterGroup;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
+import com.uxplima.uxmessentials.tablist.domain.TablistSlotRange;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurationNode;
 
@@ -47,6 +49,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  *     layout {                                         # OPTIONAL fixed-slot filler grid (see #layout)
  *       direction = "COLUMNS"
  *       fillers = [ { slot = 5, text = "<gray>play.example.net", skin = "player:Notch" } ]
+ *       groups = [ { id = "players", slots = [ "21-40" ], text = "<white>{player}" } ]   # needs exact = true
  *     }
  *   }
  *   default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
@@ -78,6 +81,10 @@ import org.spongepowered.configurate.ConfigurationNode;
 final class TablistContentCodec {
 
     private static final long DEFAULT_REFRESH_TICKS = 20L;
+
+    /** A roster row with no authored text is the occupant's name: the one thing every such row shows. */
+    private static final String DEFAULT_GROUP_TEXT = "{player}";
+
     private static final long MILLIS_PER_TICK = 50L;
 
     private TablistContentCodec() {}
@@ -199,7 +206,107 @@ final class TablistContentCodec {
         }
         int capacity = TablistLayout.COLUMNS * rows;
         List<TablistFiller> fillers = fillers(node.node("fillers"), formatName, capacity, exact, log);
-        return fillers.isEmpty() && !exact ? TablistLayout.empty() : new TablistLayout(fillers, direction, rows, exact);
+        List<TablistRosterGroup> groups = groups(node.node("groups"), formatName, capacity, exact, log);
+        if (fillers.isEmpty() && groups.isEmpty() && !exact) {
+            return TablistLayout.empty();
+        }
+        TablistLayout layout = new TablistLayout(fillers, groups, direction, rows, exact);
+        if (groups.isEmpty()) {
+            return layout;
+        }
+        try {
+            // Building the design is the ownership check: it rejects a cell a filler and a group both claim, two groups
+            // that overlap, and a repeated group id. A layout that cannot be planned would paint an ambiguous grid, so
+            // the groups are dropped and the fillers alone are kept rather than failing the whole format.
+            layout.design(formatName);
+            return layout;
+        } catch (IllegalArgumentException rejected) {
+            log.warn(
+                    "tablist_roster_groups_dropped format={} reason={}",
+                    formatName,
+                    String.valueOf(rejected.getMessage()));
+            return new TablistLayout(fillers, direction, rows, exact);
+        }
+    }
+
+    /**
+     * Parse a layout's optional roster groups: the cells the live players are drawn into.
+     *
+     * <pre>{@code
+     * groups = [
+     *   { id = "players", slots = [ "21-40" ], text = "<white>{player}", condition = "" }
+     * ]
+     * }</pre>
+     *
+     * <p>A group owns cells, so it needs an exact grid; one authored without {@code exact = true} is dropped with a
+     * warning rather than silently ignored. A group with no usable slot range, a blank id, or a repeated id is dropped
+     * the same way, and the layout keeps the groups that parsed.
+     */
+    private static List<TablistRosterGroup> groups(
+            ConfigurationNode node, String formatName, int capacity, boolean exact, Logger log) {
+        if (node.virtual() || !node.isList()) {
+            return List.of();
+        }
+        if (!exact) {
+            log.warn("tablist_roster_groups_disabled format={} reason=exact-grid-required", formatName);
+            return List.of();
+        }
+        List<TablistRosterGroup> parsed = new ArrayList<>();
+        Set<String> seenIds = new LinkedHashSet<>();
+        for (ConfigurationNode child : node.childrenList()) {
+            group(child, formatName, capacity, seenIds, log).ifPresent(parsed::add);
+        }
+        return parsed;
+    }
+
+    private static Optional<TablistRosterGroup> group(
+            ConfigurationNode node, String formatName, int capacity, Set<String> seenIds, Logger log) {
+        String id = node.node("id").getString("").trim();
+        if (id.isEmpty()) {
+            log.warn("tablist_roster_group_skipped format={} reason=blank-id", formatName);
+            return Optional.empty();
+        }
+        if (!seenIds.add(id)) {
+            log.warn("tablist_roster_group_skipped format={} group={} reason=duplicate-id", formatName, id);
+            return Optional.empty();
+        }
+        List<TablistSlotRange> ranges = ranges(node.node("slots"), formatName, id, capacity, log);
+        if (ranges.isEmpty()) {
+            log.warn("tablist_roster_group_skipped format={} group={} reason=no-slots", formatName, id);
+            return Optional.empty();
+        }
+        String text = node.node("text").getString(DEFAULT_GROUP_TEXT);
+        DisplayCondition condition =
+                ConditionParser.parse(node.node("condition").getString());
+        return Optional.of(new TablistRosterGroup(id, ranges, condition, text));
+    }
+
+    /** Parse one group's {@code slots} list: {@code "7"} for a single cell, {@code "21-40"} for a run of them. */
+    private static List<TablistSlotRange> ranges(
+            ConfigurationNode node, String formatName, String groupId, int capacity, Logger log) {
+        List<TablistSlotRange> parsed = new ArrayList<>();
+        for (String source : strings(node)) {
+            try {
+                TablistSlotRange range = TablistSlotRange.parse(source);
+                if (range.last() > capacity) {
+                    log.warn(
+                            "tablist_roster_range_skipped format={} group={} range={} reason=out-of-grid capacity={}",
+                            formatName,
+                            groupId,
+                            source,
+                            capacity);
+                    continue;
+                }
+                parsed.add(range);
+            } catch (IllegalArgumentException rejected) {
+                log.warn(
+                        "tablist_roster_range_skipped format={} group={} range={} reason=unreadable",
+                        formatName,
+                        groupId,
+                        source);
+            }
+        }
+        return parsed;
     }
 
     private static List<TablistFiller> fillers(

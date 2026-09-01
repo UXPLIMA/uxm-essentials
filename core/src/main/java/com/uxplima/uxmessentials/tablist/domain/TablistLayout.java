@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.tablist.domain;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -19,12 +20,23 @@ import java.util.Objects;
  * them over; the adapter keys its per-(viewer, slot) tracking on {@link TablistFiller#slot()}, so order is presentational
  * only.
  *
+ * <p>A layout may also carry {@link TablistRosterGroup roster groups}: the cells the live players are drawn into. A
+ * group only makes sense in an {@code exact} grid, because a cell can hold a chosen player only when this layout owns
+ * every cell; the codec drops a group authored without one. With groups the grid is planned per viewer by
+ * {@link VirtualTabPlanner}, which decides which candidate sits in which cell and leaves every unclaimed cell empty.
+ *
  * @param fillers the filler entries this layout paints, in codec order (defensively copied)
+ * @param groups the roster groups the live players are drawn into, in codec order (defensively copied)
  * @param direction how a 1-based slot maps to a grid cell
  * @param gridRows the number of rows per column the client renders (twenty for a standard 80-slot tab list)
  * @param exact whether every grid cell must be materialized as a synthetic entry, including visually empty cells
  */
-public record TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows, boolean exact) {
+public record TablistLayout(
+        List<TablistFiller> fillers,
+        List<TablistRosterGroup> groups,
+        Direction direction,
+        int gridRows,
+        boolean exact) {
 
     /** The vanilla tab list is four columns wide; the slot arithmetic mirrors the client's fill order. */
     public static final int COLUMNS = 4;
@@ -52,6 +64,7 @@ public record TablistLayout(List<TablistFiller> fillers, Direction direction, in
 
     public TablistLayout {
         Objects.requireNonNull(fillers, "fillers");
+        Objects.requireNonNull(groups, "groups");
         Objects.requireNonNull(direction, "direction");
         if (gridRows <= 0) {
             throw new IllegalArgumentException("a tablist layout grid must have a positive row count, got " + gridRows);
@@ -60,22 +73,48 @@ public record TablistLayout(List<TablistFiller> fillers, Direction direction, in
             throw new IllegalArgumentException(
                     "an exact tablist layout cannot exceed " + MAX_EXACT_SLOTS + " cells, got " + COLUMNS * gridRows);
         }
+        if (!groups.isEmpty() && !exact) {
+            throw new IllegalArgumentException("a tablist roster group needs an exact grid to own its cells");
+        }
         fillers = List.copyOf(fillers);
+        groups = List.copyOf(groups);
     }
 
     /** Backwards-compatible sparse layout constructor. */
     public TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows) {
-        this(fillers, direction, gridRows, false);
+        this(fillers, List.of(), direction, gridRows, false);
+    }
+
+    /** A layout with fillers only: the historical shape, sparse or exact, with no roster group. */
+    public TablistLayout(List<TablistFiller> fillers, Direction direction, int gridRows, boolean exact) {
+        this(fillers, List.of(), direction, gridRows, exact);
     }
 
     /** The inert layout a format with no fillers carries: no rows painted, the native name/order path untouched. */
     public static TablistLayout empty() {
-        return new TablistLayout(List.of(), Direction.COLUMNS, DEFAULT_GRID_ROWS, false);
+        return new TablistLayout(List.of(), List.of(), Direction.COLUMNS, DEFAULT_GRID_ROWS, false);
     }
 
     /** True when this layout paints no filler rows — the format renders exactly as it did before fillers existed. */
     public boolean isEmpty() {
-        return fillers.isEmpty() && !exact;
+        return fillers.isEmpty() && groups.isEmpty() && !exact;
+    }
+
+    /** True when the live players are drawn into cells this layout owns rather than into the cells the client picks. */
+    public boolean hasGroups() {
+        return !groups.isEmpty();
+    }
+
+    /**
+     * This layout as a planning design named {@code id}: the fillers as fixed cells and the groups as placements. The
+     * design rejects a cell two owners claim, so building one is also the ownership check.
+     */
+    public TablistLayoutDesign design(String id) {
+        List<TablistPlayerGroup> placements = new ArrayList<>(groups.size());
+        for (TablistRosterGroup group : groups) {
+            placements.add(group.placement());
+        }
+        return new TablistLayoutDesign(id, capacity(), direction, gridRows, fillers, placements);
     }
 
     /** Number of client cells this layout declares. */

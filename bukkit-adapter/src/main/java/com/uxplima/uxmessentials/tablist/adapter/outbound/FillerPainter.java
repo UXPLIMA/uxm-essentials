@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.entity.Player;
 
@@ -17,7 +18,12 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
+import com.uxplima.uxmessentials.tablist.domain.TablistLayoutDesign;
+import com.uxplima.uxmessentials.tablist.domain.TablistRosterGroup;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
+import com.uxplima.uxmessentials.tablist.domain.VirtualTabCell;
+import com.uxplima.uxmessentials.tablist.domain.VirtualTabGrid;
+import com.uxplima.uxmessentials.tablist.domain.VirtualTabPlanner;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoEntry;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoGameMode;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoPackets;
@@ -57,10 +63,16 @@ final class FillerPainter {
         Component render(Player viewer, String source, long tick);
     }
 
+    /** The design name the planner reports a rejected cell under; operator-facing only, one painter, one grid. */
+    private static final String DESIGN_ID = "tablist";
+
     private final TabListPackets packets;
     private final @Nullable PlayerInfoPackets batchPackets;
     private final TablistSkinResolver skinResolver;
     private final TextRenderer textRenderer;
+
+    /** The memoized planning design; see {@link #designOf}. Written and read on region threads, so an atomic holder. */
+    private final AtomicReference<Design> design = new AtomicReference<>();
 
     /**
      * The filler grid currently painted for each viewer, keyed by viewer UUID then by 1-based slot. The value remembers
@@ -88,6 +100,15 @@ final class FillerPainter {
      * {@link #fillerId} UUID so no fake row is orphaned. An empty layout removes every filler this viewer carried.
      */
     void applyFillers(Player viewer, TablistLayout layout, long tick) {
+        applyFillers(viewer, layout, Map.of(), tick);
+    }
+
+    /**
+     * The same reconcile with the roster the layout's groups draw from: the candidates of each group, already filtered
+     * and ordered by the renderer, keyed by group id. A layout with no group ignores the map entirely.
+     */
+    void applyFillers(
+            Player viewer, TablistLayout layout, Map<String, ? extends List<? extends Player>> occupants, long tick) {
         UUID viewerId = viewer.getUniqueId();
         Map<Integer, AppliedFiller> previous = appliedFillers.get(viewerId);
         if (layout.isEmpty()) {
@@ -100,8 +121,8 @@ final class FillerPainter {
         Map<Integer, AppliedFiller> next = new LinkedHashMap<>();
         List<PlayerInfoEntry> changed = new ArrayList<>();
         List<UUID> replacedProfiles = new ArrayList<>();
-        for (TablistFiller filler : materializedFillers(layout)) {
-            paintFiller(viewer, layout, filler, tick, previous, next, changed, replacedProfiles);
+        for (PlannedCell cell : plannedCells(layout, occupants)) {
+            paintCell(viewer, layout, cell, tick, previous, next, changed, replacedProfiles);
         }
         removeIds(viewer, replacedProfiles);
         sendChanged(viewer, changed);
@@ -122,22 +143,25 @@ final class FillerPainter {
      * {@link AppliedFiller#pending() pending flag} keeps it from ever equalling the resolved cell, so the next tick
      * re-evaluates and repaints the texture once the fetch lands rather than early-returning on an unchanged tuple.
      */
-    private void paintFiller(
+    private void paintCell(
             Player viewer,
             TablistLayout layout,
-            TablistFiller filler,
+            PlannedCell cell,
             long tick,
             @Nullable Map<Integer, AppliedFiller> previous,
             Map<Integer, AppliedFiller> next,
             List<PlayerInfoEntry> changed,
             List<UUID> replacedProfiles) {
-        int slot = filler.slot();
+        int slot = cell.slot();
         int order = TablistLayout.slotToListOrder(slot, layout.direction(), layout.gridRows());
-        Optional<TablistSkinSource> skinSource = filler.skin();
+        Optional<TablistSkinSource> skinSource = cell.skin();
         Optional<TabSkin> skin = skinSource.flatMap(skinResolver::resolve);
         boolean pending = skinSource.isPresent() && skin.isEmpty();
-        Component text = filler.text().isEmpty() ? Component.empty() : textRenderer.render(viewer, filler.text(), tick);
-        AppliedFiller desired = new AppliedFiller(text, order, skin.orElse(null), pending);
+        // A roster cell is rendered for its occupant, not for the viewer: {player} is who the row is about, and a
+        // placeholder in it reads that player's state. A filler has no occupant, so it renders for the viewer.
+        Player subject = cell.subject() != null ? cell.subject() : viewer;
+        Component text = cell.text().isEmpty() ? Component.empty() : textRenderer.render(subject, cell.text(), tick);
+        AppliedFiller desired = new AppliedFiller(text, order, skin.orElse(null), pending, cell.latency());
         AppliedFiller current = previous == null ? null : previous.get(slot);
         if (current != null && desired.equals(current)) {
             // Unchanged, fully-resolved cell: keep the entry as-is, send nothing this tick (the flicker guard). A
@@ -153,7 +177,15 @@ final class FillerPainter {
         }
         String profileName = layout.exact() ? "uxm_slot_" + slot : "";
         changed.add(new PlayerInfoEntry(
-                id, text, order, skin.orElse(null), profileName, true, 0, PlayerInfoGameMode.SURVIVAL, true));
+                id,
+                text,
+                order,
+                skin.orElse(null),
+                profileName,
+                true,
+                cell.latency(),
+                PlayerInfoGameMode.SURVIVAL,
+                true));
         next.put(slot, desired);
     }
 
@@ -179,6 +211,127 @@ final class FillerPainter {
                     packets.addOrUpdate(new TabEntry(
                             entry.id(), entry.displayName(), entry.listOrder(), entry.skin(), entry.name())));
         }
+    }
+
+    /**
+     * One cell this painter is about to paint: where it sits, what it says, whose skin it wears, and the player it is
+     * about. A filler cell has no subject and no latency; a roster cell carries the occupant, so its row renders for
+     * them and its entry carries their ping so the client draws their connection bars.
+     */
+    private record PlannedCell(
+            int slot,
+            String text,
+            Optional<TablistSkinSource> skin,
+            @Nullable Player subject,
+            int latency) {
+
+        static PlannedCell of(TablistFiller filler) {
+            return new PlannedCell(filler.slot(), filler.text(), filler.skin(), null, 0);
+        }
+
+        static PlannedCell of(int slot, TablistRosterGroup group, Player occupant) {
+            String name = occupant.getName();
+            return new PlannedCell(
+                    slot,
+                    group.text(),
+                    Optional.of(new TablistSkinSource.PlayerName(name)),
+                    occupant,
+                    latencyBars(occupant.getPing()));
+        }
+
+        static PlannedCell empty(int slot) {
+            return new PlannedCell(slot, "", Optional.empty(), null, 0);
+        }
+    }
+
+    /**
+     * The cells of {@code layout} for this paint. Without a roster group this is the authored (or, in an exact grid,
+     * the materialized) filler list, exactly as before. With one the grid is planned: the fillers own their cells, each
+     * group's candidates fill the cells it owns in the order the renderer handed them over, and every cell nobody
+     * claimed is painted empty so the grid keeps its shape as players come and go.
+     */
+    private List<PlannedCell> plannedCells(
+            TablistLayout layout, Map<String, ? extends List<? extends Player>> occupants) {
+        if (!layout.hasGroups()) {
+            List<PlannedCell> cells = new ArrayList<>();
+            for (TablistFiller filler : materializedFillers(layout)) {
+                cells.add(PlannedCell.of(filler));
+            }
+            return cells;
+        }
+        TablistLayoutDesign design = designOf(layout);
+        if (design == null) {
+            List<PlannedCell> cells = new ArrayList<>();
+            for (TablistFiller filler : materializedFillers(layout)) {
+                cells.add(PlannedCell.of(filler));
+            }
+            return cells;
+        }
+        Map<String, TablistRosterGroup> groups = new LinkedHashMap<>();
+        for (TablistRosterGroup group : layout.groups()) {
+            groups.put(group.id(), group);
+        }
+        VirtualTabGrid<Player> grid = VirtualTabPlanner.plan(design, occupants, Player::getUniqueId);
+        List<PlannedCell> cells = new ArrayList<>(grid.slotCount());
+        for (VirtualTabCell<Player> cell : grid.cells()) {
+            cells.add(plannedCell(cell, groups));
+        }
+        return cells;
+    }
+
+    private static PlannedCell plannedCell(VirtualTabCell<Player> cell, Map<String, TablistRosterGroup> groups) {
+        return switch (cell.content()) {
+            case VirtualTabCell.Fixed<Player> fixed -> PlannedCell.of(fixed.filler());
+            case VirtualTabCell.Player<Player> occupied -> {
+                TablistRosterGroup group = groups.get(occupied.groupId());
+                yield group == null
+                        ? PlannedCell.empty(cell.slot())
+                        : PlannedCell.of(cell.slot(), group, occupied.occupant());
+            }
+            case VirtualTabCell.Empty<Player> ignored -> PlannedCell.empty(cell.slot());
+        };
+    }
+
+    /**
+     * The planning design of {@code layout}, memoized on the layout instance a config load produced. Building it walks
+     * every filler and validates every cell's ownership, which is work no render tick needs to repeat: a reload hands
+     * over a new layout instance, so an identity check is enough to notice one. A layout the design rejects (the codec
+     * normally catches this first) memoizes {@code null}, so the painter falls back to the fillers and never throws on
+     * the render path.
+     */
+    private @Nullable TablistLayoutDesign designOf(TablistLayout layout) {
+        Design memo = design.get();
+        if (memo != null && memo.layout() == layout) {
+            return memo.design();
+        }
+        TablistLayoutDesign built;
+        try {
+            built = layout.design(DESIGN_ID);
+        } catch (IllegalArgumentException rejected) {
+            built = null;
+        }
+        design.set(new Design(layout, built));
+        return built;
+    }
+
+    /** The vanilla five-bar ping ladder, so a cell's bars only change when the bar itself would. */
+    private static int latencyBars(int ping) {
+        if (ping < 0) {
+            return 0;
+        }
+        if (ping < 150) {
+            return 100;
+        }
+        if (ping < 300) {
+            return 200;
+        }
+        if (ping < 600) {
+            return 400;
+        }
+        if (ping < 1000) {
+            return 800;
+        }
+        return 1500;
     }
 
     /** Expand an exact layout to every declared client cell; sparse layouts keep only authored fillers. */
@@ -255,6 +408,14 @@ final class FillerPainter {
         if (layout.isEmpty()) {
             return Set.of();
         }
+        if (layout.exact()) {
+            // Every cell of an exact grid is painted, roster cells included, so protect the whole grid by slot.
+            Set<UUID> ids = new java.util.HashSet<>(layout.capacity());
+            for (int slot = 1; slot <= layout.capacity(); slot++) {
+                ids.add(fillerId(viewer.getUniqueId(), slot));
+            }
+            return ids;
+        }
         List<TablistFiller> planned = materializedFillers(layout);
         Set<UUID> ids = new java.util.HashSet<>(planned.size());
         for (TablistFiller filler : planned) {
@@ -299,5 +460,8 @@ final class FillerPainter {
      * as the steady state. {@link Component} has a value-based {@code equals}.
      */
     private record AppliedFiller(
-            Component text, int order, @Nullable TabSkin skin, boolean pending) {}
+            Component text, int order, @Nullable TabSkin skin, boolean pending, int latency) {}
+
+    /** The design last built, kept beside the layout instance it was built from so a reload rebuilds it. */
+    private record Design(TablistLayout layout, @Nullable TablistLayoutDesign design) {}
 }

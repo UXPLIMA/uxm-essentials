@@ -25,7 +25,9 @@ import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
+import com.uxplima.uxmessentials.tablist.domain.TablistRosterGroup;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
+import com.uxplima.uxmessentials.tablist.domain.TablistSlotRange;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoEntry;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoGameMode;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoPackets;
@@ -542,6 +544,78 @@ class TablistRendererTest {
         assertThat(plain(entries.get(79).displayName())).isEmpty();
         assertThat(entries.get(79).id()).isEqualTo(fillerId(viewer.getUniqueId(), 80));
         assertThat(entries).extracting(TabEntry::name).doesNotContain("");
+    }
+
+    @Test
+    void aRosterGroupDrawsThePlayersIntoTheCellsItOwns() {
+        PlayerMock viewer = server.addPlayer("Alexia");
+        server.addPlayer("Zed");
+        RecordingPackets packets = new RecordingPackets();
+        TablistRosterGroup group = new TablistRosterGroup(
+                "players", List.of(new TablistSlotRange(21, 24)), DisplayCondition.always(), "<white>{player}");
+        TablistLayout exact = new TablistLayout(
+                List.of(new TablistFiller(1, "<gold>Players", Optional.empty())),
+                List.of(group),
+                TablistLayout.Direction.COLUMNS,
+                20,
+                true);
+        TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
+
+        renderer.renderFor(viewer);
+
+        List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
+        assertThat(entries).hasSize(80);
+        assertThat(plain(entries.get(0).displayName())).isEqualTo("Players");
+        // The group owns cells 21 to 24; the two online players fill the first two of them, by name.
+        assertThat(plain(entries.get(20).displayName())).isEqualTo("Alexia");
+        assertThat(plain(entries.get(21).displayName())).isEqualTo("Zed");
+        assertThat(plain(entries.get(22).displayName())).isEmpty();
+    }
+
+    @Test
+    void aRosterGroupDrawsOnlyThePlayersItsConditionMatches() {
+        PlayerMock viewer = server.addPlayer("Alexia");
+        PlayerMock staff = server.addPlayer("Septy");
+        staff.addAttachment(MockBukkit.createMockPlugin(), STAFF_NODE, true);
+        RecordingPackets packets = new RecordingPackets();
+        TablistRosterGroup staffGroup = new TablistRosterGroup(
+                "staff",
+                List.of(new TablistSlotRange(21, 22)),
+                new DisplayCondition.Permission(STAFF_NODE),
+                "<red>{player}");
+        TablistRosterGroup everybody = new TablistRosterGroup(
+                "players", List.of(new TablistSlotRange(23, 24)), DisplayCondition.always(), "<white>{player}");
+        TablistLayout exact =
+                new TablistLayout(List.of(), List.of(staffGroup, everybody), TablistLayout.Direction.COLUMNS, 20, true);
+        TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
+
+        renderer.renderFor(viewer);
+
+        List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
+        assertThat(plain(entries.get(20).displayName())).isEqualTo("Septy");
+        assertThat(plain(entries.get(21).displayName())).isEmpty();
+        // A player drawn by the staff group is not drawn again by the group below it.
+        assertThat(plain(entries.get(22).displayName())).isEqualTo("Alexia");
+        assertThat(plain(entries.get(23).displayName())).isEmpty();
+    }
+
+    @Test
+    void aRosterRowReadsThePlayerItIsAboutRatherThanTheViewer() {
+        PlayerMock viewer = server.addPlayer("Alexia");
+        server.addPlayer("Zed");
+        RecordingPackets packets = new RecordingPackets();
+        TablistRosterGroup group = new TablistRosterGroup(
+                "players", List.of(new TablistSlotRange(21, 22)), DisplayCondition.always(), "<white>{player}");
+        TablistLayout exact = new TablistLayout(List.of(), List.of(group), TablistLayout.Direction.COLUMNS, 20, true);
+        TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
+
+        renderer.renderFor(viewer);
+
+        // Both rows are sent to the one viewer, and neither carries the viewer's name twice: each row is its own
+        // player.
+        List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
+        assertThat(plain(entries.get(20).displayName())).isEqualTo("Alexia");
+        assertThat(plain(entries.get(21).displayName())).isEqualTo("Zed");
     }
 
     @Test

@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
+import com.uxplima.uxmessentials.tablist.domain.TablistRosterGroup;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -308,6 +309,118 @@ class TablistContentCodecTest {
         assertThat(layout.isEmpty()).isTrue();
         assertThat(layout.exact()).isFalse();
         assertThat(log.warnings).anyMatch(w -> w.contains("tablist_exact_layout_disabled"));
+    }
+
+    @Test
+    void readsTheRosterGroupsOfAnExactGrid(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(dir, """
+                formats {
+                  default {
+                    condition = ""
+                    suppress-real-players = true
+                    layout {
+                      exact = true
+                      fillers = [ { slot = 1, text = "<gold>Players" } ]
+                      groups = [
+                        { id = "staff", slots = [ "21-24" ], condition = "permission:uxmessentials.staff",
+                          text = "<red>{player}" }
+                        { id = "players", slots = [ "25-40" ] }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistLayout layout =
+                select(TablistContentCodec.read(root, LOG), n -> true, "world").layout();
+
+        assertThat(layout.hasGroups()).isTrue();
+        assertThat(layout.groups()).extracting(TablistRosterGroup::id).containsExactly("staff", "players");
+        assertThat(layout.groups().get(0).slots()).containsExactly(21, 22, 23, 24);
+        assertThat(layout.groups().get(0).text()).isEqualTo("<red>{player}");
+        // A group with no text of its own draws the occupant's name, the one thing every roster row shows.
+        assertThat(layout.groups().get(1).text()).isEqualTo("{player}");
+    }
+
+    @Test
+    void dropsARosterGroupWithoutAnExactGrid(@TempDir Path dir) throws Exception {
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(dir, """
+                formats {
+                  default {
+                    condition = ""
+                    header = [ "safe" ]
+                    layout {
+                      fillers = [ { slot = 1, text = "<gold>Players" } ]
+                      groups = [ { id = "players", slots = [ "21-40" ] } ]
+                    }
+                  }
+                }
+                """);
+
+        TablistLayout layout =
+                select(TablistContentCodec.read(root, log), n -> true, "world").layout();
+
+        assertThat(layout.hasGroups()).isFalse();
+        assertThat(layout.fillers()).hasSize(1);
+        assertThat(log.warnings).anyMatch(w -> w.contains("tablist_roster_groups_disabled"));
+    }
+
+    @Test
+    void dropsTheRosterGroupsWhenTwoOfThemClaimOneCell(@TempDir Path dir) throws Exception {
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(dir, """
+                formats {
+                  default {
+                    condition = ""
+                    suppress-real-players = true
+                    layout {
+                      exact = true
+                      fillers = [ { slot = 1, text = "<gold>Players" } ]
+                      groups = [
+                        { id = "staff", slots = [ "21-30" ] }
+                        { id = "players", slots = [ "30-40" ] }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistLayout layout =
+                select(TablistContentCodec.read(root, log), n -> true, "world").layout();
+
+        // The grid still paints; only the ambiguous placement is dropped, so nothing silently overwrites a cell.
+        assertThat(layout.hasGroups()).isFalse();
+        assertThat(layout.exact()).isTrue();
+        assertThat(layout.fillers()).hasSize(1);
+        assertThat(log.warnings).anyMatch(w -> w.contains("tablist_roster_groups_dropped"));
+    }
+
+    @Test
+    void skipsARosterGroupWithNoUsableSlots(@TempDir Path dir) throws Exception {
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(dir, """
+                formats {
+                  default {
+                    condition = ""
+                    suppress-real-players = true
+                    layout {
+                      exact = true
+                      groups = [
+                        { id = "players", slots = [ "81-90" ] }
+                        { id = "staff", slots = [ "21-24" ] }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistLayout layout =
+                select(TablistContentCodec.read(root, log), n -> true, "world").layout();
+
+        assertThat(layout.groups()).extracting(TablistRosterGroup::id).containsExactly("staff");
+        assertThat(log.warnings).anyMatch(w -> w.contains("tablist_roster_range_skipped"));
+        assertThat(log.warnings).anyMatch(w -> w.contains("tablist_roster_group_skipped"));
     }
 
     @Test

@@ -2,7 +2,10 @@ package com.uxplima.uxmessentials.tablist.adapter.outbound;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,6 +31,7 @@ import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
+import com.uxplima.uxmessentials.tablist.domain.TablistRosterGroup;
 import com.uxplima.uxmlib.hud.Tablist;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import org.jspecify.annotations.NullMarked;
@@ -70,6 +74,13 @@ import org.jspecify.annotations.Nullable;
 public final class TablistRenderer {
 
     private final Tablist tablist;
+
+    /**
+     * Every player a roster group may draw. The same supplier the row painter and the suppression fan out over, so a
+     * grid draws the players the rest of the renderer already knows about.
+     */
+    private final Supplier<? extends Collection<? extends Player>> roster;
+
     private final Supplier<TablistFormatConfig> formats;
     private final AnimationRegistry animations;
 
@@ -139,6 +150,7 @@ public final class TablistRenderer {
         Objects.requireNonNull(viewers, "viewers");
         Objects.requireNonNull(scheduler, "scheduler");
         this.tablist = new Tablist();
+        this.roster = viewers;
         this.rowPainter =
                 new RealPlayerRowPainter(packets, skinResolver, this::render, animations::tick, viewers, scheduler);
         this.fillerPainter = new FillerPainter(packets, skinResolver, this::render);
@@ -185,7 +197,33 @@ public final class TablistRenderer {
             suppression.apply(
                     player, format.suppressRealPlayers(), fillerPainter.plannedFillerIds(player, format.layout()));
         }
-        fillerPainter.applyFillers(player, format.layout(), tick);
+        fillerPainter.applyFillers(player, format.layout(), occupants(format.layout()), tick);
+    }
+
+    /**
+     * The candidates of each roster group in {@code layout}, in the order the grid fills its cells: every online player
+     * whose condition matches, by name. A layout with no group returns nothing and the painter never asks. The
+     * condition is evaluated against the <em>candidate</em>, so a staff group holds the staff whoever is looking, and a
+     * viewer's own row is drawn by the group that matches them, like anybody else's.
+     */
+    private Map<String, List<Player>> occupants(TablistLayout layout) {
+        if (!layout.hasGroups()) {
+            return Map.of();
+        }
+        List<Player> candidates = new ArrayList<>(roster.get());
+        candidates.removeIf(candidate -> !candidate.isOnline());
+        candidates.sort(Comparator.comparing(candidate -> candidate.getName().toLowerCase(Locale.ROOT)));
+        Map<String, List<Player>> byGroup = new LinkedHashMap<>();
+        for (TablistRosterGroup group : layout.groups()) {
+            List<Player> matching = new ArrayList<>(candidates.size());
+            for (Player candidate : candidates) {
+                if (group.condition().matches(conditionContext(candidate))) {
+                    matching.add(candidate);
+                }
+            }
+            byGroup.put(group.id(), matching);
+        }
+        return byGroup;
     }
 
     /**

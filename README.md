@@ -149,7 +149,7 @@ database-backed so they survive rollbacks.
 | **holograms** | `Display`-entity holograms: multi-line, multi-page (per-viewer click-to-cycle), provider-driven leaderboards, click-action chains, inline animations, per-player visibility and per-hologram blacklists, glow colour and opacity, link-to-NPC follow, plus FancyHolograms and DecentHolograms importers. |
 | **npc** | Packet-based NPCs over an in-house, GPL-free packet layer: players, mobs, and display entities; skins by name / MineSkin / URL; click-action chains; equipment, glow, poses, and deep per-type variants; per-owner creation quotas and a command blocklist. |
 | **scoreboard** | Per-player, condition-selected sidebars chosen by priority, with animated and conditional lines and hidden score numbers. |
-| **tablist** | Per-player tab name formatting and sorting, animated header / footer, and fixed-slot layouts with filler entries. |
+| **tablist** | Per-player tab name formatting and sorting, animated header / footer, and fixed-slot layouts: filler entries, and roster groups that draw the players into the cells you choose. |
 | **nametags** | Above-head nametags rendered through display entities: per-viewer, vanish-aware, with a separate view-range and cull distance. |
 | **vote** | A full vote-rewards engine: Votifier intake, totals and a leaderboard, a config-driven reward engine, a cross-server vote party with escalation, voting streaks, per-site cooldowns and reminders, multi-channel broadcasts, and Discord webhook notifications. |
 | **discordlink** | Link a Minecraft account to Discord, sync roles, and push audit / economy notifications (with the Discord add-on). |
