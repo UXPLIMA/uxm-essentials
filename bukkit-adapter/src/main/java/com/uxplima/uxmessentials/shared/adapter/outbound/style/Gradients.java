@@ -31,10 +31,24 @@ public final class Gradients {
     /** One ramp: a palette colour and the lighter one beside it in the same family. */
     private record Ramp(TextColor from, TextColor to) {}
 
-    private static final Ramp SKY = new Ramp(StyleTags.ACCENT, StyleTags.VALUE);
-    private static final Ramp MONEY = new Ramp(StyleTags.EMERALD, StyleTags.GOOD);
-    private static final Ramp DANGER = new Ramp(StyleTags.BAD, StyleTags.ROSE);
-    private static final Ramp ATTENTION = new Ramp(StyleTags.GOLD, StyleTags.YELLOW);
+    // The four ramps are read from the palette each time rather than held, because the palette is read from a
+    // file and a server may reload it while the server runs. A ramp cached here would keep the colours the
+    // class happened to load with.
+    private static Ramp sky() {
+        return new Ramp(StyleTags.accent(), StyleTags.value());
+    }
+
+    private static Ramp money() {
+        return new Ramp(StyleTags.emerald(), StyleTags.good());
+    }
+
+    private static Ramp danger() {
+        return new Ramp(StyleTags.bad(), StyleTags.rose());
+    }
+
+    private static Ramp attention() {
+        return new Ramp(StyleTags.gold(), StyleTags.yellow());
+    }
 
     private Gradients() {}
 
@@ -50,6 +64,23 @@ public final class Gradients {
             return name;
         }
         return ramped(plain, rampOf(name)).decoration(TextDecoration.BOLD, true);
+    }
+
+    /**
+     * {@code text} painted across {@code from} to {@code to}, in bold, whatever colour it arrived with.
+     *
+     * <p>The seam a heading uses when the file that wrote it named a wheel position rather than a meaning.
+     * The two colours come from the theme, so this decides nothing about the look on its own.
+     */
+    public static Component across(Component text, TextColor from, TextColor to) {
+        Objects.requireNonNull(text, "text");
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        String plain = PlainTextComponentSerializer.plainText().serialize(text);
+        if (plain.isBlank()) {
+            return text;
+        }
+        return ramped(plain, new Ramp(from, to)).decoration(TextDecoration.BOLD, true);
     }
 
     /** {@code plain} with each visible character a step further along {@code ramp}. */
@@ -76,16 +107,16 @@ public final class Gradients {
      */
     private static Ramp rampOf(Component name) {
         @Nullable TextColor colour = firstColour(name);
-        if (StyleTags.BAD.equals(colour)) {
-            return DANGER;
+        if (StyleTags.bad().equals(colour)) {
+            return danger();
         }
-        if (StyleTags.GOOD.equals(colour) || StyleTags.EMERALD.equals(colour)) {
-            return MONEY;
+        if (StyleTags.good().equals(colour) || StyleTags.emerald().equals(colour)) {
+            return money();
         }
-        if (StyleTags.GOLD.equals(colour)) {
-            return ATTENTION;
+        if (StyleTags.gold().equals(colour)) {
+            return attention();
         }
-        return SKY;
+        return sky();
     }
 
     /** The first colour set anywhere in {@code component}, depth first, or {@code null} when it carries none. */

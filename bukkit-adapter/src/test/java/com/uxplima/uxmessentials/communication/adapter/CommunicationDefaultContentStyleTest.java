@@ -39,14 +39,14 @@ class CommunicationDefaultContentStyleTest {
     @Test
     void theInfoPageValueTokenResolvesToCyanAndLeavesNoLiteralToken() {
         Component rendered = MINI.deserialize(INFO_TITLE, StyleTags.resolver());
-        assertThat(colours(rendered)).contains(StyleTags.VALUE);
+        assertThat(colours(rendered)).contains(StyleTags.value());
         assertNoLiteralTokens(rendered);
     }
 
     @Test
     void theInfoPageCtaAndBodyTokensResolveToTheirColours() {
         Component rendered = MINI.deserialize(INFO_LINK, StyleTags.resolver());
-        assertThat(colours(rendered)).contains(StyleTags.CTA, StyleTags.MUTED, StyleTags.BODY);
+        assertThat(colours(rendered)).contains(StyleTags.cta(), StyleTags.muted(), StyleTags.body());
         assertNoLiteralTokens(rendered);
     }
 
@@ -56,7 +56,7 @@ class CommunicationDefaultContentStyleTest {
         Component rendered = MINI.deserialize(ADVANCEMENT, StyleTags.resolver());
         String plain = PLAIN.serialize(rendered);
         assertThat(plain).startsWith("ɴᴇᴡꜱ ▶"); // <tag:'NEWS'> renders the category prefix
-        assertThat(colours(rendered)).contains(StyleTags.ACCENT, StyleTags.BODY, StyleTags.GOOD);
+        assertThat(colours(rendered)).contains(StyleTags.accent(), StyleTags.body(), StyleTags.good());
         assertNoLiteralTokens(rendered);
     }
 

@@ -12,7 +12,7 @@ class StyledTextTest {
     @Test
     void rendersTokensFromCatalogString() {
         Component c = StyledText.render("<accent>Base</accent>");
-        assertThat(c.color()).isEqualTo(StyleTags.ACCENT);
+        assertThat(c.color()).isEqualTo(StyleTags.accent());
         assertThat(PlainTextComponentSerializer.plainText().serialize(c)).isEqualTo("Base");
     }
 

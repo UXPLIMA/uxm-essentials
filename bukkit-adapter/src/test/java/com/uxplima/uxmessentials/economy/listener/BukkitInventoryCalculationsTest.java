@@ -143,7 +143,7 @@ class BukkitInventoryCalculationsTest {
         // instance and the same StyleTags resolver the wired item-name path now uses.
         Component name = MiniMessage.miniMessage().deserialize("<money>Emerald</money>", StyleTags.resolver());
 
-        assertThat(name.color()).isEqualTo(StyleTags.MONEY);
+        assertThat(name.color()).isEqualTo(StyleTags.money());
 
         String plain = PlainTextComponentSerializer.plainText().serialize(name);
         assertThat(plain).isEqualTo("Emerald");
@@ -179,7 +179,7 @@ class BukkitInventoryCalculationsTest {
 
         Component displayName = minted.getItemMeta().displayName();
         assertThat(displayName).isNotNull();
-        assertThat(displayName.color()).isEqualTo(StyleTags.MONEY);
+        assertThat(displayName.color()).isEqualTo(StyleTags.money());
         // Item names default to italic in Adventure; the path explicitly turns it off so the name reads upright.
         assertThat(displayName.decoration(TextDecoration.ITALIC)).isEqualTo(TextDecoration.State.FALSE);
         assertThat(PlainTextComponentSerializer.plainText().serialize(displayName))

@@ -33,8 +33,6 @@ public final class Tiles {
     /** Every lore line is padded a space either side, so the text never touches the edge of the tooltip. */
     private static final String PADDING = " ";
 
-    private static final Component DIAMOND = Component.text(DIAMOND_GLYPH, StyleTags.ICON);
-
     private static final Component PAD = Component.text(PADDING);
 
     /**
@@ -88,7 +86,10 @@ public final class Tiles {
 
     /** The title line itself: the diamond, then the title in its gradient, padded either side. */
     private static Component head(Component name) {
-        return PAD.append(DIAMOND).append(Gradients.title(name)).append(PAD);
+        // The glyph is built here rather than held, because its colour comes from the palette and a
+        // server may reload that while the server runs.
+        Component diamond = Component.text(DIAMOND_GLYPH, StyleTags.icon());
+        return PAD.append(diamond).append(Gradients.title(name)).append(PAD);
     }
 
     /** Whether {@code name} would put a title on the tile, or is the blank a titled tile already carries. */

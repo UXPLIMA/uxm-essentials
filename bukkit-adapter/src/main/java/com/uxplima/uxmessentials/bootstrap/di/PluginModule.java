@@ -265,6 +265,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
@@ -430,6 +432,12 @@ public final class PluginModule {
         resources.addReloadTask(ReloadTask.kernel("config", config::reload, "re-read from disk"));
         resources.addReloadTask(
                 ReloadTask.kernel("messages", wiredKernel.catalog()::reload, "catalogs re-read from disk"));
+        // The colours, from the file the server shares with the other plugins it runs of ours. A third kernel
+        // step rather than part of the config step: the theme is its own file, and an operator who changes one
+        // colour should see the reason for a failure named as the theme rather than as the config.
+        Path themeFolder = plugin.getDataFolder().toPath();
+        resources.addReloadTask(ReloadTask.kernel(
+                "theme", () -> StyleTags.use(ThemeFile.read(themeFolder)), "colours re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
         resources.localeBinding(new LocaleBinding(
                 wiredKernel.localeStore(), wiredKernel.serverDefault(), kernel.messages(), kernel.log()));

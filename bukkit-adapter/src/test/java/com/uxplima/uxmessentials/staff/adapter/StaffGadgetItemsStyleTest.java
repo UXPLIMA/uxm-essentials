@@ -46,7 +46,7 @@ class StaffGadgetItemsStyleTest {
         Component name = item.getItemMeta().displayName();
 
         assertThat(name).isNotNull();
-        assertThat(name.color()).isEqualTo(StyleTags.ACCENT);
+        assertThat(name.color()).isEqualTo(StyleTags.accent());
         assertThat(name.decoration(TextDecoration.ITALIC)).isEqualTo(TextDecoration.State.FALSE);
 
         String plain = PlainTextComponentSerializer.plainText().serialize(name);
@@ -64,7 +64,7 @@ class StaffGadgetItemsStyleTest {
             Component name = item.getItemMeta().displayName();
 
             assertThat(name).as("display name for %s", spec.gadget()).isNotNull();
-            assertThat(name.color()).as("colour for %s", spec.gadget()).isEqualTo(StyleTags.ACCENT);
+            assertThat(name.color()).as("colour for %s", spec.gadget()).isEqualTo(StyleTags.accent());
             assertThat(name.decoration(TextDecoration.ITALIC))
                     .as("italic for %s", spec.gadget())
                     .isEqualTo(TextDecoration.State.FALSE);

@@ -11,6 +11,8 @@ import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlagRegistrar;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardSetPwarpFlagRegistrar;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
@@ -75,6 +77,15 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         // added, so a new knob is visible in their file instead of only in the jar (see DefaultResources).
         DefaultResources.writeInto(
                 getDataFolder().toPath(), getLogger(), getPluginMeta().getVersion());
+
+        // The colours, before anything renders a line: the file the server shares with the other plugins it
+        // runs of ours, then this plugin's own file over it. A server that wrote neither keeps the colours
+        // this plugin ships, which is what every server has seen until now.
+        try {
+            StyleTags.use(ThemeFile.read(getDataFolder().toPath()));
+        } catch (RuntimeException unreadableTheme) {
+            getLogger().log(Level.WARNING, "using the shipped colours: " + unreadableTheme.getMessage());
+        }
 
         getLogger().info("[3/5] Wiring core modules and persistence...");
         CloseableResources wired = PluginModule.wire(this);

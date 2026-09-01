@@ -79,7 +79,9 @@ extensive MockBukkit/JUnit test suite.
 - **Folia-ready.** Nothing schedules through `BukkitScheduler`. A `Scheduler` port maps onto Paper's global /
   region / entity / async schedulers, so the same code runs unchanged on Folia.
 - **Adventure-native.** All text is MiniMessage resolved through a shared style theme: no `§`/`&` colour
-  codes anywhere.
+  codes anywhere. Every colour is a named role, and a server re-colours the whole plugin by writing the
+  roles it wants into `plugins/uxmTheme/theme.conf`. Nothing has to be written: what a theme leaves out
+  keeps the colour the plugin ships.
 - **Built on solid foundations.** Hexagonal (ports & adapters) with DDD bounded contexts; static analysis and
   architecture tests run as part of every build.
 

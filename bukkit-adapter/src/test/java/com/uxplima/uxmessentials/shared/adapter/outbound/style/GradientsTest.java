@@ -22,8 +22,8 @@ class GradientsTest {
         Component title = Gradients.title(NAME);
 
         assertThat(title.decoration(TextDecoration.BOLD)).isEqualTo(TextDecoration.State.TRUE);
-        assertThat(title.children().get(0).color()).isEqualTo(StyleTags.ACCENT);
-        assertThat(title.children().get(4).color()).isEqualTo(StyleTags.VALUE);
+        assertThat(title.children().get(0).color()).isEqualTo(StyleTags.accent());
+        assertThat(title.children().get(4).color()).isEqualTo(StyleTags.value());
     }
 
     @Test
@@ -34,24 +34,36 @@ class GradientsTest {
 
     @Test
     void aDangerTitleStaysRedAndAMoneyTitleStaysGreen() {
-        assertThat(Gradients.title(NAME.color(StyleTags.BAD)).children().get(0).color())
-                .isEqualTo(StyleTags.BAD);
-        assertThat(Gradients.title(NAME.color(StyleTags.GOOD)).children().get(0).color())
-                .isEqualTo(StyleTags.EMERALD);
-        assertThat(Gradients.title(NAME.color(StyleTags.GOLD)).children().get(0).color())
-                .isEqualTo(StyleTags.GOLD);
+        assertThat(Gradients.title(NAME.color(StyleTags.bad()))
+                        .children()
+                        .get(0)
+                        .color())
+                .isEqualTo(StyleTags.bad());
+        assertThat(Gradients.title(NAME.color(StyleTags.good()))
+                        .children()
+                        .get(0)
+                        .color())
+                .isEqualTo(StyleTags.emerald());
+        assertThat(Gradients.title(NAME.color(StyleTags.gold()))
+                        .children()
+                        .get(0)
+                        .color())
+                .isEqualTo(StyleTags.gold());
     }
 
     @Test
     void aColourTheCatalogUsesForReadingIsNeutral() {
         // Ice, white and the greys say nothing about meaning, so a title wearing one opens on the brand sky.
-        assertThat(Gradients.title(NAME.color(StyleTags.VALUE))
+        assertThat(Gradients.title(NAME.color(StyleTags.value()))
                         .children()
                         .get(0)
                         .color())
-                .isEqualTo(StyleTags.ACCENT);
-        assertThat(Gradients.title(NAME.color(StyleTags.BODY)).children().get(0).color())
-                .isEqualTo(StyleTags.ACCENT);
+                .isEqualTo(StyleTags.accent());
+        assertThat(Gradients.title(NAME.color(StyleTags.body()))
+                        .children()
+                        .get(0)
+                        .color())
+                .isEqualTo(StyleTags.accent());
     }
 
     @Test

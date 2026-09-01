@@ -37,7 +37,7 @@ class TilesTest {
         Component head = Tiles.titled(TITLE, List.of(CRUMB)).get(0);
 
         Component diamond = head.children().get(0);
-        assertThat(diamond.color()).isEqualTo(StyleTags.ICON);
+        assertThat(diamond.color()).isEqualTo(StyleTags.icon());
         assertThat(head.children().get(1).decoration(TextDecoration.BOLD)).isEqualTo(TextDecoration.State.TRUE);
     }
 
@@ -45,10 +45,10 @@ class TilesTest {
     void theTitleIsRedrawnInTheGradientWhateverColourTheCatalogGaveIt() {
         // The catalog painted this one ice; the tile still opens on the brand sky, so no two tiles disagree.
         Component head =
-                Tiles.titled(TITLE.color(StyleTags.VALUE), List.of(CRUMB)).get(0);
+                Tiles.titled(TITLE.color(StyleTags.value()), List.of(CRUMB)).get(0);
         Component title = head.children().get(1);
 
-        assertThat(title.children().get(0).color()).isEqualTo(StyleTags.ACCENT);
+        assertThat(title.children().get(0).color()).isEqualTo(StyleTags.accent());
     }
 
     @Test
