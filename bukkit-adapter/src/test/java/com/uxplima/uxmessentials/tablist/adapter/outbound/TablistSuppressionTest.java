@@ -135,6 +135,47 @@ class TablistSuppressionTest {
     }
 
     @Test
+    void aPlayerASeatKeepsListedIsNotHiddenWhenSuppressModeStarts() {
+        PlayerMock viewer = server.addPlayer();
+        PlayerMock seated = server.addPlayer();
+        RecordingGate gate = new RecordingGate();
+        RecordingPackets packets = new RecordingPackets();
+        TablistSuppression suppression = suppression(gate, packets, passThroughRewriter());
+
+        suppression.apply(viewer, true, Set.of(seated.getUniqueId()));
+
+        // A player a roster group seated is drawn by their own entry, so the entering edge must leave that row listed.
+        Relist relist = packets.lastRelistTo(viewer.getUniqueId());
+        assertThat(relist.listed()).isFalse();
+        assertThat(relist.ids()).contains(viewer.getUniqueId());
+        assertThat(relist.ids()).doesNotContain(seated.getUniqueId());
+    }
+
+    @Test
+    void aPlayerSeatedLaterIsListedAgainAndOneReleasedIsHidden() {
+        PlayerMock viewer = server.addPlayer();
+        PlayerMock seated = server.addPlayer();
+        RecordingGate gate = new RecordingGate();
+        RecordingPackets packets = new RecordingPackets();
+        TablistSuppression suppression = suppression(gate, packets, passThroughRewriter());
+
+        suppression.apply(viewer, true, Set.of());
+        suppression.apply(viewer, true, Set.of(seated.getUniqueId()));
+
+        // The group seated the player after the viewer was already suppressed, so their row is listed again.
+        Relist listedAgain = packets.lastRelistTo(viewer.getUniqueId());
+        assertThat(listedAgain.listed()).isTrue();
+        assertThat(listedAgain.ids()).containsExactly(seated.getUniqueId());
+
+        suppression.apply(viewer, true, Set.of());
+
+        // The group released the cell, so the row is hidden again.
+        Relist hiddenAgain = packets.lastRelistTo(viewer.getUniqueId());
+        assertThat(hiddenAgain.listed()).isFalse();
+        assertThat(hiddenAgain.ids()).containsExactly(seated.getUniqueId());
+    }
+
+    @Test
     void aSecondSuppressTickDoesNotReInjectOrReRelist() {
         PlayerMock viewer = server.addPlayer();
         RecordingGate gate = new RecordingGate();

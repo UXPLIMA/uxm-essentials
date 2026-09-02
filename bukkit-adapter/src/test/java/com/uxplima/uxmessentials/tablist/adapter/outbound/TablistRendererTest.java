@@ -547,9 +547,9 @@ class TablistRendererTest {
     }
 
     @Test
-    void aRosterGroupDrawsThePlayersIntoTheCellsItOwns() {
+    void aRosterGroupSeatsThePlayersInTheCellsItOwns() {
         PlayerMock viewer = server.addPlayer("Alexia");
-        server.addPlayer("Zed");
+        PlayerMock other = server.addPlayer("Zed");
         RecordingPackets packets = new RecordingPackets();
         TablistRosterGroup group = new TablistRosterGroup(
                 "players", List.of(new TablistSlotRange(21, 24)), DisplayCondition.always(), "<white>{player}");
@@ -562,18 +562,26 @@ class TablistRendererTest {
         TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
 
         renderer.renderFor(viewer);
+        renderer.renderFor(other);
 
+        // The group owns cells 21 to 24; the two online players take the first two of them, by name, through their own
+        // tab entries: the list name is the group's text and the list order is the cell's.
+        assertThat(plain(viewer.playerListName())).isEqualTo("Alexia");
+        assertThat(viewer.getPlayerListOrder())
+                .isEqualTo(TablistLayout.slotToListOrder(21, TablistLayout.Direction.COLUMNS, 20));
+        assertThat(plain(other.playerListName())).isEqualTo("Zed");
+        assertThat(other.getPlayerListOrder())
+                .isEqualTo(TablistLayout.slotToListOrder(22, TablistLayout.Direction.COLUMNS, 20));
+        // A seated cell is drawn by the player, so the grid paints no synthetic cell over them.
         List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
-        assertThat(entries).hasSize(80);
+        assertThat(entries).hasSize(78);
+        assertThat(entries).extracting(TabEntry::id).doesNotContain(fillerId(viewer.getUniqueId(), 21));
+        assertThat(entries).extracting(TabEntry::id).doesNotContain(fillerId(viewer.getUniqueId(), 22));
         assertThat(plain(entries.get(0).displayName())).isEqualTo("Players");
-        // The group owns cells 21 to 24; the two online players fill the first two of them, by name.
-        assertThat(plain(entries.get(20).displayName())).isEqualTo("Alexia");
-        assertThat(plain(entries.get(21).displayName())).isEqualTo("Zed");
-        assertThat(plain(entries.get(22).displayName())).isEmpty();
     }
 
     @Test
-    void aRosterGroupDrawsOnlyThePlayersItsConditionMatches() {
+    void aRosterGroupSeatsOnlyThePlayersItsConditionMatches() {
         PlayerMock viewer = server.addPlayer("Alexia");
         PlayerMock staff = server.addPlayer("Septy");
         staff.addAttachment(MockBukkit.createMockPlugin(), STAFF_NODE, true);
@@ -590,19 +598,19 @@ class TablistRendererTest {
         TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
 
         renderer.renderFor(viewer);
+        renderer.renderFor(staff);
 
-        List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
-        assertThat(plain(entries.get(20).displayName())).isEqualTo("Septy");
-        assertThat(plain(entries.get(21).displayName())).isEmpty();
-        // A player drawn by the staff group is not drawn again by the group below it.
-        assertThat(plain(entries.get(22).displayName())).isEqualTo("Alexia");
-        assertThat(plain(entries.get(23).displayName())).isEmpty();
+        // The staff group seats the one player it matches; a player it seated is not seated again by the group below.
+        assertThat(staff.getPlayerListOrder())
+                .isEqualTo(TablistLayout.slotToListOrder(21, TablistLayout.Direction.COLUMNS, 20));
+        assertThat(viewer.getPlayerListOrder())
+                .isEqualTo(TablistLayout.slotToListOrder(23, TablistLayout.Direction.COLUMNS, 20));
     }
 
     @Test
     void aRosterRowReadsThePlayerItIsAboutRatherThanTheViewer() {
         PlayerMock viewer = server.addPlayer("Alexia");
-        server.addPlayer("Zed");
+        PlayerMock other = server.addPlayer("Zed");
         RecordingPackets packets = new RecordingPackets();
         TablistRosterGroup group = new TablistRosterGroup(
                 "players", List.of(new TablistSlotRange(21, 22)), DisplayCondition.always(), "<white>{player}");
@@ -610,16 +618,15 @@ class TablistRendererTest {
         TablistRenderer renderer = rendererWith(packets, suppressFillerFormat("default", exact));
 
         renderer.renderFor(viewer);
+        renderer.renderFor(other);
 
-        // Both rows are sent to the one viewer, and neither carries the viewer's name twice: each row is its own
-        // player.
-        List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
-        assertThat(plain(entries.get(20).displayName())).isEqualTo("Alexia");
-        assertThat(plain(entries.get(21).displayName())).isEqualTo("Zed");
+        // Each seated row renders for its own player, so neither row carries the other player's name.
+        assertThat(plain(viewer.playerListName())).isEqualTo("Alexia");
+        assertThat(plain(other.playerListName())).isEqualTo("Zed");
     }
 
     @Test
-    void theLayoutSkinDressesEveryCellExceptTheRosterRows() {
+    void theLayoutSkinDressesEveryCellTheGridPaints() {
         PlayerMock viewer = server.addPlayer("Alexia");
         RecordingPackets packets = new RecordingPackets();
         FakeProfiles profiles = new FakeProfiles();
@@ -646,9 +653,10 @@ class TablistRendererTest {
         List<TabEntry> entries = packets.entriesSentTo(viewer.getUniqueId());
         // A written cell wears the layout's skin, and so does a cell nobody claimed, so no cell shows a default head.
         assertThat(skinOf(entries.get(0)).textureValue()).isEqualTo("blanktex");
-        assertThat(skinOf(entries.get(79)).textureValue()).isEqualTo("blanktex");
-        // A roster row wears the player it is about.
-        assertThat(skinOf(entries.get(20)).textureValue()).isEqualTo("alexiatex");
+        assertThat(skinOf(entries.get(entries.size() - 1)).textureValue()).isEqualTo("blanktex");
+        // The one seated cell is the player's own entry, so the grid paints one cell fewer and never dresses it.
+        assertThat(entries).hasSize(79);
+        assertThat(entries).extracting(TabEntry::id).doesNotContain(fillerId(viewer.getUniqueId(), 21));
     }
 
     @Test

@@ -9,8 +9,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
@@ -31,7 +33,11 @@ import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
+import com.uxplima.uxmessentials.tablist.domain.TablistLayoutDesign;
 import com.uxplima.uxmessentials.tablist.domain.TablistRosterGroup;
+import com.uxplima.uxmessentials.tablist.domain.VirtualTabCell;
+import com.uxplima.uxmessentials.tablist.domain.VirtualTabGrid;
+import com.uxplima.uxmessentials.tablist.domain.VirtualTabPlanner;
 import com.uxplima.uxmlib.hud.Tablist;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import org.jspecify.annotations.NullMarked;
@@ -115,6 +121,12 @@ public final class TablistRenderer {
     /** Paints the fixed-slot {@link TablistLayout filler grid} a selected format may carry; see {@link FillerPainter}. */
     private final FillerPainter fillerPainter;
 
+    /** The design name the planner reports a rejected cell under; operator-facing only, one renderer, one grid. */
+    private static final String DESIGN_ID = "tablist";
+
+    /** The seating planned for the current tick; see {@link #seating(TablistLayout, long)}. Region threads read it. */
+    private final AtomicReference<Seating> seating = new AtomicReference<>();
+
     /**
      * The opt-in "suppress real players" mechanism, or {@code null} when the packet-interception pipeline is not wired
      * (every constructor but the suppression-enabled one). A {@code null} suppression means the {@code suppress-real-
@@ -187,18 +199,102 @@ public final class TablistRenderer {
         }
         appliedFormat.put(player.getUniqueId(), format.name());
         applyHeaderFooter(player, content, tick);
-        rowPainter.applyRow(player, format, tick);
+        // Where the roster groups seat the players this tick. The seating is the same for every viewer, so it is
+        // planned once per tick and read here: a seated player is drawn by their OWN tab entry, given the cell's list
+        // order and the group's text, which is how a real row lands in the grid without a synthetic row beside it.
+        Seating seating = seating(format.layout(), tick);
+        rowPainter.applyRow(player, format, seat(seating, player, format.layout()), tick);
         // Reconcile the opt-in suppress mode BEFORE the fillers are painted, priming the protected-id snapshot with the
         // ids the layout is about to paint. The interceptor is live for an already-suppressed viewer, so a filler whose
         // ADD_PLAYER crosses it must already be in the snapshot or it would be force-unlisted on its first (and, thanks
         // to the per-cell flicker guard, only) paint and stay hidden. Priming from the planned ids closes that window
         // for a layout that grows mid-suppression; the entering edge is unaffected because the snapshot is a superset.
         if (suppression != null) {
-            suppression.apply(
-                    player, format.suppressRealPlayers(), fillerPainter.plannedFillerIds(player, format.layout()));
+            suppression.apply(player, format.suppressRealPlayers(), keptEntries(player, format.layout(), seating));
         }
-        fillerPainter.applyFillers(player, format.layout(), occupants(format.layout()), tick);
+        fillerPainter.applyFillers(player, format.layout(), seating.slots(), tick);
     }
+
+    /** The seat {@code player} holds this tick, or {@code null} when no roster group seated them. */
+    private RealPlayerRowPainter.@Nullable RowSeat seat(Seating seating, Player player, TablistLayout layout) {
+        RosterSeat seated = seating.seats().get(player.getUniqueId());
+        if (seated == null) {
+            return null;
+        }
+        int order = TablistLayout.slotToListOrder(seated.slot(), layout.direction(), layout.gridRows());
+        return new RealPlayerRowPainter.RowSeat(seated.text(), order);
+    }
+
+    /**
+     * The tab entries a suppress mode must keep listed for {@code viewer}: the filler cells the layout is about to
+     * paint, plus every player a roster group seated, because a seated player is drawn by their own entry and hiding it
+     * would empty the cell they sit in.
+     */
+    private Set<UUID> keptEntries(Player viewer, TablistLayout layout, Seating seating) {
+        Set<UUID> kept = new java.util.HashSet<>(fillerPainter.plannedFillerIds(viewer, layout, seating.slots()));
+        kept.addAll(seating.seats().keySet());
+        return kept;
+    }
+
+    /**
+     * The roster seating of {@code layout} for this tick, planned once and reused across the fan-out. The seating reads
+     * only the online roster and each group's condition, never the viewer, so every viewer sees the same player in the
+     * same cell; the memo therefore keys on the render tick and the layout instance a config load produced.
+     */
+    private Seating seating(TablistLayout layout, long tick) {
+        Seating memo = seating.get();
+        if (memo != null && memo.tick() == tick && memo.layout() == layout) {
+            return memo;
+        }
+        Seating planned = planSeating(layout, tick);
+        seating.set(planned);
+        return planned;
+    }
+
+    /**
+     * Plan which player sits in which cell. A layout with no group seats nobody. A design the planner rejects (the
+     * codec normally catches this first) seats nobody either, so the grid falls back to its fillers and the render path
+     * never throws.
+     */
+    private Seating planSeating(TablistLayout layout, long tick) {
+        if (!layout.hasGroups()) {
+            return new Seating(tick, layout, Map.of(), Set.of());
+        }
+        TablistLayoutDesign design;
+        try {
+            design = layout.design(DESIGN_ID);
+        } catch (IllegalArgumentException rejected) {
+            return new Seating(tick, layout, Map.of(), Set.of());
+        }
+        Map<String, TablistRosterGroup> groups = new LinkedHashMap<>();
+        for (TablistRosterGroup group : layout.groups()) {
+            groups.put(group.id(), group);
+        }
+        VirtualTabGrid<Player> grid = VirtualTabPlanner.plan(design, occupants(layout), Player::getUniqueId);
+        Map<UUID, RosterSeat> seats = new LinkedHashMap<>();
+        Set<Integer> slots = new java.util.HashSet<>();
+        for (VirtualTabCell<Player> cell : grid.cells()) {
+            if (!(cell.content() instanceof VirtualTabCell.Player<Player> occupied)) {
+                continue;
+            }
+            TablistRosterGroup group = groups.get(occupied.groupId());
+            if (group == null) {
+                continue;
+            }
+            seats.put(occupied.occupant().getUniqueId(), new RosterSeat(cell.slot(), group.text()));
+            slots.add(cell.slot());
+        }
+        return new Seating(tick, layout, Map.copyOf(seats), Set.copyOf(slots));
+    }
+
+    /** The cell one player was seated in, and the text of the group that seated them. */
+    private record RosterSeat(int slot, String text) {}
+
+    /**
+     * The seating planned for one (tick, layout): who sits where, and which cells are taken. Held whole so the filler
+     * painter can skip the taken cells and the suppress mode can keep the seated players listed.
+     */
+    private record Seating(long tick, TablistLayout layout, Map<UUID, RosterSeat> seats, Set<Integer> slots) {}
 
     /**
      * The candidates of each roster group in {@code layout}, in the order the grid fills its cells: every online player

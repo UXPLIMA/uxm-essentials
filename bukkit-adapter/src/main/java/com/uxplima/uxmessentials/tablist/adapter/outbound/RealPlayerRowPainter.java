@@ -25,6 +25,7 @@ import com.uxplima.uxmlib.packet.tablist.TabEntry;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Paints the real player's own tab-list row for a {@link TablistRenderer}'s selected format: the list name, the sort
@@ -97,15 +98,37 @@ final class RealPlayerRowPainter {
      * keeps the native list-name/order path. A switch between the two reverts the path it is leaving so neither lingers.
      */
     void applyRow(Player player, TablistFormat format, long tick) {
+        applyRow(player, format, null, tick);
+    }
+
+    /**
+     * The same row with the seat a roster group gave the player. A seated player wears the group's text as their list
+     * name and the list order of the cell they sit in, so the layout draws them through their own tab entry instead of
+     * a synthetic row beside it. An unseated player ({@code seat} is null) keeps the format's own name and order.
+     */
+    void applyRow(Player player, TablistFormat format, @Nullable RowSeat seat, long tick) {
+        Optional<String> nameFormat = seat == null ? format.nameFormat() : Optional.of(seat.nameFormat());
+        OptionalInt order = seat == null ? effectiveOrder(format) : OptionalInt.of(seat.order());
         Optional<TablistSkinSource> skinSource = format.skin();
         if (skinSource.isEmpty()) {
             // No skin: native path, and revert any skin entry previously painted for the player.
             revertSkin(player);
-            applyNameFormat(player, format.nameFormat(), tick);
-            applyOrder(player, effectiveOrder(format));
+            applyNameFormat(player, nameFormat, tick);
+            applyOrder(player, order);
             return;
         }
-        applySkinRow(player, format, skinSource.get(), tick);
+        applySkinRow(player, skinSource.get(), nameFormat, order, tick);
+    }
+
+    /**
+     * Where a roster group seats one player: the group's text, which becomes that player's list name, and the list
+     * order of the cell the group gave them. A seat replaces the format's own name format and sort order for that
+     * player, because the cell they sit in is what the layout is about.
+     */
+    record RowSeat(String nameFormat, int order) {
+        RowSeat {
+            Objects.requireNonNull(nameFormat, "nameFormat");
+        }
     }
 
     /**
@@ -195,27 +218,31 @@ final class RealPlayerRowPainter {
      * online player's entry is not re-added every tick. A skin source that resolves to no texture yet (an offline fetch
      * still in flight) falls back to the native path this tick — the resolver fills its cache and a later tick repaints.
      */
-    private void applySkinRow(Player player, TablistFormat format, TablistSkinSource skinSource, long tick) {
+    private void applySkinRow(
+            Player player,
+            TablistSkinSource skinSource,
+            Optional<String> nameFormat,
+            OptionalInt sortOrder,
+            long tick) {
         Optional<TabSkin> skin = skinResolver.resolve(skinSource);
         if (skin.isEmpty()) {
             // The texture is not available yet; take the native path so the name/order still apply with no skin.
             revertSkin(player);
-            applyNameFormat(player, format.nameFormat(), tick);
-            applyOrder(player, effectiveOrder(format));
+            applyNameFormat(player, nameFormat, tick);
+            applyOrder(player, sortOrder);
             return;
         }
         UUID uuid = player.getUniqueId();
-        String nameSource = format.nameFormat().orElse("");
-        int order = effectiveOrder(format).orElse(0);
+        String nameSource = nameFormat.orElse("");
+        int order = sortOrder.orElse(0);
         AppliedSkin desired = new AppliedSkin(nameSource, order, skinSource);
         if (desired.equals(appliedSkin.get(uuid))) {
             return;
         }
         // Taking ownership of the row through packets, so drop any native name/order set for the player.
         resetNameAndOrder(player);
-        Component name = format.nameFormat()
-                .map(source -> renderName(player, source, tick))
-                .orElse(displayName(player));
+        Component name =
+                nameFormat.map(source -> renderName(player, source, tick)).orElse(displayName(player));
         broadcast(packets.addOrUpdate(new TabEntry(uuid, name, order, skin.get(), player.getName())));
         appliedSkin.put(uuid, desired);
     }

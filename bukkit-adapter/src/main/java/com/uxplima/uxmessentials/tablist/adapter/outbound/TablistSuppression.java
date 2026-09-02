@@ -140,10 +140,18 @@ public final class TablistSuppression {
         }
         // Refresh the protected-id snapshot before the fillers are painted, so the listener never suppresses a filler
         // this layout is about to add for an already-suppressed viewer.
-        fillerIds.put(viewerId, Set.copyOf(plannedFillerIds));
+        Set<UUID> kept = Set.copyOf(plannedFillerIds);
+        Set<UUID> previous = fillerIds.put(viewerId, kept);
         if (active.add(viewerId)) {
             gate.inject(viewer);
-            relistReal(viewer, false);
+            hideReal(viewer, kept);
+            return;
+        }
+        if (previous != null && !previous.equals(kept)) {
+            // The protected set changed under a viewer who is already suppressed: a roster group seated a player (their
+            // own entry must come back) or released one (it must go). The interceptor only rewrites packets the server
+            // sends, so a set that changes with no packet in flight needs this relist to reach the client at all.
+            relistChanged(viewer, previous, kept);
         }
     }
 
@@ -184,6 +192,47 @@ public final class TablistSuppression {
         List<UUID> realIds = realPlayerIds();
         if (!realIds.isEmpty()) {
             packets.send(viewer, packets.relist(realIds, listed));
+        }
+    }
+
+    /**
+     * Hide the real players from {@code viewer} on the entering edge, except the ones {@code kept} protects: a player a
+     * roster group has seated is drawn by their own entry, so hiding it would empty the cell they sit in.
+     */
+    private void hideReal(Player viewer, Set<UUID> kept) {
+        List<UUID> hidden = new ArrayList<>();
+        for (UUID id : realPlayerIds()) {
+            if (!kept.contains(id)) {
+                hidden.add(id);
+            }
+        }
+        if (!hidden.isEmpty()) {
+            packets.send(viewer, packets.relist(hidden, false));
+        }
+    }
+
+    /**
+     * Carry a changed protected set to {@code viewer}: a real player who entered it is listed again (they now hold a
+     * cell), and one who left it is hidden again (their cell is gone). Only real players are relisted; a filler entry
+     * is added listed and removed outright, so it never needs one.
+     */
+    private void relistChanged(Player viewer, Set<UUID> previous, Set<UUID> kept) {
+        List<UUID> shown = new ArrayList<>();
+        List<UUID> hidden = new ArrayList<>();
+        for (UUID id : realPlayerIds()) {
+            boolean wasKept = previous.contains(id);
+            boolean isKept = kept.contains(id);
+            if (isKept && !wasKept) {
+                shown.add(id);
+            } else if (!isKept && wasKept) {
+                hidden.add(id);
+            }
+        }
+        if (!shown.isEmpty()) {
+            packets.send(viewer, packets.relist(shown, true));
+        }
+        if (!hidden.isEmpty()) {
+            packets.send(viewer, packets.relist(hidden, false));
         }
     }
 
