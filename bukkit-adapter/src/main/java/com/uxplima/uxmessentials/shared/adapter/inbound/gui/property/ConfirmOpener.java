@@ -10,14 +10,14 @@ import org.jspecify.annotations.NullMarked;
  * {@code ConfirmMenu}. Defined here, in the property package, so a property depends only on this small port and not
  * on the engine that implements it; the engine supplies the implementation, mirroring {@link SelectorOpener} exactly.
  *
- * <p>An opener receives the viewer, a resolved title, and the two decisions — {@code onYes} run once if the viewer
- * confirms, {@code onNo} run once if they decline — and shows them as a child window the one menu listener routes and
+ * <p>An opener receives the viewer, a resolved title, and the two decisions ({@code onYes} run once if the viewer
+ * confirms, {@code onNo} run once if they decline) and shows them as a child window the one menu listener routes and
  * the one teardown owns. A {@link ListProperty}'s remove gesture uses it to gate a deletion the same way the bespoke
  * sub-menu used {@code ConfirmMenu}, but on a single holder/listener/teardown.
  *
- * <p>A property only ever opens an engine confirm when its {@link ClickContext} carries an opener (the engine editor
- * runtime threads one in); a context with no confirm opener — the legacy {@code EntityEditorView} path — leaves the
- * property on its uxmLib {@code ConfirmMenu} fallback, so both runtimes coexist while editors migrate.
+ * <p>A confirm opener is always present, for the reason {@link SelectorOpener} gives: the context requires one and
+ * only the engine editor runtime builds a context. No property keeps a {@code ConfirmMenu} fallback alive for a
+ * state that can no longer arrive.
  */
 @NullMarked
 public interface ConfirmOpener {

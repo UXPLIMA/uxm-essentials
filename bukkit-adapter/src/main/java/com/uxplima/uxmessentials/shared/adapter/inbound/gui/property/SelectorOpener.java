@@ -15,17 +15,16 @@ import org.jspecify.annotations.NullMarked;
  * port and not on the engine that implements it; the engine supplies the implementation, keeping the property
  * decoupled from the runtime it opens into.
  *
- * <p>An opener receives everything the property already has — the viewer, a resolved title, the row count, the
- * filler material, and one {@link SelectorButton} per option (icon plus its choose action) — and shows them as a
+ * <p>An opener receives everything the property already has: the viewer, a resolved title, the row count, the
+ * filler material, and one {@link SelectorButton} per option (icon plus its choose action), and shows them as a
  * child window the one menu listener routes and the one teardown owns. A button click runs its
  * {@link SelectorButton#onChoose} exactly once on the viewer's entity thread; closing the window without choosing
- * runs nothing. The same capability serves any property that opens a flat picker — the enum selector now, and the
- * list and colour pickers as they migrate — so each builds {@link SelectorButton}s and lets the engine paint and
- * route them.
+ * runs nothing. The same capability serves every property that opens a flat picker (the enum, list and colour
+ * pickers all do), so each builds {@link SelectorButton}s and lets the engine paint and route them.
  *
- * <p>A property only ever opens a selector when its {@link ClickContext} carries an opener (the engine editor
- * runtime threads one in); a context with no opener — the legacy {@code EntityEditorView} path — leaves the
- * property on its uxmLib fallback, so both runtimes coexist while editors migrate.
+ * <p>An opener is always present. {@link ClickContext} requires one, and the engine editor runtime is the only
+ * thing that builds a context, so a property neither checks for its absence nor keeps a second window system alive
+ * for that case; {@code EntityEditorView} is a shim over the same runtime, not a path around it.
  */
 @NullMarked
 public interface SelectorOpener {
