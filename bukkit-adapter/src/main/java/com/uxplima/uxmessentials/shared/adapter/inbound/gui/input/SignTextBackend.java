@@ -17,8 +17,13 @@ import org.jspecify.annotations.Nullable;
  * The sign backend of the text-input seam: opens a transient sign through uxmLib's {@link PlayerInput} (the same
  * native, packet-free mechanism its {@code SIGN} backend uses) and reports the typed lines. A sign cannot be
  * pre-seeded from the prompt, so {@code initialText} is ignored here, exactly as the chat backend ignores it. The
- * uxmLib {@link com.uxplima.uxmlib.gui.input.InputResult outcome} maps one-to-one onto {@link InputResult}; the
- * cancel-keyword check and the entity-thread hop live upstream in {@link TextInput}, so this stays a thin adapter.
+ * entity-thread hop lives upstream in {@link TextInput}, so this stays a thin adapter.
+ *
+ * <p>The uxmLib {@link com.uxplima.uxmlib.gui.input.InputResult outcome} matches {@link InputResult} in shape but not
+ * in position: uxmLib applies its own cancel keyword before the result is handed over, so a line matching it arrives
+ * already {@code Cancelled} and the seam's own keyword check never sees it. That word is the operator's first
+ * configured keyword (see {@code TextInputInstaller}), which keeps the two floors agreeing, but it does mean this is
+ * the one backend where a cancellation cannot be told apart from a closed prompt.
  */
 @NullMarked
 final class SignTextBackend implements TextInputBackend {

@@ -28,8 +28,10 @@ import org.jspecify.annotations.Nullable;
  * and routes the result. This replaces the two split mechanisms — uxmLib's {@code AnvilInput} and the per-context chat
  * listeners — so every input point is configurable as anvil or chat without the call site knowing which ran.
  *
- * <p><b>Cancel policy (one place).</b> Both backends report a raw {@link InputResult}; the cancel-keyword check lives
- * here. A structural cancel (anvil closed) and a {@code Submitted} line that matches a configured cancel keyword both
+ * <p><b>Cancel policy.</b> Backends report a raw {@link InputResult} and the cancel-keyword check lives here, with
+ * one exception: the sign backend sits on uxmLib's {@code PlayerInput}, which applies a keyword of its own one floor
+ * down and hands over a result that is already {@code Cancelled}. It is given the operator's first configured keyword
+ * so the two floors agree on that word; the rest of the list is caught here as it is for every other backend. A structural cancel (anvil closed) and a {@code Submitted} line that matches a configured cancel keyword both
  * resolve to a cancellation: the viewer is sent the {@code gui.input.cancelled} acknowledgement and {@code onCancel}
  * runs (reopening the prior menu, as before). Any other line runs {@code onSubmit} with the typed text.
  *

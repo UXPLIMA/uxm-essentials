@@ -74,7 +74,13 @@ public final class TextInputInstaller {
         chatBackend.install();
         // uxmLib's PlayerInput owns the transient-sign mechanism; the sign backend only ever asks it for SIGN, and the
         // seam does its own entity-thread hop, so PlayerInput is built without a scheduler and torn down on disable.
-        PlayerInput playerInput = new PlayerInput(plugin);
+        // It applies a cancel keyword of its own before a result reaches us, and there is no way to turn that off, so
+        // it is given the operator's first configured keyword rather than the library default: with the default, the
+        // literal word `cancel` aborted a sign prompt even on a server that had removed it from `cancel-keywords`,
+        // and nothing said why. The remaining keywords arrive as Submitted and the seam's own check catches them.
+        // Read once here, so a reload that changes the first keyword leaves this one stale until the next restart;
+        // the real fix is for the keyword policy to live only on this floor, which needs the library to allow it.
+        PlayerInput playerInput = new PlayerInput(plugin, null, settings.primaryCancelKeyword());
         playerInput.install();
         SignTextBackend signBackend = new SignTextBackend(playerInput);
         // Wire the dialog backend only where the native Dialog API exists (Minecraft 1.21.6+). On an older server it
