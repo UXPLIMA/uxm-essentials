@@ -294,13 +294,17 @@ public final class ItemRenderer {
     }
 
     /**
-     * The resolved material spec string: a {@code %token%} spec expands through its placeholder, a literal spec
-     * is itself. This is the string the icon providers and the material fallback both read — so {@code %head%}
-     * → {@code skull:Notch} reaches the skull provider, and {@code DIAMOND} reaches the material lookup.
+     * The resolved material spec string: every {@code %token%} expands in place through its placeholder and the rest
+     * of the value is kept, so a literal spec is itself. This is the string the icon providers and the material
+     * fallback both read, which is why the text around a token matters as much as the token: {@code %head%} yielding
+     * {@code skull:Notch} reaches the skull provider, {@code skull:%player%} reaches it as {@code skull:Notch} rather
+     * than as a bare name no provider claims, and {@code DIAMOND} reaches the material lookup. Substituting in place
+     * rather than replacing the whole value is what the lore and name paths have always done; a material that
+     * resolves to a name nothing recognises falls back to stone silently, so getting this wrong showed up as a plain
+     * grey icon rather than as an error.
      */
     private String resolveMaterialSpec(String raw, MenuContext ctx) {
-        Matcher matcher = PLACEHOLDER.matcher(raw);
-        return matcher.find() ? resolveToken(matcher.group(1), ctx) : raw;
+        return substitutePlaceholders(raw, ctx);
     }
 
     /**

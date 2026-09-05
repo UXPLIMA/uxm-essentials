@@ -44,12 +44,13 @@ class ItemRendererTest {
 
     private ItemRenderer renderer;
     private MenuContext ctx;
+    private PlaceholderRegistry placeholders;
 
     @BeforeEach
     void setUp() {
         MockBukkit.mock();
         GuiText guiText = new GuiText(new KeyMessages());
-        PlaceholderRegistry placeholders = new PlaceholderRegistry();
+        placeholders = new PlaceholderRegistry();
         placeholders.register("icon", c -> "DIAMOND");
         renderer = new ItemRenderer(guiText, placeholders);
         ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
@@ -139,6 +140,17 @@ class ItemRendererTest {
         // Bedrock icon sourcing) both read this exact string.
         assertThat(renderer.materialSpec(
                         item("skull:Notch", new ItemDecor(1, Optional.empty(), false, List.of())), ctx))
+                .isEqualTo("skull:Notch");
+    }
+
+    @Test
+    void materialSpecSubstitutesATokenInsideAPrefixedSpec() {
+        // The prefix is part of the spec, not decoration around it: skull:%player% has to reach the skull provider as
+        // skull:Notch. Expanding the token and discarding everything around it left a bare name no icon provider
+        // claims, and the material fallback rendered that as stone without saying anything.
+        placeholders.register("player", c -> "Notch");
+        assertThat(renderer.materialSpec(
+                        item("skull:%player%", new ItemDecor(1, Optional.empty(), false, List.of())), ctx))
                 .isEqualTo("skull:Notch");
     }
 
