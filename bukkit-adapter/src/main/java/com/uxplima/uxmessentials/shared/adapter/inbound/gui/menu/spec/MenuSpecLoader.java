@@ -743,7 +743,9 @@ public final class MenuSpecLoader {
             }
             actions.put(kind, refs(clickActionsNode(value)));
             RequirementSpec block = parseRequirementSpec(value);
-            if (block != RequirementSpec.NONE) {
+            // By value, not by identity. parseRequirementSpec happens to hand back the NONE constant for an empty
+            // block, so `!=` works today, but the safety would sit two methods away from the test that relies on it.
+            if (!RequirementSpec.NONE.equals(block)) {
                 requirements.put(kind, block);
             }
             parseElseBranch(value.node("else")).ifPresent(branch -> orElse.put(kind, branch));
