@@ -11,6 +11,7 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.LayoutFit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
@@ -106,7 +107,8 @@ public final class ListProperty implements EditableProperty {
         List<String> entries = current.get();
         List<Integer> slots = layout.entrySlots();
         List<SelectorButton> buttons = new ArrayList<>();
-        for (int i = 0; i < entries.size() && i < slots.size(); i++) {
+        int drawn = LayoutFit.drawable("list entry-slots", entries.size(), slots);
+        for (int i = 0; i < drawn; i++) {
             buttons.add(engineEntryButton(context, entries.get(i), i, slots.get(i)));
         }
         buttons.add(SelectorButton.of(layout.addSlot(), addIcon(context), () -> add(context)));

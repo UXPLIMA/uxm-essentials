@@ -15,6 +15,7 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.LayoutFit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
@@ -129,7 +130,8 @@ public final class ColourProperty implements EditableProperty {
         List<Integer> slots = layout.paletteSlots();
         List<Material> icons = layout.paletteIcons();
         List<SelectorButton> buttons = new ArrayList<>();
-        for (int i = 0; i < palette.size() && i < slots.size(); i++) {
+        int drawn = LayoutFit.drawable("colour-picker palette-slots", palette.size(), slots);
+        for (int i = 0; i < drawn; i++) {
             ColourSwatch swatch = palette.get(i);
             ItemStack icon = swatchIcon(context.viewer(), swatch, icons.get(i), selected);
             buttons.add(SelectorButton.of(slots.get(i), icon, () -> pick(context, swatch.argb())));

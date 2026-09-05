@@ -12,6 +12,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.LayoutFit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
@@ -64,7 +65,8 @@ public final class EditorRenderer {
     private void paintProperties(Inventory inv, EditorSpec spec, EditorState state, PlayerRef viewer) {
         List<EditableProperty> props = spec.propertiesFor(state.subject());
         List<Integer> slots = spec.layout().propertySlots();
-        for (int i = 0; i < props.size() && i < slots.size(); i++) {
+        int drawn = LayoutFit.drawable("editor property-slots", props.size(), slots);
+        for (int i = 0; i < drawn; i++) {
             EditableProperty property = props.get(i);
             int slot = slots.get(i);
             inv.setItem(slot, propertyButton(viewer, spec, property));

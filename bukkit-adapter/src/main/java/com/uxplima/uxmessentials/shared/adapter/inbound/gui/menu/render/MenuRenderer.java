@@ -15,6 +15,7 @@ import org.bukkit.inventory.PlayerInventory;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.LayoutFit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ContentProviderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.BottomSlots;
@@ -285,7 +286,8 @@ public final class MenuRenderer {
                 continue;
             }
             List<@Nullable ItemStack> painted = provider.render(ctx, region);
-            for (int index = 0; index < slots.size() && index < painted.size(); index++) {
+            int drawn = LayoutFit.drawable("content region " + region.id(), painted.size(), slots);
+            for (int index = 0; index < drawn; index++) {
                 int slot = slots.get(index);
                 if (fits(inv, slot)) {
                     inv.setItem(slot, painted.get(index));
