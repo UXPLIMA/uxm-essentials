@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 
 import io.papermc.paper.datacomponent.DataComponentType;
@@ -79,6 +80,37 @@ class ItemRendererTest {
         ItemStack it = renderer.render(item("STONE", new ItemDecor(1, Optional.empty(), true, List.of())), ctx);
         // ItemBuilder.glow(true) uses the native glint override, not a dummy enchant, so assert the override.
         assertThat(it.getItemMeta().getEnchantmentGlintOverride()).isTrue();
+    }
+
+    @Test
+    void aFlagTokenIsAcceptedInTheCaseTheConfFileIsWrittenIn() {
+        // Every other key in a menu conf is lower case, and the four enum parsers beside this one fold case, so
+        // an operator writing the flag the same way had it dropped: the icon rendered carrying the tooltip
+        // section they had asked to hide, which is what an icon with no flags set looks like.
+        ItemStack it = renderer.render(
+                item("STONE", new ItemDecor(1, Optional.empty(), false, List.of("hide_attributes"))), ctx);
+        assertThat(it.getItemMeta().hasItemFlag(ItemFlag.HIDE_ATTRIBUTES)).isTrue();
+    }
+
+    @Test
+    void aFlagTokenMayUseTheHyphenTheRestOfTheConfUses() {
+        ItemStack it = renderer.render(
+                item("STONE", new ItemDecor(1, Optional.empty(), false, List.of("hide-armor-trim"))), ctx);
+        assertThat(it.getItemMeta().hasItemFlag(ItemFlag.HIDE_ARMOR_TRIM)).isTrue();
+    }
+
+    @Test
+    void theDocumentedUpperCaseFlagSpellingKeepsWorking() {
+        ItemStack it = renderer.render(
+                item("STONE", new ItemDecor(1, Optional.empty(), false, List.of("HIDE_ENCHANTS"))), ctx);
+        assertThat(it.getItemMeta().hasItemFlag(ItemFlag.HIDE_ENCHANTS)).isTrue();
+    }
+
+    @Test
+    void aTokenThatNamesNoFlagIsSkippedRatherThanFailingTheRender() {
+        ItemStack it = renderer.render(
+                item("STONE", new ItemDecor(1, Optional.empty(), false, List.of("hide_nothing", "hide_dye"))), ctx);
+        assertThat(it.getItemMeta().hasItemFlag(ItemFlag.HIDE_DYE)).isTrue();
     }
 
     @Test

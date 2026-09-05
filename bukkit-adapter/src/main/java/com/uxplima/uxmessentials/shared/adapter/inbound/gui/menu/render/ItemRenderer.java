@@ -679,7 +679,7 @@ public final class ItemRenderer {
         List<ItemFlag> flags = new ArrayList<>(tokens.size());
         for (String token : tokens) {
             try {
-                flags.add(ItemFlag.valueOf(token));
+                flags.add(ItemFlag.valueOf(enumName(token)));
             } catch (IllegalArgumentException unknownFlag) {
                 // A spec naming a flag that does not exist on this server should not abort the render.
             }
@@ -769,6 +769,20 @@ public final class ItemRenderer {
         return Optional.of(new PotionEffect(type.get(), duration, amplifier));
     }
 
+    /**
+     * The enum-constant spelling of an operator's token: trimmed, upper-cased, and with the hyphen a conf file
+     * favours folded to the underscore a Java constant uses. Every enum-valued decor token resolves through
+     * this, so none of them is stricter than the ones beside it.
+     *
+     * <p>{@code flags} was the exception and read {@code valueOf} on the raw string while the four parsers next
+     * to it folded case, so {@code flags = ["hide_attributes"]} was dropped in a file whose every other key is
+     * lower case. The icon still rendered, carrying the tooltip section the operator had asked to hide, which
+     * is exactly what a server with no flags configured looks like.
+     */
+    private static String enumName(String token) {
+        return token.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+    }
+
     /** A colour as a {@code #RRGGBB} hex, an {@code r,g,b} triple, or a named dye colour; empty when unparseable. */
     private static Optional<Color> parseColor(String raw) {
         String value = raw.trim();
@@ -782,7 +796,7 @@ public final class ItemRenderer {
             if (value.contains(",")) {
                 return rgbTriple(value);
             }
-            return Optional.of(DyeColor.valueOf(value.toUpperCase(Locale.ROOT)).getColor());
+            return Optional.of(DyeColor.valueOf(enumName(value)).getColor());
         } catch (IllegalArgumentException malformed) {
             // A bad hex, an out-of-range channel, or an unknown colour name is skipped, like an unknown flag.
             return Optional.empty();
@@ -804,7 +818,7 @@ public final class ItemRenderer {
     /** A {@link DyeColor} by case-insensitive name, present only when it matches a known dye. */
     private static Optional<DyeColor> parseDye(String name) {
         try {
-            return Optional.of(DyeColor.valueOf(name.trim().toUpperCase(Locale.ROOT)));
+            return Optional.of(DyeColor.valueOf(enumName(name)));
         } catch (IllegalArgumentException unknown) {
             return Optional.empty();
         }
@@ -813,7 +827,7 @@ public final class ItemRenderer {
     /** An {@link ItemRarity} by case-insensitive name (COMMON/UNCOMMON/RARE/EPIC), empty when it is not a rarity. */
     private static Optional<ItemRarity> parseRarity(String name) {
         try {
-            return Optional.of(ItemRarity.valueOf(name.trim().toUpperCase(Locale.ROOT)));
+            return Optional.of(ItemRarity.valueOf(enumName(name)));
         } catch (IllegalArgumentException unknown) {
             return Optional.empty();
         }
@@ -822,7 +836,7 @@ public final class ItemRenderer {
     /** An {@link AttributeModifier.Operation} by name ({@code add_number}/{@code add_scalar}/{@code multiply_scalar_1}). */
     private static Optional<AttributeModifier.Operation> parseOperation(String name) {
         try {
-            return Optional.of(AttributeModifier.Operation.valueOf(name.trim().toUpperCase(Locale.ROOT)));
+            return Optional.of(AttributeModifier.Operation.valueOf(enumName(name)));
         } catch (IllegalArgumentException unknown) {
             return Optional.empty();
         }
@@ -830,7 +844,7 @@ public final class ItemRenderer {
 
     /** An {@link EquipmentSlotGroup} by name; a blank token is the whole-item {@code any}, an unknown one is skipped. */
     private static Optional<EquipmentSlotGroup> parseSlotGroup(String name) {
-        return switch (name.trim().toLowerCase(Locale.ROOT)) {
+        return switch (name.trim().toLowerCase(Locale.ROOT).replace('-', '_')) {
             case "", "any" -> Optional.of(EquipmentSlotGroup.ANY);
             case "hand", "mainhand", "main_hand" -> Optional.of(EquipmentSlotGroup.MAINHAND);
             case "off_hand", "offhand" -> Optional.of(EquipmentSlotGroup.OFFHAND);
