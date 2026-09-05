@@ -30,9 +30,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class GridRenderer {
 
-    /** The slots in one inventory row, the divisor that turns a row count into a slot count. */
-    private static final int ROW = 9;
-
     /** The tallest window a grid opens into: five content rows plus the control row, the pagination case. */
     private static final int MAX_WINDOW_ROWS = 6;
 
@@ -62,8 +59,8 @@ public final class GridRenderer {
         Objects.requireNonNull(live, "live");
         Objects.requireNonNull(viewer, "viewer");
         int contentRows = windowRows(spec.menuRows()) - 1;
-        int pageSize = contentRows * ROW;
-        int menuSize = spec.menuRows() * ROW;
+        int pageSize = contentRows * GridSpec.COLUMNS;
+        int menuSize = spec.menuRows() * GridSpec.COLUMNS;
         int pageCount = Math.max(1, ceilDiv(menuSize, pageSize));
         int clamped = Math.min(Math.max(0, page), pageCount - 1);
         paintContent(inv, spec, state, clamped, pageSize, menuSize, viewer);
@@ -91,8 +88,8 @@ public final class GridRenderer {
     /** Paint the control row: a blocker backdrop, the conditional prev/next buttons, then the caller's controls. */
     private void paintControls(
             Inventory inv, GridSpec spec, GridViewState state, int contentRows, int page, int pageCount) {
-        int base = contentRows * ROW;
-        for (int column = 0; column < ROW; column++) {
+        int base = contentRows * GridSpec.COLUMNS;
+        for (int column = 0; column < GridSpec.COLUMNS; column++) {
             inv.setItem(base + column, spec.blockerIcon());
         }
         OptionalInt prev = OptionalInt.empty();

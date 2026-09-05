@@ -40,6 +40,9 @@ public record GridSpec(
         ItemStack nextIcon,
         List<Control> controls) {
 
+    /** Columns in one inventory row, the unit every slot on the canvas is counted in. */
+    public static final int COLUMNS = 9;
+
     /**
      * The control-row column the previous-page button is drawn in. Declared on the contract rather than in the
      * renderer so the rule and its enforcement cannot drift apart: {@link Control} refuses this column, and the
@@ -64,7 +67,7 @@ public record GridSpec(
     }
 
     /**
-     * The first menu slot in {@code [0, menuRows*9)} that no content item occupies on this draw, or empty when the
+     * The first menu slot in {@code [0, menuRows*COLUMNS)} that no content item occupies on this draw, or empty when
      * canvas is full — where the engine appends an item shift-clicked out of the operator's inventory. The content
      * supplier is re-read here, so appending one item then re-rendering makes the next append land on the following
      * free slot. It scans only the chest slots, never the bottom-inventory range, so a shift-click always fills the
@@ -72,7 +75,7 @@ public record GridSpec(
      */
     public OptionalInt firstEmptySlot() {
         Map<Integer, MenuItemSpec> filled = content.get();
-        int capacity = menuRows * 9;
+        int capacity = menuRows * COLUMNS;
         for (int slot = 0; slot < capacity; slot++) {
             if (!filled.containsKey(slot)) {
                 return OptionalInt.of(slot);
@@ -99,8 +102,8 @@ public record GridSpec(
     public record Control(int column, ItemStack icon, Consumer<Player> onClick) {
 
         public Control {
-            if (column < 0 || column > 8) {
-                throw new IllegalArgumentException("column must be 0..8, was " + column);
+            if (column < 0 || column >= COLUMNS) {
+                throw new IllegalArgumentException("column must be 0.." + (COLUMNS - 1) + ", was " + column);
             }
             if (column == PREV_COLUMN || column == NEXT_COLUMN) {
                 throw new IllegalArgumentException(
