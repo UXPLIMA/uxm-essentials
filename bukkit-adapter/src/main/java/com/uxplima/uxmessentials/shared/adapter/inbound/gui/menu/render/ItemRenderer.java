@@ -287,7 +287,7 @@ public final class ItemRenderer {
             out.add(resolveText(spec, ctx));
             return;
         }
-        String substituted = applyMath(substitutePlaceholders(spec, ctx));
+        String substituted = applyMath(substitutePlaceholders(dropMathMissingAnOperand(spec, ctx), ctx));
         for (String segment : substituted.split("\n", -1)) {
             out.add(StyledText.render(segment));
         }
@@ -340,7 +340,7 @@ public final class ItemRenderer {
         if (s.isEmpty()) {
             return Component.empty();
         }
-        String substituted = substitutePlaceholders(s, ctx);
+        String substituted = substitutePlaceholders(dropMathMissingAnOperand(s, ctx), ctx);
         if (s.startsWith("@")) {
             String key = substituted.substring(1);
             // The catalog entry may carry {token} arguments (e.g. {sound}, {warp}); fill them from the same
@@ -369,6 +369,51 @@ public final class ItemRenderer {
         }
         matcher.appendTail(out);
         return out.toString();
+    }
+
+    /**
+     * Drop every {@code {math: …}} block in an unsubstituted line whose expression names a token that resolves to
+     * nothing, so the block renders as the gap a missing operand deserves rather than as a number.
+     *
+     * <p>The token pass runs before the math pass, which leaves an unresolved token as a hole in the expression.
+     * {@code {math: %missing% * 2}} becomes {@code " * 2"}, which the evaluator refuses, so the line shows a gap
+     * and the operator sees something is wrong. {@code {math: %missing% + 1}} becomes {@code " + 1"}, which
+     * parses, because plus is also a unary prefix, and the player is shown the number 1. Minus behaves the same
+     * way, and those two are the commonest operators in a menu file: the arithmetic that reads worst is the
+     * arithmetic that fails invisibly.
+     *
+     * <p>This runs on the line as written, before substitution, which is why it can tell a hole from a value and
+     * why the pass order does not have to change. A block that arrives inside a local placeholder's value is
+     * checked by {@link #substituteLocal} on that template for the same reason. A block assembled by a registry
+     * placeholder's return value is not reachable this way and keeps the old behaviour; changing that means
+     * reordering the passes, which trades this defect for a different one.
+     *
+     * <p>Tokens inside a math block resolve twice, once here and once in the substitution that follows. The pass
+     * is gated on the line carrying a math block at all, so nothing else pays for it.
+     */
+    private String dropMathMissingAnOperand(String raw, MenuContext ctx) {
+        if (raw.indexOf("{math:") < 0) {
+            return raw;
+        }
+        Matcher matcher = MATH.matcher(raw);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String block = missesAnOperand(matcher.group(1), ctx) ? "" : matcher.group();
+            matcher.appendReplacement(out, Matcher.quoteReplacement(block));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /** Whether any {@code %token%} in an unsubstituted math expression resolves to nothing. */
+    private boolean missesAnOperand(String expression, MenuContext ctx) {
+        Matcher matcher = PLACEHOLDER.matcher(expression);
+        while (matcher.find()) {
+            if (resolveToken(matcher.group(1), ctx).isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Evaluate one substituted expression to the evaluator's formatted number, or empty when it cannot be parsed. */
@@ -427,7 +472,7 @@ public final class ItemRenderer {
         }
         depth[0]++;
         try {
-            Matcher matcher = PLACEHOLDER.matcher(template);
+            Matcher matcher = PLACEHOLDER.matcher(dropMathMissingAnOperand(template, ctx));
             StringBuilder out = new StringBuilder();
             while (matcher.find()) {
                 matcher.appendReplacement(out, Matcher.quoteReplacement(resolveToken(matcher.group(1), ctx)));

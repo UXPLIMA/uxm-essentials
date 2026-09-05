@@ -114,6 +114,43 @@ class ItemRendererTest {
     }
 
     @Test
+    void aMathBlockWhoseOperandIsMissingShowsNothingRatherThanAPlausibleNumber() {
+        // The token pass leaves an unresolved token as a hole, so "%missing% + 1" reached the evaluator as
+        // " + 1". Plus is also a unary prefix, so it parsed and the player was shown the number 1. Minus did
+        // the same. Those are the two commonest operators in a menu file.
+        assertThat(plainLore(renderer, itemWithLore(List.of("{math: %missing% + 1}"))))
+                .containsExactly("");
+        assertThat(plainLore(renderer, itemWithLore(List.of("{math: %missing% - 1}"))))
+                .containsExactly("");
+    }
+
+    @Test
+    void aMathBlockWhoseOperandIsMissingAlreadyShowedNothingForTheOtherOperators() {
+        // Star and slash are not unary, so these always failed to parse and rendered as a gap. Pinned so the
+        // fix for the two that did not is not read later as the whole of the behaviour.
+        assertThat(plainLore(renderer, itemWithLore(List.of("{math: %missing% * 2}"))))
+                .containsExactly("");
+    }
+
+    @Test
+    void aMathBlockWithEveryOperandPresentStillEvaluates() {
+        placeholders.register("coins", c -> "50");
+
+        assertThat(plainLore(renderer, itemWithLore(List.of("{math: %coins% + 1}"))))
+                .containsExactly("51");
+    }
+
+    @Test
+    void aMathBlockInsideALocalPlaceholderIsCheckedOnTheTemplateToo() {
+        // substituteLocal resolves the inner tokens and leaves the block for the outer math pass, so a hole
+        // arrives already anonymous there. The template is checked before that happens.
+        MenuContext local = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0)
+                .withLocalPlaceholders(Map.of("total", "{math: %missing% + 1}"));
+
+        assertThat(plainLore(renderer, itemWithLore(List.of("%total%")), local)).containsExactly("");
+    }
+
+    @Test
     void multiLinePlaceholderExpandsIntoSeparateLoreLines() {
         // A per-entry icon (kit/warp browse) emits a variable number of lines through one placeholder; the engine
         // must turn each newline-separated segment into its own lore component, in order.
