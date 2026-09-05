@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
@@ -44,6 +45,7 @@ class ColourPickerLayoutTest {
         assertThat(layout.paletteSlots())
                 .isEqualTo(ColourPickerLayout.codeDefault().paletteSlots());
         assertThat(log.warnings).hasSize(1);
+        assertThat(log.warnings.get(0)).contains("left").doesNotContain("-2147483648");
     }
 
     @Test
@@ -62,6 +64,7 @@ class ColourPickerLayoutTest {
     @Test
     void aNegativeButtonSlotFallsBackInsteadOfBecomingSlotZero() throws IOException {
         // Math.max(0, ...) turned this into slot zero, where it collided with whatever the palette had drawn.
+        // The warning must name the -1 the operator wrote, not the sentinel the read fell back to.
         write("rows = 6\ncustom-slot = -1\n");
         RecordingLogger log = new RecordingLogger();
 
@@ -70,6 +73,34 @@ class ColourPickerLayoutTest {
         assertThat(layout.customSlot())
                 .isEqualTo(ColourPickerLayout.codeDefault().customSlot());
         assertThat(log.warnings).hasSize(1);
+        assertThat(log.warnings.get(0)).contains("-1").doesNotContain("-2147483648");
+    }
+
+    @Test
+    void aButtonSlotThatIsNotANumberIsRefusedAndNamedInTheWarning() throws IOException {
+        write("rows = 6\ncustom-slot = \"left\"\n");
+        RecordingLogger log = new RecordingLogger();
+
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+
+        assertThat(layout.customSlot())
+                .isEqualTo(ColourPickerLayout.codeDefault().customSlot());
+        assertThat(log.warnings).hasSize(1);
+        assertThat(log.warnings.get(0)).contains("left").doesNotContain("-2147483648");
+    }
+
+    @Test
+    void anOmittedButtonSlotTakesTheBuiltInOneWithoutWarning() throws IOException {
+        // An absent key and an unreadable one both read as the sentinel, so the absent case is excluded before
+        // the read. Collapse that one too and every operator who leaves an optional key out gets warned at.
+        write("rows = 6\n");
+        RecordingLogger log = new RecordingLogger();
+
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+
+        assertThat(layout.customSlot())
+                .isEqualTo(ColourPickerLayout.codeDefault().customSlot());
+        assertThat(log.warnings).isEmpty();
     }
 
     @Test
@@ -105,7 +136,11 @@ class ColourPickerLayoutTest {
         Files.writeString(file, body);
     }
 
-    /** Collects the warnings so a test can assert the picker said what it refused rather than only what it drew. */
+    /**
+     * Collects the warnings, arguments included, so a test can assert the picker named the value the operator
+     * typed. Reading a node with a default can copy that default into the node, and a warning that reports the
+     * node afterwards then prints the sentinel instead of the word, telling nobody anything.
+     */
     private static final class RecordingLogger implements Logger {
 
         private final List<String> warnings = new ArrayList<>();
@@ -118,7 +153,7 @@ class ColourPickerLayoutTest {
 
         @Override
         public void warn(String message, Object... args) {
-            warnings.add(message);
+            warnings.add(message + " " + Arrays.toString(args));
         }
 
         @Override

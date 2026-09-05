@@ -204,6 +204,9 @@ public record ColourPickerLayout(
      * own: a hole would shift every swatch after it onto the wrong colour, which is a worse window than the
      * built-in one.
      *
+     * <p>The written value is read off the node before the number is, because reading with a default leaves the
+     * default on the node and the warning would then name the sentinel rather than the word an operator typed.
+     *
      * <p>The check matters because an entry that is not a number reads as zero through Configurate, and zero is
      * a real slot. {@code palette-slots = ["left", "middle"]} therefore stacked two swatches on slot zero, lost
      * the other fourteen colours, and opened looking like somebody had meant it, with nothing logged. The rows
@@ -215,12 +218,13 @@ public record ColourPickerLayout(
         }
         List<Integer> values = new ArrayList<>();
         for (ConfigurationNode child : node.childrenList()) {
+            @Nullable Object written = child.raw();
             int value = child.getInt(NOT_A_SLOT);
             if (!inWindow(value, rows)) {
                 log.warn(
                         "colour picker palette-slots entry {} is not a slot in a {}-row window, using the built-in"
                                 + " palette",
-                        child.raw(),
+                        written,
                         rows);
                 return fallback;
             }
@@ -234,14 +238,18 @@ public record ColourPickerLayout(
      * outside the window. Clamping an out-of-range value into the window is what this replaces: a negative slot
      * silently became slot zero and collided with whatever the palette had drawn there, and a slot past the end
      * was kept and simply never drawn.
+     *
+     * <p>Absence is answered before the read, not by the sentinel. An absent key and an unreadable one read
+     * alike, and collapsing those two as well would warn at every operator who leaves an optional key out.
      */
     private static int slot(ConfigurationNode node, int fallback, int rows, String key, Logger log) {
         if (node.virtual()) {
             return fallback;
         }
+        @Nullable Object written = node.raw();
         int value = node.getInt(NOT_A_SLOT);
         if (!inWindow(value, rows)) {
-            log.warn("colour picker {} {} is not a slot in a {}-row window, using {}", key, node.raw(), rows, fallback);
+            log.warn("colour picker {} {} is not a slot in a {}-row window, using {}", key, written, rows, fallback);
             return fallback;
         }
         return value;
