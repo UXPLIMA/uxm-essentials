@@ -156,7 +156,7 @@ public final class MenuVocabulary {
         Matcher matcher = PLACEHOLDER.matcher(operand);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
-            String value = placeholders.resolve(matcher.group(1), ctx).orElse("");
+            String value = placeholders.resolveOrReport(matcher.group(1), ctx).orElse("");
             matcher.appendReplacement(out, Matcher.quoteReplacement(value));
         }
         matcher.appendTail(out);

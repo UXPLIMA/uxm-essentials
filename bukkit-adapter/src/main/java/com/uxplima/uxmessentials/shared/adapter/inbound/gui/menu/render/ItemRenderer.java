@@ -454,7 +454,7 @@ public final class ItemRenderer {
         if (local != null) {
             return substituteLocal(local, ctx);
         }
-        return placeholders.resolve(token, ctx).orElse("");
+        return placeholders.resolveOrReport(token, ctx).orElse("");
     }
 
     /**

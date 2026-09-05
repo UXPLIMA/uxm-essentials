@@ -141,6 +141,29 @@ class ItemRendererTest {
     }
 
     @Test
+    void aRegisteredHandlerReturningNothingIsAMissingOperandToo() {
+        // A registry that answers "" looks nothing like one that answers nothing from inside the expression, and
+        // an empty string is not a number in any position, so this is the same hole as an unregistered token.
+        placeholders.register("blank", c -> "");
+
+        assertThat(plainLore(renderer, itemWithLore(List.of("{math: %blank% + 1}"))))
+                .containsExactly("");
+    }
+
+    @Test
+    void aHandlerThatThrowsCostsItsOwnTokenAndNotTheWindow() {
+        // Handlers arrive through the developer API, so one of them throwing is somebody else's defect. It used
+        // to escape the renderer and take the whole window with it, while the same handler failing inside
+        // resolveAll cost only the token it would have filled.
+        placeholders.register("angry", c -> {
+            throw new IllegalStateException("no");
+        });
+
+        assertThat(plainLore(renderer, itemWithLore(List.of("before %angry% after"))))
+                .containsExactly("before  after");
+    }
+
+    @Test
     void aMathBlockInsideALocalPlaceholderIsCheckedOnTheTemplateToo() {
         // substituteLocal resolves the inner tokens and leaves the block for the outer math pass, so a hole
         // arrives already anonymous there. The template is checked before that happens.

@@ -112,8 +112,9 @@ public final class CustomPlaceholders {
             Matcher matcher = TOKEN.matcher(template);
             StringBuilder out = new StringBuilder();
             while (matcher.find()) {
-                String value =
-                        bindings.placeholders().resolve(matcher.group(1), ctx).orElse("");
+                String value = bindings.placeholders()
+                        .resolveOrReport(matcher.group(1), ctx)
+                        .orElse("");
                 matcher.appendReplacement(out, Matcher.quoteReplacement(value));
             }
             matcher.appendTail(out);

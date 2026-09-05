@@ -5,11 +5,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 
@@ -26,7 +29,16 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuCon
  */
 public final class PlaceholderRegistry {
 
+    private static final Logger LOG = Logger.getLogger(PlaceholderRegistry.class.getName());
+
     private final ConcurrentHashMap<String, Function<MenuContext, String>> handlers = new ConcurrentHashMap<>();
+
+    /**
+     * The ids already reported as broken, so a handler that throws on every render of an {@code update = true}
+     * item costs one console line rather than one per tick. A failure that keeps happening says nothing the
+     * first line did not.
+     */
+    private final Set<String> reported = ConcurrentHashMap.newKeySet();
 
     /**
      * The prefix/family resolvers consulted when no exact handler matches, in registration order. Written once each
@@ -78,6 +90,33 @@ public final class PlaceholderRegistry {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Resolve {@code id} the way a render does: as {@link #resolve}, except that a handler which throws yields no
+     * text and is named on the console once instead of escaping. This is the seam every render-time and
+     * condition-time caller uses, because the alternative is what used to happen: one broken handler took the
+     * whole window with it, so a bad value an operator typed cost one icon while a bad handler a consumer wired
+     * through {@code registerPlaceholder} cost the menu.
+     *
+     * <p>{@link #resolve} keeps throwing on purpose. A caller that would rather know is entitled to know, and
+     * the developer API hands third parties a way to register a handler we do not own, so the price of one
+     * failing has to be paid where the render can carry on rather than decided once for everybody.
+     *
+     * <p>The silence in {@link #resolveAll} is a different case and not an inconsistency: that call runs every
+     * handler against a context most of them were not written for, so a throw there is expected and means only
+     * that the placeholder belongs to another menu. Here the token was asked for by name, so a throw is a defect
+     * in whoever registered it, and a blank token tells its author nothing.
+     */
+    public Optional<String> resolveOrReport(String id, MenuContext ctx) {
+        try {
+            return resolve(id, ctx);
+        } catch (RuntimeException failure) {
+            if (reported.add(id)) {
+                LOG.log(Level.WARNING, "event=placeholder_failed token=" + id, failure);
+            }
+            return Optional.empty();
+        }
     }
 
     /**
