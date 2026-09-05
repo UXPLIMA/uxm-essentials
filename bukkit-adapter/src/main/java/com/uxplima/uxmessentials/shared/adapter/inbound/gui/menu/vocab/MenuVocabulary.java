@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab;
 
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
@@ -21,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Expression
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Expressions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -270,7 +270,9 @@ public final class MenuVocabulary {
      * {@code 1f} each and a malformed number falls back to that default, so a bare key still plays at full gain
      * exactly as it always did; a blank key is a no-op rather than an error. The grammar is parsed by the shared
      * {@link SoundActions.SoundArg} so this action and the {@code broadcast-sound} / {@code rawsound} pack read the
-     * same argument shape, and the key is lowercased through the vanilla registry as it has always been here.
+     * same argument shape. The key is resolved through the vanilla registry, so an operator may write either the
+     * dotted key or the UPPER_SNAKE constant; a name the registry does not know is passed to the client as written,
+     * which is how a resource-pack key still reaches it.
      */
     private static void playSound(MenuActionContext ctx) {
         SoundActions.SoundArg sound = SoundActions.SoundArg.parse(ctx.arg());
@@ -278,6 +280,6 @@ public final class MenuVocabulary {
             return;
         }
         var at = Objects.requireNonNull(ctx.player().getLocation(), "player location");
-        ctx.player().playSound(at, sound.key().toLowerCase(Locale.ROOT), sound.volume(), sound.pitch());
+        ctx.player().playSound(at, BukkitRegistryKeys.soundKeyName(sound.key()), sound.volume(), sound.pitch());
     }
 }

@@ -44,27 +44,42 @@ public final class BukkitRegistryKeys {
             @Nullable NamespacedKey key = NamespacedKey.fromString(normalized);
             return key == null ? null : Registry.SOUNDS.get(key);
         }
-        return constantNamed(trimmed);
+        @Nullable NamespacedKey key = constantKey(normalized);
+        return key == null ? null : Registry.SOUNDS.get(key);
     }
 
     /**
-     * The sound whose registry key the UPPER_SNAKE {@code name} spells. Every dot in a key path is an underscore
-     * in the constant, so the key is found by flattening the registry's own keys the same way and comparing,
-     * rather than by rewriting the name: {@code BLOCK_NOTE_BLOCK_PLING} gives no way to know that its second
-     * underscore is a dot in {@code block.note_block.pling} and its third is not, so turning every underscore
-     * into a dot named a sound that does not exist and the effect went silent with nothing logged.
+     * The key name to hand a client for an operator-written sound name: the registry's own spelling when the name
+     * names a vanilla sound in either form, and otherwise the name lowercased and passed through untouched, which
+     * is what a resource-pack key needs. Never blank-checks or rejects, because the caller's contract is to play
+     * whatever the operator wrote and let an unknown name be the client's silent no-op.
+     */
+    public static String soundKeyName(String name) {
+        Objects.requireNonNull(name, "name");
+        String normalized = name.trim().toLowerCase(Locale.ROOT);
+        if (normalized.contains(":") || normalized.contains(".")) {
+            return normalized;
+        }
+        @Nullable NamespacedKey key = constantKey(normalized);
+        return key == null ? normalized : key.value();
+    }
+
+    /**
+     * The registry key the UPPER_SNAKE {@code flattened} name spells, already lowercased. Every dot in a key path
+     * is an underscore in the constant, so the key is found by flattening the registry's own keys the same way and
+     * comparing, rather than by rewriting the name: {@code BLOCK_NOTE_BLOCK_PLING} gives no way to know that its
+     * second underscore is a dot in {@code block.note_block.pling} and its third is not, so turning every
+     * underscore into a dot named a sound that does not exist and the effect went silent with nothing logged.
      *
      * <p>This walks the registry rather than consulting a prepared index. The walk is a few thousand string
      * comparisons and only a constant-form name reaches it, which is small beside the teleport or the menu click
      * that asked for the sound; a cached index would buy little and would have to answer for its own lifetime.
      */
-    private static @Nullable Sound constantNamed(String name) {
-        String flattened = name.toLowerCase(Locale.ROOT);
+    private static @Nullable NamespacedKey constantKey(String flattened) {
         return Registry.SOUNDS
                 .keyStream()
                 .filter(key -> key.value().replace('.', '_').equals(flattened))
                 .findFirst()
-                .map(Registry.SOUNDS::get)
                 .orElse(null);
     }
 

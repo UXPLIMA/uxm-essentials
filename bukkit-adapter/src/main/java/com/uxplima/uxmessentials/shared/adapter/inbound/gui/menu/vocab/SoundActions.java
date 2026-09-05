@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -14,6 +13,7 @@ import net.kyori.adventure.sound.Sound;
 import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 
 /**
@@ -29,8 +29,8 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
  * parser {@link MenuVocabulary}'s in-place {@code sound} action reads too, so the three sound effects speak the
  * same argument shape.
  *
- * <p>{@code broadcast-sound} lowercases its key and resolves it through the vanilla registry the same way
- * {@code sound} does. {@code rawsound} does the opposite on purpose: it passes the key through untouched to the
+ * <p>{@code broadcast-sound} resolves its key through the vanilla registry the same way {@code sound} does, so
+ * either the dotted key or the UPPER_SNAKE constant names the same sound. {@code rawsound} does the opposite on purpose: it passes the key through untouched to the
  * Adventure sound API so a resource-pack key (say {@code myserver:custom.ding}) or a precise vanilla key reaches
  * the client exactly as written. Every handler is wrapped in {@link #safe}, so a malformed key — an Adventure
  * {@code Key} the client would reject throws while being built — becomes a logged no-op rather than an exception
@@ -74,15 +74,15 @@ public final class SoundActions {
 
     /**
      * Play {@code <key> [volume] [pitch]} to every online player at their own location, so each hears it locally
-     * rather than at the clicker's position. The key is lowercased and resolved through the vanilla registry the
-     * same way the viewer-only {@code sound} action does; a blank key is a silent no-op.
+     * rather than at the clicker's position. The key is resolved through the vanilla registry the same way the
+     * viewer-only {@code sound} action does, so both name forms work; a blank key is a silent no-op.
      */
     private static void broadcastSound(MenuActionContext ctx) {
         SoundArg sound = SoundArg.parse(ctx.arg());
         if (sound.key().isBlank()) {
             return;
         }
-        String key = sound.key().toLowerCase(Locale.ROOT);
+        String key = BukkitRegistryKeys.soundKeyName(sound.key());
         for (Player online : Bukkit.getOnlinePlayers()) {
             var at = Objects.requireNonNull(online.getLocation(), "player location");
             online.playSound(at, key, sound.volume(), sound.pitch());

@@ -93,6 +93,24 @@ class SoundActionsTest {
     }
 
     @Test
+    void soundAcceptsTheUpperSnakeConstantForm() {
+        // The documented example on the menu engine page is written this way, and so is every sound in the UI style
+        // canon. Handing the name straight to the client played block_note_block_pling, which names nothing.
+        invoke("sound", "BLOCK_NOTE_BLOCK_PLING", viewer);
+
+        assertThat(only(viewer).getSound()).isEqualTo("block.note_block.pling");
+    }
+
+    @Test
+    void soundLeavesAResourcePackKeyAlone() {
+        // A key the vanilla registry does not know belongs to the operator's resource pack. It reached the client
+        // before this and has to keep reaching it, so the registry lookup is a translation and never a filter.
+        invoke("sound", "myserver:custom.ding", viewer);
+
+        assertThat(only(viewer).getSound()).isEqualTo("myserver:custom.ding");
+    }
+
+    @Test
     void blankSoundIsANoOp() {
         invoke("sound", "", viewer);
 
@@ -123,6 +141,16 @@ class SoundActionsTest {
 
         assertThat(viewer.getHeardSounds()).isNotEmpty();
         assertThat(second.getHeardSounds()).isNotEmpty();
+    }
+
+    @Test
+    void broadcastSoundAcceptsTheUpperSnakeConstantForm() {
+        PlayerMock second = server.addPlayer("Second");
+
+        invoke("broadcast-sound", "BLOCK_NOTE_BLOCK_PLING", viewer);
+
+        assertThat(only(viewer).getSound()).isEqualTo("block.note_block.pling");
+        assertThat(only(second).getSound()).isEqualTo("block.note_block.pling");
     }
 
     @Test

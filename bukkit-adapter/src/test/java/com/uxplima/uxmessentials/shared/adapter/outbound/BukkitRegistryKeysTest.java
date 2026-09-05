@@ -56,4 +56,23 @@ class BukkitRegistryKeysTest {
     void aBlankNameIsNull() {
         assertThat(BukkitRegistryKeys.resolveSound("   ")).isNull();
     }
+
+    @Test
+    void theKeyNameOfAConstantIsTheRegistrySpelling() {
+        assertThat(BukkitRegistryKeys.soundKeyName("BLOCK_NOTE_BLOCK_PLING")).isEqualTo("block.note_block.pling");
+        assertThat(BukkitRegistryKeys.soundKeyName("ENTITY_ENDERMAN_TELEPORT")).isEqualTo("entity.enderman.teleport");
+    }
+
+    @Test
+    void theKeyNameOfADottedNameIsItself() {
+        assertThat(BukkitRegistryKeys.soundKeyName("block.note_block.pling")).isEqualTo("block.note_block.pling");
+    }
+
+    @Test
+    void theKeyNameOfAResourcePackKeyPassesThrough() {
+        // A key the vanilla registry does not know is the operator's own, from a resource pack. Rejecting it would
+        // silence a sound that works today, so the name goes to the client exactly as written apart from its case.
+        assertThat(BukkitRegistryKeys.soundKeyName("myserver:custom.ding")).isEqualTo("myserver:custom.ding");
+        assertThat(BukkitRegistryKeys.soundKeyName("not_a_sound_at_all")).isEqualTo("not_a_sound_at_all");
+    }
 }
