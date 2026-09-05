@@ -1,7 +1,7 @@
 name: uxmEssentials-redis
 version: '${version}'
 main: com.uxplima.uxmessentials.redis.UxmEssentialsRedisPlugin
-api-version: '1.21'
+api-version: '26.2'
 authors: ['UXPLIMA']
 description: 'Optional Redis pub/sub transport for the uxmEssentials cross-server bus. Drop this jar in plugins/ and set network.transport=redis to sync homes/warps/economy/vaults over Redis with no proxy.'
 website: 'https://github.com/UXPLIMA/uxmEssentials'

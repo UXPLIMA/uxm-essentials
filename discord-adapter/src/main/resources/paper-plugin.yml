@@ -2,7 +2,7 @@ name: uxmessentials-discord
 version: '${version}'
 main: com.uxplima.uxmessentials.discord.UxmEssentialsDiscord
 loader: com.uxplima.uxmessentials.discord.UxmDiscordLoader
-api-version: '1.21'
+api-version: '26.2'
 authors: ['UXPLIMA']
 description: 'Optional Discord bridge for uxmEssentials: mirrors audit events and economy notifications to Discord via JDA. Dormant until configured with a bot token.'
 website: 'https://github.com/UXPLIMA/uxmEssentials'

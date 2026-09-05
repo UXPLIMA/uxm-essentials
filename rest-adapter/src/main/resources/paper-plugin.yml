@@ -2,7 +2,7 @@ name: uxmEssentials-rest
 version: '${version}'
 main: com.uxplima.uxmessentials.rest.UxmEssentialsRest
 loader: com.uxplima.uxmessentials.rest.UxmRestLoader
-api-version: '1.21'
+api-version: '26.2'
 authors: ['UXPLIMA']
 description: 'Optional REST and WebSocket API for uxmEssentials: read and write everything the developer API publishes, over HTTP. Dormant until enabled in config/rest.conf.'
 website: 'https://github.com/UXPLIMA/uxmEssentials'

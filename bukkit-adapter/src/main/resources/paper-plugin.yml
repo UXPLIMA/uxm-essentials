@@ -3,7 +3,7 @@ version: '${version}'
 main: com.uxplima.uxmessentials.bootstrap.UxmEssentialsPlugin
 bootstrapper: com.uxplima.uxmessentials.bootstrap.UxmEssentialsBootstrap
 loader: com.uxplima.uxmessentials.bootstrap.UxmEssentialsLoader
-api-version: '1.21'
+api-version: '26.2'
 
 # Enabled before the worlds are created, which is the only way CraftServer.getGenerator will accept
 # `generator: uxmEssentials:void` for the default world: it refuses a generator whose plugin is not
