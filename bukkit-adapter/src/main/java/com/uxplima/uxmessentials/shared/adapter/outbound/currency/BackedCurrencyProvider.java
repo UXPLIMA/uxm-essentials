@@ -16,6 +16,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>The {@code double} boundary is the menu vocabulary's, not ours: amounts are converted to {@link Money}
  * with the currency's precision before they reach the backend, and back again only for display.
+ *
+ * <p>{@link #balance} and {@link #has} answer the unavailable case here rather than passing it down.
+ * {@link CurrencyProvider} promises {@code 0}/{@code false} for a back-end that is not live, but
+ * {@link CurrencyBackend#balance} promises only "zero when they hold none" and says nothing about an
+ * unavailable back-end. Every backend we ship happens to answer zero there, each for its own reason, so
+ * reading the balance through was giving the right answer on a property no interface states.
  */
 public final class BackedCurrencyProvider implements CurrencyProvider {
 
@@ -41,12 +47,13 @@ public final class BackedCurrencyProvider implements CurrencyProvider {
 
     @Override
     public double balance(UUID player) {
-        return backend.balance(ref(player), currency).amount().doubleValue();
+        return available() ? backend.balance(ref(player), currency).amount().doubleValue() : 0;
     }
 
     @Override
     public boolean has(UUID player, double amount) {
-        return backend.balance(ref(player), currency).amount().compareTo(BigDecimal.valueOf(amount)) >= 0;
+        return available()
+                && backend.balance(ref(player), currency).amount().compareTo(BigDecimal.valueOf(amount)) >= 0;
     }
 
     @Override

@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistr
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.economy.domain.Precision;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.junit.jupiter.api.Test;
 
@@ -69,6 +70,25 @@ class CurrenciesBackedTest {
                 .as("the earlier unavailable answer was not cached, so the same spec now resolves")
                 .isTrue();
         assertThat(currencies.resolve("coins").balance(ALICE)).isEqualTo(25.0);
+    }
+
+    @Test
+    void aDeadBackEndHoldsNoMoneyEvenWhileItStillRemembersABalance() {
+        FakeCurrencyBackend ledger = new FakeCurrencyBackend("native", Precision.DECIMAL, false);
+        ledger.seed(ALICE, 500.0);
+        Currencies currencies = new Currencies(() -> backends(ledger), SILENT, "coins");
+        CurrencyProvider provider = currencies.resolve("coins");
+
+        assertThat(provider.available()).isFalse();
+        assertThat(provider.balance(ALICE))
+                .as("an unavailable provider reports nothing, whatever the back-end still has on file")
+                .isEqualTo(0.0);
+        assertThat(provider.has(ALICE, 100))
+                .as("a requirement never passes against an economy that is not live")
+                .isFalse();
+        assertThat(provider.has(ALICE, 0))
+                .as("not even the zero threshold, which every live economy passes")
+                .isFalse();
     }
 
     private static EconomyBackends backends(CurrencyBackend... backends) {
