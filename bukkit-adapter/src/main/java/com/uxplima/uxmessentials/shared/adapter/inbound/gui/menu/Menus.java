@@ -405,6 +405,12 @@ public final class Menus {
             throw new IllegalArgumentException("no menu spec registered under id: " + specId);
         }
         int startPage = Math.max(0, page);
+        // Snapshot before the hop, not for immutability: MenuContext, LastOpen and OpenMenuInfo each copy at their
+        // own door, but every one of those copies runs on the entity thread after the list resolution, so they
+        // preserve a caller's mutation rather than prevent it. This one is taken on the calling thread, and it is
+        // the only thing standing between a caller that reuses its argument map and a window built from what the
+        // map says by the time the second hop lands. A test scheduler that runs inline never gives the caller that
+        // turn, which is what makes this copy read as the fourth redundant one.
         Map<String, String> args = Map.copyOf(arguments);
         MenuContext ctx = MenuContext.of(viewer, subject, startPage, args)
                 .withLocalPlaceholders(spec.placeholders())
