@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -1252,7 +1253,8 @@ public final class MenuListener implements Listener {
             return false;
         }
         long now = clock.getAsLong();
-        if (now - holder.lastClickMs() < cooldown) {
+        OptionalLong last = holder.lastClickMs();
+        if (last.isPresent() && now - last.getAsLong() < cooldown) {
             return true;
         }
         holder.lastClickMs(now);

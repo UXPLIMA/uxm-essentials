@@ -37,10 +37,11 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * The end-to-end proof for the two Phase-7 click features: the drop/double-click gestures and the anti-spam
  * cooldown. The real {@link MenuSpecLoader} reads the config, the live {@link MenuListener} maps the Bukkit
  * {@link ClickType} to a gesture and throttles the window, and a recording {@code record} action captures which
- * gesture fired and how often — so these drive config → open → click → effect. The cooldown listener is handed a
- * clock it advances by hand so the window is deterministic; the clock base sits above the cooldown so the first
- * click (measured against the holder's zero stamp) always passes, exactly as the real millisecond clock does in
- * production where {@code System.currentTimeMillis()} dwarfs any window.
+ * gesture fired and how often, so these drive config → open → click → effect. The cooldown listener is handed a
+ * clock it advances by hand so the window is deterministic. Most of these start it at 1000 for readability rather
+ * than out of necessity: the holder records "never clicked" as an absent value, so the first click passes at any
+ * reading. It used to record it as zero, which passed only because the clock base was above the window, and the
+ * last test here is the one that would have caught that.
  */
 class ClickKindCooldownGoldenTest {
 
@@ -73,7 +74,7 @@ class ClickKindCooldownGoldenTest {
     private Scheduler scheduler;
     private List<String> notes;
 
-    /** The hand-advanced clock backing the cooldown listener; starts above the window so the first click passes. */
+    /** The hand-advanced clock backing the cooldown listener. */
     private long clockNow = 1_000L;
 
     /** The clock reading the throttle measures against; each test advances {@link #clockNow} between clicks. */
@@ -154,6 +155,24 @@ class ClickKindCooldownGoldenTest {
         assertThat(notes)
                 .as("t=0 fires, t=100 is inside the 500ms window and swallowed, t=600 is past it and fires")
                 .containsExactly("hit", "hit");
+    }
+
+    @Test
+    void theFirstClickPassesUnderAClockThatStartsInsideTheWindow() {
+        // The stamp used to be a zero meaning "never", so the first click was measured against it and swallowed
+        // whenever the clock's origin was smaller than the window. System.currentTimeMillis never is, but the
+        // clock is injected and nanoTime / 1_000_000 starts wherever the machine's monotonic origin happens to
+        // be. Under one of those, every menu ate its opening click, once, in the interaction a viewer is most
+        // likely to read as the server ignoring them.
+        install(0L);
+        open("cooled");
+
+        clockNow = 1L;
+        click(0, ClickType.LEFT);
+
+        assertThat(notes)
+                .as("the opening click of a menu is never inside the window")
+                .containsExactly("hit");
     }
 
     @Test
