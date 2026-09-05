@@ -90,6 +90,20 @@ class ClickRequirementRoutingGoldenTest {
             }
             """;
 
+    private static final String STOP_ON_AND = """
+            rows = 1
+            items {
+              a { slot = 0, material = DIAMOND, name = "x", click {
+                left {
+                  click = ["record:ran"]
+                  requirements = [ "has-empty-slots:0", "has-empty-slots:1" ]
+                  deny = ["record:blocked"]
+                  stop-at-success = true
+                }
+              } }
+            }
+            """;
+
     private static final String STOP_OFF = """
             rows = 1
             items {
@@ -133,6 +147,7 @@ class ClickRequirementRoutingGoldenTest {
         menus.registerSpec("per-req", loader.parse(PER_REQ));
         menus.registerSpec("optional", loader.parse(OPTIONAL));
         menus.registerSpec("stop-on", loader.parse(STOP_ON));
+        menus.registerSpec("stop-on-and", loader.parse(STOP_ON_AND));
         menus.registerSpec("stop-off", loader.parse(STOP_OFF));
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
@@ -199,6 +214,24 @@ class ClickRequirementRoutingGoldenTest {
         assertThat(notes)
                 .as("minimum 1 is met by the first requirement, so the loop breaks and the second never runs")
                 .containsExactly("ran");
+    }
+
+    /**
+     * With no minimum the block is an AND, and no running tally can settle it before the last requirement is asked,
+     * so {@code stop-at-success} must not break out of the walk. Dropping the positive-minimum half of that guard
+     * leaves the break threshold at the raw minimum, which a zero pass count already meets: the loop would stop
+     * after the first requirement and the block would pass on it alone, with the rest of the gate never evaluated.
+     */
+    @Test
+    void stopAtSuccessDoesNotShortCircuitABlockWithNoMinimum() {
+        fillInventory();
+        open("stop-on-and");
+
+        leftClick(0);
+
+        assertThat(notes)
+                .as("the second requirement still decides an AND block, whatever the first one answered")
+                .containsExactly("blocked");
     }
 
     @Test

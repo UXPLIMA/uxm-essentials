@@ -1309,6 +1309,10 @@ public final class MenuListener implements Listener {
             } else if (!r.optional()) {
                 mandatoryFail = true;
             }
+            // Both halves carry weight. Only a positive minimum lets a running tally settle the block early; an
+            // AND block is decided by its last requirement, and cap is then the raw minimum, which a zero pass
+            // count already meets. Without the first half the walk would stop after one requirement and the rest
+            // of the gate would never be asked.
             if (spec.stopAtSuccess() && min > 0 && passes >= cap) {
                 break;
             }
