@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The narrow capability the menu engine's {@code input:} step uses to capture a line of text without depending on the
  * concrete text-input seam: it hands over the viewer, an input-point key (the operator's per-key anvil/chat/sign mode
- * is looked up by it), a resolved prompt label and an optional pre-fill, and gets exactly one callback back — the typed
+ * is looked up by it), a resolved prompt label and an optional pre-fill, and gets exactly one callback back: the typed
  * line on submit, or {@code onCancel}. Production wires it over {@code TextInput.promptResolved}; a test wires a
  * synchronous fake. Defined here so {@code MenuListener} stays decoupled from the input package and testable without
  * constructing the whole seam.
