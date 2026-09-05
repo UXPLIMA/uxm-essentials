@@ -102,6 +102,19 @@ class SoundActionsTest {
     }
 
     @Test
+    void soundPlaysTheShippedPageTurnOfEveryMenu() {
+        // The exact value 104 shipped menu files use for their page-turn button. Its key is item.book.page_turn,
+        // so the underscore inside page_turn is the whole difficulty, and getting it wrong silences the one sound
+        // the plugin plays most often in a way nobody reports: a menu that turns a page quietly still turns it.
+        invoke("sound", "ITEM_BOOK_PAGE_TURN 0.7 1.2", viewer);
+
+        AudioExperience heard = only(viewer);
+        assertThat(heard.getSound()).isEqualTo("item.book.page_turn");
+        assertThat(heard.getVolume()).isEqualTo(0.7f);
+        assertThat(heard.getPitch()).isEqualTo(1.2f);
+    }
+
+    @Test
     void soundLeavesAResourcePackKeyAlone() {
         // A key the vanilla registry does not know belongs to the operator's resource pack. It reached the client
         // before this and has to keep reaching it, so the registry lookup is a translation and never a filter.
