@@ -61,6 +61,15 @@ public record ColourPickerLayout(
 
     public static final String NAME = "colour-picker";
 
+    /** Slots per inventory row, the unit the window's capacity is counted in. */
+    private static final int SLOTS_PER_ROW = 9;
+
+    /**
+     * The value a slot key reads as when Configurate cannot make a number of it. Chosen outside every possible
+     * window so an unreadable value and an out-of-range one need only one check between them.
+     */
+    private static final int NOT_A_SLOT = Integer.MIN_VALUE;
+
     public ColourPickerLayout {
         paletteSlots = List.copyOf(Objects.requireNonNull(paletteSlots, "paletteSlots"));
         paletteIcons = List.copyOf(Objects.requireNonNull(paletteIcons, "paletteIcons"));
@@ -112,11 +121,11 @@ public record ColourPickerLayout(
             return codeDefault;
         }
         int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows(), log);
-        List<Integer> slots = intList(root.node("palette-slots"), codeDefault.paletteSlots());
+        List<Integer> slots = slotList(root.node("palette-slots"), codeDefault.paletteSlots(), rows, log);
         List<Material> icons = paletteIcons(root.node("palette-icons"), slots.size(), codeDefault, log);
-        int customSlot = Math.max(0, root.node("custom-slot").getInt(codeDefault.customSlot()));
-        int clearSlot = Math.max(0, root.node("clear-slot").getInt(codeDefault.clearSlot()));
-        int backSlot = Math.max(0, root.node("back-slot").getInt(codeDefault.backSlot()));
+        int customSlot = slot(root.node("custom-slot"), codeDefault.customSlot(), rows, "custom-slot", log);
+        int clearSlot = slot(root.node("clear-slot"), codeDefault.clearSlot(), rows, "clear-slot", log);
+        int backSlot = slot(root.node("back-slot"), codeDefault.backSlot(), rows, "back-slot", log);
         Material customIcon = material(root.node("custom-icon").getString(), codeDefault.customIcon(), log);
         Material clearIcon = material(root.node("clear-icon").getString(), codeDefault.clearIcon(), log);
         Material backIcon = material(root.node("back-icon").getString(), codeDefault.backIcon(), log);
@@ -189,15 +198,62 @@ public record ColourPickerLayout(
         return matched;
     }
 
-    private static List<Integer> intList(ConfigurationNode node, List<Integer> fallback) {
+    /**
+     * The palette slots at {@code node}, or the built-in list when the key is absent or any entry is not a slot
+     * this window has. The list is positional against the palette icons, so a bad entry is not dropped on its
+     * own: a hole would shift every swatch after it onto the wrong colour, which is a worse window than the
+     * built-in one.
+     *
+     * <p>The check matters because an entry that is not a number reads as zero through Configurate, and zero is
+     * a real slot. {@code palette-slots = ["left", "middle"]} therefore stacked two swatches on slot zero, lost
+     * the other fourteen colours, and opened looking like somebody had meant it, with nothing logged. The rows
+     * and materials next to it both said so when they were wrong; this one did not.
+     */
+    private static List<Integer> slotList(ConfigurationNode node, List<Integer> fallback, int rows, Logger log) {
         if (node.virtual() || node.empty()) {
             return fallback;
         }
         List<Integer> values = new ArrayList<>();
         for (ConfigurationNode child : node.childrenList()) {
-            values.add(child.getInt());
+            int value = child.getInt(NOT_A_SLOT);
+            if (!inWindow(value, rows)) {
+                log.warn(
+                        "colour picker palette-slots entry {} is not a slot in a {}-row window, using the built-in"
+                                + " palette",
+                        child.raw(),
+                        rows);
+                return fallback;
+            }
+            values.add(value);
         }
         return values.isEmpty() ? fallback : values;
+    }
+
+    /**
+     * One configured button slot, or {@code fallback} when the key is absent, is not a number, or names a slot
+     * outside the window. Clamping an out-of-range value into the window is what this replaces: a negative slot
+     * silently became slot zero and collided with whatever the palette had drawn there, and a slot past the end
+     * was kept and simply never drawn.
+     */
+    private static int slot(ConfigurationNode node, int fallback, int rows, String key, Logger log) {
+        if (node.virtual()) {
+            return fallback;
+        }
+        int value = node.getInt(NOT_A_SLOT);
+        if (!inWindow(value, rows)) {
+            log.warn("colour picker {} {} is not a slot in a {}-row window, using {}", key, node.raw(), rows, fallback);
+            return fallback;
+        }
+        return value;
+    }
+
+    /**
+     * Whether {@code slot} is drawable in a {@code rows}-row window. {@link #NOT_A_SLOT} is deliberately outside
+     * every window, so a value that could not be read as a number and a value that is out of range take the same
+     * path here and need no second check.
+     */
+    private static boolean inWindow(int slot, int rows) {
+        return slot >= 0 && slot < rows * SLOTS_PER_ROW;
     }
 
     private static BufferedReader openReader(String resource) throws IOException {
