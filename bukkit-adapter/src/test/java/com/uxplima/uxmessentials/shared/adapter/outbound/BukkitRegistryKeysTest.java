@@ -75,4 +75,20 @@ class BukkitRegistryKeysTest {
         assertThat(BukkitRegistryKeys.soundKeyName("myserver:custom.ding")).isEqualTo("myserver:custom.ding");
         assertThat(BukkitRegistryKeys.soundKeyName("not_a_sound_at_all")).isEqualTo("not_a_sound_at_all");
     }
+
+    @Test
+    void resolvesAParticleInEitherSpelling() {
+        // Particle keys are underscore-separated where sound keys are dot-separated, so the constant form is the
+        // key already and needs no translation. Asserted here beside the sound cases so the one class that answers
+        // "what may an operator write" answers it for both, rather than leaving the particle half to the modules.
+        assertThat(BukkitRegistryKeys.resolveParticle("END_ROD")).isNotNull();
+        assertThat(BukkitRegistryKeys.resolveParticle("end_rod"))
+                .isEqualTo(BukkitRegistryKeys.resolveParticle("END_ROD"));
+    }
+
+    @Test
+    void anUnknownParticleIsNull() {
+        assertThat(BukkitRegistryKeys.resolveParticle("definitely_not_a_particle_xyz"))
+                .isNull();
+    }
 }
