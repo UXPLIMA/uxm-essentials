@@ -81,6 +81,12 @@ dependencies {
     implementation("com.uxplima.uxmlib:uxmlib-gui:0.5.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
+    // uxmLib Bedrock toolkit (dogfood) - the Floodgate/Geyser detector and the Cumulus form sender the menu
+    // engine renders through for a Bedrock viewer. Floodgate stays compileOnly on this side too: the library
+    // names the SDK only past its own plugin-present guard.
+    implementation("com.uxplima.uxmlib:uxmlib-bedrock:0.5.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
     // uxmLib item toolkit (dogfood) — the PdcFlag helper backing the per-player boolean-flag PDC stores.
     // Arrives transitively via uxmlib-gui, but declared directly so the PdcFlag use is explicit.
     implementation("com.uxplima.uxmlib:uxmlib-item:0.5.0-SNAPSHOT") { isTransitive = false }

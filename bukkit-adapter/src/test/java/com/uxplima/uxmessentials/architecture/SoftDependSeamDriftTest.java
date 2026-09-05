@@ -56,9 +56,11 @@ import org.junit.jupiter.api.Test;
  *
  * <p><strong>The exception table.</strong> {@link #SHARED_SEAMS} names, per plugin, the exact files allowed to
  * span more than one, and each entry states why. Every current entry is a design rather than debt: two
- * unrelated Vault services, two independent Floodgate factory seams, and a PlayerPoints back-end beside a
- * PlayerPoints balance feed. Pinning the file names means none of them can spread further: a third file probing
- * Vault fails the build exactly like a second file probing Jobs would.
+ * unrelated Vault services, and a PlayerPoints back-end beside a PlayerPoints balance feed. Pinning the file
+ * names means none of them can spread further: a third file probing Vault fails the build exactly like a second
+ * file probing Jobs would. Floodgate and Geyser hold no entry, because no file here probes them any more:
+ * uxmLib's uxmlib-bedrock module owns both guards, and this plugin only asks its two factories for the detector
+ * and the screen.
  */
 class SoftDependSeamDriftTest {
 
@@ -71,10 +73,6 @@ class SoftDependSeamDriftTest {
             // bridge, and the two hooks SPI implementations for its economy and permission services.
             "Vault",
             Set.of("ForeignEconomyProviders.java", "VaultEconomyHook.java", "VaultPermissionHook.java"),
-            // The Bedrock detector and the Bedrock screen are two independent factory seams in one package,
-            // each binding a different Floodgate/Cumulus type strictly past its own guard.
-            "floodgate",
-            Set.of("BedrockDetector.java", "BedrockScreen.java"),
             // A currency back-end and a balance feed: separate ports, separate lifetimes, same plugin.
             "PlayerPoints",
             Set.of("PlayerPointsBalanceFeed.java", "PlayerPointsCurrencyBackend.java"));

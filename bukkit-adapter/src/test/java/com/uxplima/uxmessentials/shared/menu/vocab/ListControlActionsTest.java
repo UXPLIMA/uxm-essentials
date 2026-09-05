@@ -26,8 +26,6 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
@@ -45,6 +43,8 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

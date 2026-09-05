@@ -11,13 +11,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

@@ -25,11 +25,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuOpenEvent;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockButton;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockIcons;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockImage;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
@@ -59,7 +54,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.PagedLi
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.PagedListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.SelectorState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
@@ -74,6 +68,12 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.bedrock.BedrockButton;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockIcons;
+import com.uxplima.uxmlib.bedrock.BedrockImage;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
+import com.uxplima.uxmlib.bedrock.BedrockWidget;
 import org.jspecify.annotations.Nullable;
 
 /**

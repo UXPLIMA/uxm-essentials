@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import com.uxplima.uxmlib.bedrock.BedrockWidget;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;

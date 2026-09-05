@@ -177,8 +177,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInsta
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
@@ -327,6 +325,8 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldQueries;
 import com.uxplima.uxmessentials.worlds.application.port.RescueTargets;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmlib.advancement.Toasts;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;

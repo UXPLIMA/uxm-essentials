@@ -15,14 +15,14 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

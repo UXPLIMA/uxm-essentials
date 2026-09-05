@@ -214,15 +214,18 @@ public final class IntegrationCatalog {
                     IntegrationFamily.VOTE,
                     "VotifierListener.java",
                     "feeds votes from vote sites into the vote module"),
+            // Both Bedrock seams name the wiring site rather than a class of ours. The detector and the form
+            // screen live in uxmLib (com.uxplima.uxmlib.bedrock), which owns the present-guard now; PluginModule
+            // is where this plugin asks for them, so it is the file to read when the integration misbehaves.
             new Integration(
                     "floodgate",
                     IntegrationFamily.BEDROCK,
-                    "BedrockDetector.java",
+                    "PluginModule.java",
                     "shows Bedrock players native forms instead of chest menus"),
             new Integration(
                     "Geyser-Spigot",
                     IntegrationFamily.BEDROCK,
-                    "BedrockDetector.java",
+                    "PluginModule.java",
                     "names Bedrock players on networks running Geyser without Floodgate"),
             new Integration(
                     "AuthMe",

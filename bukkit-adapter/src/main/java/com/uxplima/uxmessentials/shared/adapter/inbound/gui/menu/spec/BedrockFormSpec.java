@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmlib.bedrock.BedrockWidget;
 import org.jspecify.annotations.Nullable;
 
 /**

@@ -12,7 +12,6 @@ import org.bukkit.event.Listener;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.skin.SkinRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MineSkinService;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -34,6 +33,7 @@ import com.uxplima.uxmessentials.skin.application.UpdateSkin;
 import com.uxplima.uxmessentials.skin.application.port.BedrockSkins;
 import com.uxplima.uxmessentials.skin.application.port.SkinRepository;
 import com.uxplima.uxmessentials.skin.application.port.SkinView;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import org.jspecify.annotations.NullMarked;
 
 /**

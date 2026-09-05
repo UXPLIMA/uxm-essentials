@@ -17,14 +17,14 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;

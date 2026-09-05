@@ -186,7 +186,7 @@ dependencies:
     WorldEdit:
       load: BEFORE
       required: false
-    # Floodgate backs the Bedrock-form integration (shared.adapter.inbound.gui.menu.bedrock BedrockDetector). The
+    # Floodgate backs the Bedrock-form integration (uxmLib com.uxplima.uxmlib.bedrock BedrockDetector). The
     # detector binds to the Floodgate SDK only past a plugin-present guard, so the menu engine (and the plugin as a
     # whole) runs fully on a Java-only server: an absent Floodgate never loads an org.geysermc class. Loaded before
     # us so the guard sees it on enable; Cumulus's form classes ride along with Floodgate transitively.

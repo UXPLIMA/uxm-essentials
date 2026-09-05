@@ -6,10 +6,10 @@ import java.util.Objects;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockDetector;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.bedrock.BedrockScreen;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import com.uxplima.uxmlib.gui.dialog.DialogInputScreen;
 import com.uxplima.uxmlib.gui.input.PlayerInput;

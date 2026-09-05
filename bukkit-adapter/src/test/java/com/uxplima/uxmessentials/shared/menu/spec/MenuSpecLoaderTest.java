@@ -9,7 +9,6 @@ import java.io.StringReader;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
+import com.uxplima.uxmlib.bedrock.BedrockWidget;
 import org.junit.jupiter.api.Test;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;

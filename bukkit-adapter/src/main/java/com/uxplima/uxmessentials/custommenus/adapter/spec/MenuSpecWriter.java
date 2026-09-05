@@ -11,7 +11,6 @@ import java.util.TreeMap;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockFormSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.BedrockWidget;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ContentRegionSpec;
@@ -29,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requiremen
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
+import com.uxplima.uxmlib.bedrock.BedrockWidget;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
