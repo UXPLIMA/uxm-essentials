@@ -1203,7 +1203,6 @@ public final class MenuListener implements Listener {
         String initial = input.defaultText().isBlank() ? null : renderer.plainText(input.defaultText(), base);
         textPrompt.prompt(
                 live,
-                base.viewer(),
                 input.key(),
                 prompt,
                 initial,
@@ -1573,7 +1572,6 @@ public final class MenuListener implements Listener {
         }
         textPrompt.prompt(
                 live,
-                holder.ctx().viewer(),
                 key,
                 Component.empty(),
                 null,

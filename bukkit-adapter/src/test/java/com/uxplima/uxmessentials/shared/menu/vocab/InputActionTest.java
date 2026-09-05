@@ -188,7 +188,6 @@ class InputActionTest {
         @Override
         public void prompt(
                 org.bukkit.entity.Player player,
-                PlayerRef viewer,
                 String key,
                 Component promptLabel,
                 @Nullable String initialText,

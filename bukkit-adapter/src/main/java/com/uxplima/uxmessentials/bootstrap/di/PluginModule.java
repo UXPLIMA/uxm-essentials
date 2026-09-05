@@ -211,6 +211,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringCon
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.IpHashing;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
@@ -607,13 +608,13 @@ public final class PluginModule {
         // deferred reference the seam populates on enable, before any menu can be clicked — the same late-init pattern
         // the economy backends use. A confirm: step needs only the confirm opener, already available above.
         AtomicReference<TextInput> menuTextInputRef = new AtomicReference<>();
-        MenuTextPrompt menuTextPrompt = (player, viewer, key, prompt, initialText, onSubmit, onCancel) -> {
+        MenuTextPrompt menuTextPrompt = (player, key, prompt, initialText, onSubmit, onCancel) -> {
             TextInput seam = menuTextInputRef.get();
             if (seam == null) {
                 onCancel.run();
                 return;
             }
-            seam.promptResolved(player, viewer, key, prompt, initialText, onSubmit, onCancel);
+            seam.promptResolved(player, BukkitRefs.toRef(player), key, prompt, initialText, onSubmit, onCancel);
         };
         MenuListener menuListener = new MenuListener(
                 menuRenderer,
