@@ -40,6 +40,16 @@ public record GridSpec(
         ItemStack nextIcon,
         List<Control> controls) {
 
+    /**
+     * The control-row column the previous-page button is drawn in. Declared on the contract rather than in the
+     * renderer so the rule and its enforcement cannot drift apart: {@link Control} refuses this column, and the
+     * renderer paints the button here, from the same constant.
+     */
+    public static final int PREV_COLUMN = 0;
+
+    /** The control-row column the next-page button is drawn in, reserved on the same terms as {@link #PREV_COLUMN}. */
+    public static final int NEXT_COLUMN = 8;
+
     public GridSpec {
         Objects.requireNonNull(title, "title");
         if (menuRows < 1 || menuRows > 6) {
@@ -72,12 +82,17 @@ public record GridSpec(
     }
 
     /**
-     * One button on the grid's bottom control row: the column {@code 0..8} it sits at within that row (the engine adds
+     * One button on the grid's bottom control row: the column {@code 1..7} it sits at within that row (the engine adds
      * the row's base slot so the caller stays window-height agnostic), the already-built icon to place there, and the
-     * handler run with the live viewer when it is clicked. Columns {@code 0} and {@code 8} are reserved for the engine's
-     * previous / next pagination buttons, so a control button uses {@code 1..7}.
+     * handler run with the live viewer when it is clicked. {@link #PREV_COLUMN} and {@link #NEXT_COLUMN} belong to the
+     * engine's pagination buttons and are refused here.
      *
-     * @param column the control-row column {@code 0..8} the button is drawn in
+     * <p>They used to be documented as reserved and accepted anyway. The renderer paints the caller's controls after
+     * the nav buttons, so a control in one of those columns covered the nav icon, while the click router asks about a
+     * page flip first: the viewer saw one button and got a page turn. Only on a canvas tall enough to paginate, which
+     * is the one nobody opens while testing.
+     *
+     * @param column the control-row column {@code 1..7} the button is drawn in
      * @param icon the prepared icon to place (name/lore already applied by the caller)
      * @param onClick invoked with the live viewer when the button is clicked
      */
@@ -86,6 +101,10 @@ public record GridSpec(
         public Control {
             if (column < 0 || column > 8) {
                 throw new IllegalArgumentException("column must be 0..8, was " + column);
+            }
+            if (column == PREV_COLUMN || column == NEXT_COLUMN) {
+                throw new IllegalArgumentException(
+                        "column " + column + " is reserved for the pagination buttons, a control uses 1..7");
             }
             Objects.requireNonNull(icon, "icon");
             Objects.requireNonNull(onClick, "onClick");

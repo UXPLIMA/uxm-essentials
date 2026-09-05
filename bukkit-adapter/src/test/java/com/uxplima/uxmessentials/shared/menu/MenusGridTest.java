@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.shared.menu;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -239,6 +241,41 @@ class MenusGridTest {
                 false,
                 Optional.empty(),
                 ItemType.NONE);
+    }
+
+    @Test
+    void aControlInAPaginationColumnIsRefusedRatherThanDrawnOverTheNavButton() {
+        // The renderer paints controls after the nav buttons and the click router asks about a page flip first,
+        // so a control here showed the caller's icon and turned the page. Only on a canvas tall enough to
+        // paginate, which is the one nobody opens while testing. The record documented these as reserved and
+        // took them anyway.
+        ItemStack any = icon(Material.EMERALD);
+
+        assertThatThrownBy(() -> new GridSpec.Control(GridSpec.PREV_COLUMN, any, player -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+        assertThatThrownBy(() -> new GridSpec.Control(GridSpec.NEXT_COLUMN, any, player -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+    }
+
+    @Test
+    void everyColumnBetweenThePaginationButtonsIsStillAControlColumn() {
+        ItemStack any = icon(Material.EMERALD);
+
+        for (int column = 1; column <= 7; column++) {
+            int at = column;
+            assertThatCode(() -> new GridSpec.Control(at, any, player -> {})).doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void aColumnOutsideTheRowIsStillRefusedAsOutOfRange() {
+        ItemStack any = icon(Material.EMERALD);
+
+        assertThatThrownBy(() -> new GridSpec.Control(9, any, player -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("0..8");
     }
 
     private static ItemStack icon(Material material) {

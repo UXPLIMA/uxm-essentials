@@ -36,12 +36,6 @@ public final class GridRenderer {
     /** The tallest window a grid opens into: five content rows plus the control row, the pagination case. */
     private static final int MAX_WINDOW_ROWS = 6;
 
-    /** The control-row column the previous-page button sits in, reserved so a control button never collides with it. */
-    private static final int PREV_COLUMN = 0;
-
-    /** The control-row column the next-page button sits in, reserved so a control button never collides with it. */
-    private static final int NEXT_COLUMN = 8;
-
     private final ItemRenderer itemRenderer;
 
     public GridRenderer(ItemRenderer itemRenderer) {
@@ -104,11 +98,11 @@ public final class GridRenderer {
         OptionalInt prev = OptionalInt.empty();
         OptionalInt next = OptionalInt.empty();
         if (page > 0) {
-            prev = OptionalInt.of(base + PREV_COLUMN);
+            prev = OptionalInt.of(base + GridSpec.PREV_COLUMN);
             inv.setItem(prev.getAsInt(), spec.prevIcon());
         }
         if (page < pageCount - 1) {
-            next = OptionalInt.of(base + NEXT_COLUMN);
+            next = OptionalInt.of(base + GridSpec.NEXT_COLUMN);
             inv.setItem(next.getAsInt(), spec.nextIcon());
         }
         state.recordNav(prev, next);
