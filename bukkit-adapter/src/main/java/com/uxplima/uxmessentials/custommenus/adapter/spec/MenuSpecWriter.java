@@ -1,7 +1,10 @@
 package com.uxplima.uxmessentials.custommenus.adapter.spec;
 
 import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,11 +45,19 @@ import org.spongepowered.configurate.serialize.SerializationException;
  * a file into a model, this turns a model back into a file, and the two compose into a lossless round-trip so an
  * in-game edit can be written back without hand-formatting HOCON.
  *
- * <p>The contract is model-faithful, not byte-faithful: comments, key order, and the loader's convenience shorthands
+ * <p>One thing is byte-faithful, and it is the header. The block of comments that opens the shipped
+ * {@code menus/example.conf} is the only place an operator is told the grammar of the file they are editing, and a
+ * writer that rebuilds the file from the model deletes it on the first save. So the header is a bundled resource,
+ * {@code /menus/header.txt}, and it is re-emitted at the top of everything this class writes. The shipped example
+ * opens with the same resource, byte for byte, and a test holds the two together.
+ *
+ * <p>The rest of the contract is model-faithful, not byte-faithful: comments, key order, and the loader's convenience shorthands
  * ({@code update-interval}, {@code slot} for a single index, the {@code permission}/{@code pages} view sugar) are
  * canonicalised to their fully-expanded form, but re-loading the emitted text yields a {@link MenuSpec} that
  * {@code equals} the original. Only non-default keys are emitted where the loader treats absence as a default, so the
- * output stays clean and a menu that declared little writes little. Load-time inputs the loader consumes before the
+ * output stays clean and a menu that declared little writes little. A note an operator wrote beside their own line
+ * is lost, and so is the order they wrote their keys in: that is accepted, and the header itself says so, because an
+ * operator who is told keeps their notes somewhere else. Load-time inputs the loader consumes before the
  * model exists ({@code patterns {}}, {@code layout}, the {@code fill-item}'s auto-computed slots) are not (and need
  * not be) reproduced: the items they expand into are written concretely and round-trip on their own.
  *
@@ -58,6 +69,15 @@ public final class MenuSpecWriter {
 
     /** The reserved id the loader stores the {@code fill-item} background under; written back as {@code fill-item}. */
     private static final String FILL_ITEM_ID = "__fill__";
+
+    /** The bundled header, re-emitted at the top of every file this class writes. */
+    private static final String HEADER_RESOURCE = "/menus/header.txt";
+
+    /**
+     * Read once, at class load, so a jar that lost the resource fails at the first save with the name of the file it
+     * wanted rather than writing menus with no header for the rest of the run.
+     */
+    private static final String HEADER = readHeader();
 
     /** The HOCON gesture key each {@link ClickKind} is written under: the kebab spelling the loader accepts. */
     private static final Map<ClickKind, String> GESTURE_KEYS = gestureKeys();
@@ -669,6 +689,22 @@ public final class MenuSpecWriter {
         } catch (ConfigurateException failure) {
             throw new IllegalStateException("failed to render menu spec", failure);
         }
-        return writer.toString();
+        // Prepended as text rather than attached as a node comment: typesafe-config renders a comment above the
+        // field it belongs to, and a file header belongs to no field. Attaching it to the first key would move it
+        // whenever the alphabetical order of the keys changed.
+        return HEADER + writer.toString();
+    }
+
+    private static String readHeader() {
+        try (InputStream bundled = MenuSpecWriter.class.getResourceAsStream(HEADER_RESOURCE)) {
+            if (bundled == null) {
+                throw new IllegalStateException(HEADER_RESOURCE + " is not in the jar");
+            }
+            String header = new String(bundled.readAllBytes(), StandardCharsets.UTF_8);
+            // One blank line between the header and the first key, whatever the resource ends with.
+            return header.stripTrailing() + System.lineSeparator() + System.lineSeparator();
+        } catch (IOException failure) {
+            throw new IllegalStateException("failed to read " + HEADER_RESOURCE, failure);
+        }
     }
 }
