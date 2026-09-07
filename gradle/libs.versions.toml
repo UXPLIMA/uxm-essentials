@@ -103,6 +103,15 @@ luckperms-api     = { module = "net.luckperms:api",                             
 jda               = { module = "net.dv8tion:JDA",                                version.ref = "jda" }
 lettuce           = { module = "io.lettuce:lettuce-core",                        version.ref = "lettuce" }
 uxmlib-redis      = { module = "com.uxplima.uxmlib:uxmlib-redis",                version.ref = "uxmlib" }
+uxmlib-gui       = { module = "com.uxplima.uxmlib:uxmlib-gui",                version.ref = "uxmlib" }
+uxmlib-bedrock   = { module = "com.uxplima.uxmlib:uxmlib-bedrock",            version.ref = "uxmlib" }
+uxmlib-item      = { module = "com.uxplima.uxmlib:uxmlib-item",               version.ref = "uxmlib" }
+uxmlib-hud       = { module = "com.uxplima.uxmlib:uxmlib-hud",                version.ref = "uxmlib" }
+uxmlib-integration = { module = "com.uxplima.uxmlib:uxmlib-integration",        version.ref = "uxmlib" }
+uxmlib-nametags  = { module = "com.uxplima.uxmlib:uxmlib-nametags",           version.ref = "uxmlib" }
+uxmlib-packet    = { module = "com.uxplima.uxmlib:uxmlib-packet",             version.ref = "uxmlib" }
+uxmlib-pipeline  = { module = "com.uxplima.uxmlib:uxmlib-pipeline",           version.ref = "uxmlib" }
+uxmlib-update    = { module = "com.uxplima.uxmlib:uxmlib-update",             version.ref = "uxmlib" }
 
 # economy provider APIs: compileOnly soft-depends (see §9 + §16)
 treasury-api      = { module = "me.lokka30:treasury-api",                        version.ref = "treasury" }
