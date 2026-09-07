@@ -1,4 +1,5 @@
 import net.ltgt.gradle.errorprone.errorprone
+import java.util.zip.ZipFile
 
 plugins {
     id("uxmessentials.java-conventions")
@@ -310,3 +311,83 @@ if (includedUxmLib != null) {
         dependsOn(includedUxmLib.task(":uxmlib-packet:paperweightUserdevSetup"))
     }
 }
+
+// A hand audit of the shipped jar with unzip is right on the day somebody ran it and never again, and this
+// is the 12 MB product jar an operator downloads. Everything this module bundles is either our own code or
+// is relocated under com.uxplima.uxmessentials.libs, so every prefix below is a rule with a reason and a hit
+// on one is a defect rather than a matter of taste.
+val forbiddenJarEntries =
+    listOf(
+        // The server owns these. A second copy on the plugin's side of the class loader wins or loses at random.
+        "net/kyori/" to "Paper owns Adventure. A shaded copy breaks the server's own serializers.",
+        "org/slf4j/" to "Paper owns slf4j. A second API with no binding behind it makes logging go quiet.",
+        "org/bukkit/" to "The server API belongs to the server. It is compileOnly and is never shipped.",
+        "io/papermc/" to "Paper's own classes come from the running server, never from a plugin jar.",
+        "net/minecraft/" to "A hit here is the Mojang-mapped server jar, riding along with the dev bundle.",
+        "com/mojang/" to "Brigadier and the mappings come from the server.",
+        // Ours, and shaded. It ships only under our own namespace.
+        "com/uxplima/uxmlib/" to "uxmLib must be relocated. This entry is un-relocated.",
+        "org/bstats/" to "bStats must be relocated, or two plugins that bundle it clash on the classpath.",
+        // UxmEssentialsLoader resolves these at boot. Shipping one pins a version the operator cannot change.
+        "org/spongepowered/" to "Configurate is provisioned at boot by UxmEssentialsLoader.",
+        "com/typesafe/" to "Typesafe Config arrives with Configurate through that loader.",
+        "io/leangen/" to "geantyref arrives with Configurate through that loader.",
+        "com/google/gson/" to "gson is provisioned at boot by UxmEssentialsLoader.",
+        "com/github/benmanes/" to "Caffeine is provisioned at boot by UxmEssentialsLoader.",
+        "org/jooq/" to "jOOQ is provisioned at boot by UxmEssentialsLoader.",
+        "org/flywaydb/" to "Flyway is provisioned at boot by UxmEssentialsLoader.",
+        "com/zaxxer/" to "HikariCP is provisioned at boot by UxmEssentialsLoader.",
+        "org/sqlite/" to "The SQLite driver is provisioned at boot by UxmEssentialsLoader.",
+        // Other people's plugins. Every one of these is a compileOnly soft-depend that the adapters reach only
+        // past a plugin-present guard, so the class must come from the installed plugin and never from us.
+        "me/clip/" to "PlaceholderAPI is another plugin.",
+        "io/github/miniplaceholders/" to "MiniPlaceholders is another plugin.",
+        "net/luckperms/" to "LuckPerms is another plugin.",
+        "net/milkbowl/" to "Vault is another plugin.",
+        "me/lokka30/" to "Treasury is another plugin.",
+        "org/geysermc/" to "Floodgate and its Cumulus forms are another plugin.",
+        "org/dynmap/" to "Dynmap is another plugin.",
+        "xyz/jpenilla/" to "squaremap is another plugin.",
+        "me/angeschossen/" to "Lands is another plugin.",
+        "me/ryanhamshire/" to "GriefPrevention is another plugin.",
+        "com/griefprevention/" to "GriefPrevention's newer package, under the same rule.",
+        "fr/xyness/" to "SimpleClaimSystem is another plugin.",
+        "net/weesli/" to "RClaim is another plugin.",
+    )
+
+val verifyJar =
+    tasks.register("verifyJar") {
+        description = "Fail the build when the shaded jar carries a package it must not."
+        group = "verification"
+        // The shaded jar has its own base name here, so it never overwrites the plain jar and only
+        // shadowJar has to run first.
+        dependsOn(tasks.shadowJar)
+        val jar = tasks.shadowJar.flatMap { shadow -> shadow.archiveFile }
+        inputs.file(jar)
+        doLast {
+            val names = mutableListOf<String>()
+            ZipFile(jar.get().asFile).use { archive ->
+                val entries = archive.entries()
+                while (entries.hasMoreElements()) {
+                    names.add(entries.nextElement().name)
+                }
+            }
+            val found = mutableListOf<String>()
+            for ((prefix, why) in forbiddenJarEntries) {
+                var count = 0
+                for (name in names) {
+                    if (name.startsWith(prefix)) {
+                        count++
+                    }
+                }
+                if (count > 0) {
+                    found.add("  " + prefix + " (" + count + " entries): " + why)
+                }
+            }
+            if (found.isNotEmpty()) {
+                throw GradleException("The jar carries packages it must not:\n" + found.joinToString("\n"))
+            }
+        }
+    }
+
+tasks.check { dependsOn(verifyJar) }

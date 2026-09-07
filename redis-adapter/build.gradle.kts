@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     id("uxmessentials.java-conventions")
     alias(libs.plugins.shadow)
@@ -57,3 +59,63 @@ tasks.assemble { dependsOn(tasks.shadowJar) }
 // ShadowJarNettyRelocationTest inspects the built jar, so the jar must exist before the test task runs
 // (during `check` as well as a bare `test`).
 tasks.test { dependsOn(tasks.shadowJar) }
+
+// This companion joins the host jar's classpath, so what it must not carry is decided twice over: by the
+// relocations above, and by the LinkageError that a second copy of a shared class causes. The list agrees with
+// ShadowJarNettyRelocationTest, which asserts the other half of the same rule: that the relocated copies are
+// present, and that io/lettuce/ and our own redis package stay where they are.
+//
+// org/slf4j/ is knowingly absent from this list. Lettuce drags slf4j-api in and the jar ships 34 of its
+// classes today. Paper owns slf4j, so that is a real defect, but removing it changes what the companion
+// ships and is a decision for the owner rather than a repair to fold into a guard.
+val forbiddenJarEntries =
+    listOf(
+        "io/netty/" to "Netty is relocated on purpose. Bare, it clashes with Paper's own differently-versioned Netty.",
+        "reactor/" to "Reactor is relocated with Netty, and clashes the same way when it is not.",
+        "org/reactivestreams/" to "Reactive Streams is relocated with Reactor, under the same rule.",
+        "com/uxplima/uxmlib/" to "uxmLib must be relocated. This entry is un-relocated.",
+        "com/uxplima/uxmessentials/shared/" to "core is the host's. A second copy is a loader-constraint LinkageError.",
+        "com/uxplima/uxmessentials/api/" to "The published API is the host's too. Shading it splits one class in two.",
+        "org/bukkit/" to "The server API belongs to the server. It is compileOnly and is never shipped.",
+        "io/papermc/" to "Paper's own classes come from the running server, never from a plugin jar.",
+        "net/kyori/" to "Paper owns Adventure. A shaded copy breaks the server's own serializers.",
+        "net/minecraft/" to "No jar of ours may carry the server. This transport never touches NMS at all.",
+        "org/bstats/" to "Only the host jar reports metrics. A companion carrying bStats would double-count a server.",
+    )
+
+val verifyJar =
+    tasks.register("verifyJar") {
+        description = "Fail the build when the shaded jar carries a package it must not."
+        group = "verification"
+        // The shaded jar has its own base name here, so it never overwrites the plain jar and only
+        // shadowJar has to run first.
+        dependsOn(tasks.shadowJar)
+        val jar = tasks.shadowJar.flatMap { shadow -> shadow.archiveFile }
+        inputs.file(jar)
+        doLast {
+            val names = mutableListOf<String>()
+            ZipFile(jar.get().asFile).use { archive ->
+                val entries = archive.entries()
+                while (entries.hasMoreElements()) {
+                    names.add(entries.nextElement().name)
+                }
+            }
+            val found = mutableListOf<String>()
+            for ((prefix, why) in forbiddenJarEntries) {
+                var count = 0
+                for (name in names) {
+                    if (name.startsWith(prefix)) {
+                        count++
+                    }
+                }
+                if (count > 0) {
+                    found.add("  " + prefix + " (" + count + " entries): " + why)
+                }
+            }
+            if (found.isNotEmpty()) {
+                throw GradleException("The jar carries packages it must not:\n" + found.joinToString("\n"))
+            }
+        }
+    }
+
+tasks.check { dependsOn(verifyJar) }

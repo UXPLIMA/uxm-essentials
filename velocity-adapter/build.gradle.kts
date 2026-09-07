@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     id("uxmessentials.java-conventions")
     alias(libs.plugins.shadow)
@@ -92,3 +94,63 @@ spotless {
         targetExclude("build/generated-src/**", "build/generated/**")
     }
 }
+
+// The proxy jar is judged against Velocity, not against Paper, and the two do not forbid the same things.
+// Velocity ships Adventure, MiniMessage, Configurate, gson, Guava and slf4j itself, and it loads a plugin
+// through a class loader that already sees them, so a bundled copy is the one that loses. The other half is
+// that this jar runs on a proxy: it must carry no server code at all, not even the Bukkit API, because there
+// is no server on that side of the connection to reconcile it with.
+val forbiddenJarEntries =
+    listOf(
+        "com/velocitypowered/" to "The proxy API belongs to the proxy. It is compileOnly and is never shipped.",
+        "net/kyori/" to "Velocity owns Adventure and MiniMessage. A shaded copy breaks the proxy's own serializers.",
+        "org/slf4j/" to "Velocity owns slf4j and injects the plugin's logger. A second API makes logging go quiet.",
+        "org/spongepowered/" to "Velocity ships Configurate at a version it chose. Ours is compileOnly here.",
+        "com/typesafe/" to "Typesafe Config arrives with the proxy's Configurate.",
+        "io/leangen/" to "geantyref arrives with the proxy's Configurate.",
+        "com/google/gson/" to "Velocity ships gson and hands it to a plugin.",
+        "com/google/common/" to "Velocity ships Guava and hands it to a plugin.",
+        "net/luckperms/" to "LuckPerms is another plugin, on the proxy exactly as on a backend.",
+        "com/uxplima/uxmlib/" to "uxmLib must be relocated. This entry is un-relocated.",
+        "org/bukkit/" to "A proxy jar carries no server API. Nothing here may compile against Bukkit.",
+        "io/papermc/" to "A proxy jar carries no Paper API either.",
+        "net/minecraft/" to "A proxy jar carries no server. There is no NMS on this side of the connection.",
+        "org/bstats/" to "Only the host jar reports metrics. A proxy jar carrying bStats would double-count a network.",
+    )
+
+val verifyJar =
+    tasks.register("verifyJar") {
+        description = "Fail the build when the shaded jar carries a package it must not."
+        group = "verification"
+        // The shaded jar has its own base name here, so it never overwrites the plain jar and only
+        // shadowJar has to run first.
+        dependsOn(tasks.shadowJar)
+        val jar = tasks.shadowJar.flatMap { shadow -> shadow.archiveFile }
+        inputs.file(jar)
+        doLast {
+            val names = mutableListOf<String>()
+            ZipFile(jar.get().asFile).use { archive ->
+                val entries = archive.entries()
+                while (entries.hasMoreElements()) {
+                    names.add(entries.nextElement().name)
+                }
+            }
+            val found = mutableListOf<String>()
+            for ((prefix, why) in forbiddenJarEntries) {
+                var count = 0
+                for (name in names) {
+                    if (name.startsWith(prefix)) {
+                        count++
+                    }
+                }
+                if (count > 0) {
+                    found.add("  " + prefix + " (" + count + " entries): " + why)
+                }
+            }
+            if (found.isNotEmpty()) {
+                throw GradleException("The jar carries packages it must not:\n" + found.joinToString("\n"))
+            }
+        }
+    }
+
+tasks.check { dependsOn(verifyJar) }
