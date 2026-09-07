@@ -49,6 +49,10 @@ tasks.shadowJar {
     // uxmlib-redis (and its uxmlib-common transitive) is shaded. Relocate it to the same coordinates the main
     // jar uses so this companion never clashes on the classes with another plugin that bundles uxmlib.
     relocate("com.uxplima.uxmlib", "com.uxplima.uxmessentials.libs.uxmlib")
+    // Paper owns slf4j, and a second copy of the API with no binding behind it makes logging go quiet rather
+    // than fail. Lettuce drags slf4j-api in, so it has to be dropped here. This is the same exclusion the
+    // other plugins in the estate carry, and CONTRACT.md section 14 names slf4j directly.
+    dependencies { exclude(dependency("org.slf4j:.*:.*")) }
     // Netty ships native-transport metadata + ServiceLoader files that must be merged, not dropped, or the
     // relocated classes fail to resolve at runtime.
     mergeServiceFiles()
@@ -64,12 +68,9 @@ tasks.test { dependsOn(tasks.shadowJar) }
 // relocations above, and by the LinkageError that a second copy of a shared class causes. The list agrees with
 // ShadowJarNettyRelocationTest, which asserts the other half of the same rule: that the relocated copies are
 // present, and that io/lettuce/ and our own redis package stay where they are.
-//
-// org/slf4j/ is knowingly absent from this list. Lettuce drags slf4j-api in and the jar ships 34 of its
-// classes today. Paper owns slf4j, so that is a real defect, but removing it changes what the companion
-// ships and is a decision for the owner rather than a repair to fold into a guard.
 val forbiddenJarEntries =
     listOf(
+        "org/slf4j/" to "Paper owns slf4j. A second API with no binding makes logging go quiet.",
         "io/netty/" to "Netty is relocated on purpose. Bare, it clashes with Paper's own differently-versioned Netty.",
         "reactor/" to "Reactor is relocated with Netty, and clashes the same way when it is not.",
         "org/reactivestreams/" to "Reactive Streams is relocated with Reactor, under the same rule.",
