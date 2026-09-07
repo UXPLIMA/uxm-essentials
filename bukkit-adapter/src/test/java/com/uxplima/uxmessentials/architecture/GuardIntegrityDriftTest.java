@@ -8,13 +8,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -58,8 +63,16 @@ class GuardIntegrityDriftTest {
             "domainFactsAndProposalsAreRecords",
             "domainHasNoBukkit",
             "economyDomainHasNoProviderSdk",
-            "menuPureCoreDoesNotUseHooks",
             "noClassDependsOnBukkitScheduler");
+
+    /** The package tree {@code ArchitectureTest} analyses, so this guard scans exactly what the rules scan. */
+    private static final String ANALYZED_PACKAGE = "com.uxplima.uxmessentials";
+
+    /** The package patterns a rule's {@code that()} clause selects its subject by, if it selects by package. */
+    private static final Pattern SUBJECT_PACKAGES = Pattern.compile("resideIn(?:A|Any)Package\\(([^)]*)\\)");
+
+    /** One double-quoted package pattern inside such a call. */
+    private static final Pattern QUOTED = Pattern.compile("\"([^\"]+)\"");
 
     /** An {@code ArchRule} field declaration, capturing the field name. */
     private static final Pattern ARCH_RULE_FIELD =
@@ -124,6 +137,73 @@ class GuardIntegrityDriftTest {
                         + " rule whose subject was renamed out from under it: the second kind goes green"
                         + " forever and nobody is told. Add a rule here only with the reason it can be empty.")
                 .containsExactlyInAnyOrderElementsOf(MAY_PASS_ON_AN_EMPTY_SET);
+    }
+
+    /**
+     * A rule allowed to pass on an empty set must still have something to scan.
+     *
+     * <p>{@link #onlyTheNamedArchUnitRulesMayPassOnAnEmptySet} names the rules whose <em>violation</em> set may be
+     * empty: "nothing here breaks this" is the answer they exist to give. It cannot tell that apart from an empty
+     * <em>subject</em> set, which says nothing at all, and the two are not the same sentence. A rule whose packages
+     * were emptied by a move goes green through that allowlist in silence while an identical rule without the
+     * allowlist entry fails loudly, which is the exact drift this class is for.
+     *
+     * <p>So each allowlisted rule that selects its subject by package is asked whether any analysed class actually
+     * resides there. A rule that selects by type, or by residing <em>outside</em> a package, or that names no
+     * {@code that()} clause at all, has a subject by construction and is not asked.
+     */
+    @Test
+    void everyRuleAllowedToPassOnAnEmptySetStillHasASubjectToScan() {
+        JavaClasses analysed = new ClassFileImporter().importPackages(ANALYZED_PACKAGE);
+        Set<String> aimedAtNothing = new TreeSet<>();
+        for (Map.Entry<String, List<String>> rule : subjectPackagesByRule().entrySet()) {
+            if (!MAY_PASS_ON_AN_EMPTY_SET.contains(rule.getKey())) {
+                continue;
+            }
+            if (analysed.stream()
+                    .noneMatch(JavaClass.Predicates.resideInAnyPackage(
+                            rule.getValue().toArray(new String[0])))) {
+                aimedAtNothing.add(rule.getKey() + " -> " + rule.getValue());
+            }
+        }
+        assertThat(aimedAtNothing)
+                .as("these rules are allowed to pass on an empty violation set, and their subject set is empty too,"
+                        + " so they are not checking anything and cannot fail. A rule whose packages went away has"
+                        + " to be repointed at where its subject lives now, or retired with a receipt naming the"
+                        + " repository that carries it. Do not answer this by adding it to the allowlist above:"
+                        + " that is the same silence with a signature on it.")
+                .isEmpty();
+    }
+
+    /** Every {@code ArchRule} that picks its subject by package, mapped to the patterns it picks by. */
+    private static Map<String, List<String>> subjectPackagesByRule() {
+        String source = read(repoRoot().resolve(ARCHITECTURE_TEST));
+        Matcher matcher = ARCH_RULE_FIELD.matcher(source);
+        List<Integer> starts = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        while (matcher.find()) {
+            starts.add(matcher.start());
+            names.add(matcher.group(1));
+        }
+        Map<String, List<String>> byRule = new LinkedHashMap<>();
+        for (int i = 0; i < names.size(); i++) {
+            int end = i + 1 < starts.size() ? starts.get(i + 1) : source.length();
+            String body = source.substring(starts.get(i), end);
+            // The subject clause is everything before should(); a package named after it is a target, not a subject.
+            int should = body.indexOf(".should(");
+            Matcher subject = SUBJECT_PACKAGES.matcher(should > 0 ? body.substring(0, should) : body);
+            List<String> patterns = new ArrayList<>();
+            while (subject.find()) {
+                Matcher quoted = QUOTED.matcher(subject.group(1));
+                while (quoted.find()) {
+                    patterns.add(quoted.group(1));
+                }
+            }
+            if (!patterns.isEmpty()) {
+                byRule.put(names.get(i), patterns);
+            }
+        }
+        return byRule;
     }
 
     /** Every drift guard class in the repository, whichever module it lives in. */
