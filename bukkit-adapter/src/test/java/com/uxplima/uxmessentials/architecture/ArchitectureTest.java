@@ -135,32 +135,22 @@ class ArchitectureTest {
                     + "waiting for somebody to mutate it")
             .allowEmptyShould(true);
 
-    // The menu engine's spec model and evaluation are the pure core: plain JUnit can exercise them
-    // without a server. Keeping them free of Bukkit / Paper / NMS is what makes that possible.
-    @ArchTest
-    static final ArchRule menuPureCoreHasNoBukkit = noClasses()
-            .that()
-            .resideInAnyPackage("..gui.menu.spec..", "..gui.menu.eval..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage("org.bukkit..", "io.papermc..", "net.minecraft..")
-            .because("the menu engine's spec model and evaluation must stay pure for plain-JUnit testing");
-
-    // Optional-plugin integrations are an outbound, Bukkit-side concern: the hooks SPI references org.bukkit and
-    // each real impl references a plugin SDK. The menu engine's pure core (spec model + evaluation) must stay
-    // plain-JUnit testable, so it may not reach into the hooks package. A spec/eval class importing Hooks would
-    // pull the Bukkit-side integration layer into the pure core. (Vacuous today; a guard for the future, since the
-    // org.bukkit fence above only catches direct org.bukkit dependencies, not a transitive one through Hooks.)
-    @ArchTest
-    static final ArchRule menuPureCoreDoesNotUseHooks = noClasses()
-            .that()
-            .resideInAnyPackage("..gui.menu.spec..", "..gui.menu.eval..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("..shared.adapter.outbound.hooks..")
-            .because("the menu engine's spec model and evaluation stay pure; optional-plugin hooks are an "
-                    + "outbound Bukkit-side concern consumed at the adapter edge")
-            .allowEmptyShould(true);
+    // The two menu pure-core fences that used to sit here are gone, and this comment is their receipt.
+    //
+    // They asserted that the engine's spec model and evaluation (..gui.menu.spec.., ..gui.menu.eval..) name no
+    // Bukkit and reach no hooks, so the pure core stayed testable under plain JUnit. Those packages are uxmLib's
+    // now: com.uxplima.uxmlib.menu.spec and .eval. A rule kept here would have nothing to scan, and ArchUnit said
+    // so for one of them while the other passed vacuously through the empty-set allow-list, which is the drift
+    // GuardIntegrityDriftTest.everyRuleAllowedToPassOnAnEmptySetStillHasASubjectToScan now catches.
+    //
+    // The guarantee did not disappear, it relocated. uxm-lib carries it as
+    // ArchitectureTest.theMenuModelTouchesNoPlatform, a superset of what was asserted here: org.bukkit,
+    // io.papermc, com.destroystokyo.paper, org.spigotmc and net.minecraft rather than Bukkit and Paper alone. It
+    // was proved by breaking it three ways, and a Paper probe passed before the widening, so the hole it closes
+    // was real.
+    //
+    // Do not restore these two here. Nothing in this repository resides in those packages, so a rule written here
+    // could only ever pass on an empty set.
 
     // The engine's public surface is the Menus facade, the MenuBindings registries, and the two context
     // types a binding lambda is handed, MenuContext (condition/placeholder/list) and MenuActionContext
@@ -188,18 +178,26 @@ class ArchitectureTest {
                     + "binding reads are the public surface; the holder, listener, refresh task and renderer stay "
                     + "private to the engine");
 
-    // Every spec-driven menu renders through the engine (Menus / MenuBindings / holder / listener); none of them
-    // touch uxmLib's GUI library directly. The only production classes that legitimately depend on
-    // com.uxplima.uxmlib.gui are the non-menu text-input and storage leaves, and they stay that way:
+    // What this protects: a product feature must not build its own window out of the GUI toolkit behind the
+    // engine's back. If a feature wants a window it declares a menu spec and lets the engine draw it.
+    //
+    // This used to forbid the whole com.uxplima.uxmlib.gui package, and that reading died when the menu engine
+    // moved into uxmLib. The text port (GuiText), the input seam (gui.input.TextInput, InputRequest) and the look
+    // helpers (gui.style) now live in that package and are named by every editor view legitimately, because the
+    // engine itself hands them round. Forbidding by package produced 258 violations, none of which was a feature
+    // bypassing the engine. So the fence forbids by CAPABILITY instead: the window-construction types, the ones
+    // that open an inventory of their own. Naming GuiText, gui.input.* or gui.style.* is not building a window.
+    //
+    // The leaves that legitimately do construct one, and stay that way:
     //   - vaults VaultView and itemworld DisposalCommand are real item-STORAGE inventories (uxmLib StorageGui):
     //     players put and take items, contents persist: these are not menus.
-    //   - the shared AnvilTextBackend, SignTextBackend, DialogTextBackend and their TextInputInstaller are the
-    //     TEXT-INPUT seam (uxmLib com.uxplima.uxmlib.gui anvil/input/dialog). The runtime-neutral leaves the whole
-    //     engine reuses for typed input.
     //   - bootstrap PluginModule is the Guis.install(...) site: the uxmLib GUI runtime must stay installed for the
-    //     storage and anvil leaves above.
-    // Any other production class reaching for com.uxplima.uxmlib.gui would be a spec menu that slipped off the
-    // engine; this fence fails until it is migrated, rather than letting it bypass the engine silently.
+    //     storage leaves above.
+    // The three text-input backends that used to be listed here are uxmLib's own classes now, so they no longer
+    // need an exemption from this repository's fence: the allow-list is shorter than it was, not longer.
+    //
+    // Any other production class constructing a uxmLib window would be a spec menu that slipped off the engine;
+    // this fence fails until it is migrated, rather than letting it bypass the engine silently.
     @ArchTest
     static final ArchRule onlyStorageAndAnvilLeavesUseUxmlibGui = noClasses()
             .that()
@@ -207,12 +205,11 @@ class ArchitectureTest {
             .and(areProductionClasses())
             .and(areNotAllowedUxmlibGuiLeaves())
             .should()
-            .dependOnClassesThat()
-            .resideInAPackage("com.uxplima.uxmlib.gui..")
+            .dependOnClassesThat(areUxmlibWindowConstruction())
             .because("spec-driven menus must render through the engine; only the item-storage inventories "
-                    + "(VaultView, DisposalCommand), the text-input seam (AnvilTextBackend, SignTextBackend, "
-                    + "DialogTextBackend, TextInputInstaller) and the Guis.install site (PluginModule) may touch "
-                    + "uxmLib's GUI library");
+                    + "(VaultView, DisposalCommand) and the Guis.install site (PluginModule) may construct a "
+                    + "uxmLib GUI window. The text port, the input seam and the look helpers in the same package "
+                    + "are not window construction and are open to every caller");
 
     // The completeness twin of the uxmLib fence above. That rule proves no spec menu reaches for uxmLib's GUI
     // library; this one proves no spec menu drops a level lower and hand-rolls a raw Bukkit inventory instead
@@ -319,7 +316,7 @@ class ArchitectureTest {
      * one sanctioned place a Bukkit inventory is created, and every spec menu funnels through it.
      */
     private static boolean isMenuEngine(String topLevelName) {
-        return topLevelName.startsWith("com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.");
+        return topLevelName.startsWith("com.uxplima.uxmlib.menu.");
     }
 
     /**
@@ -340,10 +337,6 @@ class ArchitectureTest {
         java.util.Set<String> allowed = java.util.Set.of(
                 "com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView",
                 "com.uxplima.uxmessentials.itemworld.adapter.inbound.command.DisposalCommand",
-                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.AnvilTextBackend",
-                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.SignTextBackend",
-                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.DialogTextBackend",
-                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller",
                 "com.uxplima.uxmessentials.bootstrap.di.PluginModule");
         return DescribedPredicate.describe("are not the allowed uxmLib-GUI leaves", javaClass -> {
             String fullName = javaClass.getFullName();
@@ -354,6 +347,28 @@ class ArchitectureTest {
     }
 
     /**
+     * uxmLib's window-construction types: the classes that open an inventory of their own. This is the capability
+     * the fence above forbids, as distinct from the package it used to forbid. The menu engine lives in that
+     * package now, so its text port, input seam and look helpers are named by product code legitimately; none of
+     * them opens a window, and a feature that wants one declares a spec instead of assembling it here.
+     */
+    private static DescribedPredicate<JavaClass> areUxmlibWindowConstruction() {
+        java.util.Set<String> windows = java.util.Set.of(
+                "com.uxplima.uxmlib.gui.Gui",
+                "com.uxplima.uxmlib.gui.AbstractGui",
+                "com.uxplima.uxmlib.gui.SimpleGui",
+                "com.uxplima.uxmlib.gui.PaginatedGui",
+                "com.uxplima.uxmlib.gui.ScrollingGui",
+                "com.uxplima.uxmlib.gui.StorageGui",
+                "com.uxplima.uxmlib.gui.GuiRegistry",
+                "com.uxplima.uxmlib.gui.Guis",
+                "com.uxplima.uxmlib.gui.GuiListener",
+                "com.uxplima.uxmlib.gui.InventorySink");
+        return DescribedPredicate.describe(
+                "are uxmLib GUI window construction", javaClass -> windows.contains(javaClass.getFullName()));
+    }
+
+    /**
      * The engine's private machinery: everything under {@code render/} plus the runtime internals, but not the
      * two public context types a binding lambda reads. Naming the runtime internals one by one (by their fully
      * qualified names, so this predicate itself does not depend on those classes) is what lets feature wiring
@@ -361,7 +376,7 @@ class ArchitectureTest {
      * and refresh task encapsulated.
      */
     private static DescribedPredicate<JavaClass> menuInternals() {
-        String runtime = "com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.";
+        String runtime = "com.uxplima.uxmlib.menu.runtime.";
         java.util.Set<String> runtimeInternals = java.util.Set.of(
                 runtime + "MenuHolder",
                 runtime + "MenuListener",
