@@ -14,7 +14,6 @@ import org.bukkit.Bukkit;
 
 import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -22,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmlib.menu.eval.ExpressionException;
 import com.uxplima.uxmlib.menu.eval.Expressions;
 import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
@@ -91,7 +91,7 @@ public final class MenuVocabulary {
         bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
         bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
         bindings.condition("on-page", (ctx, args) -> pageInRanges(ctx.page() + 1, args.getOrDefault("value", "")));
-        ReportingPlaceholders placeholders = new ReportingPlaceholders(bindings.placeholders());
+        PlaceholderRegistry placeholders = bindings.placeholders();
         bindings.condition("papi-compare", (ctx, args) -> compare(ctx, args, placeholders));
         bindings.condition("expr", exprCondition(placeholders, log));
     }
@@ -103,7 +103,7 @@ public final class MenuVocabulary {
      * and the offending text is logged once (de-duplicated so a broken spec does not flood the log on every render).
      */
     private static BiPredicate<MenuContext, Map<String, String>> exprCondition(
-            ReportingPlaceholders placeholders, Logger log) {
+            PlaceholderRegistry placeholders, Logger log) {
         Set<String> warned = ConcurrentHashMap.newKeySet();
         return (ctx, args) -> {
             String expression = expand(args.getOrDefault("value", ""), ctx, placeholders);
@@ -125,7 +125,7 @@ public final class MenuVocabulary {
      * fall back to a string equality test. An unknown operator yields {@code false} rather than throwing, so a spec
      * typo hides the item rather than aborting the menu.
      */
-    private static boolean compare(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+    private static boolean compare(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         String left = expand(args.getOrDefault("left", ""), ctx, placeholders);
         String op = args.getOrDefault("op", "=").strip();
         String right = expand(args.getOrDefault("right", ""), ctx, placeholders);
@@ -155,7 +155,7 @@ public final class MenuVocabulary {
     }
 
     /** Replace every {@code %token%} in {@code operand} with its resolved placeholder value (or empty). */
-    private static String expand(String operand, MenuContext ctx, ReportingPlaceholders placeholders) {
+    private static String expand(String operand, MenuContext ctx, PlaceholderRegistry placeholders) {
         Matcher matcher = PLACEHOLDER.matcher(operand);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {

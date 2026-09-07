@@ -10,7 +10,6 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
 import com.uxplima.uxmessentials.shared.menu.TestViewer;
 import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
@@ -77,9 +76,9 @@ class PlaceholderRegistryTest {
         registry.register("broken", ctx -> {
             throw new IllegalStateException("no");
         });
-        ReportingPlaceholders reporting = new ReportingPlaceholders(registry);
+        PlaceholderRegistry reporting = registry;
         List<LogRecord> logged = new ArrayList<>();
-        Logger logger = Logger.getLogger(ReportingPlaceholders.class.getName());
+        Logger logger = Logger.getLogger(PlaceholderRegistry.class.getName());
         Handler collector = collector(logged);
         boolean parents = logger.getUseParentHandlers();
         logger.setUseParentHandlers(false);
@@ -103,7 +102,7 @@ class PlaceholderRegistryTest {
         registry.register("fine", ctx -> "value");
         registry.fallback(id -> id.startsWith("papi_"), (id, ctx) -> "papi:" + id);
 
-        ReportingPlaceholders reporting = new ReportingPlaceholders(registry);
+        PlaceholderRegistry reporting = registry;
 
         assertThat(reporting.resolveOrReport("fine", CTX)).contains("value");
         assertThat(reporting.resolveOrReport("papi_x", CTX)).contains("papi:papi_x");

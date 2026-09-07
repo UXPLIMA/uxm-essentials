@@ -6,8 +6,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
 
@@ -60,11 +60,11 @@ public final class CustomPlaceholders {
     private final AtomicReference<Map<String, String>> defs = new AtomicReference<>(Map.of());
 
     /** The same registry, wrapped so a handler that throws costs one token rather than the whole template. */
-    private final ReportingPlaceholders reporting;
+    private final PlaceholderRegistry reporting;
 
     public CustomPlaceholders(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
-        this.reporting = new ReportingPlaceholders(bindings.placeholders());
+        this.reporting = bindings.placeholders();
         bindings.placeholders().fallback(this::claims, this::resolve);
     }
 

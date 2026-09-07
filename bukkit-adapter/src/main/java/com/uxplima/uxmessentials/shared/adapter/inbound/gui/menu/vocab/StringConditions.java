@@ -9,9 +9,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.google.common.base.Splitter;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
 
 /**
@@ -58,7 +58,7 @@ public final class StringConditions {
     public static void register(MenuBindings bindings, Logger log) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(log, "log");
-        ReportingPlaceholders placeholders = new ReportingPlaceholders(bindings.placeholders());
+        PlaceholderRegistry placeholders = bindings.placeholders();
         bindings.condition("contains", closed("contains", log, (ctx, args) -> contains(ctx, args, placeholders)));
         bindings.condition(
                 "equals-ignorecase",
@@ -89,7 +89,7 @@ public final class StringConditions {
     }
 
     /** {@code contains:<A> <B>}: expand both operands; true iff A contains B. A missing B is {@code false}. */
-    private static boolean contains(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+    private static boolean contains(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         String[] operands = splitFirst(value(args));
         if (operands.length < 2) {
             return false;
@@ -99,7 +99,7 @@ public final class StringConditions {
 
     /** {@code equals-ignorecase:<A> <B>}: expand both operands; true iff A equals B ignoring case. */
     private static boolean equalsIgnoreCase(
-            MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+            MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         String[] operands = splitFirst(value(args));
         if (operands.length < 2) {
             return false;
@@ -113,7 +113,7 @@ public final class StringConditions {
      * pattern is unusual. A malformed pattern throws {@link java.util.regex.PatternSyntaxException} up to
      * {@link #closed}, which is the fail-closed path.
      */
-    private static boolean regex(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+    private static boolean regex(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         String[] operands = splitFirst(value(args));
         if (operands.length < 2) {
             return false;
@@ -127,7 +127,7 @@ public final class StringConditions {
      * integer {@code n} with {@code op} (one of {@code > >= < <= == = !=}). A wrong token count, a non-integer
      * {@code n}, or an unknown operator is {@code false}.
      */
-    private static boolean length(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+    private static boolean length(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         List<String> parts = WHITESPACE.splitToList(value(args).strip());
         if (parts.size() != 3) {
             return false;
@@ -141,7 +141,7 @@ public final class StringConditions {
     }
 
     /** {@code is-integer:<A>}: expand A; true iff it parses as a Java {@code int}. */
-    private static boolean isInteger(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+    private static boolean isInteger(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         String operand = expand(value(args).strip(), ctx, placeholders);
         try {
             Integer.parseInt(operand);
@@ -152,7 +152,7 @@ public final class StringConditions {
     }
 
     /** {@code is-double:<A>}: expand A; true iff it parses as a finite {@code double} (so {@code Infinity}/NaN fail). */
-    private static boolean isDouble(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+    private static boolean isDouble(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         String operand = expand(value(args).strip(), ctx, placeholders);
         try {
             return Double.isFinite(Double.parseDouble(operand));
@@ -162,7 +162,7 @@ public final class StringConditions {
     }
 
     /** {@code is-object:<A>}: expand A; true iff it is present (non-blank), DeluxeMenus' "is object" sense. */
-    private static boolean isObject(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
+    private static boolean isObject(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
         return !expand(value(args).strip(), ctx, placeholders).isBlank();
     }
 
@@ -190,7 +190,7 @@ public final class StringConditions {
     }
 
     /** Replace every {@code %token%} in {@code operand} with its resolved placeholder value (or empty when unknown). */
-    private static String expand(String operand, MenuContext ctx, ReportingPlaceholders placeholders) {
+    private static String expand(String operand, MenuContext ctx, PlaceholderRegistry placeholders) {
         Matcher matcher = PLACEHOLDER.matcher(operand);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
