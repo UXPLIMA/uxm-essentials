@@ -10,7 +10,7 @@
 # is how the doc once drifted a whole Minecraft generation behind the build while
 # the script still reported a clean run: every stale coordinate it checked still
 # existed in a repository, because old releases are never withdrawn. Reachability
-# alone can never catch staleness. (VersionsCanonDriftTest enforces the same
+# alone can never catch staleness. (ShippedVersionsDriftTest enforces the same
 # invariant offline inside ./gradlew check; this is the release-time copy.)
 #
 # Phase 2, reachability. Every [libraries] entry's version.ref is resolved against

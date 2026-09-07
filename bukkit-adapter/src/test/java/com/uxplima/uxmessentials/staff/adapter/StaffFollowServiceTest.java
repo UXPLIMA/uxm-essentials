@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
+import com.uxplima.uxmessentials.testing.CompletePlayerMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,8 +37,11 @@ class StaffFollowServiceTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        staff = server.addPlayer("Staff");
-        target = server.addPlayer("Target");
+        // The staff member teleports through teleportAsync, which MockBukkit leaves unimplemented. An
+        // unimplemented mock aborts the test rather than failing it, so the tick test reported green for a
+        // whole build without ever reaching its assertion.
+        staff = CompletePlayerMock.addTo(server, "Staff");
+        target = CompletePlayerMock.addTo(server, "Target");
         inMode = new HashSet<>();
         inMode.add(staff.getUniqueId());
         follow = new StaffFollowService(

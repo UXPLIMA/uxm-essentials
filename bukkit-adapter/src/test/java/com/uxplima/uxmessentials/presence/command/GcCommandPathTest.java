@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.testing.TpsAwareServerMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,9 @@ class GcCommandPathTest {
 
     @BeforeEach
     void setUp() {
-        server = MockBukkit.mock();
+        // A plain ServerMock leaves getTPS() unimplemented, and an unimplemented mock aborts the test
+        // instead of failing it, so the two tests that read the health line never used to run at all.
+        server = MockBukkit.mock(new TpsAwareServerMock());
         server.addSimpleWorld("world");
         command = new GcCommand(presenceServices(), new EchoMessages(), new InlineScheduler());
     }
@@ -79,7 +82,9 @@ class GcCommandPathTest {
         String line = PLAIN.serialize(viewer.nextComponentMessage());
         assertThat(line)
                 .contains("gc-result")
-                .contains("tps1m=")
+                // The server double reports a healthy 20.0, so the rounding the read-out does is assertable
+                // rather than only the placeholder's presence.
+                .contains("tps1m=20.0")
                 .contains("memUsed=")
                 .contains("memMax=")
                 .contains("chunks=")

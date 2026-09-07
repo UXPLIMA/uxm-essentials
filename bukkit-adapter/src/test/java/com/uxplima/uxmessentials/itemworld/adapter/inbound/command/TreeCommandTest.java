@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.testing.EditableWorldMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,14 +53,16 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * MockBukkit coverage of {@code /tree} through its real Brigadier node. With admin-fun enabled an op looking at
  * a block grows a tree of the requested type one block above it; an unknown type answers
  * {@code TREE_UNKNOWN_TYPE} and nothing in range answers {@code TREE_NO_TARGET}. MockBukkit does not raytrace,
- * so the looked-at block is supplied through a {@code getTargetBlockExact} stub on the player. World tree
- * generation under MockBukkit is unreliable, so the generation outcome is asserted only as one of the two
- * spawned/failed keys plus the audit being called only on success; the unknown-type and no-target branches
- * which do not depend on generation: carry the deterministic assertions.
+ * so the looked-at block is supplied through a {@code getTargetBlockExact} stub on the player, and it leaves
+ * {@code World#generateTree} unimplemented, so the world is an {@link EditableWorldMock} that records the ask
+ * and answers it. That makes the grow branch deterministic: the command is held to which tree it asked for,
+ * where it asked for it, which key it answered with, and that the audit line follows the success and only the
+ * success.
  */
 class TreeCommandTest {
 
     private ServerMock server;
+    private EditableWorldMock world;
     private TargetingPlayer player;
     private RecordingSink sink;
     private MutableConfig config;
@@ -68,7 +71,7 @@ class TreeCommandTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        server.addSimpleWorld("world");
+        world = EditableWorldMock.addTo(server, "world");
         player = new TargetingPlayer(server, "Alice");
         server.addPlayer(player);
         player.setOp(true);
@@ -100,13 +103,26 @@ class TreeCommandTest {
 
         execute("tree tree");
 
-        assertThat(sink.keys).containsAnyOf(ItemworldMessageKey.TREE_SPAWNED, ItemworldMessageKey.TREE_FAILED);
-        // The audit line is emitted only on a successful grow, never on a failed one.
-        if (sink.keys.contains(ItemworldMessageKey.TREE_SPAWNED)) {
-            assertThat(audit.grewTreeTypes).containsExactly("tree");
-        } else {
-            assertThat(audit.grewTreeTypes).isEmpty();
-        }
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.TREE_SPAWNED);
+        assertThat(audit.grewTreeTypes).containsExactly("tree");
+        // The tree goes one block above the block the player is looking at, never into it.
+        assertThat(world.grownTrees()).singleElement().satisfies(grown -> {
+            assertThat(grown.type()).isEqualTo(org.bukkit.TreeType.TREE);
+            assertThat(grown.location().getBlockY()).isEqualTo(65);
+        });
+    }
+
+    @Test
+    void aRefusedGrowReportsFailedAndWritesNoAuditLine() {
+        Block target = player.getWorld().getBlockAt(0, 64, 0);
+        target.setType(Material.GRASS_BLOCK);
+        player.target = target;
+        world.refuseTrees(); // a server refuses when the sapling has no room
+
+        execute("tree tree");
+
+        assertThat(sink.keys).containsExactly(ItemworldMessageKey.TREE_FAILED);
+        assertThat(audit.grewTreeTypes).isEmpty();
     }
 
     @Test

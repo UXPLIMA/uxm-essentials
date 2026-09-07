@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmessentials.testing.CompletePlayerMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * MockBukkit coverage of {@link DurationPickerView} on the menu engine: opening it builds an engine selector window
  * (a {@link MenuHolder}) with clock preset buttons, a preset click through the one menu listener fires the callback
  * with that exact duration string, a custom anvil submission of a valid timed span fires it with the trimmed string
- * (driven through the package-private {@code resolveTyped} seam, since MockBukkit cannot open a live anvil), a
+ * (driven through the package-private {@code resolveTyped} seam, since MockBukkit has no anvil rename field), a
  * malformed span replies with the reject key without firing, and a permanent parse is rejected for a timed verb (the
  * validator the flow supplies refuses it). The scheduler double runs each hop inline so a click resolves on the test
  * thread.
@@ -62,7 +63,10 @@ class DurationPickerViewTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        viewer = server.addPlayer("Staff");
+        // A rejected span re-opens the prompt, and MockBukkit leaves openAnvil unimplemented. An
+        // unimplemented mock aborts the test rather than failing it, so the two reject tests reported green
+        // without ever evaluating an assertion.
+        viewer = CompletePlayerMock.addTo(server, "Staff");
         viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
         textInput = TextInputTestKit.create(
                 plugin,

@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordina
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.testing.CompletePlayerMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -193,9 +194,12 @@ class PlayerStateReconciliationTest {
         assertThat(found).noneMatch(n -> n.who().uuid().equals(alice.getUniqueId())); // self excluded
     }
 
+    // The report reads calculateTotalExperiencePoints, which MockBukkit leaves unimplemented. An
+    // unimplemented mock aborts the test rather than failing it, so this and the reset below reported green
+    // without ever reaching an assertion.
     @Test
     void experienceSetReplacesTheTotalAndReportsTheResult() {
-        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock alice = CompletePlayerMock.addTo(server, "Alice");
         PlayerRef ref = BukkitRefs.toRef(alice);
         AtomicReference<PlayerEffects.ExperienceReport> report = new AtomicReference<>();
 
@@ -206,11 +210,14 @@ class PlayerStateReconciliationTest {
         PlayerEffects.ExperienceReport result = report.get();
         assertThat(result).isNotNull();
         assertThat(java.util.Objects.requireNonNull(result).level()).isEqualTo(5);
+        // Five levels and no progress into the sixth is 55 points on the vanilla curve. The report carries
+        // the points as well as the level, and nothing was holding that half to anything.
+        assertThat(result.totalPoints()).isEqualTo(55);
     }
 
     @Test
     void experienceResetZeroesTheLevel() {
-        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock alice = CompletePlayerMock.addTo(server, "Alice");
         PlayerRef ref = BukkitRefs.toRef(alice);
         alice.setLevel(10);
 

@@ -378,11 +378,23 @@ class ArchitectureTest {
     /**
      * Production classes only. The architecture tests and their nested helpers legitimately wire the engine to
      * exercise it, so this rule must not flag a test that constructs the renderer or listener for a fixture.
+     *
+     * <p>The same goes for {@code com.uxplima.uxmessentials.testing}, the test-support package: fakes, event
+     * builders and the mock doubles that fill the operations MockBukkit declares and does not implement. It
+     * lives only in {@code src/test} and reaches no jar. It needs naming separately because a double is named
+     * after what it stands in for and not after a test: {@code CompletePlayerMock} is a {@code PlayerMock},
+     * and a {@code PlayerMock} is an {@code InventoryHolder}, which the raw-inventory fence below would
+     * otherwise read as a hand-rolled menu.
      */
     private static DescribedPredicate<JavaClass> areProductionClasses() {
         return DescribedPredicate.describe(
-                "are production classes", javaClass -> !javaClass.getName().contains("Test"));
+                "are production classes",
+                javaClass -> !javaClass.getName().contains("Test")
+                        && !javaClass.getPackageName().equals(TEST_SUPPORT_PACKAGE));
     }
+
+    /** The test-support package: doubles and builders, never shipped. */
+    private static final String TEST_SUPPORT_PACKAGE = "com.uxplima.uxmessentials.testing";
 
     /**
      * A typed player name becomes an account in one place. Paper reads the server's own name cache only when the

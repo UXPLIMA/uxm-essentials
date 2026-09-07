@@ -107,3 +107,41 @@ tasks.withType<Test>().configureEach {
     // is what the build is verified against.
     maxHeapSize = "2g"
 }
+
+// A skipped test protects nothing, and it reports as green. MockBukkit turns an unimplemented mock into a
+// TestAbortedException, which JUnit records as a skip, so a guard can stop running and nobody is told. There
+// is no legitimate skip in this repository, so a skip fails the build.
+val verifyNoSkippedTests =
+    tasks.register("verifyNoSkippedTests") {
+        description = "Fail the build when a test was skipped instead of run."
+        group = "verification"
+        dependsOn(tasks.named("test"))
+        val results = layout.buildDirectory.dir("test-results/test")
+        doLast {
+            val folder = results.get().asFile
+            if (!folder.isDirectory) {
+                return@doLast
+            }
+            val skippedSuites = mutableListOf<String>()
+            val counter = Regex("""skipped="(\d+)"""")
+            for (file in folder.listFiles().orEmpty()) {
+                if (!file.name.startsWith("TEST-") || !file.name.endsWith(".xml")) {
+                    continue
+                }
+                // The first ">" in the file closes the XML declaration, not the testsuite tag.
+                val head = file.readText().substringAfter("<testsuite").substringBefore(">")
+                val skipped = counter.find(head)?.groupValues?.get(1)?.toInt() ?: 0
+                if (skipped > 0) {
+                    skippedSuites.add("  " + file.name.removePrefix("TEST-").removeSuffix(".xml") + ": " + skipped)
+                }
+            }
+            if (skippedSuites.isNotEmpty()) {
+                throw GradleException(
+                    "A test was skipped rather than run, so it guards nothing:\n" +
+                        skippedSuites.joinToString("\n"),
+                )
+            }
+        }
+    }
+
+tasks.named("check") { dependsOn(verifyNoSkippedTests) }

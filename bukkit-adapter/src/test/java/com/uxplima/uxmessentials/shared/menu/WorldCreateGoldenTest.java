@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.Engine;
 import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.FakeEngine;
 import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.FakeRepository;
 import com.uxplima.uxmessentials.shared.menu.WorldEditorTestSupport.Snapshot;
+import com.uxplima.uxmessentials.testing.CompletePlayerMock;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateDraft;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateMenu;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
@@ -65,7 +66,10 @@ class WorldCreateGoldenTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        player = server.addPlayer("Admin");
+        // Clicking the name button opens an anvil prompt, and MockBukkit leaves openAnvil unimplemented. An
+        // unimplemented mock aborts the test rather than failing it, so that click test reported green
+        // without ever evaluating its assertion.
+        player = CompletePlayerMock.addTo(server, "Admin");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         scheduler = new WorldEditorTestSupport.SyncScheduler();
         repository = new FakeRepository();
@@ -121,8 +125,10 @@ class WorldCreateGoldenTest {
         // by confirming the create window closes as the input prompt opens.
         WorldEditorTestSupport.fireClick(server, player, 4, ClickType.LEFT);
 
-        assertThat(player.getOpenInventory().getTopInventory().getHolder())
-                .isNotInstanceOf(com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder.class);
+        // The create window is gone and the anvil prompt is what the player is looking at. An anvil carries no
+        // holder at all, so its type is what says the seam opened rather than the menu staying put.
+        assertThat(player.getOpenInventory().getTopInventory().getType())
+                .isEqualTo(org.bukkit.event.inventory.InventoryType.ANVIL);
     }
 
     @Test

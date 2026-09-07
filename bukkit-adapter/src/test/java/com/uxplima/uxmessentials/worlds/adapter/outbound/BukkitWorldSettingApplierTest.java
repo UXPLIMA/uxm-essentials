@@ -8,6 +8,7 @@ import org.bukkit.GameRule;
 import org.bukkit.World;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.testing.EditableWorldMock;
 import com.uxplima.uxmessentials.worlds.domain.SpawnCodec;
 import com.uxplima.uxmessentials.worlds.domain.WeatherLock;
 import com.uxplima.uxmessentials.worlds.domain.WorldDifficulty;
@@ -32,7 +33,7 @@ class BukkitWorldSettingApplierTest {
     @BeforeEach
     void startServer() {
         server = MockBukkit.mock();
-        server.addSimpleWorld("w");
+        EditableWorldMock.addTo(server, "w");
         applier = new BukkitWorldSettingApplier(server, new BukkitGameRuleCatalog(), new NoOpLogger());
     }
 
@@ -128,10 +129,9 @@ class BukkitWorldSettingApplierTest {
         assertThat(world.getGameRuleValue(GameRule.DO_WEATHER_CYCLE)).isTrue();
     }
 
-    // MockBukkit's WorldMock#setSpawnLocation(int,int,int,float) throws UnimplementedOperationException
-    // (a TestAbortedException), so the applier's spawn path, which carries yaw, can only be verified
-    // end-to-end on a real server. We assert the parser yields exactly the components the applier feeds
-    // setSpawnLocation; the apply call below either lands them (real server) or aborts on the known gap.
+    // The world is an EditableWorldMock because MockBukkit leaves the yaw-carrying setSpawnLocation
+    // unimplemented, and an unimplemented mock aborts the test instead of failing it, so the three
+    // assertions below never used to run.
     @Test
     void appliesSpawnLocation() {
         World world = server.getWorld("w");
@@ -140,10 +140,14 @@ class BukkitWorldSettingApplierTest {
                 SpawnCodec.parseComponents("10.0;64.0;-20.0;90.0;0.0").orElseThrow();
         assertThat(components).containsExactly(10.0, 64.0, -20.0, 90.0, 0.0);
 
-        applier.apply(WorldName.of("w"), settings); // aborts (skips) under MockBukkit; lands the spawn on Paper
+        applier.apply(WorldName.of("w"), settings);
+
         assertThat(world.getSpawnLocation().getBlockX()).isEqualTo(10);
         assertThat(world.getSpawnLocation().getBlockY()).isEqualTo(64);
         assertThat(world.getSpawnLocation().getBlockZ()).isEqualTo(-20);
+        // The yaw is the reason the applier calls the four-argument overload at all: a spawn that faces the
+        // wrong way is the defect this line catches.
+        assertThat(world.getSpawnLocation().getYaw()).isEqualTo(90.0f);
     }
 
     @Test
