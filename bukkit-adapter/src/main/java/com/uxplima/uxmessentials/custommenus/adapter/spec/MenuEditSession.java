@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  * The mutable working copy of a {@link MenuSpec} the in-game menu editor edits before it writes. It is the middle of
  * the editor's spec service. The loader turns a file into an immutable {@link MenuSpec}, this clones that into an
  * editable model an operator mutates through the GUI, and {@link #toSpec()} freezes it back into an immutable spec the
- * {@link MenuSpecWriter} serialises. So an edit is a clone, a sequence of mutations, and a re-freeze, never a
+ * {@link MenuFileWriter} serialises. So an edit is a clone, a sequence of mutations, and a re-freeze, never a
  * hand-built HOCON string.
  *
  * <p>Bukkit-free like the spec model it holds: it references only the {@code spec/} records and the menu's

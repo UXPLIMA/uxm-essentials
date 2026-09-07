@@ -32,8 +32,8 @@ import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuEditLockListener;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -122,7 +122,7 @@ class MenuGridViewTest {
         writeMenu("big", 6, "x { slot = 50, material = STONE, click { left = [\"close\"] } }");
         names.addAll(loader.loadFrom(menusDir).loadedNames());
 
-        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuSpecWriter(), bindings, NOOP);
+        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuFileWriter(), bindings, NOOP);
         MenuEditorService service = new MenuEditorService(
                 menusDir,
                 persistence,

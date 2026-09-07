@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmlib.menu.spec.ClickKind;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
 import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
@@ -18,14 +18,15 @@ import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.junit.jupiter.api.Test;
 
 /**
- * The golden round-trip proof for {@link MenuSpecWriter}: a spec that has been through the loader, then the writer,
+ * The golden round-trip proof for {@link MenuFileWriter}: a spec that has been through the loader, then the writer,
  * then the loader again must equal the spec it started as. It is the load-time contract of the whole menu editor
  * an in-game edit is only safe to write back if writing then re-reading is lossless, so the coverage is deliberately
  * exhaustive: the shipped {@code menus/example.conf} plus synthesized specs that exercise every key the loader reads
  * (multiple items, slot ranges, the full decor surface, every click gesture with a requirement block and an
- * else-chain, view requirements and the {@code permission}/{@code pages} shorthands, a list item, item-drag, refresh,
- * a non-chest inventory type, a bottom-inventory canvas, the chest-only routing hint, a fill item, and a Bedrock
- * form). Pure JUnit and Configurate only, no MockBukkit, because the writer and the model it walks are Bukkit-free.
+ * else-chain, view requirements and the {@code permission}/{@code pages} shorthands, a paged and sorted list item,
+ * an {@code input:} and a {@code confirm:} continuation, item-drag, refresh, a non-chest inventory type, a
+ * bottom-inventory canvas, the chest-only routing hint, a fill item, and a Bedrock form). Pure JUnit and Configurate
+ * only, no MockBukkit, because the writer and the model it walks are Bukkit-free.
  *
  * <p>Equality is the records' own deep value equality: {@link MenuSpec} and every type it holds are records, so a
  * single {@code isEqualTo} compares title, rows, refresh, actions, items, decor, clicks, requirements, and the rest
@@ -34,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class MenuSpecRoundTripTest {
 
     private final MenuSpecLoader loader = new MenuSpecLoader();
-    private final MenuSpecWriter writer = new MenuSpecWriter();
+    private final MenuFileWriter writer = new MenuFileWriter();
 
     @Test
     void shippedExampleMenuRoundTrips() {
@@ -222,12 +223,24 @@ class MenuSpecRoundTripTest {
                 material = CHEST
                 list {
                   source = "warps"
+                  page-size = 12
+                  sorts = ["name", "created"]
                   template {
                     slots = ["12-14"]
                     material = ENDER_PEARL
                     name = "<yellow>%warp%"
                     click { left = ["warp:teleport"] }
                   }
+                }
+              }
+              continuing {
+                slot = 16
+                material = WRITABLE_BOOK
+                click {
+                  left = [ { do = "input:warp.rename", prompt = "New name?", default = "home",
+                             deny = ["message:cancelled"] } ]
+                  right = [ { do = "confirm:warp.delete", title = "<red>Delete it?",
+                              yes = ["command:delwarp home"], no = ["message:kept"] } ]
                 }
               }
               draggable {

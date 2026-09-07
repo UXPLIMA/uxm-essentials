@@ -13,8 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutcome;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
@@ -44,11 +44,11 @@ class MenuEditorServiceTest {
     void setUp() throws IOException {
         MenuBindings bindings = new MenuBindings();
         bindings.action("close", ctx -> {});
-        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuSpecWriter(), bindings, NOOP);
+        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuFileWriter(), bindings, NOOP);
         MenuSpec shop = loader.parse(
                 "title = \"<gold>Shop\"\nrows = 1\nitems { buy { slot = 0, material = EMERALD, click { left = [\"close\"] } } }");
         registered.put("shop", shop);
-        Files.writeString(menusDir.resolve("shop.conf"), new MenuSpecWriter().write(shop));
+        Files.writeString(menusDir.resolve("shop.conf"), new MenuFileWriter().write(shop));
         service = new MenuEditorService(
                 menusDir,
                 persistence,

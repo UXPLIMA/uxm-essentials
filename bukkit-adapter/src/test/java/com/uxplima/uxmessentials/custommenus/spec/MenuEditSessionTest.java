@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.custommenus.spec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.BufferedReader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -9,7 +11,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmlib.menu.spec.ItemType;
 import com.uxplima.uxmlib.menu.spec.LoreMode;
@@ -20,17 +22,20 @@ import com.uxplima.uxmlib.menu.spec.Ref;
 import com.uxplima.uxmlib.menu.spec.RefreshSpec;
 import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.junit.jupiter.api.Test;
+import org.spongepowered.configurate.ConfigurateException;
+import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * Plain-JUnit coverage of {@link MenuEditSession}, the mutable edit model the menu editor mutates before it writes.
  * The linchpin proof is a round-trip: clone a parsed spec, mutate it through the model's operations, {@code toSpec()}
- * it, serialize with {@link MenuSpecWriter}, re-load through {@link MenuSpecLoader}, and assert it equals the spec an
+ * it, serialize with {@link MenuFileWriter}, re-load through {@link MenuSpecLoader}, and assert it equals the spec an
  * operator would have written by hand, so the edit model and the writer compose without loss.
  */
 class MenuEditSessionTest {
 
     private final MenuSpecLoader loader = new MenuSpecLoader();
-    private final MenuSpecWriter writer = new MenuSpecWriter();
+    private final MenuFileWriter writer = new MenuFileWriter();
 
     @Test
     void cloneMutateAndWriteRoundTripsToTheExpectedSpec() {
@@ -243,7 +248,7 @@ class MenuEditSessionTest {
     }
 
     @Test
-    void theCommandBlockRidesTheSessionAndWritesBackWithTheSpec() {
+    void theCommandBlockRidesTheSessionAndWritesBackWithTheSpec() throws Exception {
         MenuSpec spec =
                 loader.parse("rows = 1\nitems { x { slot = 0, material = STONE, click { left = [\"close\"] } } }");
         OpenCommandSpec command = new OpenCommandSpec(
@@ -258,9 +263,31 @@ class MenuEditSessionTest {
         MenuEditSession session = MenuEditSession.from(spec, command);
 
         assertThat(session.command()).contains(command);
-        // The written file carries the command {} block, so re-reading it reproduces the same open command.
+        // The written file carries the command {} block, so re-reading it reproduces the same open command. The
+        // block is appended after the menu the library writes, so the assertion is on the parsed document rather
+        // than on the text: a concatenation that produced two documents would still contain both words.
         String hocon = writer.write(session.toSpec(), session.command().orElse(null));
-        assertThat(hocon).contains("command");
-        assertThat(hocon).contains("store");
+        ConfigurationNode root = parse(hocon);
+        assertThat(loader.parse(hocon)).isEqualTo(spec);
+        assertThat(root.node("command", "name").getString()).isEqualTo("shop");
+        assertThat(root.node("command", "aliases").getList(String.class)).containsExactly("store");
+        assertThat(root.node("command", "permission").getString()).isEqualTo("menu.shop");
+        assertThat(root.node("command", "usage").getString()).isEqualTo("/shop");
+        ConfigurationNode argument =
+                root.node("command", "arguments").childrenList().get(0);
+        assertThat(argument.node("name").getString()).isEqualTo("target");
+        assertThat(argument.node("type").getString()).isEqualTo("online-player");
+    }
+
+    /** Parse a written menu file as the one HOCON document it has to be, menu keys and command block together. */
+    private static ConfigurationNode parse(String hocon) {
+        try {
+            return HoconConfigurationLoader.builder()
+                    .source(() -> new BufferedReader(new StringReader(hocon)))
+                    .build()
+                    .load();
+        } catch (ConfigurateException failure) {
+            throw new IllegalStateException("the written menu file is not one HOCON document", failure);
+        }
     }
 }

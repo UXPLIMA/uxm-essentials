@@ -7,7 +7,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
 import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.Test;
@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The header a menu file teaches itself with, and what a save keeps of it.
  *
- * <p>{@link MenuSpecWriter} rebuilds a file out of the model, so everything the model does not hold is gone the first
+ * <p>{@link MenuFileWriter} rebuilds a file out of the model, so everything the model does not hold is gone the first
  * time an operator presses save in the editor. That took the header with it: the block of comments that opens the
  * shipped {@code menus/example.conf} is the only place an operator is told the grammar of the file they are editing,
  * and one save left them with a menu that works and a file that teaches nothing.
@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 class MenuSpecHeaderTest {
 
     private final MenuSpecLoader loader = new MenuSpecLoader();
-    private final MenuSpecWriter writer = new MenuSpecWriter();
+    private final MenuFileWriter writer = new MenuFileWriter();
 
     private static final String MENU = """
             title = "<gold>Shop"

@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmlib.menu.spec.ClickKind;
 import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
@@ -16,13 +16,13 @@ import org.junit.jupiter.api.Test;
 /**
  * Plain-JUnit coverage of the P4 click-action and view-requirement mutations {@link MenuEditSession} grew. Each proof
  * is a round-trip: clone a parsed spec, mutate a gesture's action list or the item's view requirement block, {@code
- * toSpec()} it, serialise with {@link MenuSpecWriter}, re-load through {@link MenuSpecLoader}, and assert the reloaded
+ * toSpec()} it, serialise with {@link MenuFileWriter}, re-load through {@link MenuSpecLoader}, and assert the reloaded
  * click / view carries the change, so the edit model and the P0 writer compose without loss.
  */
 class MenuClickRequirementEditTest {
 
     private final MenuSpecLoader loader = new MenuSpecLoader();
-    private final MenuSpecWriter writer = new MenuSpecWriter();
+    private final MenuFileWriter writer = new MenuFileWriter();
 
     @Test
     void addingAnActionToAGestureRoundTrips() {

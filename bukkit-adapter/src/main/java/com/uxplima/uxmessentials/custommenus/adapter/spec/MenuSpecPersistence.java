@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommand
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecException;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -17,24 +18,30 @@ import org.jspecify.annotations.Nullable;
  * spec service. It gates every write behind the same {@link MenuBindings#validate} check the loader runs on enable, so
  * a menu whose refs name an unregistered action, condition, placeholder, or list source is never written: an editor
  * cannot save a spec that would only be skipped with a warning the next time it loads. A spec that validates is
- * serialized through {@link MenuSpecWriter} and written to disk, replacing the file the loader will re-read.
+ * serialized through {@link MenuFileWriter} and written to disk, replacing the file the loader will re-read.
  *
  * <p>Bukkit-free by construction: it works with the pure spec model, the writer, and {@code java.nio}, so it can run
  * off the tick thread and is exercised by plain JUnit. It never reloads the engine itself. The caller triggers the
  * single-file reload once the write returns, and it never throws for an expected failure: an unwritable path is a
  * logged {@link Status#IO_ERROR} outcome, an invalid ref set a {@link Status#INVALID_REFS} outcome, so the command
  * can turn either into an operator message rather than a stack trace.
+ *
+ * <p>A third failure joins the first of those. The writer refuses a spec that the file grammar cannot hold rather
+ * than dropping the part it cannot spell, and the menu-property editor can build one: it offers rows, inventory-type
+ * and bottom-inventory as three independent fields, while a bottom-inventory menu is six rows and chest-only by
+ * definition. Such a save is reported as {@link Status#IO_ERROR} with the writer's own sentence in the log, because
+ * the outcome the operator needs is the same one: nothing was written, and the file on disk is untouched.
  */
 public final class MenuSpecPersistence {
 
     /** The extension every menu spec is written under: the one the engine's loader reads. */
     private static final String CONF_EXTENSION = ".conf";
 
-    private final MenuSpecWriter writer;
+    private final MenuFileWriter writer;
     private final MenuBindings bindings;
     private final Logger log;
 
-    public MenuSpecPersistence(MenuSpecWriter writer, MenuBindings bindings, Logger log) {
+    public MenuSpecPersistence(MenuFileWriter writer, MenuBindings bindings, Logger log) {
         this.writer = Objects.requireNonNull(writer, "writer");
         this.bindings = Objects.requireNonNull(bindings, "bindings");
         this.log = Objects.requireNonNull(log, "log");
@@ -44,7 +51,8 @@ public final class MenuSpecPersistence {
      * Validate {@code spec} against the live bindings and, when it is clean, serialize it (with the optional
      * {@code command} open-command block) to {@code menusDir/<name>.conf}. Returns the outcome rather than throwing:
      * {@link Status#INVALID_REFS} with the offending ids when validation fails (no file written), {@link
-     * Status#IO_ERROR} when the write fails, {@link Status#SAVED} otherwise.
+     * Status#IO_ERROR} when the write fails or the spec holds a shape the grammar cannot express (no file written
+     * either way), {@link Status#SAVED} otherwise.
      */
     public SaveResult save(Path menusDir, String name, MenuSpec spec, @Nullable OpenCommandSpec command) {
         Objects.requireNonNull(menusDir, "menusDir");
@@ -61,6 +69,9 @@ public final class MenuSpecPersistence {
             return SaveResult.saved();
         } catch (IOException failure) {
             log.warn("could not write menu {} : {}", name, String.valueOf(failure.getMessage()));
+            return SaveResult.ioError();
+        } catch (MenuSpecException unwritable) {
+            log.warn("could not write menu {} : {}", name, String.valueOf(unwritable.getMessage()));
             return SaveResult.ioError();
         }
     }

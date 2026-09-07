@@ -24,8 +24,8 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -114,7 +114,7 @@ class MenuEditorViewTest {
         writeMenu("beta", "<aqua>Beta");
         names.addAll(loader.loadFrom(menusDir).loadedNames());
 
-        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuSpecWriter(), bindings, NOOP);
+        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuFileWriter(), bindings, NOOP);
         MenuEditorService service = new MenuEditorService(
                 menusDir,
                 persistence,

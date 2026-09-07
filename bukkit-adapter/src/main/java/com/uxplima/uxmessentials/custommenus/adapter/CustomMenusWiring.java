@@ -39,8 +39,8 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpener
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuSwapListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.OpenerItems;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.OpenerSpec;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -163,7 +163,7 @@ public final class CustomMenusWiring {
         GuiPlusConvertService guiPlusConvert = new GuiPlusConvertService(menusDir, new GuiPlusConverter(), log);
         // The save path behind /menu save: the writer inverts the loader, the persistence service validates against the
         // same bindings before writing, and openCommandFor hands the command {} block back so a menu keeps its opener.
-        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuSpecWriter(), bindings, log);
+        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuFileWriter(), bindings, log);
         Function<String, Optional<OpenCommandSpec>> openCommandFor = name -> {
             Map<String, OpenCommandSpec> current = openCommands.get();
             return current == null ? Optional.empty() : Optional.ofNullable(current.get(name));

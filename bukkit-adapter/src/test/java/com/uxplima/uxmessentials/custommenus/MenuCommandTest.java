@@ -28,8 +28,8 @@ import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConverter;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.MenuCommand;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
+import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
-import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
@@ -736,7 +736,7 @@ class MenuCommandTest {
         OguiConvertService oguiConvert = new OguiConvertService(menusDir, new OguiConverter(), new NoopLogger());
         GuiPlusConvertService guiPlusConvert =
                 new GuiPlusConvertService(menusDir, new GuiPlusConverter(), new NoopLogger());
-        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuSpecWriter(), bindings, new NoopLogger());
+        MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuFileWriter(), bindings, new NoopLogger());
         MenuCommand command = new MenuCommand(
                 menus,
                 () -> List.copyOf(names),
