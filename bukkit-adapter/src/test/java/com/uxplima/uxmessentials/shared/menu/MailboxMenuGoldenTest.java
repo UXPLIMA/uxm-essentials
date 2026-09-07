@@ -31,11 +31,9 @@ import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -45,6 +43,11 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +95,7 @@ class MailboxMenuGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         mail = new FakeMail();
@@ -180,16 +183,16 @@ class MailboxMenuGoldenTest {
     /** Build the engine, register the mailbox bindings + specs, and open the list for the player. */
     private void openEngine() {
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
 
-        MailboxMenu menu = new MailboxMenu(menus, guiText, scheduler, mail, clearMail);
+        MailboxMenu menu = new MailboxMenu(menus, guiText, EngineScheduler.of(scheduler), mail, clearMail);
         menu.register(bindings, dataFolder, NOOP);
-        menu.open(viewer);
+        menu.open(player);
     }
 
     private void fireClick(int slot, ClickType type) {

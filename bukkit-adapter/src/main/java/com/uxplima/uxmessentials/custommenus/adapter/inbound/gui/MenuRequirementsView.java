@@ -15,18 +15,19 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuSchema;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuSchema;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -71,13 +72,12 @@ public final class MenuRequirementsView {
         this.view = EntityEditorView.<ReqTarget>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(this::title)
-                .valueLore(CustomMenusMessageKey.MENU_ITEM_EDITOR_VALUE_LORE)
-                .backName(CustomMenusMessageKey.MENU_ACTION_EDITOR_REQ_BACK)
+                .valueLore(CustomMenusMessageKey.MENU_ITEM_EDITOR_VALUE_LORE.key())
+                .backName(CustomMenusMessageKey.MENU_ACTION_EDITOR_REQ_BACK.key())
                 .properties(this::properties)
-                .onBack(onBack)
+                .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .build();
     }
 
@@ -87,7 +87,7 @@ public final class MenuRequirementsView {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(session, "session");
         Objects.requireNonNull(itemId, "itemId");
-        view.open(player, viewer, new ReqTarget(session, itemId));
+        view.open(player, new ReqTarget(session, itemId));
     }
 
     /** The item editor's "View requirements" row: value lore is the condition count, a click opens this editor. */
@@ -98,7 +98,7 @@ public final class MenuRequirementsView {
                 CustomMenusMessageKey.MENU_ACTION_EDITOR_REQUIREMENTS,
                 Material.COMPARATOR,
                 viewer -> Integer.toString(session.viewConditions(itemId).size()),
-                context -> open(context.player(), context.viewer(), session, itemId));
+                context -> open(context.viewer(), BukkitRefs.toRef(context.viewer()), session, itemId));
     }
 
     /** The property drawn at {@code slot}, exposed so a test can resolve it without firing a click. */
@@ -106,8 +106,9 @@ public final class MenuRequirementsView {
         return view.propertyAt(slot, new ReqTarget(session, itemId));
     }
 
-    private Component title(PlayerRef viewer, ReqTarget target) {
-        return guiText.text(viewer, CustomMenusMessageKey.MENU_ACTION_EDITOR_REQ_TITLE, Map.of("id", target.itemId()));
+    private Component title(Player viewer, ReqTarget target) {
+        return guiText.text(
+                viewer, CustomMenusMessageKey.MENU_ACTION_EDITOR_REQ_TITLE.key(), Map.of("id", target.itemId()));
     }
 
     private List<EditableProperty> properties(ReqTarget target) {
@@ -123,7 +124,7 @@ public final class MenuRequirementsView {
                 context -> openConditions(context, target));
     }
 
-    private void openConditions(ClickContext context, ReqTarget target) {
+    private void openConditions(PropertyClick context, ReqTarget target) {
         MenuRefListEditor.RefList list = new MenuRefListEditor.RefList(
                 CustomMenusMessageKey.MENU_ACTION_EDITOR_CONDITIONS_TITLE,
                 Map.of(),
@@ -136,7 +137,7 @@ public final class MenuRequirementsView {
 
     private EditableProperty minimumRow(ReqTarget target) {
         return new NumberProperty(
-                CustomMenusMessageKey.MENU_ACTION_EDITOR_MINIMUM,
+                CustomMenusMessageKey.MENU_ACTION_EDITOR_MINIMUM.key(),
                 Material.REPEATER,
                 () -> viewMinimum(target),
                 1,
@@ -155,7 +156,7 @@ public final class MenuRequirementsView {
                 context -> openDeny(context, target));
     }
 
-    private void openDeny(ClickContext context, ReqTarget target) {
+    private void openDeny(PropertyClick context, ReqTarget target) {
         MenuRefListEditor.RefList list = new MenuRefListEditor.RefList(
                 CustomMenusMessageKey.MENU_ACTION_EDITOR_DENY_TITLE,
                 Map.of(),

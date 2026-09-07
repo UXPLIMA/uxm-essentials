@@ -11,12 +11,12 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -56,7 +56,7 @@ public final class EconomyAdminGuiViews {
             Server server,
             PlayerPickerView picker,
             CurrencyPickerMenu currencyPicker,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput,
+            com.uxplima.uxmlib.gui.input.TextInput textInput,
             PlayerLookup players,
             EconomyProvider economy,
             EcoAdmin ecoAdmin,

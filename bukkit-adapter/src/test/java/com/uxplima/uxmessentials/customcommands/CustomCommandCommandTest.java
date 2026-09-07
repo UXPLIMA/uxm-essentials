@@ -233,7 +233,7 @@ class CustomCommandCommandTest {
                                 new SyncScheduler(),
                                 new TokenMessages(),
                                 new CreateWizard(
-                                        (player, viewer, request, onSubmit, onCancel) -> onCancel.run(),
+                                        (player, request, onSubmit, onCancel) -> onCancel.run(),
                                         folder,
                                         () -> Set.copyOf(state.get().catalog().ids()),
                                         new CommandFeedback(new TokenMessages()),

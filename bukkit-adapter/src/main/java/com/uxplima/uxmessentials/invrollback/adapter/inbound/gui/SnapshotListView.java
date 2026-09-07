@@ -23,7 +23,6 @@ import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -31,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -112,7 +112,6 @@ public final class SnapshotListView {
         EntityListView.<SnapshotCard>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(EntityListLayout.paginatedDefault(Material.CHEST))
                 .title(InvrollbackMessageKey.INVROLLBACK_GUI_TITLE)
                 .navNames(InvrollbackMessageKey.INVROLLBACK_GUI_PREV, InvrollbackMessageKey.INVROLLBACK_GUI_NEXT)

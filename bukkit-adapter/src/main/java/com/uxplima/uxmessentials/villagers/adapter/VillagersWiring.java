@@ -11,8 +11,6 @@ import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -38,6 +36,8 @@ import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerRestockSweep
 import com.uxplima.uxmessentials.villagers.application.VillagersConfig;
 import com.uxplima.uxmessentials.villagers.domain.RestockPolicy;
 import com.uxplima.uxmessentials.villagers.domain.VillagerProtectionPolicy;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

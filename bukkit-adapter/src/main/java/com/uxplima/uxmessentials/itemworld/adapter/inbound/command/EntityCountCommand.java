@@ -164,7 +164,7 @@ public final class EntityCountCommand extends ItemworldCommandSupport implements
                         e.getValue(),
                         iconMaterial(e.getKey()).name()))
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        view.open(ref(player), sorted, radius);
+        view.open(player, sorted, radius);
     }
 
     /** Tally the entities within {@code radius} of {@code player} by type; runs on the actor's region thread. */

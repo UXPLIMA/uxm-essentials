@@ -21,18 +21,10 @@ import com.uxplima.uxmessentials.communication.application.port.AnnouncementStor
 import com.uxplima.uxmessentials.communication.domain.StoredAnnouncement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -41,6 +33,17 @@ import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,7 +86,7 @@ class AnnouncementEditorViewTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         Guis.install(plugin);
         GuiText guiText = new GuiText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
@@ -93,16 +96,16 @@ class AnnouncementEditorViewTest {
                 TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         // The list stays a uxmLib EntityListView for now; the per-announcement editor and the settings screen open
         // through this one editor-capable engine, routed by the one listener registered here.
-        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
         MenuBindings bindings = new MenuBindings();
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
         MenuListener listener = new MenuListener(
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 editorRenderer,
                 menus.selectorOpener(),
@@ -111,7 +114,8 @@ class AnnouncementEditorViewTest {
         view = new AnnouncementEditorView(
                 menus,
                 guiText,
-                scheduler,
+                ThemeFile::shippedTheme,
+                EngineScheduler.of(scheduler),
                 new KeyMessages(),
                 store,
                 settingsStore,
@@ -152,7 +156,7 @@ class AnnouncementEditorViewTest {
     @Test
     void togglingEnabledPersistsThroughTheStore() {
         store.save(StoredAnnouncement.fresh("alpha", "one").withEnabled(false));
-        view.editor().open(player, viewer, store.find("alpha").orElseThrow());
+        view.editor().open(player, store.find("alpha").orElseThrow());
 
         fireClick(ENABLED_SLOT, ClickType.LEFT);
 
@@ -163,7 +167,7 @@ class AnnouncementEditorViewTest {
     @Test
     void togglingAChannelPersistsThroughTheStore() {
         store.save(StoredAnnouncement.fresh("alpha", "one")); // starts on CHAT only
-        view.editor().open(player, viewer, store.find("alpha").orElseThrow());
+        view.editor().open(player, store.find("alpha").orElseThrow());
 
         fireClick(TITLE_SLOT, ClickType.LEFT); // add the TITLE channel
 
@@ -267,7 +271,7 @@ class AnnouncementEditorViewTest {
     @Test
     void deleteIsGatedByAConfirmMenu() {
         store.save(StoredAnnouncement.fresh("alpha", "one"));
-        view.editor().open(player, viewer, store.find("alpha").orElseThrow());
+        view.editor().open(player, store.find("alpha").orElseThrow());
 
         fireClick(DELETE_SLOT, ClickType.LEFT); // opens the confirm menu, does not delete
         assertThat(store.exists("alpha")).isTrue();
@@ -290,8 +294,8 @@ class AnnouncementEditorViewTest {
                 .orElseThrow();
     }
 
-    private ClickContext context() {
-        return ClickContexts.carrier(player, viewer);
+    private PropertyClick context() {
+        return ClickContexts.carrier(player);
     }
 
     private void fireClick(int slot, ClickType type) {

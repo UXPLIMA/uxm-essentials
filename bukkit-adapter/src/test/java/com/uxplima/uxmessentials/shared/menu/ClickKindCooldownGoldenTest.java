@@ -15,17 +15,19 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,10 +95,10 @@ class ClickKindCooldownGoldenTest {
         bindings.action("record", ctx -> notes.add(ctx.arg()));
 
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         scheduler = new SyncScheduler();
-        menus = new Menus(renderer, scheduler, bindings.lists());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         MenuSpecLoader loader = new MenuSpecLoader();
         menus.registerSpec("gestures", loader.parse(GESTURES));
         menus.registerSpec("cooled", loader.parse(COOLED));
@@ -214,7 +216,7 @@ class ClickKindCooldownGoldenTest {
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 null,
                 null,
@@ -225,7 +227,7 @@ class ClickKindCooldownGoldenTest {
     }
 
     private void open(String specId) {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), specId, null);
+        menus.open(player, specId, null);
     }
 
     private void click(int slot, ClickType type) {

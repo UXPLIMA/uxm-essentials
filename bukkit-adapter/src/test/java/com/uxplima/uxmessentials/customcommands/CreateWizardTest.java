@@ -21,12 +21,11 @@ import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ArgumentKind;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +48,6 @@ class CreateWizardTest {
 
     private ServerMock server;
     private PlayerMock player;
-    private PlayerRef viewer;
     private ScriptedPrompt prompt;
     private final List<String> saved = new ArrayList<>();
     private Set<String> taken = Set.of();
@@ -58,7 +56,6 @@ class CreateWizardTest {
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer("Operator");
-        viewer = BukkitRefs.toRef(player);
         prompt = new ScriptedPrompt();
     }
 
@@ -83,7 +80,7 @@ class CreateWizardTest {
                 "done",
                 "save");
 
-        assertThat(wizard().start(player, viewer, "selam")).isTrue();
+        assertThat(wizard().start(player, "selam")).isTrue();
 
         CustomCommand written = loaded("selam");
         assertThat(written.literal().name()).isEqualTo("selamla");
@@ -102,14 +99,14 @@ class CreateWizardTest {
     void anIdAlreadyInUseIsRefusedBeforeTheFirstQuestion() {
         taken = Set.of("selam");
 
-        assertThat(wizard().start(player, viewer, "selam")).isFalse();
+        assertThat(wizard().start(player, "selam")).isFalse();
         assertThat(prompt.asked()).isEmpty();
         assertThat(directory.toFile().list()).isNullOrEmpty();
     }
 
     @Test
     void anIdThatIsNotAUsableFileNameIsRefusedToo() {
-        assertThat(wizard().start(player, viewer, "Not A Command")).isFalse();
+        assertThat(wizard().start(player, "Not A Command")).isFalse();
         assertThat(prompt.asked()).isEmpty();
     }
 
@@ -128,7 +125,7 @@ class CreateWizardTest {
                 "done",
                 "save");
 
-        assertThat(wizard().start(player, viewer, "selam")).isTrue();
+        assertThat(wizard().start(player, "selam")).isTrue();
 
         assertThat(loaded("selam").literal().name()).isEqualTo("selamla");
         assertThat(prompt.asked())
@@ -143,7 +140,7 @@ class CreateWizardTest {
     void cancellingAtTheLastStepWritesNothing() {
         prompt.script("selamla", "none", "none", "none", "yes", "done", "message:hello", "done", "no thanks");
 
-        wizard().start(player, viewer, "selam");
+        wizard().start(player, "selam");
 
         assertThat(Files.exists(directory.resolve("selam.conf"))).isFalse();
         assertThat(saved).isEmpty();
@@ -154,7 +151,7 @@ class CreateWizardTest {
         prompt.cancelAfter(3);
         prompt.script("selamla", "none", "none");
 
-        wizard().start(player, viewer, "selam");
+        wizard().start(player, "selam");
 
         assertThat(Files.exists(directory.resolve("selam.conf"))).isFalse();
         assertThat(saved).isEmpty();
@@ -194,8 +191,7 @@ class CreateWizardTest {
         }
 
         @Override
-        public void ask(
-                Player player, PlayerRef viewer, InputRequest request, Consumer<String> onSubmit, Runnable onCancel) {
+        public void ask(Player player, InputRequest request, Consumer<String> onSubmit, Runnable onCancel) {
             asked.add(request.key());
             if (asked.size() > cancelAfter || answers.isEmpty()) {
                 onCancel.run();

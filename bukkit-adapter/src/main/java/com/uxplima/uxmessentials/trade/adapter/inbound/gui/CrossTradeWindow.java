@@ -9,16 +9,19 @@ import java.util.Optional;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.ContentRegions;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -46,7 +49,8 @@ public final class CrossTradeWindow {
     public CrossTradeWindow(Messages messages, Menus menus, Path dataFolder, Logger log) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
-        this.spec = MenuSpecs.loadOrBundled(SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, log);
+        this.spec = MenuSpecs.loadOrBundled(
+                SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, EngineLog.of(log));
         this.offerSlots = ContentRegions.slots(spec, OFFER_REGION, SPEC_RESOURCE);
     }
 
@@ -67,7 +71,7 @@ public final class CrossTradeWindow {
         bindings.placeholder(
                 "trade_cross_title",
                 ctx -> messages.resolve(
-                        ctx.viewer(),
+                        BukkitRefs.toRef(ctx.viewer()),
                         TradeMessageKey.TRADE_WINDOW_TITLE,
                         Map.of("player", holder(ctx).remote().name())));
         bindings.action("trade:cross-confirm", action -> view.confirm(action.subject(CrossTradeHolder.class)));
@@ -77,12 +81,12 @@ public final class CrossTradeWindow {
 
     /** Show this window to {@code holder}'s local player, carrying the holder as the menu's subject. */
     void open(CrossTradeHolder holder) {
-        menus.open(holder.local(), SPEC_ID, holder);
+        LivePlayers.of(holder.local()).ifPresent(viewer -> menus.open(viewer, SPEC_ID, holder));
     }
 
     /** The live window {@code viewer} has open, when it is still this one. Read on the viewer's own thread. */
     Optional<Inventory> live(PlayerRef viewer) {
-        return menus.openWindow(viewer, SPEC_ID);
+        return LivePlayers.of(viewer).flatMap(live -> menus.openWindow(live, SPEC_ID));
     }
 
     /** Read the staked items out of a live window, as a positional array of copies. */

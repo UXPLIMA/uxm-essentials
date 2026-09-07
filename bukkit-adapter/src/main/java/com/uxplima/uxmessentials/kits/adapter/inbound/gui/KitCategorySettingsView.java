@@ -12,16 +12,18 @@ import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -102,8 +104,8 @@ public final class KitCategorySettingsView {
         bindings.action("kits:cat-set-slot", this::promptSlot);
         bindings.action("kits:cat-set-parent", this::openParent);
         bindings.action("kits:cat-set-delete", this::delete);
-        bindings.action("kits:cat-set-back", ctx -> onBack.accept(ctx.player(), ctx.viewer()));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        bindings.action("kits:cat-set-back", ctx -> onBack.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open the settings panel for {@code category}; reads no port, the category is the subject the panel renders. */
@@ -111,19 +113,19 @@ public final class KitCategorySettingsView {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(category, "category");
-        menus.open(viewer, SPEC_ID, category);
+        menus.open(player, SPEC_ID, category);
     }
 
     /** Capture a display name through the input seam, then save it and re-open; cancel re-opens unchanged. */
     private void promptName(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         KitCategory category = subject(ctx);
         textInput.prompt(
                 player,
-                viewer,
                 InputRequest.of(
-                        "kit.category.display-name", KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_PROMPT),
+                        "kit.category.display-name",
+                        KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_PROMPT.key()),
                 name -> applyName(player, viewer, category, name),
                 () -> open(player, viewer, category));
     }
@@ -136,7 +138,7 @@ public final class KitCategorySettingsView {
     /** Copy the item in the operator's main hand as the icon material, then save and re-open; empty hand is rejected. */
     private void setMaterial(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         KitCategory category = subject(ctx);
         org.bukkit.Material hand = player.getInventory().getItemInMainHand().getType();
         if (hand.isAir()) {
@@ -150,13 +152,13 @@ public final class KitCategorySettingsView {
     /** Capture pipe-separated lore through the input seam, then save it and re-open; cancel re-opens unchanged. */
     private void promptLore(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         KitCategory category = subject(ctx);
         textInput.prompt(
                 player,
-                viewer,
                 InputRequest.of(
-                        "kit.category.display-lore", KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_PROMPT),
+                        "kit.category.display-lore",
+                        KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_PROMPT.key()),
                 input -> applyLore(player, viewer, category, input),
                 () -> open(player, viewer, category));
     }
@@ -169,12 +171,11 @@ public final class KitCategorySettingsView {
     /** Capture a sorting-slot index through the input seam, then save it and re-open; a non-number is rejected. */
     private void promptSlot(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         KitCategory category = subject(ctx);
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("kit.category.slot", KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT),
+                InputRequest.of("kit.category.slot", KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT.key()),
                 input -> applySlot(player, viewer, category, input),
                 () -> open(player, viewer, category));
     }
@@ -198,14 +199,14 @@ public final class KitCategorySettingsView {
     /** Open the engine parent-category selector; choosing a parent saves it and re-opens this panel. */
     private void openParent(MenuActionContext ctx) {
         if (parentSelector != null) {
-            parentSelector.open(ctx.player(), ctx.viewer(), subject(ctx));
+            parentSelector.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), subject(ctx));
         }
     }
 
     /** Delete the category through the repository, then return to the manager: the old delete button's effect. */
     private void delete(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         categoryRepository.delete(subject(ctx).id());
         onBack.accept(player, viewer);
     }
@@ -220,7 +221,8 @@ public final class KitCategorySettingsView {
     private String parentName(MenuContext ctx) {
         return subject(ctx)
                 .parentCategoryId()
-                .orElseGet(() -> messages.resolve(ctx.viewer(), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
+                .orElseGet(() -> messages.resolve(
+                        BukkitRefs.toRef(ctx.viewer()), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
     }
 
     private KitCategory subject(MenuContext ctx) {

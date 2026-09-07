@@ -14,18 +14,20 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -96,7 +98,7 @@ public final class KitCategoryManagerMenu {
         bindings.action("kits:category-manager-open", this::openClicked);
         bindings.action("kits:category-manager-create", this::createClicked);
         bindings.action("kits:category-manager-back", this::backClicked);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the category manager for {@code viewer}; a category click opens its settings, create prompts for an id. */
@@ -104,7 +106,7 @@ public final class KitCategoryManagerMenu {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         scheduler.onEntity(
-                viewer, () -> menus.open(viewer, SPEC_ID, new Listing(List.copyOf(categoryRepository.all()))));
+                viewer, () -> menus.open(player, SPEC_ID, new Listing(List.copyOf(categoryRepository.all()))));
     }
 
     /**
@@ -113,7 +115,7 @@ public final class KitCategoryManagerMenu {
      */
     private String lore(MenuContext ctx) {
         KitCategory category = categoryOf(ctx);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         List<String> lines = new ArrayList<>(category.displayLore());
         lines.add("");
         lines.add(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_ICON_ID, Map.of("id", category.id())));
@@ -132,17 +134,16 @@ public final class KitCategoryManagerMenu {
 
     /** Left-click a category icon: open its settings panel. */
     private void openClicked(MenuActionContext ctx) {
-        openSettings(ctx.player(), ctx.viewer(), ctx.entry(KitCategory.class));
+        openSettings(ctx.player(), BukkitRefs.toRef(ctx.viewer()), ctx.entry(KitCategory.class));
     }
 
     /** Left-click create: prompt for a category id, then save it and open its settings. */
     private void createClicked(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("kit.category.create-name", KitsMessageKey.KIT_EDITOR_CATEGORY_PROMPT_CREATE),
+                InputRequest.of("kit.category.create-name", KitsMessageKey.KIT_EDITOR_CATEGORY_PROMPT_CREATE.key()),
                 name -> create(player, viewer, name),
                 () -> open(player, viewer));
     }
@@ -150,7 +151,7 @@ public final class KitCategoryManagerMenu {
     /** Left-click back: reopen the kit manager, changing nothing. */
     private void backClicked(MenuActionContext ctx) {
         if (onBack != null) {
-            onBack.accept(ctx.player(), ctx.viewer());
+            onBack.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
         }
     }
 

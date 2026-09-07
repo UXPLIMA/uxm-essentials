@@ -6,6 +6,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import org.junit.jupiter.api.AfterEach;
@@ -98,6 +99,6 @@ class PdcReminderPreferencesTest {
     }
 
     private static PlayerRef ref(PlayerMock p) {
-        return new PlayerRef(p.getUniqueId(), p.getName());
+        return BukkitRefs.toRef(p);
     }
 }

@@ -3,9 +3,9 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
 
 /**
  * The input slice of the action vocabulary: it registers the {@code input} and {@code confirm} ids so a spec that
@@ -14,7 +14,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
  * and the other action packs.
  *
  * <p>The real behaviour of these two steps is <em>not</em> here. It lives in the click dispatcher, which reads the
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Continuation Continuation} the loader attaches
+ * {@link com.uxplima.uxmlib.menu.spec.Continuation Continuation} the loader attaches
  * to the ref and splits the action chain around it, because their outcome arrives on a later callback and cannot run
  * inline through a plain action handler. On the flat success path the dispatcher intercepts the step before it ever
  * reaches these handlers, so they only fire when the step was written somewhere the dispatcher does not intercept, an

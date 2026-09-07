@@ -10,12 +10,7 @@ import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -27,6 +22,12 @@ import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -108,7 +109,7 @@ public final class WorldCreateMenu {
         bindings.action("worlds:create-generator-next", ctx -> cycleGenerator(ctx, false));
         bindings.action("worlds:create-generator-prev", ctx -> cycleGenerator(ctx, true));
         bindings.action("worlds:create-confirm", this::create);
-        bindings.action("worlds:create-back", ctx -> reopenList.accept(ctx.player(), ctx.viewer()));
+        bindings.action("worlds:create-back", ctx -> reopenList.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
         menus.registerSpec(SPEC_ID, WorldEditorSpecs.load(SPEC_RESOURCE, ROWS, dataFolder, log));
     }
 
@@ -122,14 +123,14 @@ public final class WorldCreateMenu {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(draft, "draft");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, draft));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, draft));
     }
 
     private void cycleEnvironment(MenuActionContext ctx, boolean backward) {
         WorldCreateDraft draft = draft(ctx);
         open(
                 ctx.player(),
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 draft.withEnvironment(cycle(WorldEnvironment.values(), draft.environment(), backward)));
     }
 
@@ -137,26 +138,25 @@ public final class WorldCreateMenu {
         WorldCreateDraft draft = draft(ctx);
         open(
                 ctx.player(),
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 draft.withWorldType(cycle(WorldGenType.values(), draft.worldType(), backward)));
     }
 
     private void cycleGenerator(MenuActionContext ctx, boolean backward) {
         WorldCreateDraft draft = draft(ctx);
-        open(ctx.player(), ctx.viewer(), draft.withGenerator(nextGenerator(draft.generator(), backward)));
+        open(
+                ctx.player(),
+                BukkitRefs.toRef(ctx.viewer()),
+                draft.withGenerator(nextGenerator(draft.generator(), backward)));
     }
 
     private void promptName(MenuActionContext ctx) {
         WorldCreateDraft draft = draft(ctx);
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
-        InputRequest request = InputRequest.of(NAME_INPUT_KEY, WorldEditorMessageKey.CREATE_NAME_PROMPT);
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+        InputRequest request = InputRequest.of(NAME_INPUT_KEY, WorldEditorMessageKey.CREATE_NAME_PROMPT.key());
         textInput.prompt(
-                player,
-                viewer,
-                request,
-                line -> applyName(player, viewer, draft, line),
-                () -> open(player, viewer, draft));
+                player, request, line -> applyName(player, viewer, draft, line), () -> open(player, viewer, draft));
     }
 
     /** Validate the typed name with the same shape {@link WorldName} enforces, then re-open with it; reject otherwise. */
@@ -174,14 +174,10 @@ public final class WorldCreateMenu {
     private void promptSeed(MenuActionContext ctx) {
         WorldCreateDraft draft = draft(ctx);
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
-        InputRequest request = InputRequest.of(SEED_INPUT_KEY, WorldEditorMessageKey.CREATE_SEED_PROMPT);
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+        InputRequest request = InputRequest.of(SEED_INPUT_KEY, WorldEditorMessageKey.CREATE_SEED_PROMPT.key());
         textInput.prompt(
-                player,
-                viewer,
-                request,
-                line -> applySeed(player, viewer, draft, line),
-                () -> open(player, viewer, draft));
+                player, request, line -> applySeed(player, viewer, draft, line), () -> open(player, viewer, draft));
     }
 
     /** Parse the typed seed (empty clears it) and re-open with it; a non-number sends the existing rejection. */
@@ -206,7 +202,7 @@ public final class WorldCreateMenu {
     private void create(MenuActionContext ctx) {
         WorldCreateDraft draft = draft(ctx);
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         if (!draft.hasName()) {
             notifier.send(viewer, WorldEditorMessageKey.CREATE_NAME_REQUIRED, Map.of());
             open(player, viewer, draft);

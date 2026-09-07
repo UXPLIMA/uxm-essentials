@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -164,7 +165,7 @@ class BukkitRewardApplierTest {
     }
 
     private PlayerRef ref() {
-        return new PlayerRef(voter.getUniqueId(), voter.getName());
+        return BukkitRefs.toRef(voter);
     }
 
     private static void fillInventory(PlayerMock player) {

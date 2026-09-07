@@ -21,18 +21,20 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -121,8 +123,8 @@ public final class EconomyTargetMenu {
         bindings.action("economy:target-reset", this::confirmReset);
         bindings.action("economy:target-history", this::openHistory);
         bindings.action("economy:target-select-currency", this::openCurrencyPicker);
-        bindings.action("economy:target-back", ctx -> onBack.accept(ctx.player(), ctx.viewer()));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        bindings.action("economy:target-back", ctx -> onBack.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open the manage screen for {@code target} with the default currency active. */
@@ -142,7 +144,7 @@ public final class EconomyTargetMenu {
         Objects.requireNonNull(active, "active");
         scheduler.async(() -> {
             List<Money> balances = readBalances(target);
-            menus.open(viewerRef, SPEC_ID, new TargetSubject(target, active, List.copyOf(balances)));
+            menus.open(viewer, SPEC_ID, new TargetSubject(target, active, List.copyOf(balances)));
         });
     }
 
@@ -158,7 +160,7 @@ public final class EconomyTargetMenu {
     private String balancesLore(MenuContext ctx) {
         return subject(ctx).balances().stream()
                 .map(balance -> messages.resolve(
-                        ctx.viewer(),
+                        BukkitRefs.toRef(ctx.viewer()),
                         EconomyMessageKey.ECO_ADMIN_GUI_TARGET_HEAD_LORE,
                         Map.of("eco_currency", balance.currency().plural(), "eco_amount", notifier.amount(balance))))
                 .collect(Collectors.joining("\n"));
@@ -167,12 +169,11 @@ public final class EconomyTargetMenu {
     /** Capture an amount through the input seam, then dispatch {@code verb} for the active currency, exactly as before. */
     private void prompt(MenuActionContext ctx, EcoAdminOps.Verb verb) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         TargetSubject subject = ctx.subject(TargetSubject.class);
         textInput.prompt(
                 viewer,
-                viewerRef,
-                InputRequest.of("eco.amount", EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT),
+                InputRequest.of("eco.amount", EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT.key()),
                 text -> applyAmount(viewer, viewerRef, subject.target(), subject.active(), verb, text),
                 () -> open(viewer, viewerRef, subject.target(), subject.active()));
     }
@@ -198,14 +199,14 @@ public final class EconomyTargetMenu {
     /** Confirm-gate the reset through the engine confirm dialog; yes zeroes the balance off-tick and re-opens. */
     private void confirmReset(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         TargetSubject subject = ctx.subject(TargetSubject.class);
         PlayerRef target = subject.target();
         Currency active = subject.active();
         Component title = guiText.text(
                 viewerRef, EconomyMessageKey.ECO_ADMIN_GUI_RESET_CONFIRM_TITLE, Map.of("eco_target", target.name()));
         menus.confirm(
-                viewerRef,
+                ctx.viewer(),
                 title,
                 () -> {
                     scheduler.async(() -> ops.reset(viewerRef, target, active));
@@ -224,7 +225,7 @@ public final class EconomyTargetMenu {
     /** Open the shared picker; choosing a currency re-opens this screen with it active (subject carries the new active). */
     private void openCurrencyPicker(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         TargetSubject subject = ctx.subject(TargetSubject.class);
         PlayerRef target = subject.target();
         List<Currency> all = List.copyOf(currencies.all());

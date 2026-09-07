@@ -6,11 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 import java.util.function.BiFunction;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmlib.menu.eval.PageRequest;
+import com.uxplima.uxmlib.menu.eval.PagedResult;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.Test;
 
 class PagedListSourceRegistryTest {

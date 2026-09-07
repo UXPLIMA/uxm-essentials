@@ -9,16 +9,16 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -96,10 +96,8 @@ public final class ModerationGuiViews {
                 revoker,
                 clock,
                 detailLayout,
-                (player, viewer) -> listHolder[0].open(viewer),
-                (player, punishment) -> historyMenu.open(
-                        com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(player),
-                        punishment.target()));
+                (player, viewer) -> listHolder[0].open(player),
+                (player, punishment) -> historyMenu.open(player, punishment.target()));
 
         ModerationActiveMenu list =
                 new ModerationActiveMenu(menus, scheduler, repository, players, messages, clock, detail);
@@ -112,7 +110,7 @@ public final class ModerationGuiViews {
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        list.open(viewer);
+        list.open(player);
     }
 
     /**
@@ -124,7 +122,7 @@ public final class ModerationGuiViews {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(target, "target");
-        historyMenu.open(viewer, target.uuid());
+        historyMenu.open(player, target.uuid());
     }
 
     private static EntityEditorLayout detailCodeDefault() {

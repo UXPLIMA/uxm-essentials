@@ -33,13 +33,8 @@ import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -52,6 +47,13 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -120,10 +122,15 @@ class CustomCommandEndToEndTest {
         permissions = new FakePermissions();
         permissions.grant(NODE);
         GuiText guiText = new GuiText(new KeyMessages());
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, new PlaceholderRegistry()), new ConditionRegistry());
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry()), new ConditionRegistry());
         Menus menus = new Menus(
-                renderer, scheduler, new ListSourceRegistry(), null, registry.registry(), new ConditionRegistry());
+                renderer,
+                EngineScheduler.of(scheduler),
+                new ListSourceRegistry(),
+                null,
+                registry.registry(),
+                new ConditionRegistry());
         runner = new RunCustomCommand(
                 permissions,
                 cooldowns,

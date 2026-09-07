@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -139,7 +140,7 @@ class PlayerWarpSubcommandWiringTest {
     }
 
     private static PlayerRef refOf(PlayerMock player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     private void dispatch(PlayerMock sender, String input) {

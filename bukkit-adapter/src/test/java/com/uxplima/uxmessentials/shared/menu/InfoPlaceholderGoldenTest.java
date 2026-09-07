@@ -16,16 +16,16 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.InfoPlaceholders;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,7 +90,7 @@ class InfoPlaceholderGoldenTest {
     @Test
     void timeInventoryAndStatisticPlaceholdersRenderThroughTheOpenPath() {
         menus.registerSpec("panel", new MenuSpecLoader().parse(HOCON));
-        menus.open(new PlayerRef(viewer.getUniqueId(), viewer.getName()), "panel", null);
+        menus.open(viewer, "panel", null);
 
         ItemStack item = topItem();
         assertThat(plainName(item)).isEqualTo("DIAMOND x5");
@@ -106,7 +106,7 @@ class InfoPlaceholderGoldenTest {
     void everyViewerStatePlaceholderFailsSoftToEmptyForAnOfflineViewer() {
         // A random UUID no online player owns: Bukkit.getPlayer returns null, so each viewer-state read is empty,
         // never a throw. server_date still resolves: it reads the real clock, not the viewer.
-        MenuContext offline = MenuContext.of(new PlayerRef(UUID.randomUUID(), "Ghost"), null, 0);
+        MenuContext offline = MenuContext.of(TestViewer.of(UUID.randomUUID(), "Ghost"), null, 0);
 
         assertThat(bindings.placeholders().resolve("stat_MOB_KILLS", offline)).contains("");
         assertThat(bindings.placeholders().resolve("world_time", offline)).contains("");

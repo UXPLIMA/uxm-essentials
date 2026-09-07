@@ -4,11 +4,11 @@ import java.util.List;
 
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentClick;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentProvider;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ContentRegionSpec;
+import com.uxplima.uxmlib.menu.providers.ContentClick;
+import com.uxplima.uxmlib.menu.providers.ContentProvider;
+import com.uxplima.uxmlib.menu.providers.ContentRegions;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ContentRegionSpec;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

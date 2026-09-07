@@ -19,7 +19,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -27,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -105,7 +105,6 @@ public final class JailGuiFlow {
         EntityListView<String> chooser = EntityListView.<String>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(chooserLayout)
                 .title(ModerationMessageKey.MOD_GUI_JAIL_CHOOSE_TITLE)
                 .navNames(ModerationMessageKey.MOD_GUI_JAIL_CHOOSE_PREV, ModerationMessageKey.MOD_GUI_JAIL_CHOOSE_NEXT)

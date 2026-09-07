@@ -10,11 +10,11 @@ import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -59,8 +59,7 @@ public final class KitCreatePrompt {
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("kit.create-name", KitsMessageKey.KIT_EDITOR_PROMPT_CREATE),
+                InputRequest.of("kit.create-name", KitsMessageKey.KIT_EDITOR_PROMPT_CREATE.key()),
                 name -> onName(player, viewer, name, reopen),
                 reopen);
     }

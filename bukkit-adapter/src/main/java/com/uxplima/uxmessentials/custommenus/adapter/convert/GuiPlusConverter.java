@@ -28,7 +28,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
  * mirroring a source class: a GUI is a top-level {@code type} / {@code rows} / {@code title} / {@code permission} plus
  * a {@code scenes} map, and each scene holds an {@code items} map of typed {@code click-events} and {@code conditions}.
  * It emits the {@code title} / {@code rows} / {@code items { … }} shape
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader} loads, mirroring the sibling
+ * {@link com.uxplima.uxmlib.menu.spec.MenuSpecLoader} loads, mirroring the sibling
  * {@link DeluxeMenusConverter}, {@link ZMenuConverter} and {@link OguiConverter}.
  *
  * <p>GUIPlus is multi-<em>scene</em> (a scene is a page/state we do not model) so only the first scene is converted

@@ -9,13 +9,10 @@ import java.util.Objects;
 import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -23,6 +20,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -70,16 +72,17 @@ public final class RtpMenu {
         bindings.placeholder("rtp_world_icon", ctx -> rowOf(ctx).icon());
         bindings.placeholder("rtp_world_name", ctx -> rowOf(ctx).name());
         bindings.action("teleport:rtp-world", this::clickWorld);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
      * Open the world picker for {@code viewer} on their entity thread. The RTP-enabled world set and each tile's name
      * are resolved there off warm server reads and the catalog, then handed to the engine as the subject.
      */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, level(viewer)));
+        scheduler.onEntity(
+                BukkitRefs.toRef(viewer), () -> menus.open(viewer, SPEC_ID, level(BukkitRefs.toRef(viewer))));
     }
 
     private WorldRow rowOf(MenuContext ctx) {
@@ -114,7 +117,7 @@ public final class RtpMenu {
     /** Random-teleport the viewer within the clicked world and close the menu, on the viewer's entity thread. */
     private void clickWorld(MenuActionContext ctx) {
         WorldRow row = ctx.entry(WorldRow.class);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         scheduler.onEntity(viewer, () -> {
             services.notifier().send(viewer, TeleportMessageKey.RTP_SEARCHING);
             services.resolveRtp().background(viewer, row.world());

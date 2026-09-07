@@ -13,21 +13,23 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.LastMenu;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,17 +73,17 @@ class BackStackGoldenTest {
 
         GuiText guiText = new GuiText(new KeyMessages());
         bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         scheduler = new SyncScheduler();
         loader = new MenuSpecLoader();
         lastMenu = new LastMenu();
-        menus = new Menus(renderer, scheduler, bindings.lists(), null, null, null, lastMenu);
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), null, null, null, lastMenu);
         MenuVocabulary.registerActions(bindings, menus, true, new RecordingLogger());
         menus.registerSpec("a", loader.parse(A_HOCON));
         menus.registerSpec("b", loader.parse(B_HOCON));
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -130,22 +132,18 @@ class BackStackGoldenTest {
 
     @Test
     void backOnAnEngineWiredWithoutAHistoryJustCloses() {
-        Menus plain = new Menus(renderer, scheduler, bindings.lists());
+        Menus plain = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         plain.registerSpec("a", loader.parse(A_HOCON));
-        plain.open(ref(), "a", null);
+        plain.open(player, "a", null);
         assertThat(menuIsOpen()).isTrue();
 
-        plain.back(ref());
+        plain.back(player);
 
         assertThat(menuIsOpen()).isFalse();
     }
 
     private void open(String specId) {
-        menus.open(ref(), specId, null);
-    }
-
-    private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        menus.open(player, specId, null);
     }
 
     private void leftClick(int slot) {

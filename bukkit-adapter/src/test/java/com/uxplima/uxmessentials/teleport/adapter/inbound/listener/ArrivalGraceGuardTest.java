@@ -12,6 +12,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.potion.PotionEffectType;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -109,7 +110,7 @@ class ArrivalGraceGuardTest {
     }
 
     private static PlayerRef ref(PlayerMock player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** A clock the test advances to cross the grace window boundary. */

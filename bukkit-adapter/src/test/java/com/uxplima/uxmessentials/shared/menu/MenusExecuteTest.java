@@ -8,21 +8,23 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.Ref;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,7 +74,7 @@ class MenusExecuteTest {
 
         assertThatNullPointerException().isThrownBy(() -> menus.execute(null, Ref.parse("record:hi")));
         assertThatNullPointerException()
-                .isThrownBy(() -> menus.execute(new PlayerRef(server.addPlayer().getUniqueId(), "x"), null));
+                .isThrownBy(() -> menus.execute(TestViewer.of(server.addPlayer().getUniqueId(), "x"), null));
     }
 
     @Test
@@ -87,7 +89,7 @@ class MenusExecuteTest {
         Menus menus = engine(bindings);
         PlayerMock steve = server.addPlayer("Steve");
 
-        menus.execute(new PlayerRef(steve.getUniqueId(), steve.getName()), Ref.parse("record:hi"));
+        menus.execute(steve, Ref.parse("record:hi"));
 
         assertThat(ranFor.get()).isEqualTo("Steve");
         assertThat(ranArg.get()).isEqualTo("hi");
@@ -96,10 +98,10 @@ class MenusExecuteTest {
     @Test
     void executeOnAnEngineWithoutAnActionRegistryIsANoOp() {
         // The list/spec-only engine carries no action registry, so execute runs nothing rather than failing.
-        Menus menus = new Menus(renderer(), new SyncScheduler(), new ListSourceRegistry());
+        Menus menus = new Menus(renderer(), EngineScheduler.of(new SyncScheduler()), new ListSourceRegistry());
         PlayerMock steve = server.addPlayer("Steve");
 
-        menus.execute(new PlayerRef(steve.getUniqueId(), steve.getName()), Ref.parse("record:hi"));
+        menus.execute(steve, Ref.parse("record:hi"));
         // No throw is the assertion; there is no registry to dispatch through.
     }
 
@@ -107,7 +109,7 @@ class MenusExecuteTest {
     private Menus engine(MenuBindings bindings) {
         return new Menus(
                 renderer(),
-                new SyncScheduler(),
+                EngineScheduler.of(new SyncScheduler()),
                 new ListSourceRegistry(),
                 null,
                 bindings.actions(),
@@ -116,7 +118,8 @@ class MenusExecuteTest {
     }
 
     private static MenuRenderer renderer() {
-        ItemRenderer itemRenderer = new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry());
+        ItemRenderer itemRenderer =
+                new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, new PlaceholderRegistry());
         return new MenuRenderer(itemRenderer, new ConditionRegistry());
     }
 

@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
@@ -103,7 +104,7 @@ class KitBrowseGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         repository = new RecordingRepository();
         categories = new StubCategoryRepository();

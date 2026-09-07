@@ -55,6 +55,9 @@ import com.uxplima.uxmessentials.messaging.domain.MailBox;
 import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.presence.adapter.outbound.InMemoryPresenceStore;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -265,19 +268,17 @@ class MessagingSendPathTest {
     private MessagingGuiViews guiViews() {
         var plugin = MockBukkit.createMockPlugin();
         var guiText = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages());
-        var textInput = com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit.create(
+        var textInput = com.uxplima.uxmlib.gui.input.TextInputTestKit.create(
                 plugin, guiText, scheduler, Path.of("nonexistent"), NO_LOG);
         var layouts = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(guiDir, NO_LOG);
-        var bindings = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
-        var itemRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
-                guiText, bindings.placeholders());
-        var renderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
-                itemRenderer, bindings.conditions());
-        var menus = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
-                renderer, scheduler, bindings.lists());
+        var bindings = new com.uxplima.uxmlib.menu.binding.MenuBindings();
+        var itemRenderer = new com.uxplima.uxmlib.menu.render.ItemRenderer(
+                guiText, ThemeFile::shippedTheme, bindings.placeholders());
+        var renderer = new com.uxplima.uxmlib.menu.render.MenuRenderer(itemRenderer, bindings.conditions());
+        var menus = new com.uxplima.uxmlib.menu.Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         return MessagingGuiViews.create(
                 guiText,
-                scheduler,
+                EngineScheduler.of(scheduler),
                 new KeyMessages(),
                 DENY_ALL,
                 services(),
@@ -368,7 +369,7 @@ class MessagingSendPathTest {
     }
 
     private static PlayerRef ref(Player player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** Resolves online players against the live mock server; "Ghost" is the one known offline profile. */

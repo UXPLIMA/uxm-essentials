@@ -22,25 +22,27 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.EditorSpec;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,7 +69,6 @@ class NpcEquipmentPropertyTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
     private Menus menus;
@@ -79,7 +80,6 @@ class NpcEquipmentPropertyTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         worn = new EnumMap<>(EquipmentSlot.class);
@@ -157,7 +157,7 @@ class NpcEquipmentPropertyTest {
         installEngine(recording);
         player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_HELMET));
 
-        menus.openEditor(viewer, editorSpec(), null);
+        menus.openEditor(player, editorSpec(), null);
         fireClick(PROP_SLOT, ClickType.LEFT); // open the equipment grid child
         fireClick(HEAD_SLOT, ClickType.LEFT); // set from hand + reopen grid
         fireClick(BACK_SLOT, ClickType.LEFT); // back → parent editor
@@ -170,15 +170,15 @@ class NpcEquipmentPropertyTest {
     }
 
     private void installEngine(Scheduler sched) {
-        EditorRenderer editorRenderer = new EditorRenderer(guiText);
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, sched, new ListSourceRegistry(), editorRenderer);
+        menus = new Menus(renderer, EngineScheduler.of(sched), new ListSourceRegistry(), editorRenderer);
         MenuListener listener = new MenuListener(
                 renderer,
                 new ActionRegistry(),
                 new ConditionRegistry(),
-                sched,
+                EngineScheduler.of(sched),
                 plugin,
                 editorRenderer,
                 menus.selectorOpener(),
@@ -187,17 +187,17 @@ class NpcEquipmentPropertyTest {
     }
 
     private void openEditor() {
-        menus.openEditor(viewer, editorSpec(), null);
+        menus.openEditor(player, editorSpec(), null);
     }
 
     private EditorSpec editorSpec() {
         return EditorSpec.builder()
                 .layout(layout())
                 .title((v, subject) -> Component.text("edit"))
-                .valueLore(Key.VALUE_LORE)
-                .backName(Key.BACK)
+                .valueLore(Key.VALUE_LORE.key())
+                .backName(Key.BACK.key())
                 .properties(subject -> List.<EditableProperty>of(equipmentProperty()))
-                .onBack((p, v) -> {})
+                .onBack(p -> {})
                 .build();
     }
 
@@ -213,7 +213,7 @@ class NpcEquipmentPropertyTest {
                     worn.remove(slot);
                     return null;
                 },
-                scheduler);
+                EngineScheduler.of(scheduler));
     }
 
     private static EntityEditorLayout layout() {

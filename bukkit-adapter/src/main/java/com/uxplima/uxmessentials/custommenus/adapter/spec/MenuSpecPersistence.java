@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
 import org.jspecify.annotations.Nullable;
 
 /**

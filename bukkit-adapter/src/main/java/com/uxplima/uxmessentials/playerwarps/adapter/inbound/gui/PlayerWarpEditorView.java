@@ -23,21 +23,21 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpEffects;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.EnumProperty;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -97,16 +97,15 @@ public final class PlayerWarpEditorView {
         this.view = EntityEditorView.<OwnedWarp>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(this::title)
-                .valueLore(PlayerwarpsMessageKey.PWARP_GUI_EDITOR_VALUE_LORE)
-                .backName(PlayerwarpsMessageKey.PWARP_GUI_EDITOR_BACK)
+                .valueLore(PlayerwarpsMessageKey.PWARP_GUI_EDITOR_VALUE_LORE.key())
+                .backName(PlayerwarpsMessageKey.PWARP_GUI_EDITOR_BACK.key())
                 .properties(this::properties)
-                .onBack(onBack)
+                .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .onDelete(
-                        PlayerwarpsMessageKey.PWARP_GUI_EDITOR_DELETE,
-                        PlayerwarpsMessageKey.PWARP_GUI_EDITOR_DELETE_CONFIRM,
+                        PlayerwarpsMessageKey.PWARP_GUI_EDITOR_DELETE.key(),
+                        PlayerwarpsMessageKey.PWARP_GUI_EDITOR_DELETE_CONFIRM.key(),
                         (player, owned) -> archivePlayerWarp.archive(
                                 owned.owner(), owned.warp().name()))
                 .build();
@@ -114,7 +113,7 @@ public final class PlayerWarpEditorView {
 
     /** Open the editor for {@code owned}, scheduled on the viewer's entity thread by the framework. */
     public void open(Player player, PlayerRef viewer, OwnedWarp owned) {
-        view.open(player, viewer, owned);
+        view.open(player, owned);
     }
 
     /** The underlying property grid: exposed for tests to resolve a slot to its property without a live click. */
@@ -122,10 +121,10 @@ public final class PlayerWarpEditorView {
         return view;
     }
 
-    private Component title(PlayerRef viewer, OwnedWarp owned) {
+    private Component title(Player viewer, OwnedWarp owned) {
         return guiText.text(
                 viewer,
-                PlayerwarpsMessageKey.PWARP_GUI_EDITOR_TITLE,
+                PlayerwarpsMessageKey.PWARP_GUI_EDITOR_TITLE.key(),
                 Map.of("name", owned.warp().name().value()));
     }
 
@@ -223,13 +222,13 @@ public final class PlayerWarpEditorView {
     private EditableProperty nameProperty(PlayerRef owner, PlayerWarpName name) {
         return new TextProperty(
                 "editor.text-field",
-                PlayerwarpsMessageKey.PWARP_GUI_PROP_NAME,
-                PlayerwarpsMessageKey.PWARP_GUI_PROP_NAME_PROMPT,
+                PlayerwarpsMessageKey.PWARP_GUI_PROP_NAME.key(),
+                PlayerwarpsMessageKey.PWARP_GUI_PROP_NAME_PROMPT.key(),
                 Material.NAME_TAG,
                 name::value,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> rename(owner, name, value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -286,7 +285,7 @@ public final class PlayerWarpEditorView {
                     Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
                     scheduler.async(() -> {
                         mutate(owner, name, warp -> warp.movedTo(at, Instant.now()));
-                        scheduler.onEntity(BukkitRefs.toRef(player), reopen);
+                        scheduler.entity(player, reopen);
                     });
                 },
                 scheduler);
@@ -297,8 +296,8 @@ public final class PlayerWarpEditorView {
     private EditableProperty iconProperty(PlayerRef owner, PlayerWarpName name) {
         return new TextProperty(
                 "editor.text-field",
-                PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON,
-                PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON_PROMPT,
+                PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON.key(),
+                PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON_PROMPT.key(),
                 iconButtonMaterial(owner, name),
                 () -> current(owner, name)
                         .flatMap(warp -> warp.icon().map(IconSpec::value))
@@ -306,7 +305,7 @@ public final class PlayerWarpEditorView {
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> mutate(
                         owner, name, warp -> warp.withIcon(optional(value).map(IconSpec::of), Instant.now())),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -325,15 +324,15 @@ public final class PlayerWarpEditorView {
 
     private EditableProperty visibilityProperty(PlayerRef owner, PlayerWarpName name) {
         return new EnumProperty<>(
-                PlayerwarpsMessageKey.PWARP_GUI_PROP_VISIBILITY,
-                PlayerwarpsMessageKey.PWARP_GUI_SELECT_VISIBILITY,
+                PlayerwarpsMessageKey.PWARP_GUI_PROP_VISIBILITY.key(),
+                PlayerwarpsMessageKey.PWARP_GUI_SELECT_VISIBILITY.key(),
                 Material.ENDER_EYE,
                 guiText,
                 List.of(Boolean.TRUE, Boolean.FALSE),
                 () -> current(owner, name)
                         .map(warp -> warp.access() == WarpAccess.PUBLIC)
                         .orElse(false),
-                (viewer, isPublic) -> visibilityWord(viewer, isPublic),
+                (viewer, isPublic) -> visibilityWord(BukkitRefs.toRef(viewer), isPublic),
                 isPublic -> applyVisibility(owner, name, isPublic),
                 sub.selectorOptionIcon(),
                 sub.selectorFiller(),
@@ -362,13 +361,13 @@ public final class PlayerWarpEditorView {
             java.util.function.BiFunction<PlayerWarp, Optional<String>, PlayerWarp> setter) {
         return new TextProperty(
                 "editor.text-field",
-                label,
-                prompt,
+                label.key(),
+                prompt.key(),
                 icon,
                 () -> current(owner, name).flatMap(getter).orElseGet(this::none),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> mutate(owner, name, warp -> setter.apply(warp, optional(value))),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -381,7 +380,7 @@ public final class PlayerWarpEditorView {
             java.util.function.Function<PlayerWarp, Optional<Double>> getter,
             java.util.function.BiFunction<PlayerWarp, Optional<Double>, PlayerWarp> setter) {
         return new NumberProperty(
-                label,
+                label.key(),
                 Material.CLOCK,
                 () -> Math.round(current(owner, name).flatMap(getter).orElse(0.0) * SECONDS_FACTOR),
                 SECONDS_FACTOR, // a click steps one whole second

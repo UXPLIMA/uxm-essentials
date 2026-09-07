@@ -7,11 +7,8 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -20,6 +17,11 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -88,7 +90,7 @@ public final class WorldListMenu {
         bindings.action("worlds:edit", this::edit);
         bindings.action("worlds:teleport", this::teleport);
         bindings.action("worlds:create", this::create);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
@@ -99,7 +101,7 @@ public final class WorldListMenu {
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, snapshot()));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, snapshot()));
     }
 
     /** The current managed worlds paired with their live loaded state, read on the calling region thread. */
@@ -123,7 +125,9 @@ public final class WorldListMenu {
     /** Left-click a world icon: open that world's engine main editor hub on the viewer's entity thread. */
     private void edit(MenuActionContext ctx) {
         mainMenu.open(
-                ctx.player(), ctx.viewer(), ctx.entry(WorldRow.class).world().name());
+                ctx.player(),
+                BukkitRefs.toRef(ctx.viewer()),
+                ctx.entry(WorldRow.class).world().name());
     }
 
     /**
@@ -132,7 +136,7 @@ public final class WorldListMenu {
      * the load-then-teleport runs on the global region thread because loading a world is legal under Folia only there.
      */
     private void teleport(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         com.uxplima.uxmessentials.worlds.domain.WorldName world =
                 ctx.entry(WorldRow.class).world().name();
         ctx.player().closeInventory();
@@ -141,7 +145,7 @@ public final class WorldListMenu {
 
     /** Left-click the create button: open the engine new-world configuration screen, exactly as the old button did. */
     private void create(MenuActionContext ctx) {
-        createMenu.open(ctx.player(), ctx.viewer());
+        createMenu.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
     private static String envMaterial(ManagedWorld world) {

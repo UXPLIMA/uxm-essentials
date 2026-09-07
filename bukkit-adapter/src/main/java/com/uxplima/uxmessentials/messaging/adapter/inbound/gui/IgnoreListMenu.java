@@ -12,17 +12,19 @@ import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.application.Unignore;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreEntry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -83,18 +85,18 @@ public final class IgnoreListMenu {
         bindings.placeholder("ignore_target", this::target);
         bindings.action("messaging:unignore", this::unignore);
         bindings.action("messaging:ignore-add", this::promptAdd);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the ignore-list manager for {@code viewer} (the live player resolved by the engine). */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, SPEC_ID, null);
     }
 
     /** The viewer's ignore entries, read off the region thread (it reads the database); touches no Bukkit API. */
     private List<IgnoreEntry> ignored(MenuContext ctx) {
-        return ignores.load(ctx.viewer()).entries();
+        return ignores.load(BukkitRefs.toRef(ctx.viewer())).entries();
     }
 
     /** The bound entry's ignored-player name, for the head label and lore. */
@@ -104,25 +106,23 @@ public final class IgnoreListMenu {
 
     /** Left-click a head: un-ignore that player through the same {@link Unignore} use case, then reopen the list. */
     private void unignore(MenuActionContext ctx) {
-        PlayerRef owner = ctx.viewer();
+        PlayerRef owner = BukkitRefs.toRef(ctx.viewer());
         IgnoreEntry entry = ctx.entry(IgnoreEntry.class);
         scheduler.async(() -> {
             unignoreUseCase.unignore(owner, entry.ignored());
-            open(owner);
+            open(ctx.viewer());
         });
     }
 
     /** Prompt for a name through the shared text-input seam, exactly as the old create button did. */
     private void promptAdd(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef owner = ctx.viewer();
         player.closeInventory();
         textInput.prompt(
                 player,
-                owner,
-                InputRequest.of(IGNORE_ADD_INPUT_KEY, MessagingMessageKey.GUI_IGNORE_ADD_PROMPT),
-                name -> addByName(owner, name),
-                () -> open(owner));
+                InputRequest.of(IGNORE_ADD_INPUT_KEY, MessagingMessageKey.GUI_IGNORE_ADD_PROMPT.key()),
+                name -> addByName(ctx.viewer(), name),
+                () -> open(ctx.viewer()));
     }
 
     /**
@@ -131,12 +131,12 @@ public final class IgnoreListMenu {
      * self-check and idempotency are the use case's). This is the seam the add prompt routes a submitted line to; it
      * is public only so the golden test can drive it without firing a live prompt.
      */
-    public void addByName(PlayerRef owner, String name) {
+    public void addByName(Player owner, String name) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(name, "name");
         Optional<PlayerRef> target = players.findOnlineByName(name);
         scheduler.async(() -> {
-            target.ifPresent(ref -> ignoreUseCase.ignore(owner, ref));
+            target.ifPresent(ref -> ignoreUseCase.ignore(BukkitRefs.toRef(owner), ref));
             open(owner);
         });
     }

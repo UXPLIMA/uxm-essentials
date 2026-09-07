@@ -16,6 +16,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -155,7 +156,7 @@ class EnderseeViewPathTest {
     }
 
     private static PlayerRef ref(PlayerMock player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** Resolves a title key to its plain key string; MiniMessage parses it as literal text in the view. */

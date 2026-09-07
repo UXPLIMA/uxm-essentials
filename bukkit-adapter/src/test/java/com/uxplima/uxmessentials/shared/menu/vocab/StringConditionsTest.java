@@ -6,11 +6,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiPredicate;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -123,7 +123,7 @@ class StringConditionsTest {
         StringConditions.register(bindings, new NoopLogger());
         BiPredicate<MenuContext, Map<String, String>> condition =
                 bindings.condition(id).orElseThrow(() -> new AssertionError("condition not registered: " + id));
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "Tester"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "Tester"), null, 0);
         return condition.test(ctx, Map.of("value", value));
     }
 

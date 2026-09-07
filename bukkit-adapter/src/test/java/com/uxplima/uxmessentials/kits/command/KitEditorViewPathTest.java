@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -119,7 +120,7 @@ class KitEditorViewPathTest {
     }
 
     private static PlayerRef ref(PlayerMock player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** A repository holding one {@code starter} kit and recording the definition the editor saves back. */

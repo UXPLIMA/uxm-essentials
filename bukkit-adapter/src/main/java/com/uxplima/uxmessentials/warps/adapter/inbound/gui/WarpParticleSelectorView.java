@@ -13,10 +13,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -24,7 +20,11 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.SelectorButton;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -87,7 +87,7 @@ public final class WarpParticleSelectorView {
                 ? WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_TITLE_DEPARTURE
                 : WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_TITLE_ARRIVAL;
         menus.openSelector(
-                viewer,
+                player,
                 text(viewer, titleKey),
                 ROWS,
                 FILLER,
@@ -145,8 +145,7 @@ public final class WarpParticleSelectorView {
                 : WarpsMessageKey.WARP_EDITOR_PARTICLE_ARRIVAL_PROMPT;
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("warp.particle", promptKey),
+                InputRequest.of("warp.particle", promptKey.key()),
                 input -> pick(player, viewer, name, owner, isDeparture, Optional.of(input.toUpperCase(Locale.ROOT))),
                 () -> open(player, viewer, name, owner, isDeparture));
     }

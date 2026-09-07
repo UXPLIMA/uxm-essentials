@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.plugin.Plugin;
@@ -73,12 +74,9 @@ import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -99,11 +97,17 @@ import com.uxplima.uxmessentials.shared.application.port.DirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.hologram.HologramManager;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.packet.display.DisplayTextPackets;
 import com.uxplima.uxmlib.packet.display.internal.NmsDisplayTextPackets;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
 import com.uxplima.uxmlib.pipeline.PacketSender;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -138,6 +142,7 @@ public final class HologramsWiring {
             com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards,
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
+            Supplier<Theme> theme,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -264,16 +269,17 @@ public final class HologramsWiring {
         // The list backs both /hologram (no args) and the /uxmess gui hub entry; the back button returns to it.
         HologramEditorSubLayouts subLayouts = HologramEditorSubLayouts.load(
                 plugin.getDataFolder().toPath(), "holograms", "hologram-editor", kernel.log());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout colourPicker =
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.load(
-                        plugin.getDataFolder().toPath(), kernel.log());
+        com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout colourPicker =
+                com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout.load(
+                        plugin.getDataFolder().toPath(), EngineLog.of(kernel.log()));
         EntityEditorLayout editorLayout =
                 guiLayouts.loadEntityEditor("holograms", "hologram-editor", editorCodeDefault());
         HologramListMenu[] listHolder = new HologramListMenu[1];
         HologramEditorView editorView = new HologramEditorView(
                 menus,
                 guiText,
-                kernel.scheduler(),
+                theme,
+                new PaperScheduler(plugin),
                 repository,
                 services,
                 textInput,
@@ -282,7 +288,7 @@ public final class HologramsWiring {
                 editorLayout,
                 subLayouts,
                 colourPicker,
-                (player, viewer) -> listHolder[0].open(viewer));
+                (player, viewer) -> listHolder[0].open(player));
         HologramListMenu listMenu =
                 new HologramListMenu(menus, kernel.scheduler(), repository, services, textInput, editorView);
         listHolder[0] = listMenu;

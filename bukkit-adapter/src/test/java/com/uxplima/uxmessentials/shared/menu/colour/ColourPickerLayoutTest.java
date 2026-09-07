@@ -9,8 +9,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,7 +30,7 @@ class ColourPickerLayoutTest {
     void aLayoutWithNoFileOnDiskFallsBackToTheBundledOne() {
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.paletteSlots()).hasSize(16);
         assertThat(log.warnings).isEmpty();
@@ -40,7 +41,7 @@ class ColourPickerLayoutTest {
         write("rows = 6\npalette-slots = [\"left\", \"middle\"]\n");
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.paletteSlots())
                 .isEqualTo(ColourPickerLayout.codeDefault().paletteSlots());
@@ -54,7 +55,7 @@ class ColourPickerLayoutTest {
         write("rows = 6\npalette-slots = [0, 60]\n");
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.paletteSlots())
                 .isEqualTo(ColourPickerLayout.codeDefault().paletteSlots());
@@ -68,7 +69,7 @@ class ColourPickerLayoutTest {
         write("rows = 6\ncustom-slot = -1\n");
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.customSlot())
                 .isEqualTo(ColourPickerLayout.codeDefault().customSlot());
@@ -81,7 +82,7 @@ class ColourPickerLayoutTest {
         write("rows = 6\ncustom-slot = \"left\"\n");
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.customSlot())
                 .isEqualTo(ColourPickerLayout.codeDefault().customSlot());
@@ -96,7 +97,7 @@ class ColourPickerLayoutTest {
         write("rows = 6\n");
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.customSlot())
                 .isEqualTo(ColourPickerLayout.codeDefault().customSlot());
@@ -108,7 +109,7 @@ class ColourPickerLayoutTest {
         write("rows = 6\nback-slot = 60\n");
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.backSlot()).isEqualTo(ColourPickerLayout.codeDefault().backSlot());
         assertThat(log.warnings).hasSize(1);
@@ -119,7 +120,7 @@ class ColourPickerLayoutTest {
         write("rows = 6\npalette-slots = [1, 2]\ncustom-slot = 3\n");
         RecordingLogger log = new RecordingLogger();
 
-        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, log);
+        ColourPickerLayout layout = ColourPickerLayout.load(dataFolder, EngineLog.of(log));
 
         assertThat(layout.paletteSlots()).containsExactly(1, 2);
         assertThat(layout.customSlot()).isEqualTo(3);

@@ -5,15 +5,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Function;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources.WorldEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LuckPermsGroupSource.GroupEntry;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
  */
 class LuckPermsGroupSourceTest {
 
-    private static final PlayerRef VIEWER = new PlayerRef(UUID.randomUUID(), "Viewer");
+    private static final Player VIEWER = TestViewer.named("Viewer");
 
     private ServerMock server;
     private MenuBindings bindings;

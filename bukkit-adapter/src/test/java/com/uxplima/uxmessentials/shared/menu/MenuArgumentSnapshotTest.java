@@ -12,13 +12,14 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,9 +69,8 @@ class MenuArgumentSnapshotTest {
     void theWindowIsBuiltFromTheArgumentsAsTheyWereWhenOpenWasCalled() {
         Map<String, String> arguments = new HashMap<>();
         arguments.put("who", "Notch");
-        PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
 
-        menus.open(viewer, "greet", null, 0, arguments);
+        menus.open(player, "greet", null, 0, arguments);
         arguments.put("who", "Herobrine");
         scheduler.drain();
 
@@ -81,9 +81,9 @@ class MenuArgumentSnapshotTest {
     void theRecordedOpenCarriesTheSameSnapshot() {
         Map<String, String> arguments = new HashMap<>();
         arguments.put("who", "Notch");
-        PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        PlayerRef viewer = BukkitRefs.toRef(player);
 
-        menus.open(viewer, "greet", null, 0, arguments);
+        menus.open(player, "greet", null, 0, arguments);
         arguments.put("who", "Herobrine");
         scheduler.drain();
 

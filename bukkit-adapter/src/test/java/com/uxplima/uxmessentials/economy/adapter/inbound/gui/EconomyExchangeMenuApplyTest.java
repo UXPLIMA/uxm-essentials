@@ -18,14 +18,15 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,7 @@ class EconomyExchangeMenuApplyTest {
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer("Alice");
-        viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
+        viewerRef = BukkitRefs.toRef(player);
         provider = mock(EconomyProvider.class);
         // The apply seam re-opens the panel after the exchange, which re-reads the two balances off the provider.
         when(provider.balance(any(PlayerRef.class), any(Currency.class))).thenReturn(Money.of(COINS, BigDecimal.ZERO));

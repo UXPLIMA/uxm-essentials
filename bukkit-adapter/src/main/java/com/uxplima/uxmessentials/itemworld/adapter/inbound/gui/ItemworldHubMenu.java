@@ -19,18 +19,19 @@ import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
 import com.uxplima.uxmessentials.itemworld.domain.TimeSpec;
 import com.uxplima.uxmessentials.itemworld.domain.WeatherSpec;
 import com.uxplima.uxmessentials.itemworld.domain.event.EntitiesPurged;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -90,11 +91,11 @@ public final class ItemworldHubMenu {
         bindings.action("itemworld:weather-rain", ctx -> setWeather(ctx, WeatherSpec.of(WeatherSpec.Kind.RAIN)));
         bindings.action("itemworld:clear-drops", ctx -> sweep(ctx, purgePolicy.killAll(DROPS_TYPE)));
         bindings.action("itemworld:clear-mobs", ctx -> sweep(ctx, purgePolicy.butcher(BUTCHER_RADIUS)));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /** Open the launcher for {@code viewer} (the live player resolved by the engine). */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, SPEC_ID, null);
     }
@@ -102,18 +103,23 @@ public final class ItemworldHubMenu {
     /** The fully-resolved button label for {@code station}: the workstation name filled into the hub catalog key. */
     private String stationLabel(MenuContext ctx, Workstation station) {
         return messages.resolve(
-                ctx.viewer(), ItemworldMessageKey.GUI_HUB_WORKSTATION, Map.of("station", station.displayName()));
+                BukkitRefs.toRef(ctx.viewer()),
+                ItemworldMessageKey.GUI_HUB_WORKSTATION,
+                Map.of("station", station.displayName()));
     }
 
     /** Open the clicked station for the viewer and reply, mirroring the old launcher's workstation button. */
     private void openStation(MenuActionContext ctx, Workstation station) {
         station.open(ctx.player());
-        reply(ctx.viewer(), ItemworldMessageKey.WORKSTATION_OPENED, Map.of("station", station.displayName()));
+        reply(
+                BukkitRefs.toRef(ctx.viewer()),
+                ItemworldMessageKey.WORKSTATION_OPENED,
+                Map.of("station", station.displayName()));
     }
 
     /** Set the world time on the global region, then reply, exactly as the old time button did. */
     private void setTime(MenuActionContext ctx, TimeSpec spec) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         World world = ctx.player().getWorld();
         scheduler.onGlobal(() -> {
             long resolved = spec.mode() == TimeSpec.Mode.SET ? spec.ticks() : world.getTime() + spec.ticks();
@@ -127,7 +133,7 @@ public final class ItemworldHubMenu {
 
     /** Apply the weather on the global region, then reply, exactly as the old weather button did. */
     private void setWeather(MenuActionContext ctx, WeatherSpec spec) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         World world = ctx.player().getWorld();
         scheduler.onGlobal(() -> {
             BukkitWeatherApplier.apply(world, spec);
@@ -149,7 +155,7 @@ public final class ItemworldHubMenu {
      */
     private void sweep(MenuActionContext ctx, PurgeSelection selection) {
         Player player = ctx.player();
-        PlayerRef actor = ctx.viewer();
+        PlayerRef actor = BukkitRefs.toRef(ctx.viewer());
         WorldRef world = BukkitRefs.toRef(player.getWorld());
         if (selection.scope() == PurgeSelection.Scope.RADIUS) {
             scheduler.onEntity(

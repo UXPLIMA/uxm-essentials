@@ -9,6 +9,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Villager;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -48,7 +49,7 @@ class VillagerProtectToggleTest {
         MockBukkit.createMockPlugin();
         world = server.addSimpleWorld("world");
         player = server.addPlayer("Steve");
-        ref = new PlayerRef(player.getUniqueId(), player.getName());
+        ref = BukkitRefs.toRef(player);
         villager = (Villager) world.spawnEntity(new Location(world, 0, 64, 0), EntityType.VILLAGER);
         villager.setPersistent(false);
         flags = new PdcVillagerFlags();

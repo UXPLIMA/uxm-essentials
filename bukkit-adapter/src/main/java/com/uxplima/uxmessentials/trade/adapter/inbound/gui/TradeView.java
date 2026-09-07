@@ -15,7 +15,6 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -32,6 +31,7 @@ import com.uxplima.uxmessentials.trade.domain.TradeSession;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import com.uxplima.uxmessentials.trade.domain.event.TradeCancelled;
 import com.uxplima.uxmessentials.trade.domain.event.TradeCompleted;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

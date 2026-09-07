@@ -7,8 +7,6 @@ import java.util.Map;
 
 import org.bukkit.inventory.Inventory;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LuckPermsGroupSource;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -16,6 +14,8 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,7 +68,7 @@ class LuckPermsGroupSourceGoldenTest {
     @Test
     void absentLuckPermsRendersAnEmptyGrid() {
         menus.registerSpec("ranks", new MenuSpecLoader().parse(GROUPS_HOCON));
-        menus.open(new PlayerRef(viewerPlayer.getUniqueId(), viewerPlayer.getName()), "ranks", null);
+        menus.open(viewerPlayer, "ranks", null);
 
         Inventory top = viewerPlayer.getOpenInventory().getTopInventory();
         for (int slot = 0; slot < 9; slot++) {

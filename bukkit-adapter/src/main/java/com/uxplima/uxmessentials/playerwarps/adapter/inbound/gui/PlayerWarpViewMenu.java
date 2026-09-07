@@ -24,17 +24,19 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -77,7 +79,7 @@ public final class PlayerWarpViewMenu {
     private final Messages messages;
     private final Notifier notifier;
     private final BiConsumer<Player, PlayerRef> openBrowse;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openManage;
+    private final BiConsumer<Player, PlayerWarpName> openManage;
 
     public PlayerWarpViewMenu(
             Menus menus,
@@ -91,7 +93,7 @@ public final class PlayerWarpViewMenu {
             Messages messages,
             Notifier notifier,
             BiConsumer<Player, PlayerRef> openBrowse,
-            BiConsumer<PlayerRef, PlayerWarpName> openManage) {
+            BiConsumer<Player, PlayerWarpName> openManage) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -137,11 +139,12 @@ public final class PlayerWarpViewMenu {
         bindings.action(
                 "playerwarps:view-manage",
                 ctx -> openManage.accept(ctx.viewer(), subject(ctx).name()));
-        bindings.action("playerwarps:view-back", ctx -> openBrowse.accept(ctx.player(), ctx.viewer()));
+        bindings.action(
+                "playerwarps:view-back", ctx -> openBrowse.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
         bindings.action(
                 "playerwarps:rate-back", ctx -> open(ctx.viewer(), subject(ctx).name()));
-        menus.registerSpec(VIEW_SPEC_ID, MenuSpecs.loadOrBundled(VIEW_RESOURCE, dataFolder, 3, log));
-        menus.registerSpec(RATE_SPEC_ID, MenuSpecs.loadOrBundled(RATE_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(VIEW_SPEC_ID, MenuSpecs.loadOrBundled(VIEW_RESOURCE, dataFolder, 3, EngineLog.of(log)));
+        menus.registerSpec(RATE_SPEC_ID, MenuSpecs.loadOrBundled(RATE_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /**
@@ -150,14 +153,16 @@ public final class PlayerWarpViewMenu {
      * window on the viewer's entity thread; a warp that has since gone tells the viewer it is not found and opens
      * nothing.
      */
-    public void open(PlayerRef viewer, PlayerWarpName name) {
+    public void open(Player viewer, PlayerWarpName name) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(name, "name");
-        scheduler.async(() -> resolve(viewer, name)
+        scheduler.async(() -> resolve(BukkitRefs.toRef(viewer), name)
                 .ifPresentOrElse(
                         subject -> menus.open(viewer, VIEW_SPEC_ID, subject),
                         () -> notifier.send(
-                                viewer, PlayerWarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()))));
+                                BukkitRefs.toRef(viewer),
+                                PlayerWarpError.NOT_FOUND.messageKey(),
+                                Map.of("warp", name.value()))));
     }
 
     /** Snapshot the warp and the viewer's relationship to it (favourited, owner, member) into an immutable subject. */
@@ -181,7 +186,7 @@ public final class PlayerWarpViewMenu {
      */
     private void teleport(MenuActionContext ctx) {
         Subject subject = subject(ctx);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject.name();
         Optional<String> password = ctx.arg().isBlank() ? Optional.empty() : Optional.of(ctx.arg());
         ctx.player().closeInventory();
@@ -190,7 +195,7 @@ public final class PlayerWarpViewMenu {
 
     /** Star or un-star the subject warp off the tick thread, then re-open the panel so the button pair flips. */
     private void toggleFavourite(MenuActionContext ctx, boolean add) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         scheduler.async(() -> {
             if (add) {
@@ -198,7 +203,7 @@ public final class PlayerWarpViewMenu {
             } else {
                 favouritePlayerWarp.unfavourite(viewer, name);
             }
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
@@ -212,11 +217,11 @@ public final class PlayerWarpViewMenu {
         if (stars < 1) {
             return;
         }
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         scheduler.async(() -> {
             ratePlayerWarp.rate(viewer, name, stars);
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
@@ -224,7 +229,9 @@ public final class PlayerWarpViewMenu {
     private String name(MenuContext ctx) {
         Subject subject = subject(ctx);
         return resolve(
-                ctx.viewer(), PlayerwarpsMessageKey.PWARP_GUI_VIEW_ENTRY_NAME, Map.of("warp", displayName(subject)));
+                BukkitRefs.toRef(ctx.viewer()),
+                PlayerwarpsMessageKey.PWARP_GUI_VIEW_ENTRY_NAME,
+                Map.of("warp", displayName(subject)));
     }
 
     /**
@@ -234,7 +241,7 @@ public final class PlayerWarpViewMenu {
      */
     private String lore(MenuContext ctx) {
         PlayerWarp warp = subject(ctx).warp();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         List<String> lines = new ArrayList<>();
         lines.add(line(viewer, PlayerwarpsMessageKey.PWARP_GUI_VIEW_LORE_OWNER, Map.of("owner", warp.ownerName())));
         lines.add(line(

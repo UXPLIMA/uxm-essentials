@@ -17,7 +17,6 @@ import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -25,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -119,7 +119,6 @@ public final class RegionListView {
         EntityListView.<RegionRow>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(RegionsMessageKey.REGIONS_GUI_TITLE)
                 .emptyTitle(RegionsMessageKey.REGIONS_GUI_EMPTY)

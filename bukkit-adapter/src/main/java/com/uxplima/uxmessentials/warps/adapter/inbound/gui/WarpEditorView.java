@@ -14,13 +14,8 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -32,6 +27,13 @@ import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -133,7 +135,7 @@ public final class WarpEditorView {
         bindings.condition(
                 "warps:editor-server-warp", (ctx, args) -> subject(ctx).owner() == null);
         registerActions(bindings);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     private void registerPlaceholders(MenuBindings bindings) {
@@ -144,7 +146,8 @@ public final class WarpEditorView {
                 "warp_edit_icon", ctx -> iconMaterial(subject(ctx)).name().toLowerCase(Locale.ROOT));
         bindings.placeholder(
                 "warp_edit_lock",
-                ctx -> lockState(ctx.viewer(), subject(ctx).display().isLocked()));
+                ctx -> lockState(
+                        BukkitRefs.toRef(ctx.viewer()), subject(ctx).display().isLocked()));
         bindings.placeholder(
                 "warp_edit_password", ctx -> orNone(ctx, subject(ctx).display().password()));
         bindings.placeholder("warp_edit_welcome", this::welcomeText);
@@ -217,7 +220,7 @@ public final class WarpEditorView {
                 player.closeInventory();
                 return;
             }
-            menus.open(viewer, SPEC_ID, new WarpEditTarget(warpName, warpOwner, display));
+            menus.open(player, SPEC_ID, new WarpEditTarget(warpName, warpOwner, display));
         });
     }
 
@@ -239,7 +242,7 @@ public final class WarpEditorView {
     /** Teleport to the warp through the same path the {@code /warp <name>} command uses; close first to debounce. */
     private void teleport(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         WarpEditTarget target = subject(ctx);
         player.closeInventory();
         if (target.owner() == null) {
@@ -252,7 +255,7 @@ public final class WarpEditorView {
     /** Copy the item in the operator's main hand as the icon material, then save and re-open; empty hand rejected. */
     private void setIcon(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         WarpEditTarget target = subject(ctx);
         Material hand = player.getInventory().getItemInMainHand().getType();
         if (hand.isAir()) {
@@ -275,7 +278,7 @@ public final class WarpEditorView {
     private void openCategory(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
         if (categorySelector != null && target.owner() == null) {
-            categorySelector.open(ctx.player(), ctx.viewer(), target.warpName());
+            categorySelector.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), target.warpName());
         }
     }
 
@@ -306,7 +309,7 @@ public final class WarpEditorView {
     private void openWelcome(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
         if (welcomeMessagesView != null) {
-            welcomeMessagesView.open(ctx.player(), ctx.viewer(), target.warpName(), target.owner());
+            welcomeMessagesView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), target.warpName(), target.owner());
         }
     }
 
@@ -318,7 +321,8 @@ public final class WarpEditorView {
                 soundMenu.open(ctx.viewer(), new WarpSoundEdit(WarpName.of(target.warpName()), departure));
             }
         } else if (soundSelectorView != null) {
-            soundSelectorView.open(ctx.player(), ctx.viewer(), target.warpName(), target.owner(), departure);
+            soundSelectorView.open(
+                    ctx.player(), BukkitRefs.toRef(ctx.viewer()), target.warpName(), target.owner(), departure);
         }
     }
 
@@ -333,7 +337,8 @@ public final class WarpEditorView {
     private void openParticles(MenuActionContext ctx, boolean departure) {
         WarpEditTarget target = subject(ctx);
         if (particleSelectorView != null) {
-            particleSelectorView.open(ctx.player(), ctx.viewer(), target.warpName(), target.owner(), departure);
+            particleSelectorView.open(
+                    ctx.player(), BukkitRefs.toRef(ctx.viewer()), target.warpName(), target.owner(), departure);
         }
     }
 
@@ -359,7 +364,7 @@ public final class WarpEditorView {
         try {
             parsed = Double.parseDouble(input.trim());
         } catch (NumberFormatException notANumber) {
-            ctx.player().sendMessage(text(ctx.viewer(), WarpsMessageKey.WARP_EDITOR_INVALID_NUMBER));
+            ctx.player().sendMessage(text(BukkitRefs.toRef(ctx.viewer()), WarpsMessageKey.WARP_EDITOR_INVALID_NUMBER));
             reopen(ctx, target);
             return;
         }
@@ -391,9 +396,8 @@ public final class WarpEditorView {
             WarpEditTarget target,
             java.util.function.Consumer<String> action) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
         player.closeInventory();
-        textInput.prompt(player, viewer, InputRequest.of(inputKey, promptKey), action, () -> reopen(ctx, target));
+        textInput.prompt(player, InputRequest.of(inputKey, promptKey.key()), action, () -> reopen(ctx, target));
     }
 
     /** Apply a mutation to the edited warp through the shared loader; a stale warp is a no-op the re-open catches. */
@@ -406,7 +410,7 @@ public final class WarpEditorView {
 
     /** Re-open the editor after a mutation so the operator sees the result with a fresh subject snapshot. */
     private void reopen(MenuActionContext ctx, WarpEditTarget target) {
-        open(ctx.player(), ctx.viewer(), target.warpName(), target.owner());
+        open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), target.warpName(), target.owner());
     }
 
     /** The warp's live display item, a valid per-warp override, else the {@link #DEFAULT_ICON} fallback. */
@@ -420,31 +424,35 @@ public final class WarpEditorView {
 
     private String welcomeText(MenuContext ctx) {
         List<WelcomeMessage> messages = subject(ctx).display().welcomeMessages();
-        return messages.isEmpty() ? none(ctx.viewer()) : messages.get(0).message();
+        return messages.isEmpty()
+                ? none(BukkitRefs.toRef(ctx.viewer()))
+                : messages.get(0).message();
     }
 
     private String welcomeType(MenuContext ctx) {
         List<WelcomeMessage> messages = subject(ctx).display().welcomeMessages();
-        return messages.isEmpty() ? none(ctx.viewer()) : messages.get(0).type();
+        return messages.isEmpty()
+                ? none(BukkitRefs.toRef(ctx.viewer()))
+                : messages.get(0).type();
     }
 
     private String categoryName(MenuContext ctx) {
         WarpEditTarget target = subject(ctx);
         if (target.owner() != null) {
-            return none(ctx.viewer());
+            return none(BukkitRefs.toRef(ctx.viewer()));
         }
         return warpRepository
                 .find(WarpName.of(target.warpName()))
                 .flatMap(warp -> warp.categoryId())
-                .orElseGet(() -> none(ctx.viewer()));
+                .orElseGet(() -> none(BukkitRefs.toRef(ctx.viewer())));
     }
 
     private String seconds(MenuContext ctx, Optional<Double> value) {
-        return value.map(d -> d + "s").orElseGet(() -> none(ctx.viewer()));
+        return value.map(d -> d + "s").orElseGet(() -> none(BukkitRefs.toRef(ctx.viewer())));
     }
 
     private String orNone(MenuContext ctx, Optional<String> value) {
-        return value.orElseGet(() -> none(ctx.viewer()));
+        return value.orElseGet(() -> none(BukkitRefs.toRef(ctx.viewer())));
     }
 
     private String none(PlayerRef viewer) {

@@ -32,24 +32,26 @@ import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenuCleanupListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.LastMenu;
+import com.uxplima.uxmlib.menu.runtime.LastMenuCleanupListener;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,7 +106,7 @@ class MenuCommandTest {
         player = server.addPlayer("Operator");
         player.setOp(true); // the happy-path dispatches hold both the use and admin nodes; a gate test drops them
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
         lastMenu = new LastMenu();
         // The bindings back the action registry /menu execute dispatches through and the loader validates against:
@@ -118,7 +120,7 @@ class MenuCommandTest {
         });
         menus = new Menus(
                 renderer,
-                new SyncScheduler(),
+                EngineScheduler.of(new SyncScheduler()),
                 new ListSourceRegistry(),
                 null,
                 bindings.actions(),
@@ -177,8 +179,8 @@ class MenuCommandTest {
                 (MenuHolder) steve.getOpenInventory().getTopInventory().getHolder();
         // The viewer is the target (so %player% and every player-scoped placeholder resolve against Steve), while the
         // executor is the operator who ran the command (so %executor% names the opener, distinct from %player%).
-        assertThat(holder.ctx().viewer().name()).isEqualTo("Steve");
-        assertThat(holder.ctx().executor().name()).isEqualTo("Operator");
+        assertThat(holder.ctx().viewer().getName()).isEqualTo("Steve");
+        assertThat(MenuExecutor.of(holder.ctx()).name()).isEqualTo("Operator");
     }
 
     @Test
@@ -579,7 +581,7 @@ class MenuCommandTest {
     @Test
     void lastReopensTheRecordedCustomMenuWithItsArguments() {
         // A subject-less open records into the tracker; the player closes it, then /menu last brings it back.
-        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of("who", "Steve"));
+        menus.open(player, "shop", null, 0, Map.of("who", "Steve"));
         player.closeInventory();
 
         execute("menu last", player);
@@ -592,7 +594,7 @@ class MenuCommandTest {
 
     @Test
     void lastReopensOnTheRecordedPage() {
-        menus.open(BukkitRefs.toRef(player), "shop", null, 2, Map.of());
+        menus.open(player, "shop", null, 2, Map.of());
         player.closeInventory();
 
         execute("menu last", player);
@@ -614,7 +616,7 @@ class MenuCommandTest {
         menus.registerSpec("warp-list", new MenuSpecLoader().parse(SPEC_HOCON));
         names.add("warp-list");
         // A feature menu carries a live domain subject, so the engine does not remember it for a blind reopen.
-        menus.open(BukkitRefs.toRef(player), "warp-list", "a-subject", 0, Map.of());
+        menus.open(player, "warp-list", "a-subject", 0, Map.of());
         player.closeInventory();
 
         execute("menu last", player);
@@ -640,7 +642,7 @@ class MenuCommandTest {
     void lastReplaysWithoutGrowingTheBackHistory() {
         // A single open records one entry; /menu last replays it without re-recording, so the history stays one deep
         // however many times it is reopened: a back from it then finds nothing beneath.
-        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
+        menus.open(player, "shop", null, 0, Map.of());
         execute("menu last", player);
         execute("menu last", player);
 
@@ -656,7 +658,7 @@ class MenuCommandTest {
 
     @Test
     void quitClearsThePlayersRememberedMenu() {
-        menus.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
+        menus.open(player, "shop", null, 0, Map.of());
         assertThat(lastMenu.get(player.getUniqueId())).isPresent();
 
         new LastMenuCleanupListener(lastMenu)
@@ -672,12 +674,13 @@ class MenuCommandTest {
         // remembers no reopen target, so /menu last over a still-empty tracker replies no-last.
         Menus plain = new Menus(
                 new MenuRenderer(
-                        new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry()),
+                        new ItemRenderer(
+                                new GuiText(new KeyMessages()), ThemeFile::shippedTheme, new PlaceholderRegistry()),
                         new ConditionRegistry()),
-                new SyncScheduler(),
+                EngineScheduler.of(new SyncScheduler()),
                 new ListSourceRegistry());
         plain.registerSpec("shop", new MenuSpecLoader().parse(SPEC_HOCON));
-        plain.open(BukkitRefs.toRef(player), "shop", null, 0, Map.of());
+        plain.open(player, "shop", null, 0, Map.of());
 
         assertThat(lastMenu.get(player.getUniqueId())).isEmpty();
     }

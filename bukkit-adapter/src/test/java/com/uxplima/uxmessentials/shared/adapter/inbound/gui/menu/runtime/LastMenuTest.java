@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
+package com.uxplima.uxmlib.menu.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

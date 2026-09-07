@@ -16,8 +16,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PlayerDataPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
@@ -27,6 +25,8 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -125,7 +125,7 @@ class LocalPlaceholderGoldenTest {
     }
 
     private void open(String id) {
-        menus.open(new PlayerRef(viewer.getUniqueId(), viewer.getName()), id, null);
+        menus.open(viewer, id, null);
     }
 
     private ItemStack topItem() {

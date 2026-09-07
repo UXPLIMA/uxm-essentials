@@ -203,9 +203,9 @@ class FoliaThreadingDriftTest {
         allow.put(
                 pkg + "shared.adapter.inbound.gui.PlayerPickerView",
                 "GLOBAL: online-head roster snapshot taken inside scheduler.onGlobal, then opened per-entity");
-        allow.put(
-                pkg + "shared.adapter.inbound.gui.menu.Menus",
-                "GLOBAL: engine shutdown() closes open menus inside scheduler.onGlobal");
+        // The menu engine's Menus moved to uxmLib (com.uxplima.uxmlib.menu.Menus) with the rest of the engine, so
+        // there is no longer a class here to exempt. The allowlist is strictly smaller and therefore stricter; the
+        // shutdown() enumeration it used to cover is uxmLib's to guard now.
         allow.put(
                 pkg + "shared.adapter.inbound.gui.menu.vocab.LiveDataSources",
                 "GLOBAL: online-players menu source snapshots the roster inside scheduler.onGlobal (guarded by "

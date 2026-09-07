@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PinnedEntry;
+import com.uxplima.uxmlib.menu.eval.Pagination;
+import com.uxplima.uxmlib.menu.eval.PinnedEntry;
 import org.junit.jupiter.api.Test;
 
 class PaginationTest {

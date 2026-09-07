@@ -25,12 +25,13 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * buttons are ARROW icons at slots 48 and 50 on every page. The engine window is snapshotted as {@code (slot ->
  * material, plain name)} and asserted equal, slot for slot, to the analytic baseline the old view produced for this
  * fixture: content heads, nav, and the page-1 placements all included. Then a click on the first head through the
- * engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener} proves the
+ * engine's own {@link com.uxplima.uxmlib.menu.runtime.MenuListener} proves the
  * migrated path hands that entity to the {@code onSelect} drill-down the old grid drove, faithful in both
  * appearance and behaviour.
  */
@@ -75,7 +76,7 @@ class OnlinePlayerListGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
@@ -120,7 +121,6 @@ class OnlinePlayerListGoldenTest {
         EntityListView<String> list = EntityListView.<String>builder()
                 .menus(engine.menus())
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(EntityListLayout.paginatedDefault(Material.NAME_TAG))
                 .title(PresenceMessageKey.LIST_GUI_TITLE)
                 .navNames(PresenceMessageKey.LIST_GUI_PREV, PresenceMessageKey.LIST_GUI_NEXT)

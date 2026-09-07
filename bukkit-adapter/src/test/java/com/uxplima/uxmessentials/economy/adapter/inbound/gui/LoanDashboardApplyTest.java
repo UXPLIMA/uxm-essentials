@@ -19,8 +19,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -29,6 +28,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ class LoanDashboardApplyTest {
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer("Debtor");
-        viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
+        viewerRef = BukkitRefs.toRef(player);
         loanService = mock(LoanService.class);
         // The apply seams re-open the dashboard, which re-reads the profile and loans off the service.
         when(loanService.getCreditScore(any())).thenReturn(new Loan.CreditScore(viewerRef, 600, 0L));

@@ -9,15 +9,18 @@ import java.util.Optional;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.ContentRegions;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -53,7 +56,8 @@ public final class VillagerManagerWindow {
     public VillagerManagerWindow(Messages messages, Menus menus, Path dataFolder, Logger log) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
-        this.spec = MenuSpecs.loadOrBundled(SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, log);
+        this.spec = MenuSpecs.loadOrBundled(
+                SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, EngineLog.of(log));
         this.slots = ContentRegions.slots(spec, REGION, SPEC_RESOURCE);
         if (slots.isEmpty() || slots.size() % SLOTS_PER_TRADE != 0) {
             throw new IllegalStateException(SPEC_RESOURCE + ": the '" + REGION + "' region must declare a whole "
@@ -84,7 +88,7 @@ public final class VillagerManagerWindow {
         bindings.placeholder(
                 "villagers_manager_title",
                 ctx -> messages.resolve(
-                        ctx.viewer(),
+                        BukkitRefs.toRef(ctx.viewer()),
                         VillagersMessageKey.VILLAGERS_MANAGER_TITLE,
                         Map.of("name", view.villagerLabel(ctx.subject(VillagerManagerHolder.class)))));
         bindings.condition(
@@ -109,17 +113,17 @@ public final class VillagerManagerWindow {
 
     /** Show this window to {@code holder}'s editor, carrying the holder as the menu's subject. */
     void open(VillagerManagerHolder holder) {
-        menus.open(holder.editor(), SPEC_ID, holder);
+        LivePlayers.of(holder.editor()).ifPresent(editor -> menus.open(editor, SPEC_ID, holder));
     }
 
     /** Redraw {@code editor}'s window in place, so a toggled button shows its new state. */
     void redraw(PlayerRef editor) {
-        menus.redraw(editor, SPEC_ID);
+        LivePlayers.of(editor).ifPresent(live -> menus.redraw(live, SPEC_ID));
     }
 
     /** The live window {@code editor} has open, when it is still this one. Read on the editor's own thread. */
     Optional<Inventory> live(PlayerRef editor) {
-        return menus.openWindow(editor, SPEC_ID);
+        return LivePlayers.of(editor).flatMap(live -> menus.openWindow(live, SPEC_ID));
     }
 
     /** Read the staked buy/sell stacks out of a live window, as a positional array of copies. */

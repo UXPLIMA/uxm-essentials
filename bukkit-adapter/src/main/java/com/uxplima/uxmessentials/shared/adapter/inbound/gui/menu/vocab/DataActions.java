@@ -4,12 +4,12 @@ import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.function.Consumer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore.NumericOp;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
 
 /**
  * The player-data slice of the menu action vocabulary: the ways a click (or an operator's {@code /menu} spec) can
@@ -94,7 +94,7 @@ public final class DataActions {
         if (arg.key().isEmpty()) {
             return; // no key to write. Nothing to do, but not an error
         }
-        playerData.set(ctx.viewer().uuid(), arg.key(), arg.value());
+        playerData.set(ctx.viewer().getUniqueId(), arg.key(), arg.value());
     }
 
     /** Apply {@code op} of {@code <number>} against {@code <key>}; a blank key or a malformed operand warns and skips. */
@@ -108,7 +108,7 @@ public final class DataActions {
             log.warn("event=menu_data_skipped action=data-{} reason=malformed_number value={}", op, ctx.arg());
             return;
         }
-        playerData.apply(ctx.viewer().uuid(), arg.key(), op, operand.getAsDouble());
+        playerData.apply(ctx.viewer().getUniqueId(), arg.key(), op, operand.getAsDouble());
     }
 
     /** Remove {@code <key>} from the viewer's durable data; a blank key is a silent no-op. */
@@ -117,7 +117,7 @@ public final class DataActions {
         if (key.isEmpty()) {
             return;
         }
-        playerData.remove(ctx.viewer().uuid(), key);
+        playerData.remove(ctx.viewer().getUniqueId(), key);
     }
 
     // --- transient PDC meta

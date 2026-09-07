@@ -21,6 +21,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MerchantRecipe;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -74,7 +75,7 @@ class VillagerManagerViewTest {
         plugin = MockBukkit.createMockPlugin();
         world = server.addSimpleWorld("world");
         player = server.addPlayer("Steve");
-        editor = new PlayerRef(player.getUniqueId(), player.getName());
+        editor = BukkitRefs.toRef(player);
         villager = (Villager) world.spawnEntity(new Location(world, 0, 64, 0), EntityType.VILLAGER);
         flags = new PdcVillagerFlags();
         store = new VillagerRecipeStore();

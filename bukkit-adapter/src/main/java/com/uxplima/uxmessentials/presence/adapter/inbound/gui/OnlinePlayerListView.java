@@ -14,12 +14,12 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.item.SkullData;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -50,7 +50,6 @@ public final class OnlinePlayerListView {
         this.view = EntityListView.<Entry>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(PresenceMessageKey.LIST_GUI_TITLE)
                 .emptyTitle(PresenceMessageKey.LIST_GUI_EMPTY_TITLE)

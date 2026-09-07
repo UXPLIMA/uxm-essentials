@@ -31,8 +31,7 @@ import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -41,6 +40,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -371,7 +372,7 @@ class RegionsCommandTest {
                 messages,
                 noopSink(),
                 service,
-                (player, viewer, request, onSubmit, onCancel) -> {},
+                (player, request, onSubmit, onCancel) -> {},
                 List.of("pvp", "build"),
                 EntityListLayout.paginatedDefault(Material.GRAY_DYE),
                 (clicker, region) -> {});
@@ -383,8 +384,7 @@ class RegionsCommandTest {
                 noopSink(),
                 service,
                 EntityListLayout.paginatedDefault(Material.PAPER),
-                (Player clicker, RegionRef region) ->
-                        flagEditor.open(new PlayerRef(clicker.getUniqueId(), clicker.getName()), region));
+                (Player clicker, RegionRef region) -> flagEditor.open(BukkitRefs.toRef(clicker), region));
         return new RegionsCommand(
                 service,
                 listView,

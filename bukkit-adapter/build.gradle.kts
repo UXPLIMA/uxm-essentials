@@ -91,6 +91,11 @@ dependencies {
     // uxmLib item toolkit (dogfood): the PdcFlag helper backing the per-player boolean-flag PDC stores.
     // Arrives transitively via uxmlib-gui, but declared directly so the PdcFlag use is explicit.
     implementation(libs.uxmlib.item) { isTransitive = false }
+    // uxmLib menu engine (dogfood): the spec loader, the renderers, the runtime and the property editors every
+    // menu in this plugin is drawn by. This plugin keeps only its own vocabulary on top of it.
+    implementation(libs.uxmlib.menu) {
+        exclude(group = "org.spongepowered")
+    }
     // uxmLib HUD toolkit (dogfood), Titles for the teleport arrival banner. Pulls uxmlib-common only.
     implementation(libs.uxmlib.hud) {
         exclude(group = "org.spongepowered")

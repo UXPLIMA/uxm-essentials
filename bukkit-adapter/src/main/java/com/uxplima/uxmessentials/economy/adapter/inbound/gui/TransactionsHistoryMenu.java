@@ -7,16 +7,18 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -81,11 +83,11 @@ public final class TransactionsHistoryMenu {
         bindings.placeholder("history_to", ctx -> receiver(entry(ctx)));
         bindings.placeholder("history_amount", ctx -> amountText(entry(ctx)));
         bindings.placeholder("history_reason", ctx -> entry(ctx).reason());
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Resolve {@code targetPlayer}'s history (or the global log when null) off-thread, then open it for {@code viewer}. */
-    public void open(PlayerRef viewer, @Nullable UUID targetPlayer, String targetName) {
+    public void open(Player viewer, @Nullable UUID targetPlayer, String targetName) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(targetName, "targetName");
         scheduler.async(() -> {
@@ -104,7 +106,7 @@ public final class TransactionsHistoryMenu {
     }
 
     /** Resolve {@code bankId}'s logs off-thread, then open the read-only list for {@code viewer}. */
-    public void openForBank(PlayerRef viewer, String bankId, String bankName) {
+    public void openForBank(Player viewer, String bankId, String bankName) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(bankId, "bankId");
         Objects.requireNonNull(bankName, "bankName");

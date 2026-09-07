@@ -34,8 +34,8 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -47,6 +47,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,7 +99,7 @@ class EconomyAdminGuiTest {
     private MenuBindings bindings;
     private Menus menus;
     private AnvilInput anvil;
-    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput;
+    private com.uxplima.uxmlib.gui.input.TextInput textInput;
     private PlayerPickerView picker;
     private @org.jspecify.annotations.Nullable CurrencyPickerMenu currencyPicker;
     private EconomyNotifier notifier;
@@ -108,9 +110,9 @@ class EconomyAdminGuiTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         admin = server.addPlayer("Admin");
-        adminRef = new PlayerRef(admin.getUniqueId(), admin.getName());
+        adminRef = BukkitRefs.toRef(admin);
         targetPlayer = server.addPlayer("Target");
-        target = new PlayerRef(targetPlayer.getUniqueId(), targetPlayer.getName());
+        target = BukkitRefs.toRef(targetPlayer);
 
         ecoAdmin = mock(EcoAdmin.class);
         provider = mock(EconomyProvider.class);
@@ -126,8 +128,13 @@ class EconomyAdminGuiTest {
         anvil = new AnvilInput(plugin);
         anvil.install();
         Guis.install(plugin);
-        textInput = com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller.install(
-                        plugin, plugin.getDataFolder().toPath(), anvil, guiText, scheduler, mock(Logger.class))
+        textInput = com.uxplima.uxmlib.gui.input.TextInputInstaller.install(
+                        plugin,
+                        plugin.getDataFolder().toPath(),
+                        anvil,
+                        guiText,
+                        EngineScheduler.of(scheduler),
+                        com.uxplima.uxmlib.common.Log.NONE)
                 .textInput();
         notifier = new EconomyNotifier(new KeyMessages(), new NoopSink());
         historyView = mock(TransactionsHistoryMenu.class);

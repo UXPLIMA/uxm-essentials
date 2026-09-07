@@ -29,7 +29,7 @@ jda            = "5.6.1"
 lettuce        = "7.6.0.RELEASE" # io.lettuce:lettuce-core: Maven Central; the Redis bus transport ships in the uxmEssentials-redis companion jar
 
 # uxmLib (sibling toolkit; built via composite in dev, resolved from mavenLocal otherwise)
-uxmlib         = "0.47.0"
+uxmlib         = "0.50.0"
 
 # economy provider integrations (see docs/11-economy-integration.md, docs/adr/0004)
 treasury       = "1.2.0"        # me.lokka30:treasury-api: CodeMC repo, NOT Maven Central (verified 2026-05-30)
@@ -106,6 +106,7 @@ uxmlib-redis      = { module = "com.uxplima.uxmlib:uxmlib-redis",               
 uxmlib-gui       = { module = "com.uxplima.uxmlib:uxmlib-gui",                version.ref = "uxmlib" }
 uxmlib-bedrock   = { module = "com.uxplima.uxmlib:uxmlib-bedrock",            version.ref = "uxmlib" }
 uxmlib-item      = { module = "com.uxplima.uxmlib:uxmlib-item",               version.ref = "uxmlib" }
+uxmlib-menu      = { module = "com.uxplima.uxmlib:uxmlib-menu",               version.ref = "uxmlib" }
 uxmlib-hud       = { module = "com.uxplima.uxmlib:uxmlib-hud",                version.ref = "uxmlib" }
 uxmlib-integration = { module = "com.uxplima.uxmlib:uxmlib-integration",        version.ref = "uxmlib" }
 uxmlib-nametags  = { module = "com.uxplima.uxmlib:uxmlib-nametags",           version.ref = "uxmlib" }

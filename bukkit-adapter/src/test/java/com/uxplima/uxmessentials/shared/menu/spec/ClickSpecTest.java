@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
 import org.junit.jupiter.api.Test;
 
 /**

@@ -22,6 +22,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.vaults.VaultRepositories;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -160,7 +161,7 @@ class VaultGuiPathTest {
         execute(dispatcher, "vault");
 
         assertThat(player.getOpenInventory().getTopInventory().getHolder())
-                .isInstanceOf(com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder.class);
+                .isInstanceOf(com.uxplima.uxmlib.menu.runtime.MenuHolder.class);
     }
 
     private CommandDispatcher<CommandSourceStack> registerCommand() {
@@ -178,7 +179,7 @@ class VaultGuiPathTest {
     }
 
     private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     private VaultServices services() {

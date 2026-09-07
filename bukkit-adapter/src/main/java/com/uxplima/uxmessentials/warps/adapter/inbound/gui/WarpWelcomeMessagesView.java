@@ -9,19 +9,21 @@ import java.util.Objects;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -106,7 +108,7 @@ public final class WarpWelcomeMessagesView {
         bindings.action("warps:welcome-add", this::add);
         bindings.action("warps:welcome-clear", this::clear);
         bindings.action("warps:welcome-back", this::back);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /**
@@ -124,7 +126,7 @@ public final class WarpWelcomeMessagesView {
                 player.closeInventory();
                 return;
             }
-            menus.open(viewer, SPEC_ID, snapshot(warpName, warpOwner, warp.welcomeMessages()));
+            menus.open(player, SPEC_ID, snapshot(warpName, warpOwner, warp.welcomeMessages()));
         });
     }
 
@@ -142,12 +144,11 @@ public final class WarpWelcomeMessagesView {
         WelcomeList list = subject(ctx);
         IndexedWelcome target = entry(ctx);
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("warp.welcome", WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT),
+                InputRequest.of("warp.welcome", WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT.key()),
                 input -> applyEdit(player, viewer, list, target.index(), input),
                 () -> open(player, viewer, list.warpName(), list.warpOwner()));
     }
@@ -192,12 +193,11 @@ public final class WarpWelcomeMessagesView {
     private void add(MenuActionContext ctx) {
         WelcomeList list = subject(ctx);
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("warp.welcome", WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT),
+                InputRequest.of("warp.welcome", WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT.key()),
                 input -> applyAdd(player, viewer, list, input),
                 () -> open(player, viewer, list.warpName(), list.warpOwner()));
     }
@@ -220,7 +220,7 @@ public final class WarpWelcomeMessagesView {
     /** Click back: reopen the warp editor for this warp. */
     private void back(MenuActionContext ctx) {
         WelcomeList list = subject(ctx);
-        editorView.open(ctx.player(), ctx.viewer(), list.warpName(), list.warpOwner());
+        editorView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), list.warpName(), list.warpOwner());
     }
 
     /** The warp's live welcome messages as a mutable list, or an empty list when the warp is gone. */
@@ -239,7 +239,7 @@ public final class WarpWelcomeMessagesView {
 
     /** Re-read the warp and re-open the list with a fresh subject so the operator sees the result. */
     private void reopen(MenuActionContext ctx, WelcomeList list) {
-        open(ctx.player(), ctx.viewer(), list.warpName(), list.warpOwner());
+        open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), list.warpName(), list.warpOwner());
     }
 
     private static Material materialFor(String type) {

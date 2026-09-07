@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -67,14 +68,11 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -90,10 +88,16 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
 import com.uxplima.uxmlib.packet.npc.internal.NmsNpcPackets;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
 import com.uxplima.uxmlib.pipeline.PacketSender;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -129,6 +133,7 @@ public final class NpcWiring {
             com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
+            Supplier<Theme> theme,
             GuiLayouts guiLayouts,
             TextInput textInput,
             ManagementGuiRegistry guiRegistry,
@@ -181,8 +186,8 @@ public final class NpcWiring {
         // The management GUI: an editor exposing every NPC property over the use cases, and a list, drawn through
         // the menu engine: that opens it. The list backs both /npc (no args) and the /uxmess gui hub entry; the
         // editor's back button returns to it. The list registers its bindings and spec with the engine here.
-        NpcListMenu listMenu =
-                buildGui(plugin, kernel, repository, services, skinByName, guiText, guiLayouts, textInput, menus);
+        NpcListMenu listMenu = buildGui(
+                plugin, kernel, repository, services, skinByName, guiText, guiLayouts, textInput, theme, menus);
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "npc",
@@ -243,18 +248,20 @@ public final class NpcWiring {
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
+            Supplier<Theme> theme,
             Menus menus) {
         NpcEditorSubLayouts subLayouts =
                 NpcEditorSubLayouts.load(plugin.getDataFolder().toPath(), "npc", "npc-editor", kernel.log());
         EntityEditorLayout editorLayout = guiLayouts.loadEntityEditor("npc", "npc-editor", editorCodeDefault());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout colourPicker =
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.load(
-                        plugin.getDataFolder().toPath(), kernel.log());
+        com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout colourPicker =
+                com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout.load(
+                        plugin.getDataFolder().toPath(), EngineLog.of(kernel.log()));
         NpcListMenu[] listHolder = new NpcListMenu[1];
         NpcEditorView editor = new NpcEditorView(
                 menus,
                 guiText,
-                kernel.scheduler(),
+                theme,
+                new PaperScheduler(plugin),
                 repository,
                 services,
                 skinByName,

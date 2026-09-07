@@ -114,7 +114,7 @@ public final class PunishmentGuiFlow {
             PunishmentAction action,
             PlayerRef target,
             PunishmentAction.Executor executor) {
-        confirm.open(viewer, viewerRef, target, action, executor, () -> open(viewer, viewerRef, action));
+        confirm.open(viewer, target, action, executor, () -> open(viewer, viewerRef, action));
     }
 
     /** A timed verb accepts only a positive, well-formed span: a permanent or malformed parse is rejected. */

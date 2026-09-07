@@ -40,12 +40,9 @@ import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -59,6 +56,12 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,7 +99,7 @@ class HomeListGoldenTest {
         plugin = MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         repository = new FakeHomeRepository();
         messages = new KeyMessages();
         openedAction.clear();
@@ -156,17 +159,18 @@ class HomeListGoldenTest {
         // mirror them here so a single-page grid hides both arrows exactly as the old view did.
         bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
         bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
-        ItemRenderer itemRenderer = new ItemRenderer(new GuiText(messages), bindings.placeholders());
+        ItemRenderer itemRenderer =
+                new ItemRenderer(new GuiText(messages), ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
 
         HomeListMenu menu = menu(menus, scheduler);
         menu.register(bindings, Path.of("nonexistent"), NOOP);
-        menu.open(viewer);
+        menu.open(player);
     }
 
     private HomeListMenu menu(Menus menus, Scheduler scheduler) {

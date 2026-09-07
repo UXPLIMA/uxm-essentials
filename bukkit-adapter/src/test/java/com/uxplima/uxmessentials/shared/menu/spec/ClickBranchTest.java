@@ -9,11 +9,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
+import com.uxplima.uxmlib.menu.spec.ClickBranch;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.RequirementSpec;
 import org.junit.jupiter.api.Test;
 
 /** The pure else-chain node: {@link ClickBranch}'s compact-constructor discipline and {@link ClickSpec#elseFor}. */

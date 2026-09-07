@@ -25,19 +25,9 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuTextPrompt;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ListControlActions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -45,6 +35,18 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmlib.menu.eval.PageRequest;
+import com.uxplima.uxmlib.menu.eval.PagedResult;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.runtime.MenuTextPrompt;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -100,7 +102,6 @@ class ListControlActionsTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private MenuRenderer renderer;
     private MenuBindings bindings;
     private RecordingScheduler scheduler;
@@ -111,14 +112,13 @@ class ListControlActionsTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Viewer");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         scheduler = new RecordingScheduler();
         prompt = new RecordingPrompt();
         bindings = new MenuBindings();
         ListControlActions.register(bindings, new NoopLogger());
         bindings.placeholders().register("v", ctx -> (String) ctx.entry().orElseThrow());
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         renderer = new MenuRenderer(itemRenderer, bindings.conditions());
     }
 
@@ -296,7 +296,7 @@ class ListControlActionsTest {
         paged.register("pw:browse", source);
         Menus menus = new Menus(
                 renderer,
-                scheduler,
+                EngineScheduler.of(scheduler),
                 bindings.lists(),
                 null,
                 null,
@@ -310,7 +310,7 @@ class ListControlActionsTest {
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 null,
                 null,
@@ -320,7 +320,7 @@ class ListControlActionsTest {
                 paged,
                 prompt);
         server.getPluginManager().registerEvents(listener, plugin);
-        menus.open(viewer, "browse", null, 0, args);
+        menus.open(player, "browse", null, 0, args);
         scheduler.drainAsync();
         source.reset();
         return source;

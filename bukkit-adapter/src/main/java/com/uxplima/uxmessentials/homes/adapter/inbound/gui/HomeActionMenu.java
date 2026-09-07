@@ -22,13 +22,8 @@ import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -39,6 +34,13 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -83,8 +85,8 @@ public final class HomeActionMenu {
     private final boolean blockUnsafeRelocate;
     private final Predicate<Position> destinationUnsafe;
     private final ClaimService claimService;
-    private final BiConsumer<PlayerRef, Home> openIconPicker;
-    private final BiConsumer<PlayerRef, Home> openInvitesMenu;
+    private final BiConsumer<Player, Home> openIconPicker;
+    private final BiConsumer<Player, Home> openInvitesMenu;
     private final Consumer<Player> openList;
 
     public HomeActionMenu(Collaborators collaborators) {
@@ -137,11 +139,11 @@ public final class HomeActionMenu {
         bindings.action("homes:toggle-visibility", this::toggleVisibility);
         bindings.action("homes:open-invites", ctx -> openInvitesMenu.accept(ctx.viewer(), home(ctx)));
         bindings.action("homes:action-back", ctx -> openList.accept(ctx.player()));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /** Open the action menu for {@code home}; the live player is resolved by the engine. */
-    public void open(PlayerRef viewer, Home home) {
+    public void open(Player viewer, Home home) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(home, "home");
         menus.open(viewer, SPEC_ID, home);
@@ -161,14 +163,14 @@ public final class HomeActionMenu {
      */
     private void handleTeleport(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Home home = home(ctx);
         scheduler.onRegion(home.location(), () -> {
             ClaimDecision access = claimService.canAccess(viewer, home.location());
             if (!access.allowed()) {
                 scheduler.onEntity(viewer, () -> {
                     notifier.send(viewer, claimMessageKey(access));
-                    open(viewer, home);
+                    open(ctx.viewer(), home);
                 });
                 return;
             }
@@ -188,10 +190,10 @@ public final class HomeActionMenu {
                 return;
             }
             confirm(
-                    viewer,
+                    player,
                     text(viewer, HomesMessageKey.HOME_CONFIRM_UNSAFE_TP, Map.of()),
                     () -> doTeleport(player, viewer, home),
-                    () -> open(viewer, home));
+                    () -> open(player, home));
         });
     }
 
@@ -202,14 +204,14 @@ public final class HomeActionMenu {
 
     /** Delete the home, opening a confirm dialog first when {@code confirm-delete} is on. */
     private void handleDelete(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Home home = home(ctx);
         if (confirmDelete) {
             confirm(
-                    viewer,
+                    ctx.viewer(),
                     text(viewer, HomesMessageKey.HOME_CONFIRM_DELETE, slotName(home)),
                     () -> doDelete(viewer, home),
-                    () -> open(viewer, home));
+                    () -> open(ctx.viewer(), home));
         } else {
             doDelete(viewer, home);
         }
@@ -225,96 +227,94 @@ public final class HomeActionMenu {
     /** Re-anchor the home to the player's current position, optionally confirming first. */
     private void handleRelocate(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Home home = home(ctx);
         Position at = com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(
                 Objects.requireNonNull(player.getLocation(), "player location"));
         if (confirmRelocate) {
             confirm(
-                    viewer,
+                    ctx.viewer(),
                     text(viewer, HomesMessageKey.HOME_CONFIRM_RELOCATE, slotName(home)),
-                    () -> doRelocate(viewer, home, at),
-                    () -> open(viewer, home));
+                    () -> doRelocate(ctx.viewer(), home, at),
+                    () -> open(ctx.viewer(), home));
         } else {
-            doRelocate(viewer, home, at);
+            doRelocate(ctx.viewer(), home, at);
         }
     }
 
-    private void doRelocate(PlayerRef viewer, Home home, Position at) {
+    private void doRelocate(Player viewer, Home home, Position at) {
         scheduler.onRegion(at, () -> {
             if (blockUnsafeRelocate
-                    && !permissions.has(viewer, BYPASS_UNSAFE_PERMISSION)
+                    && !permissions.has(BukkitRefs.toRef(viewer), BYPASS_UNSAFE_PERMISSION)
                     && destinationUnsafe.test(at)) {
                 rejectRelocate(viewer, home, HomesMessageKey.HOME_UNSAFE_LOCATION);
                 return;
             }
-            ClaimDecision decision = claimService.canPlace(viewer, at);
+            ClaimDecision decision = claimService.canPlace(BukkitRefs.toRef(viewer), at);
             if (!decision.allowed()) {
                 rejectRelocate(viewer, home, claimMessageKey(decision));
                 return;
             }
             scheduler.async(() -> {
                 relocateHome.relocate(home.owner(), home.slot(), at);
-                scheduler.onEntity(viewer, () -> reopenFresh(viewer, home));
+                scheduler.onEntity(BukkitRefs.toRef(viewer), () -> reopenFresh(viewer, home));
             });
         });
     }
 
-    private void rejectRelocate(PlayerRef viewer, Home home, MessageKey key) {
-        scheduler.onEntity(viewer, () -> {
-            notifier.send(viewer, key);
+    private void rejectRelocate(Player viewer, Home home, MessageKey key) {
+        scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
+            notifier.send(BukkitRefs.toRef(viewer), key);
             open(viewer, home);
         });
     }
 
     private void rename(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
         Home home = home(ctx);
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(HOME_RENAME_INPUT_KEY, HomesMessageKey.HOME_RENAME_PROMPT),
-                text -> handleRenameInput(viewer, home, text),
-                () -> open(viewer, home));
+                InputRequest.of(HOME_RENAME_INPUT_KEY, HomesMessageKey.HOME_RENAME_PROMPT.key()),
+                text -> handleRenameInput(ctx.viewer(), home, text),
+                () -> open(ctx.viewer(), home));
     }
 
     /**
      * Apply typed rename input. Blank or overlong text is rejected (the menu reopens unchanged); valid input renames
      * off-thread and reopens with the re-read home. Public so the golden test can drive it without a live prompt.
      */
-    public void handleRenameInput(PlayerRef viewer, Home home, String input) {
+    public void handleRenameInput(Player viewer, Home home, String input) {
         String text = input.strip();
         if (text.isBlank() || text.length() > HomeLabel.MAX_LENGTH) {
-            notifier.send(viewer, HomesMessageKey.HOME_RENAME_TOO_LONG);
+            notifier.send(BukkitRefs.toRef(viewer), HomesMessageKey.HOME_RENAME_TOO_LONG);
             open(viewer, home);
             return;
         }
         HomeLabel label = HomeLabel.of(text);
         scheduler.async(() -> {
             renameHome.rename(home.owner(), home.slot(), Optional.of(label));
-            scheduler.onEntity(viewer, () -> reopenFresh(viewer, home));
+            scheduler.onEntity(BukkitRefs.toRef(viewer), () -> reopenFresh(viewer, home));
         });
     }
 
     /** Flip the home public/private off-thread, then reopen with the re-read home so the cell reflects the change. */
     private void toggleVisibility(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Home home = home(ctx);
         scheduler.async(() -> {
             setHomeVisibility.setVisibility(home.owner(), home.slot(), !home.isPublic());
-            scheduler.onEntity(viewer, () -> reopenFresh(viewer, home));
+            scheduler.onEntity(viewer, () -> reopenFresh(ctx.viewer(), home));
         });
     }
 
     /** Re-read the home from the store and reopen the action menu, falling back to the stale subject when gone. */
-    private void reopenFresh(PlayerRef viewer, Home home) {
+    private void reopenFresh(Player viewer, Home home) {
         Home updated = repository.findSlot(home.owner(), home.slot()).orElse(home);
         open(viewer, updated);
     }
 
-    private void confirm(PlayerRef viewer, Component title, Runnable onConfirm, Runnable onCancel) {
+    private void confirm(Player viewer, Component title, Runnable onConfirm, Runnable onCancel) {
         menus.confirm(viewer, title, onConfirm, onCancel);
     }
 
@@ -372,7 +372,7 @@ public final class HomeActionMenu {
             boolean blockUnsafeRelocate,
             Predicate<Position> destinationUnsafe,
             ClaimService claimService,
-            BiConsumer<PlayerRef, Home> openIconPicker,
-            BiConsumer<PlayerRef, Home> openInvitesMenu,
+            BiConsumer<Player, Home> openIconPicker,
+            BiConsumer<Player, Home> openInvitesMenu,
             Consumer<Player> openList) {}
 }

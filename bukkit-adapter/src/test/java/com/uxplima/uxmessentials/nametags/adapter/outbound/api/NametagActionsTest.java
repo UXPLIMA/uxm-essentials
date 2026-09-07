@@ -10,6 +10,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.api.action.UxmFailure;
 import com.uxplima.uxmessentials.nametags.adapter.outbound.PacketNametagPresenter;
 import com.uxplima.uxmessentials.shared.action.ActionDoubles;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.query.QueryDoubles;
 import org.junit.jupiter.api.AfterEach;
@@ -36,7 +37,7 @@ class NametagActionsTest {
     void setUp() {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
-        who = new PlayerRef(alice.getUniqueId(), alice.getName());
+        who = BukkitRefs.toRef(alice);
         presenter = mock(PacketNametagPresenter.class);
         scheduler = new ActionDoubles.InlineScheduler();
         actions = new NametagActions(presenter, new QueryDoubles.MapLookup().with(who), scheduler);

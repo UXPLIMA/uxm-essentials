@@ -25,11 +25,9 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -60,6 +58,11 @@ import com.uxplima.uxmessentials.vaults.domain.VaultItemPolicy;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.StorageGui;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,7 +104,7 @@ class VaultSelectorGoldenTest {
         plugin = MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         player = server.addPlayer("Owner");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         repository = new FakeRepository();
         repository.allocate(1);
         repository.allocate(3);
@@ -178,16 +181,16 @@ class VaultSelectorGoldenTest {
     private void openEngine() {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
 
         vaultMenu(menus, scheduler).register(bindings, dataFolder, new NoopLogger());
-        menus.open(viewer, VaultSelectorMenu.SPEC_ID, null);
+        menus.open(player, VaultSelectorMenu.SPEC_ID, null);
     }
 
     /** A {@link VaultSelectorMenu} wired off the same collaborators as the old view, over the engine façade. */

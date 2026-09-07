@@ -11,6 +11,7 @@ import org.bukkit.inventory.ItemStack;
 import com.uxplima.uxmessentials.api.view.UxmPowertool;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PdcPowertoolStore;
 import com.uxplima.uxmessentials.itemworld.domain.PowertoolBinding;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.query.QueryDoubles;
 import org.junit.jupiter.api.AfterEach;
@@ -37,7 +38,7 @@ class ItemworldQueriesTest {
     void setUp() {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
-        who = new PlayerRef(alice.getUniqueId(), alice.getName());
+        who = BukkitRefs.toRef(alice);
         store = new PdcPowertoolStore(MockBukkit.createMockPlugin("uxmEssentials"));
         scheduler = new QueryDoubles.InlineScheduler();
         queries = new ItemworldQueries(store, new QueryDoubles.MapLookup().with(who), scheduler);

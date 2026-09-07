@@ -9,10 +9,8 @@ import java.util.UUID;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -20,6 +18,10 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.staff.application.port.StaffTeleport;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -72,21 +74,22 @@ public final class StaffPlayerMenu {
         bindings.placeholder(
                 "staff_player_name", ctx -> ctx.entry(PlayerRef.class).name());
         bindings.action("staff:teleport-to", this::teleportTo);
-        menus.registerSpec(NAVIGATOR_SPEC_ID, MenuSpecs.loadOrBundled(NAVIGATOR_RESOURCE, dataFolder, 6, log));
-        menus.registerSpec(LIST_SPEC_ID, MenuSpecs.loadOrBundled(LIST_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(
+                NAVIGATOR_SPEC_ID, MenuSpecs.loadOrBundled(NAVIGATOR_RESOURCE, dataFolder, 6, EngineLog.of(log)));
+        menus.registerSpec(LIST_SPEC_ID, MenuSpecs.loadOrBundled(LIST_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the COMPASS navigator for {@code looker} over the pre-computed visible roster {@code players}. */
-    public void openNavigator(PlayerRef looker, List<PlayerRef> players) {
+    public void openNavigator(Player looker, List<PlayerRef> players) {
         open(NAVIGATOR_SPEC_ID, looker, players);
     }
 
     /** Open {@code /stafflist} for {@code looker} over the pre-computed visible staff roster {@code players}. */
-    public void openList(PlayerRef looker, List<PlayerRef> players) {
+    public void openList(Player looker, List<PlayerRef> players) {
         open(LIST_SPEC_ID, looker, players);
     }
 
-    private void open(String specId, PlayerRef looker, List<PlayerRef> players) {
+    private void open(String specId, Player looker, List<PlayerRef> players) {
         Objects.requireNonNull(looker, "looker");
         Objects.requireNonNull(players, "players");
         menus.open(looker, specId, new PlayerHeads(players));
@@ -98,7 +101,7 @@ public final class StaffPlayerMenu {
      * there), so the target read and the teleport are region-safe, mirroring the old picker's click handler.
      */
     private void teleportTo(MenuActionContext ctx) {
-        PlayerRef looker = ctx.viewer();
+        PlayerRef looker = BukkitRefs.toRef(ctx.viewer());
         UUID targetId = ctx.entry(PlayerRef.class).uuid();
         ctx.player().closeInventory();
         Player target = server.getPlayer(targetId);

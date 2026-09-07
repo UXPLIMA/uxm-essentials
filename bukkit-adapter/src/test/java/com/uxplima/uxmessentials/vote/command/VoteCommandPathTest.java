@@ -20,6 +20,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -464,13 +465,12 @@ class VoteCommandPathTest {
     private final class ServerPlayerLookup implements PlayerLookup {
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.ofNullable(server.getPlayerExact(name))
-                    .map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
+            return Optional.ofNullable(server.getPlayerExact(name)).map(BukkitRefs::toRef);
         }
 
         @Override
         public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.ofNullable(server.getPlayer(uuid)).map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
+            return Optional.ofNullable(server.getPlayer(uuid)).map(BukkitRefs::toRef);
         }
 
         @Override

@@ -8,9 +8,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomPlaceholders;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +31,7 @@ class CustomPlaceholdersTest {
         bindings = new MenuBindings();
         // A built-in exact handler a custom template can reference; kept deterministic rather than reaching for a live
         // viewer so the test stays pure JUnit.
-        bindings.placeholder("player", ctx -> ctx.viewer().name());
+        bindings.placeholder("player", ctx -> ctx.viewer().getName());
         placeholders = new CustomPlaceholders(bindings);
     }
 
@@ -101,7 +101,7 @@ class CustomPlaceholdersTest {
     }
 
     private Optional<String> resolve(String id) {
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "Steve"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "Steve"), null, 0);
         return bindings.placeholders().resolve(id, ctx);
     }
 }

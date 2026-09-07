@@ -21,30 +21,32 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContexts;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,7 +79,6 @@ class EntityEditorViewTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
     private TextInput textInput;
@@ -89,23 +90,22 @@ class EntityEditorViewTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         widget = new Widget();
         // One editor-capable engine and its single listener: the shim opens through this Menus and its delete-confirm
         // child is routed by the one listener, the engine path the production wiring uses.
-        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
         MenuBindings bindings = new MenuBindings();
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders()), bindings.conditions());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
         MenuListener listener = new MenuListener(
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 editorRenderer,
                 menus.selectorOpener(),
@@ -121,7 +121,7 @@ class EntityEditorViewTest {
     @Test
     void rendersOnePropertyButtonPerConfSlotPlusBackAndDelete(@TempDir Path dir) throws Exception {
         EntityEditorLayout layout = layout(dir, "property-slots = [10, 12]\nback-slot = 22\ndelete-slot = 26\n");
-        editor(layout, List.of(togglePill(), counter()), true).open(player, viewer, widget);
+        editor(layout, List.of(togglePill(), counter()), true).open(player, widget);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
@@ -135,7 +135,7 @@ class EntityEditorViewTest {
     @Test
     void togglePropertyFlipsAndCallsItsSetter(@TempDir Path dir) throws Exception {
         EntityEditorLayout layout = layout(dir, "property-slots = [10]\nback-slot = 22\n");
-        editor(layout, List.of(togglePill()), false).open(player, viewer, widget);
+        editor(layout, List.of(togglePill()), false).open(player, widget);
 
         assertThat(widget.enabled).isFalse();
         fireClick(10, ClickType.LEFT);
@@ -147,7 +147,7 @@ class EntityEditorViewTest {
     void numberPropertyStepsWithinBounds(@TempDir Path dir) throws Exception {
         EntityEditorLayout layout = layout(dir, "property-slots = [10]\nback-slot = 22\n");
         widget.count = 9;
-        editor(layout, List.of(counter()), false).open(player, viewer, widget);
+        editor(layout, List.of(counter()), false).open(player, widget);
 
         fireClick(10, ClickType.LEFT); // +5 step, clamped to max 10
 
@@ -161,16 +161,16 @@ class EntityEditorViewTest {
     void textPropertyRoutesValidatedInputToItsSetter() {
         TextProperty property = new TextProperty(
                 "editor.text-field",
-                Key.LABEL,
-                Key.PROMPT,
+                Key.LABEL.key(),
+                Key.PROMPT.key(),
                 Material.NAME_TAG,
                 () -> widget.label,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> widget.label = value,
-                textInput,
-                scheduler);
+                textInput::prompt,
+                EngineScheduler.of(scheduler));
 
-        property.applyInput(ClickContexts.carrier(player, viewer), "  Castle  ");
+        property.applyInput(ClickContexts.carrier(player), "  Castle  ");
 
         assertThat(widget.label).isEqualTo("Castle");
     }
@@ -179,16 +179,16 @@ class EntityEditorViewTest {
     void textPropertyRejectsBlankInputWithoutCallingSetter() {
         TextProperty property = new TextProperty(
                 "editor.text-field",
-                Key.LABEL,
-                Key.PROMPT,
+                Key.LABEL.key(),
+                Key.PROMPT.key(),
                 Material.NAME_TAG,
                 () -> widget.label,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> widget.label = value,
-                textInput,
-                scheduler);
+                textInput::prompt,
+                EngineScheduler.of(scheduler));
 
-        property.applyInput(ClickContexts.carrier(player, viewer), "   ");
+        property.applyInput(ClickContexts.carrier(player), "   ");
 
         assertThat(widget.label).isEqualTo("old");
     }
@@ -200,16 +200,15 @@ class EntityEditorViewTest {
         EntityEditorView<Widget> view = EntityEditorView.<Widget>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title((v, w) -> Component.text("edit"))
-                .valueLore(Key.VALUE_LORE)
-                .backName(Key.BACK)
+                .valueLore(Key.VALUE_LORE.key())
+                .backName(Key.BACK.key())
                 .properties(w -> List.of(togglePill()))
-                .onBack((p, v) -> {})
-                .onDelete(Key.DELETE, Key.DELETE_CONFIRM, (p, w) -> deleted.set(true))
+                .onBack(p -> {})
+                .onDelete(Key.DELETE.key(), Key.DELETE_CONFIRM.key(), (p, w) -> deleted.set(true))
                 .build();
-        view.open(player, viewer, widget);
+        view.open(player, widget);
 
         fireClick(26, ClickType.LEFT); // clicking delete opens the confirm menu, it does not delete
 
@@ -227,32 +226,39 @@ class EntityEditorViewTest {
         EntityEditorView.Builder<Widget> builder = EntityEditorView.<Widget>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title((v, w) -> Component.text("edit"))
-                .valueLore(Key.VALUE_LORE)
-                .backName(Key.BACK)
+                .valueLore(Key.VALUE_LORE.key())
+                .backName(Key.BACK.key())
                 .properties(w -> properties)
-                .onBack((p, v) -> {});
+                .onBack(p -> {});
         if (withDelete) {
-            builder.onDelete(Key.DELETE, Key.DELETE_CONFIRM, (p, w) -> {});
+            builder.onDelete(Key.DELETE.key(), Key.DELETE_CONFIRM.key(), (p, w) -> {});
         }
         return builder.build();
     }
 
     private ToggleProperty<Boolean> togglePill() {
         return ToggleProperty.ofBoolean(
-                Key.LABEL,
+                Key.LABEL.key(),
                 Material.LEVER,
                 () -> widget.enabled,
                 (v, state) -> state ? "On" : "Off",
                 value -> widget.enabled = value,
-                scheduler);
+                EngineScheduler.of(scheduler));
     }
 
     private NumberProperty counter() {
         return new NumberProperty(
-                Key.LABEL, Material.CLOCK, () -> widget.count, 5, 10, 0, 10, value -> widget.count = value, scheduler);
+                Key.LABEL.key(),
+                Material.CLOCK,
+                () -> widget.count,
+                5,
+                10,
+                0,
+                10,
+                value -> widget.count = value,
+                EngineScheduler.of(scheduler));
     }
 
     private EntityEditorLayout layout(Path dir, String body) throws Exception {

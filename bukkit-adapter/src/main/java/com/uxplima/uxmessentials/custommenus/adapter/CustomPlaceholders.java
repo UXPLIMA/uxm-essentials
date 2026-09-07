@@ -6,8 +6,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -28,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>A template may reference other tokens: a built-in ({@code %player%}), a data reader ({@code %data_number_coins%}),
  * a PlaceholderAPI value ({@code %papi_*%}), or another custom name. {@link #substitute} expands those inner
  * {@code %token%}s through the same registry, but deliberately leaves {@code {math: …}} blocks and MiniMessage
- * {@code <tags>} verbatim: the outer {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer}
+ * {@code <tags>} verbatim: the outer {@link com.uxplima.uxmlib.menu.render.ItemRenderer}
  * owns the math and MiniMessage passes, so a template like {@code "{math: %coins% * 2}"} has only its inner
  * {@code %coins%} resolved here, and the outer pass then evaluates the arithmetic. Recursion is bounded by a
  * per-render depth guard so a cycle ({@code a=%b%}, {@code b=%a%}) stops at {@link #MAX_DEPTH} and returns the
@@ -51,8 +52,6 @@ public final class CustomPlaceholders {
      */
     private static final ThreadLocal<int[]> DEPTH = ThreadLocal.withInitial(() -> new int[1]);
 
-    private final MenuBindings bindings;
-
     /**
      * The operator's {@code name -> template} definitions, seeded empty so nothing is claimed until the placeholders
      * file is read, and swapped whole on reload. An atomic reference keeps the swap a single publish that a concurrent
@@ -60,8 +59,12 @@ public final class CustomPlaceholders {
      */
     private final AtomicReference<Map<String, String>> defs = new AtomicReference<>(Map.of());
 
+    /** The same registry, wrapped so a handler that throws costs one token rather than the whole template. */
+    private final ReportingPlaceholders reporting;
+
     public CustomPlaceholders(MenuBindings bindings) {
-        this.bindings = Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(bindings, "bindings");
+        this.reporting = new ReportingPlaceholders(bindings.placeholders());
         bindings.placeholders().fallback(this::claims, this::resolve);
     }
 
@@ -112,9 +115,7 @@ public final class CustomPlaceholders {
             Matcher matcher = TOKEN.matcher(template);
             StringBuilder out = new StringBuilder();
             while (matcher.find()) {
-                String value = bindings.placeholders()
-                        .resolveOrReport(matcher.group(1), ctx)
-                        .orElse("");
+                String value = reporting.resolveOrReport(matcher.group(1), ctx).orElse("");
                 matcher.appendReplacement(out, Matcher.quoteReplacement(value));
             }
             matcher.appendTail(out);

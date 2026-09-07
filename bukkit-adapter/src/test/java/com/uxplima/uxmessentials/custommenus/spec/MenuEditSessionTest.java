@@ -11,14 +11,14 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommand
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.LoreMode;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.RefreshSpec;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.junit.jupiter.api.Test;
 
 /**

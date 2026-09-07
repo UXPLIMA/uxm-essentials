@@ -9,11 +9,8 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -21,6 +18,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -76,7 +78,7 @@ public final class WarpCategoryParentSelectorMenu {
         bindings.action("warps:category-parent-assign", this::assignClicked);
         bindings.action("warps:category-parent-clear", this::clearClicked);
         bindings.action("warps:category-parent-back", this::backClicked);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the selector for {@code viewer} to set the parent of {@code category}, returning to its settings on pick. */
@@ -87,7 +89,7 @@ public final class WarpCategoryParentSelectorMenu {
         List<WarpCategory> candidates = categoryRepository.all().stream()
                 .filter(candidate -> !candidate.id().equals(category.id()))
                 .toList();
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, new Selection(category, candidates)));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, new Selection(category, candidates)));
     }
 
     /**
@@ -99,10 +101,14 @@ public final class WarpCategoryParentSelectorMenu {
         List<String> lines = new ArrayList<>(candidate.displayLore());
         lines.add("");
         lines.add(messages.resolve(
-                ctx.viewer(), WarpsMessageKey.WARP_EDITOR_CATEGORY_ICON_ID, Map.of("id", candidate.id())));
+                BukkitRefs.toRef(ctx.viewer()),
+                WarpsMessageKey.WARP_EDITOR_CATEGORY_ICON_ID,
+                Map.of("id", candidate.id())));
         lines.add("");
         lines.add(messages.resolve(
-                ctx.viewer(), WarpsMessageKey.WARP_EDITOR_CATEGORY_PARENT_SELECTOR_SELECT_HINT, Map.of()));
+                BukkitRefs.toRef(ctx.viewer()),
+                WarpsMessageKey.WARP_EDITOR_CATEGORY_PARENT_SELECTOR_SELECT_HINT,
+                Map.of()));
         return String.join("\n", lines);
     }
 
@@ -118,14 +124,14 @@ public final class WarpCategoryParentSelectorMenu {
 
     /** Left-click back: reopen the settings panel, changing nothing. */
     private void backClicked(MenuActionContext ctx) {
-        settingsView.open(ctx.player(), ctx.viewer(), editedOf(ctx));
+        settingsView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), editedOf(ctx));
     }
 
     /** Save the edited category under {@code parentId} through the repository, then reopen its settings. */
     private void assign(MenuActionContext ctx, Optional<String> parentId) {
         WarpCategory updated = editedOf(ctx).withParentCategoryId(parentId);
         categoryRepository.save(updated);
-        settingsView.open(ctx.player(), ctx.viewer(), updated);
+        settingsView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), updated);
     }
 
     private static WarpCategory candidateOf(MenuContext ctx) {

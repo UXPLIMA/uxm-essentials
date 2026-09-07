@@ -46,6 +46,8 @@ import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -270,19 +272,16 @@ class PlaytimeCommandPathTest {
     }
 
     /** A minimal editor-capable engine; this test only wires the view into a command and never opens it. */
-    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus engine(
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText) {
-        var editorRenderer =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer(guiText);
-        var itemRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
-                guiText, new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry());
-        var renderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
-                itemRenderer,
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry());
-        return new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
+    private com.uxplima.uxmlib.menu.Menus engine(com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText) {
+        var editorRenderer = new com.uxplima.uxmlib.menu.render.EditorRenderer(guiText, ThemeFile::shippedTheme);
+        var itemRenderer = new com.uxplima.uxmlib.menu.render.ItemRenderer(
+                guiText, ThemeFile::shippedTheme, new com.uxplima.uxmlib.menu.binding.PlaceholderRegistry());
+        var renderer = new com.uxplima.uxmlib.menu.render.MenuRenderer(
+                itemRenderer, new com.uxplima.uxmlib.menu.binding.ConditionRegistry());
+        return new com.uxplima.uxmlib.menu.Menus(
                 renderer,
-                new SyncScheduler(),
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry(),
+                EngineScheduler.of(new SyncScheduler()),
+                new com.uxplima.uxmlib.menu.binding.ListSourceRegistry(),
                 editorRenderer);
     }
 

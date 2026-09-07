@@ -17,13 +17,8 @@ import com.uxplima.uxmessentials.economy.domain.AmountParser;
 import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -31,6 +26,13 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -91,15 +93,14 @@ public final class BankActionsMenu {
         bindings.action("economy:bank-members", this::openMembers);
         bindings.action("economy:bank-logs", this::openLogs);
         bindings.action("economy:bank-actions-back", this::openBankList);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open the actions panel for {@code bank}; the bank is the subject the title and buttons act on. */
     public void open(Player player, SharedBank bank) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(bank, "bank");
-        PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
-        menus.open(viewer, SPEC_ID, new BankActionsSubject(bank));
+        menus.open(player, SPEC_ID, new BankActionsSubject(bank));
     }
 
     /** Members button: open the engine bank-members grid for this bank, exactly as the old members button did. */
@@ -125,7 +126,7 @@ public final class BankActionsMenu {
      */
     private void promptTransfer(MenuActionContext ctx, boolean deposit) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         SharedBank bank = ctx.subject(BankActionsSubject.class).bank();
         EconomyMessageKey promptKey = deposit
                 ? EconomyMessageKey.BANK_ACTIONS_DEPOSIT_PROMPT
@@ -133,8 +134,7 @@ public final class BankActionsMenu {
         String inputKey = deposit ? "bank.deposit" : "bank.withdraw";
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(inputKey, promptKey, Map.of("bank", bank.name())),
+                InputRequest.of(inputKey, promptKey.key(), Map.of("bank", bank.name())),
                 input -> applyTransfer(player, viewer, bank, input, deposit),
                 () -> navigation.get().bankListMenu().open(player));
     }

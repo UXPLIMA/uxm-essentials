@@ -23,12 +23,13 @@ import com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +46,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the analytic baseline
  * the old view produced for this fixture; the active currency's icon must carry the {@code UNBREAKING} glint with
  * {@code HIDE_ENCHANTS} while the inactive one carries neither. Then a left click on the inactive currency through the
- * engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener} proves the
+ * engine's own {@link com.uxplima.uxmlib.menu.runtime.MenuListener} proves the
  * migrated path hands that currency to the recording {@code onPick} the old view drove, faithful in both
  * appearance and behaviour.
  */
@@ -81,7 +82,7 @@ class CurrencyPickerGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);

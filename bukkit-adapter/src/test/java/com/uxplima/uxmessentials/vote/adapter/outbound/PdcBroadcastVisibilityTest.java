@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import org.junit.jupiter.api.AfterEach;
@@ -85,6 +86,6 @@ class PdcBroadcastVisibilityTest {
     }
 
     private static PlayerRef ref(PlayerMock p) {
-        return new PlayerRef(p.getUniqueId(), p.getName());
+        return BukkitRefs.toRef(p);
     }
 }

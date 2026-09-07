@@ -17,21 +17,22 @@ import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -93,13 +94,12 @@ public final class JailListView {
         this.view = EntityListView.<String>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(ModerationMessageKey.MOD_GUI_JAIL_LIST_TITLE)
                 .navNames(ModerationMessageKey.MOD_GUI_JAIL_LIST_PREV, ModerationMessageKey.MOD_GUI_JAIL_LIST_NEXT)
                 .entities(snapshot::get)
                 .iconRenderer(this::icon)
-                .onSelect((player, name) -> openEdit(BukkitRefs.toRef(player), name))
+                .onSelect((player, name) -> openEdit(player, name))
                 .onCreate(ModerationMessageKey.MOD_GUI_JAIL_LIST_CREATE, this::promptCreate)
                 .build();
     }
@@ -118,8 +118,9 @@ public final class JailListView {
         bindings.action("moderation:jail-reanchor", this::reAnchor);
         bindings.action("moderation:jail-goto", this::goTo);
         bindings.action("moderation:jail-delete", this::delete);
-        bindings.action("moderation:jail-back", ctx -> open(ctx.player(), ctx.viewer()));
-        menus.registerSpec(EDIT_SPEC_ID, MenuSpecs.loadOrBundled(EDIT_SPEC_RESOURCE, dataFolder, EDIT_ROWS, log));
+        bindings.action("moderation:jail-back", ctx -> open(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
+        menus.registerSpec(
+                EDIT_SPEC_ID, MenuSpecs.loadOrBundled(EDIT_SPEC_RESOURCE, dataFolder, EDIT_ROWS, EngineLog.of(log)));
     }
 
     /** Resolve the jail-name union off-thread, then open the list on the viewer's entity thread. */
@@ -161,9 +162,9 @@ public final class JailListView {
     }
 
     /** Open the engine edit screen: resolve the jail's coordinates off-thread, then hand them in as the subject. */
-    private void openEdit(PlayerRef viewer, String name) {
+    private void openEdit(Player viewer, String name) {
         scheduler.async(() -> {
-            String coords = coords(viewer, name);
+            String coords = coords(BukkitRefs.toRef(viewer), name);
             menus.open(viewer, EDIT_SPEC_ID, new JailEdit(name, coords));
         });
     }
@@ -171,7 +172,7 @@ public final class JailListView {
     /** Re-anchor the jail at the viewer's current location, read here on the viewer's own region thread. */
     private void reAnchor(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         String name = ctx.subject(JailEdit.class).name();
         scheduler.onEntity(viewer, () -> {
             services.setJail().set(viewer, name, position(player));
@@ -188,12 +189,13 @@ public final class JailListView {
      */
     private void goTo(MenuActionContext ctx) {
         ctx.player().closeInventory();
-        sanctions.sendToJail(ctx.viewer(), ctx.subject(JailEdit.class).name());
+        sanctions.sendToJail(
+                BukkitRefs.toRef(ctx.viewer()), ctx.subject(JailEdit.class).name());
     }
 
     private void delete(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         services.delJail().delete(viewer, ctx.subject(JailEdit.class).name());
         open(player, viewer);
     }
@@ -201,9 +203,8 @@ public final class JailListView {
     /** Prompt for a new jail name; a submission saves it at the viewer's current location, a cancel reopens the list. */
     private void promptCreate(Player player) {
         PlayerRef viewer = BukkitRefs.toRef(player);
-        InputRequest request = InputRequest.of(CREATE_KEY, ModerationMessageKey.MOD_GUI_JAIL_CREATE_PROMPT);
-        textInput.prompt(
-                player, viewer, request, text -> createOrReopen(player, viewer, text), () -> open(player, viewer));
+        InputRequest request = InputRequest.of(CREATE_KEY, ModerationMessageKey.MOD_GUI_JAIL_CREATE_PROMPT.key());
+        textInput.prompt(player, request, text -> createOrReopen(player, viewer, text), () -> open(player, viewer));
     }
 
     /** A blank name reopens the list; otherwise the trimmed name creates a jail at the viewer's location. */

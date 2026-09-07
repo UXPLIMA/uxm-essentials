@@ -21,29 +21,32 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.render.RenderedSlot;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
+import com.uxplima.uxmlib.scheduler.TaskHandle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,8 +77,9 @@ class MenuListenerTest {
         actions = new ActionRegistry();
         ConditionRegistry conditions = new ConditionRegistry();
         MenuRenderer renderer = new MenuRenderer(
-                new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry()), conditions);
-        listener = new MenuListener(renderer, actions, conditions, new SyncScheduler(), plugin);
+                new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, new PlaceholderRegistry()),
+                conditions);
+        listener = new MenuListener(renderer, actions, conditions, EngineScheduler.of(new SyncScheduler()), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -116,7 +120,17 @@ class MenuListenerTest {
     void closeCancelsTheRefreshHandle() {
         AtomicBoolean cancelled = new AtomicBoolean(false);
         MenuHolder holder = holderWithSlotZero(new RenderedSlot(itemBoundLeftTo("test:hit"), null));
-        holder.setRefreshHandle(() -> cancelled.set(true));
+        holder.setRefreshHandle(new TaskHandle() {
+            @Override
+            public void cancel() {
+                cancelled.set(true);
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return cancelled.get();
+            }
+        });
         openMenu(holder);
 
         server.getPluginManager().callEvent(new InventoryCloseEvent(viewer.getOpenInventory()));
@@ -146,7 +160,7 @@ class MenuListenerTest {
 
     private MenuHolder holderWithSlotZero(RenderedSlot rs) {
         MenuSpec spec = new MenuSpecLoader().parse("rows = 1\nitems {}");
-        MenuContext ctx = MenuContext.of(new PlayerRef(viewer.getUniqueId(), viewer.getName()), null, 0);
+        MenuContext ctx = MenuContext.of(viewer, null, 0);
         MenuHolder holder = new MenuHolder("t", spec, ctx);
         holder.recordSlot(0, rs);
         return holder;

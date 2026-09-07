@@ -19,9 +19,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -31,6 +29,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.testing.CompletePlayerMock;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,7 +68,7 @@ class DurationPickerViewTest {
         // unimplemented mock aborts the test rather than failing it, so the two reject tests reported green
         // without ever evaluating an assertion.
         viewer = CompletePlayerMock.addTo(server, "Staff");
-        viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
+        viewerRef = BukkitRefs.toRef(viewer);
         textInput = TextInputTestKit.create(
                 plugin,
                 new GuiText(new KeyMessages()),

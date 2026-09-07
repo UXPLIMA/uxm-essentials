@@ -24,14 +24,14 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuItemMark;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.render.MenuItemMark;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -186,7 +186,7 @@ class BottomInventoryGoldenTest {
     void aNonBottomMenuNeverTouchesThePlayerInventory() {
         player.getInventory().setItem(9, new ItemStack(Material.DIAMOND));
 
-        menus.open(ref(), "plain", null);
+        menus.open(player, "plain", null);
         scheduler.drain();
 
         assertThat(player.getInventory().getItem(9))
@@ -195,12 +195,8 @@ class BottomInventoryGoldenTest {
     }
 
     private void openBottom() {
-        menus.open(ref(), "bottom", null);
+        menus.open(player, "bottom", null);
         scheduler.drain();
-    }
-
-    private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
     }
 
     private void clickRaw(int rawSlot) {

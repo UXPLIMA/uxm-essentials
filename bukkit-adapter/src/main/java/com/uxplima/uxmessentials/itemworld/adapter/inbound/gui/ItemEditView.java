@@ -31,14 +31,8 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.LorePolicy;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
@@ -48,7 +42,15 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.property.SelectorButton;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -132,7 +134,7 @@ public final class ItemEditView {
         bindings.action("itemedit:model-clear", this::modelClear);
         bindings.action("itemedit:durability", this::durability);
         bindings.action("itemedit:repair", this::repair);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open the editor on the viewer's held item; an empty hand answers with a message rather than an empty window. */
@@ -145,7 +147,7 @@ public final class ItemEditView {
                 handExpired(player, viewer);
                 return;
             }
-            menus.open(viewer, SPEC_ID, new ItemEditTarget(hand.getType()));
+            menus.open(player, SPEC_ID, new ItemEditTarget(hand.getType()));
         });
     }
 
@@ -153,19 +155,19 @@ public final class ItemEditView {
 
     /** The preview slot's icon: the held item serialized so the {@code b64:} provider renders it component-for-component. */
     private String previewMaterial(MenuContext ctx) {
-        ItemStack hand = handOf(ctx.viewer());
+        ItemStack hand = handOf(BukkitRefs.toRef(ctx.viewer()));
         return hand == null || hand.getType().isAir() ? Material.BARRIER.name() : SerializedItems.encode(hand);
     }
 
     /** The preview slot's name: the held item's effective name (custom or vanilla) as MiniMessage source. */
     private String previewName(MenuContext ctx) {
-        ItemStack hand = handOf(ctx.viewer());
+        ItemStack hand = handOf(BukkitRefs.toRef(ctx.viewer()));
         return hand == null || hand.getType().isAir() ? "" : MINI.serialize(hand.effectiveName());
     }
 
     /** The preview slot's lore: the held item's own lore lines, joined so the renderer splits them back apart. */
     private String previewLore(MenuContext ctx) {
-        ItemStack hand = handOf(ctx.viewer());
+        ItemStack hand = handOf(BukkitRefs.toRef(ctx.viewer()));
         List<String> lore = hand == null ? List.of() : ItemEdits.currentLore(hand);
         return String.join("\n", lore);
     }
@@ -192,7 +194,7 @@ public final class ItemEditView {
         }
         applyAndReopen(
                 ctx.player(),
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 ItemEdits.resetName(hand),
                 ItemworldMessageKey.ITEMEDIT_NAME_RESET,
                 Map.of());
@@ -247,7 +249,7 @@ public final class ItemEditView {
         }
         applyAndReopen(
                 ctx.player(),
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 ItemEdits.withLore(hand, List.of()),
                 ItemworldMessageKey.ITEMEDIT_LORE_CLEARED,
                 Map.of());
@@ -283,7 +285,7 @@ public final class ItemEditView {
         }
         applyAndReopen(
                 ctx.player(),
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 ItemEdits.customModelData(hand, OptionalInt.empty()),
                 ItemworldMessageKey.ITEMEDIT_MODEL_CLEARED,
                 Map.of());
@@ -329,7 +331,7 @@ public final class ItemEditView {
             return;
         }
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         if (!(hand.getItemMeta() instanceof Damageable damageable) || !damageable.hasDamage()) {
             reply(viewer, ItemworldMessageKey.ITEMEDIT_REPAIR_NOTHING, Map.of());
             open(player, viewer);
@@ -349,7 +351,7 @@ public final class ItemEditView {
         boolean next = meta == null || !meta.isUnbreakable();
         applyAndReopen(
                 ctx.player(),
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 ItemEdits.unbreakable(hand, next),
                 ItemworldMessageKey.ITEMEDIT_UNBREAKABLE_SET,
                 Map.of("state", onOff(next)));
@@ -363,7 +365,7 @@ public final class ItemEditView {
             return;
         }
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Material expected = hand.getType();
         List<Enchantment> enchants = allEnchants();
         List<SelectorButton> buttons = new ArrayList<>();
@@ -378,7 +380,7 @@ public final class ItemEditView {
         }
         buttons.add(SelectorButton.of(ENCHANT_BACK_SLOT, backIcon(viewer), () -> open(player, viewer)));
         menus.openSelector(
-                viewer,
+                ctx.viewer(),
                 text(viewer, ItemworldMessageKey.ITEMEDIT_GUI_ENCHANT_ADD_TITLE),
                 ENCHANT_ROWS,
                 FILLER,
@@ -390,10 +392,9 @@ public final class ItemEditView {
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
                 InputRequest.of(
                         "itemedit.enchant-level",
-                        ItemworldMessageKey.ITEMEDIT_GUI_ENCHANT_LEVEL_PROMPT,
+                        ItemworldMessageKey.ITEMEDIT_GUI_ENCHANT_LEVEL_PROMPT.key(),
                         Map.of("enchant", id)),
                 input -> applyEnchant(player, viewer, expected, enchant, id, input),
                 () -> open(player, viewer));
@@ -435,7 +436,7 @@ public final class ItemEditView {
             return;
         }
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Material expected = hand.getType();
         ItemMeta meta = hand.getItemMeta();
         Map<Enchantment, Integer> enchants = meta == null ? Map.of() : meta.getEnchants();
@@ -459,7 +460,7 @@ public final class ItemEditView {
         }
         buttons.add(SelectorButton.of(PICKER_BACK_SLOT, backIcon(viewer), () -> open(player, viewer)));
         menus.openSelector(
-                viewer,
+                ctx.viewer(),
                 text(viewer, ItemworldMessageKey.ITEMEDIT_GUI_ENCHANT_REMOVE_TITLE),
                 PICKER_ROWS,
                 FILLER,
@@ -492,7 +493,7 @@ public final class ItemEditView {
         if (hand == null) {
             return;
         }
-        openFlagsFor(ctx.player(), ctx.viewer(), hand.getType());
+        openFlagsFor(ctx.player(), BukkitRefs.toRef(ctx.viewer()), hand.getType());
     }
 
     private void openFlagsFor(Player player, PlayerRef viewer, Material expected) {
@@ -519,7 +520,7 @@ public final class ItemEditView {
         }
         buttons.add(SelectorButton.of(PICKER_BACK_SLOT, backIcon(viewer), () -> open(player, viewer)));
         menus.openSelector(
-                viewer, text(viewer, ItemworldMessageKey.ITEMEDIT_GUI_FLAGS_TITLE), PICKER_ROWS, FILLER, buttons);
+                player, text(viewer, ItemworldMessageKey.ITEMEDIT_GUI_FLAGS_TITLE), PICKER_ROWS, FILLER, buttons);
     }
 
     private void toggleFlag(Player player, PlayerRef viewer, Material expected, ItemFlag flag, String token) {
@@ -539,7 +540,9 @@ public final class ItemEditView {
     /** Resolve the live hand for an action still in the panel, closing gracefully when the item is gone or changed. */
     private @Nullable ItemStack live(MenuActionContext ctx) {
         return liveHand(
-                ctx.player(), ctx.viewer(), ctx.subject(ItemEditTarget.class).type());
+                ctx.player(),
+                BukkitRefs.toRef(ctx.viewer()),
+                ctx.subject(ItemEditTarget.class).type());
     }
 
     /**
@@ -571,13 +574,12 @@ public final class ItemEditView {
      */
     private void promptText(MenuActionContext ctx, String inputKey, MessageKey label, TextEdit edit) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Material expected = ctx.subject(ItemEditTarget.class).type();
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(inputKey, label),
+                InputRequest.of(inputKey, label.key()),
                 input -> {
                     ItemStack hand = liveHand(player, viewer, expected);
                     if (hand != null) {

@@ -109,6 +109,6 @@ public final class StaffListCommand extends StaffCommandSupport implements Comma
             sink.deliver(lookerRef, messages.resolve(lookerRef, StaffMessageKey.STAFF_LIST_EMPTY, Map.of()));
             return;
         }
-        playerMenu.openList(lookerRef, roster);
+        playerMenu.openList(sender, roster);
     }
 }

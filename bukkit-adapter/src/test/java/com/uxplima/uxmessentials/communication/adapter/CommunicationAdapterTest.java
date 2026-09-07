@@ -37,7 +37,10 @@ import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -384,13 +387,14 @@ class CommunicationAdapterTest {
         return new com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView(
                 editorEngine(guiText, scheduler),
                 guiText,
-                scheduler,
+                ThemeFile::shippedTheme,
+                EngineScheduler.of(scheduler),
                 sink,
                 commandAnnouncementStore,
                 announcerSettingsStore,
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(
                         java.nio.file.Path.of("."), new NoopLogger()),
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit.create(
+                com.uxplima.uxmlib.gui.input.TextInputTestKit.create(
                         MockBukkit.createMockPlugin(),
                         guiText,
                         scheduler,
@@ -399,19 +403,17 @@ class CommunicationAdapterTest {
     }
 
     /** A minimal editor-capable engine for the editor view; the command tests never open it, so it is inert here. */
-    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus editorEngine(
+    private com.uxplima.uxmlib.menu.Menus editorEngine(
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText, Scheduler scheduler) {
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings bindings =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer renderer =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
-                        new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
-                                guiText, bindings.placeholders()),
-                        bindings.conditions());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer editorRenderer =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer(guiText);
-        return new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
-                renderer, scheduler, bindings.lists(), editorRenderer);
+        com.uxplima.uxmlib.menu.binding.MenuBindings bindings = new com.uxplima.uxmlib.menu.binding.MenuBindings();
+        com.uxplima.uxmlib.menu.render.MenuRenderer renderer = new com.uxplima.uxmlib.menu.render.MenuRenderer(
+                new com.uxplima.uxmlib.menu.render.ItemRenderer(
+                        guiText, ThemeFile::shippedTheme, bindings.placeholders()),
+                bindings.conditions());
+        com.uxplima.uxmlib.menu.render.EditorRenderer editorRenderer =
+                new com.uxplima.uxmlib.menu.render.EditorRenderer(guiText, ThemeFile::shippedTheme);
+        return new com.uxplima.uxmlib.menu.Menus(
+                renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
     }
 
     private BukkitAnnouncerBroadcaster announcerBroadcaster() {
@@ -432,7 +434,7 @@ class CommunicationAdapterTest {
     }
 
     private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     private Path writeContent(Path dataDir) throws Exception {

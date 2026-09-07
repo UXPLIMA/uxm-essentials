@@ -26,8 +26,9 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -39,6 +40,8 @@ import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerMe
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputInstaller;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -99,8 +102,8 @@ class WarpManagerCategoryTest {
                         plugin.getDataFolder().toPath(),
                         anvil,
                         new GuiText(messages),
-                        scheduler,
-                        new SilentLogger())
+                        EngineScheduler.of(scheduler),
+                        EngineLog.of(new SilentLogger()))
                 .textInput();
 
         TestMenuEngine engine = TestMenuEngine.create(messages, scheduler);
@@ -160,7 +163,7 @@ class WarpManagerCategoryTest {
     }
 
     private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** A category repository over a fixed, mutable map: the panel's saves and deletes land here. */

@@ -22,9 +22,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.DurationPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -33,6 +31,9 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * at slot 22, an ARROW back button at slot 18, gray-glass filler everywhere else). The engine window is snapshotted as
  * {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the analytic baseline the old view
  * produced for this fixture. A real click on a preset through the engine's own {@link
- * com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener} proves the migrated path hands that
+ * com.uxplima.uxmlib.menu.runtime.MenuListener} proves the migrated path hands that
  * exact span to the recording {@code onPick}; the back button runs its supplied action. The custom-span anvil branch is
  * driven through the package-private {@code resolveTyped} apply seam (MockBukkit cannot open a live anvil): a valid span
  * fires {@code onPick}, a malformed one does not.
@@ -77,7 +78,7 @@ class DurationPickerGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP_LOG);

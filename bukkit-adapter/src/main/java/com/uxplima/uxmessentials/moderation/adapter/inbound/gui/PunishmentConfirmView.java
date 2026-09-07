@@ -7,16 +7,18 @@ import java.util.Optional;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -92,7 +94,7 @@ public final class PunishmentConfirmView {
         bindings.action(
                 "moderation:punish-back",
                 ctx -> ctx.subject(Confirm.class).onBack().run());
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /**
@@ -102,16 +104,15 @@ public final class PunishmentConfirmView {
      */
     public void open(
             Player viewer,
-            PlayerRef actor,
             PlayerRef target,
             PunishmentAction action,
             PunishmentAction.Executor executor,
             Runnable onBack) {
-        open(actor, target, action, executor, onBack, Optional.empty());
+        open(viewer, target, action, executor, onBack, Optional.empty());
     }
 
     private void open(
-            PlayerRef actor,
+            Player actor,
             PlayerRef target,
             PunishmentAction action,
             PunishmentAction.Executor executor,
@@ -132,7 +133,7 @@ public final class PunishmentConfirmView {
      */
     void confirm(MenuActionContext ctx, boolean silent) {
         Player viewer = ctx.player();
-        PlayerRef actor = ctx.viewer();
+        PlayerRef actor = BukkitRefs.toRef(viewer);
         Confirm subject = ctx.subject(Confirm.class);
         scheduler.onEntity(actor, () -> {
             viewer.closeInventory();
@@ -143,15 +144,13 @@ public final class PunishmentConfirmView {
     /** Prompt for a reason; a submission reopens the confirm screen carrying the typed reason, a cancel keeps it. */
     private void promptReason(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef actor = ctx.viewer();
         Confirm subject = ctx.subject(Confirm.class);
-        InputRequest request = InputRequest.of(REASON_KEY, ModerationMessageKey.MOD_GUI_CONFIRM_REASON_PROMPT);
+        InputRequest request = InputRequest.of(REASON_KEY, ModerationMessageKey.MOD_GUI_CONFIRM_REASON_PROMPT.key());
         textInput.prompt(
                 viewer,
-                actor,
                 request,
-                text -> applyReason(actor, subject, reasonOf(text)),
-                () -> applyReason(actor, subject, subject.reason()));
+                text -> applyReason(viewer, subject, reasonOf(text)),
+                () -> applyReason(viewer, subject, subject.reason()));
     }
 
     /**
@@ -159,7 +158,7 @@ public final class PunishmentConfirmView {
      * drives the reason-input submit branch, the round-trip that reopens with the captured reason, without a live
      * anvil (MockBukkit cannot drive one), mirroring the economy amount seam.
      */
-    void applyReason(PlayerRef actor, Confirm subject, Optional<String> reason) {
+    void applyReason(Player actor, Confirm subject, Optional<String> reason) {
         open(actor, subject.target(), subject.action(), subject.executor(), subject.onBack(), reason);
     }
 

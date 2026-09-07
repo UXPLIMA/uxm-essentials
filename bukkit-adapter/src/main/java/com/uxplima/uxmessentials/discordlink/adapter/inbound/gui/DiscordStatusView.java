@@ -17,18 +17,18 @@ import com.uxplima.uxmessentials.discordlink.application.Unlink;
 import com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge;
 import com.uxplima.uxmessentials.discordlink.domain.ConfirmedLink;
 import com.uxplima.uxmessentials.discordlink.domain.LinkCode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.ActionProperty;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -89,7 +89,6 @@ public final class DiscordStatusView {
                 MODULE, PANEL_LAYOUT, EntityEditorLayout.codeDefault(List.of(STATUS_SLOT, ACTION_SLOT), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .menus(menus)
                 .layout(layout)
                 .title(DiscordlinkMessageKey.GUI_TITLE)
@@ -114,16 +113,16 @@ public final class DiscordStatusView {
         Objects.requireNonNull(viewer, "viewer");
         boolean linked = linkStatus.status(viewer).isPresent();
         ActionProperty status = new ActionProperty(
-                DiscordlinkMessageKey.GUI_STATUS, Material.PLAYER_HEAD, this::statusHint, (player, reopen) -> {});
+                DiscordlinkMessageKey.GUI_STATUS.key(), Material.PLAYER_HEAD, this::statusHint, (player, reopen) -> {});
         EditableProperty action = linked ? unlinkButton() : linkButton();
         return List.of(status, action);
     }
 
     private ActionProperty linkButton() {
         return new ActionProperty(
-                DiscordlinkMessageKey.GUI_LINK,
+                DiscordlinkMessageKey.GUI_LINK.key(),
                 Material.NAME_TAG,
-                who -> messages.resolve(who, DiscordlinkMessageKey.GUI_LINK_HINT, Map.of()),
+                who -> messages.resolve(BukkitRefs.toRef(who), DiscordlinkMessageKey.GUI_LINK_HINT, Map.of()),
                 (player, reopen) -> {
                     PlayerRef viewer = BukkitRefs.toRef(player);
                     generateCode(viewer);
@@ -133,9 +132,9 @@ public final class DiscordStatusView {
 
     private ActionProperty unlinkButton() {
         return new ActionProperty(
-                DiscordlinkMessageKey.GUI_UNLINK,
+                DiscordlinkMessageKey.GUI_UNLINK.key(),
                 Material.BARRIER,
-                who -> messages.resolve(who, DiscordlinkMessageKey.GUI_UNLINK_HINT, Map.of()),
+                who -> messages.resolve(BukkitRefs.toRef(who), DiscordlinkMessageKey.GUI_UNLINK_HINT, Map.of()),
                 (player, reopen) -> confirmUnlink(player, reopen));
     }
 
@@ -143,7 +142,7 @@ public final class DiscordStatusView {
         PlayerRef viewer = BukkitRefs.toRef(player);
         Component title = guiText.text(viewer, DiscordlinkMessageKey.GUI_UNLINK_CONFIRM);
         // The unlink gate is the engine's two-button confirm menu: yes runs Unlink, no reopens the status panel.
-        menus.confirm(viewer, title, () -> runUnlink(viewer, reopen), reopen);
+        menus.confirm(player, title, () -> runUnlink(viewer, reopen), reopen);
     }
 
     private void runUnlink(PlayerRef viewer, Runnable reopen) {
@@ -172,12 +171,13 @@ public final class DiscordStatusView {
         notifier.send(viewer, DiscordlinkMessageKey.DISCORD_LINK_HOWTO, Map.of("code", code.value()));
     }
 
-    private String statusHint(PlayerRef viewer) {
-        Optional<ConfirmedLink> link = linkStatus.status(viewer);
+    private String statusHint(Player viewer) {
+        Optional<ConfirmedLink> link = linkStatus.status(BukkitRefs.toRef(viewer));
         return link.map(confirmed -> messages.resolve(
-                        viewer,
+                        BukkitRefs.toRef(viewer),
                         DiscordlinkMessageKey.GUI_STATUS_LINKED,
                         Map.of("discord", confirmed.discordId().value())))
-                .orElseGet(() -> messages.resolve(viewer, DiscordlinkMessageKey.GUI_STATUS_UNLINKED, Map.of()));
+                .orElseGet(() -> messages.resolve(
+                        BukkitRefs.toRef(viewer), DiscordlinkMessageKey.GUI_STATUS_UNLINKED, Map.of()));
     }
 }

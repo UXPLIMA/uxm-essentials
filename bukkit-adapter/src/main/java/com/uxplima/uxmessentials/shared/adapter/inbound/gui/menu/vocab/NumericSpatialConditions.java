@@ -13,10 +13,10 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import com.google.common.base.Splitter;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -69,7 +69,7 @@ public final class NumericSpatialConditions {
     public static void register(MenuBindings bindings, Logger log) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(log, "log");
-        PlaceholderRegistry placeholders = bindings.placeholders();
+        ReportingPlaceholders placeholders = new ReportingPlaceholders(bindings.placeholders());
         bindings.condition("compare", closed("compare", log, (ctx, args) -> compare(ctx, args, placeholders)));
         bindings.condition("is-near", closed("is-near", log, NumericSpatialConditions::isNear));
         bindings.condition("cuboid", closed("cuboid", log, NumericSpatialConditions::cuboid));
@@ -101,7 +101,7 @@ public final class NumericSpatialConditions {
      * config-reachable twin of {@code papi-compare}, whose named {@code left}/{@code op}/{@code right} args the loader
      * cannot fill from a plain token.
      */
-    private static boolean compare(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
+    private static boolean compare(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
         List<String> tokens = WHITESPACE.splitToList(value(args).strip());
         if (tokens.size() != 3) {
             return false;
@@ -228,11 +228,11 @@ public final class NumericSpatialConditions {
 
     /** The live {@link Player} for the open context's viewer, or {@code null} when that player is offline. */
     private static @Nullable Player viewer(MenuContext ctx) {
-        return Bukkit.getPlayer(ctx.viewer().uuid());
+        return Bukkit.getPlayer(ctx.viewer().getUniqueId());
     }
 
     /** Replace every {@code %token%} in {@code operand} with its resolved placeholder value (or empty when unknown). */
-    private static String expand(String operand, MenuContext ctx, PlaceholderRegistry placeholders) {
+    private static String expand(String operand, MenuContext ctx, ReportingPlaceholders placeholders) {
         Matcher matcher = PLACEHOLDER.matcher(operand);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {

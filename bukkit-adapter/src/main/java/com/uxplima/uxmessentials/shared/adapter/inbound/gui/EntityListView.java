@@ -11,11 +11,12 @@ import java.util.function.Supplier;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.EntityListSpec;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -67,7 +68,6 @@ public final class EntityListView<T> {
     private EntityListView(Builder<T> builder) {
         this.menus = Objects.requireNonNull(builder.menus, "menus");
         this.guiText = Objects.requireNonNull(builder.guiText, "guiText");
-        Objects.requireNonNull(builder.scheduler, "scheduler");
         this.layout = Objects.requireNonNull(builder.layout, "layout");
         this.title = Objects.requireNonNull(builder.title, "title");
         this.emptyTitle = builder.emptyTitle;
@@ -91,7 +91,7 @@ public final class EntityListView<T> {
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        menus.openList(viewer, spec(viewer));
+        menus.openList(player, spec(viewer));
     }
 
     /**
@@ -118,7 +118,7 @@ public final class EntityListView<T> {
                 .navNames(guiText.text(viewer, prevName), guiText.text(viewer, nextName))
                 .filler(layout.filler())
                 .entities(() -> List.<Object>copyOf(entities.get()))
-                .iconRenderer((v, entity) -> iconRenderer.apply(v, cast(entity)))
+                .iconRenderer((v, entity) -> iconRenderer.apply(BukkitRefs.toRef(v), cast(entity)))
                 .onSelect((player, entity) -> onSelect.accept(player, cast(entity)));
         if (onCreate != null && createName != null && layout.createSlot().isPresent()) {
             spec.onCreate(
@@ -157,7 +157,6 @@ public final class EntityListView<T> {
     public static final class Builder<T> {
         private @Nullable Menus menus;
         private @Nullable GuiText guiText;
-        private @Nullable Scheduler scheduler;
         private @Nullable EntityListLayout layout;
         private @Nullable MessageKey title;
         private @Nullable MessageKey emptyTitle;
@@ -181,11 +180,6 @@ public final class EntityListView<T> {
 
         public Builder<T> guiText(GuiText guiText) {
             this.guiText = Objects.requireNonNull(guiText, "guiText");
-            return this;
-        }
-
-        public Builder<T> scheduler(Scheduler scheduler) {
-            this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
             return this;
         }
 

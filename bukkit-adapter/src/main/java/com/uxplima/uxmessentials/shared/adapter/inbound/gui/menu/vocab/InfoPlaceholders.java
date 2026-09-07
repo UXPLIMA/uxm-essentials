@@ -14,8 +14,8 @@ import org.bukkit.Statistic;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -216,6 +216,6 @@ public final class InfoPlaceholders {
 
     /** The online {@link Player} for the viewer, or {@code null} when the viewer is offline or absent. */
     @Nullable private static Player online(MenuContext ctx) {
-        return Bukkit.getPlayer(ctx.viewer().uuid());
+        return Bukkit.getPlayer(ctx.viewer().getUniqueId());
     }
 }

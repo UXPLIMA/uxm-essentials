@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.kits.domain.KitAction;
 import com.uxplima.uxmessentials.kits.domain.KitActionType;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -128,7 +129,7 @@ class BukkitKitActionRunnerTest {
     }
 
     private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     private static KitDefinition kit() {

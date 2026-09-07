@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
@@ -63,6 +64,9 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable ServerConnector serverConnector;
     private @Nullable BedrockDetector bedrock;
     private @Nullable BedrockScreen bedrockScreen;
+
+    /** The theme the menu engine draws in; set once during wiring and re-read on a theme reload. */
+    private @Nullable EngineTheme engineTheme;
 
     /**
      * @param log the operator logger a failing teardown hook or rolled-back module reports to, so one bad
@@ -258,6 +262,19 @@ public final class CloseableResources implements AutoCloseable {
     /** The resolved Bedrock screen, or null before wiring has constructed it. */
     public @Nullable BedrockScreen bedrockScreen() {
         return bedrockScreen;
+    }
+
+    /**
+     * Record the theme the menu engine draws in, so every module wiring hands the engine the same one and a reload
+     * reaches all of them. Held here rather than threaded because the module wirings run long after it is read.
+     */
+    public void engineTheme(EngineTheme resolved) {
+        this.engineTheme = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The theme the menu engine draws in, or null before wiring has read it. */
+    public @Nullable EngineTheme engineTheme() {
+        return engineTheme;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */

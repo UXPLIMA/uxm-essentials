@@ -12,13 +12,12 @@ import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec.ArgType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -234,7 +233,8 @@ class CustomMenuLoaderTest {
     }
 
     private static Menus newMenus() {
-        return new Menus(mock(MenuRenderer.class), mock(Scheduler.class), new ListSourceRegistry());
+        return new Menus(
+                mock(MenuRenderer.class), mock(com.uxplima.uxmlib.scheduler.Scheduler.class), new ListSourceRegistry());
     }
 
     /** Captures the SLF4J-style lines the loader emits so the test can assert on what an operator would read. */

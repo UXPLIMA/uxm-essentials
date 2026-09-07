@@ -12,8 +12,10 @@ import org.jspecify.annotations.NullMarked;
  *     the present-guard asks the plugin manager for it (plugin names are case-sensitive, and {@code dynmap},
  *     {@code squaremap} and {@code floodgate} really are lower case)
  * @param family what the integration is for, used to group the doctor report
- * @param seam the simple file name of the one production class that owns the present-guard, which is the class
- *     to open when the integration misbehaves
+ * @param seam the fully qualified name of the one production class that owns the present-guard, which is the
+ *     class to open when the integration misbehaves. Fully qualified rather than a file name because the class
+ *     is the fact: several of these guards live in uxmLib's menu module now, and a checkout path stops being
+ *     true the moment a class moves between modules while the integration itself is unchanged
  * @param purpose one operator-facing clause naming what installing the plugin turns on
  */
 @NullMarked

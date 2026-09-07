@@ -9,8 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmlib.menu.Menus;
 
 /**
  * Opens a configured menu when a player swaps their hand items (the F key) instead of performing the swap. The menu
@@ -41,6 +40,6 @@ public final class MenuSwapListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        menus.open(BukkitRefs.toRef(event.getPlayer()), menu.get(), null);
+        menus.open(event.getPlayer(), menu.get(), null);
     }
 }

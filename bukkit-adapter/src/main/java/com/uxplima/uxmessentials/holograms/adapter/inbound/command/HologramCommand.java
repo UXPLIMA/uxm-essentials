@@ -228,7 +228,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
             return Command.SINGLE_SUCCESS;
         }
         if (sender.hasPermission(GUI_PERMISSION)) {
-            listMenu.open(ref(sender));
+            listMenu.open(sender);
         } else {
             services.list().list(ref(sender));
         }

@@ -12,15 +12,17 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -65,13 +67,13 @@ public final class CurrencyPickerMenu {
         bindings.placeholder(
                 "currency_picker_name",
                 ctx -> messages.resolve(
-                        ctx.viewer(),
+                        BukkitRefs.toRef(ctx.viewer()),
                         EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_NAME,
                         Map.of("currency", currencyOf(ctx).plural())));
         bindings.placeholder("currency_picker_lore", this::lore);
         bindings.placeholder("currency_picker_active", ctx -> Boolean.toString(isActive(ctx)));
         bindings.action("economy:currency-pick", this::pickClicked);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
@@ -85,7 +87,7 @@ public final class CurrencyPickerMenu {
         Objects.requireNonNull(currencies, "currencies");
         Objects.requireNonNull(active, "active");
         Objects.requireNonNull(onPick, "onPick");
-        scheduler.onEntity(viewerRef, () -> menus.open(viewerRef, SPEC_ID, new Selection(currencies, active, onPick)));
+        scheduler.onEntity(viewerRef, () -> menus.open(viewer, SPEC_ID, new Selection(currencies, active, onPick)));
     }
 
     /** The bound currency's lore: its own line, plus the active line when this is the currency in use. */
@@ -93,9 +95,12 @@ public final class CurrencyPickerMenu {
         Currency currency = currencyOf(ctx);
         List<String> lines = new ArrayList<>();
         lines.add(messages.resolve(
-                ctx.viewer(), EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_LORE, Map.of("currency", currency.plural())));
+                BukkitRefs.toRef(ctx.viewer()),
+                EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_LORE,
+                Map.of("currency", currency.plural())));
         if (isActive(ctx)) {
-            lines.add(messages.resolve(ctx.viewer(), EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_ACTIVE_LORE, Map.of()));
+            lines.add(messages.resolve(
+                    BukkitRefs.toRef(ctx.viewer()), EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_ACTIVE_LORE, Map.of()));
         }
         return String.join("\n", lines);
     }

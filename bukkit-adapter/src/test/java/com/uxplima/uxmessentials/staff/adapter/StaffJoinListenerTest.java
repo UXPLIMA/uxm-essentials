@@ -12,6 +12,7 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -56,7 +57,7 @@ class StaffJoinListenerTest {
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer("Alice");
-        who = new PlayerRef(player.getUniqueId(), player.getName());
+        who = BukkitRefs.toRef(player);
         Plugin plugin = MockBukkit.createMockPlugin("uxmEssentials");
         settings = StaffAdapterFakes.defaultSettings();
         gadgetItems = new StaffGadgetItems(plugin);
@@ -131,7 +132,7 @@ class StaffJoinListenerTest {
         probe.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
         // The capture is a pure value; the probe is only used to produce the encoded sword loadout the orphaned
         // row would hold.
-        return capture.capture(new PlayerRef(probe.getUniqueId(), probe.getName()));
+        return capture.capture(BukkitRefs.toRef(probe));
     }
 
     private static final class SyncScheduler implements Scheduler {

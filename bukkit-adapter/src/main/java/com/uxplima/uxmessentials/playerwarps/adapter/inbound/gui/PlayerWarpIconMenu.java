@@ -7,17 +7,20 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -96,13 +99,13 @@ public final class PlayerWarpIconMenu {
     private final Menus menus;
     private final Scheduler scheduler;
     private final EditPlayerWarp editPlayerWarp;
-    private final BiConsumer<PlayerRef, PlayerWarpName> manageOpener;
+    private final BiConsumer<Player, PlayerWarpName> manageOpener;
 
     public PlayerWarpIconMenu(
             Menus menus,
             Scheduler scheduler,
             EditPlayerWarp editPlayerWarp,
-            BiConsumer<PlayerRef, PlayerWarpName> manageOpener) {
+            BiConsumer<Player, PlayerWarpName> manageOpener) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.editPlayerWarp = Objects.requireNonNull(editPlayerWarp, "editPlayerWarp");
@@ -120,14 +123,14 @@ public final class PlayerWarpIconMenu {
         bindings.action("playerwarps:icon-set", this::setIcon);
         bindings.action("playerwarps:icon-reset", this::resetIcon);
         bindings.action("playerwarps:icon-back", this::back);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the icon picker for the warp named {@code name}, on {@code viewer}'s entity thread. */
-    public void open(PlayerRef viewer, PlayerWarpName name) {
+    public void open(Player viewer, PlayerWarpName name) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(name, "name");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, name));
+        scheduler.onEntity(BukkitRefs.toRef(viewer), () -> menus.open(viewer, SPEC_ID, name));
     }
 
     /** Left-click a palette material: set the warp's icon to it off the tick thread, then reopen the manage panel. */
@@ -142,11 +145,11 @@ public final class PlayerWarpIconMenu {
     }
 
     private void apply(MenuActionContext ctx, Optional<IconSpec> icon) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = ctx.subject(PlayerWarpName.class);
         scheduler.async(() -> {
             editPlayerWarp.setIcon(viewer, name, icon);
-            manageOpener.accept(viewer, name);
+            manageOpener.accept(ctx.viewer(), name);
         });
     }
 

@@ -9,12 +9,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PlayerDataPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,7 +86,7 @@ class PlayerDataPlaceholdersTest {
 
     @Test
     void metaValueIsEmptyWhenTheViewerIsOffline() {
-        MenuContext offline = MenuContext.of(new PlayerRef(UUID.randomUUID(), "Ghost"), null, 0);
+        MenuContext offline = MenuContext.of(TestViewer.of(UUID.randomUUID(), "Ghost"), null, 0);
 
         assertThat(bindings.placeholders().resolve("meta_value_rank", offline)).contains("");
     }
@@ -113,7 +113,7 @@ class PlayerDataPlaceholdersTest {
     }
 
     private Optional<String> resolve(String id) {
-        MenuContext ctx = MenuContext.of(new PlayerRef(viewer.getUniqueId(), viewer.getName()), null, 0);
+        MenuContext ctx = MenuContext.of(viewer, null, 0);
         return bindings.placeholders().resolve(id, ctx);
     }
 

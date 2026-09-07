@@ -18,13 +18,8 @@ import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankAction;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankMember;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -33,6 +28,13 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -96,11 +98,11 @@ public final class BankMembersMenu {
         bindings.placeholder("bank_member_role", ctx -> member(ctx).role().name());
         bindings.condition(
                 "economy:can-add-member",
-                (ctx, args) -> subject(ctx).hasPermission(ctx.viewer(), BankAction.ADD_MEMBER));
+                (ctx, args) -> subject(ctx).hasPermission(BukkitRefs.toRef(ctx.viewer()), BankAction.ADD_MEMBER));
         bindings.action("economy:remove-member", this::removeMember);
         bindings.action("economy:add-member", this::addMember);
         bindings.action("economy:bank-back", this::back);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Re-fetch the bank fresh off the tick thread, then open the members list for {@code player}. */
@@ -115,14 +117,14 @@ public final class BankMembersMenu {
                         viewer, () -> navigation.get().bankActionsView().open(player, bank));
                 return;
             }
-            menus.open(viewer, SPEC_ID, fresh.get());
+            menus.open(player, SPEC_ID, fresh.get());
         });
     }
 
     /** Right-click a head: remove that member through the bank service off-thread, then reopen the refreshed list. */
     private void removeMember(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         SharedBank bank = ctx.subject(SharedBank.class);
         BankMember member = ctx.entry(BankMember.class);
         scheduler.async(() -> {
@@ -167,8 +169,7 @@ public final class BankMembersMenu {
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("bank.member-add", EconomyMessageKey.BANK_MEMBERS_GUI_ADD_PROMPT),
+                InputRequest.of("bank.member-add", EconomyMessageKey.BANK_MEMBERS_GUI_ADD_PROMPT.key()),
                 targetName -> {
                     String cleanName = targetName.trim();
                     if (cleanName.isEmpty()) {

@@ -11,17 +11,18 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.property.SelectorButton;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * A paginated picker over the registered ids the {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu
  * .binding.MenuSchema schema} exports, the action ids for a click gesture, the condition ids for a view requirement.
- * It opens as an engine selector child window (through the caller's {@link ClickContext} opener), one paper button per
+ * It opens as an engine selector child window (through the caller's {@link PropertyClick} opener), one paper button per
  * id, prev/next buttons when the catalog spans more than one page, and a back button to the ref-list it was opened
  * from. Picking an id runs {@code onPick} once; nothing here mutates a session. The ref-list editor that opened it
  * owns the arg entry and the append.
@@ -50,7 +51,7 @@ final class MenuIdPicker {
     }
 
     /** Open the picker over {@code ids} on its first page; {@code onPick} receives the chosen id, {@code back} returns. */
-    void open(ClickContext context, MessageKey title, List<String> ids, Consumer<String> onPick, Runnable back) {
+    void open(PropertyClick context, MessageKey title, List<String> ids, Consumer<String> onPick, Runnable back) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(onPick, "onPick");
@@ -59,7 +60,7 @@ final class MenuIdPicker {
     }
 
     private void openPage(
-            ClickContext context,
+            PropertyClick context,
             MessageKey title,
             List<String> ids,
             Consumer<String> onPick,
@@ -76,11 +77,17 @@ final class MenuIdPicker {
         }
         addNav(context, title, ids, onPick, back, buttons, clamped, pages);
         buttons.add(SelectorButton.of(BACK_SLOT, backIcon(context), back));
-        context.opener().openSelector(context.viewer(), guiText.text(context.viewer(), title), ROWS, FILLER, buttons);
+        context.opener()
+                .openSelector(
+                        context.viewer(),
+                        guiText.text(BukkitRefs.toRef(context.viewer()), title),
+                        ROWS,
+                        FILLER,
+                        buttons);
     }
 
     private void addNav(
-            ClickContext context,
+            PropertyClick context,
             MessageKey title,
             List<String> ids,
             Consumer<String> onPick,
@@ -102,22 +109,24 @@ final class MenuIdPicker {
         }
     }
 
-    private ItemStack idIcon(ClickContext context, String id) {
+    private ItemStack idIcon(PropertyClick context, String id) {
         return ItemBuilder.of(ID_ICON)
                 .name(guiText.text(
-                        context.viewer(), CustomMenusMessageKey.MENU_ACTION_EDITOR_ID_NAME, Map.of("id", id)))
+                        BukkitRefs.toRef(context.viewer()),
+                        CustomMenusMessageKey.MENU_ACTION_EDITOR_ID_NAME,
+                        Map.of("id", id)))
                 .build();
     }
 
-    private ItemStack navIcon(ClickContext context, MessageKey name) {
+    private ItemStack navIcon(PropertyClick context, MessageKey name) {
         return ItemBuilder.of(NAV_ICON)
-                .name(guiText.text(context.viewer(), name))
+                .name(guiText.text(BukkitRefs.toRef(context.viewer()), name))
                 .build();
     }
 
-    private ItemStack backIcon(ClickContext context) {
+    private ItemStack backIcon(PropertyClick context) {
         return ItemBuilder.of(BACK_ICON)
-                .name(guiText.text(context.viewer(), CustomMenusMessageKey.MENU_ACTION_EDITOR_BACK))
+                .name(guiText.text(BukkitRefs.toRef(context.viewer()), CustomMenusMessageKey.MENU_ACTION_EDITOR_BACK))
                 .build();
     }
 

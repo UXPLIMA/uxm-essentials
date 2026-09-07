@@ -27,21 +27,22 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCard;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpQuery;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpSort;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PinnedEntry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.eval.PageRequest;
+import com.uxplima.uxmlib.menu.eval.PagedResult;
+import com.uxplima.uxmlib.menu.eval.PinnedEntry;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -114,7 +115,7 @@ public final class PlayerWarpBrowseMenu {
     private final PlayerWarpBrowse browse;
     private final UsePlayerWarp usePlayerWarp;
     private final Messages messages;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openView;
+    private final BiConsumer<Player, PlayerWarpName> openView;
     private final boolean sponsorEnabled;
     private final int sponsorSlots;
 
@@ -124,7 +125,7 @@ public final class PlayerWarpBrowseMenu {
             PlayerWarpBrowse browse,
             UsePlayerWarp usePlayerWarp,
             Messages messages,
-            BiConsumer<PlayerRef, PlayerWarpName> openView,
+            BiConsumer<Player, PlayerWarpName> openView,
             SponsorConfig sponsorConfig) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -148,7 +149,7 @@ public final class PlayerWarpBrowseMenu {
         bindings.placeholder("pwarp_browse_lore", this::lore);
         bindings.action("playerwarps:browse-click", this::click);
         bindings.action("playerwarps:browse-teleport", this::teleport);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the browse for {@code viewer} at the public default, on their entity thread. */
@@ -167,7 +168,7 @@ public final class PlayerWarpBrowseMenu {
         Objects.requireNonNull(presetFilters, "presetFilters");
         Position position = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
         Subject subject = new Subject(Optional.of(position), Map.copyOf(presetFilters));
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, subject));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, subject));
     }
 
     /**
@@ -181,7 +182,7 @@ public final class PlayerWarpBrowseMenu {
         List<Tile> pinned = pinnedSponsors(request.size());
         if (pinned.isEmpty()) {
             WarpQuery query = query(
-                    ctx.viewer().uuid(),
+                    ctx.viewer().getUniqueId(),
                     subject.viewerPosition(),
                     resolveSort(request.sort()),
                     request.page(),
@@ -203,7 +204,7 @@ public final class PlayerWarpBrowseMenu {
         // the flow so a sponsor is never drawn twice.
         int effective = Math.max(1, request.size() - pinned.size());
         WarpQuery query = query(
-                ctx.viewer().uuid(),
+                ctx.viewer().getUniqueId(),
                 subject.viewerPosition(),
                 resolveSort(request.sort()),
                 request.page(),
@@ -297,10 +298,12 @@ public final class PlayerWarpBrowseMenu {
     private String name(MenuContext ctx) {
         Tile tile = tileOf(ctx);
         if (tile == EMPTY) {
-            return resolve(ctx.viewer(), PlayerwarpsMessageKey.PWARP_GUI_BROWSE_EMPTY, Map.of());
+            return resolve(BukkitRefs.toRef(ctx.viewer()), PlayerwarpsMessageKey.PWARP_GUI_BROWSE_EMPTY, Map.of());
         }
         return resolve(
-                ctx.viewer(), PlayerwarpsMessageKey.PWARP_GUI_BROWSE_ENTRY_NAME, Map.of("warp", displayName(tile)));
+                BukkitRefs.toRef(ctx.viewer()),
+                PlayerwarpsMessageKey.PWARP_GUI_BROWSE_ENTRY_NAME,
+                Map.of("warp", displayName(tile)));
     }
 
     /**
@@ -310,7 +313,7 @@ public final class PlayerWarpBrowseMenu {
      */
     private String lore(MenuContext ctx) {
         Tile tile = tileOf(ctx);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         if (tile == EMPTY) {
             return resolve(viewer, PlayerwarpsMessageKey.PWARP_GUI_BROWSE_EMPTY_LORE, Map.of());
         }
@@ -375,7 +378,7 @@ public final class PlayerWarpBrowseMenu {
         if (tile == EMPTY) {
             return;
         }
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = PlayerWarpName.of(tile.name());
         ctx.player().closeInventory();
         scheduler.async(() -> usePlayerWarp.useFor(viewer, name, Optional.empty()));

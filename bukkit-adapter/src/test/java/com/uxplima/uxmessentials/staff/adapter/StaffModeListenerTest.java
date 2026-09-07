@@ -20,10 +20,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -45,6 +43,10 @@ import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.staff.application.port.StaffChannel;
 import com.uxplima.uxmessentials.staff.application.port.StaffInspector;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -237,9 +239,9 @@ class StaffModeListenerTest {
         // an air-COMPASS / air-EXAMINE open resolves its spec and does not throw.
         GuiText guiText = new GuiText(new EchoMessages());
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, new SyncScheduler(), bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(new SyncScheduler()), bindings.lists());
         StaffPlayerMenu playerMenu = new StaffPlayerMenu(menus, server, new EchoMessages(), new SilentSink(), teleport);
         playerMenu.register(bindings, specResources(), new StaffAdapterFakes.NoopLogger());
         StaffExamineMenu examineMenu =

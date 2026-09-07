@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.Material;
@@ -18,30 +19,31 @@ import com.uxplima.uxmessentials.communication.application.port.AnnouncementStor
 import com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerSettings;
 import com.uxplima.uxmessentials.communication.domain.StoredAnnouncement;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.display.ConditionTargets;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.ListProperty;
+import com.uxplima.uxmlib.menu.property.ListPropertyLayout;
+import com.uxplima.uxmlib.menu.property.ListPropertyText;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -100,6 +102,10 @@ public final class AnnouncementEditorView {
     private static final PlayerRef GUI_ACTOR = new PlayerRef(new java.util.UUID(0L, 0L), "announce-gui");
 
     private final GuiText guiText;
+
+    /** The colours the engine draws a list window in; asked per render so a theme reload is picked up. */
+    private final Supplier<Theme> theme;
+
     private final Scheduler scheduler;
     private final Messages messages;
     private final AnnouncementStore store;
@@ -113,6 +119,7 @@ public final class AnnouncementEditorView {
     public AnnouncementEditorView(
             Menus menus,
             GuiText guiText,
+            Supplier<Theme> theme,
             Scheduler scheduler,
             Messages messages,
             AnnouncementStore store,
@@ -121,6 +128,7 @@ public final class AnnouncementEditorView {
             TextInput textInput) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
+        this.theme = Objects.requireNonNull(theme, "theme");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.store = Objects.requireNonNull(store, "store");
@@ -139,19 +147,18 @@ public final class AnnouncementEditorView {
         this.editor = EntityEditorView.<StoredAnnouncement>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(editorLayout)
                 .title((viewer, announcement) -> guiText.text(
-                        viewer, CommunicationMessageKey.ANNOUNCE_EDITOR_TITLE, Map.of("id", announcement.id())))
-                .valueLore(CommunicationMessageKey.ANNOUNCE_EDITOR_VALUE_LORE)
-                .backName(CommunicationMessageKey.ANNOUNCE_EDITOR_BACK)
+                        viewer, CommunicationMessageKey.ANNOUNCE_EDITOR_TITLE.key(), Map.of("id", announcement.id())))
+                .valueLore(CommunicationMessageKey.ANNOUNCE_EDITOR_VALUE_LORE.key())
+                .backName(CommunicationMessageKey.ANNOUNCE_EDITOR_BACK.key())
                 .properties(this::properties)
                 // list is assigned after this builder; both back and delete reach it through openList at click time
                 // (the lambdas run long after construction), so the field read is always the fully-built list.
-                .onBack((player, viewer) -> openList(player, viewer))
+                .onBack(player -> openList(player, BukkitRefs.toRef(player)))
                 .onDelete(
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_DELETE,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_DELETE_CONFIRM,
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_DELETE.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_DELETE_CONFIRM.key(),
                         this::deleteAnnouncement)
                 .build();
 
@@ -165,19 +172,17 @@ public final class AnnouncementEditorView {
         this.settings = EntityEditorView.builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(settingsLayout)
-                .title((viewer, ignored) -> guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_SETTINGS_TITLE))
-                .valueLore(CommunicationMessageKey.ANNOUNCE_SETTINGS_VALUE_LORE)
-                .backName(CommunicationMessageKey.ANNOUNCE_SETTINGS_BACK)
+                .title((viewer, ignored) -> guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_SETTINGS_TITLE.key()))
+                .valueLore(CommunicationMessageKey.ANNOUNCE_SETTINGS_VALUE_LORE.key())
+                .backName(CommunicationMessageKey.ANNOUNCE_SETTINGS_BACK.key())
                 .properties(ignored -> settingsProperties())
-                .onBack((player, viewer) -> openList(player, viewer))
+                .onBack(player -> openList(player, BukkitRefs.toRef(player)))
                 .build();
 
         this.list = EntityListView.<StoredAnnouncement>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(listLayout)
                 .title(CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_TITLE)
                 .navNames(
@@ -185,7 +190,7 @@ public final class AnnouncementEditorView {
                         CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_NEXT)
                 .entities(store::all)
                 .iconRenderer(this::listIcon)
-                .onSelect((player, announcement) -> editor.open(player, BukkitRefs.toRef(player), announcement))
+                .onSelect((player, announcement) -> editor.open(player, announcement))
                 .onCreate(CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_CREATE, this::promptCreate)
                 .onAction(CommunicationMessageKey.ANNOUNCE_SETTINGS_BUTTON, this::openSettings)
                 .build();
@@ -203,7 +208,7 @@ public final class AnnouncementEditorView {
 
     /** Open the global announcer-settings screen: the list GUI's last-slot button opens it. */
     private void openSettings(Player player) {
-        settings.open(player, BukkitRefs.toRef(player), SETTINGS_SINGLETON);
+        settings.open(player, SETTINGS_SINGLETON);
     }
 
     /** The settings screen, exposed so a test can resolve its property slots without a live click. */
@@ -224,26 +229,26 @@ public final class AnnouncementEditorView {
     private EditableProperty intervalProperty() {
         return new TextProperty(
                 TEXT_FIELD_INPUT_KEY,
-                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL,
-                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL_PROMPT,
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL.key(),
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL_PROMPT.key(),
                 Material.CLOCK,
                 () -> intervalWord(currentSettings()),
                 AnnouncementEditorView::parseLong,
                 raw -> saveSettings(settings -> settings.withIntervalSeconds(parseLongOrClear(raw))),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty minPlayersProperty() {
         return new TextProperty(
                 TEXT_FIELD_INPUT_KEY,
-                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS,
-                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS_PROMPT,
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS.key(),
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS_PROMPT.key(),
                 Material.PLAYER_HEAD,
                 () -> minPlayersWord(currentSettings()),
                 AnnouncementEditorView::parseLong,
                 raw -> saveSettings(settings -> settings.withMinOnlinePlayers((int) parseLongOrClear(raw))),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -309,7 +314,7 @@ public final class AnnouncementEditorView {
         PlayerRef viewer = BukkitRefs.toRef(player);
         scheduler.async(() -> {
             store.delete(announcement.id());
-            scheduler.onEntity(viewer, () -> list.open(player, viewer));
+            scheduler.entity(player, () -> list.open(player, viewer));
         });
     }
 
@@ -341,8 +346,7 @@ public final class AnnouncementEditorView {
         PlayerRef viewer = BukkitRefs.toRef(player);
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(CREATE_INPUT_KEY, CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_CREATE_PROMPT),
+                InputRequest.of(CREATE_INPUT_KEY, CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_CREATE_PROMPT.key()),
                 text -> handleCreate(player, text),
                 () -> list.open(player, viewer));
     }
@@ -359,13 +363,13 @@ public final class AnnouncementEditorView {
                 // A create collision keeps the existing announcement untouched and just reopens the list; the
                 // create is a no-op rather than an overwrite, so an operator never loses an announcement by reusing
                 // an id.
-                scheduler.onEntity(viewer, () -> list.open(player, viewer));
+                scheduler.entity(player, () -> list.open(player, viewer));
                 return;
             }
             // A fresh announcement seeds one placeholder line carrying the id; the operator edits the message next.
             store.save(StoredAnnouncement.fresh(id, "<gray>" + id));
             // Land straight in the new announcement's editor.
-            store.find(id).ifPresent(created -> scheduler.onEntity(viewer, () -> editor.open(player, viewer, created)));
+            store.find(id).ifPresent(created -> scheduler.entity(player, () -> editor.open(player, created)));
         });
     }
 
@@ -404,22 +408,23 @@ public final class AnnouncementEditorView {
     private EditableProperty messageProperty(String id) {
         return new ListProperty(
                 LIST_ENTRY_INPUT_KEY,
-                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_MESSAGE,
+                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_MESSAGE.key(),
                 Material.WRITABLE_BOOK,
                 guiText,
+                theme,
                 () -> current(id).map(StoredAnnouncement::lines).orElse(List.of()),
                 lines -> applyLines(id, lines),
                 new ListPropertyText(
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_TITLE,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ENTRY_NAME,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ENTRY_HINTS,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ADD,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ADD_PROMPT,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_EDIT_PROMPT,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_REMOVE_CONFIRM,
-                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_BACK),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_TITLE.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ENTRY_NAME.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ENTRY_HINTS.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ADD.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_ADD_PROMPT.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_EDIT_PROMPT.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_REMOVE_CONFIRM.key(),
+                        CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_BACK.key()),
                 messageListLayout,
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -435,7 +440,7 @@ public final class AnnouncementEditorView {
 
     private EditableProperty enabledProperty(String id) {
         return ToggleProperty.ofBoolean(
-                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_ENABLED,
+                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_ENABLED.key(),
                 Material.LEVER,
                 () -> current(id).map(StoredAnnouncement::enabled).orElse(false),
                 this::enabledWord,
@@ -445,7 +450,7 @@ public final class AnnouncementEditorView {
 
     private EditableProperty channelProperty(String id, BroadcastChannel channel, MessageKey label, Material icon) {
         return ToggleProperty.ofBoolean(
-                label,
+                label.key(),
                 icon,
                 () -> current(id)
                         .map(announcement -> announcement.channels().contains(channel))
@@ -474,8 +479,8 @@ public final class AnnouncementEditorView {
     private EditableProperty worldProperty(String id) {
         return new TextProperty(
                 TEXT_FIELD_INPUT_KEY,
-                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_WORLD,
-                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_WORLD_PROMPT,
+                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_WORLD.key(),
+                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_WORLD_PROMPT.key(),
                 Material.GRASS_BLOCK,
                 () -> current(id)
                         .flatMap(announcement -> ConditionTargets.world(announcement.condition()))
@@ -485,15 +490,15 @@ public final class AnnouncementEditorView {
                         id,
                         announcement -> announcement.withCondition(
                                 ConditionTargets.withWorld(announcement.condition(), value))),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty permissionProperty(String id) {
         return new TextProperty(
                 TEXT_FIELD_INPUT_KEY,
-                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_PERMISSION,
-                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_PERMISSION_PROMPT,
+                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_PERMISSION.key(),
+                CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_PERMISSION_PROMPT.key(),
                 Material.NAME_TAG,
                 () -> current(id)
                         .flatMap(announcement -> ConditionTargets.permission(announcement.condition()))
@@ -503,7 +508,7 @@ public final class AnnouncementEditorView {
                         id,
                         announcement -> announcement.withCondition(
                                 ConditionTargets.withPermission(announcement.condition(), value))),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -526,6 +531,10 @@ public final class AnnouncementEditorView {
         return trimmed;
     }
 
+    private String enabledWord(Player viewer, boolean enabled) {
+        return enabledWord(BukkitRefs.toRef(viewer), enabled);
+    }
+
     private String enabledWord(PlayerRef viewer, boolean enabled) {
         return messages.resolve(
                 viewer,
@@ -535,7 +544,7 @@ public final class AnnouncementEditorView {
                 Map.of());
     }
 
-    private String onOff(PlayerRef viewer, boolean on) {
+    private String onOff(Player viewer, boolean on) {
         return enabledWord(viewer, on);
     }
 

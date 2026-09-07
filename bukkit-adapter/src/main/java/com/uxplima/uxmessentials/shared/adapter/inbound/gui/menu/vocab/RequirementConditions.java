@@ -18,11 +18,11 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.google.common.base.Splitter;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -216,7 +216,7 @@ public final class RequirementConditions {
 
     /** The live {@link Player} for the open context's viewer, or {@code null} when that player is offline. */
     private static @Nullable Player viewer(MenuContext ctx) {
-        return Bukkit.getPlayer(ctx.viewer().uuid());
+        return Bukkit.getPlayer(ctx.viewer().getUniqueId());
     }
 
     /** The single positional argument the runtime's split carried onto the condition ref, or empty when it had none. */

@@ -9,21 +9,23 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ChildClickHandler;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.property.ChildClickHandler;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.property.SelectorButton;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 
 /**
  * The "equipment" property: its click opens a six-button grid (head, chest, legs, feet, main-hand, off-hand)
@@ -35,7 +37,7 @@ import com.uxplima.uxmlib.item.ItemBuilder;
  *
  * <p>The grid opens as an engine child window the one menu listener routes. Each slot is a {@link SelectorButton}
  * carrying a gesture-aware {@link ChildClickHandler} (left = set-from-hand, shift-left = clear) and the back button
- * reopens the parent editor via the {@link ClickContext}. The set-from-hand reads the live player's main hand inside
+ * reopens the parent editor via the {@link PropertyClick}. The set-from-hand reads the live player's main hand inside
  * the handler, which runs on the viewer's entity thread, so a Bukkit read there is legal; the actual write hops off
  * the tick thread before reopening the grid so the change shows.
  */
@@ -76,8 +78,8 @@ final class NpcEquipmentProperty implements EditableProperty {
     }
 
     @Override
-    public NpcMessageKey label() {
-        return NpcMessageKey.NPC_GUI_PROP_EQUIPMENT;
+    public String label() {
+        return NpcMessageKey.NPC_GUI_PROP_EQUIPMENT.key();
     }
 
     @Override
@@ -86,13 +88,13 @@ final class NpcEquipmentProperty implements EditableProperty {
     }
 
     @Override
-    public String valueLore(PlayerRef viewer) {
+    public String valueLore(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         return Integer.toString(current.get().size());
     }
 
     @Override
-    public void onClick(ClickContext context) {
+    public void onClick(PropertyClick context) {
         Objects.requireNonNull(context, "context");
         openGrid(context);
     }
@@ -102,7 +104,7 @@ final class NpcEquipmentProperty implements EditableProperty {
      * item, its handler set-from-hand on left / clear on shift-left) plus a back button that reopens the parent
      * editor. The opener shows the window on the viewer's entity thread.
      */
-    private void openGrid(ClickContext context) {
+    private void openGrid(PropertyClick context) {
         Map<EquipmentSlot, String> worn = current.get();
         List<Integer> slots = layout.allSlots();
         List<SelectorButton> buttons = new ArrayList<>();
@@ -115,7 +117,7 @@ final class NpcEquipmentProperty implements EditableProperty {
         context.opener()
                 .openSelector(
                         context.viewer(),
-                        guiText.text(context.viewer(), NpcMessageKey.NPC_GUI_EQUIP_TITLE),
+                        guiText.text(BukkitRefs.toRef(context.viewer()), NpcMessageKey.NPC_GUI_EQUIP_TITLE),
                         layout.rows(),
                         layout.fillerIcon(),
                         buttons);
@@ -123,7 +125,7 @@ final class NpcEquipmentProperty implements EditableProperty {
 
     /** A gesture-aware slot button: left-click sets the slot from the held item, shift-left clears it. */
     private SelectorButton slotButton(
-            ClickContext context, int gridSlot, EquipmentSlot slot, @org.jspecify.annotations.Nullable String token) {
+            PropertyClick context, int gridSlot, EquipmentSlot slot, @org.jspecify.annotations.Nullable String token) {
         ItemStack icon = slotIcon(context, slot, token);
         ChildClickHandler handler = (rightClick, shiftClick) -> {
             if (shiftClick && !rightClick) {
@@ -136,43 +138,45 @@ final class NpcEquipmentProperty implements EditableProperty {
     }
 
     private ItemStack slotIcon(
-            ClickContext context, EquipmentSlot slot, @org.jspecify.annotations.Nullable String token) {
+            PropertyClick context, EquipmentSlot slot, @org.jspecify.annotations.Nullable String token) {
         Material material = iconFor(token);
         return ItemBuilder.of(material)
                 .name(Tiles.blankName())
                 .lore(Tiles.titled(
                         guiText.text(
-                                context.viewer(), NpcMessageKey.NPC_GUI_EQUIP_SLOT_NAME, Map.of("slot", label(slot))),
+                                BukkitRefs.toRef(context.viewer()),
+                                NpcMessageKey.NPC_GUI_EQUIP_SLOT_NAME,
+                                Map.of("slot", label(slot))),
                         guiText.text(
-                                context.viewer(),
+                                BukkitRefs.toRef(context.viewer()),
                                 NpcMessageKey.NPC_GUI_EQUIP_SLOT_HINTS,
-                                Map.of("item", describe(context.viewer(), token)))))
+                                Map.of("item", describe(BukkitRefs.toRef(context.viewer()), token)))))
                 .build();
     }
 
-    private ItemStack backIcon(ClickContext context) {
+    private ItemStack backIcon(PropertyClick context) {
         return ItemBuilder.of(layout.backIcon())
-                .name(guiText.text(context.viewer(), NpcMessageKey.NPC_GUI_EQUIP_BACK))
+                .name(guiText.text(BukkitRefs.toRef(context.viewer()), NpcMessageKey.NPC_GUI_EQUIP_BACK))
                 .build();
     }
 
-    private void setFromHand(ClickContext context, EquipmentSlot slot) {
-        ItemStack hand = context.player().getInventory().getItemInMainHand();
+    private void setFromHand(PropertyClick context, EquipmentSlot slot) {
+        ItemStack hand = context.viewer().getInventory().getItemInMainHand();
         if (hand.getType().isAir()) {
-            scheduler.onEntity(context.viewer(), () -> openGrid(context));
+            scheduler.entity(context.viewer(), () -> openGrid(context));
             return;
         }
         String token = EquipmentPayloads.serialize(hand);
         scheduler.async(() -> {
             setSlot.accept(slot, token);
-            scheduler.onEntity(context.viewer(), () -> openGrid(context));
+            scheduler.entity(context.viewer(), () -> openGrid(context));
         });
     }
 
-    private void clear(ClickContext context, EquipmentSlot slot) {
+    private void clear(PropertyClick context, EquipmentSlot slot) {
         scheduler.async(() -> {
             clearSlot.apply(slot);
-            scheduler.onEntity(context.viewer(), () -> openGrid(context));
+            scheduler.entity(context.viewer(), () -> openGrid(context));
         });
     }
 

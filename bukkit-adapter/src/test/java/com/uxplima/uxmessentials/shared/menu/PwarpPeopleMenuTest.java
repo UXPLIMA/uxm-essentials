@@ -45,14 +45,9 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuTextPrompt;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -63,6 +58,14 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.runtime.MenuTextPrompt;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -119,7 +122,7 @@ class PwarpPeopleMenuTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         repository = mock(PlayerWarpRepository.class);
         players = mock(PlayerLookup.class);
@@ -148,7 +151,7 @@ class PwarpPeopleMenuTest {
         UUID target = UUID.randomUUID();
         when(memberStore.list(PlayerWarpId.of(1))).thenReturn(List.of(new WarpMember(target, WarpRole.MANAGER, now())));
         when(players.findByUuid(target)).thenReturn(Optional.of(new PlayerRef(target, "Charlie")));
-        menu.openMembers(viewer, warp.name());
+        menu.openMembers(player, warp.name());
 
         assertThat(top().getItem(FIRST_ROW_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
         fireClick(FIRST_ROW_SLOT, ClickType.LEFT);
@@ -162,7 +165,7 @@ class PwarpPeopleMenuTest {
     void addingACoOwnerThreadsTheTypedNameIntoAddMemberWithTheCoOwnerRole() {
         UUID granted = UUID.randomUUID();
         when(players.findByName("Bob")).thenReturn(Optional.of(new PlayerRef(granted, "Bob")));
-        menu.openMembers(viewer, warp.name());
+        menu.openMembers(player, warp.name());
 
         fireClick(MEMBERS_ADD_COOWNER_SLOT, ClickType.LEFT); // opens the input prompt, grants nothing yet
         assertThat(prompt.prompts).isEqualTo(1);
@@ -177,7 +180,7 @@ class PwarpPeopleMenuTest {
     void addingAManagerThreadsTheTypedNameIntoAddMemberWithTheManagerRole() {
         UUID granted = UUID.randomUUID();
         when(players.findByName("Bob")).thenReturn(Optional.of(new PlayerRef(granted, "Bob")));
-        menu.openMembers(viewer, warp.name());
+        menu.openMembers(player, warp.name());
 
         fireClick(MEMBERS_ADD_MANAGER_SLOT, ClickType.LEFT);
         prompt.submit("Bob");
@@ -192,7 +195,7 @@ class PwarpPeopleMenuTest {
         UUID target = UUID.randomUUID();
         when(whitelistStore.list(PlayerWarpId.of(1))).thenReturn(List.of(target));
         when(players.findByUuid(target)).thenReturn(Optional.of(new PlayerRef(target, "Charlie")));
-        menu.openWhitelist(viewer, warp.name());
+        menu.openWhitelist(player, warp.name());
 
         assertThat(top().getItem(FIRST_ROW_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
         fireClick(FIRST_ROW_SLOT, ClickType.LEFT);
@@ -206,7 +209,7 @@ class PwarpPeopleMenuTest {
     void addingToTheWhitelistThreadsTheTypedNameIntoWhitelist() {
         UUID granted = UUID.randomUUID();
         when(players.findByName("Bob")).thenReturn(Optional.of(new PlayerRef(granted, "Bob")));
-        menu.openWhitelist(viewer, warp.name());
+        menu.openWhitelist(player, warp.name());
 
         fireClick(WHITELIST_ADD_SLOT, ClickType.LEFT);
         prompt.submit("Bob");
@@ -223,7 +226,7 @@ class PwarpPeopleMenuTest {
                 .thenReturn(
                         List.of(new BanRecord(target, Optional.empty(), Optional.empty(), Optional.empty(), now())));
         when(players.findByUuid(target)).thenReturn(Optional.of(new PlayerRef(target, "Charlie")));
-        menu.openBans(viewer, warp.name());
+        menu.openBans(player, warp.name());
 
         assertThat(top().getItem(FIRST_ROW_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
         fireClick(FIRST_ROW_SLOT, ClickType.LEFT);
@@ -236,7 +239,7 @@ class PwarpPeopleMenuTest {
     void addingABanThreadsTheTypedNameIntoAPermanentReasonlessBan() {
         UUID banned = UUID.randomUUID();
         when(players.findByName("Bob")).thenReturn(Optional.of(new PlayerRef(banned, "Bob")));
-        menu.openBans(viewer, warp.name());
+        menu.openBans(player, warp.name());
 
         fireClick(BANS_ADD_SLOT, ClickType.LEFT);
         prompt.submit("Bob");
@@ -256,16 +259,16 @@ class PwarpPeopleMenuTest {
     private void wireEngine() {
         MenuBindings bindings = new MenuBindings();
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        EditorRenderer editorRenderer = new EditorRenderer(guiText);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
         prompt = new RecordingPrompt();
         MenuListener listener = new MenuListener(
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 editorRenderer,
                 menus.selectorOpener(),

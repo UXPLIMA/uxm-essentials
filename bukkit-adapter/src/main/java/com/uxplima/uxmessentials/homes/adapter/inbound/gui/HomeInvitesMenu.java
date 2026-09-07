@@ -17,19 +17,21 @@ import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.domain.Home;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -102,11 +104,11 @@ public final class HomeInvitesMenu {
         bindings.action("homes:uninvite", this::revoke);
         bindings.action("homes:invite-add", this::promptAdd);
         bindings.action("homes:invites-back", this::back);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the invited-players list for {@code home}; the live player is resolved by the engine. */
-    public void open(PlayerRef viewer, Home home) {
+    public void open(Player viewer, Home home) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(home, "home");
         menus.open(viewer, SPEC_ID, home);
@@ -136,10 +138,12 @@ public final class HomeInvitesMenu {
     private String name(MenuContext ctx) {
         InvitedEntry entry = ctx.entry(InvitedEntry.class);
         if (entry.uuid() == null) {
-            return messages.resolve(ctx.viewer(), HomesMessageKey.HOME_INVITES_EMPTY_NAME, Map.of());
+            return messages.resolve(BukkitRefs.toRef(ctx.viewer()), HomesMessageKey.HOME_INVITES_EMPTY_NAME, Map.of());
         }
         return messages.resolve(
-                ctx.viewer(), HomesMessageKey.HOME_INVITES_ENTRY_NAME, Map.of("invited_player", entry.name()));
+                BukkitRefs.toRef(ctx.viewer()),
+                HomesMessageKey.HOME_INVITES_ENTRY_NAME,
+                Map.of("invited_player", entry.name()));
     }
 
     /** The bound head's lore: the revoke hint for a real entry, nothing for the empty marker. */
@@ -148,7 +152,7 @@ public final class HomeInvitesMenu {
         if (entry.uuid() == null) {
             return "";
         }
-        return messages.resolve(ctx.viewer(), HomesMessageKey.HOME_INVITES_ENTRY_LORE, Map.of());
+        return messages.resolve(BukkitRefs.toRef(ctx.viewer()), HomesMessageKey.HOME_INVITES_ENTRY_LORE, Map.of());
     }
 
     /** Left-click a head: revoke that invite through the use case, then reopen the list (no-op on the marker). */
@@ -159,25 +163,23 @@ public final class HomeInvitesMenu {
             return;
         }
         Home home = ctx.subject(Home.class);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         scheduler.async(() -> {
             uninviteFromHome.uninvite(home.owner(), home.slot(), new PlayerRef(target, entry.name()));
-            scheduler.onEntity(viewer, () -> open(viewer, home));
+            scheduler.onEntity(viewer, () -> open(ctx.viewer(), home));
         });
     }
 
     /** Prompt for a name through the shared text-input seam, exactly as the old add button did. */
     private void promptAdd(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
         Home home = ctx.subject(Home.class);
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(INVITE_ADD_INPUT_KEY, HomesMessageKey.HOME_INVITES_ADD_PROMPT),
-                name -> addByName(viewer, home, name),
-                () -> open(viewer, home));
+                InputRequest.of(INVITE_ADD_INPUT_KEY, HomesMessageKey.HOME_INVITES_ADD_PROMPT.key()),
+                name -> addByName(ctx.viewer(), home, name),
+                () -> open(ctx.viewer(), home));
     }
 
     /**
@@ -185,7 +187,7 @@ public final class HomeInvitesMenu {
      * unknown-player line and reopens unchanged, mirroring the old add flow. The lookup runs off the tick thread (it
      * may call a blocking offline lookup); public only so the golden test can drive it without a live prompt.
      */
-    public void addByName(PlayerRef viewer, Home home, String name) {
+    public void addByName(Player viewer, Home home, String name) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(home, "home");
         Objects.requireNonNull(name, "name");
@@ -193,20 +195,23 @@ public final class HomeInvitesMenu {
         scheduler.async(() -> {
             Optional<PlayerRef> resolved = players.findByName(typed);
             if (resolved.isEmpty()) {
-                scheduler.onEntity(viewer, () -> {
-                    notifier.send(viewer, HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER, Map.of("player", typed));
+                scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
+                    notifier.send(
+                            BukkitRefs.toRef(viewer),
+                            HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER,
+                            Map.of("player", typed));
                     open(viewer, home);
                 });
                 return;
             }
             inviteToHome.invite(home.owner(), home.slot(), resolved.get());
-            scheduler.onEntity(viewer, () -> open(viewer, home));
+            scheduler.onEntity(BukkitRefs.toRef(viewer), () -> open(viewer, home));
         });
     }
 
     /** Left-click the back button: return to the home action menu for this home. */
     private void back(MenuActionContext ctx) {
-        actionMenu.open(ctx.player(), ctx.viewer(), ctx.subject(Home.class));
+        actionMenu.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), ctx.subject(Home.class));
     }
 
     /**

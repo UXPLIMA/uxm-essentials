@@ -6,9 +6,10 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.customcommands.application.port.RequirementCheck;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.Ref;
 
 /**
  * Evaluates a definition's {@code requirements} through the menu engine's condition registry, so a token means the
@@ -34,6 +35,10 @@ public final class MenuRequirementCheck implements RequirementCheck {
         for (String token : requirements) {
             refs.add(Ref.parse(token));
         }
-        return menus.passes(actor, refs, arguments);
+        // The engine gates on a live player. An actor who has left cannot satisfy a requirement, and a command
+        // whose requirements cannot be read must not run, so their absence reads as a refusal rather than a pass.
+        return LivePlayers.of(actor)
+                .map(live -> menus.passes(live, refs, arguments))
+                .orElse(false);
     }
 }

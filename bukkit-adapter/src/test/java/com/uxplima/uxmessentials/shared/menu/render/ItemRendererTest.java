@@ -18,19 +18,21 @@ import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.TooltipDisplay;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.DataComponents;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RichMeta;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.DataComponents;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.RichMeta;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,8 +55,8 @@ class ItemRendererTest {
         GuiText guiText = new GuiText(new KeyMessages());
         placeholders = new PlaceholderRegistry();
         placeholders.register("icon", c -> "DIAMOND");
-        renderer = new ItemRenderer(guiText, placeholders);
-        ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        renderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, placeholders);
+        ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
     }
 
     @AfterEach
@@ -167,7 +169,7 @@ class ItemRendererTest {
     void aMathBlockInsideALocalPlaceholderIsCheckedOnTheTemplateToo() {
         // substituteLocal resolves the inner tokens and leaves the block for the outer math pass, so a hole
         // arrives already anonymous there. The template is checked before that happens.
-        MenuContext local = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0)
+        MenuContext local = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0)
                 .withLocalPlaceholders(Map.of("total", "{math: %missing% + 1}"));
 
         assertThat(plainLore(renderer, itemWithLore(List.of("%total%")), local)).containsExactly("");
@@ -179,7 +181,7 @@ class ItemRendererTest {
         // must turn each newline-separated segment into its own lore component, in order.
         PlaceholderRegistry ph = new PlaceholderRegistry();
         ph.register("status", c -> "line one\nline two\nline three");
-        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, ph);
 
         assertThat(plainLore(r, itemWithLore(List.of("%status%"))))
                 .containsExactly("line one", "line two", "line three");
@@ -204,7 +206,7 @@ class ItemRendererTest {
         // A real browse icon mixes a catalog header, a multi-line placeholder body, and a plain footer: 1 + 2 + 1.
         PlaceholderRegistry ph = new PlaceholderRegistry();
         ph.register("status", c -> "ok\ncost 10");
-        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, ph);
 
         assertThat(plainLore(r, itemWithLore(List.of("@some_key", "%status%", "plain"))))
                 .containsExactly("some_key", "ok", "cost 10", "plain");
@@ -426,7 +428,7 @@ class ItemRendererTest {
     void argumentTokenExpandsFromTheOpenContextArguments() {
         // A command opened with typed arguments carries them on the context; %argument_<name>% must render its value
         // in a name (and lore) without needing a registered placeholder.
-        MenuContext argCtx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0, Map.of("amount", "5"));
+        MenuContext argCtx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0, Map.of("amount", "5"));
 
         ItemStack it = renderer.render(itemNamed("You gave %argument_amount%"), argCtx);
 
@@ -435,7 +437,7 @@ class ItemRendererTest {
 
     @Test
     void anUnknownArgumentTokenRendersEmpty() {
-        MenuContext argCtx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0, Map.of("amount", "5"));
+        MenuContext argCtx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0, Map.of("amount", "5"));
 
         ItemStack it = renderer.render(itemNamed("[%argument_missing%]"), argCtx);
 
@@ -446,7 +448,7 @@ class ItemRendererTest {
     void anArgumentTokenInLoreExpandsWhileANormalPlaceholderStillResolves() {
         // Regression guard: adding the argument_ special-case must not shadow the registry: %icon% still resolves
         // (registered to "DIAMOND" in setUp), and %argument_target% resolves from the context arguments.
-        MenuContext argCtx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0, Map.of("target", "Steve"));
+        MenuContext argCtx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0, Map.of("target", "Steve"));
 
         assertThat(plainLore(renderer, itemWithLore(List.of("to %argument_target%", "icon %icon%")), argCtx))
                 .containsExactly("to Steve", "icon DIAMOND");
@@ -458,9 +460,9 @@ class ItemRendererTest {
         // the engine must fill from the registered placeholder so the option shows that entry's name, not "{sound}".
         PlaceholderRegistry ph = new PlaceholderRegistry();
         ph.register("sound", c -> c.entry(String.class));
-        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, ph);
         MenuContext entryCtx =
-                MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0).withEntry("Enderman Teleport");
+                MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0).withEntry("Enderman Teleport");
 
         ItemStack it = r.render(itemNamed("@Sound: {sound}"), entryCtx);
 
@@ -472,7 +474,7 @@ class ItemRendererTest {
         // The menu defines its own %player%, which must win over the registered built-in for this menu alone.
         PlaceholderRegistry ph = new PlaceholderRegistry();
         ph.register("player", c -> "REAL");
-        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, ph);
         MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("player", "OVERRIDDEN"));
 
         assertThat(plainName(r.render(itemNamed("%player%"), localCtx))).isEqualTo("OVERRIDDEN");
@@ -481,7 +483,8 @@ class ItemRendererTest {
     @Test
     void aNestedLocalTokenResolvesLocalFirst() {
         // a -> %b% -> "X": the inner %b% must resolve against the local block, not the (empty) registry.
-        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry());
+        ItemRenderer r =
+                new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("a", "%b%", "b", "X"));
 
         assertThat(plainName(r.render(itemNamed("%a%"), localCtx))).isEqualTo("X");
@@ -489,7 +492,8 @@ class ItemRendererTest {
 
     @Test
     void aLocalCycleTerminatesBoundedInsteadOfOverflowing() {
-        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry());
+        ItemRenderer r =
+                new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("a", "%b%", "b", "%a%"));
 
         assertThatCode(() -> r.render(itemNamed("%a%"), localCtx)).doesNotThrowAnyException();
@@ -503,7 +507,7 @@ class ItemRendererTest {
         // The local substitute resolves the inner %coins% but leaves {math: …} for the renderer's outer math pass.
         PlaceholderRegistry ph = new PlaceholderRegistry();
         ph.register("coins", c -> "5");
-        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, ph);
         MenuContext localCtx = ctx.withLocalPlaceholders(Map.of("doubled", "{math: %coins% * 2}"));
 
         assertThat(plainName(r.render(itemNamed("%doubled%"), localCtx))).isEqualTo("10");
@@ -534,9 +538,18 @@ class ItemRendererTest {
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             // Mirror the real catalog: the key's text carries {token} arguments the placeholders map fills.
             String text = key.key();
-            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-                text = text.replace("{" + entry.getKey() + "}", entry.getValue());
+            // Ask for each argument by name, as the real catalog does: the renderer hands over a map that
+            // resolves a token when it is asked for, and iterating it yields only what the line spells.
+            java.util.regex.Matcher argument =
+                    java.util.regex.Pattern.compile("\\{([A-Za-z0-9_.-]+)\\}").matcher(text);
+            StringBuilder filled = new StringBuilder();
+            while (argument.find()) {
+                String value = placeholders.get(argument.group(1));
+                argument.appendReplacement(
+                        filled, java.util.regex.Matcher.quoteReplacement(value != null ? value : argument.group()));
             }
+            argument.appendTail(filled);
+            text = filled.toString();
             return text;
         }
     }

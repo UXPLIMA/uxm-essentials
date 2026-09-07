@@ -16,20 +16,23 @@ import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadWindowListener;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,13 +71,14 @@ class PinKeypadReopenLoopTest {
         scheduler = new DeferringScheduler();
 
         GuiText guiText = new GuiText(new KeyMessages());
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, new PlaceholderRegistry()), new ConditionRegistry());
-        menus = new Menus(renderer, scheduler, new ListSourceRegistry(), null, null, new ConditionRegistry());
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry()), new ConditionRegistry());
+        menus = new Menus(
+                renderer, EngineScheduler.of(scheduler), new ListSourceRegistry(), null, null, new ConditionRegistry());
         Logger log = new SilentLogger();
         menus.registerSpec(
                 PinKeypadView.CREATE_SPEC_ID,
-                MenuSpecs.loadOrBundled("modules/security/gui/pin-create.conf", dataFolder, 4, log));
+                MenuSpecs.loadOrBundled("modules/security/gui/pin-create.conf", dataFolder, 4, EngineLog.of(log)));
 
         view = new PinKeypadView(
                 menus,

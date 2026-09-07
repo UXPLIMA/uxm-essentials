@@ -4,12 +4,14 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import org.bukkit.entity.Player;
+
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -54,8 +56,8 @@ public final class EntityCountMenu {
         bindings.placeholder("entity_type", ctx -> entry(ctx).typeKey());
         bindings.placeholder("entity_count", ctx -> String.valueOf(entry(ctx).count()));
         bindings.placeholder("entity_radius", ctx -> String.valueOf(subject(ctx).radius()));
-        menus.registerSpec(GRID_SPEC_ID, MenuSpecs.loadOrBundled(GRID_RESOURCE, dataFolder, 6, log));
-        menus.registerSpec(EMPTY_SPEC_ID, MenuSpecs.loadOrBundled(EMPTY_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(GRID_SPEC_ID, MenuSpecs.loadOrBundled(GRID_RESOURCE, dataFolder, 6, EngineLog.of(log)));
+        menus.registerSpec(EMPTY_SPEC_ID, MenuSpecs.loadOrBundled(EMPTY_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
@@ -63,7 +65,7 @@ public final class EntityCountMenu {
      * {@code scanRadius}. The caller ran the region-bound scan and resolved each icon material; this only renders
      * it, so an empty tally opens the empty-state title.
      */
-    public void open(PlayerRef viewer, List<Tally> tally, int scanRadius) {
+    public void open(Player viewer, List<Tally> tally, int scanRadius) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(tally, "tally");
         if (tally.isEmpty()) {

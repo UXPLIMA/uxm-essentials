@@ -7,15 +7,17 @@ import java.util.UUID;
 import java.util.function.Function;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources.OnlinePlayerEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources.WorldEntry;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
@@ -29,7 +31,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
  */
 class LiveDataSourcesTest {
 
-    private static final PlayerRef VIEWER = new PlayerRef(UUID.randomUUID(), "Viewer");
+    private static final Player VIEWER = TestViewer.named("Viewer");
     private static final UUID ENTRY_UUID = UUID.fromString("11111111-2222-3333-4444-555555555555");
 
     @Test

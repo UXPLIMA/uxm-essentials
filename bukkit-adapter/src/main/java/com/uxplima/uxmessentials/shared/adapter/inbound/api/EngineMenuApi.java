@@ -15,17 +15,16 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuClick;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuIconProvider;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.IconProviderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -98,7 +97,7 @@ public final class EngineMenuApi implements MenuApi {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(lore, "lore");
         Objects.requireNonNull(viewer, "viewer");
-        MenuContext ctx = MenuContext.of(new PlayerRef(viewer.getUniqueId(), viewer.getName()), null, 0);
+        MenuContext ctx = MenuContext.of(viewer, null, 0);
         return itemRenderer.render(itemSpec(material, name, lore), ctx);
     }
 

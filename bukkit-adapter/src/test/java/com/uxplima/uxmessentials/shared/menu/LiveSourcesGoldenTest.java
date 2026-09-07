@@ -11,14 +11,14 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +92,7 @@ class LiveSourcesGoldenTest {
     @Test
     void onlinePlayersSourceRendersAHeadPerPlayer() {
         menus.registerSpec("roster", new MenuSpecLoader().parse(ONLINE_PLAYERS_HOCON));
-        menus.open(new PlayerRef(viewerPlayer.getUniqueId(), viewerPlayer.getName()), "roster", null);
+        menus.open(viewerPlayer, "roster", null);
 
         Inventory top = viewerPlayer.getOpenInventory().getTopInventory();
         List<String> headNames = new ArrayList<>();
@@ -114,7 +114,7 @@ class LiveSourcesGoldenTest {
     @Test
     void worldsSourceRendersATilePerWorldWithItsEnvironmentIcon() {
         menus.registerSpec("places", new MenuSpecLoader().parse(WORLDS_HOCON));
-        menus.open(new PlayerRef(viewerPlayer.getUniqueId(), viewerPlayer.getName()), "places", null);
+        menus.open(viewerPlayer, "places", null);
 
         Inventory top = viewerPlayer.getOpenInventory().getTopInventory();
         ItemStack world = top.getItem(0);

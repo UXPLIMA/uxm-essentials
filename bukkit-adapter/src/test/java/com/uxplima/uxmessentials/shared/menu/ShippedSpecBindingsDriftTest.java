@@ -11,9 +11,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.Test;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
@@ -788,10 +788,8 @@ class ShippedSpecBindingsDriftTest {
         EXPECTED_CONDITIONS.forEach(id -> bindings.condition(id, (ctx, args) -> true));
         EXPECTED_PLACEHOLDERS.forEach(id -> bindings.placeholder(id, ctx -> ""));
         EXPECTED_LISTS.forEach(id -> bindings.list(id, ctx -> List.of()));
-        EXPECTED_PAGED_LISTS.forEach(id -> bindings.pagedList(
-                id,
-                (ctx, request) ->
-                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult.of(List.of(), 0)));
+        EXPECTED_PAGED_LISTS.forEach(id ->
+                bindings.pagedList(id, (ctx, request) -> com.uxplima.uxmlib.menu.eval.PagedResult.of(List.of(), 0)));
         EXPECTED_CONTENTS.forEach(id -> bindings.content(id, (ctx, region) -> List.of()));
 
         assertThat(bindings.validate(specs))

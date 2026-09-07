@@ -5,11 +5,11 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Expressions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.eval.Expressions;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -74,11 +74,11 @@ public final class PlayerDataPlaceholders {
     private static String resolve(String id, MenuContext ctx, PlayerDataStore playerData, PlayerMeta playerMeta) {
         if (id.startsWith(DATA_VALUE)) {
             return playerData
-                    .get(ctx.viewer().uuid(), id.substring(DATA_VALUE.length()))
+                    .get(ctx.viewer().getUniqueId(), id.substring(DATA_VALUE.length()))
                     .orElse("");
         }
         if (id.startsWith(DATA_NUMBER)) {
-            double value = playerData.number(ctx.viewer().uuid(), id.substring(DATA_NUMBER.length()), 0);
+            double value = playerData.number(ctx.viewer().getUniqueId(), id.substring(DATA_NUMBER.length()), 0);
             return Expressions.format(value);
         }
         if (id.startsWith(META_VALUE)) {
@@ -89,7 +89,7 @@ public final class PlayerDataPlaceholders {
 
     /** The viewer's PDC value under {@code key}, or empty when the viewer is offline or has no such meta. */
     private static String metaValue(MenuContext ctx, String key, PlayerMeta playerMeta) {
-        Player player = Bukkit.getPlayer(ctx.viewer().uuid());
+        Player player = Bukkit.getPlayer(ctx.viewer().getUniqueId());
         if (player == null) {
             return "";
         }

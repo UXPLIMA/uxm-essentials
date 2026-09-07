@@ -11,16 +11,19 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.ContentRegions;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -70,7 +73,7 @@ public final class MirrorWindow {
     }
 
     private void load(MirrorKind kind, String resource, int rows, Path dataFolder, Logger log) {
-        MenuSpec spec = MenuSpecs.loadOrBundled(resource, dataFolder, rows, log);
+        MenuSpec spec = MenuSpecs.loadOrBundled(resource, dataFolder, rows, EngineLog.of(log));
         List<Integer> declared = ContentRegions.slots(spec, kind.regionId(), resource);
         if (declared.size() != kind.slotCount()) {
             throw new IllegalStateException(resource + ": the '" + kind.regionId() + "' region must declare exactly "
@@ -94,12 +97,14 @@ public final class MirrorWindow {
 
     /** Show {@code holder}'s window to its viewer, carrying the holder as the menu's subject. */
     void open(MirrorHolder holder) {
-        menus.open(holder.viewer(), holder.kind().specId(), holder);
+        LivePlayers.of(holder.viewer())
+                .ifPresent(viewer -> menus.open(viewer, holder.kind().specId(), holder));
     }
 
     /** The live window behind {@code holder}, when the viewer still has it open. Read on the viewer's own thread. */
     Optional<Inventory> live(MirrorHolder holder) {
-        return menus.openWindow(holder.viewer(), holder.kind().specId());
+        return LivePlayers.of(holder.viewer())
+                .flatMap(viewer -> menus.openWindow(viewer, holder.kind().specId()));
     }
 
     /** Read the mirrored region out of a live window, as a positional array of copies. */
@@ -126,6 +131,8 @@ public final class MirrorWindow {
     private String title(MenuContext ctx, MessageKey key) {
         MirrorHolder holder = ctx.subject(MirrorHolder.class);
         return messages.resolve(
-                ctx.viewer(), key, Map.of("player", holder.target().name()));
+                BukkitRefs.toRef(ctx.viewer()),
+                key,
+                Map.of("player", holder.target().name()));
     }
 }

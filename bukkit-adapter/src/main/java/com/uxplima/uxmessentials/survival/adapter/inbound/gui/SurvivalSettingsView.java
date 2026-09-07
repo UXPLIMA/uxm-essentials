@@ -11,13 +11,10 @@ import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -26,6 +23,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.ActionProperty;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -79,7 +80,6 @@ public final class SurvivalSettingsView {
                 guiLayouts.loadEntityEditor(MODULE, LAYOUT, EntityEditorLayout.codeDefault(SLOTS, 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .menus(menus)
                 .layout(layout)
                 .title(SurvivalMessageKey.SURVIVAL_GUI_TITLE)
@@ -101,9 +101,9 @@ public final class SurvivalSettingsView {
         for (Mechanic mechanic : mechanics) {
             if (mechanic.enabled() && permissions.has(viewer, mechanic.togglePermission())) {
                 properties.add(new ActionProperty(
-                        mechanic.label(),
+                        mechanic.label().key(),
                         mechanic.icon(),
-                        who -> onOff(who, activeFor(who, mechanic)),
+                        who -> onOff(BukkitRefs.toRef(who), activeFor(BukkitRefs.toRef(who), mechanic)),
                         (player, reopen) -> flip(mechanic, player, reopen)));
             }
         }

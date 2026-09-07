@@ -5,25 +5,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.render.RenderedSlot;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +54,7 @@ class MenuRendererTest {
 
     private MenuRenderer renderer;
     private MenuSpec spec;
-    private PlayerRef ref;
+    private Player ref;
 
     @BeforeEach
     void setUp() {
@@ -60,12 +62,12 @@ class MenuRendererTest {
         GuiText guiText = new GuiText(new KeyMessages());
         PlaceholderRegistry placeholders = new PlaceholderRegistry();
         placeholders.register("v", ctx -> ctx.entry(String.class));
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, placeholders);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, placeholders);
         ConditionRegistry conditions = new ConditionRegistry();
         conditions.register("always-false", (c, args) -> false);
         renderer = new MenuRenderer(itemRenderer, conditions);
         spec = new MenuSpecLoader().parse(HOCON);
-        ref = new PlayerRef(UUID.randomUUID(), "P");
+        ref = TestViewer.named("P");
     }
 
     @AfterEach

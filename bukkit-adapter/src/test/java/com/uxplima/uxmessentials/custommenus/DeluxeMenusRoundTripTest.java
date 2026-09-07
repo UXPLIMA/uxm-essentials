@@ -7,12 +7,12 @@ import java.nio.file.Path;
 import java.util.List;
 
 import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConverter;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.Requirement;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

@@ -71,8 +71,8 @@ public final class StaffGadgetActions {
     void onAir(StaffGadget gadget, Player player, PlayerRef who) {
         switch (gadget) {
             case VANISH -> vanish.setVanished(who, !player.isInvisible());
-            case EXAMINE -> openExamine(who);
-            case COMPASS -> openNavigator(player, who);
+            case EXAMINE -> openExamine(player);
+            case COMPASS -> openNavigator(player);
             case FREEZE, FOLLOW -> notifier.send(who, StaffMessageKey.STAFF_GADGET_NO_TARGET);
         }
     }
@@ -82,14 +82,14 @@ public final class StaffGadgetActions {
      * online list off it is illegal on Folia, and {@code canSee} is the looker's vanish-aware visibility), then hand
      * it to the menu engine, which builds and opens on the looker's entity thread. Mirrors the old picker's open.
      */
-    private void openNavigator(Player looker, PlayerRef who) {
+    private void openNavigator(Player looker) {
         scheduler.onGlobal(() -> {
             List<PlayerRef> roster = server.getOnlinePlayers().stream()
                     .filter(online -> !online.getUniqueId().equals(looker.getUniqueId()))
                     .filter(looker::canSee)
                     .map(BukkitRefs::toRef)
                     .collect(Collectors.toList());
-            playerMenu.openNavigator(who, roster);
+            playerMenu.openNavigator(looker, roster);
         });
     }
 
@@ -100,7 +100,7 @@ public final class StaffGadgetActions {
             case FOLLOW -> follow(actor, who, targetPlayer);
             case COMPASS -> teleport(who, targetPlayer, targetRef);
             case VANISH -> vanish.setVanished(who, !actor.isInvisible());
-            case EXAMINE -> openExamine(who);
+            case EXAMINE -> openExamine(actor);
         }
     }
 
@@ -109,7 +109,7 @@ public final class StaffGadgetActions {
      * it is illegal on Folia), then hand it to the menu engine, which builds and opens on the looker's entity
      * thread. The picker lists every online player, as the old view did. Mirrors the old picker's open.
      */
-    private void openExamine(PlayerRef who) {
+    private void openExamine(Player who) {
         scheduler.onGlobal(() -> {
             List<PlayerRef> roster =
                     server.getOnlinePlayers().stream().map(BukkitRefs::toRef).collect(Collectors.toList());

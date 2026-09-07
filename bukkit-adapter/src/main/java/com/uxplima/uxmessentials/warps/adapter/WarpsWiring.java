@@ -11,7 +11,6 @@ import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -31,6 +30,7 @@ import com.uxplima.uxmessentials.warps.application.WarpInfo;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -73,8 +73,8 @@ public final class WarpsWiring {
             Bus bus,
             GuiLayouts guiLayouts,
             TextInput textInput,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings menuBindings) {
+            com.uxplima.uxmlib.menu.Menus menus,
+            com.uxplima.uxmlib.menu.binding.MenuBindings menuBindings) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");

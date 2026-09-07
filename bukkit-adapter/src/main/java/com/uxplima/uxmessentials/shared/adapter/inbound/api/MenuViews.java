@@ -10,9 +10,10 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuClick;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuClickKind;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -64,17 +65,17 @@ final class MenuViews {
 
         @Override
         public UUID viewerId() {
-            return ctx.viewer().uuid();
+            return ctx.viewer().getUniqueId();
         }
 
         @Override
         public String viewerName() {
-            return ctx.viewer().name();
+            return ctx.viewer().getName();
         }
 
         @Override
         public UUID executorId() {
-            return ctx.executor().uuid();
+            return MenuExecutor.of(ctx).uuid();
         }
 
         @Override

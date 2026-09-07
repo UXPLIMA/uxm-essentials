@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.domain.event.ScoreboardVisibilityToggled;
 import com.uxplima.uxmessentials.shared.action.ActionDoubles;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.query.QueryDoubles;
 import org.junit.jupiter.api.AfterEach;
@@ -44,7 +45,7 @@ class ScoreboardApiTest {
     void setUp() {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
-        who = new PlayerRef(alice.getUniqueId(), alice.getName());
+        who = BukkitRefs.toRef(alice);
         visibility = new FakeVisibility();
         renderer = mock(ScoreboardRenderer.class);
         events = new ActionDoubles.RecordingEvents();

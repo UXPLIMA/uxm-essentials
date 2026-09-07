@@ -21,7 +21,15 @@ import org.junit.jupiter.api.Test;
  */
 class GuiShellsAreLayoutDrivenDriftTest {
 
-    private static final String[] SHELLS = {"EntityListView", "EntityEditorView", "SettingsPanelView"};
+    // EntityEditorView is not in this list any more, and this comment is its receipt.
+    //
+    // It moved to uxmLib with the rest of the menu engine, so there is no source here to read and the check could
+    // only ever fail on a missing path. The guarantee did not disappear, it relocated: uxm-lib carries it as
+    // EntityEditorViewIsLayoutDrivenDriftTest, which reads that file line by line for "Material." and the import
+    // and reports the file, the line number and the offending line. It was proved by breaking it.
+    //
+    // The two shells below are still here and still checked. Do not add EntityEditorView back.
+    private static final String[] SHELLS = {"EntityListView", "SettingsPanelView"};
 
     @Test
     void theGenericShellsNameNoMaterial() {

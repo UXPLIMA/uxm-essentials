@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -17,19 +18,21 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ConfirmOpener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmlib.menu.property.ConfirmOpener;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +53,6 @@ class ConfirmActionTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private Menus menus;
     private MenuBindings bindings;
     private RecordingConfirm confirm;
@@ -61,20 +63,20 @@ class ConfirmActionTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         captured = new ArrayList<>();
         bindings = new MenuBindings();
         bindings.action("capture", ctx -> captured.add(ctx.arg()));
         Scheduler scheduler = new SyncScheduler();
-        ItemRenderer itemRenderer = new ItemRenderer(new GuiText(new KeyMessages()), bindings.placeholders());
+        ItemRenderer itemRenderer =
+                new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        menus = new Menus(renderer, scheduler, bindings.lists());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         confirm = new RecordingConfirm();
         MenuListener listener = new MenuListener(
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 null,
                 null,
@@ -124,7 +126,7 @@ class ConfirmActionTest {
                                   } }
                                 }
                                 """));
-        menus.open(viewer, "menu", null);
+        menus.open(player, "menu", null);
     }
 
     private void rightClick() {
@@ -143,7 +145,7 @@ class ConfirmActionTest {
         @Nullable Runnable onNo;
 
         @Override
-        public void openConfirm(PlayerRef viewer, Component title, Runnable onYes, Runnable onNo) {
+        public void openConfirm(Player viewer, Component title, Runnable onYes, Runnable onNo) {
             this.opens++;
             this.onYes = onYes;
             this.onNo = onNo;

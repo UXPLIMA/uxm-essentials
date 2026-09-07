@@ -3,14 +3,16 @@ package com.uxplima.uxmessentials.shared.menu;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 
 /**
  * A test-only builder for a wired menu engine. Constructing the engine touches the {@code render/} and
@@ -39,9 +41,9 @@ public final class TestMenuEngine {
     public static TestMenuEngine create(Messages messages, Scheduler scheduler) {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions(), bindings.contents());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         return new TestMenuEngine(bindings, renderer, menus, scheduler);
     }
 
@@ -79,14 +81,14 @@ public final class TestMenuEngine {
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 null,
                 null,
                 null,
                 0L,
                 System::currentTimeMillis,
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry(),
+                new com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry(),
                 null,
                 bindings.contents());
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);

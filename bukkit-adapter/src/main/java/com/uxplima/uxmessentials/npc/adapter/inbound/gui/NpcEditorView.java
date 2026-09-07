@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
@@ -25,28 +26,29 @@ import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.EnumProperty;
+import com.uxplima.uxmlib.menu.property.ListProperty;
+import com.uxplima.uxmlib.menu.property.ListPropertyText;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout;
+import com.uxplima.uxmlib.menu.property.colour.ColourPickerText;
+import com.uxplima.uxmlib.menu.property.colour.ColourProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 
 /**
  * The per-NPC property editor: a thin consumer of the shared {@link EntityEditorView} that exposes every NPC
@@ -65,6 +67,10 @@ public final class NpcEditorView {
     private static final long SCALE_FACTOR = 100L;
 
     private final GuiText guiText;
+
+    /** The colours the engine draws a list window in; asked per render so a theme reload is picked up. */
+    private final Supplier<Theme> theme;
+
     private final Scheduler scheduler;
     private final NpcRepository repository;
     private final NpcServices services;
@@ -79,6 +85,7 @@ public final class NpcEditorView {
     public NpcEditorView(
             Menus menus,
             GuiText guiText,
+            Supplier<Theme> theme,
             Scheduler scheduler,
             NpcRepository repository,
             NpcServices services,
@@ -91,6 +98,7 @@ public final class NpcEditorView {
             BiConsumer<Player, PlayerRef> onBack) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
+        this.theme = Objects.requireNonNull(theme, "theme");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.services = Objects.requireNonNull(services, "services");
@@ -105,23 +113,22 @@ public final class NpcEditorView {
         this.view = EntityEditorView.<Npc>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(this::title)
-                .valueLore(NpcMessageKey.NPC_GUI_EDITOR_VALUE_LORE)
-                .backName(NpcMessageKey.NPC_GUI_EDITOR_BACK)
+                .valueLore(NpcMessageKey.NPC_GUI_EDITOR_VALUE_LORE.key())
+                .backName(NpcMessageKey.NPC_GUI_EDITOR_BACK.key())
                 .properties(this::properties)
-                .onBack(onBack)
+                .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .onDelete(
-                        NpcMessageKey.NPC_GUI_EDITOR_DELETE,
-                        NpcMessageKey.NPC_GUI_EDITOR_DELETE_CONFIRM,
+                        NpcMessageKey.NPC_GUI_EDITOR_DELETE.key(),
+                        NpcMessageKey.NPC_GUI_EDITOR_DELETE_CONFIRM.key(),
                         (player, npc) -> services.delete().delete(ref(player), npc.name()))
                 .build();
     }
 
     /** Open the editor for {@code npc}, scheduled on the viewer's entity thread by the framework. */
     public void open(Player player, PlayerRef viewer, Npc npc) {
-        view.open(player, viewer, npc);
+        view.open(player, npc);
     }
 
     /** The underlying property grid: exposed for tests to resolve a slot to its property without a live click. */
@@ -129,10 +136,10 @@ public final class NpcEditorView {
         return view;
     }
 
-    private Component title(PlayerRef viewer, Npc npc) {
+    private Component title(Player viewer, Npc npc) {
         return guiText.text(
                 viewer,
-                NpcMessageKey.NPC_GUI_EDITOR_TITLE,
+                NpcMessageKey.NPC_GUI_EDITOR_TITLE.key(),
                 Map.of("name", npc.name().value()));
     }
 
@@ -168,13 +175,13 @@ public final class NpcEditorView {
     private EditableProperty nameProperty(NpcName name) {
         return new TextProperty(
                 "editor.text-field",
-                NpcMessageKey.NPC_GUI_PROP_NAME,
-                NpcMessageKey.NPC_GUI_PROP_NAME_PROMPT,
+                NpcMessageKey.NPC_GUI_PROP_NAME.key(),
+                NpcMessageKey.NPC_GUI_PROP_NAME_PROMPT.key(),
                 Material.NAME_TAG,
                 name::value,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> rename(name, NpcName.of(value)),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -200,13 +207,13 @@ public final class NpcEditorView {
     private EditableProperty skinProperty(NpcName name) {
         return new TextProperty(
                 "editor.text-field",
-                NpcMessageKey.NPC_GUI_PROP_SKIN,
-                NpcMessageKey.NPC_GUI_PROP_SKIN_PROMPT,
+                NpcMessageKey.NPC_GUI_PROP_SKIN.key(),
+                NpcMessageKey.NPC_GUI_PROP_SKIN_PROMPT.key(),
                 Material.PLAYER_HEAD,
                 () -> skinSummary(name),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applySkin(name, value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -231,8 +238,8 @@ public final class NpcEditorView {
         // Each selectable type draws as its own spawn egg (the fake player as a head), so the picker reads like the
         // vanilla creative menu; selectorOptionIcon stays the fallback for a type with no spawn egg of its own.
         return new EnumProperty<>(
-                NpcMessageKey.NPC_GUI_PROP_TYPE,
-                NpcMessageKey.NPC_GUI_SELECT_TYPE,
+                NpcMessageKey.NPC_GUI_PROP_TYPE.key(),
+                NpcMessageKey.NPC_GUI_SELECT_TYPE.key(),
                 Material.VILLAGER_SPAWN_EGG,
                 guiText,
                 renderableTypes(),
@@ -249,8 +256,8 @@ public final class NpcEditorView {
 
     private EditableProperty poseProperty(NpcName name) {
         return new EnumProperty<>(
-                NpcMessageKey.NPC_GUI_PROP_POSE,
-                NpcMessageKey.NPC_GUI_SELECT_POSE,
+                NpcMessageKey.NPC_GUI_PROP_POSE.key(),
+                NpcMessageKey.NPC_GUI_SELECT_POSE.key(),
                 Material.ARMOR_STAND,
                 guiText,
                 POSES,
@@ -268,7 +275,7 @@ public final class NpcEditorView {
         // The same glass colour-picker the hologram editor uses. An NPC's glow is a scoreboard-team colour, so a
         // chosen ARGB is snapped to the nearest of the sixteen named colours; the clear button drops the override.
         return new ColourProperty(
-                NpcMessageKey.NPC_GUI_PROP_GLOW_COLOR,
+                NpcMessageKey.NPC_GUI_PROP_GLOW_COLOR.key(),
                 Material.GLOWSTONE,
                 () -> glowArgb(name),
                 argb -> setGlowColor(
@@ -281,7 +288,7 @@ public final class NpcEditorView {
                 guiText,
                 colourPickerText,
                 colourPicker,
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -299,7 +306,7 @@ public final class NpcEditorView {
 
     private EditableProperty lookProperty(NpcName name) {
         return ToggleProperty.ofBoolean(
-                NpcMessageKey.NPC_GUI_PROP_LOOK,
+                NpcMessageKey.NPC_GUI_PROP_LOOK.key(),
                 Material.ENDER_EYE,
                 () -> current(name).map(Npc::lookAtPlayer).orElse(true),
                 this::onOff,
@@ -309,7 +316,7 @@ public final class NpcEditorView {
 
     private EditableProperty collidableProperty(NpcName name) {
         return ToggleProperty.ofBoolean(
-                NpcMessageKey.NPC_GUI_PROP_COLLIDABLE,
+                NpcMessageKey.NPC_GUI_PROP_COLLIDABLE.key(),
                 Material.SHIELD,
                 () -> current(name).map(Npc::collidable).orElse(false),
                 this::onOff,
@@ -319,7 +326,7 @@ public final class NpcEditorView {
 
     private EditableProperty glowProperty(NpcName name) {
         return ToggleProperty.ofBoolean(
-                NpcMessageKey.NPC_GUI_PROP_GLOW,
+                NpcMessageKey.NPC_GUI_PROP_GLOW.key(),
                 Material.GLOWSTONE_DUST,
                 () -> current(name).map(Npc::glowing).orElse(false),
                 this::onOff,
@@ -329,7 +336,7 @@ public final class NpcEditorView {
 
     private EditableProperty mirrorProperty(NpcName name) {
         return ToggleProperty.ofBoolean(
-                NpcMessageKey.NPC_GUI_PROP_MIRROR,
+                NpcMessageKey.NPC_GUI_PROP_MIRROR.key(),
                 Material.GLASS_PANE,
                 () -> current(name).map(Npc::mirrorSkin).orElse(false),
                 this::onOff,
@@ -339,7 +346,7 @@ public final class NpcEditorView {
 
     private EditableProperty stateProperty(NpcName name, SetNpcState.Flag flag, MessageKey label, Material icon) {
         return ToggleProperty.ofBoolean(
-                label,
+                label.key(),
                 icon,
                 () -> stateValue(name, flag),
                 this::onOff,
@@ -349,7 +356,7 @@ public final class NpcEditorView {
 
     private EditableProperty showInTabProperty(NpcName name) {
         return ToggleProperty.ofBoolean(
-                NpcMessageKey.NPC_GUI_PROP_SHOW_IN_TAB,
+                NpcMessageKey.NPC_GUI_PROP_SHOW_IN_TAB.key(),
                 Material.PAPER,
                 () -> current(name).map(Npc::showInTab).orElse(false),
                 this::onOff,
@@ -361,7 +368,7 @@ public final class NpcEditorView {
 
     private EditableProperty scaleProperty(NpcName name) {
         return new NumberProperty(
-                NpcMessageKey.NPC_GUI_PROP_SCALE,
+                NpcMessageKey.NPC_GUI_PROP_SCALE.key(),
                 Material.CLOCK,
                 () -> Math.round(current(name).map(Npc::scale).orElse(Npc.DEFAULT_SCALE) * SCALE_FACTOR),
                 10,
@@ -375,8 +382,8 @@ public final class NpcEditorView {
     private EditableProperty displayNameProperty(NpcName name) {
         return new TextProperty(
                 "editor.text-field",
-                NpcMessageKey.NPC_GUI_PROP_DISPLAY_NAME,
-                NpcMessageKey.NPC_GUI_PROP_DISPLAY_NAME_PROMPT,
+                NpcMessageKey.NPC_GUI_PROP_DISPLAY_NAME.key(),
+                NpcMessageKey.NPC_GUI_PROP_DISPLAY_NAME_PROMPT.key(),
                 Material.OAK_SIGN,
                 () -> current(name)
                         .map(Npc::displayName)
@@ -384,7 +391,7 @@ public final class NpcEditorView {
                         .orElseGet(this::none),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applyDisplayName(name, value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -405,22 +412,23 @@ public final class NpcEditorView {
     private EditableProperty actionsProperty(NpcName name) {
         return new ListProperty(
                 "editor.list-entry",
-                NpcMessageKey.NPC_GUI_PROP_ACTIONS,
+                NpcMessageKey.NPC_GUI_PROP_ACTIONS.key(),
                 Material.COMMAND_BLOCK,
                 guiText,
+                theme,
                 () -> currentActionLines(name),
                 lines -> applyActions(name, lines),
                 new ListPropertyText(
-                        NpcMessageKey.NPC_GUI_ACTIONS_TITLE,
-                        NpcMessageKey.NPC_GUI_ACTIONS_ENTRY_NAME,
-                        NpcMessageKey.NPC_GUI_ACTIONS_ENTRY_HINTS,
-                        NpcMessageKey.NPC_GUI_ACTIONS_ADD,
-                        NpcMessageKey.NPC_GUI_ACTIONS_ADD_PROMPT,
-                        NpcMessageKey.NPC_GUI_ACTIONS_EDIT_PROMPT,
-                        NpcMessageKey.NPC_GUI_ACTIONS_REMOVE_CONFIRM,
-                        NpcMessageKey.NPC_GUI_ACTIONS_BACK),
+                        NpcMessageKey.NPC_GUI_ACTIONS_TITLE.key(),
+                        NpcMessageKey.NPC_GUI_ACTIONS_ENTRY_NAME.key(),
+                        NpcMessageKey.NPC_GUI_ACTIONS_ENTRY_HINTS.key(),
+                        NpcMessageKey.NPC_GUI_ACTIONS_ADD.key(),
+                        NpcMessageKey.NPC_GUI_ACTIONS_ADD_PROMPT.key(),
+                        NpcMessageKey.NPC_GUI_ACTIONS_EDIT_PROMPT.key(),
+                        NpcMessageKey.NPC_GUI_ACTIONS_REMOVE_CONFIRM.key(),
+                        NpcMessageKey.NPC_GUI_ACTIONS_BACK.key()),
                 sub.actions(),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -434,7 +442,7 @@ public final class NpcEditorView {
                     Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
                     scheduler.async(() -> {
                         services.move().move(ref(player), name, at);
-                        scheduler.onEntity(ref(player), reopen);
+                        scheduler.entity(player, reopen);
                     });
                 },
                 scheduler);
@@ -541,17 +549,19 @@ public final class NpcEditorView {
         return skin.slim() ? "slim" : "classic";
     }
 
-    private String onOff(PlayerRef viewer, boolean on) {
+    private String onOff(Player viewer, boolean on) {
         return messages.resolve(
-                viewer, on ? NpcMessageKey.NPC_GUI_VALUE_ON : NpcMessageKey.NPC_GUI_VALUE_OFF, Map.of());
+                BukkitRefs.toRef(viewer),
+                on ? NpcMessageKey.NPC_GUI_VALUE_ON : NpcMessageKey.NPC_GUI_VALUE_OFF,
+                Map.of());
     }
 
     private String none() {
         return messages.resolve(GUI_ACTOR, NpcMessageKey.NPC_GUI_VALUE_NONE, Map.of());
     }
 
-    private String defaultWord(PlayerRef viewer) {
-        return messages.resolve(viewer, NpcMessageKey.NPC_GUI_VALUE_DEFAULT, Map.of());
+    private String defaultWord(Player viewer) {
+        return messages.resolve(BukkitRefs.toRef(viewer), NpcMessageKey.NPC_GUI_VALUE_DEFAULT, Map.of());
     }
 
     private static PlayerRef ref(Player player) {

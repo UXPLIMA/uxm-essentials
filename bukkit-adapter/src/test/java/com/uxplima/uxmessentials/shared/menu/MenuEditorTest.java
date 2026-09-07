@@ -21,26 +21,28 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.EditorSpec;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,7 +67,6 @@ class MenuEditorTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
     private Menus menus;
@@ -76,19 +77,18 @@ class MenuEditorTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         widget = new Widget();
-        EditorRenderer editorRenderer = new EditorRenderer(guiText);
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, scheduler, new ListSourceRegistry(), editorRenderer);
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry(), editorRenderer);
         MenuListener listener = new MenuListener(
                 renderer,
                 new ActionRegistry(),
                 new ConditionRegistry(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 editorRenderer,
                 menus.selectorOpener(),
@@ -104,7 +104,7 @@ class MenuEditorTest {
     @Test
     void openEditorWithNoPropertiesShowsAMenuHolderWindowWithFillerAndBack() {
         EntityEditorLayout layout = layout(List.of(10, 12), 22);
-        menus.openEditor(viewer, editorSpec(layout, w -> List.of()), widget);
+        menus.openEditor(player, editorSpec(layout, w -> List.of()), widget);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
@@ -121,7 +121,7 @@ class MenuEditorTest {
         AtomicReference<Boolean> c = new AtomicReference<>(true);
         List<EditableProperty> props =
                 List.of(toggle(a, Material.LEVER), toggle(b, Material.TORCH), toggle(c, Material.REDSTONE_TORCH));
-        menus.openEditor(viewer, editorSpec(layout, w -> props), widget);
+        menus.openEditor(player, editorSpec(layout, w -> props), widget);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getItem(10).getType()).isEqualTo(Material.LEVER);
@@ -136,7 +136,7 @@ class MenuEditorTest {
     @Test
     void clickingATogglePropertyFlipsTheValueAndReRendersTheSlot() {
         EntityEditorLayout layout = layout(List.of(10), 22);
-        menus.openEditor(viewer, editorSpec(layout, w -> List.of(widgetToggle())), widget);
+        menus.openEditor(player, editorSpec(layout, w -> List.of(widgetToggle())), widget);
 
         assertThat(widget.enabled).isFalse();
         assertThat(valueLoreOf(player.getOpenInventory().getTopInventory().getItem(10)))
@@ -152,7 +152,7 @@ class MenuEditorTest {
     @Test
     void reRenderRedrawsTheSameInventoryInPlaceWithoutReopening() {
         EntityEditorLayout layout = layout(List.of(10), 22);
-        menus.openEditor(viewer, editorSpec(layout, w -> List.of(widgetToggle())), widget);
+        menus.openEditor(player, editorSpec(layout, w -> List.of(widgetToggle())), widget);
         Inventory before = player.getOpenInventory().getTopInventory();
 
         fireClick(10, ClickType.LEFT);
@@ -169,26 +169,31 @@ class MenuEditorTest {
         return EditorSpec.builder()
                 .layout(layout)
                 .title((v, subject) -> Component.text("edit"))
-                .valueLore(Key.VALUE_LORE)
-                .backName(Key.BACK)
+                .valueLore(Key.VALUE_LORE.key())
+                .backName(Key.BACK.key())
                 .properties(props)
-                .onBack((p, v) -> {})
+                .onBack(p -> {})
                 .build();
     }
 
     private ToggleProperty<Boolean> widgetToggle() {
         return ToggleProperty.ofBoolean(
-                Key.LABEL,
+                Key.LABEL.key(),
                 Material.LEVER,
                 () -> widget.enabled,
                 (v, state) -> state ? "On" : "Off",
                 value -> widget.enabled = value,
-                scheduler);
+                EngineScheduler.of(scheduler));
     }
 
     private ToggleProperty<Boolean> toggle(AtomicReference<Boolean> backing, Material icon) {
         return ToggleProperty.ofBoolean(
-                Key.LABEL, icon, backing::get, (v, state) -> state ? "On" : "Off", backing::set, scheduler);
+                Key.LABEL.key(),
+                icon,
+                backing::get,
+                (v, state) -> state ? "On" : "Off",
+                backing::set,
+                EngineScheduler.of(scheduler));
     }
 
     private static EntityEditorLayout layout(List<Integer> propertySlots, int backSlot) {

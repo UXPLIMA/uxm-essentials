@@ -7,9 +7,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -30,7 +31,7 @@ class MenuSpecsTest {
         Files.createDirectories(onDisk.getParent());
         Files.writeString(onDisk, "title = \"Operator Menu\"\nrows = 5\n", StandardCharsets.UTF_8);
 
-        MenuSpec spec = MenuSpecs.loadOrBundled(resource, dataFolder, 6, new NoopLogger());
+        MenuSpec spec = MenuSpecs.loadOrBundled(resource, dataFolder, 6, EngineLog.of(new NoopLogger()));
 
         assertThat(spec.title()).isEqualTo("Operator Menu");
         assertThat(spec.rows()).isEqualTo(5);
@@ -40,7 +41,7 @@ class MenuSpecsTest {
     void fallsBackToEmptySpecOfRequestedRowsWhenResourceIsMissing() {
         String resource = "modules/example/gui/does-not-exist.conf";
 
-        MenuSpec spec = MenuSpecs.loadOrBundled(resource, dataFolder, 4, new NoopLogger());
+        MenuSpec spec = MenuSpecs.loadOrBundled(resource, dataFolder, 4, EngineLog.of(new NoopLogger()));
 
         assertThat(spec.title()).isEmpty();
         assertThat(spec.rows()).isEqualTo(4);

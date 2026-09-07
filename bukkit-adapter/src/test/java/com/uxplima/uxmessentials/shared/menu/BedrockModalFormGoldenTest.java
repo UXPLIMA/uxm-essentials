@@ -18,12 +18,8 @@ import org.bukkit.inventory.InventoryView;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -33,6 +29,12 @@ import com.uxplima.uxmlib.bedrock.BedrockButton;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.bedrock.BedrockWidget;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ConfirmRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,7 +71,7 @@ class BedrockModalFormGoldenTest {
 
         bindings = new MenuBindings();
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         scheduler = new SyncScheduler();
         detector = new FakeBedrockDetector();
@@ -88,7 +90,7 @@ class BedrockModalFormGoldenTest {
         detector.bedrock = true;
         Menus menus = engine();
 
-        menus.confirm(viewer(), Component.text("Delete home?"), () -> yes.set(true), () -> no.set(true));
+        menus.confirm(player, Component.text("Delete home?"), () -> yes.set(true), () -> no.set(true));
 
         assertThat(chestOpen())
                 .as("a Bedrock viewer is redirected to a ModalForm, so no confirm chest is opened")
@@ -122,7 +124,7 @@ class BedrockModalFormGoldenTest {
         detector.bedrock = true;
         Menus menus = engine();
 
-        menus.confirm(viewer(), Component.text("Delete home?"), () -> yes.set(true), () -> no.set(true));
+        menus.confirm(player, Component.text("Delete home?"), () -> yes.set(true), () -> no.set(true));
         screen.tapButton2();
 
         assertThat(no)
@@ -138,7 +140,7 @@ class BedrockModalFormGoldenTest {
         detector.bedrock = false;
         Menus menus = engine();
 
-        menus.confirm(viewer(), Component.text("Delete home?"), () -> yes.set(true), () -> no.set(true));
+        menus.confirm(player, Component.text("Delete home?"), () -> yes.set(true), () -> no.set(true));
 
         assertThat(chestOpen())
                 .as("a Java viewer opens the confirm chest exactly as before")
@@ -163,7 +165,7 @@ class BedrockModalFormGoldenTest {
     private Menus engine() {
         return new Menus(
                 renderer,
-                scheduler,
+                EngineScheduler.of(scheduler),
                 bindings.lists(),
                 null,
                 bindings.actions(),
@@ -171,10 +173,6 @@ class BedrockModalFormGoldenTest {
                 null,
                 detector,
                 screen);
-    }
-
-    private PlayerRef viewer() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
     }
 
     /** Whether the viewer is looking at one of this engine's chest windows. A gated/redirected confirm never opens one. */

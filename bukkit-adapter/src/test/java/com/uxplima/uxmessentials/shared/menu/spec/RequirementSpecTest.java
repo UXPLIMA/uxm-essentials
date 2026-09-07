@@ -6,11 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Requirement;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.Requirement;
+import com.uxplima.uxmlib.menu.spec.RequirementSpec;
 import org.junit.jupiter.api.Test;
 
 /** The pure requirement model: {@code effectiveMinimum} folds the combinator rules, {@code requirementFor} merges. */

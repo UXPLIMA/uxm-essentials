@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.SetNick;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -169,7 +170,7 @@ class NickCommandTest {
     }
 
     private static PlayerRef ref(PlayerMock player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** The catalog is unused on these paths (confirmations come from the mocked use cases); resolve to the key. */

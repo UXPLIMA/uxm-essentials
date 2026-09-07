@@ -7,10 +7,7 @@ import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -20,6 +17,10 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -91,7 +92,8 @@ public final class WorldMainMenu {
         bindings.action("worlds:editor-rules", ctx -> drillGrid(ctx, true));
         bindings.action("worlds:editor-access", ctx -> drillGrid(ctx, false));
         bindings.action("worlds:editor-generation", this::drillGeneration);
-        bindings.action("worlds:editor-main-back", ctx -> reopenList.accept(ctx.player(), ctx.viewer()));
+        bindings.action(
+                "worlds:editor-main-back", ctx -> reopenList.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
         bindings.action("worlds:editor-toggle-load", this::toggle);
         menus.registerSpec(SPEC_ID, WorldEditorSpecs.load(SPEC_RESOURCE, ROWS, dataFolder, log));
     }
@@ -120,7 +122,7 @@ public final class WorldMainMenu {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(world, "world");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, snapshot(world)));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, snapshot(world)));
     }
 
     /** The world's summary, read on the calling entity thread so the engine renders without touching Bukkit off-thread. */
@@ -139,19 +141,21 @@ public final class WorldMainMenu {
 
     private void drillGrid(MenuActionContext ctx, boolean rules) {
         if (gridMenu != null) {
-            gridMenu.open(ctx.player(), ctx.viewer(), subject(ctx).world(), rules);
+            gridMenu.open(
+                    ctx.player(), BukkitRefs.toRef(ctx.viewer()), subject(ctx).world(), rules);
         }
     }
 
     private void drillGeneration(MenuActionContext ctx) {
         if (generationMenu != null) {
-            generationMenu.open(ctx.player(), ctx.viewer(), subject(ctx).world());
+            generationMenu.open(
+                    ctx.player(), BukkitRefs.toRef(ctx.viewer()), subject(ctx).world());
         }
     }
 
     private void toggle(MenuActionContext ctx) {
         if (toggleLoad != null) {
-            toggleLoad.accept(ctx.viewer(), subject(ctx).world());
+            toggleLoad.accept(BukkitRefs.toRef(ctx.viewer()), subject(ctx).world());
         }
     }
 

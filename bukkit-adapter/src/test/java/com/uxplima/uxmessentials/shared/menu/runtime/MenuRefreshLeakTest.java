@@ -5,14 +5,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuRefresh;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.Test;
 
 class MenuRefreshLeakTest {
@@ -21,7 +23,7 @@ class MenuRefreshLeakTest {
     void enabledRefreshSchedulesOneTaskAndCancelOnCloseBalances() {
         var sched = new RecordingScheduler();
         MenuHolder h = holderWithRefresh(true);
-        MenuRefresh.start(h, sched, () -> {});
+        MenuRefresh.start(h, EngineScheduler.of(sched), () -> {});
         assertThat(sched.scheduled).isEqualTo(1);
         h.cancelRefresh();
         assertThat(sched.cancelled).isEqualTo(1);
@@ -32,7 +34,7 @@ class MenuRefreshLeakTest {
     void cancelIsIdempotentSoBalanceHolds() {
         var sched = new RecordingScheduler();
         MenuHolder h = holderWithRefresh(true);
-        MenuRefresh.start(h, sched, () -> {});
+        MenuRefresh.start(h, EngineScheduler.of(sched), () -> {});
         h.cancelRefresh();
         h.cancelRefresh();
         assertThat(sched.cancelled).isEqualTo(1);
@@ -41,14 +43,14 @@ class MenuRefreshLeakTest {
     @Test
     void disabledRefreshSchedulesNothing() {
         var sched = new RecordingScheduler();
-        MenuRefresh.start(holderWithRefresh(false), sched, () -> {});
+        MenuRefresh.start(holderWithRefresh(false), EngineScheduler.of(sched), () -> {});
         assertThat(sched.scheduled).isZero();
     }
 
     private static MenuHolder holderWithRefresh(boolean enabled) {
         MenuSpec spec = new MenuSpecLoader()
                 .parse("rows = 1\nrefresh { enabled = " + enabled + ", interval-ticks = 20 }\nitems {}");
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
         return new MenuHolder("t", spec, ctx);
     }
 

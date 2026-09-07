@@ -22,7 +22,6 @@ import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilit
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -30,9 +29,11 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.packet.scoreboard.internal.NmsScoreboardPackets;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
 import com.uxplima.uxmlib.pipeline.PacketSender;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -84,7 +85,7 @@ public final class ScoreboardWiring {
         // the live board on its next tick from the same PDC bit. /scoreboard gui and the /uxmess gui hub both open it.
         GuiText guiText = new GuiText(kernel.messages());
         ScoreboardSettingsView settingsView = new ScoreboardSettingsView(
-                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), visibility, toggle, menus);
+                guiText, new PaperScheduler(plugin), guiLayouts, kernel.messages(), visibility, toggle, menus);
 
         List<CommandRegistration> commands = List.of(new ScoreboardCommand(
                 toggle, renderer, kernel.scheduler(), kernel.messages(), settingsView, visibility));

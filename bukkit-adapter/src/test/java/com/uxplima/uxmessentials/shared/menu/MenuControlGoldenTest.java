@@ -20,24 +20,26 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuControlActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -114,10 +116,10 @@ class MenuControlGoldenTest {
         bindings.placeholder("counter", ctx -> String.valueOf(counter.incrementAndGet()));
         bindings.placeholder("v", ctx -> ctx.entry(String.class));
         bindings.lists().register("t:list", ctx -> List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"));
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
-        menus = new Menus(renderer, scheduler, bindings.lists());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         MenuVocabulary.registerActions(bindings, menus, true, new RecordingLogger());
         MenuControlActions.register(bindings, new RecordingLogger());
         MenuSpecLoader loader = new MenuSpecLoader();
@@ -126,8 +128,8 @@ class MenuControlGoldenTest {
         menus.registerSpec("list", loader.parse(LIST_HOCON));
         menus.registerSpec("menu1", loader.parse(MENU1_HOCON));
         menus.registerSpec("menu2", loader.parse(MENU2_HOCON));
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -203,15 +205,14 @@ class MenuControlGoldenTest {
         // same way it did before paging was added: asserted directly, since a listener swallows a handler throw.
         Consumer<MenuActionContext> open =
                 bindings.action("open").orElseThrow(() -> new AssertionError("open not registered"));
-        PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
-        MenuActionContext ctx =
-                new MenuActionContext(MenuContext.of(ref, null, 0), player, ClickKind.LEFT, Map.of("value", "ghost"));
+        MenuActionContext ctx = new MenuActionContext(
+                MenuContext.of(player, null, 0), player, ClickKind.LEFT, Map.of("value", "ghost"));
 
         assertThatThrownBy(() -> open.accept(ctx)).isInstanceOf(IllegalArgumentException.class);
     }
 
     private void open(String specId) {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), specId, null);
+        menus.open(player, specId, null);
     }
 
     /** Fire a left click at {@code slot} of the top (menu) inventory through the live listener. */

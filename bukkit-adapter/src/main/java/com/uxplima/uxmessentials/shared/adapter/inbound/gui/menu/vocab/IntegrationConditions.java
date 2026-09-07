@@ -15,15 +15,16 @@ import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -214,14 +215,14 @@ public final class IntegrationConditions {
     /** {@code has-group:<group>}: whether the viewer belongs to {@code group}; a blank group or absent Vault is false. */
     private static boolean hasGroup(MenuContext ctx, Map<String, String> args, PermissionQuery permissions) {
         String group = value(args).strip();
-        return !group.isEmpty() && permissions.inGroup(ctx.viewer().uuid(), group);
+        return !group.isEmpty() && permissions.inGroup(ctx.viewer().getUniqueId(), group);
     }
 
     /** {@code has-points:<amount>}: whether the viewer holds at least {@code amount} PlayerPoints; non-numeric is false. */
     private static boolean hasPoints(MenuContext ctx, Map<String, String> args, Currencies currencies) {
         OptionalDouble amount = parseNumber(value(args));
         return amount.isPresent()
-                && currencies.resolve("playerpoints").has(ctx.viewer().uuid(), amount.getAsDouble());
+                && currencies.resolve("playerpoints").has(ctx.viewer().getUniqueId(), amount.getAsDouble());
     }
 
     /**
@@ -234,7 +235,7 @@ public final class IntegrationConditions {
         if (required.isEmpty()) {
             return false;
         }
-        int actual = protocol.protocolVersion(ctx.viewer());
+        int actual = protocol.protocolVersion(BukkitRefs.toRef(ctx.viewer()));
         return actual == ClientProtocol.UNKNOWN || actual >= required.getAsDouble();
     }
 
@@ -261,7 +262,8 @@ public final class IntegrationConditions {
      */
     private static boolean cooldownReady(MenuContext ctx, Map<String, String> args, Cooldowns cooldowns) {
         String label = firstToken(value(args));
-        return !label.isEmpty() && cooldowns.checkLabel(ctx.viewer(), label).isOk();
+        return !label.isEmpty()
+                && cooldowns.checkLabel(BukkitRefs.toRef(ctx.viewer()), label).isOk();
     }
 
     /**
@@ -274,7 +276,7 @@ public final class IntegrationConditions {
     private static void setCooldown(MenuActionContext ctx, Cooldowns cooldowns) {
         String label = firstToken(ctx.arg());
         if (!label.isEmpty()) {
-            cooldowns.stampLabel(ctx.viewer(), label);
+            cooldowns.stampLabel(BukkitRefs.toRef(ctx.viewer()), label);
         }
     }
 
@@ -322,7 +324,7 @@ public final class IntegrationConditions {
 
     /** The live {@link Player} for the open context's viewer, or {@code null} when that player is offline. */
     private static @Nullable Player viewer(MenuContext ctx, Server server) {
-        return server.getPlayer(ctx.viewer().uuid());
+        return server.getPlayer(ctx.viewer().getUniqueId());
     }
 
     /** The single positional argument the runtime's split carried onto the condition/action ref, or empty. */

@@ -22,18 +22,8 @@ import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutco
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridHandlers;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
@@ -41,6 +31,18 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.GridHandlers;
+import com.uxplima.uxmlib.menu.GridSpec;
+import com.uxplima.uxmlib.menu.GridView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -221,7 +223,7 @@ public final class MenuGridView {
         GridHandlers handlers = new GridHandlers(
                 (view, player, menuSlot, filled, kind) -> onSlot(viewer, state, view, player, menuSlot, filled, kind),
                 (view, player, menuSlot, item) -> onCapture(state, view, menuSlot, item));
-        menus.openGrid(viewer, spec, handlers);
+        LivePlayers.of(viewer).ifPresent(live -> menus.openGrid(live, spec, handlers));
     }
 
     private Map<String, String> titlePlaceholders(GridEditState state) {
@@ -238,7 +240,7 @@ public final class MenuGridView {
                 new GridSpec.Control(
                         PREVIEW_COLUMN,
                         icon(viewer, PREVIEW_ICON, CustomMenusMessageKey.MENU_GRID_PREVIEW),
-                        player -> preview(viewer, state)),
+                        player -> preview(player, state)),
                 new GridSpec.Control(
                         SAVE_COLUMN,
                         icon(viewer, SAVE_ICON, CustomMenusMessageKey.MENU_GRID_SAVE),
@@ -251,8 +253,8 @@ public final class MenuGridView {
      * Closing the preview steps back to this grid (the engine's close hook), and the working copy is unchanged, so no
      * edit is lost by looking.
      */
-    private void preview(PlayerRef viewer, GridEditState state) {
-        menus.openPreview(viewer, state.session.toSpec(), () -> reopenGrid(viewer));
+    private void preview(Player viewer, GridEditState state) {
+        menus.openPreview(viewer, state.session.toSpec(), () -> reopenGrid(BukkitRefs.toRef(viewer)));
     }
 
     /**
@@ -380,7 +382,7 @@ public final class MenuGridView {
             return;
         }
         menus.confirm(
-                viewer,
+                player,
                 guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_CLEAR_CONFIRM, slot(menuSlot)),
                 () -> confirmClear(viewer, state, player, id, menuSlot),
                 () -> showGrid(viewer, state));

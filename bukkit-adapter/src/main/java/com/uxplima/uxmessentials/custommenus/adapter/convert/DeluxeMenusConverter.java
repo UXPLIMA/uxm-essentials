@@ -25,7 +25,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
  * DeluxeMenus keeps their menus. It reads the well-known DeluxeMenus surface, {@code menu_title}, {@code size},
  * {@code open_requirement}, and each {@code items.<id>} with its material / name / lore / slots / per-gesture click
  * commands and requirements, and emits the {@code title} / {@code rows} / {@code items { … }} shape
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader} loads.
+ * {@link com.uxplima.uxmlib.menu.spec.MenuSpecLoader} loads.
  *
  * <p>The conversion covers the common surface and degrades gracefully everywhere else: an unknown click tag becomes a
  * best-effort {@code console} command, an unmappable requirement type (a JavaScript expression, a construct we have no

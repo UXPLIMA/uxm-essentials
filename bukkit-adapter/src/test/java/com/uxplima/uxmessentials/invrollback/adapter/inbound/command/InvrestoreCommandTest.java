@@ -37,8 +37,7 @@ import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -46,6 +45,8 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,7 +128,7 @@ class InvrestoreCommandTest {
         PlayerMock staff = server.addPlayer("Staff");
         staff.addAttachment(plugin, PERMISSION, true);
         PlayerMock victim = server.addPlayer("Victim");
-        lookup.register(new PlayerRef(victim.getUniqueId(), victim.getName()));
+        lookup.register(BukkitRefs.toRef(victim));
         ItemStack[] contents = new ItemStack[41];
         contents[0] = new ItemStack(Material.DIAMOND, 1);
         repository.save(Snapshot.capture(

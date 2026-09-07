@@ -15,16 +15,17 @@ import org.bukkit.plugin.ServicePriority;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.IconProviderRegistry;
+import com.uxplima.uxmlib.menu.providers.IconProviders;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,10 @@ class IconProviderRegistrationGoldenTest {
         // Build the renderer over the runtime-backed chain BEFORE any registration, so a later registerIconProvider
         // proves it reaches the already-built renderer through the live registry reference.
         ItemRenderer itemRenderer = new ItemRenderer(
-                guiText, bindings.placeholders(), IconProviders.defaults().withRuntime(runtimeIcons));
+                guiText,
+                ThemeFile::shippedTheme,
+                bindings.placeholders(),
+                IconProviders.defaults().withRuntime(runtimeIcons));
         MenuApi api = new EngineMenuApi(bindings, itemRenderer, runtimeIcons);
         server.getServicesManager().register(MenuApi.class, api, plugin, ServicePriority.Normal);
     }

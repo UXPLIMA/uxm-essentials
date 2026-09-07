@@ -11,18 +11,19 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -94,11 +95,11 @@ public final class HologramListMenu {
                 ctx -> Long.toString(Math.round(holoOf(ctx).location().z())));
         bindings.action("holograms:edit", this::edit);
         bindings.action("holograms:create", this::create);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the hologram list for {@code viewer} (the live player resolved by the engine). */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, SPEC_ID, null);
     }
@@ -110,7 +111,7 @@ public final class HologramListMenu {
 
     /** Left-click a hologram icon: open that hologram's bespoke property editor on the viewer's entity thread. */
     private void edit(MenuActionContext ctx) {
-        editor.open(ctx.player(), ctx.viewer(), ctx.entry(Hologram.class));
+        editor.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), ctx.entry(Hologram.class));
     }
 
     /**
@@ -119,13 +120,12 @@ public final class HologramListMenu {
      */
     private void create(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("hologram.create-name", HologramsMessageKey.HOLOGRAM_GUI_LIST_CREATE_PROMPT),
+                InputRequest.of("hologram.create-name", HologramsMessageKey.HOLOGRAM_GUI_LIST_CREATE_PROMPT.key()),
                 text -> handleCreate(player, viewer, text),
-                () -> open(viewer));
+                () -> open(ctx.viewer()));
     }
 
     /**
@@ -135,14 +135,14 @@ public final class HologramListMenu {
      */
     private void handleCreate(Player player, PlayerRef viewer, String text) {
         if (text.isBlank()) {
-            open(viewer);
+            open(player);
             return;
         }
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
         HologramName name = HologramName.of(text);
         scheduler.async(() -> {
             services.create().create(viewer, name, at, HologramLine.of(name.value()));
-            scheduler.onEntity(viewer, () -> open(viewer));
+            scheduler.onEntity(viewer, () -> open(player));
         });
     }
 }

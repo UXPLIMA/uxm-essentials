@@ -22,9 +22,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -33,6 +31,9 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * buttons at 47 and 51, gray-glass filler everywhere else). The engine window is snapshotted as {@code (slot ->
  * material, plain name)} and asserted equal, slot for slot, to the analytic baseline the old view produced for this
  * fixture: content heads, nav, offline button and footer buttons all included. A real click on a head through the
- * engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener} hands that target
+ * engine's own {@link com.uxplima.uxmlib.menu.runtime.MenuListener} hands that target
  * to the recording {@code onPick}; a click on a footer button runs its own callback with the viewer. The offline-name
  * anvil branch is driven through the package-private {@code resolveTyped} apply seam, exercised in the same-package
  * {@code PlayerPickerViewTest}.
@@ -78,7 +79,7 @@ class PlayerPickerGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         // Two more online players so page 0 carries three heads (Alice, Bob, Carol) in content order.
         server.addPlayer("Bob");
         server.addPlayer("Carol");

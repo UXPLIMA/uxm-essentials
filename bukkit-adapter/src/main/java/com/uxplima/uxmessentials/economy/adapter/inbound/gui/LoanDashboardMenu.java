@@ -20,20 +20,22 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -105,7 +107,7 @@ public final class LoanDashboardMenu {
         bindings.list("economy:loan-list", ctx -> subject(ctx).loans());
         bindings.action("economy:loan-entry", this::onEntryClick);
         bindings.action("economy:loan-request", ctx -> requestFlow.start(ctx.player()));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /**
@@ -120,14 +122,14 @@ public final class LoanDashboardMenu {
             Loan.CreditScore creditScore = loanService.getCreditScore(viewerRef);
             LoanService.LoanQuote quote = loanService.quote(creditScore.score());
             List<Loan> activeLoans = loanService.getActiveLoans(viewerRef);
-            menus.open(viewerRef, SPEC_ID, new LoanDashboardSubject(creditScore, quote, List.copyOf(activeLoans)));
+            menus.open(player, SPEC_ID, new LoanDashboardSubject(creditScore, quote, List.copyOf(activeLoans)));
         });
     }
 
     /** The credit-profile lore: the score, the interest at that score, and one limit row per configured currency. */
     private String profileLore(MenuContext ctx) {
         LoanDashboardSubject subject = subject(ctx);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         BigDecimal interestPct = subject.quote().interestRate().multiply(BigDecimal.valueOf(100));
         String limit = subject.quote().limit().setScale(0, RoundingMode.HALF_UP).toPlainString();
         List<String> lines = new ArrayList<>();
@@ -153,13 +155,14 @@ public final class LoanDashboardMenu {
     /** The bound loan's entry name. */
     private String entryName(MenuContext ctx) {
         Loan loan = ctx.entry(Loan.class);
-        return resolve(ctx.viewer(), EconomyMessageKey.LOAN_GUI_LOAN_NAME, Map.of("id", shortId(loan)));
+        return resolve(
+                BukkitRefs.toRef(ctx.viewer()), EconomyMessageKey.LOAN_GUI_LOAN_NAME, Map.of("id", shortId(loan)));
     }
 
     /** The bound loan's entry lore block, joined for the engine to split into one component per line. */
     private String entryLore(MenuContext ctx) {
         Loan loan = ctx.entry(Loan.class);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         String currency = loan.principal().currency().id().value();
         List<String> lines = new ArrayList<>();
         lines.add(resolve(
@@ -238,9 +241,10 @@ public final class LoanDashboardMenu {
         Currency currency = loan.remainingAmount().currency();
         textInput.prompt(
                 player,
-                viewerRef,
                 InputRequest.of(
-                        "loan.repay-custom", EconomyMessageKey.LOAN_GUI_CUSTOM_PROMPT, Map.of("id", shortId(loan))),
+                        "loan.repay-custom",
+                        EconomyMessageKey.LOAN_GUI_CUSTOM_PROMPT.key(),
+                        Map.of("id", shortId(loan))),
                 amountStr -> applyCustomRepayment(player, viewerRef, loan, currency, amountStr),
                 () -> open(player));
     }
@@ -289,7 +293,7 @@ public final class LoanDashboardMenu {
     }
 
     private String resolve(MenuContext ctx, EconomyMessageKey key) {
-        return resolve(ctx.viewer(), key);
+        return resolve(BukkitRefs.toRef(ctx.viewer()), key);
     }
 
     private String resolve(PlayerRef viewer, EconomyMessageKey key) {

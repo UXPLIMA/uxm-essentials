@@ -2,12 +2,12 @@ package com.uxplima.uxmessentials.shared.menu.spec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickBranch;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RequirementSpec;
+import com.uxplima.uxmlib.menu.spec.ClickBranch;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.RequirementSpec;
 import org.junit.jupiter.api.Test;
 
 /** How the loader reads a gesture's {@code else} block into a nested {@link ClickBranch} chain. */

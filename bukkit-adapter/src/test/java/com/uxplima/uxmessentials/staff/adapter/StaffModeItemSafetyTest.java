@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingEvents;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingRepository;
@@ -56,7 +57,7 @@ class StaffModeItemSafetyTest {
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer("Alice");
-        who = new PlayerRef(player.getUniqueId(), player.getName());
+        who = BukkitRefs.toRef(player);
         settings = StaffAdapterFakes.defaultSettings();
         gadgetItems = new StaffGadgetItems(MockBukkit.createMockPlugin("uxmEssentials"));
         vanish = new RecordingVanish();
@@ -177,7 +178,7 @@ class StaffModeItemSafetyTest {
     /** Decode the saved loadout into a throwaway player's inventory so the stored items can be inspected. */
     private PlayerInventory restoreInto(SavedLoadout saved) {
         Player probe = server.addPlayer("Probe");
-        PlayerRef probeRef = new PlayerRef(probe.getUniqueId(), probe.getName());
+        PlayerRef probeRef = BukkitRefs.toRef(probe);
         capture.restore(probeRef, saved);
         return probe.getInventory();
     }

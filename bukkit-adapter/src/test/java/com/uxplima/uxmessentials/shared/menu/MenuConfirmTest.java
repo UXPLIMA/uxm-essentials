@@ -17,20 +17,22 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +54,6 @@ class MenuConfirmTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private Scheduler scheduler;
     private Menus menus;
 
@@ -61,15 +62,15 @@ class MenuConfirmTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         scheduler = new SyncScheduler();
         ItemRenderer itemRenderer = new ItemRenderer(
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages()),
+                ThemeFile::shippedTheme,
                 new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, scheduler, new ListSourceRegistry());
-        MenuListener listener =
-                new MenuListener(renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin);
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry());
+        MenuListener listener = new MenuListener(
+                renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -80,7 +81,7 @@ class MenuConfirmTest {
 
     @Test
     void confirmOpensAMenuHolderWindowWithYesAndNoButtonsAtTheUxmLibSlots() {
-        menus.confirm(viewer, Component.text("delete?"), () -> {}, () -> {});
+        menus.confirm(player, Component.text("delete?"), () -> {}, () -> {});
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
@@ -92,7 +93,7 @@ class MenuConfirmTest {
     void clickingYesRunsOnYesOnceNotOnNoAndClosesTheWindow() {
         AtomicInteger yes = new AtomicInteger();
         AtomicInteger no = new AtomicInteger();
-        menus.confirm(viewer, Component.text("delete?"), yes::incrementAndGet, no::incrementAndGet);
+        menus.confirm(player, Component.text("delete?"), yes::incrementAndGet, no::incrementAndGet);
 
         fireClick(YES_SLOT);
 
@@ -105,7 +106,7 @@ class MenuConfirmTest {
     void clickingNoRunsOnNoOnceNotOnYesAndClosesTheWindow() {
         AtomicInteger yes = new AtomicInteger();
         AtomicInteger no = new AtomicInteger();
-        menus.confirm(viewer, Component.text("delete?"), yes::incrementAndGet, no::incrementAndGet);
+        menus.confirm(player, Component.text("delete?"), yes::incrementAndGet, no::incrementAndGet);
 
         fireClick(NO_SLOT);
 
@@ -118,7 +119,7 @@ class MenuConfirmTest {
     void closingTheWindowWithoutAClickRunsNeitherHandler() {
         AtomicInteger yes = new AtomicInteger();
         AtomicInteger no = new AtomicInteger();
-        menus.confirm(viewer, Component.text("delete?"), yes::incrementAndGet, no::incrementAndGet);
+        menus.confirm(player, Component.text("delete?"), yes::incrementAndGet, no::incrementAndGet);
 
         player.closeInventory();
 
@@ -129,7 +130,7 @@ class MenuConfirmTest {
     @Test
     void aSecondClickAfterYesDoesNotReRunTheHandler() {
         AtomicInteger yes = new AtomicInteger();
-        menus.confirm(viewer, Component.text("delete?"), yes::incrementAndGet, () -> {});
+        menus.confirm(player, Component.text("delete?"), yes::incrementAndGet, () -> {});
 
         fireClick(YES_SLOT);
         // The window closed on the first click; a stray second click on the same slot must not re-fire.
@@ -143,14 +144,15 @@ class MenuConfirmTest {
         var recording = new RecordingScheduler();
         ItemRenderer itemRenderer = new ItemRenderer(
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages()),
+                ThemeFile::shippedTheme,
                 new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        Menus leakMenus = new Menus(renderer, recording, new ListSourceRegistry());
-        MenuListener leakListener =
-                new MenuListener(renderer, new ActionRegistry(), new ConditionRegistry(), recording, plugin);
+        Menus leakMenus = new Menus(renderer, EngineScheduler.of(recording), new ListSourceRegistry());
+        MenuListener leakListener = new MenuListener(
+                renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(recording), plugin);
         server.getPluginManager().registerEvents(leakListener, plugin);
 
-        leakMenus.confirm(viewer, Component.text("delete?"), () -> {}, () -> {});
+        leakMenus.confirm(player, Component.text("delete?"), () -> {}, () -> {});
         fireClick(YES_SLOT);
         player.closeInventory();
         player.closeInventory(); // a double-close is a harmless no-op

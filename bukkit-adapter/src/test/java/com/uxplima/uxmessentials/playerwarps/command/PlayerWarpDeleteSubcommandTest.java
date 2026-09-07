@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -65,8 +66,7 @@ class PlayerWarpDeleteSubcommandTest {
 
         dispatch(player, "pwarp del hub");
 
-        verify(archivePlayerWarp)
-                .archive(eq(new PlayerRef(player.getUniqueId(), player.getName())), eq(PlayerWarpName.of("hub")));
+        verify(archivePlayerWarp).archive(eq(BukkitRefs.toRef(player)), eq(PlayerWarpName.of("hub")));
     }
 
     private void dispatch(PlayerMock sender, String input) {

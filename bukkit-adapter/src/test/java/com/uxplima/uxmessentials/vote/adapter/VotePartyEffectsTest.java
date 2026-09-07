@@ -10,6 +10,7 @@ import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -114,7 +115,7 @@ class VotePartyEffectsTest {
             // The production handler calls scheduler.onEntity for each online player. In the test we just
             // run the effect block inline (the sync scheduler) to confirm no-throw.
             for (org.bukkit.entity.Player online : org.bukkit.Bukkit.getOnlinePlayers()) {
-                scheduler.onEntity(new PlayerRef(online.getUniqueId(), online.getName()), () -> {
+                scheduler.onEntity(BukkitRefs.toRef(online), () -> {
                     @Nullable Location loc = online.getLocation();
                     if (loc == null) {
                         return;

@@ -7,18 +7,19 @@ import java.util.Objects;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -54,7 +55,6 @@ public final class TeleportSettingsView {
                 guiLayouts.loadEntityEditor(MODULE, LAYOUT, EntityEditorLayout.codeDefault(List.of(11, 15), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .menus(menus)
                 .layout(layout)
                 .title(TeleportMessageKey.GUI_SETTINGS_TITLE)
@@ -74,17 +74,17 @@ public final class TeleportSettingsView {
             Messages messages, Scheduler scheduler, TeleportFlags flags, PlayerRef viewer) {
         return List.of(
                 ToggleProperty.ofBoolean(
-                        TeleportMessageKey.GUI_SETTINGS_ACCEPT,
+                        TeleportMessageKey.GUI_SETTINGS_ACCEPT.key(),
                         Material.ENDER_PEARL,
                         () -> flags.acceptsRequests(viewer),
-                        (who, on) -> onOff(messages, who, on),
+                        (who, on) -> onOff(messages, BukkitRefs.toRef(who), on),
                         on -> flags.setAcceptsRequests(viewer, on),
                         scheduler),
                 ToggleProperty.ofBoolean(
-                        TeleportMessageKey.GUI_SETTINGS_AUTO_ACCEPT,
+                        TeleportMessageKey.GUI_SETTINGS_AUTO_ACCEPT.key(),
                         Material.LIME_DYE,
                         () -> flags.autoAccepts(viewer),
-                        (who, on) -> onOff(messages, who, on),
+                        (who, on) -> onOff(messages, BukkitRefs.toRef(who), on),
                         on -> {
                             if (flags.autoAccepts(viewer) != on) {
                                 flags.toggleAutoAccepts(viewer);

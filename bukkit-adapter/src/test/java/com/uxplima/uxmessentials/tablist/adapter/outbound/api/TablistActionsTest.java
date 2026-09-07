@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.api.action.UxmFailure;
 import com.uxplima.uxmessentials.shared.action.ActionDoubles;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.query.QueryDoubles;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderer;
@@ -33,7 +34,7 @@ class TablistActionsTest {
     void setUp() {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
-        who = new PlayerRef(alice.getUniqueId(), alice.getName());
+        who = BukkitRefs.toRef(alice);
         renderer = mock(TablistRenderer.class);
         scheduler = new ActionDoubles.InlineScheduler();
         actions = new TablistActions(renderer, new QueryDoubles.MapLookup().with(who), scheduler);

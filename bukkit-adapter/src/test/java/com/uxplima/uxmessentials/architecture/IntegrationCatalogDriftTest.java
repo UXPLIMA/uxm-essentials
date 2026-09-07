@@ -6,16 +6,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.stream.Stream;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.integration.Integration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.integration.IntegrationCatalog;
@@ -65,18 +61,27 @@ class IntegrationCatalogDriftTest {
     }
 
     @Test
-    void everyCatalogedSeamNamesAFileThatExists() {
-        Set<String> production = productionFileNames();
+    void everyCatalogedSeamNamesAClassThatResolves() {
         List<String> missing = new ArrayList<>();
         for (Integration integration : IntegrationCatalog.all()) {
-            if (!production.contains(integration.seam())) {
+            if (!resolves(integration.seam())) {
                 missing.add(integration.plugin() + " -> " + integration.seam());
             }
         }
         assertThat(missing)
-                .as("a catalogued seam names a file that no longer exists; point the entry at the class that owns "
-                        + "the present-guard today, or retire the entry with the integration")
+                .as("a catalogued seam names a class that is not on the classpath; point the entry at the class "
+                        + "that owns the present-guard today, or retire the entry with the integration")
                 .isEmpty();
+    }
+
+    /** Whether {@code className} is on this module's compile classpath, wherever the module that carries it lives. */
+    private static boolean resolves(String className) {
+        try {
+            Class.forName(className, false, IntegrationCatalogDriftTest.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError absent) {
+            return false;
+        }
     }
 
     @Test
@@ -92,10 +97,10 @@ class IntegrationCatalogDriftTest {
     }
 
     @Test
-    void theSeamGuardFiresOnAMissingFile() {
-        assertThat(productionFileNames())
-                .as("a file that was never written must not be found, or the seam check proves nothing")
-                .doesNotContain("GhostIntegrationSeam.java");
+    void theSeamGuardFiresOnAMissingClass() {
+        assertThat(resolves("com.uxplima.uxmessentials.GhostIntegrationSeam"))
+                .as("a class that was never written must not resolve, or the seam check proves nothing")
+                .isFalse();
     }
 
     /** The names in {@code required} that are absent from {@code declared}. The whole bijection detector. */
@@ -121,25 +126,6 @@ class IntegrationCatalogDriftTest {
         return names;
     }
 
-    /** Every production Java file name across the modules that may hold an integration seam. */
-    private static Set<String> productionFileNames() {
-        Set<String> names = new TreeSet<>();
-        for (String module : List.of("core", "bukkit-adapter", "persistence-adapter")) {
-            Path src = repoRoot().resolve(module).resolve("src/main/java");
-            if (!Files.isDirectory(src)) {
-                continue;
-            }
-            try (Stream<Path> files = Files.walk(src)) {
-                files.filter(path -> path.toString().endsWith(".java"))
-                        .forEach(path -> names.add(path.getFileName().toString()));
-            } catch (IOException failure) {
-                throw new UncheckedIOException("failed to walk " + src, failure);
-            }
-        }
-        assertThat(names).as("expected production sources under %s", repoRoot()).isNotEmpty();
-        return names;
-    }
-
     private static String resource(String path) {
         try (InputStream in = IntegrationCatalogDriftTest.class.getResourceAsStream(path)) {
             if (in == null) {
@@ -149,17 +135,5 @@ class IntegrationCatalogDriftTest {
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
-    }
-
-    private static Path repoRoot() {
-        Path dir = Path.of("").toAbsolutePath();
-        while (dir != null) {
-            if (Files.exists(dir.resolve("settings.gradle.kts"))) {
-                return dir;
-            }
-            dir = dir.getParent();
-        }
-        throw new IllegalStateException(
-                "could not locate the repository root from " + Path.of("").toAbsolutePath());
     }
 }

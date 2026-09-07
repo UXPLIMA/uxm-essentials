@@ -13,15 +13,18 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.security.adapter.VerificationFeedback;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -112,8 +115,9 @@ public final class PinKeypadView {
         bindings.action("security:pin-submit", ctx -> pressSubmit(ctx, actions));
         bindings.action("security:pin-totp", ctx -> pressTotp(ctx, actions));
         bindings.condition("security:totp-enabled", (ctx, args) -> totpEnabled(ctx));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
-        menus.registerSpec(CREATE_SPEC_ID, MenuSpecs.loadOrBundled(CREATE_SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
+        menus.registerSpec(
+                CREATE_SPEC_ID, MenuSpecs.loadOrBundled(CREATE_SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open a fresh keypad for {@code viewer}; {@code totpEnabled} shows the "type a code" button. */
@@ -133,7 +137,7 @@ public final class PinKeypadView {
         Objects.requireNonNull(viewer, "viewer");
         open.put(viewer.uuid(), new Tracked(viewer, false, true));
         markOpening(viewer.uuid());
-        menus.open(viewer, CREATE_SPEC_ID, new PinSession(viewer, false));
+        menus.open(player, CREATE_SPEC_ID, new PinSession(viewer, false));
     }
 
     /**
@@ -224,7 +228,7 @@ public final class PinKeypadView {
     private void show(PlayerRef viewer, boolean totpEnabled) {
         open.put(viewer.uuid(), new Tracked(viewer, totpEnabled, false));
         markOpening(viewer.uuid());
-        menus.open(viewer, SPEC_ID, new PinSession(viewer, totpEnabled));
+        LivePlayers.of(viewer).ifPresent(live -> menus.open(live, SPEC_ID, new PinSession(viewer, totpEnabled)));
     }
 
     private void markOpening(UUID viewer) {
@@ -243,13 +247,15 @@ public final class PinKeypadView {
         PinSession session = sessionOf(ctx);
         int length = session == null ? 0 : session.length();
         return messages.resolve(
-                ctx.viewer(), SecurityMessageKey.SECURITY_VERIFY_KEYPAD_ENTRY, Map.of("entry", mask(length)));
+                BukkitRefs.toRef(ctx.viewer()),
+                SecurityMessageKey.SECURITY_VERIFY_KEYPAD_ENTRY,
+                Map.of("entry", mask(length)));
     }
 
     /** One digit button's label, resolved from the catalog so it stays localized and operator-editable. */
     private String digitLabel(MenuContext ctx, int digit) {
         return messages.resolve(
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 SecurityMessageKey.SECURITY_VERIFY_KEYPAD_DIGIT,
                 Map.of("digit", Integer.toString(digit)));
     }
@@ -259,7 +265,7 @@ public final class PinKeypadView {
         session.append(Character.forDigit(digit, 10), MAX_ENTRY);
         ctx.control().refresh();
         // The click is what tells the player the pad took the tap; the masked display only says how many it has.
-        feedback.keyPress(ctx.viewer());
+        feedback.keyPress(BukkitRefs.toRef(ctx.viewer()));
     }
 
     private void pressClear(MenuActionContext ctx) {
@@ -270,11 +276,11 @@ public final class PinKeypadView {
     private void pressSubmit(MenuActionContext ctx, KeypadActions actions) {
         String entered = ctx.subject(PinSession.class).consume();
         ctx.control().refresh();
-        actions.submit(ctx.player(), ctx.viewer(), entered);
+        actions.submit(ctx.player(), BukkitRefs.toRef(ctx.viewer()), entered);
     }
 
     private void pressTotp(MenuActionContext ctx, KeypadActions actions) {
-        actions.requestTotp(ctx.player(), ctx.viewer());
+        actions.requestTotp(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
     private boolean totpEnabled(MenuContext ctx) {

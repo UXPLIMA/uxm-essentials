@@ -32,8 +32,7 @@ import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -44,6 +43,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.shared.menu.TileText;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,7 +70,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * {@code applyCost} / {@code applyDisplayName} / {@code applyDisplayLore} / {@code applyCommands} save the
  * single-field copy the old prompts saved and re-open the panel. The toggle, display-material, delete, category, and
  * back buttons are fired as real clicks through the engine's own
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener}. So the move is faithful in
+ * {@link com.uxplima.uxmlib.menu.runtime.MenuListener}. So the move is faithful in
  * both appearance and behaviour.
  */
 class KitSettingsGoldenTest {
@@ -120,7 +121,7 @@ class KitSettingsGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);

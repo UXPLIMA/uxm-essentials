@@ -8,14 +8,16 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -73,20 +75,20 @@ public final class EconomyAdminMenu {
         bindings.action("economy:admin-manage", this::openPicker);
         bindings.action("economy:admin-bulk", this::openBulk);
         bindings.action("economy:admin-history", this::openGlobalHistory);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open the admin hub for {@code viewer}; the viewer reference is the menu subject. */
     public void open(Player viewer, PlayerRef viewerRef) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(viewerRef, "viewerRef");
-        menus.open(viewerRef, SPEC_ID, viewerRef);
+        menus.open(viewer, SPEC_ID, viewerRef);
     }
 
     /** Open the shared player picker; the picked target routes to the per-player manage screen, as before. */
     private void openPicker(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         PlayerPickerView.Request request = new PlayerPickerView.Request(
                 EconomyMessageKey.ECO_ADMIN_GUI_PICK_TITLE,
                 target -> targetMenu.open(viewer, viewerRef, target),
@@ -101,12 +103,12 @@ public final class EconomyAdminMenu {
 
     /** Open the server-wide bulk screen through the engine, exactly as the old hub did. */
     private void openBulk(MenuActionContext ctx) {
-        bulkMenu.open(ctx.player(), ctx.viewer());
+        bulkMenu.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
     /** Open the global transaction-history list, exactly as the old hub did. */
     private void openGlobalHistory(MenuActionContext ctx) {
-        PlayerRef viewerRef = ctx.viewer();
-        scheduler.onEntity(viewerRef, () -> historyView.open(viewerRef, null, "Global"));
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
+        scheduler.onEntity(viewerRef, () -> historyView.open(ctx.viewer(), null, "Global"));
     }
 }

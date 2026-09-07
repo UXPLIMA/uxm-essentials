@@ -6,6 +6,7 @@ import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingVanish;
 import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture;
@@ -36,7 +37,7 @@ class BukkitStaffModePerksTest {
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer("Alice");
-        who = new PlayerRef(player.getUniqueId(), player.getName());
+        who = BukkitRefs.toRef(player);
         settings = StaffAdapterFakes.defaultSettings();
         capture = new BukkitStaffLoadoutCapture(
                 settings, new StaffGadgetItems(MockBukkit.createMockPlugin("uxmEssentials")), new RecordingVanish());

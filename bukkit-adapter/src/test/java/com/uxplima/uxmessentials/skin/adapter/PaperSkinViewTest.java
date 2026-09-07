@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.UUID;
 
 import com.destroystokyo.paper.profile.ProfileProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -43,7 +44,7 @@ class PaperSkinViewTest {
     @Test
     void applyingReplacesTheTexturesPropertyOnThePlayersProfile() {
         PlayerMock player = server.addPlayer("Steve");
-        PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
+        PlayerRef who = BukkitRefs.toRef(player);
 
         view().apply(who, new SkinTexture("dmFsdWU=", "c2ln"), SkinModel.CLASSIC);
 
@@ -55,7 +56,7 @@ class PaperSkinViewTest {
     @Test
     void aSecondApplyLeavesOneTexturePropertyRatherThanTwo() {
         PlayerMock player = server.addPlayer("Steve");
-        PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
+        PlayerRef who = BukkitRefs.toRef(player);
 
         view().apply(who, new SkinTexture("Zmlyc3Q=", "c2ln"), SkinModel.CLASSIC);
         view().apply(who, new SkinTexture("c2Vjb25k", "c2ln"), SkinModel.SLIM);
@@ -70,7 +71,7 @@ class PaperSkinViewTest {
     @Test
     void anUnsignedTextureGoesOnUnsigned() {
         PlayerMock player = server.addPlayer("Steve");
-        PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
+        PlayerRef who = BukkitRefs.toRef(player);
 
         view().apply(who, new SkinTexture("dmFsdWU=", null), SkinModel.CLASSIC);
 

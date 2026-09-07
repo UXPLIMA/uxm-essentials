@@ -19,7 +19,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.SurvivalPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -58,6 +57,7 @@ import com.uxplima.uxmessentials.survival.domain.DropChance;
 import com.uxplima.uxmessentials.survival.domain.SellPrices;
 import com.uxplima.uxmessentials.survival.domain.SleepThreshold;
 import com.uxplima.uxmessentials.survival.domain.SmeltMap;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

@@ -10,24 +10,26 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,9 +60,9 @@ class SoundActionsTest {
         viewer = server.addPlayer("Viewer");
         GuiText guiText = new GuiText(new KeyMessages());
         bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, new SyncScheduler(), new ListSourceRegistry());
+        menus = new Menus(renderer, EngineScheduler.of(new SyncScheduler()), new ListSourceRegistry());
         log = new RecordingLogger();
         // Register the real generic actions (for the enhanced `sound`) and the real sound pack (broadcast/raw).
         MenuVocabulary.registerActions(bindings, menus, true, log);
@@ -274,9 +276,8 @@ class SoundActionsTest {
     private void invoke(String id, String arg, PlayerMock as) {
         Consumer<MenuActionContext> handler =
                 bindings.action(id).orElseThrow(() -> new AssertionError("action not registered: " + id));
-        PlayerRef ref = new PlayerRef(as.getUniqueId(), as.getName());
         MenuActionContext ctx =
-                new MenuActionContext(MenuContext.of(ref, null, 0), as, ClickKind.LEFT, Map.of("value", arg));
+                new MenuActionContext(MenuContext.of(as, null, 0), as, ClickKind.LEFT, Map.of("value", arg));
         handler.accept(ctx);
     }
 

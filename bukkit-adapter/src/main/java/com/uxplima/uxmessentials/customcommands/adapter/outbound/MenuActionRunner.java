@@ -11,12 +11,13 @@ import org.bukkit.Bukkit;
 import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ActionStep;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.Ref;
 
 /**
  * Runs a custom command's action chain through the menu engine's action vocabulary, so a command does exactly what
@@ -97,10 +98,14 @@ public final class MenuActionRunner implements ActionRunner {
             }
             audit(token, actor, allowed);
             Ref ref = Ref.parse(token);
+            // The engine spends a live player, so an action for somebody who has left is dropped rather than run
+            // against a name. That is what the engine itself used to do when its own lookup missed.
             if (step.offset().isZero()) {
-                menus.execute(actor, ref, arguments);
+                LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, arguments));
             } else {
-                scheduler.asyncAfter(step.offset(), () -> menus.execute(actor, ref, arguments));
+                scheduler.asyncAfter(
+                        step.offset(),
+                        () -> LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, arguments)));
             }
         }
     }

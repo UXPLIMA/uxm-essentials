@@ -27,31 +27,33 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridHandlers;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.GridSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.GridHandlers;
+import com.uxplima.uxmlib.menu.GridSpec;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.RefreshSpec;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,7 +76,6 @@ class MenusGridTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private Menus menus;
 
     @BeforeEach
@@ -82,14 +83,13 @@ class MenusGridTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         GuiText guiText = new GuiText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, new PlaceholderRegistry()), new ConditionRegistry());
-        menus = new Menus(renderer, scheduler, new ListSourceRegistry());
-        MenuListener listener =
-                new MenuListener(renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin);
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry()), new ConditionRegistry());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry());
+        MenuListener listener = new MenuListener(
+                renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -101,7 +101,7 @@ class MenusGridTest {
     @Test
     void gridPaintsFilledSlotsPlaceholdersAndAControlBar() {
         GridHandlers noop = new GridHandlers((view, player, menuSlot, filled, kind) -> {});
-        menus.openGrid(viewer, spec(1, () -> Map.of(0, item("DIAMOND")), p -> {}), noop);
+        menus.openGrid(player, spec(1, () -> Map.of(0, item("DIAMOND")), p -> {}), noop);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
@@ -117,7 +117,7 @@ class MenusGridTest {
         AtomicBoolean controlRan = new AtomicBoolean();
         GridHandlers handlers = new GridHandlers(
                 (view, player, menuSlot, filled, kind) -> lastSlot.set(new int[] {menuSlot, filled ? 1 : 0}));
-        menus.openGrid(viewer, spec(1, () -> Map.of(0, item("DIAMOND")), p -> controlRan.set(true)), handlers);
+        menus.openGrid(player, spec(1, () -> Map.of(0, item("DIAMOND")), p -> controlRan.set(true)), handlers);
 
         fireClick(0, ClickType.LEFT);
         assertThat(lastSlot.get()).containsExactly(0, 1); // filled slot 0
@@ -135,7 +135,7 @@ class MenusGridTest {
         GridHandlers handlers = new GridHandlers(
                 (view, player, menuSlot, filled, kind) -> lastSlot.set(new int[] {menuSlot, filled ? 1 : 0}));
         // A menu slot on the second page (50) only reachable after a page flip; the control row is slots 45..53.
-        menus.openGrid(viewer, spec(6, () -> Map.of(50, item("DIAMOND")), p -> {}), handlers);
+        menus.openGrid(player, spec(6, () -> Map.of(50, item("DIAMOND")), p -> {}), handlers);
 
         Inventory page0 = player.getOpenInventory().getTopInventory();
         assertThat(page0.getSize()).isEqualTo(54);
@@ -159,7 +159,7 @@ class MenusGridTest {
         // cancelled outright, the same safety every non-grid menu window gets, and no item is smuggled onto the
         // cursor.
         GridHandlers noCapture = new GridHandlers((view, player, menuSlot, filled, kind) -> {});
-        menus.openGrid(viewer, spec(1, () -> Map.of(0, item("DIAMOND")), p -> {}), noCapture);
+        menus.openGrid(player, spec(1, () -> Map.of(0, item("DIAMOND")), p -> {}), noCapture);
 
         InventoryDragEvent event = fireDrag(new ItemStack(Material.DIAMOND), 1, 2);
 
@@ -182,7 +182,7 @@ class MenusGridTest {
     @Test
     void aPreviewRendersASpecAsAPlayerSeesItWithoutRegisteringIt() {
         MenuSpec spec = previewSpec();
-        menus.openPreview(viewer, spec, () -> {});
+        menus.openPreview(player, spec, () -> {});
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
@@ -197,7 +197,7 @@ class MenusGridTest {
     @Test
     void closingAPreviewFiresItsCloseHookExactlyOnce() {
         AtomicReference<Integer> closes = new AtomicReference<>(0);
-        menus.openPreview(viewer, previewSpec(), () -> closes.updateAndGet(n -> n + 1));
+        menus.openPreview(player, previewSpec(), () -> closes.updateAndGet(n -> n + 1));
 
         player.closeInventory(); // the grid editor wires this hook to reopenGrid, the "back to editor" path
 
@@ -234,10 +234,8 @@ class MenusGridTest {
                 "",
                 List.of(),
                 new ItemDecor(1, Optional.empty(), false, List.of()),
-                List.<com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref>of(),
-                new ClickSpec(
-                        Map.<ClickKind, List<com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref>>of(),
-                        Map.of()),
+                List.<com.uxplima.uxmlib.menu.spec.Ref>of(),
+                new ClickSpec(Map.<ClickKind, List<com.uxplima.uxmlib.menu.spec.Ref>>of(), Map.of()),
                 false,
                 Optional.empty(),
                 ItemType.NONE);

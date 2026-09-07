@@ -12,6 +12,7 @@ import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
@@ -97,11 +98,7 @@ class ChannelBroadcasterTest {
         server.addPlayer("Bob");
         ChannelBroadcaster broadcaster = new ChannelBroadcaster(scheduler, display());
 
-        broadcaster.deliverOne(
-                new PlayerRef(alice.getUniqueId(), alice.getName()),
-                Component.text("preview"),
-                Set.of(BroadcastChannel.CHAT),
-                null);
+        broadcaster.deliverOne(BukkitRefs.toRef(alice), Component.text("preview"), Set.of(BroadcastChannel.CHAT), null);
 
         assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("preview");
     }

@@ -12,15 +12,14 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MovementActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -156,9 +155,8 @@ class MovementActionsTest {
 
         Consumer<MenuActionContext> connect =
                 realBindings.action("connect").orElseThrow(() -> new AssertionError("connect not registered"));
-        PlayerRef ref = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-        MenuActionContext ctx =
-                new MenuActionContext(MenuContext.of(ref, null, 0), viewer, ClickKind.LEFT, Map.of("value", "lobby"));
+        MenuActionContext ctx = new MenuActionContext(
+                MenuContext.of(viewer, null, 0), viewer, ClickKind.LEFT, Map.of("value", "lobby"));
 
         assertThatCode(() -> connect.accept(ctx)).doesNotThrowAnyException();
     }
@@ -213,9 +211,8 @@ class MovementActionsTest {
     private void invoke(String id, String arg) {
         Consumer<MenuActionContext> handler =
                 bindings.action(id).orElseThrow(() -> new AssertionError("action not registered: " + id));
-        PlayerRef ref = new PlayerRef(viewer.getUniqueId(), viewer.getName());
         MenuActionContext ctx =
-                new MenuActionContext(MenuContext.of(ref, null, 0), viewer, ClickKind.LEFT, Map.of("value", arg));
+                new MenuActionContext(MenuContext.of(viewer, null, 0), viewer, ClickKind.LEFT, Map.of("value", arg));
         handler.accept(ctx);
     }
 

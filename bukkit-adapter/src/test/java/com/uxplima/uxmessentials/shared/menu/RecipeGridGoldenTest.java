@@ -16,11 +16,8 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -28,6 +25,11 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +53,6 @@ class RecipeGridGoldenTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private Messages messages;
 
     @BeforeEach
@@ -60,7 +61,6 @@ class RecipeGridGoldenTest {
         plugin = MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         player = server.addPlayer("Crafter");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         messages = new KeyMessages();
         Guis.install(plugin);
     }
@@ -84,7 +84,7 @@ class RecipeGridGoldenTest {
     @Test
     void anItemWithNoRecipeOpensTheOneRowEmptyStateTitle() {
         RecipeGridMenu menu = engine();
-        menu.openEmpty(viewer);
+        menu.openEmpty(player);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getSize()).isEqualTo(9);
@@ -124,7 +124,7 @@ class RecipeGridGoldenTest {
         // Planks across the top corners of the grid, the rest empty; the result an oak boat.
         List<@Nullable Material> grid =
                 Arrays.asList(Material.OAK_PLANKS, null, Material.OAK_PLANKS, null, null, null, null, null, null);
-        menu.open(viewer, grid, Material.OAK_BOAT);
+        menu.open(player, grid, Material.OAK_BOAT);
         return menu;
     }
 
@@ -132,13 +132,13 @@ class RecipeGridGoldenTest {
     private RecipeGridMenu engine() {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         RecipeGridMenu menu = new RecipeGridMenu(menus, messages, Material.BLACK_STAINED_GLASS_PANE);
         menu.register(bindings, specDir(), new NoopLogger());
         return menu;

@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.providers.HeadQuery;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

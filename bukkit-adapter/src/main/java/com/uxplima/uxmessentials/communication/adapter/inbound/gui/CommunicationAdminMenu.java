@@ -17,20 +17,21 @@ import com.uxplima.uxmessentials.communication.application.CommunicationMessageK
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -116,12 +117,13 @@ public final class CommunicationAdminMenu {
                 "announcement_id", ctx -> ctx.entry(Announcement.class).id());
         bindings.placeholder("announcement_lines", this::announcementLines);
         bindings.placeholder("announcement_channels", this::announcementChannels);
-        menus.registerSpec(PANEL_SPEC_ID, MenuSpecs.loadOrBundled(PANEL_RESOURCE, dataFolder, 3, log));
-        menus.registerSpec(ANNOUNCER_SPEC_ID, MenuSpecs.loadOrBundled(ANNOUNCER_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(PANEL_SPEC_ID, MenuSpecs.loadOrBundled(PANEL_RESOURCE, dataFolder, 3, EngineLog.of(log)));
+        menus.registerSpec(
+                ANNOUNCER_SPEC_ID, MenuSpecs.loadOrBundled(ANNOUNCER_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /** Open the admin panel for {@code viewer} (the live player resolved by the engine). */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, PANEL_SPEC_ID, null);
     }
@@ -129,7 +131,7 @@ public final class CommunicationAdminMenu {
     /** The chat-lock value lore: the locked/unlocked word, redrawn in place after each flip. */
     private String lockStateLore(MenuContext ctx) {
         return messages.resolve(
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 chatLock.isLocked()
                         ? CommunicationMessageKey.GUI_VALUE_LOCKED
                         : CommunicationMessageKey.GUI_VALUE_UNLOCKED,
@@ -144,9 +146,9 @@ public final class CommunicationAdminMenu {
     /** Confirm-gate the {@code /clearchat} fan-out; cancel reopens the panel. */
     private void confirmClearChat(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Component title = guiText.text(viewer, CommunicationMessageKey.GUI_CLEARCHAT_CONFIRM);
-        menus.confirm(viewer, title, () -> doClearChat(player), () -> open(viewer));
+        menus.confirm(ctx.viewer(), title, () -> doClearChat(player), () -> open(ctx.viewer()));
     }
 
     /**
@@ -173,14 +175,12 @@ public final class CommunicationAdminMenu {
     /** Capture a broadcast line in chat through the shared text-input seam, then reopen the panel. */
     private void promptBroadcast(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(BROADCAST_INPUT_KEY, CommunicationMessageKey.GUI_BROADCAST_PROMPT),
+                InputRequest.of(BROADCAST_INPUT_KEY, CommunicationMessageKey.GUI_BROADCAST_PROMPT.key()),
                 this::submitBroadcast,
-                () -> open(viewer));
+                () -> open(ctx.viewer()));
     }
 
     /**

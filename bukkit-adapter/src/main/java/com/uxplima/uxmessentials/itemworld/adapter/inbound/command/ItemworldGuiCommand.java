@@ -14,7 +14,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -64,7 +63,7 @@ public final class ItemworldGuiCommand implements CommandRegistration {
             sink.deliver(console, messages.resolve(console, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of()));
             return 0;
         }
-        view.open(BukkitRefs.toRef(player));
+        view.open(player);
         return Command.SINGLE_SUCCESS;
     }
 }

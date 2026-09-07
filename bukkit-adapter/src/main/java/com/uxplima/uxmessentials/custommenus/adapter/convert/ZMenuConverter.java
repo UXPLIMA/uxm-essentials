@@ -25,7 +25,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
  * {@code items.<id>} with its inline {@code item} block (material / name / lore / amount), its {@code slot} /
  * {@code slots}, its default {@code actions} list, and its {@code click-requirement} gates, and emits the
  * {@code title} / {@code rows} / {@code items { … }} shape
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader} loads.
+ * {@link com.uxplima.uxmlib.menu.spec.MenuSpecLoader} loads.
  *
  * <p>zMenu actions and requirements are <em>typed maps</em> (each a {@code - type: <t>} entry with type-specific
  * fields), not the bracketed {@code [tag] arg} strings DeluxeMenus uses. Each action type maps onto one or more of

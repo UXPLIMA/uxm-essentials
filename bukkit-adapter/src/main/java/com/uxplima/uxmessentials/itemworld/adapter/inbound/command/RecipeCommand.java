@@ -122,10 +122,10 @@ public final class RecipeCommand extends ItemworldCommandSupport implements Comm
     private void openGrid(RecipeGridMenu view, Player player, Material material) {
         Optional<Recipe> crafting = firstCraftingRecipe(material);
         if (crafting.isEmpty()) {
-            view.openEmpty(ref(player));
+            view.openEmpty(player);
             return;
         }
-        view.open(ref(player), gridCells(crafting.get()), material);
+        view.open(player, gridCells(crafting.get()), material);
     }
 
     private Optional<Material> namedItem(CommandContext<CommandSourceStack> ctx, String raw) {

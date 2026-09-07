@@ -11,10 +11,6 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -22,7 +18,11 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.SelectorButton;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -95,7 +95,7 @@ public final class DurationPickerView {
         Objects.requireNonNull(viewerRef, "viewerRef");
         Objects.requireNonNull(request, "request");
         menus.openSelector(
-                viewerRef, guiText.text(viewerRef, request.title()), ROWS, FILLER, buttons(viewer, viewerRef, request));
+                viewer, guiText.text(viewerRef, request.title()), ROWS, FILLER, buttons(viewer, viewerRef, request));
     }
 
     /** Build one selector button per preset, the custom-span anvil button, and (when supplied) the back button. */
@@ -119,8 +119,7 @@ public final class DurationPickerView {
     private void promptCustom(Player viewer, PlayerRef viewerRef, Request request) {
         textInput.prompt(
                 viewer,
-                viewerRef,
-                InputRequest.of(INPUT_KEY, GuiMessageKey.DURATION_PICKER_CUSTOM_PROMPT),
+                InputRequest.of(INPUT_KEY, GuiMessageKey.DURATION_PICKER_CUSTOM_PROMPT.key()),
                 text -> resolveTyped(viewer, viewerRef, request, text),
                 () -> open(viewer, viewerRef, request));
     }

@@ -14,13 +14,14 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -67,17 +68,16 @@ public final class PunishmentDetailView {
         this.editor = EntityEditorView.<ActivePunishment>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title((viewer, p) -> guiText.text(
-                        viewer, ModerationMessageKey.MOD_GUI_DETAIL_TITLE, Map.of("player", p.targetName())))
-                .valueLore(ModerationMessageKey.MOD_GUI_DETAIL_VALUE_LORE)
-                .backName(ModerationMessageKey.MOD_GUI_DETAIL_BACK)
+                        viewer, ModerationMessageKey.MOD_GUI_DETAIL_TITLE.key(), Map.of("player", p.targetName())))
+                .valueLore(ModerationMessageKey.MOD_GUI_DETAIL_VALUE_LORE.key())
+                .backName(ModerationMessageKey.MOD_GUI_DETAIL_BACK.key())
                 .properties(punishment -> properties(punishment, onHistory))
-                .onBack(onBack)
+                .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .onDelete(
-                        ModerationMessageKey.MOD_GUI_DETAIL_REVOKE,
-                        ModerationMessageKey.MOD_GUI_DETAIL_REVOKE_CONFIRM,
+                        ModerationMessageKey.MOD_GUI_DETAIL_REVOKE.key(),
+                        ModerationMessageKey.MOD_GUI_DETAIL_REVOKE_CONFIRM.key(),
                         this::revoke)
                 .build();
     }
@@ -87,7 +87,7 @@ public final class PunishmentDetailView {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(punishment, "punishment");
-        editor.open(player, viewer, punishment);
+        editor.open(player, punishment);
     }
 
     /** The slot↔property seam the framework exposes, so tests can assert the grid without firing a click. */

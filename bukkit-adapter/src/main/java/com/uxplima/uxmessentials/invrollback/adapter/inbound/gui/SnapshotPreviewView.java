@@ -12,11 +12,11 @@ import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotC
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec.Summary;
 import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**

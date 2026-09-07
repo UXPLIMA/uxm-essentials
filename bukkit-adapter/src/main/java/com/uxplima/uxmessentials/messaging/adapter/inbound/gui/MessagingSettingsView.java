@@ -11,17 +11,18 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EditorSpec;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -85,7 +86,7 @@ public final class MessagingSettingsView {
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        menus.openEditor(viewer, spec, viewer);
+        menus.openEditor(player, spec, viewer);
     }
 
     /**
@@ -105,21 +106,22 @@ public final class MessagingSettingsView {
     private EditorSpec buildSpec() {
         return EditorSpec.builder()
                 .layout(layout)
-                .title((viewer, subject) -> guiText.text(viewer, MessagingMessageKey.GUI_SETTINGS_TITLE))
-                .valueLore(MessagingMessageKey.GUI_SETTINGS_VALUE_LORE)
-                .backName(MessagingMessageKey.GUI_SETTINGS_BACK)
+                .title((viewer, subject) ->
+                        guiText.text(BukkitRefs.toRef(viewer), MessagingMessageKey.GUI_SETTINGS_TITLE))
+                .valueLore(MessagingMessageKey.GUI_SETTINGS_VALUE_LORE.key())
+                .backName(MessagingMessageKey.GUI_SETTINGS_BACK.key())
                 .properties(subject -> settings((PlayerRef) Objects.requireNonNull(subject, "subject")))
-                .onBack((player, viewer) -> player.closeInventory())
+                .onBack(Player::closeInventory)
                 .build();
     }
 
     private List<EditableProperty> settings(PlayerRef viewer) {
         List<EditableProperty> properties = new ArrayList<>(2);
         properties.add(ToggleProperty.ofBoolean(
-                MessagingMessageKey.GUI_SETTINGS_ACCEPT,
+                MessagingMessageKey.GUI_SETTINGS_ACCEPT.key(),
                 Material.WRITABLE_BOOK,
                 () -> toggles.acceptsMessages(viewer),
-                (who, on) -> onOff(who, on),
+                (who, on) -> onOff(BukkitRefs.toRef(who), on),
                 on -> {
                     // The store flip toggles the current value; only flip when the target differs from now, so a
                     // re-click that lands on the same state is a no-op rather than a double-toggle.
@@ -131,10 +133,10 @@ public final class MessagingSettingsView {
         // Social spy is a staff capability; only staff who can already run /socialspy get the toggle.
         if (permissions.has(viewer, SOCIALSPY_PERMISSION)) {
             properties.add(ToggleProperty.ofBoolean(
-                    MessagingMessageKey.GUI_SETTINGS_SOCIALSPY,
+                    MessagingMessageKey.GUI_SETTINGS_SOCIALSPY.key(),
                     Material.ENDER_EYE,
                     () -> socialSpy.isSpying(viewer),
-                    (who, on) -> onOff(who, on),
+                    (who, on) -> onOff(BukkitRefs.toRef(who), on),
                     on -> {
                         if (socialSpy.isSpying(viewer) != on) {
                             socialSpy.toggle(viewer);

@@ -19,16 +19,16 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentClick;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentProvider;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ContentRegionSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.providers.ContentClick;
+import com.uxplima.uxmlib.menu.providers.ContentProvider;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ContentRegionSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,6 @@ class MenuContentRegionTest {
     private Plugin plugin;
     private PlayerMock player;
     private TestMenuEngine engine;
-    private PlayerRef viewer;
 
     @BeforeEach
     void setUp() {
@@ -62,7 +61,6 @@ class MenuContentRegionTest {
         player = server.addPlayer("Alice");
         engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
         engine.installListener(plugin);
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
     }
 
     @AfterEach
@@ -204,7 +202,7 @@ class MenuContentRegionTest {
         open();
         provider.painted.set(0, new ItemStack(Material.EMERALD));
 
-        engine.menus().redraw(viewer, SPEC_ID);
+        engine.menus().redraw(player, SPEC_ID);
 
         assertThat(player.getOpenInventory().getTopInventory().getItem(10).getType())
                 .isEqualTo(Material.EMERALD);
@@ -221,7 +219,7 @@ class MenuContentRegionTest {
         top.setItem(11, new ItemStack(Material.EMERALD));
         top.setItem(10, null);
 
-        engine.menus().redraw(viewer, SPEC_ID);
+        engine.menus().redraw(player, SPEC_ID);
 
         // Neither move is undone: a repaint here would mint back the taken stack and wipe the placed one.
         assertThat(top.getItem(10)).isNull();
@@ -236,7 +234,7 @@ class MenuContentRegionTest {
         player.closeInventory();
         int renderedWhileOpen = provider.renders;
 
-        engine.menus().redraw(viewer, SPEC_ID);
+        engine.menus().redraw(player, SPEC_ID);
 
         // Nothing was drawn: there is no window of this menu left to draw into.
         assertThat(provider.renders).isEqualTo(renderedWhileOpen);
@@ -278,7 +276,7 @@ class MenuContentRegionTest {
     }
 
     private void open() {
-        engine.menus().open(viewer, SPEC_ID, null);
+        engine.menus().open(player, SPEC_ID, null);
     }
 
     /** Dispatch a click on {@code rawSlot} with {@code cursor} held, and hand the event back for its cancel state. */

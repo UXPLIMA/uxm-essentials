@@ -26,8 +26,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -42,6 +41,8 @@ import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,7 +109,7 @@ class WarpEditorGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
@@ -298,10 +299,10 @@ class WarpEditorGoldenTest {
     }
 
     /** The action context the package-private duration seam needs: the editor's current subject for this warp. */
-    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext actionContextSubject() {
-        var ctx = com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext.of(viewer, null, 0);
-        return new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext(
-                ctx, player, com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind.LEFT, Map.of());
+    private com.uxplima.uxmlib.menu.runtime.MenuActionContext actionContextSubject() {
+        var ctx = com.uxplima.uxmlib.menu.runtime.MenuContext.of(player, null, 0);
+        return new com.uxplima.uxmlib.menu.runtime.MenuActionContext(
+                ctx, player, com.uxplima.uxmlib.menu.spec.ClickKind.LEFT, Map.of());
     }
 
     private WarpEditTarget targetOf(String name, @Nullable PlayerRef owner) {

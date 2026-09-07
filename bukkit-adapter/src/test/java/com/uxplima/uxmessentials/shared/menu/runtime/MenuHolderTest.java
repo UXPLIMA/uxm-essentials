@@ -8,17 +8,18 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.render.RenderedSlot;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
+import com.uxplima.uxmlib.scheduler.TaskHandle;
 import org.junit.jupiter.api.Test;
 
 class MenuHolderTest {
@@ -27,7 +28,17 @@ class MenuHolderTest {
     void cancelRefreshCancelsOnceThenIsNoOp() {
         AtomicInteger cancels = new AtomicInteger();
         MenuHolder h = newHolder();
-        h.setRefreshHandle(cancels::incrementAndGet);
+        h.setRefreshHandle(new TaskHandle() {
+            @Override
+            public void cancel() {
+                cancels.incrementAndGet();
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return cancels.get() > 0;
+            }
+        });
         h.cancelRefresh();
         h.cancelRefresh();
         assertThat(cancels.get()).isEqualTo(1);
@@ -44,7 +55,7 @@ class MenuHolderTest {
 
     private static MenuHolder newHolder() {
         MenuSpec spec = new MenuSpecLoader().parse("rows = 1\nitems {}");
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
         return new MenuHolder("t", spec, ctx);
     }
 

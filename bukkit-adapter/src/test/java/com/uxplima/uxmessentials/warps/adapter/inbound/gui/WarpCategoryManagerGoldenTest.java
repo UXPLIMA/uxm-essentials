@@ -20,8 +20,7 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -33,6 +32,8 @@ import com.uxplima.uxmessentials.shared.menu.TileText;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +51,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * asserted equal, slot for slot, to the analytic baseline the old view produced. Category icons, the two fixed
  * buttons, and the engine's mandatory nav arrows at 45/46.
  *
- * <p>Then, through the engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener},
+ * <p>Then, through the engine's own {@link com.uxplima.uxmlib.menu.runtime.MenuListener},
  * a left click on the first category opens that category's still-bespoke 27-slot settings panel, the back button
  * invokes the manager's back seam, and the create seam saves a new category and opens its settings, proving the
  * migrated path runs what the old click did, in both appearance and behaviour.
@@ -85,7 +86,7 @@ class WarpCategoryManagerGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);

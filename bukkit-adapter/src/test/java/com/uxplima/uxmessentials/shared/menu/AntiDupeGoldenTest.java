@@ -15,16 +15,17 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuItemMark;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAntiDupeListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.render.MenuItemMark;
+import com.uxplima.uxmlib.menu.runtime.MenuAntiDupeListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,7 @@ class AntiDupeGoldenTest {
         TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
         menus = engine.menus();
         menus.registerSpec("marked-menu", new MenuSpecLoader().parse(MENU_HOCON));
-        server.getPluginManager().registerEvents(new MenuAntiDupeListener(log), plugin);
+        server.getPluginManager().registerEvents(new MenuAntiDupeListener(EngineLog.of(log)), plugin);
     }
 
     @AfterEach
@@ -72,7 +73,7 @@ class AntiDupeGoldenTest {
 
     @Test
     void everyRenderedTileCarriesTheMark() {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "marked-menu", null);
+        menus.open(player, "marked-menu", null);
 
         ItemStack tile = player.getOpenInventory().getTopInventory().getItem(0);
         assertThat(MenuItemMark.isMarked(tile))

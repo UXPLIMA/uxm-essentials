@@ -12,18 +12,19 @@ import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -92,14 +93,14 @@ public final class NpcListMenu {
                 "npc_z", ctx -> Long.toString(Math.round(npcOf(ctx).location().z())));
         bindings.action("npc:edit", this::edit);
         bindings.action("npc:create", this::create);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the NPC list for {@code viewer} (the live player resolved by the engine). */
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        menus.open(viewer, SPEC_ID, null);
+        menus.open(player, SPEC_ID, null);
     }
 
     /** The bound list element for the slot being rendered or clicked. */
@@ -109,7 +110,7 @@ public final class NpcListMenu {
 
     /** Left-click an NPC icon: open that NPC's bespoke property editor on the viewer's entity thread. */
     private void edit(MenuActionContext ctx) {
-        editor.open(ctx.player(), ctx.viewer(), ctx.entry(Npc.class));
+        editor.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), ctx.entry(Npc.class));
     }
 
     /**
@@ -118,11 +119,10 @@ public final class NpcListMenu {
      */
     private void create(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("npc.create-name", NpcMessageKey.NPC_GUI_LIST_CREATE_PROMPT),
+                InputRequest.of("npc.create-name", NpcMessageKey.NPC_GUI_LIST_CREATE_PROMPT.key()),
                 text -> handleCreate(player, viewer, text),
                 () -> open(player, viewer));
     }

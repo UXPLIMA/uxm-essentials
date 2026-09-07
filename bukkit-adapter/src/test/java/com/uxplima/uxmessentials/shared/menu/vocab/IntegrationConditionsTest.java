@@ -17,16 +17,14 @@ import java.util.function.Consumer;
 
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.IntegrationConditions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.FakeCurrencyBackend;
@@ -37,6 +35,11 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -184,7 +187,7 @@ class IntegrationConditionsTest {
         // A fresh, never-stamped label is ready (not on cooldown), so the gate passes.
         assertThat(test("cooldown", "daily")).isTrue();
 
-        cooldowns.stampLabel(online(), "daily");
+        cooldowns.stampLabel(BukkitRefs.toRef(online()), "daily");
 
         // Now the label is on cooldown, so the gate fails: the ready/expired semantics the condition documents.
         assertThat(test("cooldown", "daily")).isFalse();
@@ -291,14 +294,14 @@ class IntegrationConditionsTest {
     }
 
     private boolean testOffline(String id, String arg) {
-        return fire(bindings, id, arg, new PlayerRef(UUID.randomUUID(), "Ghost"));
+        return fire(bindings, id, arg, TestViewer.of(UUID.randomUUID(), "Ghost"));
     }
 
-    private PlayerRef online() {
-        return new PlayerRef(viewer.getUniqueId(), viewer.getName());
+    private Player online() {
+        return viewer;
     }
 
-    private static boolean fire(MenuBindings bindings, String id, String arg, PlayerRef ref) {
+    private static boolean fire(MenuBindings bindings, String id, String arg, Player ref) {
         BiPredicate<MenuContext, Map<String, String>> condition =
                 bindings.condition(id).orElseThrow(() -> new AssertionError("condition not registered: " + id));
         return condition.test(MenuContext.of(ref, null, 0), Map.of("value", arg));

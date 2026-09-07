@@ -172,22 +172,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenuCleanupListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuAntiDupeListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuTextPrompt;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.DataActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
@@ -211,7 +197,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringCon
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.IpHashing;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
@@ -229,7 +215,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
@@ -264,6 +249,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
@@ -329,6 +315,21 @@ import com.uxplima.uxmlib.advancement.Toasts;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputInstaller;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.HeadQuery;
+import com.uxplima.uxmlib.menu.providers.IconProviderRegistry;
+import com.uxplima.uxmlib.menu.providers.IconProviders;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.LastMenu;
+import com.uxplima.uxmlib.menu.runtime.LastMenuCleanupListener;
+import com.uxplima.uxmlib.menu.runtime.MenuAntiDupeListener;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.runtime.MenuTextPrompt;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -352,6 +353,11 @@ public final class PluginModule {
     private static final int DEFAULT_NAME_INDEX_SIZE = 50_000;
 
     private PluginModule() {}
+
+    /** The theme the engine draws in, recorded during wiring; a module wired before it is a composition-root defect. */
+    private static EngineTheme engineTheme(CloseableResources resources) {
+        return Objects.requireNonNull(resources.engineTheme(), "engineTheme");
+    }
 
     /**
      * Seed the name index from the server's own user cache the first time it runs, so players who joined before
@@ -437,8 +443,17 @@ public final class PluginModule {
         // step rather than part of the config step: the theme is its own file, and an operator who changes one
         // colour should see the reason for a failure named as the theme rather than as the config.
         Path themeFolder = plugin.getDataFolder().toPath();
+        // The same file read a second time, as the type uxmLib's renderers ask for. Held rather than re-read per
+        // render, and refreshed by the same reload step, so a colour change reaches both readers in one hop.
+        EngineTheme engineTheme = new EngineTheme(themeFolder);
+        resources.engineTheme(engineTheme);
         resources.addReloadTask(ReloadTask.kernel(
-                "theme", () -> StyleTags.use(ThemeFile.read(themeFolder)), "colours re-read from disk"));
+                "theme",
+                () -> {
+                    StyleTags.use(ThemeFile.read(themeFolder));
+                    engineTheme.reload();
+                },
+                "colours re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
         resources.localeBinding(new LocaleBinding(
                 wiredKernel.localeStore(), wiredKernel.serverDefault(), kernel.messages(), kernel.log()));
@@ -503,8 +518,9 @@ public final class PluginModule {
         IconProviderRegistry runtimeIcons = new IconProviderRegistry();
         ItemRenderer menuItemRenderer = new ItemRenderer(
                 guiText,
+                engineTheme,
                 menuBindings.placeholders(),
-                IconProviders.full(plugin.getServer(), kernel.log(), hooks.capability(HeadQuery.class))
+                IconProviders.full(plugin.getServer(), EngineLog.of(kernel.log()), hooks.capability(HeadQuery.class))
                         .withRuntime(runtimeIcons));
         MenuRenderer menuRenderer =
                 new MenuRenderer(menuItemRenderer, menuBindings.conditions(), menuBindings.contents());
@@ -558,7 +574,7 @@ public final class PluginModule {
         // is built first so the listener can borrow its selector and confirm openers. What a property's click hook
         // uses to open a picker or a remove-confirm as an engine child window, and thread them into the editor click
         // context.
-        EditorRenderer menuEditorRenderer = new EditorRenderer(guiText);
+        EditorRenderer menuEditorRenderer = new EditorRenderer(guiText, engineTheme);
         // The action and condition registries are handed to the façade too, so an open runs a spec's open-actions and
         // gates on its open-requirement. The same registries the click listener resolves against, so an open-action
         // and a click action reach the identical handler. A menu's open-command opening it (see MenuOpenCommand)
@@ -583,7 +599,7 @@ public final class PluginModule {
         kernel.log().info("event=bedrock_screen backend={}", bedrockScreen == BedrockScreen.NONE ? "none" : "cumulus");
         Menus menus = new Menus(
                 menuRenderer,
-                kernel.scheduler(),
+                new PaperScheduler(plugin),
                 menuBindings.lists(),
                 menuEditorRenderer,
                 menuBindings.actions(),
@@ -596,7 +612,7 @@ public final class PluginModule {
         // Defence-in-depth over the engine's cancel-all-clicks invariant: strip a marked menu display item that ever
         // escapes into a player's real inventory (close-sweep + join-sweep). A separate listener from the menu router,
         // like the last-menu cleanup above.
-        resources.addListener(new MenuAntiDupeListener(kernel.log()));
+        resources.addListener(new MenuAntiDupeListener(EngineLog.of(kernel.log())));
         // The server-wide click-cooldown floor (milliseconds), read from modules/custommenus/config.conf. Zero (the
         // default, opt-in) means no throttling, so menus open byte-identically until an operator sets a floor; a menu
         // may raise it further with its own click-cooldown key. The system clock is threaded in explicitly so the
@@ -614,13 +630,13 @@ public final class PluginModule {
                 onCancel.run();
                 return;
             }
-            seam.promptResolved(player, BukkitRefs.toRef(player), key, prompt, initialText, onSubmit, onCancel);
+            seam.promptResolved(player, key, prompt, initialText, onSubmit, onCancel);
         };
         MenuListener menuListener = new MenuListener(
                 menuRenderer,
                 menuBindings.actions(),
                 menuBindings.conditions(),
-                kernel.scheduler(),
+                new PaperScheduler(plugin),
                 plugin,
                 menuEditorRenderer,
                 menus.selectorOpener(),
@@ -815,8 +831,7 @@ public final class PluginModule {
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
         EntityListLayout hubLayout =
                 guiLayouts.loadEntityList("management", "hub", EntityListLayout.paginatedDefault(Material.NETHER_STAR));
-        ManagementHubView hub =
-                new ManagementHubView(menus, guiText, kernel.scheduler(), kernel.permissions(), guiRegistry, hubLayout);
+        ManagementHubView hub = new ManagementHubView(menus, guiText, kernel.permissions(), guiRegistry, hubLayout);
         GuiSubcommand guiNode = new GuiSubcommand(guiRegistry, hub, kernel.permissions(), kernel.messages());
         UxmessCommand uxmessCommand = new UxmessCommand(
                 registry,
@@ -1056,8 +1071,8 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 anvil,
                 new GuiText(kernel.messages()),
-                kernel.scheduler(),
-                kernel.log(),
+                new PaperScheduler(plugin),
+                EngineLog.of(kernel.log()),
                 resolvedBedrock == null ? BedrockDetector.NONE : resolvedBedrock,
                 resolvedScreen == null ? BedrockScreen.NONE : resolvedScreen);
         resources.onClose(input.uninstall());
@@ -1770,6 +1785,7 @@ public final class PluginModule {
                 ctx.kernel().scheduler(),
                 ctx.kernel().messages(),
                 new GuiText(ctx.kernel().messages()),
+                engineTheme(resources),
                 guiLayouts,
                 textInput,
                 guiRegistry);
@@ -1997,7 +2013,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.homes.application.HomesMessageKey.HOME_MENU_TITLE,
                 Material.RED_BED,
                 "uxmessentials.home.use",
-                (player, viewer) -> wired.listView().open(viewer)));
+                (player, viewer) -> wired.listView().open(player)));
     }
 
     private static void bindHomeRespawn(ContextLinks links, HomeRespawnLocator locator) {
@@ -2433,7 +2449,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey.GUI_HUB_TITLE,
                 Material.CRAFTING_TABLE,
                 "uxmessentials.itemworld.gui",
-                (player, viewer) -> wired.hubView().open(viewer)));
+                (player, viewer) -> wired.hubView().open(player)));
         // The one readable corner of an otherwise stateless module: the command bindings a player stamped onto
         // their own items, read from the same item PDC /powertoollist reads.
         links.queries.register(
@@ -2497,7 +2513,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_SELECTOR_TITLE,
                 Material.ENDER_CHEST,
                 "uxmessentials.vault.use",
-                (player, viewer) -> wired.selector().open(viewer)));
+                (player, viewer) -> wired.selector().open(player)));
     }
 
     private static void bindMute(
@@ -2630,7 +2646,15 @@ public final class PluginModule {
         com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore announcerSettingsStore =
                 AnnouncementStores.settings(persistence);
         CommunicationWiring.Wired wired = CommunicationWiring.wire(
-                plugin, ctx, announcementStore, announcerSettingsStore, guiLayouts, textInput, menus, menuBindings);
+                plugin,
+                ctx,
+                announcementStore,
+                announcerSettingsStore,
+                engineTheme(resources),
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -2649,7 +2673,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.communication.application.CommunicationMessageKey.GUI_PANEL_TITLE,
                 Material.WRITABLE_BOOK,
                 "uxmessentials.communication.gui",
-                (player, viewer) -> wired.adminMenu().open(viewer)));
+                (player, viewer) -> wired.adminMenu().open(player)));
     }
 
     private static void wireHolograms(
@@ -2689,6 +2713,7 @@ public final class PluginModule {
                 leaderboards,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
+                engineTheme(resources),
                 guiLayouts,
                 textInput,
                 menus,
@@ -2704,7 +2729,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.holograms.application.HologramsMessageKey.HOLOGRAM_GUI_LIST_TITLE,
                 org.bukkit.Material.ARMOR_STAND,
                 "uxmessentials.holograms.gui",
-                (player, viewer) -> wired.listMenu().open(viewer)));
+                (player, viewer) -> wired.listMenu().open(player)));
         links.queries.register(
                 com.uxplima.uxmessentials.api.query.UxmHologramsQuery.class,
                 new com.uxplima.uxmessentials.holograms.adapter.outbound.api.HologramQueries(
@@ -2942,6 +2967,7 @@ public final class PluginModule {
                 bus,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
+                engineTheme(resources),
                 guiLayouts,
                 textInput,
                 guiRegistry,

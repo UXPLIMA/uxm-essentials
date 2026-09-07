@@ -9,22 +9,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -96,13 +100,13 @@ public final class ModerationActiveMenu {
         bindings.placeholder("mod_active_reason", ctx -> row(ctx).reason());
         bindings.placeholder("mod_active_remaining", ctx -> row(ctx).remaining());
         bindings.action("moderation:open-detail", this::openDetail);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Resolve the active punishments (and each name, kind label and remaining string) off-thread, then open. */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
-        scheduler.async(() -> menus.open(viewer, SPEC_ID, snapshot(viewer)));
+        scheduler.async(() -> menus.open(viewer, SPEC_ID, snapshot(BukkitRefs.toRef(viewer))));
     }
 
     /** Read the active bans/mutes/jails and resolve every display string on the off-tick thread in the viewer's locale. */
@@ -134,7 +138,10 @@ public final class ModerationActiveMenu {
 
     /** Left-click a row: open the clicked entry's bespoke detail/revoke screen on the viewer's entity thread. */
     private void openDetail(MenuActionContext ctx) {
-        detail.open(ctx.player(), ctx.viewer(), ctx.entry(ActiveRow.class).punishment());
+        detail.open(
+                ctx.player(),
+                BukkitRefs.toRef(ctx.viewer()),
+                ctx.entry(ActiveRow.class).punishment());
     }
 
     private ActiveView subject(MenuContext ctx) {

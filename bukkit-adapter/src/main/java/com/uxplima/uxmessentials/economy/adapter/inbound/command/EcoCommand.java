@@ -332,7 +332,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        services.historyView().open(ref(sender), sender.getUniqueId(), sender.getName());
+        services.historyView().open(sender, sender.getUniqueId(), sender.getName());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -347,8 +347,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             rejectUnknownTarget(ref(sender), targetName);
             return Command.SINGLE_SUCCESS;
         }
-        services.historyView()
-                .open(ref(sender), target.get().uuid(), target.get().name());
+        services.historyView().open(sender, target.get().uuid(), target.get().name());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -357,7 +356,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        services.historyView().open(ref(sender), null, "Global");
+        services.historyView().open(sender, null, "Global");
         return Command.SINGLE_SUCCESS;
     }
 

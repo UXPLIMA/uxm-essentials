@@ -23,6 +23,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -180,7 +181,7 @@ class WorldAccessListenerTest {
 
         joinListener(teleportService, true).onJoin(joinEvent(frank));
 
-        PlayerRef who = new PlayerRef(frank.getUniqueId(), frank.getName());
+        PlayerRef who = BukkitRefs.toRef(frank);
         verify(teleportService, times(1)).forced(who, who, WorldName.of("open"));
     }
 

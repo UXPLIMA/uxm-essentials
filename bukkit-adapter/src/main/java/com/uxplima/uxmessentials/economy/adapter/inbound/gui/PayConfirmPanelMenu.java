@@ -7,14 +7,16 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -56,7 +58,7 @@ public final class PayConfirmPanelMenu {
         bindings.placeholder("payconfirm_amount", ctx -> amountText(subject(ctx).amount()));
         bindings.action("economy:pay-confirm", this::confirm);
         bindings.action("economy:pay-cancel", ctx -> ctx.player().closeInventory());
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 1, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 1, EngineLog.of(log)));
     }
 
     /** Open the confirmation strip for {@code viewer}, staging {@code amount} to {@code target}. */
@@ -64,13 +66,12 @@ public final class PayConfirmPanelMenu {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(amount, "amount");
-        PlayerRef viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-        menus.open(viewerRef, SPEC_ID, new PendingPayment(target, amount));
+        menus.open(viewer, SPEC_ID, new PendingPayment(target, amount));
     }
 
     /** Run the payer's staged transfer off the tick thread, then close the window, exactly as the old confirm did. */
     private void confirm(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Player player = ctx.player();
         scheduler.async(() -> {
             pay.confirm(viewer);

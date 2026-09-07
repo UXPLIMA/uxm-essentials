@@ -19,17 +19,18 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -100,8 +101,8 @@ public final class EconomyBulkMenu {
         bindings.action("economy:bulk-giveall", this::promptGiveAll);
         bindings.action("economy:bulk-resetall", this::confirmResetAll);
         bindings.action("economy:bulk-select-currency", this::openCurrencyPicker);
-        bindings.action("economy:bulk-back", ctx -> onBack.accept(ctx.player(), ctx.viewer()));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        bindings.action("economy:bulk-back", ctx -> onBack.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open the server-wide screen for {@code viewer}, with the default currency active. */
@@ -114,18 +115,17 @@ public final class EconomyBulkMenu {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(viewerRef, "viewerRef");
         Objects.requireNonNull(active, "active");
-        menus.open(viewerRef, SPEC_ID, new BulkSubject(active));
+        menus.open(viewer, SPEC_ID, new BulkSubject(active));
     }
 
     /** Capture an amount through the input seam, then credit every online wallet, exactly as before. */
     private void promptGiveAll(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         Currency active = ctx.subject(BulkSubject.class).active();
         textInput.prompt(
                 viewer,
-                viewerRef,
-                InputRequest.of("eco.bulk-amount", EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT),
+                InputRequest.of("eco.bulk-amount", EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT.key()),
                 text -> applyGiveAll(viewer, viewerRef, active, text),
                 () -> open(viewer, viewerRef, active));
     }
@@ -153,11 +153,11 @@ public final class EconomyBulkMenu {
     /** Confirm-gate the reset-all through the engine confirm dialog; yes zeroes every online balance and re-opens. */
     private void confirmResetAll(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         Currency active = ctx.subject(BulkSubject.class).active();
         Component title = guiText.text(viewerRef, EconomyMessageKey.ECO_ADMIN_GUI_RESETALL_CONFIRM_TITLE);
         menus.confirm(
-                viewerRef, title, () -> resetAll(viewer, viewerRef, active), () -> open(viewer, viewerRef, active));
+                ctx.viewer(), title, () -> resetAll(viewer, viewerRef, active), () -> open(viewer, viewerRef, active));
     }
 
     /** Snapshot the online roster on the global thread and reset it off the tick thread, then re-open. */
@@ -172,7 +172,7 @@ public final class EconomyBulkMenu {
     /** Open the shared picker; choosing a currency re-opens this screen with it active (subject carries the new active). */
     private void openCurrencyPicker(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         Currency active = ctx.subject(BulkSubject.class).active();
         List<Currency> all = List.copyOf(currencies.all());
         currencyPicker.open(viewer, viewerRef, all, active, chosen -> open(viewer, viewerRef, chosen));

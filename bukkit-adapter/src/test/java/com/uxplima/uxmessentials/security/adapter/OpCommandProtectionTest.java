@@ -34,11 +34,9 @@ import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
 import com.uxplima.uxmessentials.security.domain.TotpCode;
 import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -46,6 +44,10 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,8 +98,9 @@ class OpCommandProtectionTest {
         // the proof through the controller directly), so the engine is wired and the shipped spec registered.
         MenuBindings bindings = new MenuBindings();
         MenuRenderer renderer = new MenuRenderer(
-                new ItemRenderer(new GuiText(messages), bindings.placeholders()), bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+                new ItemRenderer(new GuiText(messages), ThemeFile::shippedTheme, bindings.placeholders()),
+                bindings.conditions());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         VerificationFeedback feedback = new VerificationFeedback(
                 new SecurityConfig.Feedback(false, "", "", "", ""), scheduler, messages, new NoopLogger());
         PinKeypadView keypad = new PinKeypadView(menus, messages, feedback, scheduler);

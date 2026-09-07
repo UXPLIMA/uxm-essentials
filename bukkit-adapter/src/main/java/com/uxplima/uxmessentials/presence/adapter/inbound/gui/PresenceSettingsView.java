@@ -12,16 +12,17 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -63,7 +64,6 @@ public final class PresenceSettingsView {
                 guiLayouts.loadEntityEditor(MODULE, LAYOUT, EntityEditorLayout.codeDefault(List.of(11, 15), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .menus(menus)
                 .layout(layout)
                 .title(PresenceMessageKey.GUI_SETTINGS_TITLE)
@@ -88,10 +88,10 @@ public final class PresenceSettingsView {
             PlayerRef viewer) {
         return List.of(
                 ToggleProperty.ofBoolean(
-                        PresenceMessageKey.GUI_SETTINGS_AFK,
+                        PresenceMessageKey.GUI_SETTINGS_AFK.key(),
                         Material.CLOCK,
                         () -> store.current(viewer).afk(),
-                        (who, on) -> onOff(messages, who, on),
+                        (who, on) -> onOff(messages, BukkitRefs.toRef(who), on),
                         on -> {
                             if (store.current(viewer).afk() != on) {
                                 services.markAfk().toggle(viewer, Optional.empty());
@@ -99,10 +99,10 @@ public final class PresenceSettingsView {
                         },
                         scheduler),
                 ToggleProperty.ofBoolean(
-                        PresenceMessageKey.GUI_SETTINGS_VANISH,
+                        PresenceMessageKey.GUI_SETTINGS_VANISH.key(),
                         Material.POTION,
                         () -> store.current(viewer).vanished(),
-                        (who, on) -> onOff(messages, who, on),
+                        (who, on) -> onOff(messages, BukkitRefs.toRef(who), on),
                         on -> {
                             if (store.current(viewer).vanished() != on) {
                                 vanishToggle.accept(viewer);

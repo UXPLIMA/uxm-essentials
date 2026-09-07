@@ -12,8 +12,8 @@ import java.util.Objects;
 
 import org.bukkit.Material;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyLayout;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.property.ListPropertyLayout;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -21,7 +21,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * The two sub-menu geometries the hologram editor needs beyond the standard
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout}: the {@link ListPropertyLayout}
+ * {@link com.uxplima.uxmlib.menu.EntityEditorLayout}: the {@link ListPropertyLayout}
  * for the line-list and blacklist sub-menus, and the enum-selector geometry (rows, option slots, option/filler
  * icons) for the billboard / alignment / visibility pickers. The framework's editor-layout loader only reads the
  * standard property-grid keys, so these extra keys are parsed here from the same

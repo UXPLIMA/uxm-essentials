@@ -2,8 +2,8 @@ package com.uxplima.uxmessentials.shared.menu.spec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListControlSyntax;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListControlSyntax.SortDirection;
+import com.uxplima.uxmlib.menu.spec.ListControlSyntax;
+import com.uxplima.uxmlib.menu.spec.ListControlSyntax.SortDirection;
 import org.junit.jupiter.api.Test;
 
 /**

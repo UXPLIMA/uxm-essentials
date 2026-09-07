@@ -19,8 +19,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
@@ -94,6 +92,9 @@ import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import com.uxplima.uxmessentials.teleport.domain.SearchBudget;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -203,7 +204,7 @@ public final class TeleportWiring {
         // opens the same panel for an admin (gated on uxmessentials.teleport.gui).
         GuiText guiText = new GuiText(kernel.messages());
         TeleportSettingsView settingsView = new TeleportSettingsView(
-                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services.flags(), menus);
+                guiText, new PaperScheduler(plugin), guiLayouts, kernel.messages(), services.flags(), menus);
         guiRegistry.register(new ManagementGuiEntry(
                 "teleport",
                 TeleportMessageKey.GUI_SETTINGS_TITLE,

@@ -52,7 +52,7 @@ public final class CommunicationGuiCommand extends CommunicationCommandSupport i
         if (sender == null) {
             return 0;
         }
-        menu.open(ref(sender));
+        menu.open(sender);
         return Command.SINGLE_SUCCESS;
     }
 }

@@ -4,11 +4,13 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,8 +35,8 @@ public final class LabelProperty implements EditableProperty {
     }
 
     @Override
-    public MessageKey label() {
-        return label;
+    public String label() {
+        return label.key();
     }
 
     @Override
@@ -43,13 +45,13 @@ public final class LabelProperty implements EditableProperty {
     }
 
     @Override
-    public String valueLore(PlayerRef viewer) {
+    public String valueLore(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
-        return value.apply(viewer);
+        return value.apply(BukkitRefs.toRef(viewer));
     }
 
     @Override
-    public void onClick(ClickContext context) {
+    public void onClick(PropertyClick context) {
         Objects.requireNonNull(context, "context");
         // A detail line is inspect-only; a click neither mutates nor navigates.
     }

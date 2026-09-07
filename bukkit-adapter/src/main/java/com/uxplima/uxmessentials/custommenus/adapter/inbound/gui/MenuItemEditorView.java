@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -20,34 +21,35 @@ import net.kyori.adventure.text.Component;
 import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.LoreMode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.ActionProperty;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.EnumProperty;
+import com.uxplima.uxmlib.menu.property.ListProperty;
+import com.uxplima.uxmlib.menu.property.ListPropertyLayout;
+import com.uxplima.uxmlib.menu.property.ListPropertyText;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.LoreMode;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
+import com.uxplima.uxmlib.scheduler.Scheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -116,6 +118,10 @@ public final class MenuItemEditorView {
             ItemType.NONE);
 
     private final GuiText guiText;
+
+    /** The colours the engine draws a list window in; asked per render so a theme reload is picked up. */
+    private final Supplier<Theme> theme;
+
     private final Scheduler scheduler;
     private final Messages messages;
     private final TextInput textInput;
@@ -134,6 +140,7 @@ public final class MenuItemEditorView {
     public MenuItemEditorView(
             Menus menus,
             GuiText guiText,
+            Supplier<Theme> theme,
             Scheduler scheduler,
             Messages messages,
             TextInput textInput,
@@ -143,6 +150,7 @@ public final class MenuItemEditorView {
             MenuRequirementsView requirements) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
+        this.theme = Objects.requireNonNull(theme, "theme");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
@@ -155,13 +163,12 @@ public final class MenuItemEditorView {
         this.view = EntityEditorView.<ItemTarget>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(this::title)
-                .valueLore(CustomMenusMessageKey.MENU_ITEM_EDITOR_VALUE_LORE)
-                .backName(CustomMenusMessageKey.MENU_ITEM_EDITOR_BACK)
+                .valueLore(CustomMenusMessageKey.MENU_ITEM_EDITOR_VALUE_LORE.key())
+                .backName(CustomMenusMessageKey.MENU_ITEM_EDITOR_BACK.key())
                 .properties(this::properties)
-                .onBack(onBackToGrid)
+                .onBack(player -> onBackToGrid.accept(player, BukkitRefs.toRef(player)))
                 .build();
     }
 
@@ -173,7 +180,7 @@ public final class MenuItemEditorView {
         Objects.requireNonNull(itemId, "itemId");
         ItemTarget target = new ItemTarget(session, itemId);
         openTargets.put(viewer.uuid(), target);
-        view.open(player, viewer, target);
+        view.open(player, target);
     }
 
     /**
@@ -186,7 +193,7 @@ public final class MenuItemEditorView {
         Objects.requireNonNull(viewer, "viewer");
         ItemTarget target = openTargets.get(viewer.uuid());
         if (target != null) {
-            view.open(player, viewer, target);
+            view.open(player, target);
         }
     }
 
@@ -195,11 +202,11 @@ public final class MenuItemEditorView {
         return view.propertyAt(slot, new ItemTarget(session, itemId));
     }
 
-    private Component title(PlayerRef viewer, ItemTarget target) {
+    private Component title(Player viewer, ItemTarget target) {
         int slot = current(target).slots().slots().stream().findFirst().orElse(0);
         return guiText.text(
                 viewer,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_TITLE,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_TITLE.key(),
                 Map.of("id", target.itemId(), "slot", Integer.toString(slot)));
     }
 
@@ -230,19 +237,19 @@ public final class MenuItemEditorView {
     private EditableProperty materialProperty(ItemTarget target) {
         return new TextProperty(
                 TEXT_INPUT_KEY,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_MATERIAL,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_MATERIAL_PROMPT,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_MATERIAL.key(),
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_MATERIAL_PROMPT.key(),
                 Material.STONE,
                 () -> current(target).material(),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.strip()),
                 value -> target.session().setMaterial(target.itemId(), value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty captureProperty(ItemTarget target) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_CAPTURE,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_CAPTURE.key(),
                 Material.CHEST,
                 hint(CustomMenusMessageKey.MENU_ITEM_EDITOR_CAPTURE_HINT),
                 (player, reopen) -> capture(player, target, reopen));
@@ -260,7 +267,7 @@ public final class MenuItemEditorView {
         String token = SerializedItems.encode(hand);
         scheduler.async(() -> {
             target.session().setMaterial(target.itemId(), token);
-            scheduler.onEntity(viewer, () -> {
+            scheduler.entity(player, () -> {
                 player.sendMessage(guiText.text(viewer, CustomMenusMessageKey.MENU_ITEM_EDITOR_CAPTURED));
                 reopen.run();
             });
@@ -272,48 +279,49 @@ public final class MenuItemEditorView {
     private EditableProperty nameProperty(ItemTarget target) {
         return new TextProperty(
                 TEXT_INPUT_KEY,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_NAME,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_NAME_PROMPT,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_NAME.key(),
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_NAME_PROMPT.key(),
                 Material.NAME_TAG,
                 () -> current(target).name(),
                 raw -> Optional.of(clearToken(raw) ? "" : raw),
                 value -> target.session().setName(target.itemId(), value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty loreProperty(ItemTarget target) {
         return new ListProperty(
                 LIST_INPUT_KEY,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE.key(),
                 Material.WRITABLE_BOOK,
                 guiText,
+                theme,
                 () -> current(target).lore(),
                 lore -> target.session().setLore(target.itemId(), lore),
                 new ListPropertyText(
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_TITLE,
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ENTRY_NAME,
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ENTRY_HINTS,
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ADD,
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ADD_PROMPT,
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_EDIT_PROMPT,
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_REMOVE_CONFIRM,
-                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_BACK),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_TITLE.key(),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ENTRY_NAME.key(),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ENTRY_HINTS.key(),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ADD.key(),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_ADD_PROMPT.key(),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_EDIT_PROMPT.key(),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_REMOVE_CONFIRM.key(),
+                        CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_BACK.key()),
                 loreLayout,
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty slotsProperty(ItemTarget target) {
         return new TextProperty(
                 TEXT_INPUT_KEY,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_SLOTS,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_SLOTS_PROMPT,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_SLOTS.key(),
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_SLOTS_PROMPT.key(),
                 Material.CRAFTING_TABLE,
                 () -> slotToken(current(target).slots()),
                 raw -> validateSlots(target, raw),
                 value -> target.session().setSlots(target.itemId(), parseSlots(target, value)),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -345,7 +353,7 @@ public final class MenuItemEditorView {
 
     private EditableProperty amountProperty(ItemTarget target) {
         return new NumberProperty(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_AMOUNT,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_AMOUNT.key(),
                 Material.PAPER,
                 () -> current(target).decor().amount(),
                 1,
@@ -358,7 +366,7 @@ public final class MenuItemEditorView {
 
     private EditableProperty priorityProperty(ItemTarget target) {
         return new NumberProperty(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_PRIORITY,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_PRIORITY.key(),
                 Material.COMPARATOR,
                 () -> current(target).priority(),
                 1,
@@ -371,7 +379,7 @@ public final class MenuItemEditorView {
 
     private EditableProperty modelDataProperty(ItemTarget target) {
         return new NumberProperty(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_MODEL_DATA,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_MODEL_DATA.key(),
                 Material.CLOCK,
                 () -> current(target)
                         .decor()
@@ -391,7 +399,7 @@ public final class MenuItemEditorView {
 
     private EditableProperty glowProperty(ItemTarget target) {
         return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_GLOW,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_GLOW.key(),
                 Material.GLOWSTONE_DUST,
                 () -> current(target).decor().glow(),
                 this::onOff,
@@ -407,7 +415,7 @@ public final class MenuItemEditorView {
      */
     private EditableProperty vanillaTooltipProperty(ItemTarget target) {
         return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_HIDE_VANILLA_TOOLTIP,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_HIDE_VANILLA_TOOLTIP.key(),
                 Material.PAPER,
                 () -> current(target)
                         .decor()
@@ -422,7 +430,7 @@ public final class MenuItemEditorView {
 
     private EditableProperty flagProperty(ItemTarget target, String token) {
         return ToggleProperty.ofBoolean(
-                Objects.requireNonNull(FLAG_LABELS.get(token), "flag label"),
+                Objects.requireNonNull(FLAG_LABELS.get(token), "flag label").key(),
                 Material.ITEM_FRAME,
                 () -> current(target).decor().flagTokens().contains(token),
                 this::onOff,
@@ -441,8 +449,8 @@ public final class MenuItemEditorView {
 
     private EditableProperty loreModeProperty(ItemTarget target) {
         return new EnumProperty<>(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_MODE,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_SELECT_LORE_MODE,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_LORE_MODE.key(),
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_SELECT_LORE_MODE.key(),
                 Material.BOOK,
                 guiText,
                 List.of(LoreMode.values()),
@@ -458,8 +466,8 @@ public final class MenuItemEditorView {
 
     private EditableProperty typeProperty(ItemTarget target) {
         return new EnumProperty<>(
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_TYPE,
-                CustomMenusMessageKey.MENU_ITEM_EDITOR_SELECT_TYPE,
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_TYPE.key(),
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_SELECT_TYPE.key(),
                 Material.MAP,
                 guiText,
                 List.of(ItemType.values()),
@@ -479,15 +487,15 @@ public final class MenuItemEditorView {
         return target.session().item(target.itemId()).orElse(MISSING);
     }
 
-    private String onOff(PlayerRef viewer, boolean on) {
+    private String onOff(Player viewer, boolean on) {
         return messages.resolve(
-                viewer,
+                BukkitRefs.toRef(viewer),
                 on ? CustomMenusMessageKey.MENU_ITEM_EDITOR_VALUE_ON : CustomMenusMessageKey.MENU_ITEM_EDITOR_VALUE_OFF,
                 Map.of());
     }
 
-    private Function<PlayerRef, String> hint(MessageKey key) {
-        return viewer -> messages.resolve(viewer, key, Map.of());
+    private Function<Player, String> hint(MessageKey key) {
+        return viewer -> messages.resolve(BukkitRefs.toRef(viewer), key, Map.of());
     }
 
     /** Whether a typed line means "clear back to the base icon's own name", a dash, {@code none}, {@code clear}, or blank. */

@@ -8,12 +8,13 @@ import java.util.function.BiPredicate;
 
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.NumericSpatialConditions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -189,15 +190,15 @@ class NumericSpatialConditionsTest {
 
     /** Fire condition {@code id} with {@code arg} as the split-off value, for the online viewer. */
     private boolean test(String id, String arg) {
-        return test(id, arg, new PlayerRef(viewer.getUniqueId(), viewer.getName()));
+        return test(id, arg, viewer);
     }
 
     /** Fire condition {@code id} for a viewer UUID with no live player: the fail-closed offline case. */
     private boolean testOffline(String id, String arg) {
-        return test(id, arg, new PlayerRef(UUID.randomUUID(), "Ghost"));
+        return test(id, arg, TestViewer.of(UUID.randomUUID(), "Ghost"));
     }
 
-    private boolean test(String id, String arg, PlayerRef ref) {
+    private boolean test(String id, String arg, Player ref) {
         BiPredicate<MenuContext, Map<String, String>> condition =
                 bindings.condition(id).orElseThrow(() -> new AssertionError("condition not registered: " + id));
         return condition.test(MenuContext.of(ref, null, 0), Map.of("value", arg));

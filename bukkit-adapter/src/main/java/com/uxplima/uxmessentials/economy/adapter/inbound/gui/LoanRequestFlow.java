@@ -17,11 +17,11 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -82,10 +82,9 @@ final class LoanRequestFlow {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
         textInput.prompt(
                 player,
-                viewerRef,
                 InputRequest.of(
                         "loan.amount",
-                        EconomyMessageKey.LOAN_GUI_AMOUNT_PROMPT,
+                        EconomyMessageKey.LOAN_GUI_AMOUNT_PROMPT.key(),
                         Map.of("currency", currency.id().value())),
                 amountStr -> applyAmount(player, viewerRef, currency, amountStr),
                 () -> refresh.accept(player));
@@ -105,8 +104,7 @@ final class LoanRequestFlow {
     private void promptInstallments(Player player, PlayerRef viewerRef, Currency currency, Money amount) {
         textInput.prompt(
                 player,
-                viewerRef,
-                InputRequest.of("loan.installments", EconomyMessageKey.LOAN_GUI_INSTALLMENTS_PROMPT),
+                InputRequest.of("loan.installments", EconomyMessageKey.LOAN_GUI_INSTALLMENTS_PROMPT.key()),
                 installmentsStr -> applyInstallments(player, viewerRef, currency, amount, installmentsStr),
                 () -> refresh.accept(player));
     }

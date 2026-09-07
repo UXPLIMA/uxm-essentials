@@ -7,17 +7,19 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.SoundOption;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -87,11 +89,11 @@ public final class WarpSoundMenu {
         bindings.action("warp:custom-sound", this::customSound);
         bindings.action("warp:remove-sound", this::removeSound);
         bindings.action("warp:edit-back", this::back);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /** Open the sound selector for a server warp on the side the {@code edit} subject names. */
-    public void open(PlayerRef viewer, WarpSoundEdit edit) {
+    public void open(Player viewer, WarpSoundEdit edit) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(edit, "edit");
         menus.open(viewer, SPEC_ID, edit);
@@ -108,7 +110,7 @@ public final class WarpSoundMenu {
     private void customSound(MenuActionContext ctx) {
         WarpSoundEdit edit = ctx.subject(WarpSoundEdit.class);
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         String name = edit.warp().value();
         WarpsMessageKey promptKey = edit.departure()
                 ? WarpsMessageKey.WARP_EDITOR_SOUND_DEPARTURE_PROMPT
@@ -116,13 +118,12 @@ public final class WarpSoundMenu {
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("warp.sound", promptKey),
+                InputRequest.of("warp.sound", promptKey.key()),
                 input -> {
                     save(edit, Optional.of(input.toLowerCase(Locale.ROOT)));
                     editorView.open(player, viewer, name, null);
                 },
-                () -> open(viewer, edit));
+                () -> open(ctx.viewer(), edit));
     }
 
     /** Clear the warp's sound on the subject's side, then reopen the editor. */
@@ -155,7 +156,7 @@ public final class WarpSoundMenu {
     private void reopenEditor(MenuActionContext ctx) {
         editorView.open(
                 ctx.player(),
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 ctx.subject(WarpSoundEdit.class).warp().value(),
                 null);
     }

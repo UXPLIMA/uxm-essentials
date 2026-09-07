@@ -11,17 +11,17 @@ import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.poses.application.TogglePlayerSit;
 import com.uxplima.uxmessentials.poses.application.port.PlayerSitPreferences;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.ActionProperty;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -67,7 +67,6 @@ public final class PosesSettingsView {
                 guiLayouts.loadEntityEditor(MODULE, LAYOUT, EntityEditorLayout.codeDefault(List.of(11, 15), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .menus(menus)
                 .layout(layout)
                 .title(PosesMessageKey.POSES_GUI_TITLE)
@@ -90,14 +89,14 @@ public final class PosesSettingsView {
             TogglePlayerSit togglePlayerSit) {
         return List.of(
                 new ActionProperty(
-                        PosesMessageKey.POSES_GUI_STATUS,
+                        PosesMessageKey.POSES_GUI_STATUS.key(),
                         Material.ARMOR_STAND,
-                        who -> onOff(messages, who, sessions.isPosing(who)),
+                        who -> onOff(messages, BukkitRefs.toRef(who), sessions.isPosing(BukkitRefs.toRef(who))),
                         (player, reopen) -> reopen.run()),
                 new ActionProperty(
-                        PosesMessageKey.POSES_GUI_PLAYERSIT,
+                        PosesMessageKey.POSES_GUI_PLAYERSIT.key(),
                         Material.SADDLE,
-                        who -> onOff(messages, who, preferences.allowsSitting(who)),
+                        who -> onOff(messages, BukkitRefs.toRef(who), preferences.allowsSitting(BukkitRefs.toRef(who))),
                         (player, reopen) -> flipPlayerSit(togglePlayerSit, player, reopen)));
     }
 

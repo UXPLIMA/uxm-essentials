@@ -10,10 +10,10 @@ import org.bukkit.Location;
 import org.bukkit.World;
 
 import com.google.common.base.Splitter;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
 
 /**
  * The movement slice of the menu action vocabulary: the two ways a click (or an operator's {@code /menu} spec) can

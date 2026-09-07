@@ -18,18 +18,20 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputMode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuTextPrompt;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.InputMode;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuTextPrompt;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +52,6 @@ class InputActionTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private Menus menus;
     private MenuBindings bindings;
     private RecordingPrompt prompt;
@@ -61,31 +62,30 @@ class InputActionTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         captured = new ArrayList<>();
         bindings = new MenuBindings();
         // A probe action that records its resolved argument, so a continuation ref written capture:%input% proves the
         // submitted line reached the next action.
         bindings.action("capture", ctx -> captured.add(ctx.arg()));
         Scheduler scheduler = new SyncScheduler();
-        ItemRenderer itemRenderer = new ItemRenderer(new GuiText(new KeyMessages()), bindings.placeholders());
+        ItemRenderer itemRenderer =
+                new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        menus = new Menus(renderer, scheduler, bindings.lists());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         prompt = new RecordingPrompt();
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener listener =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener(
-                        renderer,
-                        bindings.actions(),
-                        bindings.conditions(),
-                        scheduler,
-                        plugin,
-                        null,
-                        null,
-                        null,
-                        0L,
-                        System::currentTimeMillis,
-                        new PagedListSourceRegistry(),
-                        prompt);
+        com.uxplima.uxmlib.menu.runtime.MenuListener listener = new com.uxplima.uxmlib.menu.runtime.MenuListener(
+                renderer,
+                bindings.actions(),
+                bindings.conditions(),
+                EngineScheduler.of(scheduler),
+                plugin,
+                null,
+                null,
+                null,
+                0L,
+                System::currentTimeMillis,
+                new PagedListSourceRegistry(),
+                prompt);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -154,10 +154,7 @@ class InputActionTest {
 
     /** Register and open a one-item menu whose left click carries {@code leftChain} as its action list. */
     private void openNamer(String leftChain) {
-        menus.registerSpec(
-                "menu",
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader()
-                        .parse("""
+        menus.registerSpec("menu", new com.uxplima.uxmlib.menu.spec.MenuSpecLoader().parse("""
                                 rows = 1
                                 items {
                                   namer { slot = 0, material = DIAMOND, name = "x", click {
@@ -165,7 +162,7 @@ class InputActionTest {
                                   } }
                                 }
                                 """.formatted(leftChain)));
-        menus.open(viewer, "menu", null);
+        menus.open(player, "menu", null);
     }
 
     private void leftClick() {

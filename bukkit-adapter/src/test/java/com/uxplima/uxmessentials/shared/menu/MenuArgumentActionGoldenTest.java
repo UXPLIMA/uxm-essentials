@@ -14,17 +14,19 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,15 +70,15 @@ class MenuArgumentActionGoldenTest {
         GuiText guiText = new GuiText(new KeyMessages());
         MenuBindings bindings = new MenuBindings();
         bindings.action("record", ctx -> captured.set(ctx.arg()));
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
-        menus = new Menus(renderer, scheduler, bindings.lists());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         MenuSpecLoader loader = new MenuSpecLoader();
         menus.registerSpec("give", loader.parse(GIVE_HOCON));
         menus.registerSpec("plain", loader.parse(PLAIN_HOCON));
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -107,7 +109,7 @@ class MenuArgumentActionGoldenTest {
 
     @Test
     void withNoOpenArgumentsTheRefArgsPassThroughUntouched() {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "give", null);
+        menus.open(player, "give", null);
 
         leftClick(0);
 
@@ -117,7 +119,7 @@ class MenuArgumentActionGoldenTest {
     }
 
     private void openWith(String specId, Map<String, String> arguments) {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), specId, null, 0, arguments);
+        menus.open(player, specId, null, 0, arguments);
     }
 
     /** Fire a left click at {@code slot} of the top (menu) inventory through the live listener. */

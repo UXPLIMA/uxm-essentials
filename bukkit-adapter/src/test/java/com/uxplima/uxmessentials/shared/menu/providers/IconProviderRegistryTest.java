@@ -9,20 +9,20 @@ import java.util.UUID;
 
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.providers.IconProviderRegistry;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.Test;
 
 /**
  * The runtime registry in isolation, with no server: a registered provider's claim is returned, an empty registry
  * resolves to empty, and when two providers both claim a spec the first registered wins, the same first-non-empty
- * rule the built-in {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders} chain
+ * rule the built-in {@link com.uxplima.uxmlib.menu.providers.IconProviders} chain
  * follows. {@link ItemStack} stand-ins are mocked so the test stays a plain unit with no MockBukkit server.
  */
 class IconProviderRegistryTest {
 
-    private final MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "Viewer"), null, 0);
+    private final MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "Viewer"), null, 0);
 
     @Test
     void aRegisteredProviderResolvesItsClaim() {

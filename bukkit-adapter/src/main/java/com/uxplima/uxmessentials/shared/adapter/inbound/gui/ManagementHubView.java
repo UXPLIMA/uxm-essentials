@@ -6,13 +6,12 @@ import java.util.Objects;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -31,7 +30,6 @@ public final class ManagementHubView {
 
     private final Menus menus;
     private final GuiText guiText;
-    private final Scheduler scheduler;
     private final Permissions permissions;
     private final ManagementGuiRegistry registry;
     private final EntityListLayout layout;
@@ -39,13 +37,11 @@ public final class ManagementHubView {
     public ManagementHubView(
             Menus menus,
             GuiText guiText,
-            Scheduler scheduler,
             Permissions permissions,
             ManagementGuiRegistry registry,
             EntityListLayout layout) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.registry = Objects.requireNonNull(registry, "registry");
         this.layout = Objects.requireNonNull(layout, "layout");
@@ -62,7 +58,6 @@ public final class ManagementHubView {
         return EntityListView.<ManagementGuiEntry>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(GuiMessageKey.HUB_TITLE)
                 .navNames(GuiMessageKey.HUB_PREV, GuiMessageKey.HUB_NEXT)

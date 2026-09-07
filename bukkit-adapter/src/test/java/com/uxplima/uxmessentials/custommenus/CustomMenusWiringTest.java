@@ -13,16 +13,9 @@ import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -31,6 +24,15 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +78,7 @@ class CustomMenusWiringTest {
                 scheduler(),
                 messages(),
                 guiText(),
+                ThemeFile::shippedTheme,
                 new GuiLayouts(dataFolder, log()),
                 textInput(),
                 new ManagementGuiRegistry());
@@ -104,6 +107,7 @@ class CustomMenusWiringTest {
                 scheduler(),
                 messages(),
                 guiText(),
+                ThemeFile::shippedTheme,
                 new GuiLayouts(dataFolder, log()),
                 textInput(),
                 new ManagementGuiRegistry());
@@ -128,6 +132,7 @@ class CustomMenusWiringTest {
                 scheduler(),
                 messages(),
                 guiText(),
+                ThemeFile::shippedTheme,
                 new GuiLayouts(dataFolder, log()),
                 textInput(),
                 new ManagementGuiRegistry());
@@ -156,6 +161,7 @@ class CustomMenusWiringTest {
                 scheduler(),
                 messages(),
                 guiText(),
+                ThemeFile::shippedTheme,
                 new GuiLayouts(dataFolder, log()),
                 textInput(),
                 new ManagementGuiRegistry());
@@ -177,9 +183,9 @@ class CustomMenusWiringTest {
 
     private static Menus menus() {
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        return new Menus(renderer, new SyncScheduler(), new ListSourceRegistry());
+        return new Menus(renderer, EngineScheduler.of(new SyncScheduler()), new ListSourceRegistry());
     }
 
     private static GuiText guiText() {

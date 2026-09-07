@@ -6,7 +6,7 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuItemMark;
+import com.uxplima.uxmlib.menu.render.MenuItemMark;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -90,8 +90,7 @@ class RtpCommandTest {
         command.route(staff, "Victim");
 
         // The target, never the issuer, is routed, within the target's own world.
-        verify(resolveRtp)
-                .background(new PlayerRef(victim.getUniqueId(), victim.getName()), BukkitRefs.toRef(victim.getWorld()));
+        verify(resolveRtp).background(BukkitRefs.toRef(victim), BukkitRefs.toRef(victim.getWorld()));
         assertThat(sink.delivered).contains("teleport.rtp.searching");
     }
 
@@ -103,7 +102,7 @@ class RtpCommandTest {
 
         command.route(sender, "resource");
 
-        verify(resolveRtp).background(new PlayerRef(sender.getUniqueId(), sender.getName()), resource);
+        verify(resolveRtp).background(BukkitRefs.toRef(sender), resource);
         assertThat(sink.delivered).contains("teleport.rtp.searching");
     }
 
@@ -136,7 +135,7 @@ class RtpCommandTest {
 
         cmd.bare(sender);
 
-        verify(menu).open(new PlayerRef(sender.getUniqueId(), sender.getName()));
+        verify(menu).open(sender);
         verify(resolveRtp, never()).background(any(), any()); // opening the GUI does not teleport on its own
     }
 
@@ -148,8 +147,7 @@ class RtpCommandTest {
 
         cmd.bare(sender);
 
-        verify(resolveRtp)
-                .background(new PlayerRef(sender.getUniqueId(), sender.getName()), BukkitRefs.toRef(sender.getWorld()));
+        verify(resolveRtp).background(BukkitRefs.toRef(sender), BukkitRefs.toRef(sender.getWorld()));
         verify(menu, never()).open(any());
         assertThat(sink.delivered).contains("teleport.rtp.searching");
     }

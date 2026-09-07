@@ -47,12 +47,9 @@ import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -69,6 +66,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -324,11 +327,11 @@ class HomeCommandPathTest {
     }
 
     private PlayerRef senderRef() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     private PlayerRef targetRef() {
-        return new PlayerRef(target.getUniqueId(), target.getName());
+        return BukkitRefs.toRef(target);
     }
 
     private CommandDispatcher<CommandSourceStack> register() {
@@ -446,13 +449,12 @@ class HomeCommandPathTest {
     private final class ServerPlayerLookup implements PlayerLookup {
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.ofNullable(server.getPlayerExact(name))
-                    .map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
+            return Optional.ofNullable(server.getPlayerExact(name)).map(BukkitRefs::toRef);
         }
 
         @Override
         public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.ofNullable(server.getPlayer(uuid)).map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
+            return Optional.ofNullable(server.getPlayer(uuid)).map(BukkitRefs::toRef);
         }
 
         @Override
@@ -519,13 +521,19 @@ class HomeCommandPathTest {
         MenuBindings bindings = new MenuBindings();
         bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
         bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
-        ItemRenderer itemRenderer = new ItemRenderer(new GuiText(messages), bindings.placeholders());
+        ItemRenderer itemRenderer =
+                new ItemRenderer(new GuiText(messages), ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         server.getPluginManager()
                 .registerEvents(
-                        new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin),
+                        new MenuListener(
+                                renderer,
+                                bindings.actions(),
+                                bindings.conditions(),
+                                EngineScheduler.of(scheduler),
+                                plugin),
                         plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         HomeListMenu listView = new HomeListMenu(
                 menus,
                 messages,

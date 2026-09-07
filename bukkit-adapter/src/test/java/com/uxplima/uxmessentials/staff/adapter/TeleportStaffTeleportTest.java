@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -59,7 +60,7 @@ class TeleportStaffTeleportTest {
     @Test
     void onlineTargetLaunchesAnAdminTeleport() {
         Player target = server.addPlayer("Target");
-        PlayerRef targetRef = new PlayerRef(target.getUniqueId(), target.getName());
+        PlayerRef targetRef = BukkitRefs.toRef(target);
         when(engine.launch(eq(STAFF), any(Destination.class), eq(TeleportKind.ADMIN)))
                 .thenReturn(Result.ok());
 
@@ -69,7 +70,7 @@ class TeleportStaffTeleportTest {
     @Test
     void aFailedLaunchIsReportedAsNotStarted() {
         Player target = server.addPlayer("Target");
-        PlayerRef targetRef = new PlayerRef(target.getUniqueId(), target.getName());
+        PlayerRef targetRef = BukkitRefs.toRef(target);
         Result<Unit, TeleportError> failed = Result.err(TeleportError.JAILED);
         when(engine.launch(eq(STAFF), any(Destination.class), eq(TeleportKind.ADMIN)))
                 .thenReturn(failed);

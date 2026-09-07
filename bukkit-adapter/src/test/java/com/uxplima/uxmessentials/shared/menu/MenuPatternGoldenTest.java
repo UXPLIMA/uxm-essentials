@@ -17,17 +17,19 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,9 +63,9 @@ class MenuPatternGoldenTest {
         // here.
         bindings.placeholder("viewer_tag", ctx -> "Steve");
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        menus = new Menus(renderer, new InlineScheduler(), bindings.lists());
+        menus = new Menus(renderer, EngineScheduler.of(new InlineScheduler()), bindings.lists());
         loader = new MenuSpecLoader();
     }
 
@@ -111,7 +113,7 @@ class MenuPatternGoldenTest {
         assertThat(result.loadedNames())
                 .as("patterns.conf is not a menu, so only the real menu registers")
                 .containsExactly("shop");
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "shop", null);
+        menus.open(player, "shop", null);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         ItemStack item = Objects.requireNonNull(inv.getItem(0), "the shared-pattern item renders at slot 0");
@@ -121,7 +123,7 @@ class MenuPatternGoldenTest {
 
     private Inventory open(String id, String hocon) {
         menus.registerSpec(id, loader.parse(hocon));
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), id, null);
+        menus.open(player, id, null);
         return player.getOpenInventory().getTopInventory();
     }
 

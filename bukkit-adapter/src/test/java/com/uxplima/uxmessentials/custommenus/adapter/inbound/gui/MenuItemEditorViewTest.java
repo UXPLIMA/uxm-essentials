@@ -33,32 +33,35 @@ import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecWriter;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.property.ActionProperty;
+import com.uxplima.uxmlib.menu.property.EnumProperty;
+import com.uxplima.uxmlib.menu.property.ListProperty;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.Ref;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,7 +112,7 @@ class MenuItemEditorViewTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         GuiText guiText = new GuiText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
 
@@ -118,15 +121,15 @@ class MenuItemEditorViewTest {
         bindings.action("message", ctx -> {});
         bindings.action("sound", ctx -> {});
         bindings.condition("perm", (ctx, args) -> true);
-        EditorRenderer editorRenderer = new EditorRenderer(guiText);
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        menus = new Menus(renderer, scheduler, bindings.lists(), editorRenderer);
+        EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders()), bindings.conditions());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
         MenuListener listener = new MenuListener(
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 editorRenderer,
                 menus.selectorOpener(),
@@ -154,7 +157,7 @@ class MenuItemEditorViewTest {
         MenuRequirementsView requirements = new MenuRequirementsView(
                 menus,
                 guiText,
-                scheduler,
+                EngineScheduler.of(scheduler),
                 new GuiLayouts(menusDir, NOOP),
                 refListEditor,
                 bindings::schema,
@@ -162,7 +165,8 @@ class MenuItemEditorViewTest {
         itemEditor = new MenuItemEditorView(
                 menus,
                 guiText,
-                scheduler,
+                ThemeFile::shippedTheme,
+                EngineScheduler.of(scheduler),
                 new KeyMessages(),
                 textInput,
                 new GuiLayouts(menusDir, NOOP),
@@ -411,8 +415,8 @@ class MenuItemEditorViewTest {
     }
 
     /** A hand-built editor click context for driving a ref-list apply seam directly (no live anvil). */
-    private ClickContext context() {
-        return new ClickContext(player, viewer, false, false, () -> {}, menus.selectorOpener(), menus.confirmOpener());
+    private PropertyClick context() {
+        return new PropertyClick(player, false, false, () -> {}, menus.selectorOpener(), menus.confirmOpener());
     }
 
     // --- helpers ---

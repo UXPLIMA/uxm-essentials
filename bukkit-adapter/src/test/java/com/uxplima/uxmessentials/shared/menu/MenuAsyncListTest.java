@@ -16,21 +16,23 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,7 +81,7 @@ class MenuAsyncListTest {
         GuiText guiText = new GuiText(new KeyMessages());
         PlaceholderRegistry placeholders = new PlaceholderRegistry();
         placeholders.register("v", ctx -> ctx.entry(String.class));
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, placeholders);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, placeholders);
         ListSourceRegistry lists = new ListSourceRegistry();
         lists.register("t:list", ctx -> {
             sourceCalls.incrementAndGet();
@@ -87,10 +89,10 @@ class MenuAsyncListTest {
             return List.of("a", "b", "c", "d", "e", "f");
         });
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        MenuListener listener =
-                new MenuListener(renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        menus = new Menus(renderer, scheduler, lists);
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), lists);
         MenuSpec spec = new MenuSpecLoader().parse(HOCON);
         menus.registerSpec("test", spec);
     }
@@ -102,7 +104,7 @@ class MenuAsyncListTest {
 
     @Test
     void listSourceResolvesOffThreadOnce() {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "test", null);
+        menus.open(player, "test", null);
 
         assertThat(sourceCalls.get()).isEqualTo(1);
         assertThat(sourcePhase.get()).isEqualTo(Phase.ASYNC);
@@ -110,7 +112,7 @@ class MenuAsyncListTest {
 
     @Test
     void paginationReusesCachedListWithoutRequery() {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "test", null);
+        menus.open(player, "test", null);
         assertThat(sourceCalls.get()).isEqualTo(1);
 
         InventoryView view = player.getOpenInventory();

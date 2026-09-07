@@ -19,18 +19,20 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -114,7 +116,7 @@ public final class EconomyExchangeMenu {
         bindings.action("economy:exchange-source", ctx -> openPicker(ctx, true));
         bindings.action("economy:exchange-target", ctx -> openPicker(ctx, false));
         bindings.action("economy:exchange-convert", this::promptConvert);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /** Open the dashboard with the first two configured currencies as source and target; a no-op with none configured. */
@@ -141,7 +143,7 @@ public final class EconomyExchangeMenu {
         scheduler.async(() -> {
             Money sourceBalance = economyProvider.balance(viewerRef, source);
             Money targetBalance = economyProvider.balance(viewerRef, target);
-            menus.open(viewerRef, SPEC_ID, new ExchangeSubject(source, target, sourceBalance, targetBalance));
+            menus.open(viewer, SPEC_ID, new ExchangeSubject(source, target, sourceBalance, targetBalance));
         });
     }
 
@@ -151,7 +153,7 @@ public final class EconomyExchangeMenu {
      */
     private void openPicker(MenuActionContext ctx, boolean pickingSource) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         ExchangeSubject subject = ctx.subject(ExchangeSubject.class);
         Currency current = pickingSource ? subject.source() : subject.target();
         List<Currency> all = new ArrayList<>(economyProvider.currencies());
@@ -179,14 +181,13 @@ public final class EconomyExchangeMenu {
      */
     private void promptConvert(MenuActionContext ctx) {
         Player viewer = ctx.player();
-        PlayerRef viewerRef = ctx.viewer();
+        PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         ExchangeSubject subject = ctx.subject(ExchangeSubject.class);
         Map<String, String> placeholders = Map.of(
                 "source", subject.source().plural(), "target", subject.target().plural());
         textInput.prompt(
                 viewer,
-                viewerRef,
-                InputRequest.of("exchange.amount", EconomyMessageKey.EXCHANGE_PROMPT, placeholders),
+                InputRequest.of("exchange.amount", EconomyMessageKey.EXCHANGE_PROMPT.key(), placeholders),
                 input -> applyConvert(viewer, viewerRef, subject.source(), subject.target(), input),
                 () -> open(viewer, subject.source(), subject.target()));
     }

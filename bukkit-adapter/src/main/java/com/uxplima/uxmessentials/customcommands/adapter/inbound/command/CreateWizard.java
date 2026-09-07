@@ -27,10 +27,9 @@ import com.uxplima.uxmessentials.customcommands.domain.CommandLiteral;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -94,9 +93,8 @@ public final class CreateWizard {
      * Start the wizard for {@code player} under {@code rawId}. Returns false when the id cannot be used, in which
      * case nothing was asked and the player has already been told why.
      */
-    public boolean start(Player player, PlayerRef viewer, String rawId) {
+    public boolean start(Player player, String rawId) {
         Objects.requireNonNull(player, "player");
-        Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(rawId, "rawId");
         if (!CustomCommandId.valid(rawId)) {
             feedback.send(player, CustomCommandsMessageKey.CUSTOMCOMMAND_WIZARD_INVALID);
@@ -108,7 +106,7 @@ public final class CreateWizard {
             return false;
         }
         feedback.send(player, CustomCommandsMessageKey.CUSTOMCOMMAND_WIZARD_START);
-        askName(new Draft(player, viewer, id));
+        askName(new Draft(player, id));
         return true;
     }
 
@@ -292,12 +290,7 @@ public final class CreateWizard {
 
     private void ask(
             Draft draft, String key, MessageKey label, Map<String, String> placeholders, Consumer<String> onAnswer) {
-        prompt.ask(
-                draft.player,
-                draft.viewer,
-                new InputRequest(key, label, placeholders, null),
-                onAnswer,
-                () -> cancel(draft));
+        prompt.ask(draft.player, new InputRequest(key, label.key(), placeholders, null), onAnswer, () -> cancel(draft));
     }
 
     /** One argument row written as {@code name type [min] [max]}, or empty when it is not usable. */
@@ -337,7 +330,6 @@ public final class CreateWizard {
     private static final class Draft {
 
         private final Player player;
-        private final PlayerRef viewer;
         private final CustomCommandId id;
         private final List<String> aliases = new ArrayList<>();
         private final Map<String, List<String>> localized = new LinkedHashMap<>();
@@ -347,9 +339,8 @@ public final class CreateWizard {
         private Optional<String> permission = Optional.empty();
         private boolean console = true;
 
-        Draft(Player player, PlayerRef viewer, CustomCommandId id) {
+        Draft(Player player, CustomCommandId id) {
             this.player = player;
-            this.viewer = viewer;
             this.id = id;
             this.name = id.value();
         }

@@ -13,17 +13,19 @@ import java.util.regex.Pattern;
 import org.bukkit.Bukkit;
 
 import com.google.common.base.Splitter;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.ExpressionException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Expressions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.eval.ExpressionException;
+import com.uxplima.uxmlib.menu.eval.Expressions;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 
 /**
  * The generic action vocabulary every menu can lean on without a feature wiring it. Registered once at startup
@@ -84,11 +86,12 @@ public final class MenuVocabulary {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(permissions, "permissions");
         Objects.requireNonNull(log, "log");
-        bindings.condition("perm", (ctx, args) -> permissions.has(ctx.viewer(), args.getOrDefault("value", "")));
+        bindings.condition(
+                "perm", (ctx, args) -> permissions.has(BukkitRefs.toRef(ctx.viewer()), args.getOrDefault("value", "")));
         bindings.condition("has-prev", (ctx, args) -> ctx.page() > 0);
         bindings.condition("has-next", (ctx, args) -> ctx.page() + 1 < ctx.pageCount());
         bindings.condition("on-page", (ctx, args) -> pageInRanges(ctx.page() + 1, args.getOrDefault("value", "")));
-        PlaceholderRegistry placeholders = bindings.placeholders();
+        ReportingPlaceholders placeholders = new ReportingPlaceholders(bindings.placeholders());
         bindings.condition("papi-compare", (ctx, args) -> compare(ctx, args, placeholders));
         bindings.condition("expr", exprCondition(placeholders, log));
     }
@@ -100,7 +103,7 @@ public final class MenuVocabulary {
      * and the offending text is logged once (de-duplicated so a broken spec does not flood the log on every render).
      */
     private static BiPredicate<MenuContext, Map<String, String>> exprCondition(
-            PlaceholderRegistry placeholders, Logger log) {
+            ReportingPlaceholders placeholders, Logger log) {
         Set<String> warned = ConcurrentHashMap.newKeySet();
         return (ctx, args) -> {
             String expression = expand(args.getOrDefault("value", ""), ctx, placeholders);
@@ -122,7 +125,7 @@ public final class MenuVocabulary {
      * fall back to a string equality test. An unknown operator yields {@code false} rather than throwing, so a spec
      * typo hides the item rather than aborting the menu.
      */
-    private static boolean compare(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
+    private static boolean compare(MenuContext ctx, Map<String, String> args, ReportingPlaceholders placeholders) {
         String left = expand(args.getOrDefault("left", ""), ctx, placeholders);
         String op = args.getOrDefault("op", "=").strip();
         String right = expand(args.getOrDefault("right", ""), ctx, placeholders);
@@ -152,7 +155,7 @@ public final class MenuVocabulary {
     }
 
     /** Replace every {@code %token%} in {@code operand} with its resolved placeholder value (or empty). */
-    private static String expand(String operand, MenuContext ctx, PlaceholderRegistry placeholders) {
+    private static String expand(String operand, MenuContext ctx, ReportingPlaceholders placeholders) {
         Matcher matcher = PLACEHOLDER.matcher(operand);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
@@ -217,8 +220,8 @@ public final class MenuVocabulary {
      */
     public static void registerPlaceholders(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
-        bindings.placeholder("player", ctx -> ctx.viewer().name());
-        bindings.placeholder("executor", ctx -> ctx.executor().name());
+        bindings.placeholder("player", ctx -> ctx.viewer().getName());
+        bindings.placeholder(MenuExecutor.KEY, ctx -> MenuExecutor.of(ctx).name());
         bindings.placeholder("page", ctx -> String.valueOf(ctx.page() + 1));
         bindings.placeholder("max_page", ctx -> String.valueOf(ctx.pageCount()));
     }

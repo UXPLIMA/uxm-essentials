@@ -109,7 +109,7 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
      */
     void bare(Player sender) {
         if (openGuiOnBare) {
-            menu.open(ref(sender));
+            menu.open(sender);
         } else {
             rtpHere(sender);
         }
@@ -128,7 +128,7 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
         if (sender == null) {
             return 0;
         }
-        menu.open(ref(sender));
+        menu.open(sender);
         return Command.SINGLE_SUCCESS;
     }
 

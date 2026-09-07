@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -25,28 +26,29 @@ import com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.TextAlignment;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.EnumProperty;
+import com.uxplima.uxmlib.menu.property.ListProperty;
+import com.uxplima.uxmlib.menu.property.ListPropertyText;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout;
+import com.uxplima.uxmlib.menu.property.colour.ColourPickerText;
+import com.uxplima.uxmlib.menu.property.colour.ColourProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 
 /**
  * The per-hologram property editor: a thin consumer of the shared {@link EntityEditorView} that exposes every
@@ -60,6 +62,10 @@ public final class HologramEditorView {
     private static final long SCALE_FACTOR = 100L;
 
     private final GuiText guiText;
+
+    /** The colours the engine draws a list window in; asked per render so a theme reload is picked up. */
+    private final Supplier<Theme> theme;
+
     private final Scheduler scheduler;
     private final HologramRepository repository;
     private final HologramServices services;
@@ -74,6 +80,7 @@ public final class HologramEditorView {
     public HologramEditorView(
             Menus menus,
             GuiText guiText,
+            Supplier<Theme> theme,
             Scheduler scheduler,
             HologramRepository repository,
             HologramServices services,
@@ -86,6 +93,7 @@ public final class HologramEditorView {
             BiConsumer<Player, PlayerRef> onBack) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
+        this.theme = Objects.requireNonNull(theme, "theme");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.services = Objects.requireNonNull(services, "services");
@@ -100,23 +108,22 @@ public final class HologramEditorView {
         this.view = EntityEditorView.<Hologram>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
-                .title((viewer, holo) -> title(viewer, holo))
-                .valueLore(HologramsMessageKey.HOLOGRAM_GUI_EDITOR_VALUE_LORE)
-                .backName(HologramsMessageKey.HOLOGRAM_GUI_EDITOR_BACK)
+                .title((viewer, holo) -> title(BukkitRefs.toRef(viewer), holo))
+                .valueLore(HologramsMessageKey.HOLOGRAM_GUI_EDITOR_VALUE_LORE.key())
+                .backName(HologramsMessageKey.HOLOGRAM_GUI_EDITOR_BACK.key())
                 .properties(this::properties)
-                .onBack(onBack)
+                .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .onDelete(
-                        HologramsMessageKey.HOLOGRAM_GUI_EDITOR_DELETE,
-                        HologramsMessageKey.HOLOGRAM_GUI_EDITOR_DELETE_CONFIRM,
+                        HologramsMessageKey.HOLOGRAM_GUI_EDITOR_DELETE.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_EDITOR_DELETE_CONFIRM.key(),
                         (player, holo) -> services.delete().delete(ref(player), holo.name()))
                 .build();
     }
 
     /** Open the editor for {@code holo}, scheduled on the viewer's entity thread by the framework. */
     public void open(Player player, PlayerRef viewer, Hologram holo) {
-        view.open(player, viewer, holo);
+        view.open(player, holo);
     }
 
     /** The underlying property grid: exposed for tests to resolve a slot to its property without a live click. */
@@ -180,13 +187,13 @@ public final class HologramEditorView {
     private EditableProperty nameProperty(HologramName name) {
         return new TextProperty(
                 "editor.text-field",
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_NAME,
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_NAME_PROMPT,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_NAME.key(),
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_NAME_PROMPT.key(),
                 Material.NAME_TAG,
                 () -> currentName(name).value(),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> rename(name, HologramName.of(value)),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -215,7 +222,7 @@ public final class HologramEditorView {
                     Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
                     scheduler.async(() -> {
                         services.move().move(ref(player), name, at);
-                        scheduler.onEntity(ref(player), reopen);
+                        scheduler.entity(player, reopen);
                     });
                 },
                 scheduler);
@@ -252,22 +259,23 @@ public final class HologramEditorView {
     private EditableProperty linesProperty(HologramName name) {
         return new ListProperty(
                 "editor.list-entry",
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_LINES,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_LINES.key(),
                 Material.WRITABLE_BOOK,
                 guiText,
+                theme,
                 () -> currentLines(name),
                 lines -> applyLines(name, lines),
                 new ListPropertyText(
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_TITLE,
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ENTRY_NAME,
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ENTRY_HINTS,
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ADD,
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ADD_PROMPT,
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_EDIT_PROMPT,
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_REMOVE_CONFIRM,
-                        HologramsMessageKey.HOLOGRAM_GUI_LINES_BACK),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_TITLE.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ENTRY_NAME.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ENTRY_HINTS.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ADD.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_ADD_PROMPT.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_EDIT_PROMPT.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_REMOVE_CONFIRM.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_LINES_BACK.key()),
                 sub.listLayout(),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -296,7 +304,7 @@ public final class HologramEditorView {
 
     private EditableProperty scaleProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_SCALE,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_SCALE.key(),
                 Material.CLOCK,
                 () -> Math.round(currentAppearance(name).scale() * SCALE_FACTOR),
                 10,
@@ -309,7 +317,7 @@ public final class HologramEditorView {
 
     private EditableProperty viewRangeProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_VIEW_RANGE,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_VIEW_RANGE.key(),
                 Material.SPYGLASS,
                 () -> Math.round(currentAppearance(name).viewRange() * SCALE_FACTOR),
                 10,
@@ -323,7 +331,7 @@ public final class HologramEditorView {
 
     private EditableProperty lineWidthProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_LINE_WIDTH,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_LINE_WIDTH.key(),
                 Material.STRING,
                 () -> currentAppearance(name).lineWidth(),
                 10,
@@ -339,7 +347,7 @@ public final class HologramEditorView {
                 ? HologramsMessageKey.HOLOGRAM_GUI_PROP_BRIGHTNESS_BLOCK
                 : HologramsMessageKey.HOLOGRAM_GUI_PROP_BRIGHTNESS_SKY;
         return new NumberProperty(
-                label,
+                label.key(),
                 block ? Material.GLOWSTONE_DUST : Material.LIGHT,
                 () -> brightnessValue(name, block),
                 1,
@@ -355,7 +363,7 @@ public final class HologramEditorView {
                 ? HologramsMessageKey.HOLOGRAM_GUI_PROP_ROTATION_YAW
                 : HologramsMessageKey.HOLOGRAM_GUI_PROP_ROTATION_PITCH;
         return new NumberProperty(
-                label,
+                label.key(),
                 Material.COMPASS,
                 () -> Math.round(
                         yaw
@@ -371,7 +379,7 @@ public final class HologramEditorView {
 
     private EditableProperty visibilityDistanceProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_VISIBILITY_DISTANCE,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_VISIBILITY_DISTANCE.key(),
                 Material.ENDER_EYE,
                 () -> currentVisibility(name).distance(),
                 5,
@@ -384,7 +392,7 @@ public final class HologramEditorView {
 
     private EditableProperty refreshProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_REFRESH,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_REFRESH.key(),
                 Material.REPEATER,
                 () -> currentHologram(name).map(Hologram::refreshIntervalTicks).orElse(0),
                 20,
@@ -397,7 +405,7 @@ public final class HologramEditorView {
 
     private EditableProperty leaderboardProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_LEADERBOARD,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_LEADERBOARD.key(),
                 Material.GOLD_INGOT,
                 () -> leaderboardLimit(name),
                 1,
@@ -412,8 +420,8 @@ public final class HologramEditorView {
 
     private EditableProperty billboardProperty(HologramName name) {
         return new EnumProperty<>(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_BILLBOARD,
-                HologramsMessageKey.HOLOGRAM_GUI_SELECT_BILLBOARD,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_BILLBOARD.key(),
+                HologramsMessageKey.HOLOGRAM_GUI_SELECT_BILLBOARD.key(),
                 Material.ITEM_FRAME,
                 guiText,
                 List.of(Billboard.values()),
@@ -429,8 +437,8 @@ public final class HologramEditorView {
 
     private EditableProperty alignmentProperty(HologramName name) {
         return new EnumProperty<>(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_ALIGNMENT,
-                HologramsMessageKey.HOLOGRAM_GUI_SELECT_ALIGNMENT,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_ALIGNMENT.key(),
+                HologramsMessageKey.HOLOGRAM_GUI_SELECT_ALIGNMENT.key(),
                 Material.PAPER,
                 guiText,
                 List.of(TextAlignment.values()),
@@ -446,8 +454,8 @@ public final class HologramEditorView {
 
     private EditableProperty visibilityModeProperty(HologramName name) {
         return new EnumProperty<>(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_VISIBILITY,
-                HologramsMessageKey.HOLOGRAM_GUI_SELECT_VISIBILITY,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_VISIBILITY.key(),
+                HologramsMessageKey.HOLOGRAM_GUI_SELECT_VISIBILITY.key(),
                 Material.ENDER_PEARL,
                 guiText,
                 List.of(Visibility.Mode.ALL, Visibility.Mode.MANUAL),
@@ -463,7 +471,7 @@ public final class HologramEditorView {
 
     private EditableProperty textShadowProperty(HologramName name) {
         return ToggleProperty.ofBoolean(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_TEXT_SHADOW,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_TEXT_SHADOW.key(),
                 Material.GRAY_DYE,
                 () -> currentAppearance(name).textShadow(),
                 this::onOff,
@@ -473,7 +481,7 @@ public final class HologramEditorView {
 
     private EditableProperty seeThroughProperty(HologramName name) {
         return ToggleProperty.ofBoolean(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_SEE_THROUGH,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_SEE_THROUGH.key(),
                 Material.GLASS,
                 () -> currentAppearance(name).seeThrough(),
                 this::onOff,
@@ -483,7 +491,7 @@ public final class HologramEditorView {
 
     private EditableProperty growUpProperty(HologramName name) {
         return ToggleProperty.ofBoolean(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_GROW_UP,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_GROW_UP.key(),
                 Material.LADDER,
                 () -> currentHologram(name).map(Hologram::growUp).orElse(false),
                 this::onOff,
@@ -496,48 +504,49 @@ public final class HologramEditorView {
     private EditableProperty clickCommandProperty(HologramName name) {
         return new TextProperty(
                 "editor.text-field",
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_CLICK_COMMAND,
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_CLICK_COMMAND_PROMPT,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_CLICK_COMMAND.key(),
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_CLICK_COMMAND_PROMPT.key(),
                 Material.COMMAND_BLOCK,
                 () -> currentHologram(name).map(Hologram::clickCommand).orElse(none()),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applyClickCommand(name, value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty npcLinkProperty(HologramName name) {
         return new TextProperty(
                 "editor.text-field",
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_NPC_LINK,
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_NPC_LINK_PROMPT,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_NPC_LINK.key(),
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_NPC_LINK_PROMPT.key(),
                 Material.PLAYER_HEAD,
                 () -> currentHologram(name).map(Hologram::linkedNpcName).orElse(none()),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applyNpcLink(name, value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty blacklistProperty(HologramName name) {
         return new ListProperty(
                 "editor.list-entry",
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_BLACKLIST,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_BLACKLIST.key(),
                 Material.BARRIER,
                 guiText,
+                theme,
                 () -> currentBlacklist(name),
                 next -> applyBlacklist(name, next),
                 new ListPropertyText(
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_TITLE,
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ENTRY_NAME,
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ENTRY_HINTS,
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ADD,
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ADD_PROMPT,
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_EDIT_PROMPT,
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_REMOVE_CONFIRM,
-                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_BACK),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_TITLE.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ENTRY_NAME.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ENTRY_HINTS.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ADD.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_ADD_PROMPT.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_EDIT_PROMPT.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_REMOVE_CONFIRM.key(),
+                        HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_BACK.key()),
                 sub.listLayout(),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -545,7 +554,7 @@ public final class HologramEditorView {
 
     private EditableProperty backgroundColourProperty(HologramName name) {
         return new ColourProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_BACKGROUND,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_BACKGROUND.key(),
                 Material.PAINTING,
                 () -> currentAppearance(name).backgroundArgb(),
                 argb -> applyAppearance(name, a -> a.withBackgroundArgb(argb)),
@@ -555,13 +564,13 @@ public final class HologramEditorView {
                 guiText,
                 colourPickerText,
                 colourPicker,
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty glowColourProperty(HologramName name) {
         return new ColourProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_GLOW,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_GLOW.key(),
                 Material.GLOWSTONE,
                 () -> currentAppearance(name).glowArgb(),
                 argb -> applyAppearance(name, a -> a.withGlowArgb(argb)),
@@ -571,13 +580,13 @@ public final class HologramEditorView {
                 guiText,
                 colourPickerText,
                 colourPicker,
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty textOpacityProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_TEXT_OPACITY,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_TEXT_OPACITY.key(),
                 Material.GLASS_BOTTLE,
                 () -> opacityValue(name),
                 15,
@@ -590,7 +599,7 @@ public final class HologramEditorView {
 
     private EditableProperty shadowRadiusProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_SHADOW_RADIUS,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_SHADOW_RADIUS.key(),
                 Material.BLACK_DYE,
                 () -> Math.round(Math.max(0f, currentAppearance(name).shadowRadius()) * SCALE_FACTOR),
                 10,
@@ -604,7 +613,7 @@ public final class HologramEditorView {
 
     private EditableProperty shadowStrengthProperty(HologramName name) {
         return new NumberProperty(
-                HologramsMessageKey.HOLOGRAM_GUI_PROP_SHADOW_STRENGTH,
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_SHADOW_STRENGTH.key(),
                 Material.GRAY_DYE,
                 () -> Math.round(Math.max(0f, currentAppearance(name).shadowStrength()) * SCALE_FACTOR),
                 10,
@@ -624,7 +633,7 @@ public final class HologramEditorView {
                     case Z -> HologramsMessageKey.HOLOGRAM_GUI_PROP_TRANSLATION_Z;
                 };
         return new NumberProperty(
-                label,
+                label.key(),
                 Material.LEAD,
                 () -> Math.round(translationValue(name, axis) * SCALE_FACTOR),
                 5,
@@ -781,9 +790,9 @@ public final class HologramEditorView {
                 .orElse(0);
     }
 
-    private String onOff(PlayerRef viewer, boolean on) {
+    private String onOff(Player viewer, boolean on) {
         return messages.resolve(
-                viewer,
+                BukkitRefs.toRef(viewer),
                 on ? HologramsMessageKey.HOLOGRAM_GUI_VALUE_ON : HologramsMessageKey.HOLOGRAM_GUI_VALUE_OFF,
                 Map.of());
     }
@@ -794,8 +803,8 @@ public final class HologramEditorView {
     }
 
     /** The catalog "default" word, shown in a colour property's value lore when no override is set. */
-    private String defaultWord(PlayerRef viewer) {
-        return messages.resolve(viewer, HologramsMessageKey.HOLOGRAM_GUI_VALUE_DEFAULT, Map.of());
+    private String defaultWord(Player viewer) {
+        return messages.resolve(BukkitRefs.toRef(viewer), HologramsMessageKey.HOLOGRAM_GUI_VALUE_DEFAULT, Map.of());
     }
 
     private static PlayerRef ref(Player player) {

@@ -4,13 +4,13 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -38,8 +38,8 @@ final class PlaytimeRowProperty implements EditableProperty {
     }
 
     @Override
-    public MessageKey label() {
-        return row.label();
+    public String label() {
+        return row.label().key();
     }
 
     @Override
@@ -48,12 +48,12 @@ final class PlaytimeRowProperty implements EditableProperty {
     }
 
     @Override
-    public String valueLore(PlayerRef viewer) {
+    public String valueLore(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         String active = breakdown.getOrDefault(row.activeKey(), "");
         String afk = row.afkKey() == null ? "" : breakdown.getOrDefault(row.afkKey(), "");
         return messages.resolve(
-                viewer,
+                BukkitRefs.toRef(viewer),
                 row.afkKey() == null
                         ? PlayerstateMessageKey.PLAYTIME_GUI_LIFETIME_VALUE
                         : PlayerstateMessageKey.PLAYTIME_GUI_ROW_VALUE,
@@ -61,7 +61,7 @@ final class PlaytimeRowProperty implements EditableProperty {
     }
 
     @Override
-    public void onClick(ClickContext context) {
+    public void onClick(PropertyClick context) {
         Objects.requireNonNull(context, "context");
         // A breakdown row is inspect-only; a click neither mutates nor navigates.
     }

@@ -11,23 +11,25 @@ import java.util.function.BiPredicate;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemDecor;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ItemType;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.SlotSet;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickSpec;
+import com.uxplima.uxmlib.menu.spec.ItemDecor;
+import com.uxplima.uxmlib.menu.spec.ItemType;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,8 +58,8 @@ class PapiBridgeTest {
     void papiTokenResolvesViaFallbackWhenClaimed() {
         PlaceholderRegistry placeholders = new PlaceholderRegistry();
         placeholders.fallback(id -> id.startsWith("papi_"), (id, ctx) -> "42");
-        ItemRenderer renderer = new ItemRenderer(new GuiText(new KeyMessages()), placeholders);
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        ItemRenderer renderer = new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, placeholders);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
 
         ItemStack rendered = renderer.render(itemNamed("%papi_x%"), ctx);
 
@@ -67,8 +69,8 @@ class PapiBridgeTest {
     @Test
     void unknownTokenStillEmpty() {
         PlaceholderRegistry placeholders = new PlaceholderRegistry();
-        ItemRenderer renderer = new ItemRenderer(new GuiText(new KeyMessages()), placeholders);
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        ItemRenderer renderer = new ItemRenderer(new GuiText(new KeyMessages()), ThemeFile::shippedTheme, placeholders);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
 
         ItemStack rendered = renderer.render(itemNamed("%nope%"), ctx);
 
@@ -92,7 +94,7 @@ class PapiBridgeTest {
         MenuVocabulary.registerConditions(bindings, new DenyAll(), new NoopLogger());
         BiPredicate<MenuContext, Map<String, String>> compare = bindings.condition("papi-compare")
                 .orElseThrow(() -> new AssertionError("papi-compare condition not registered"));
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
 
         assertThat(compare.test(ctx, Map.of("left", "10", "op", ">=", "right", "5")))
                 .isTrue();
@@ -108,7 +110,7 @@ class PapiBridgeTest {
         MenuVocabulary.registerConditions(bindings, new DenyAll(), new NoopLogger());
         BiPredicate<MenuContext, Map<String, String>> expr =
                 bindings.condition("expr").orElseThrow(() -> new AssertionError("expr condition not registered"));
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
 
         assertThat(expr.test(ctx, Map.of("value", "%balance% >= 1000"))).isTrue();
         assertThat(expr.test(ctx, Map.of("value", "%balance% < 1000"))).isFalse();
@@ -123,7 +125,7 @@ class PapiBridgeTest {
         MenuVocabulary.registerConditions(bindings, new DenyAll(), new NoopLogger());
         BiPredicate<MenuContext, Map<String, String>> expr =
                 bindings.condition("expr").orElseThrow(() -> new AssertionError("expr condition not registered"));
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
 
         assertThat(expr.test(ctx, Map.of("value", "this is not ("))).isFalse();
         assertThat(expr.test(ctx, Map.of("value", "1 / 0 > 0"))).isFalse();
@@ -135,7 +137,7 @@ class PapiBridgeTest {
         // claimed token must yield empty rather than throw: the soft-depend never hard-fails.
         MenuBindings bindings = new MenuBindings();
         PapiPlaceholders.registerInto(bindings);
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
 
         assertThat(bindings.placeholders().has("papi_player_name")).isTrue();
         assertThat(bindings.placeholders().resolve("papi_player_name", ctx)).contains("");
@@ -193,9 +195,18 @@ class PapiBridgeTest {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             String text = key.key();
-            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-                text = text.replace("{" + entry.getKey() + "}", entry.getValue());
+            // Ask for each argument by name, as the real catalog does: the renderer hands over a map that
+            // resolves a token when it is asked for, and iterating it yields only what the line spells.
+            java.util.regex.Matcher argument =
+                    java.util.regex.Pattern.compile("\\{([A-Za-z0-9_.-]+)\\}").matcher(text);
+            StringBuilder filled = new StringBuilder();
+            while (argument.find()) {
+                String value = placeholders.get(argument.group(1));
+                argument.appendReplacement(
+                        filled, java.util.regex.Matcher.quoteReplacement(value != null ? value : argument.group()));
             }
+            argument.appendTail(filled);
+            text = filled.toString();
             return text;
         }
     }

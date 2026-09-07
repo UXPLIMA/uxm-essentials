@@ -4,9 +4,9 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
 
 /**
  * The menu-control slice of the action vocabulary: the ways a click can drive the very window it fired in rather

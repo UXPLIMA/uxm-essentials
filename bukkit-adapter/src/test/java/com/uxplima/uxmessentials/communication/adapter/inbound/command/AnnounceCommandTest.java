@@ -26,8 +26,10 @@ import com.uxplima.uxmessentials.communication.application.CommunicationMessageK
 import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.port.RandomSource;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -279,12 +281,13 @@ class AnnounceCommandTest {
         return new AnnouncementEditorView(
                 editorEngine(guiText),
                 guiText,
-                scheduler,
+                ThemeFile::shippedTheme,
+                EngineScheduler.of(scheduler),
                 messages,
                 announcementStore,
                 settingsStore,
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(moduleDir, new NoopLogger()),
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit.create(
+                com.uxplima.uxmlib.gui.input.TextInputTestKit.create(
                         MockBukkit.createMockPlugin(),
                         guiText,
                         scheduler,
@@ -293,19 +296,17 @@ class AnnounceCommandTest {
     }
 
     /** A minimal editor-capable engine for the editor view; the subcommand tests never open it, so it is inert here. */
-    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus editorEngine(
+    private com.uxplima.uxmlib.menu.Menus editorEngine(
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText) {
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings bindings =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer renderer =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
-                        new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
-                                guiText, bindings.placeholders()),
-                        bindings.conditions());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer editorRenderer =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer(guiText);
-        return new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
-                renderer, scheduler, bindings.lists(), editorRenderer);
+        com.uxplima.uxmlib.menu.binding.MenuBindings bindings = new com.uxplima.uxmlib.menu.binding.MenuBindings();
+        com.uxplima.uxmlib.menu.render.MenuRenderer renderer = new com.uxplima.uxmlib.menu.render.MenuRenderer(
+                new com.uxplima.uxmlib.menu.render.ItemRenderer(
+                        guiText, ThemeFile::shippedTheme, bindings.placeholders()),
+                bindings.conditions());
+        com.uxplima.uxmlib.menu.render.EditorRenderer editorRenderer =
+                new com.uxplima.uxmlib.menu.render.EditorRenderer(guiText, ThemeFile::shippedTheme);
+        return new com.uxplima.uxmlib.menu.Menus(
+                renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
     }
 
     private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {

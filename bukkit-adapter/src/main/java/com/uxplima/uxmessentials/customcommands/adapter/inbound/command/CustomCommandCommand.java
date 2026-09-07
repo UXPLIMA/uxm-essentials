@@ -32,7 +32,6 @@ import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -295,7 +294,7 @@ public final class CustomCommandCommand implements CommandRegistration {
             return 0;
         }
         String id = StringArgumentType.getString(ctx, "id");
-        return wizard.start(player, BukkitRefs.toRef(player), id) ? Command.SINGLE_SUCCESS : 0;
+        return wizard.start(player, id) ? Command.SINGLE_SUCCESS : 0;
     }
 
     private int deleteAsk(CommandContext<CommandSourceStack> ctx) {

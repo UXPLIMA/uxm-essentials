@@ -16,6 +16,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.api.action.UxmFailure;
 import com.uxplima.uxmessentials.api.action.UxmOutcome;
 import com.uxplima.uxmessentials.shared.action.ActionDoubles;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -66,7 +67,7 @@ class VaultActionsTest {
     void setUp() {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
-        owner = new PlayerRef(alice.getUniqueId(), alice.getName());
+        owner = BukkitRefs.toRef(alice);
         repository = new FakeVaultRepository();
         scheduler = new ActionDoubles.InlineScheduler();
     }

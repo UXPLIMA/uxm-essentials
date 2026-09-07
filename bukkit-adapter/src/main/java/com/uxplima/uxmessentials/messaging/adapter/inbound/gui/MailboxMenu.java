@@ -6,6 +6,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 
+import org.bukkit.entity.Player;
+
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
@@ -14,14 +16,16 @@ import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.domain.MailBox;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -84,12 +88,12 @@ public final class MailboxMenu {
         bindings.action("messaging:read-mail", this::openDetail);
         bindings.action("messaging:clear-mail", this::confirmClear);
         bindings.action("messaging:mail-back", ctx -> open(ctx.viewer()));
-        menus.registerSpec(LIST_SPEC_ID, MenuSpecs.loadOrBundled(LIST_RESOURCE, dataFolder, 6, log));
-        menus.registerSpec(DETAIL_SPEC_ID, MenuSpecs.loadOrBundled(DETAIL_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(LIST_SPEC_ID, MenuSpecs.loadOrBundled(LIST_RESOURCE, dataFolder, 6, EngineLog.of(log)));
+        menus.registerSpec(DETAIL_SPEC_ID, MenuSpecs.loadOrBundled(DETAIL_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the mailbox for {@code viewer} (the live player resolved by the engine). */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, LIST_SPEC_ID, null);
     }
@@ -100,7 +104,7 @@ public final class MailboxMenu {
      * snapshot (the items are immutable value objects) so unread mail reads as new. Touches no Bukkit API.
      */
     private List<MailItem> items(MenuContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         MailBox box = mail.load(viewer);
         List<MailItem> snapshot = box.items();
         mail.markAllRead(viewer);
@@ -124,15 +128,15 @@ public final class MailboxMenu {
 
     /** Confirm-gate the {@code /mail clear} empty; cancel reopens the mailbox. */
     private void confirmClear(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Component title = guiText.text(viewer, MessagingMessageKey.GUI_MAIL_CLEAR_CONFIRM);
-        menus.confirm(viewer, title, () -> doClear(viewer), () -> open(viewer));
+        menus.confirm(ctx.viewer(), title, () -> doClear(ctx.viewer()), () -> open(ctx.viewer()));
     }
 
     /** Empty the box through the {@link ClearMail} use case off the click thread, then reopen the mailbox. */
-    private void doClear(PlayerRef viewer) {
+    private void doClear(Player viewer) {
         scheduler.async(() -> {
-            clearMail.clear(viewer);
+            clearMail.clear(BukkitRefs.toRef(viewer));
             open(viewer);
         });
     }

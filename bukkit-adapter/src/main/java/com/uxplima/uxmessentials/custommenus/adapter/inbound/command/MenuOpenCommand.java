@@ -19,11 +19,10 @@ import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentNodes;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -104,7 +103,7 @@ public final class MenuOpenCommand implements CommandRegistration {
         // Pre-open actions ride the engine's open-actions seam: opening the menu below runs its open-actions on open,
         // so a menu whose command opens it fires that menu's open-actions: no separate pre-open hook needed here.
         Map<String, String> arguments = ArgumentNodes.read(ctx, spec.arguments());
-        menus.open(BukkitRefs.toRef(player), menuId, null, 0, arguments);
+        menus.open(player, menuId, null, 0, arguments);
         return Command.SINGLE_SUCCESS;
     }
 

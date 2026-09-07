@@ -18,9 +18,6 @@ import com.uxplima.uxmessentials.persistence.worlds.CachedWorldRepository;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
@@ -88,6 +85,9 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldPregen;
 import com.uxplima.uxmessentials.worlds.application.port.WorldSettingApplier;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldLoaded;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldSettingChanged;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**

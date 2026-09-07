@@ -12,6 +12,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
@@ -27,17 +29,19 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -81,7 +85,7 @@ public final class PlayerWarpPeopleMenu {
     private final ManageBans manageBans;
     private final Messages messages;
     private final Notifier notifier;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openManage;
+    private final BiConsumer<Player, PlayerWarpName> openManage;
 
     public PlayerWarpPeopleMenu(
             Menus menus,
@@ -96,7 +100,7 @@ public final class PlayerWarpPeopleMenu {
             ManageBans manageBans,
             Messages messages,
             Notifier notifier,
-            BiConsumer<PlayerRef, PlayerWarpName> openManage) {
+            BiConsumer<Player, PlayerWarpName> openManage) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -134,22 +138,23 @@ public final class PlayerWarpPeopleMenu {
                 "playerwarps:people-back",
                 ctx -> openManage.accept(ctx.viewer(), subject(ctx).warp()));
         for (Kind kind : Kind.values()) {
-            menus.registerSpec(kind.specId(), MenuSpecs.loadOrBundled(kind.resource(), dataFolder, 6, log));
+            menus.registerSpec(
+                    kind.specId(), MenuSpecs.loadOrBundled(kind.resource(), dataFolder, 6, EngineLog.of(log)));
         }
     }
 
     /** Open the members sub-menu for the warp named {@code name}, snapshotting its co-owners/managers off the tick. */
-    public void openMembers(PlayerRef viewer, PlayerWarpName name) {
+    public void openMembers(Player viewer, PlayerWarpName name) {
         open(viewer, name, Kind.MEMBERS);
     }
 
     /** Open the whitelist sub-menu for the warp named {@code name}, snapshotting its guest list off the tick thread. */
-    public void openWhitelist(PlayerRef viewer, PlayerWarpName name) {
+    public void openWhitelist(Player viewer, PlayerWarpName name) {
         open(viewer, name, Kind.WHITELIST);
     }
 
     /** Open the bans sub-menu for the warp named {@code name}, snapshotting its barred players off the tick thread. */
-    public void openBans(PlayerRef viewer, PlayerWarpName name) {
+    public void openBans(Player viewer, PlayerWarpName name) {
         open(viewer, name, Kind.BANS);
     }
 
@@ -158,13 +163,14 @@ public final class PlayerWarpPeopleMenu {
      * name there, then open the sub-menu with the rows as its subject. A warp that has since gone tells the viewer it
      * is not found and opens nothing.
      */
-    private void open(PlayerRef viewer, PlayerWarpName name, Kind kind) {
+    private void open(Player viewer, PlayerWarpName name, Kind kind) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(name, "name");
         scheduler.async(() -> {
             Optional<PlayerWarp> found = repository.findByName(name);
             if (found.isEmpty()) {
-                notifier.send(viewer, PlayerWarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
+                notifier.send(
+                        BukkitRefs.toRef(viewer), PlayerWarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
                 return;
             }
             PlayerWarpId id = found.get().id().orElseThrow();
@@ -172,7 +178,7 @@ public final class PlayerWarpPeopleMenu {
                     switch (kind) {
                         case MEMBERS -> memberRows(id);
                         case WHITELIST -> whitelistRows(id);
-                        case BANS -> banRows(viewer, id);
+                        case BANS -> banRows(BukkitRefs.toRef(viewer), id);
                     };
             menus.open(viewer, kind.specId(), new PeopleView(name, rows));
         });
@@ -232,13 +238,13 @@ public final class PlayerWarpPeopleMenu {
      * informational only.
      */
     private void remove(MenuActionContext ctx, Kind kind, PeopleVerb verb) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName warp = subject(ctx).warp();
         PeopleRow row = ctx.entry(PeopleRow.class);
         PlayerRef target = new PlayerRef(row.uuid(), row.name());
         scheduler.async(() -> {
             verb.apply(viewer, warp, target);
-            open(viewer, warp, kind);
+            open(ctx.viewer(), warp, kind);
         });
     }
 
@@ -248,22 +254,22 @@ public final class PlayerWarpPeopleMenu {
      * name also sends the invalid-value notice, so a typo is never a stack trace.
      */
     private void add(MenuActionContext ctx, Kind kind, PeopleVerb verb) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName warp = subject(ctx).warp();
         String typed = ctx.arg().strip();
         if (typed.isEmpty()) {
-            open(viewer, warp, kind);
+            open(ctx.viewer(), warp, kind);
             return;
         }
         scheduler.async(() -> {
             Optional<PlayerRef> target = players.findByName(typed);
             if (target.isEmpty()) {
                 notifier.send(viewer, PlayerwarpsMessageKey.PWARP_INVALID_NAME, Map.of("value", typed));
-                open(viewer, warp, kind);
+                open(ctx.viewer(), warp, kind);
                 return;
             }
             verb.apply(viewer, warp, target.get());
-            open(viewer, warp, kind);
+            open(ctx.viewer(), warp, kind);
         });
     }
 

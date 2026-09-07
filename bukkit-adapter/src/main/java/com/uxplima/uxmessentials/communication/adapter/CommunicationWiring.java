@@ -47,9 +47,6 @@ import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -57,6 +54,11 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -89,6 +91,7 @@ public final class CommunicationWiring {
             ModuleContext ctx,
             AnnouncementStore announcementStore,
             AnnouncerSettingsStore announcerSettingsStore,
+            Supplier<Theme> theme,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -97,6 +100,7 @@ public final class CommunicationWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(announcementStore, "announcementStore");
         Objects.requireNonNull(announcerSettingsStore, "announcerSettingsStore");
+        Objects.requireNonNull(theme, "theme");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
@@ -144,7 +148,8 @@ public final class CommunicationWiring {
         AnnouncementEditorView editorView = new AnnouncementEditorView(
                 menus,
                 guiText,
-                kernel.scheduler(),
+                theme,
+                new PaperScheduler(plugin),
                 kernel.messages(),
                 announcementStore,
                 announcerSettingsStore,

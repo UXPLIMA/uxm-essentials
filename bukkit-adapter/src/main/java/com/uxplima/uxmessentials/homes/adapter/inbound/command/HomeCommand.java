@@ -133,7 +133,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         if (sender == null) {
             return 0;
         }
-        services.homeList().open(ref(sender));
+        services.homeList().open(sender);
         return Command.SINGLE_SUCCESS;
     }
 

@@ -16,21 +16,22 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.DurationText;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.SiteCooldown;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteSpec;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -113,7 +114,7 @@ public final class VoteSitesMenu {
         bindings.placeholder("vote_site_name", ctx -> entryOf(ctx).spec().name());
         bindings.placeholder("vote_site_lore", this::lore);
         bindings.action("vote:site-open", this::siteClicked);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /** Whether the board is enabled in config (i.e. {@code gui.list-display = gui}). */
@@ -129,8 +130,7 @@ public final class VoteSitesMenu {
     /** Open the board for {@code viewer}; the engine reads each site's cooldown off the tick thread before it draws. */
     public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
-        PlayerRef viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-        menus.open(viewerRef, SPEC_ID, new Board(Instant.now()));
+        menus.open(viewer, SPEC_ID, new Board(Instant.now()));
     }
 
     /**
@@ -144,7 +144,7 @@ public final class VoteSitesMenu {
         List<Object> entries = new ArrayList<>(sites.size());
         for (VoteSiteSpec site : sites) {
             // Cooldown is keyed on the Votifier service (the write key in HandleVote); display uses the name.
-            Optional<Instant> lastVote = repository.lastVoteAtSite(ctx.viewer(), site.service());
+            Optional<Instant> lastVote = repository.lastVoteAtSite(BukkitRefs.toRef(ctx.viewer()), site.service());
             SiteCooldown cooldown = new SiteCooldown(site.name(), lastVote, site.cooldown());
             boolean votable = cooldown.isVotable(now);
             entries.add(new SiteEntry(site, votable, votable ? Duration.ZERO : cooldown.remaining(now)));
@@ -158,10 +158,10 @@ public final class VoteSitesMenu {
         List<String> lines = new ArrayList<>(2);
         entry.spec().url().ifPresent(url -> lines.add("<cta>" + url + "</cta>"));
         if (entry.votable()) {
-            lines.add(messages.resolve(ctx.viewer(), VoteMessageKey.VOTE_GUI_SITE_VOTABLE, Map.of()));
+            lines.add(messages.resolve(BukkitRefs.toRef(ctx.viewer()), VoteMessageKey.VOTE_GUI_SITE_VOTABLE, Map.of()));
         } else {
             lines.add(messages.resolve(
-                    ctx.viewer(),
+                    BukkitRefs.toRef(ctx.viewer()),
                     VoteMessageKey.VOTE_GUI_SITE_COOLDOWN,
                     Map.of("time", DurationText.humanize(entry.remaining()))));
         }
@@ -175,8 +175,8 @@ public final class VoteSitesMenu {
             return;
         }
         String url = entry.spec().url().orElseThrow();
-        Component link = StyledText.render(
-                        messages.resolve(ctx.viewer(), VoteMessageKey.VOTE_GUI_CLICK, Map.of("url", url)))
+        Component link = StyledText.render(messages.resolve(
+                        BukkitRefs.toRef(ctx.viewer()), VoteMessageKey.VOTE_GUI_CLICK, Map.of("url", url)))
                 .clickEvent(ClickEvent.openUrl(url));
         ctx.player().closeInventory();
         ctx.player().sendMessage(link);

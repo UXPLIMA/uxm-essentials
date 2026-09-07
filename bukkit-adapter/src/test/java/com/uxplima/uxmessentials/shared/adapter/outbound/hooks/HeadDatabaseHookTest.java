@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import com.uxplima.uxmlib.menu.providers.HeadQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class HeadDatabaseHookTest {
 
         HeadQuery query = HookHarness.absent(hook);
 
-        assertThat(query).isSameAs(HeadQuery.ABSENT);
+        assertThat(query).isSameAs(HeadQuery.NONE);
         assertThatCode(() -> {
                     assertThat(query.available()).isFalse();
                     assertThat(query.head("any_head_id")).isEmpty();
@@ -56,9 +57,9 @@ class HeadDatabaseHookTest {
         // without the SDK on the classpath); the real HeadDatabaseService applies the same id guard before any
         // reflective read.
         assertThatCode(() -> {
-                    assertThat(HeadQuery.ABSENT.head(null)).isEmpty();
-                    assertThat(HeadQuery.ABSENT.head("")).isEmpty();
-                    assertThat(HeadQuery.ABSENT.head("   ")).isEmpty();
+                    assertThat(HeadQuery.NONE.head(null)).isEmpty();
+                    assertThat(HeadQuery.NONE.head("")).isEmpty();
+                    assertThat(HeadQuery.NONE.head("   ")).isEmpty();
                 })
                 .doesNotThrowAnyException();
     }
@@ -70,7 +71,7 @@ class HeadDatabaseHookTest {
         // HeadDatabaseService, reached past Hooks' present-guard, references HeadDatabase, and even then only
         // by reflective string name.
         assertThat(referencesHeadDatabaseSdk(HeadQuery.class)).isFalse();
-        assertThat(referencesHeadDatabaseSdk(HeadQuery.ABSENT.getClass())).isFalse();
+        assertThat(referencesHeadDatabaseSdk(HeadQuery.NONE.getClass())).isFalse();
     }
 
     @Test
@@ -78,7 +79,7 @@ class HeadDatabaseHookTest {
         Hooks hooks = Hooks.resolve(server, HookHarness.SILENT, List.of(new HeadDatabaseHook(HookHarness.SILENT)));
 
         assertThat(hooks.provides(HeadQuery.class)).isTrue();
-        assertThat(hooks.capability(HeadQuery.class)).isSameAs(HeadQuery.ABSENT);
+        assertThat(hooks.capability(HeadQuery.class)).isSameAs(HeadQuery.NONE);
     }
 
     private static boolean referencesHeadDatabaseSdk(Class<?> type) {

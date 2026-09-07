@@ -29,19 +29,8 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -49,6 +38,19 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.eval.PageRequest;
+import com.uxplima.uxmlib.menu.eval.PagedResult;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -119,7 +121,7 @@ class PagedListFlipTest {
         });
         placeholders.register("page", ctx -> String.valueOf(ctx.page() + 1));
         placeholders.register("max_page", ctx -> String.valueOf(ctx.pageCount()));
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, placeholders);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, placeholders);
         renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
     }
 
@@ -338,15 +340,24 @@ class PagedListFlipTest {
 
     private Menus menus(ListSourceRegistry lists, PagedListSourceRegistry paged) {
         return new Menus(
-                renderer, scheduler, lists, null, null, null, null, BedrockDetector.NONE, BedrockScreen.NONE, paged);
+                renderer,
+                EngineScheduler.of(scheduler),
+                lists,
+                null,
+                null,
+                null,
+                null,
+                BedrockDetector.NONE,
+                BedrockScreen.NONE,
+                paged);
     }
 
     private void installListener(PagedListSourceRegistry paged) {
         MenuListener listener = new MenuListener(
                 renderer,
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry(),
+                new com.uxplima.uxmlib.menu.binding.ActionRegistry(),
                 new ConditionRegistry(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 null,
                 null,
@@ -358,7 +369,7 @@ class PagedListFlipTest {
     }
 
     private void open(Menus menus, String specId) {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), specId, null);
+        menus.open(player, specId, null);
         scheduler.drainAsync();
     }
 

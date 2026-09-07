@@ -4,17 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,7 +32,7 @@ class GenericConditionsTest {
         MenuVocabulary.registerConditions(bindings, new GrantOnly("x.allow"), new NoopLogger());
         BiPredicate<MenuContext, Map<String, String>> perm =
                 bindings.condition("perm").orElseThrow(() -> new AssertionError("perm condition not registered"));
-        MenuContext ctx = MenuContext.of(viewer("Allowed"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.named("Allowed"), null, 0);
 
         assertThat(perm.test(ctx, Map.of("value", "x.allow"))).isTrue();
         assertThat(perm.test(ctx, Map.of("value", "x.deny"))).isFalse();
@@ -46,12 +46,13 @@ class GenericConditionsTest {
                 bindings.condition("on-page").orElseThrow(() -> new AssertionError("on-page condition not registered"));
 
         // page() is zero-based; the condition reads it one-based to match %page%, so index 1 is page 2.
-        assertThat(onPage.test(MenuContext.of(viewer("V"), null, 1), Map.of("value", "2")))
+        assertThat(onPage.test(MenuContext.of(TestViewer.named("V"), null, 1), Map.of("value", "2")))
                 .isTrue();
-        assertThat(onPage.test(MenuContext.of(viewer("V"), null, 0), Map.of("value", "2")))
+        assertThat(onPage.test(MenuContext.of(TestViewer.named("V"), null, 0), Map.of("value", "2")))
                 .isFalse();
         // A blank spec fails closed on every page.
-        assertThat(onPage.test(MenuContext.of(viewer("V"), null, 1), Map.of())).isFalse();
+        assertThat(onPage.test(MenuContext.of(TestViewer.named("V"), null, 1), Map.of()))
+                .isFalse();
     }
 
     @Test
@@ -82,14 +83,10 @@ class GenericConditionsTest {
                 bindings.placeholder("player").orElseThrow(() -> new AssertionError("player not registered"));
         Function<MenuContext, String> page =
                 bindings.placeholder("page").orElseThrow(() -> new AssertionError("page not registered"));
-        MenuContext ctx = MenuContext.of(viewer("Steve"), null, 2);
+        MenuContext ctx = MenuContext.of(TestViewer.named("Steve"), null, 2);
 
         assertThat(player.apply(ctx)).isEqualTo("Steve");
         assertThat(page.apply(ctx)).isEqualTo("3");
-    }
-
-    private static PlayerRef viewer(String name) {
-        return new PlayerRef(UUID.randomUUID(), name);
     }
 
     /** A {@link Logger} that discards every line; this test asserts behaviour, not log output. */

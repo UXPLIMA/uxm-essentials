@@ -12,8 +12,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmlib.menu.Menus;
 
 /**
  * Opens a custom menu when the player right-clicks the opener item that targets it. The held item is recognised by
@@ -53,7 +52,7 @@ public final class MenuOpenerInteractListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        menus.open(BukkitRefs.toRef(event.getPlayer()), menuId.get(), null);
+        menus.open(event.getPlayer(), menuId.get(), null);
     }
 
     private static boolean isRightClick(Action action) {

@@ -14,16 +14,17 @@ import org.bukkit.inventory.meta.SkullMeta;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.IconProviders;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.providers.HeadQuery;
+import com.uxplima.uxmlib.menu.providers.IconProviders;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,6 @@ class IconProvidersTest {
 
     private ServerMock server;
     private PlayerMock player;
-    private PlayerRef ref;
     private MenuContext ctx;
     private ItemRenderer renderer;
 
@@ -54,13 +54,12 @@ class IconProvidersTest {
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer();
-        ref = new PlayerRef(player.getUniqueId(), player.getName());
         GuiText guiText = new GuiText(new KeyMessages());
         PlaceholderRegistry placeholders = new PlaceholderRegistry();
         placeholders.register("head", c -> "skull:Notch");
         // The plain two-arg constructor must keep working and silently gain the default skull + equipment chain.
-        renderer = new ItemRenderer(guiText, placeholders);
-        ctx = MenuContext.of(ref, null, 0);
+        renderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, placeholders);
+        ctx = MenuContext.of(player, null, 0);
     }
 
     @AfterEach
@@ -129,7 +128,10 @@ class IconProvidersTest {
     @Test
     void hdbWithAbsentHeadDatabaseFallsBackWithoutCrashing() {
         ItemRenderer hdbRenderer = new ItemRenderer(
-                new GuiText(new KeyMessages()), placeholders(), IconProviders.withHeadDatabase(HeadQuery.ABSENT));
+                new GuiText(new KeyMessages()),
+                ThemeFile::shippedTheme,
+                placeholders(),
+                IconProviders.withHeadDatabase(HeadQuery.NONE));
         assertThatCode(() -> {
                     ItemStack icon = render(hdbRenderer, "hdb:7", "", 1);
                     assertThat(icon.getType()).isEqualTo(Material.STONE);

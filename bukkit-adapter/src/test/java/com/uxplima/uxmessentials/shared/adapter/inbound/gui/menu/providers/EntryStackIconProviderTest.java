@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers;
+package com.uxplima.uxmlib.menu.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,8 +7,7 @@ import java.util.Optional;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ class EntryStackIconProviderTest {
     void setUp() {
         server = MockBukkit.mock();
         PlayerMock player = server.addPlayer();
-        ctx = MenuContext.of(new PlayerRef(player.getUniqueId(), player.getName()), null, 0);
+        ctx = MenuContext.of(player, null, 0);
     }
 
     @AfterEach

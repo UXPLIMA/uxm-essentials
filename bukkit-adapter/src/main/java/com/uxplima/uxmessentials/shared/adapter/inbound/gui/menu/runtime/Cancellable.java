@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
+package com.uxplima.uxmlib.menu.runtime;
 
 /**
  * A handle to something that can be torn down once: the menu's refresh task in practice. Kept deliberately

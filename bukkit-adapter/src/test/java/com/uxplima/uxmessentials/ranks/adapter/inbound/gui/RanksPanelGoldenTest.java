@@ -39,12 +39,10 @@ import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankId;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -52,6 +50,11 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -171,20 +174,20 @@ class RanksPanelGoldenTest {
     /** Build the engine, register the ranks panel binding + spec, and open the panel for the player. */
     private void openEngine() {
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         MenuVocabulary.registerActions(bindings, menus, false, NOOP);
         MenuVocabulary.registerConditions(bindings, mock(Permissions.class), mock(Logger.class));
         MenuVocabulary.registerPlaceholders(bindings);
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
 
         RanksPanelMenu panel =
                 new RanksPanelMenu(menus, rankup, currentRank(), ladder, scheduler, new TemplateMessages());
         panel.register(bindings, specDir(), NOOP);
-        panel.open(player, new PlayerRef(player.getUniqueId(), player.getName()));
+        panel.open(player, BukkitRefs.toRef(player));
     }
 
     private CurrentRank currentRank() {
@@ -194,9 +197,9 @@ class RanksPanelGoldenTest {
     /** A ranks panel over a throwaway engine, enough for the command to hold as its {@link Optional} GUI handle. */
     private RanksPanelMenu newPanel() {
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         return new RanksPanelMenu(menus, rankup, currentRank(), ladder, scheduler, new TemplateMessages());
     }
 
@@ -264,9 +267,18 @@ class RanksPanelGoldenTest {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             String text = TEMPLATES.getOrDefault(key.key(), key.key());
-            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-                text = text.replace("{" + entry.getKey() + "}", entry.getValue());
+            // Ask for each argument by name, as the real catalog does: the renderer hands over a map that
+            // resolves a token when it is asked for, and iterating it yields only what the line spells.
+            java.util.regex.Matcher argument =
+                    java.util.regex.Pattern.compile("\\{([A-Za-z0-9_.-]+)\\}").matcher(text);
+            StringBuilder filled = new StringBuilder();
+            while (argument.find()) {
+                String value = placeholders.get(argument.group(1));
+                argument.appendReplacement(
+                        filled, java.util.regex.Matcher.quoteReplacement(value != null ? value : argument.group()));
             }
+            argument.appendTail(filled);
+            text = filled.toString();
             return text;
         }
     }

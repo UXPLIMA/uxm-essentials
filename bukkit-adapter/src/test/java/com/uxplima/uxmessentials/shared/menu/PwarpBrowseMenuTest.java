@@ -49,15 +49,10 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpCard;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpQuery;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpSort;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ListControlActions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
@@ -71,6 +66,14 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.eval.PageRequest;
+import com.uxplima.uxmlib.menu.eval.PagedResult;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,7 +118,7 @@ class PwarpBrowseMenuTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         browse = new SpyBrowse();
         viewOpened = new java.util.ArrayList<>();
@@ -329,11 +332,11 @@ class PwarpBrowseMenuTest {
         bindings = new MenuBindings();
         ListControlActions.register(bindings, NOOP);
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Menus menus = new Menus(
                 renderer,
-                scheduler,
+                EngineScheduler.of(scheduler),
                 bindings.lists(),
                 null,
                 null,
@@ -346,7 +349,7 @@ class PwarpBrowseMenuTest {
                 renderer,
                 bindings.actions(),
                 bindings.conditions(),
-                scheduler,
+                EngineScheduler.of(scheduler),
                 plugin,
                 null,
                 null,
@@ -367,11 +370,11 @@ class PwarpBrowseMenuTest {
     }
 
     private MenuContext subjectContext() {
-        return MenuContext.of(viewer, new PlayerWarpBrowseMenu.Subject(Optional.empty(), Map.of()), 0);
+        return MenuContext.of(player, new PlayerWarpBrowseMenu.Subject(Optional.empty(), Map.of()), 0);
     }
 
     private MenuContext presetContext(Map<String, String> presetFilters) {
-        return MenuContext.of(viewer, new PlayerWarpBrowseMenu.Subject(Optional.empty(), presetFilters), 0);
+        return MenuContext.of(player, new PlayerWarpBrowseMenu.Subject(Optional.empty(), presetFilters), 0);
     }
 
     private Inventory top() {

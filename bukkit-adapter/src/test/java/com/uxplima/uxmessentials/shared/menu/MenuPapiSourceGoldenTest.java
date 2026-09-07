@@ -7,20 +7,23 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.LastMenu;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.MenusMenuPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderResolver;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.LastMenu;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,12 +62,12 @@ class MenuPapiSourceGoldenTest {
 
         GuiText guiText = new GuiText(new KeyMessages());
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
         MenuSpecLoader loader = new MenuSpecLoader();
         lastMenu = new LastMenu();
-        menus = new Menus(renderer, scheduler, bindings.lists(), null, null, null, lastMenu);
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), null, null, null, lastMenu);
         menus.registerSpec("browse", loader.parse(BROWSE_HOCON));
         menus.registerSpec("argmenu", loader.parse(ARG_HOCON));
 
@@ -81,7 +84,7 @@ class MenuPapiSourceGoldenTest {
 
     @Test
     void anOpenMenuExposesItsIdPageAndRows() {
-        menus.open(ref(), "browse", null);
+        menus.open(player, "browse", null);
 
         assertThat(resolve("menu_is_in_menu")).contains("yes");
         assertThat(resolve("menu_opened")).contains("browse");
@@ -91,7 +94,7 @@ class MenuPapiSourceGoldenTest {
 
     @Test
     void aTypedArgumentTheMenuWasOpenedWithIsReadableAsASource() {
-        menus.open(ref(), "argmenu", null, 0, Map.of("target", "Steve"));
+        menus.open(player, "argmenu", null, 0, Map.of("target", "Steve"));
 
         assertThat(resolve("menu_argument_target")).contains("Steve");
         assertThat(resolve("menu_argument_absent")).contains("-");
@@ -106,7 +109,7 @@ class MenuPapiSourceGoldenTest {
 
     @Test
     void lastPersistsAfterTheMenuCloses() {
-        menus.open(ref(), "browse", null);
+        menus.open(player, "browse", null);
         player.closeInventory();
 
         // opened tracks the live window and clears on close; last is the reopen history and survives the close.
@@ -120,7 +123,7 @@ class MenuPapiSourceGoldenTest {
     }
 
     private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     private static final class KeyMessages implements Messages {

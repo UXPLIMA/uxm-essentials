@@ -16,17 +16,19 @@ import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCard;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -88,7 +90,7 @@ public final class PlayerWarpCategoriesMenu {
     private final Messages messages;
     private final PlayerWarpBrowse browse;
     private final BrowseOpener browseOpener;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openView;
+    private final BiConsumer<Player, PlayerWarpName> openView;
     private final boolean sponsorEnabled;
 
     public PlayerWarpCategoriesMenu(
@@ -98,7 +100,7 @@ public final class PlayerWarpCategoriesMenu {
             Messages messages,
             PlayerWarpBrowse browse,
             BrowseOpener browseOpener,
-            BiConsumer<PlayerRef, PlayerWarpName> openView,
+            BiConsumer<Player, PlayerWarpName> openView,
             SponsorConfig sponsorConfig) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -128,18 +130,20 @@ public final class PlayerWarpCategoriesMenu {
         bindings.placeholder("pwarp_sponsor_name", ctx -> sponsorName(ctx.entry(WarpCard.class)));
         bindings.placeholder(
                 "pwarp_sponsor_owner", ctx -> ctx.entry(WarpCard.class).ownerName());
-        bindings.action("playerwarps:browse-all", ctx -> browseOpener.open(ctx.player(), ctx.viewer(), Map.of()));
+        bindings.action(
+                "playerwarps:browse-all",
+                ctx -> browseOpener.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), Map.of()));
         bindings.action("playerwarps:browse-mine", ctx -> openBrowse(ctx, "owner"));
         bindings.action("playerwarps:browse-favourites", ctx -> openBrowse(ctx, "favouritesOf"));
         bindings.action(
                 "playerwarps:browse-top",
-                ctx -> browseOpener.open(ctx.player(), ctx.viewer(), Map.of("sort", "rating")));
+                ctx -> browseOpener.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), Map.of("sort", "rating")));
         bindings.action("playerwarps:category-open", this::openCategory);
         bindings.action("playerwarps:sponsor-open", this::openSponsor);
         // Opens this hub from the browse's categories control, so the landing stays reachable now that a bare /pwarp
         // opens the warp grid directly.
-        bindings.action("playerwarps:open-categories", ctx -> open(ctx.player(), ctx.viewer()));
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        bindings.action("playerwarps:open-categories", ctx -> open(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
@@ -152,20 +156,22 @@ public final class PlayerWarpCategoriesMenu {
         Objects.requireNonNull(viewer, "viewer");
         scheduler.async(() -> {
             Subject subject = new Subject(snapshotCategories(viewer), snapshotSponsors());
-            scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, subject));
+            scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, subject));
         });
     }
 
     /** Open the browse pre-filtered to the viewer under {@code key} (owner or favourites), from a quick-entry click. */
     private void openBrowse(MenuActionContext ctx, String key) {
         browseOpener.open(
-                ctx.player(), ctx.viewer(), Map.of(key, ctx.viewer().uuid().toString()));
+                ctx.player(),
+                BukkitRefs.toRef(ctx.viewer()),
+                Map.of(key, ctx.viewer().getUniqueId().toString()));
     }
 
     /** Drill into the browse filtered to the clicked category. */
     private void openCategory(MenuActionContext ctx) {
         WarpCategory category = ctx.entry(WarpCategory.class);
-        browseOpener.open(ctx.player(), ctx.viewer(), Map.of("category", category.id()));
+        browseOpener.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), Map.of("category", category.id()));
     }
 
     /** Drill into the clicked sponsor's detail panel, the same {@code pwarp-view} a browse tile opens. */

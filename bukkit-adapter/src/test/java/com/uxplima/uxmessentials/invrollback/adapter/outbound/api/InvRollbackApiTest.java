@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotId;
 import com.uxplima.uxmessentials.invrollback.domain.event.SnapshotRestored;
 import com.uxplima.uxmessentials.shared.action.ActionDoubles;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.query.QueryDoubles;
@@ -146,7 +147,7 @@ class InvRollbackApiTest {
     }
 
     private static PlayerRef ref(PlayerMock player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** An in-memory snapshot store, newest first, matching what the jOOQ one promises. */

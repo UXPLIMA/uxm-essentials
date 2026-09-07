@@ -38,15 +38,16 @@ import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -219,7 +220,7 @@ public final class MenuCommand implements CommandRegistration {
             feedback.send(player, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", name));
             return 0;
         }
-        menus.open(BukkitRefs.toRef(player), name, null);
+        menus.open(player, name, null);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -252,7 +253,7 @@ public final class MenuCommand implements CommandRegistration {
             return 0;
         }
         PlayerRef executor = sender instanceof Player p ? BukkitRefs.toRef(p) : BukkitRefs.toRef(target);
-        menus.open(BukkitRefs.toRef(target), name, null, 0, Map.of(), executor);
+        menus.open(target, name, null, 0, Map.of(), MenuExecutor.attach(executor));
         feedback.send(sender, CustomMenusMessageKey.MENU_OPENED_FOR, Map.of("player", target.getName()));
         return Command.SINGLE_SUCCESS;
     }
@@ -310,7 +311,7 @@ public final class MenuCommand implements CommandRegistration {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
         }
-        if (!menus.reopenLast(BukkitRefs.toRef(player))) {
+        if (!menus.reopenLast(player)) {
             feedback.send(player, CustomMenusMessageKey.MENU_NO_LAST);
             return 0;
         }
@@ -376,7 +377,7 @@ public final class MenuCommand implements CommandRegistration {
             feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
             return 0;
         }
-        menus.execute(BukkitRefs.toRef(target), Ref.parse(actionString));
+        menus.execute(target, Ref.parse(actionString));
         feedback.send(
                 sender, CustomMenusMessageKey.MENU_EXECUTED, Map.of("name", target.getName(), "action", actionString));
         return Command.SINGLE_SUCCESS;

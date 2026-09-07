@@ -15,20 +15,21 @@ import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -119,7 +120,7 @@ public final class PlayerWarpListMenu {
         bindings.placeholder("pwarp_visibility", this::visibilityWord);
         bindings.action("playerwarps:edit", this::edit);
         bindings.action("playerwarps:create", this::create);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
@@ -131,13 +132,13 @@ public final class PlayerWarpListMenu {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         boolean managesAll = permissions.has(viewer, MANAGE_PERMISSION);
-        menus.open(viewer, SPEC_ID, new PlayerWarpScope(managesAll));
+        menus.open(player, SPEC_ID, new PlayerWarpScope(managesAll));
     }
 
     /** Every warp the viewer may manage, read off the click thread: all owners' when they manage, else their own. */
     private List<OwnedWarp> warps(MenuContext ctx) {
         boolean managesAll = ctx.subject(PlayerWarpScope.class).managesAll();
-        List<PlayerWarp> warps = managesAll ? repository.all() : repository.ownedBy(ctx.viewer());
+        List<PlayerWarp> warps = managesAll ? repository.all() : repository.ownedBy(BukkitRefs.toRef(ctx.viewer()));
         return warps.stream().map(warp -> new OwnedWarp(warp.owner(), warp)).toList();
     }
 
@@ -164,14 +165,14 @@ public final class PlayerWarpListMenu {
     private String visibilityWord(MenuContext ctx) {
         boolean isPublic = warpOf(ctx).access() == WarpAccess.PUBLIC;
         return messages.resolve(
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 isPublic ? PlayerwarpsMessageKey.PWARP_GUI_VALUE_PUBLIC : PlayerwarpsMessageKey.PWARP_GUI_VALUE_PRIVATE,
                 Map.of());
     }
 
     /** Left-click a warp icon: open that warp's bespoke property editor on the viewer's entity thread. */
     private void edit(MenuActionContext ctx) {
-        editor.open(ctx.player(), ctx.viewer(), ctx.entry(OwnedWarp.class));
+        editor.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), ctx.entry(OwnedWarp.class));
     }
 
     /**
@@ -180,11 +181,10 @@ public final class PlayerWarpListMenu {
      */
     private void create(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("playerwarp.create-name", PlayerwarpsMessageKey.PWARP_GUI_LIST_CREATE_PROMPT),
+                InputRequest.of("playerwarp.create-name", PlayerwarpsMessageKey.PWARP_GUI_LIST_CREATE_PROMPT.key()),
                 text -> handleCreate(player, viewer, text),
                 () -> open(player, viewer));
     }

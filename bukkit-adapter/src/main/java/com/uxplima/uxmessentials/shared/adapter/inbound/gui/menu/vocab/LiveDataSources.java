@@ -16,10 +16,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 
 /**
  * Ready-made, read-only sources every custom menu can page without a line of code. Two are server-global rosters:
@@ -61,10 +62,14 @@ public final class LiveDataSources {
     public static void register(MenuBindings bindings, Scheduler scheduler) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(scheduler, "scheduler");
-        bindings.list("online-players", ctx -> snapshot(scheduler, () -> onlinePlayers(ctx.viewer())));
+        bindings.list(
+                "online-players", ctx -> snapshot(scheduler, () -> onlinePlayers(BukkitRefs.toRef(ctx.viewer()))));
         bindings.list("worlds", ctx -> snapshot(scheduler, LiveDataSources::loadedWorlds));
-        bindings.list("self-inventory", ctx -> selfStorage(scheduler, ctx.viewer(), Player::getInventory));
-        bindings.list("self-enderchest", ctx -> selfStorage(scheduler, ctx.viewer(), Player::getEnderChest));
+        bindings.list(
+                "self-inventory", ctx -> selfStorage(scheduler, BukkitRefs.toRef(ctx.viewer()), Player::getInventory));
+        bindings.list(
+                "self-enderchest",
+                ctx -> selfStorage(scheduler, BukkitRefs.toRef(ctx.viewer()), Player::getEnderChest));
         registerOnlinePlayerPlaceholders(bindings);
         registerWorldPlaceholders(bindings);
         registerStackPlaceholders(bindings);

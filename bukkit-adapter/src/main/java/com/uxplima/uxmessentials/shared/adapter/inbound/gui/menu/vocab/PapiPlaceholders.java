@@ -5,15 +5,15 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Bridges PlaceholderAPI tokens into the menu engine's {@code %token%} syntax. Registered once at startup, it sets
- * the {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry} fallback so any
+ * the {@link com.uxplima.uxmlib.menu.binding.PlaceholderRegistry} fallback so any
  * token written {@code %papi_<name>%} resolves through PlaceholderAPI's {@code %<name>%} expansion against the
  * viewer: letting an operator reuse the thousands of placeholders other plugins expose without a per-token binding.
  *
@@ -49,7 +49,7 @@ public final class PapiPlaceholders {
         if (!PlaceholderApiSupport.isPresent()) {
             return "";
         }
-        Player player = Bukkit.getPlayer(ctx.viewer().uuid());
+        Player player = Bukkit.getPlayer(ctx.viewer().getUniqueId());
         if (player == null) {
             return "";
         }

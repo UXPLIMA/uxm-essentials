@@ -25,8 +25,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -36,6 +34,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.shared.menu.TileText;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,7 +70,6 @@ class PunishmentConfirmViewTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock actor;
-    private PlayerRef actorRef;
     private PlayerRef target;
     private TextInput textInput;
     private TestMenuEngine engine;
@@ -81,7 +80,6 @@ class PunishmentConfirmViewTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         actor = server.addPlayer("Staff");
-        actorRef = new PlayerRef(actor.getUniqueId(), actor.getName());
         target = new PlayerRef(java.util.UUID.randomUUID(), "Target");
         textInput = TextInputTestKit.create(
                 plugin,
@@ -104,7 +102,7 @@ class PunishmentConfirmViewTest {
 
     @Test
     void engineRendersTheSameConfirmScreenAsTheOldViewWithSilent() {
-        view.open(actor, actorRef, target, PunishmentAction.BAN, recording(), () -> {});
+        view.open(actor, target, PunishmentAction.BAN, recording(), () -> {});
 
         Inventory inv = actor.getOpenInventory().getTopInventory();
         assertThat(inv.getSize()).isEqualTo(ROWS * 9);
@@ -113,7 +111,7 @@ class PunishmentConfirmViewTest {
 
     @Test
     void engineHidesTheSilentButtonForBanip() {
-        view.open(actor, actorRef, target, PunishmentAction.BANIP, recording(), () -> {});
+        view.open(actor, target, PunishmentAction.BANIP, recording(), () -> {});
 
         Inventory inv = actor.getOpenInventory().getTopInventory();
         assertThat(inv.getSize()).isEqualTo(ROWS * 9);
@@ -125,7 +123,7 @@ class PunishmentConfirmViewTest {
     @Test
     void theApplyButtonCallsTheExecutorNonSilent() {
         RecordingExecutor executor = recording();
-        view.open(actor, actorRef, target, PunishmentAction.BAN, executor, () -> {});
+        view.open(actor, target, PunishmentAction.BAN, executor, () -> {});
 
         fireClick(APPLY_SLOT);
 
@@ -137,7 +135,7 @@ class PunishmentConfirmViewTest {
     @Test
     void theSilentButtonCallsTheExecutorSilent() {
         RecordingExecutor executor = recording();
-        view.open(actor, actorRef, target, PunishmentAction.MUTE, executor, () -> {});
+        view.open(actor, target, PunishmentAction.MUTE, executor, () -> {});
 
         fireClick(SILENT_SLOT);
 
@@ -149,7 +147,7 @@ class PunishmentConfirmViewTest {
     @Test
     void theBackButtonRunsOnBack() {
         List<String> back = new ArrayList<>();
-        view.open(actor, actorRef, target, PunishmentAction.BAN, recording(), () -> back.add("back"));
+        view.open(actor, target, PunishmentAction.BAN, recording(), () -> back.add("back"));
 
         fireClick(BACK_SLOT);
 
@@ -158,14 +156,14 @@ class PunishmentConfirmViewTest {
 
     @Test
     void theReasonSeamReopensCarryingTheCapturedReason() {
-        view.open(actor, actorRef, target, PunishmentAction.BAN, recording(), () -> {});
+        view.open(actor, target, PunishmentAction.BAN, recording(), () -> {});
         // Before a reason is set, the reason item shows the "no reason" lore line.
         assertThat(loreKey(REASON_SLOT)).isEqualTo(ModerationMessageKey.MOD_GUI_CONFIRM_REASON_NONE_LORE.key());
 
         // Drive the reason-input submit branch directly (MockBukkit cannot open a live anvil): it reopens the screen
         // carrying the captured reason in the subject, which the reason item's lore key now reflects.
         view.applyReason(
-                actorRef,
+                actor,
                 new PunishmentConfirmView.Confirm(
                         PunishmentAction.BAN, target, recording(), Optional.empty(), () -> {}),
                 Optional.of("griefing"));

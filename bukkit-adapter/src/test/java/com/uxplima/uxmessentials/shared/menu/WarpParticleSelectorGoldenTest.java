@@ -22,7 +22,7 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * particle icons at content slots 0..13, the ANVIL custom button at slot 18, the ARROW back button at slot 22, and
  * the LAVA_BUCKET remove button at slot 26. The gray-glass filler slots are dropped from the snapshot.
  *
- * <p>Then a left click on the first particle through the engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener}
+ * <p>Then a left click on the first particle through the engine's own {@link com.uxplima.uxmlib.menu.runtime.MenuListener}
  * proves the migrated path runs the same set the old click did. The warp's departure particle saved through the
  * repository, and a click on remove clears it, faithful in both appearance and behaviour.
  */
@@ -97,7 +98,7 @@ class WarpParticleSelectorGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);

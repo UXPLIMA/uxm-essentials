@@ -14,10 +14,6 @@ import org.bukkit.event.Listener;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.trade.TradeRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -47,6 +43,10 @@ import com.uxplima.uxmessentials.trade.application.port.TradeEconomy;
 import com.uxplima.uxmessentials.trade.application.port.TradeEscrowStore;
 import com.uxplima.uxmessentials.trade.application.port.TradeExperience;
 import com.uxplima.uxmessentials.trade.application.port.TradeItemDelivery;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
@@ -101,14 +101,13 @@ public final class TradeWiring {
         TradeSettlement settlement = new TradeSettlement(economy != null ? economy : itemsOnlyEconomy(), experience);
         TradeMoneyPrompt moneyPrompt = (player, viewer, currencyId, onSubmit, onCancel) -> textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("trade.money", TradeMessageKey.TRADE_MONEY_PROMPT, Map.of("currency", currencyId)),
+                InputRequest.of(
+                        "trade.money", TradeMessageKey.TRADE_MONEY_PROMPT.key(), Map.of("currency", currencyId)),
                 onSubmit,
                 onCancel);
         TradeExperiencePrompt experiencePrompt = (player, viewer, onSubmit, onCancel) -> textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("trade.experience", TradeMessageKey.TRADE_EXPERIENCE_PROMPT),
+                InputRequest.of("trade.experience", TradeMessageKey.TRADE_EXPERIENCE_PROMPT.key()),
                 onSubmit,
                 onCancel);
         TradeAudit audit = new LoggingTradeAudit(new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL)));

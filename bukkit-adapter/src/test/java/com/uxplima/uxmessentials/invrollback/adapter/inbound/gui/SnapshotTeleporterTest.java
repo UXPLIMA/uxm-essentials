@@ -14,6 +14,7 @@ import org.bukkit.inventory.ItemStack;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -102,7 +103,7 @@ class SnapshotTeleporterTest {
     }
 
     private static PlayerRef ref(PlayerMock player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** Echoes the key and the placeholder map so an assertion can see the location label that was passed. */

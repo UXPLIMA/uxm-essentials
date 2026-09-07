@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.within;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.ExpressionException;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Expressions;
+import com.uxplima.uxmlib.menu.eval.ExpressionException;
+import com.uxplima.uxmlib.menu.eval.Expressions;
 import org.junit.jupiter.api.Test;
 
 /**

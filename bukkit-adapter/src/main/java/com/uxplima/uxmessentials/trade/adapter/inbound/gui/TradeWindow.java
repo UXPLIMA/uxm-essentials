@@ -12,16 +12,19 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.ContentRegions;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -61,7 +64,8 @@ public final class TradeWindow {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
         this.currencies = List.copyOf(Objects.requireNonNull(currencies, "currencies"));
-        this.spec = MenuSpecs.loadOrBundled(SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, log);
+        this.spec = MenuSpecs.loadOrBundled(
+                SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, EngineLog.of(log));
         this.offerSlots = ContentRegions.slots(spec, OFFER_REGION, SPEC_RESOURCE);
         this.mirrorSlots = ContentRegions.slots(spec, MIRROR_REGION, SPEC_RESOURCE);
         if (offerSlots.size() != mirrorSlots.size()) {
@@ -155,17 +159,17 @@ public final class TradeWindow {
 
     /** Show this window to {@code holder}'s viewer, carrying the holder as the menu's subject. */
     void open(TradeHolder holder) {
-        menus.open(holder.viewer(), SPEC_ID, holder);
+        LivePlayers.of(holder.viewer()).ifPresent(viewer -> menus.open(viewer, SPEC_ID, holder));
     }
 
     /** Redraw {@code viewer}'s window in place, if they still have it open: how a change on one side reaches both. */
     void redraw(PlayerRef viewer) {
-        menus.redraw(viewer, SPEC_ID);
+        LivePlayers.of(viewer).ifPresent(live -> menus.redraw(live, SPEC_ID));
     }
 
     /** The live window {@code viewer} has open, when it is still this one. Read on the viewer's own thread. */
     Optional<Inventory> live(PlayerRef viewer) {
-        return menus.openWindow(viewer, SPEC_ID);
+        return LivePlayers.of(viewer).flatMap(live -> menus.openWindow(live, SPEC_ID));
     }
 
     /** Read the viewer's own offer out of their live window, as a positional array of copies. */
@@ -219,7 +223,7 @@ public final class TradeWindow {
     }
 
     private String text(MenuContext ctx, TradeMessageKey key, Map<String, String> placeholders) {
-        return messages.resolve(ctx.viewer(), key, placeholders);
+        return messages.resolve(BukkitRefs.toRef(ctx.viewer()), key, placeholders);
     }
 
     /** The side of the trade the context's window renders; every binding here is about one holder. */

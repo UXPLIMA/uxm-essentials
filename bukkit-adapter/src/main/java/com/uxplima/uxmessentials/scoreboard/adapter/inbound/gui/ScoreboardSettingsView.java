@@ -10,16 +10,17 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -63,7 +64,6 @@ public final class ScoreboardSettingsView {
                 MODULE, PANEL_LAYOUT, EntityEditorLayout.codeDefault(List.of(VISIBILITY_SLOT), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .menus(menus)
                 .layout(layout)
                 .title(ScoreboardMessageKey.GUI_TITLE)
@@ -92,10 +92,10 @@ public final class ScoreboardSettingsView {
             PlayerRef viewer) {
         // The toggle's value is "shown" (the inverse of the store's "hidden" bit) so the button reads naturally.
         ToggleProperty<Boolean> show = ToggleProperty.ofBoolean(
-                ScoreboardMessageKey.GUI_VISIBILITY,
+                ScoreboardMessageKey.GUI_VISIBILITY.key(),
                 Material.PAINTING,
                 () -> !visibility.hidden(viewer),
-                (who, shown) -> shownState(messages, who, shown),
+                (who, shown) -> shownState(messages, BukkitRefs.toRef(who), shown),
                 shown -> {
                     if (!visibility.hidden(viewer) != shown) {
                         toggle.toggle(viewer);

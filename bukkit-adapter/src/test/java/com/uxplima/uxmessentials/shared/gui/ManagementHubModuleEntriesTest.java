@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -84,14 +85,14 @@ class ManagementHubModuleEntriesTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
-    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus;
+    private com.uxplima.uxmlib.menu.Menus menus;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), scheduler);
@@ -130,7 +131,7 @@ class ManagementHubModuleEntriesTest {
         Set<String> allNodes = new HashSet<>();
         EXPECTED.forEach(e -> allNodes.add(e.permission()));
         ManagementHubView hub = new ManagementHubView(
-                menus, guiText, scheduler, new FakePermissions(allNodes), registry, layout(dir, EXPECTED.size()));
+                menus, guiText, new FakePermissions(allNodes), registry, layout(dir, EXPECTED.size()));
 
         for (int i = 0; i < EXPECTED.size(); i++) {
             ModuleEntry expected = EXPECTED.get(i);
@@ -150,7 +151,6 @@ class ManagementHubModuleEntriesTest {
         ManagementHubView hub = new ManagementHubView(
                 menus,
                 guiText,
-                scheduler,
                 new FakePermissions(Set.of("uxmessentials.home.use")),
                 registry,
                 layout(dir, EXPECTED.size()));

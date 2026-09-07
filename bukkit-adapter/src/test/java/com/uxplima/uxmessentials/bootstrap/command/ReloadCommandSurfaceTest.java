@@ -188,10 +188,10 @@ class ReloadCommandSurfaceTest {
         ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
         GuiText guiText = new GuiText(messages);
         EntityListLayout layout = EntityListLayout.paginatedDefault(org.bukkit.Material.NETHER_STAR);
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus =
-                com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(messages, scheduler)
-                        .menus();
-        ManagementHubView hub = new ManagementHubView(menus, guiText, scheduler, permissions, guiRegistry, layout);
+        com.uxplima.uxmlib.menu.Menus menus = com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(
+                        messages, scheduler)
+                .menus();
+        ManagementHubView hub = new ManagementHubView(menus, guiText, permissions, guiRegistry, layout);
         return new GuiSubcommand(guiRegistry, hub, permissions, messages);
     }
 

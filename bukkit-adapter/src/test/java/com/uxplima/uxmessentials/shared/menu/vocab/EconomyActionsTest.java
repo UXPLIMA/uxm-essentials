@@ -13,17 +13,16 @@ import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistr
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.EconomyActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.FakeCurrencyBackend;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -281,9 +280,8 @@ class EconomyActionsTest {
     private void invoke(MenuBindings from, String id, String arg) {
         Consumer<MenuActionContext> handler =
                 from.action(id).orElseThrow(() -> new AssertionError("action not registered: " + id));
-        PlayerRef ref = new PlayerRef(viewer.getUniqueId(), viewer.getName());
         MenuActionContext ctx =
-                new MenuActionContext(MenuContext.of(ref, null, 0), viewer, ClickKind.LEFT, Map.of("value", arg));
+                new MenuActionContext(MenuContext.of(viewer, null, 0), viewer, ClickKind.LEFT, Map.of("value", arg));
         handler.accept(ctx);
     }
 

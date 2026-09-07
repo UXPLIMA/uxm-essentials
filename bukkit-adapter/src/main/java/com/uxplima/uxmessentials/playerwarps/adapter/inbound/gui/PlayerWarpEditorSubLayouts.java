@@ -20,7 +20,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * The enum-selector geometry the player-warp editor's {@code EnumProperty} buttons (the visibility picker) draw
- * into, beyond the standard {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout}. The
+ * into, beyond the standard {@link com.uxplima.uxmlib.menu.EntityEditorLayout}. The
  * framework's editor-layout loader only reads the property-grid keys, so these extra keys are parsed here from
  * the same {@code modules/playerwarps/gui/pwarp-editor.conf} (disk-first, then the bundled resource, then a code
  * default), keeping every slot and material operator-editable without a second conf file. Mirrors the NPC

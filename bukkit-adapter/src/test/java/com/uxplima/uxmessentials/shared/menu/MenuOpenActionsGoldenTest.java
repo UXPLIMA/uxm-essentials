@@ -13,21 +13,23 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.RequirementConditions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,12 +112,18 @@ class MenuOpenActionsGoldenTest {
         RequirementConditions.register(bindings, currencies, new PlayerMeta(plugin), log);
 
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         scheduler = new SyncScheduler();
         // The production constructor: the façade is handed the action + condition registries so an open runs
         // open-actions and gates on open-requirement, the same registries the click listener resolves against.
-        menus = new Menus(renderer, scheduler, bindings.lists(), null, bindings.actions(), bindings.conditions());
+        menus = new Menus(
+                renderer,
+                EngineScheduler.of(scheduler),
+                bindings.lists(),
+                null,
+                bindings.actions(),
+                bindings.conditions());
         loader = new MenuSpecLoader();
     }
 
@@ -199,7 +207,7 @@ class MenuOpenActionsGoldenTest {
     void anArgumentTokenInAnOpenActionResolvesFromTheOpenArguments() {
         menus.registerSpec("arg", loader.parse(ARG_HOCON));
 
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "arg", null, 0, Map.of("who", "Steve"));
+        menus.open(player, "arg", null, 0, Map.of("who", "Steve"));
 
         assertThat(captured.get())
                 .as("%argument_who% in the open-action expands from the arguments the menu was opened with")
@@ -212,10 +220,10 @@ class MenuOpenActionsGoldenTest {
         // the open-requirement would block if it were evaluated, and the open-action would fire if it ran; neither
         // happens, proving the registry-less path is byte-identical to before this seam existed.
         fillInventory();
-        Menus legacy = new Menus(renderer, scheduler, bindings.lists());
+        Menus legacy = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         legacy.registerSpec("legacy", loader.parse(LEGACY_HOCON));
 
-        legacy.open(new PlayerRef(player.getUniqueId(), player.getName()), "legacy", null);
+        legacy.open(player, "legacy", null);
 
         assertThat(menuOpen())
                 .as("the old constructor skips the gate, so the window opens even with a full inventory")
@@ -226,7 +234,7 @@ class MenuOpenActionsGoldenTest {
     }
 
     private void open(String specId) {
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), specId, null);
+        menus.open(player, specId, null);
     }
 
     /**

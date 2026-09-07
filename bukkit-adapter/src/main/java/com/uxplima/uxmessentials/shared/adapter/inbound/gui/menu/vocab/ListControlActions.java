@@ -3,10 +3,10 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListControlSyntax;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.spec.ListControlSyntax;
 
 /**
  * The paged-list-control slice of the action vocabulary: the bottom-bar buttons a browse menu drives its paged list's

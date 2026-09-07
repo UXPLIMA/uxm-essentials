@@ -27,15 +27,16 @@ import com.uxplima.uxmessentials.regions.domain.RegionMemberChange;
 import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +71,7 @@ class RegionFlagEditorViewTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         staff = server.addPlayer("Staff");
-        staffRef = new PlayerRef(staff.getUniqueId(), staff.getName());
+        staffRef = BukkitRefs.toRef(staff);
         service = new FakeRegionService();
         prompt = new FakePrompt();
         manageMembersFor = new ArrayList<>();
@@ -304,11 +305,7 @@ class RegionFlagEditorViewTest {
 
         @Override
         public void prompt(
-                org.bukkit.entity.Player player,
-                PlayerRef viewer,
-                InputRequest request,
-                Consumer<String> onSubmit,
-                Runnable onCancel) {
+                org.bukkit.entity.Player player, InputRequest request, Consumer<String> onSubmit, Runnable onCancel) {
             this.onSubmit = onSubmit;
             this.onCancel = onCancel;
         }

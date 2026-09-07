@@ -8,15 +8,13 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -34,6 +32,11 @@ import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -113,11 +116,11 @@ public final class VaultSelectorMenu {
         bindings.placeholder("vault_name", this::name);
         bindings.placeholder("vault_lore", this::lore);
         bindings.action("vault:open-slot", this::openSlot);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /** Open the selector for {@code viewer} (the live player resolved by the engine). */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, SPEC_ID, null);
     }
@@ -129,7 +132,7 @@ public final class VaultSelectorMenu {
      * with show-locked off the list is exactly the owned indices.
      */
     private List<VaultSlot> slots(MenuContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         List<VaultSummary> owned = listVaults.list(viewer).asValue().orElse(List.of());
         Map<Integer, VaultSummary> byIndex =
                 owned.stream().collect(Collectors.toMap(VaultSummary::index, summary -> summary));
@@ -181,17 +184,24 @@ public final class VaultSelectorMenu {
         VaultSummary summary = slot.summary();
         if (summary == null) {
             return resolve(
-                    ctx.viewer(), VaultsMessageKey.VAULT_SELECTOR_LOCKED_NAME, "index", Integer.toString(slot.index()));
+                    BukkitRefs.toRef(ctx.viewer()),
+                    VaultsMessageKey.VAULT_SELECTOR_LOCKED_NAME,
+                    "index",
+                    Integer.toString(slot.index()));
         }
         String custom = summary.displayName();
         if (custom == null || custom.isBlank()) {
             return resolve(
-                    ctx.viewer(),
+                    BukkitRefs.toRef(ctx.viewer()),
                     VaultsMessageKey.VAULT_SELECTOR_ENTRY_NAME,
                     "index",
                     Integer.toString(summary.index()));
         }
-        return resolve(ctx.viewer(), VaultsMessageKey.VAULT_SELECTOR_NAMED_ENTRY, "name", displaySafe(custom));
+        return resolve(
+                BukkitRefs.toRef(ctx.viewer()),
+                VaultsMessageKey.VAULT_SELECTOR_NAMED_ENTRY,
+                "name",
+                displaySafe(custom));
     }
 
     /**
@@ -203,9 +213,12 @@ public final class VaultSelectorMenu {
         VaultSlot slot = ctx.entry(VaultSlot.class);
         if (slot.summary() == null) {
             return resolve(
-                    ctx.viewer(), VaultsMessageKey.VAULT_SELECTOR_LOCKED_LORE, "index", Integer.toString(slot.index()));
+                    BukkitRefs.toRef(ctx.viewer()),
+                    VaultsMessageKey.VAULT_SELECTOR_LOCKED_LORE,
+                    "index",
+                    Integer.toString(slot.index()));
         }
-        return messages.resolve(ctx.viewer(), VaultsMessageKey.VAULT_SELECTOR_ENTRY_LORE, Map.of());
+        return messages.resolve(BukkitRefs.toRef(ctx.viewer()), VaultsMessageKey.VAULT_SELECTOR_ENTRY_LORE, Map.of());
     }
 
     /** Clamp the stored name to a sane menu width and escape MiniMessage tags so it cannot inject markup. */
@@ -226,7 +239,7 @@ public final class VaultSelectorMenu {
      */
     private void openSlot(MenuActionContext ctx) {
         VaultSlot slot = ctx.entry(VaultSlot.class);
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         if (slot.summary() == null) {
             sink.deliver(
                     viewer,

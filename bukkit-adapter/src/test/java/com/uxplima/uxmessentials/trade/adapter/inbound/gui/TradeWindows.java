@@ -3,9 +3,9 @@ package com.uxplima.uxmessentials.trade.adapter.inbound.gui;
 import java.nio.file.Path;
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmlib.menu.Menus;
 
 /**
  * Builds the two trade windows over a test engine, the way production wiring does but off a data folder that holds

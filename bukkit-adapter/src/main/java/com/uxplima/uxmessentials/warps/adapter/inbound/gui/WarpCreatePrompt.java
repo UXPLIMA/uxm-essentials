@@ -6,8 +6,6 @@ import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -15,6 +13,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.SetWarp;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -54,8 +54,7 @@ public final class WarpCreatePrompt {
         player.closeInventory();
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("warp.create-name", WarpsMessageKey.WARP_MANAGER_CREATE_PROMPT),
+                InputRequest.of("warp.create-name", WarpsMessageKey.WARP_MANAGER_CREATE_PROMPT.key()),
                 name -> onName(player, viewer, name, reopen),
                 reopen);
     }

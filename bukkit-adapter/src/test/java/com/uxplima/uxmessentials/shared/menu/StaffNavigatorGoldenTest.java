@@ -21,11 +21,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -37,6 +35,11 @@ import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.staff.application.port.StaffTeleport;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +63,6 @@ class StaffNavigatorGoldenTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock looker;
-    private PlayerRef viewer;
     private RecordingTeleport teleport;
     private RecordingKeySink sink;
 
@@ -69,7 +71,6 @@ class StaffNavigatorGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         looker = server.addPlayer("Looker");
-        viewer = new PlayerRef(looker.getUniqueId(), looker.getName());
         teleport = new RecordingTeleport();
         sink = new RecordingKeySink();
         Guis.install(plugin);
@@ -84,7 +85,7 @@ class StaffNavigatorGoldenTest {
     @Test
     void engineRendersTheSameHeadGridAndEmptyBottomRowAsTheOldView() {
         StaffPlayerMenu menu = engine();
-        menu.openNavigator(viewer, roster());
+        menu.openNavigator(looker, roster());
 
         Inventory inv = looker.getOpenInventory().getTopInventory();
         assertThat(inv.getSize()).isEqualTo(54);
@@ -95,7 +96,7 @@ class StaffNavigatorGoldenTest {
     void clickingAHeadThroughTheEngineTeleportsToThatPlayer() {
         List<PlayerRef> roster = roster();
         StaffPlayerMenu menu = engine();
-        menu.openNavigator(viewer, roster);
+        menu.openNavigator(looker, roster);
 
         fireClick(1); // content slot 1 is the second candidate
 
@@ -110,7 +111,7 @@ class StaffNavigatorGoldenTest {
         List<PlayerRef> out = new ArrayList<>();
         for (String name : List.of("Aaron", "Bjorn", "Cole")) {
             PlayerMock candidate = server.addPlayer(name);
-            out.add(new PlayerRef(candidate.getUniqueId(), candidate.getName()));
+            out.add(BukkitRefs.toRef(candidate));
         }
         return out;
     }
@@ -133,13 +134,13 @@ class StaffNavigatorGoldenTest {
     private StaffPlayerMenu engine() {
         GuiText guiText = new GuiText(new KeyMessages());
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         StaffPlayerMenu menu = new StaffPlayerMenu(menus, server, new KeyMessages(), sink, teleport);
         menu.register(bindings, specDir(), new NoopLogger());
         return menu;

@@ -27,7 +27,9 @@ class IntegrationCatalogTest {
     void everyEntryIsFullyPopulated() {
         for (Integration integration : IntegrationCatalog.all()) {
             assertThat(integration.plugin()).isNotBlank();
-            assertThat(integration.seam()).endsWith(".java");
+            // A fully qualified class name, not a file name: the seam is the class to open, and several of them
+            // live in uxmLib's menu module now, where no path under this checkout would find them.
+            assertThat(integration.seam()).contains(".").doesNotEndWith(".java");
             assertThat(integration.purpose()).isNotBlank();
         }
     }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 
 import com.uxplima.uxmessentials.moderation.application.SanctionDurationLimit;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BukkitPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -43,7 +44,7 @@ class SanctionDurationCapTest {
     void aMaxdurationNodeCapsARequestedSpan() {
         PlayerMock staff = server.addPlayer("Staff");
         staff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.moderation.ban.maxduration.3600", true);
-        PlayerRef actor = new PlayerRef(staff.getUniqueId(), staff.getName());
+        PlayerRef actor = BukkitRefs.toRef(staff);
 
         Duration capped = limit.cap(actor, "ban", Duration.ofDays(1));
 
@@ -54,7 +55,7 @@ class SanctionDurationCapTest {
     void aRequestWithinTheCapPassesThrough() {
         PlayerMock staff = server.addPlayer("Staff");
         staff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.moderation.ban.maxduration.3600", true);
-        PlayerRef actor = new PlayerRef(staff.getUniqueId(), staff.getName());
+        PlayerRef actor = BukkitRefs.toRef(staff);
 
         Duration within = limit.cap(actor, "ban", Duration.ofMinutes(30));
 
@@ -64,7 +65,7 @@ class SanctionDurationCapTest {
     @Test
     void anActorWithNoNodeIsUnlimited() {
         PlayerMock staff = server.addPlayer("Staff");
-        PlayerRef actor = new PlayerRef(staff.getUniqueId(), staff.getName());
+        PlayerRef actor = BukkitRefs.toRef(staff);
 
         Duration uncapped = limit.cap(actor, "ban", Duration.ofDays(30));
 
@@ -76,7 +77,7 @@ class SanctionDurationCapTest {
         PlayerMock staff = server.addPlayer("Staff");
         staff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.moderation.ban.maxduration.3600", true);
         staff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.moderation.ban.maxduration.86400", true);
-        PlayerRef actor = new PlayerRef(staff.getUniqueId(), staff.getName());
+        PlayerRef actor = BukkitRefs.toRef(staff);
 
         Duration capped = limit.cap(actor, "ban", Duration.ofDays(7));
 

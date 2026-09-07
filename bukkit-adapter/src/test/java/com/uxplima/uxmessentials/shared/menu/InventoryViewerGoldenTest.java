@@ -9,14 +9,14 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.LiveDataSources;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,7 +91,7 @@ class InventoryViewerGoldenTest {
         viewerPlayer.getInventory().addItem(new ItemStack(Material.BREAD, 1));
         menus.registerSpec("bag", new MenuSpecLoader().parse(INVENTORY_HOCON));
 
-        menus.open(new PlayerRef(viewerPlayer.getUniqueId(), viewerPlayer.getName()), "bag", null);
+        menus.open(viewerPlayer, "bag", null);
 
         Inventory top = viewerPlayer.getOpenInventory().getTopInventory();
         assertTile(top.getItem(0), Material.DIAMOND, 3);
@@ -104,7 +104,7 @@ class InventoryViewerGoldenTest {
         viewerPlayer.getEnderChest().addItem(new ItemStack(Material.EMERALD, 7));
         menus.registerSpec("stash", new MenuSpecLoader().parse(ENDERCHEST_HOCON));
 
-        menus.open(new PlayerRef(viewerPlayer.getUniqueId(), viewerPlayer.getName()), "stash", null);
+        menus.open(viewerPlayer, "stash", null);
 
         Inventory top = viewerPlayer.getOpenInventory().getTopInventory();
         assertTile(top.getItem(0), Material.EMERALD, 7);
@@ -118,7 +118,7 @@ class InventoryViewerGoldenTest {
         viewerPlayer.getInventory().addItem(new ItemStack(Material.DIAMOND, 3));
         menus.registerSpec("bag", new MenuSpecLoader().parse(INVENTORY_HOCON));
 
-        menus.open(new PlayerRef(viewerPlayer.getUniqueId(), viewerPlayer.getName()), "bag", null);
+        menus.open(viewerPlayer, "bag", null);
 
         Inventory top = viewerPlayer.getOpenInventory().getTopInventory();
         ItemStack tile = top.getItem(0);

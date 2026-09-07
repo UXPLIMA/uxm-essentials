@@ -19,17 +19,19 @@ import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -105,7 +107,7 @@ public final class KitSettingsView {
         Objects.requireNonNull(log, "log");
         registerPlaceholders(bindings);
         registerActions(bindings);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     private void registerPlaceholders(MenuBindings bindings) {
@@ -157,7 +159,7 @@ public final class KitSettingsView {
                 ctx -> save(ctx, subject(ctx).withAutoEquip(!subject(ctx).autoEquip())));
         bindings.action("kits:settings-delete", this::delete);
         bindings.action("kits:settings-category", this::openCategory);
-        bindings.action("kits:settings-back", ctx -> onBack.accept(ctx.player(), ctx.viewer()));
+        bindings.action("kits:settings-back", ctx -> onBack.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer())));
     }
 
     /** Open the settings panel for {@code kit}; reads no port, the kit is the subject the panel renders. */
@@ -165,14 +167,14 @@ public final class KitSettingsView {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(kit, "kit");
-        menus.open(viewer, SPEC_ID, kit);
+        menus.open(player, SPEC_ID, kit);
     }
 
     /** Open the bespoke item-editor grid for this kit's stacks: the old edit-items button's effect. */
     private void editItems(MenuActionContext ctx) {
         Player player = ctx.player();
         player.closeInventory();
-        editorView.open(player, ctx.viewer(), subject(ctx));
+        editorView.open(player, BukkitRefs.toRef(ctx.viewer()), subject(ctx));
     }
 
     /** Capture a cooldown in seconds through the input seam; a non-number or negative value is rejected. */
@@ -183,7 +185,7 @@ public final class KitSettingsView {
                 "kit.cooldown",
                 KitsMessageKey.KIT_EDITOR_PROMPT_COOLDOWN,
                 kit,
-                input -> applyCooldown(ctx.player(), ctx.viewer(), kit, input));
+                input -> applyCooldown(ctx.player(), BukkitRefs.toRef(ctx.viewer()), kit, input));
     }
 
     /** Parse the typed cooldown and, when valid, save it and re-open; otherwise send the matching rejection. */
@@ -212,7 +214,7 @@ public final class KitSettingsView {
                 "kit.cost",
                 KitsMessageKey.KIT_EDITOR_PROMPT_COST,
                 kit,
-                input -> applyCost(ctx.player(), ctx.viewer(), kit, input));
+                input -> applyCost(ctx.player(), BukkitRefs.toRef(ctx.viewer()), kit, input));
     }
 
     /** Parse the typed cost and, when valid, save it and re-open; {@code free}/{@code 0} clears the cost. */
@@ -245,7 +247,7 @@ public final class KitSettingsView {
                 "kit.display-name",
                 KitsMessageKey.KIT_EDITOR_PROMPT_DISPLAY_NAME,
                 kit,
-                input -> applyDisplayName(ctx.player(), ctx.viewer(), kit, input));
+                input -> applyDisplayName(ctx.player(), BukkitRefs.toRef(ctx.viewer()), kit, input));
     }
 
     /** Save {@code kit} with the new display name and re-open; {@code none} clears it. Package-private for the test. */
@@ -257,7 +259,7 @@ public final class KitSettingsView {
     /** Copy the item in the operator's main hand as the display material, then save and re-open; empty hand rejected. */
     private void setDisplayMaterial(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         KitDefinition kit = subject(ctx);
         Material hand = player.getInventory().getItemInMainHand().getType();
         if (hand.isAir()) {
@@ -276,7 +278,7 @@ public final class KitSettingsView {
                 "kit.display-lore",
                 KitsMessageKey.KIT_EDITOR_PROMPT_DISPLAY_LORE,
                 kit,
-                input -> applyDisplayLore(ctx.player(), ctx.viewer(), kit, input));
+                input -> applyDisplayLore(ctx.player(), BukkitRefs.toRef(ctx.viewer()), kit, input));
     }
 
     /** Save {@code kit} with the pipe-split display lore and re-open. Package-private for the golden test. */
@@ -292,7 +294,7 @@ public final class KitSettingsView {
                 "kit.commands",
                 KitsMessageKey.KIT_EDITOR_PROMPT_COMMANDS,
                 kit,
-                input -> applyCommands(ctx.player(), ctx.viewer(), kit, input));
+                input -> applyCommands(ctx.player(), BukkitRefs.toRef(ctx.viewer()), kit, input));
     }
 
     /** Save {@code kit} with the pipe-split commands and re-open. Package-private for the golden test. */
@@ -303,7 +305,7 @@ public final class KitSettingsView {
     /** Delete the kit through the {@link DelKit} use case, then return to the manager: the old delete button's effect. */
     private void delete(MenuActionContext ctx) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         player.closeInventory();
         delKit.delete(viewer, subject(ctx).id());
         onBack.accept(player, viewer);
@@ -312,7 +314,7 @@ public final class KitSettingsView {
     /** Open the engine kit category selector; choosing a category saves it and re-opens this panel. */
     private void openCategory(MenuActionContext ctx) {
         if (categorySelector != null) {
-            categorySelector.open(ctx.player(), ctx.viewer(), subject(ctx));
+            categorySelector.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), subject(ctx));
         }
     }
 
@@ -324,14 +326,14 @@ public final class KitSettingsView {
             KitDefinition kit,
             java.util.function.Consumer<String> action) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         player.closeInventory();
-        textInput.prompt(player, viewer, InputRequest.of(inputKey, promptKey), action, () -> open(player, viewer, kit));
+        textInput.prompt(player, InputRequest.of(inputKey, promptKey.key()), action, () -> open(player, viewer, kit));
     }
 
     /** Save the edited kit through the editor, then re-open the panel with the new subject. */
     private void save(MenuActionContext ctx, KitDefinition kit) {
-        save(ctx.player(), ctx.viewer(), kit);
+        save(ctx.player(), BukkitRefs.toRef(ctx.viewer()), kit);
     }
 
     private void save(Player player, PlayerRef viewer, KitDefinition kit) {
@@ -344,7 +346,7 @@ public final class KitSettingsView {
         KitDefinition kit = subject(ctx);
         return kit.hasCost()
                 ? kit.cost().amount().toPlainString()
-                : messages.resolve(ctx.viewer(), KitsMessageKey.KIT_EDITOR_VALUE_FREE, Map.of());
+                : messages.resolve(BukkitRefs.toRef(ctx.viewer()), KitsMessageKey.KIT_EDITOR_VALUE_FREE, Map.of());
     }
 
     /** The display name, or the catalog "none" string when the kit sets none. */
@@ -352,14 +354,16 @@ public final class KitSettingsView {
         return subject(ctx)
                 .display()
                 .name()
-                .orElseGet(() -> messages.resolve(ctx.viewer(), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
+                .orElseGet(() -> messages.resolve(
+                        BukkitRefs.toRef(ctx.viewer()), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
     }
 
     /** The category id, or the catalog "none" string when the kit is in no category. */
     private String category(MenuContext ctx) {
         return subject(ctx)
                 .categoryId()
-                .orElseGet(() -> messages.resolve(ctx.viewer(), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
+                .orElseGet(() -> messages.resolve(
+                        BukkitRefs.toRef(ctx.viewer()), KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of()));
     }
 
     /**
@@ -384,14 +388,14 @@ public final class KitSettingsView {
 
     private String required(MenuContext ctx, boolean value) {
         return messages.resolve(
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 value ? KitsMessageKey.KIT_EDITOR_VALUE_REQUIRED : KitsMessageKey.KIT_EDITOR_VALUE_NONE,
                 Map.of());
     }
 
     private String yesNo(MenuContext ctx, boolean value) {
         return messages.resolve(
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 value ? KitsMessageKey.KIT_EDITOR_VALUE_YES : KitsMessageKey.KIT_EDITOR_VALUE_NO,
                 Map.of());
     }

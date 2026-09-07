@@ -21,15 +21,8 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuClickEvent;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.event.MenuOpenEvent;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -39,6 +32,15 @@ import com.uxplima.uxmlib.bedrock.BedrockButton;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.bedrock.BedrockWidget;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.api.event.MenuClickEvent;
+import com.uxplima.uxmlib.menu.api.event.MenuOpenEvent;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,15 +92,15 @@ class MenuEventGoldenTest {
         bindings.action("record", ctx -> notes.add(ctx.arg()));
 
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         scheduler = new SyncScheduler();
         loader = new MenuSpecLoader();
 
-        menus = new Menus(renderer, scheduler, bindings.lists());
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         menus.registerSpec("menu", loader.parse(SPEC));
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -194,8 +196,16 @@ class MenuEventGoldenTest {
 
     private Menus bedrockMenus(BedrockScreen screen) {
         BedrockDetector everyoneBedrock = uuid -> true;
-        Menus bedrock =
-                new Menus(renderer, scheduler, bindings.lists(), null, null, null, null, everyoneBedrock, screen);
+        Menus bedrock = new Menus(
+                renderer,
+                EngineScheduler.of(scheduler),
+                bindings.lists(),
+                null,
+                null,
+                null,
+                null,
+                everyoneBedrock,
+                screen);
         bedrock.registerSpec("menu", loader.parse(SPEC));
         return bedrock;
     }
@@ -211,7 +221,7 @@ class MenuEventGoldenTest {
     }
 
     private void open(Menus target, String specId) {
-        target.open(new PlayerRef(player.getUniqueId(), player.getName()), specId, null);
+        target.open(player, specId, null);
     }
 
     private void leftClick(int slot) {

@@ -28,7 +28,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
  * ({@code world_shop:}), beneath which sit the {@code title}, the {@code rows} (or {@code size}), the open-command
  * {@code commands} aliases, and the {@code items { … }} map. This reads that surface and emits the {@code title} /
  * {@code rows} / {@code items { … }} shape
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader} loads, mirroring the sibling
+ * {@link com.uxplima.uxmlib.menu.spec.MenuSpecLoader} loads, mirroring the sibling
  * {@link DeluxeMenusConverter} and {@link ZMenuConverter}.
  *
  * <p>An OGUI item carries its actions in two styles that both map onto our {@code click.any.actions}: a simple

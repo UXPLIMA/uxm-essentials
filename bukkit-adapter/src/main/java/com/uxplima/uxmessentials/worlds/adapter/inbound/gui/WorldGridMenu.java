@@ -7,11 +7,7 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -25,6 +21,11 @@ import com.uxplima.uxmessentials.worlds.domain.WorldProperties;
 import com.uxplima.uxmessentials.worlds.domain.WorldProperty;
 import com.uxplima.uxmessentials.worlds.domain.WorldPropertyCycle;
 import com.uxplima.uxmessentials.worlds.domain.WorldSettings;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -120,7 +121,7 @@ public final class WorldGridMenu {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(world, "world");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, snapshot(world, rules)));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, snapshot(world, rules)));
     }
 
     private GridSubject snapshot(WorldName world, boolean rules) {
@@ -146,14 +147,15 @@ public final class WorldGridMenu {
         String next =
                 WorldPropertyCycle.next(property, clicked.value(), effective(action, ctx.clickKind()), worldNames());
         if (!next.equals(clicked.value())) {
-            setProperty.set(ctx.viewer(), subject.world(), property.key(), next);
+            setProperty.set(BukkitRefs.toRef(ctx.viewer()), subject.world(), property.key(), next);
         }
         menus.open(ctx.viewer(), SPEC_ID, subject.withValue(property.key(), next));
     }
 
     private void back(MenuActionContext ctx) {
         if (mainMenu != null) {
-            mainMenu.open(ctx.player(), ctx.viewer(), subject(ctx).world());
+            mainMenu.open(
+                    ctx.player(), BukkitRefs.toRef(ctx.viewer()), subject(ctx).world());
         }
     }
 

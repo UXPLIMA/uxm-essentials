@@ -7,15 +7,17 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -72,8 +74,8 @@ public final class RecipeGridMenu {
                 "recipe_result_material", ctx -> subject(ctx).result().name());
         bindings.placeholder("recipe_result_name", this::resultName);
         bindings.placeholder("recipe_result_lore", ctx -> resolve(ctx, ItemworldMessageKey.RECIPE_GUI_RESULT_LORE));
-        menus.registerSpec(GRID_SPEC_ID, MenuSpecs.loadOrBundled(GRID_RESOURCE, dataFolder, 3, log));
-        menus.registerSpec(EMPTY_SPEC_ID, MenuSpecs.loadOrBundled(EMPTY_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(GRID_SPEC_ID, MenuSpecs.loadOrBundled(GRID_RESOURCE, dataFolder, 3, EngineLog.of(log)));
+        menus.registerSpec(EMPTY_SPEC_ID, MenuSpecs.loadOrBundled(EMPTY_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /**
@@ -81,7 +83,7 @@ public final class RecipeGridMenu {
      * {@code result} material. The {@code grid} must be exactly nine cells in row-major order (top-left to
      * bottom-right).
      */
-    public void open(PlayerRef viewer, List<@Nullable Material> grid, Material result) {
+    public void open(Player viewer, List<@Nullable Material> grid, Material result) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(result, "result");
         if (Objects.requireNonNull(grid, "grid").size() != GRID_CELLS) {
@@ -91,7 +93,7 @@ public final class RecipeGridMenu {
     }
 
     /** Open the empty-state title for {@code viewer}: shown for an item with no crafting recipe. */
-    public void openEmpty(PlayerRef viewer) {
+    public void openEmpty(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, EMPTY_SPEC_ID, null);
     }
@@ -120,13 +122,13 @@ public final class RecipeGridMenu {
 
     private String resultName(MenuContext ctx) {
         return messages.resolve(
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 ItemworldMessageKey.RECIPE_GUI_RESULT_NAME,
                 Map.of("recipe_item", subject(ctx).result().getKey().getKey()));
     }
 
     private String resolve(MenuContext ctx, ItemworldMessageKey key) {
-        return messages.resolve(ctx.viewer(), key, Map.of());
+        return messages.resolve(BukkitRefs.toRef(ctx.viewer()), key, Map.of());
     }
 
     /**

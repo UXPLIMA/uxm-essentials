@@ -4,8 +4,7 @@ import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -18,5 +17,5 @@ import org.jspecify.annotations.NullMarked;
 public interface WizardPrompt {
 
     /** Ask {@code request} of {@code player}, then run exactly one of the two callbacks with their answer. */
-    void ask(Player player, PlayerRef viewer, InputRequest request, Consumer<String> onSubmit, Runnable onCancel);
+    void ask(Player player, InputRequest request, Consumer<String> onSubmit, Runnable onCancel);
 }

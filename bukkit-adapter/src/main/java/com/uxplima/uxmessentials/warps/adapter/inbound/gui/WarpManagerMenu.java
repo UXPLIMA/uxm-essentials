@@ -9,11 +9,8 @@ import java.util.function.BiConsumer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -21,6 +18,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -85,8 +87,8 @@ public final class WarpManagerMenu {
         Objects.requireNonNull(log, "log");
         bindings.list("warps:manager", ctx -> ctx.subject(WarpGrid.class).rows());
         bindings.placeholder("warp_manager_icon", ctx -> material(rowOf(ctx)).name());
-        bindings.placeholder("warp_manager_name", ctx -> name(ctx.viewer(), rowOf(ctx)));
-        bindings.placeholder("warp_manager_category", ctx -> category(ctx.viewer(), rowOf(ctx)));
+        bindings.placeholder("warp_manager_name", ctx -> name(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
+        bindings.placeholder("warp_manager_category", ctx -> category(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
         bindings.placeholder(
                 "warp_manager_world", ctx -> rowOf(ctx).location().world().name());
         bindings.placeholder(
@@ -98,7 +100,7 @@ public final class WarpManagerMenu {
         bindings.action("warps:manager-edit", this::edit);
         bindings.action("warps:manager-create", this::create);
         bindings.action("warps:manager-categories", this::categories);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
@@ -109,7 +111,7 @@ public final class WarpManagerMenu {
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, snapshot()));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, snapshot()));
     }
 
     /** The current stored warps, read on the calling region thread, in repository order. */
@@ -123,17 +125,21 @@ public final class WarpManagerMenu {
 
     /** Left-click a warp icon: open that warp's bespoke editor on the viewer's entity thread. */
     private void edit(MenuActionContext ctx) {
-        editorView.open(ctx.player(), ctx.viewer(), ctx.entry(Warp.class).name().value(), null);
+        editorView.open(
+                ctx.player(),
+                BukkitRefs.toRef(ctx.viewer()),
+                ctx.entry(Warp.class).name().value(),
+                null);
     }
 
     /** Left-click the create button: run the name-prompt → create-at-position → editor flow the old button drove. */
     private void create(MenuActionContext ctx) {
-        createPrompt.accept(ctx.player(), ctx.viewer());
+        createPrompt.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
     /** Left-click the categories button: open the bespoke category manager, as the old slot-51 button did. */
     private void categories(MenuActionContext ctx) {
-        categoryManagerView.open(ctx.player(), ctx.viewer());
+        categoryManagerView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
     /**

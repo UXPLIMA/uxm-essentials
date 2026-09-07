@@ -5,10 +5,7 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -17,6 +14,10 @@ import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -84,7 +85,7 @@ public final class WorldGenerationMenu {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(world, "world");
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, snapshot(world)));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, snapshot(world)));
     }
 
     private Subject snapshot(WorldName world) {
@@ -96,7 +97,8 @@ public final class WorldGenerationMenu {
 
     private void back(MenuActionContext ctx) {
         if (mainMenu != null) {
-            mainMenu.open(ctx.player(), ctx.viewer(), subject(ctx).world());
+            mainMenu.open(
+                    ctx.player(), BukkitRefs.toRef(ctx.viewer()), subject(ctx).world());
         }
     }
 

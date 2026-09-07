@@ -18,19 +18,20 @@ import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -97,14 +98,14 @@ public final class BankListMenu {
                 "bank_members", ctx -> Integer.toString(entry(ctx).members().size()));
         bindings.action("economy:open-bank", this::openBank);
         bindings.action("economy:create-bank", this::createBank);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Resolve the viewer's banks off the tick thread, then open the list for {@code player}. */
     public void open(Player player) {
         Objects.requireNonNull(player, "player");
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
-        scheduler.async(() -> menus.open(viewer, SPEC_ID, snapshot(viewer)));
+        scheduler.async(() -> menus.open(player, SPEC_ID, snapshot(viewer)));
     }
 
     /** Read the viewer's banks off the tick thread, resolving each by id, so the menu opens without a DB read. */
@@ -148,8 +149,7 @@ public final class BankListMenu {
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of("bank.create-name", EconomyMessageKey.BANK_CREATE_PROMPT_NAME),
+                InputRequest.of("bank.create-name", EconomyMessageKey.BANK_CREATE_PROMPT_NAME.key()),
                 name -> {
                     String cleanName = name.trim();
                     if (cleanName.isEmpty()) {

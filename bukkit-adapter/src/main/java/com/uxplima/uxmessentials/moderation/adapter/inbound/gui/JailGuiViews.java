@@ -13,15 +13,15 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -117,7 +117,7 @@ public final class JailGuiViews {
     public void openJailedPlayers(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        jailedPlayers.open(viewer);
+        jailedPlayers.open(player);
     }
 
     /** The hub's two footer buttons, re-deriving the clicker's ref so a hub built once routes each click. */
@@ -132,7 +132,7 @@ public final class JailGuiViews {
                         ModerationMessageKey.MOD_GUI_JAIL_FOOTER_JAILED,
                         ModerationMessageKey.MOD_GUI_JAIL_FOOTER_JAILED_LORE,
                         Material.PLAYER_HEAD,
-                        clicker -> jailedPlayers.open(BukkitRefs.toRef(clicker)))));
+                        clicker -> jailedPlayers.open(clicker))));
     }
 
     private static EntityListLayout jailListCodeDefault() {

@@ -22,12 +22,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -44,6 +41,12 @@ import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,7 +82,7 @@ class WarpSoundsPilotGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Editor");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         repository = new RecordingWarpRepository(serverWarp());
         messages = new TemplateMessages();
     }
@@ -119,9 +122,9 @@ class WarpSoundsPilotGoldenTest {
     private Map<Integer, Snapshot> snapshotOldView() {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, sync(), bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(sync()), bindings.lists());
         WarpEditorView editorView = new WarpEditorView(
                 menus,
                 messages,
@@ -142,9 +145,9 @@ class WarpSoundsPilotGoldenTest {
     private java.util.List<WarpSoundSelectorView.SoundOption> options() {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, sync(), bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(sync()), bindings.lists());
         WarpEditorView editorView = new WarpEditorView(
                 menus,
                 messages,
@@ -170,11 +173,12 @@ class WarpSoundsPilotGoldenTest {
     private void openEngine() {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        MenuListener listener = new MenuListener(renderer, bindings.actions(), bindings.conditions(), sync(), plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(sync()), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, sync(), bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(sync()), bindings.lists());
 
         WarpEditorView editorView = new WarpEditorView(
                 menus,
@@ -190,7 +194,7 @@ class WarpSoundsPilotGoldenTest {
                 WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput());
         WarpSoundMenu menu = WarpSoundMenu.create(menus, optionSource, repository, editorView, textInput());
         menu.register(bindings, dataFolder, new NoopLogger());
-        menu.open(viewer, new WarpSoundEdit(WARP, true));
+        menu.open(player, new WarpSoundEdit(WARP, true));
     }
 
     /** The slot -> (material, plain name) map for every non-empty, non-filler slot of {@code inv}. */
@@ -290,9 +294,18 @@ class WarpSoundsPilotGoldenTest {
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             String template = TEMPLATES.getOrDefault(key.key(), key.key());
             String result = template;
-            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-                result = result.replace("{" + entry.getKey() + "}", entry.getValue());
+            // Ask for each argument by name, as the real catalog does: the renderer hands over a map that
+            // resolves a token when it is asked for, and iterating it yields only what the line spells.
+            java.util.regex.Matcher argument =
+                    java.util.regex.Pattern.compile("\\{([A-Za-z0-9_.-]+)\\}").matcher(result);
+            StringBuilder filled = new StringBuilder();
+            while (argument.find()) {
+                String value = placeholders.get(argument.group(1));
+                argument.appendReplacement(
+                        filled, java.util.regex.Matcher.quoteReplacement(value != null ? value : argument.group()));
             }
+            argument.appendTail(filled);
+            result = filled.toString();
             return result;
         }
 

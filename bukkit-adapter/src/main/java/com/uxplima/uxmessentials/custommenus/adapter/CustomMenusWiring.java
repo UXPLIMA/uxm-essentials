@@ -47,14 +47,16 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -89,12 +91,14 @@ public final class CustomMenusWiring {
             Scheduler scheduler,
             Messages messages,
             GuiText guiText,
+            Supplier<Theme> theme,
             GuiLayouts guiLayouts,
             TextInput textInput,
             ManagementGuiRegistry guiRegistry) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(theme, "theme");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(scheduler, "scheduler");
@@ -203,7 +207,7 @@ public final class CustomMenusWiring {
         MenuRequirementsView requirementsView = new MenuRequirementsView(
                 menus,
                 guiText,
-                scheduler,
+                new PaperScheduler(plugin),
                 guiLayouts,
                 refListEditor,
                 bindings::schema,
@@ -212,7 +216,8 @@ public final class CustomMenusWiring {
         MenuItemEditorView itemEditorView = new MenuItemEditorView(
                 menus,
                 guiText,
-                scheduler,
+                theme,
+                new PaperScheduler(plugin),
                 messages,
                 textInput,
                 guiLayouts,
@@ -231,7 +236,8 @@ public final class CustomMenusWiring {
         MenuCommandEditorView commandEditorView = new MenuCommandEditorView(
                 menus,
                 guiText,
-                scheduler,
+                theme,
+                new PaperScheduler(plugin),
                 messages,
                 textInput,
                 guiLayouts,
@@ -242,7 +248,7 @@ public final class CustomMenusWiring {
         MenuPropertiesView propertiesView = new MenuPropertiesView(
                 menus,
                 guiText,
-                scheduler,
+                new PaperScheduler(plugin),
                 messages,
                 editorService,
                 editLocks,
@@ -258,7 +264,7 @@ public final class CustomMenusWiring {
                         .open(player, BukkitRefs.toRef(player), id),
                 (player, id) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
                         .overview()
-                        .open(player, BukkitRefs.toRef(player), id),
+                        .open(player, id),
                 (player, viewer) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
                         .open(player, viewer));
         propertiesViewRef.set(propertiesView);
@@ -271,7 +277,7 @@ public final class CustomMenusWiring {
                 menus::registeredSpec,
                 (player, id) -> Objects.requireNonNull(editorViewRef.get(), "editorView")
                         .overview()
-                        .open(player, BukkitRefs.toRef(player), id),
+                        .open(player, id),
                 itemEditorView);
         gridViewRef.set(gridView);
         MenuEditorView editorView = new MenuEditorView(

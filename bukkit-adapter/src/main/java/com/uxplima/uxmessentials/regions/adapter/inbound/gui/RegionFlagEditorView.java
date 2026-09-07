@@ -27,9 +27,6 @@ import com.uxplima.uxmessentials.regions.domain.RegionRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -37,7 +34,10 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.SelectorButton;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -146,7 +146,6 @@ public final class RegionFlagEditorView {
         EntityListView.<FlagRow>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(RegionsMessageKey.REGIONS_FLAGS_TITLE)
                 .emptyTitle(RegionsMessageKey.REGIONS_FLAGS_EMPTY)
@@ -183,7 +182,7 @@ public final class RegionFlagEditorView {
                         ref,
                         FlagValue.of(row.flag(), FlagState.of(row.value()).next()));
             case BOOLEAN -> applyValue(region, ref, new FlagValue(row.flag(), nextBoolean(row.value())));
-            case ENUM -> openChoicePicker(region, ref, row);
+            case ENUM -> openChoicePicker(region, clicker, ref, row);
             case STRING, INTEGER, DOUBLE -> promptValue(region, clicker, ref, row);
             case OTHER -> {
                 notify(ref, RegionsMessageKey.REGIONS_FLAGS_NOT_EDITABLE, Map.of("flag", row.flag()));
@@ -217,7 +216,7 @@ public final class RegionFlagEditorView {
     }
 
     /** Open a choice picker of the flag's choices plus an unset option; a pick writes the chosen value and re-opens. */
-    private void openChoicePicker(RegionRef region, PlayerRef ref, FlagRow row) {
+    private void openChoicePicker(RegionRef region, Player clicker, PlayerRef ref, FlagRow row) {
         List<String> choices = row.descriptor().choices();
         int total = choices.size() + 1;
         int rows = Math.min(6, Math.max(1, (total + 8) / 9));
@@ -232,15 +231,15 @@ public final class RegionFlagEditorView {
                     () -> applyValue(region, ref, new FlagValue(row.flag(), choice))));
         }
         Component title = guiText.text(ref, RegionsMessageKey.REGIONS_FLAGS_PICK_TITLE, Map.of("flag", row.flag()));
-        menus.openSelector(ref, title, rows, PICKER_FILLER, buttons);
+        menus.openSelector(clicker, title, rows, PICKER_FILLER, buttons);
     }
 
     /** Prompt for a line, then write it (validating a number); an empty line clears the flag, a cancel re-opens. */
     private void promptValue(RegionRef region, Player clicker, PlayerRef ref, FlagRow row) {
         String initial = row.value().isEmpty() ? null : row.value();
         InputRequest request = new InputRequest(
-                INPUT_KEY, RegionsMessageKey.REGIONS_FLAGS_INPUT_PROMPT, Map.of("flag", row.flag()), initial);
-        prompt.prompt(clicker, ref, request, line -> submitValue(region, ref, row, line), () -> reopen(ref, region));
+                INPUT_KEY, RegionsMessageKey.REGIONS_FLAGS_INPUT_PROMPT.key(), Map.of("flag", row.flag()), initial);
+        prompt.prompt(clicker, request, line -> submitValue(region, ref, row, line), () -> reopen(ref, region));
     }
 
     private void submitValue(RegionRef region, PlayerRef ref, FlagRow row, String line) {

@@ -23,27 +23,27 @@ import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutco
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuSchema;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuSchema;
+import com.uxplima.uxmlib.menu.property.ActionProperty;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.EnumProperty;
+import com.uxplima.uxmlib.menu.property.NumberProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.Ref;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -143,16 +143,15 @@ public final class MenuPropertiesView {
         this.view = EntityEditorView.<MenuTarget>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(this::title)
-                .valueLore(CustomMenusMessageKey.MENU_PROPERTIES_VALUE_LORE)
-                .backName(CustomMenusMessageKey.MENU_PROPERTIES_BACK)
+                .valueLore(CustomMenusMessageKey.MENU_PROPERTIES_VALUE_LORE.key())
+                .backName(CustomMenusMessageKey.MENU_PROPERTIES_BACK.key())
                 .properties(this::properties)
-                .onBack(this::backToOverview)
+                .onBack(player -> backToOverview(player, BukkitRefs.toRef(player)))
                 .onDelete(
-                        CustomMenusMessageKey.MENU_PROPERTIES_DELETE,
-                        CustomMenusMessageKey.MENU_PROPERTIES_DELETE_CONFIRM,
+                        CustomMenusMessageKey.MENU_PROPERTIES_DELETE.key(),
+                        CustomMenusMessageKey.MENU_PROPERTIES_DELETE_CONFIRM.key(),
                         this::deleteMenu)
                 .build();
     }
@@ -182,7 +181,7 @@ public final class MenuPropertiesView {
         MenuTarget target = new MenuTarget(
                 menuId, MenuEditSession.from(spec, openCommandFor.apply(menuId).orElse(null)));
         openTargets.put(viewer.uuid(), target);
-        view.open(player, viewer, target);
+        view.open(player, target);
     }
 
     /** Reopen the property editor for whatever menu {@code viewer} was editing: the command sub-editor's back target. */
@@ -191,7 +190,7 @@ public final class MenuPropertiesView {
         Objects.requireNonNull(viewer, "viewer");
         MenuTarget target = openTargets.get(viewer.uuid());
         if (target != null) {
-            view.open(player, viewer, target);
+            view.open(player, target);
         }
     }
 
@@ -205,8 +204,8 @@ public final class MenuPropertiesView {
         return Optional.ofNullable(openTargets.get(viewer)).map(MenuTarget::session);
     }
 
-    private Component title(PlayerRef viewer, MenuTarget target) {
-        return guiText.text(viewer, CustomMenusMessageKey.MENU_PROPERTIES_TITLE, Map.of("name", target.menuId()));
+    private Component title(Player viewer, MenuTarget target) {
+        return guiText.text(viewer, CustomMenusMessageKey.MENU_PROPERTIES_TITLE.key(), Map.of("name", target.menuId()));
     }
 
     private List<EditableProperty> properties(MenuTarget target) {
@@ -232,19 +231,19 @@ public final class MenuPropertiesView {
     private EditableProperty titleRow(MenuTarget target) {
         return new TextProperty(
                 TEXT_INPUT_KEY,
-                CustomMenusMessageKey.MENU_PROPERTIES_TITLE_FIELD,
-                CustomMenusMessageKey.MENU_PROPERTIES_TITLE_PROMPT,
+                CustomMenusMessageKey.MENU_PROPERTIES_TITLE_FIELD.key(),
+                CustomMenusMessageKey.MENU_PROPERTIES_TITLE_PROMPT.key(),
                 Material.NAME_TAG,
                 () -> target.session().title(),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw),
                 value -> target.session().setTitle(value),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty rowsRow(MenuTarget target) {
         return new NumberProperty(
-                CustomMenusMessageKey.MENU_PROPERTIES_ROWS,
+                CustomMenusMessageKey.MENU_PROPERTIES_ROWS.key(),
                 Material.LADDER,
                 () -> target.session().rows(),
                 1,
@@ -257,8 +256,8 @@ public final class MenuPropertiesView {
 
     private EditableProperty inventoryTypeRow(MenuTarget target) {
         return new EnumProperty<>(
-                CustomMenusMessageKey.MENU_PROPERTIES_INVENTORY_TYPE,
-                CustomMenusMessageKey.MENU_PROPERTIES_SELECT_INVENTORY_TYPE,
+                CustomMenusMessageKey.MENU_PROPERTIES_INVENTORY_TYPE.key(),
+                CustomMenusMessageKey.MENU_PROPERTIES_SELECT_INVENTORY_TYPE.key(),
                 Material.HOPPER,
                 guiText,
                 List.of(InventoryShape.values()),
@@ -274,7 +273,7 @@ public final class MenuPropertiesView {
 
     private EditableProperty clickCooldownRow(MenuTarget target) {
         return new NumberProperty(
-                CustomMenusMessageKey.MENU_PROPERTIES_CLICK_COOLDOWN,
+                CustomMenusMessageKey.MENU_PROPERTIES_CLICK_COOLDOWN.key(),
                 Material.CLOCK,
                 () -> target.session().clickCooldownMs(),
                 50,
@@ -287,7 +286,7 @@ public final class MenuPropertiesView {
 
     private EditableProperty chestOnlyRow(MenuTarget target) {
         return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_PROPERTIES_CHEST_ONLY,
+                CustomMenusMessageKey.MENU_PROPERTIES_CHEST_ONLY.key(),
                 Material.CHEST,
                 () -> target.session().chestOnly(),
                 this::onOff,
@@ -297,7 +296,7 @@ public final class MenuPropertiesView {
 
     private EditableProperty bottomInventoryRow(MenuTarget target) {
         return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_INVENTORY,
+                CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_INVENTORY.key(),
                 Material.LEATHER_CHESTPLATE,
                 () -> target.session().bottomInventory(),
                 this::onOff,
@@ -307,7 +306,7 @@ public final class MenuPropertiesView {
 
     private EditableProperty refreshRow(MenuTarget target) {
         return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_PROPERTIES_REFRESH,
+                CustomMenusMessageKey.MENU_PROPERTIES_REFRESH.key(),
                 Material.REPEATER,
                 () -> target.session().refresh().enabled(),
                 this::onOff,
@@ -317,7 +316,7 @@ public final class MenuPropertiesView {
 
     private EditableProperty refreshIntervalRow(MenuTarget target) {
         return new NumberProperty(
-                CustomMenusMessageKey.MENU_PROPERTIES_REFRESH_INTERVAL,
+                CustomMenusMessageKey.MENU_PROPERTIES_REFRESH_INTERVAL.key(),
                 Material.CLOCK,
                 () -> target.session().refresh().intervalTicks(),
                 20,
@@ -370,7 +369,7 @@ public final class MenuPropertiesView {
     }
 
     private void openRefList(
-            ClickContext context,
+            PropertyClick context,
             MessageKey title,
             List<String> catalogIds,
             Supplier<List<Ref>> current,
@@ -385,14 +384,15 @@ public final class MenuPropertiesView {
                 CustomMenusMessageKey.MENU_PROPERTIES_OPEN_COMMAND,
                 Material.COMMAND_BLOCK,
                 viewer -> target.session().command().map(OpenCommandSpec::name).orElse(""),
-                context -> commandEditor.open(context.player(), context.viewer(), target.session(), target.menuId()));
+                context -> commandEditor.open(
+                        context.viewer(), BukkitRefs.toRef(context.viewer()), target.session(), target.menuId()));
     }
 
     // --- action buttons -------------------------------------------------------------------------------------------
 
     private EditableProperty gridRow(MenuTarget target) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_PROPERTIES_GRID,
+                CustomMenusMessageKey.MENU_PROPERTIES_GRID.key(),
                 Material.CRAFTING_TABLE,
                 hint(CustomMenusMessageKey.MENU_PROPERTIES_GRID_HINT),
                 (player, reopen) -> openGrid.accept(player, target.menuId()));
@@ -400,7 +400,7 @@ public final class MenuPropertiesView {
 
     private EditableProperty saveRow(MenuTarget target) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_PROPERTIES_SAVE,
+                CustomMenusMessageKey.MENU_PROPERTIES_SAVE.key(),
                 Material.EMERALD,
                 hint(CustomMenusMessageKey.MENU_PROPERTIES_SAVE_HINT),
                 (player, reopen) -> saveMenu(player, target, reopen));
@@ -411,7 +411,7 @@ public final class MenuPropertiesView {
         Optional<OpenCommandSpec> command = target.session().command();
         scheduler.async(() -> {
             EditOutcome outcome = service.saveSession(target.menuId(), target.session(), command.orElse(null));
-            scheduler.onEntity(viewer, () -> {
+            scheduler.entity(player, () -> {
                 if (outcome == EditOutcome.SAVED) {
                     // Keep the live open-command reference in step so a later grid save does not revert this edit.
                     rememberCommand.accept(target.menuId(), command);
@@ -426,7 +426,7 @@ public final class MenuPropertiesView {
         PlayerRef viewer = BukkitRefs.toRef(player);
         scheduler.async(() -> {
             EditOutcome outcome = service.delete(target.menuId());
-            scheduler.onEntity(viewer, () -> {
+            scheduler.entity(player, () -> {
                 player.sendMessage(guiText.text(viewer, deleteKey(outcome), name(target)));
                 openTargets.remove(viewer.uuid());
                 openList.accept(player, viewer);
@@ -465,15 +465,15 @@ public final class MenuPropertiesView {
         return Map.of("name", target.menuId(), "missing", "");
     }
 
-    private String onOff(PlayerRef viewer, boolean on) {
+    private String onOff(Player viewer, boolean on) {
         return messages.resolve(
-                viewer,
+                BukkitRefs.toRef(viewer),
                 on ? CustomMenusMessageKey.MENU_PROPERTIES_VALUE_ON : CustomMenusMessageKey.MENU_PROPERTIES_VALUE_OFF,
                 Map.of());
     }
 
-    private Function<PlayerRef, String> hint(MessageKey key) {
-        return viewer -> messages.resolve(viewer, key, Map.of());
+    private Function<Player, String> hint(MessageKey key) {
+        return viewer -> messages.resolve(BukkitRefs.toRef(viewer), key, Map.of());
     }
 
     private static EntityEditorLayout codeDefault() {

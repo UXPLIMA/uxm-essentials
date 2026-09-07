@@ -10,13 +10,15 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeIcon;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -78,11 +80,11 @@ public final class HomeMenus {
         bindings.action("homes:set-icon", this::setIcon);
         bindings.action("homes:reset-icon", this::resetIcon);
         bindings.action("homes:icon-back", this::iconBack);
-        menus.registerSpec(ICON_SPEC_ID, MenuSpecs.loadOrBundled(ICON_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(ICON_SPEC_ID, MenuSpecs.loadOrBundled(ICON_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Open the icon picker for {@code home}; the live player is resolved by the engine. */
-    public void openIcons(PlayerRef viewer, Home home) {
+    public void openIcons(Player viewer, Home home) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(home, "home");
         menus.open(viewer, ICON_SPEC_ID, home);
@@ -103,7 +105,7 @@ public final class HomeMenus {
 
     private void applyIcon(MenuActionContext ctx, Home home, Optional<HomeIcon> icon) {
         Player player = ctx.player();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         scheduler.async(() -> {
             setHomeIcon.setIcon(home.owner(), home.slot(), icon);
             scheduler.onEntity(viewer, () -> actionMenu.open(player, viewer, home));
@@ -112,6 +114,6 @@ public final class HomeMenus {
 
     /** Left-click the back button: return to the home action menu without changing the icon. */
     private void iconBack(MenuActionContext ctx) {
-        actionMenu.open(ctx.player(), ctx.viewer(), ctx.subject(Home.class));
+        actionMenu.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), ctx.subject(Home.class));
     }
 }

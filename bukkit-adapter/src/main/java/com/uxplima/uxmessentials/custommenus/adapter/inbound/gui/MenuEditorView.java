@@ -18,25 +18,25 @@ import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutcome;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.ActionProperty;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -118,18 +118,17 @@ public final class MenuEditorView {
         this.overview = EntityEditorView.<String>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(overviewLayout)
-                .title((viewer, id) -> overviewTitle(viewer, id))
-                .valueLore(CustomMenusMessageKey.MENU_EDITOR_OVERVIEW_VALUE_LORE)
-                .backName(CustomMenusMessageKey.MENU_EDITOR_OVERVIEW_BACK)
+                .title((viewer, id) -> overviewTitle(BukkitRefs.toRef(viewer), id))
+                .valueLore(CustomMenusMessageKey.MENU_EDITOR_OVERVIEW_VALUE_LORE.key())
+                .backName(CustomMenusMessageKey.MENU_EDITOR_OVERVIEW_BACK.key())
                 .properties(this::overviewProperties)
                 // Routed through a method rather than a field-touching lambda: the list field is assigned after this
                 // builder, so the back handler reads it at click time, not at construction.
-                .onBack(this::openList)
+                .onBack(player -> openList(player, BukkitRefs.toRef(player)))
                 .onDelete(
-                        CustomMenusMessageKey.MENU_EDITOR_DELETE,
-                        CustomMenusMessageKey.MENU_EDITOR_DELETE_CONFIRM,
+                        CustomMenusMessageKey.MENU_EDITOR_DELETE.key(),
+                        CustomMenusMessageKey.MENU_EDITOR_DELETE_CONFIRM.key(),
                         this::deleteMenu)
                 .build();
 
@@ -138,7 +137,6 @@ public final class MenuEditorView {
         this.list = EntityListView.<String>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(listLayout)
                 .title(CustomMenusMessageKey.MENU_EDITOR_TITLE)
                 .emptyTitle(CustomMenusMessageKey.MENU_EDITOR_EMPTY_TITLE)
@@ -147,7 +145,7 @@ public final class MenuEditorView {
                         com.uxplima.uxmessentials.shared.application.message.GuiMessageKey.PAGE_NEXT)
                 .entities(menuNames)
                 .iconRenderer(this::listIcon)
-                .onSelect((player, id) -> overview.open(player, BukkitRefs.toRef(player), id))
+                .onSelect((player, id) -> overview.open(player, id))
                 .onCreate(CustomMenusMessageKey.MENU_EDITOR_CREATE, this::promptCreate)
                 .build();
     }
@@ -203,8 +201,7 @@ public final class MenuEditorView {
         PlayerRef viewer = BukkitRefs.toRef(player);
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(CREATE_INPUT_KEY, CustomMenusMessageKey.MENU_EDITOR_CREATE_PROMPT),
+                InputRequest.of(CREATE_INPUT_KEY, CustomMenusMessageKey.MENU_EDITOR_CREATE_PROMPT.key()),
                 text -> applyCreate(player, viewer, text),
                 () -> list.open(player, viewer));
     }
@@ -253,7 +250,7 @@ public final class MenuEditorView {
 
     private EditableProperty saveButton(String id) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_EDITOR_SAVE,
+                CustomMenusMessageKey.MENU_EDITOR_SAVE.key(),
                 Material.EMERALD,
                 hint(CustomMenusMessageKey.MENU_EDITOR_SAVE_HINT),
                 (player, reopen) -> saveMenu(player, id, reopen));
@@ -261,7 +258,7 @@ public final class MenuEditorView {
 
     private EditableProperty duplicateButton(String id) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_EDITOR_DUPLICATE,
+                CustomMenusMessageKey.MENU_EDITOR_DUPLICATE.key(),
                 Material.BOOK,
                 hint(CustomMenusMessageKey.MENU_EDITOR_DUPLICATE_HINT),
                 (player, reopen) -> promptDuplicate(player, id, reopen));
@@ -269,7 +266,7 @@ public final class MenuEditorView {
 
     private EditableProperty renameButton(String id) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_EDITOR_RENAME,
+                CustomMenusMessageKey.MENU_EDITOR_RENAME.key(),
                 Material.NAME_TAG,
                 hint(CustomMenusMessageKey.MENU_EDITOR_RENAME_HINT),
                 (player, reopen) -> promptRename(player, id, reopen));
@@ -278,7 +275,7 @@ public final class MenuEditorView {
     /** The overview button that opens the slot-grid canvas for this menu: the P2 editor's entry point. */
     private EditableProperty gridButton(String id) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_EDITOR_GRID,
+                CustomMenusMessageKey.MENU_EDITOR_GRID.key(),
                 Material.CRAFTING_TABLE,
                 hint(CustomMenusMessageKey.MENU_EDITOR_GRID_HINT),
                 (player, reopen) -> openGrid.accept(player, id));
@@ -287,7 +284,7 @@ public final class MenuEditorView {
     /** The overview button that opens the menu-level property editor for this menu: the P5 editor's entry point. */
     private EditableProperty propertiesButton(String id) {
         return new ActionProperty(
-                CustomMenusMessageKey.MENU_EDITOR_PROPERTIES,
+                CustomMenusMessageKey.MENU_EDITOR_PROPERTIES.key(),
                 Material.COMPARATOR,
                 hint(CustomMenusMessageKey.MENU_EDITOR_PROPERTIES_HINT),
                 (player, reopen) -> openProperties.accept(player, id));
@@ -308,8 +305,7 @@ public final class MenuEditorView {
         PlayerRef viewer = BukkitRefs.toRef(player);
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(DUPLICATE_INPUT_KEY, CustomMenusMessageKey.MENU_EDITOR_DUPLICATE_PROMPT, id(id)),
+                InputRequest.of(DUPLICATE_INPUT_KEY, CustomMenusMessageKey.MENU_EDITOR_DUPLICATE_PROMPT.key(), id(id)),
                 text -> applyDuplicate(player, viewer, id, text),
                 reopen);
     }
@@ -317,7 +313,7 @@ public final class MenuEditorView {
     /** Copy the menu off-thread, then land in the copy's overview (or the source's on a rejected name). */
     void applyDuplicate(Player player, PlayerRef viewer, String from, String text) {
         if (text.isBlank()) {
-            overview.open(player, viewer, from);
+            overview.open(player, from);
             return;
         }
         String to = text.strip();
@@ -325,7 +321,7 @@ public final class MenuEditorView {
             EditOutcome outcome = service.duplicate(from, to);
             scheduler.onEntity(viewer, () -> {
                 feedback(player, viewer, outcome, from, to);
-                overview.open(player, viewer, outcome == EditOutcome.DUPLICATED ? to : from);
+                overview.open(player, outcome == EditOutcome.DUPLICATED ? to : from);
             });
         });
     }
@@ -334,8 +330,7 @@ public final class MenuEditorView {
         PlayerRef viewer = BukkitRefs.toRef(player);
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(RENAME_INPUT_KEY, CustomMenusMessageKey.MENU_EDITOR_RENAME_PROMPT, id(id)),
+                InputRequest.of(RENAME_INPUT_KEY, CustomMenusMessageKey.MENU_EDITOR_RENAME_PROMPT.key(), id(id)),
                 text -> applyRename(player, viewer, id, text),
                 reopen);
     }
@@ -343,7 +338,7 @@ public final class MenuEditorView {
     /** Rename the menu off-thread, then land in the renamed menu's overview (or the source's on a rejected name). */
     void applyRename(Player player, PlayerRef viewer, String from, String text) {
         if (text.isBlank()) {
-            overview.open(player, viewer, from);
+            overview.open(player, from);
             return;
         }
         String to = text.strip();
@@ -352,9 +347,9 @@ public final class MenuEditorView {
             scheduler.onEntity(viewer, () -> {
                 feedback(player, viewer, outcome, from, to);
                 if (outcome == EditOutcome.RENAMED) {
-                    overview.open(player, viewer, to);
+                    overview.open(player, to);
                 } else {
-                    overview.open(player, viewer, from);
+                    overview.open(player, from);
                 }
             });
         });
@@ -396,8 +391,8 @@ public final class MenuEditorView {
     }
 
     /** A fixed value-hint resolved in the viewer's locale: an action button's lore is not an editable value. */
-    private Function<PlayerRef, String> hint(MessageKey key) {
-        return viewer -> messages.resolve(viewer, key, Map.of());
+    private Function<Player, String> hint(MessageKey key) {
+        return viewer -> messages.resolve(BukkitRefs.toRef(viewer), key, Map.of());
     }
 
     private static Map<String, String> id(String id) {

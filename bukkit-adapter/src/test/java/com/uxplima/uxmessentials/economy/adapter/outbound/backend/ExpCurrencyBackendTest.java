@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -72,7 +73,7 @@ class ExpCurrencyBackendTest {
         player.setLevel(0);
         player.setExp(0);
         ExpCurrencyBackend backend = new ExpCurrencyBackend(server, new RecordingScheduler(), new RecordingLogger());
-        PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
+        PlayerRef ref = BukkitRefs.toRef(player);
         backend.credit(ref, Money.of(XP, BigDecimal.valueOf(10)));
 
         assertThat(backend.debit(ref, Money.of(XP, BigDecimal.valueOf(11))).errorOrThrow())
@@ -86,7 +87,7 @@ class ExpCurrencyBackendTest {
         player.setLevel(0);
         player.setExp(0);
         ExpCurrencyBackend backend = new ExpCurrencyBackend(server, new RecordingScheduler(), new RecordingLogger());
-        PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
+        PlayerRef ref = BukkitRefs.toRef(player);
 
         assertThat(backend.credit(ref, Money.of(XP, BigDecimal.valueOf(100))).isOk())
                 .isTrue();
@@ -101,7 +102,7 @@ class ExpCurrencyBackendTest {
         RecordingScheduler onOwnersThread = new RecordingScheduler();
         onOwnersThread.owns = true;
         ExpCurrencyBackend backend = new ExpCurrencyBackend(server, onOwnersThread, new RecordingLogger());
-        PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
+        PlayerRef ref = BukkitRefs.toRef(player);
 
         assertThat(backend.credit(ref, Money.of(XP, BigDecimal.valueOf(30))).isOk())
                 .isTrue();

@@ -19,7 +19,7 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsV
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +49,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * slot, to the analytic baseline the old view produced. Candidate icons, the two fixed buttons, and the engine's
  * mandatory nav arrows at 45/46, and the category being edited never appears (the cyclic-parent guard). Then a left
  * click on the first candidate through the engine's own
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener} proves the migrated path runs
+ * {@link com.uxplima.uxmlib.menu.runtime.MenuListener} proves the migrated path runs
  * the same assign the old click did, the edited category saved with that parent id, and returns the viewer to its
  * settings window, faithful in both appearance and behaviour.
  */
@@ -83,7 +84,7 @@ class WarpCategoryParentSelectorGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
@@ -129,7 +130,7 @@ class WarpCategoryParentSelectorGoldenTest {
     void theEngineWindowIsMenuBacked() {
         selector.open(player, viewer, CHILD);
         assertThat(player.getOpenInventory().getTopInventory().getHolder())
-                .isInstanceOf(com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder.class);
+                .isInstanceOf(com.uxplima.uxmlib.menu.runtime.MenuHolder.class);
     }
 
     @Test

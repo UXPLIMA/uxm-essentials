@@ -16,8 +16,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PlayerDataPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -26,6 +24,8 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,7 +94,7 @@ class DataPlaceholderGoldenTest {
     @Test
     void dataAndMathAndMetaPlaceholdersRenderThroughTheOpenPath() {
         menus.registerSpec("panel", new MenuSpecLoader().parse(HOCON));
-        menus.open(new PlayerRef(viewer.getUniqueId(), viewer.getName()), "panel", null);
+        menus.open(viewer, "panel", null);
 
         ItemStack item = topItem();
         assertThat(plainName(item)).isEqualTo("50");
@@ -104,7 +104,7 @@ class DataPlaceholderGoldenTest {
     @Test
     void aMissingKeyRendersEmptyForDataValueAndZeroForDataNumber() {
         menus.registerSpec("panel", new MenuSpecLoader().parse(MISSING_HOCON));
-        menus.open(new PlayerRef(viewer.getUniqueId(), viewer.getName()), "panel", null);
+        menus.open(viewer, "panel", null);
 
         ItemStack item = topItem();
         assertThat(plainName(item)).isEmpty();

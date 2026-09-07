@@ -24,12 +24,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -49,6 +46,12 @@ import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,7 +98,7 @@ class WarpManagerGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Admin");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        viewer = BukkitRefs.toRef(player);
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         repository = new RecordingRepository();
@@ -148,7 +151,7 @@ class WarpManagerGoldenTest {
         fireClick(51, ClickType.LEFT);
 
         assertThat(player.getOpenInventory().getTopInventory().getHolder())
-                .isInstanceOf(com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder.class);
+                .isInstanceOf(com.uxplima.uxmlib.menu.runtime.MenuHolder.class);
     }
 
     /**
@@ -177,14 +180,14 @@ class WarpManagerGoldenTest {
     /** Build the engine, register the warps manager bindings + spec, and open the manager for the player. */
     private void openEngine() {
         MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         // The shipped close action the manager's close button names; the engine façade does not register it itself.
         bindings.action("close", ctx -> ctx.player().closeInventory());
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
 
         WarpManagerMenu manager = managerMenu(menus, bindings);
         manager.register(bindings, dataFolder, NOOP);
@@ -194,8 +197,7 @@ class WarpManagerGoldenTest {
     /** A {@link WarpManagerMenu} wired off the same collaborators as the old view, over the engine façade. */
     private WarpManagerMenu managerMenu(Menus menus, MenuBindings bindings) {
         Messages messages = new KeyMessages();
-        var textInput =
-                org.mockito.Mockito.mock(com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput.class);
+        var textInput = org.mockito.Mockito.mock(com.uxplima.uxmlib.gui.input.TextInput.class);
         WarpEditorView editorView = new WarpEditorView(
                 menus,
                 messages,

@@ -12,15 +12,15 @@ import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -106,12 +106,12 @@ public final class MessagingGuiViews {
 
     /** Open the ignore-list manager for {@code viewer}; the engine resolves the live player from {@code viewer}. */
     public void openIgnore(Player player, PlayerRef viewer) {
-        ignoreMenu.open(viewer);
+        ignoreMenu.open(player);
     }
 
     /** Open the mailbox for {@code viewer}; the engine resolves the live player from {@code viewer}. */
     public void openMailbox(Player player, PlayerRef viewer) {
-        mailboxMenu.open(viewer);
+        mailboxMenu.open(player);
     }
 
     /** The settings panel, for tests. */

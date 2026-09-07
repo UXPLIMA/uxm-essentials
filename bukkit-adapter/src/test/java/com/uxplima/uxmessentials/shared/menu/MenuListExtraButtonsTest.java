@@ -19,13 +19,13 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EntityListSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.EntityListSpec;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,9 +37,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * Coverage of the engine list's {@code extraButtons} completion: an {@link EntityListSpec} may carry fixed pre-built buttons
  * beyond its single create/action pair, so a caller that needs three or more non-entity buttons (the shared player
  * picker's offline-name button plus its two optional footer buttons) is not capped at two. The test opens a list with
- * two extra buttons through {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus#openList}, asserts
+ * two extra buttons through {@link com.uxplima.uxmlib.menu.Menus#openList}, asserts
  * each renders at its slot with its baked icon, and that a click on one through the one {@link
- * com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener} runs that button's handler with the
+ * com.uxplima.uxmlib.menu.runtime.MenuListener} runs that button's handler with the
  * live viewer: proving both the paint and the click-routing seam the renderer records onto the list state.
  */
 class MenuListExtraButtonsTest {
@@ -50,7 +50,6 @@ class MenuListExtraButtonsTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private TestMenuEngine engine;
     private final List<String> clicks = new ArrayList<>();
 
@@ -59,7 +58,6 @@ class MenuListExtraButtonsTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
         engine.installListener(plugin);
     }
@@ -71,7 +69,7 @@ class MenuListExtraButtonsTest {
 
     @Test
     void extraButtonsRenderAtTheirSlotsWithTheirIcons() {
-        engine.menus().openList(viewer, spec());
+        engine.menus().openList(player, spec());
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getItem(FIRST_EXTRA_SLOT).getType()).isEqualTo(Material.NAME_TAG);
@@ -80,7 +78,7 @@ class MenuListExtraButtonsTest {
 
     @Test
     void clickingAnExtraButtonRunsItsHandlerWithTheViewer() {
-        engine.menus().openList(viewer, spec());
+        engine.menus().openList(player, spec());
 
         fireClick(SECOND_EXTRA_SLOT);
 
@@ -89,7 +87,7 @@ class MenuListExtraButtonsTest {
 
     @Test
     void theWindowIsMenuBacked() {
-        engine.menus().openList(viewer, spec());
+        engine.menus().openList(player, spec());
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 

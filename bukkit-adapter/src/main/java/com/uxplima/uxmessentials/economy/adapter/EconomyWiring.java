@@ -72,8 +72,6 @@ import com.uxplima.uxmessentials.persistence.economy.WalletLedger;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
@@ -84,6 +82,8 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.ProviderVaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -122,8 +122,7 @@ public final class EconomyWiring {
             Persistence persistence,
             Bus bus,
             Hooks hooks,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
-                    textInput,
+            com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
                     picker,
             Menus menus,
@@ -273,8 +272,7 @@ public final class EconomyWiring {
             CurrencyBackendRegistry backends,
             WalletRepository repository,
             PendingTransactionRepository pendingRepo,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
-                    textInput,
+            com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
                     picker,
             Menus menus,
@@ -504,16 +502,14 @@ public final class EconomyWiring {
             EconomyProvider resolved,
             BaltopSnapshots snapshots,
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
-                    textInput,
+            com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu currencyPicker,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder) {
         // The bank, loan, and exchange dashboards all capture a typed amount through the shared input seam, so a
         // non-null TextInput is required to build them; bootstrap always supplies it.
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput input =
-                Objects.requireNonNull(textInput, "textInput");
+        com.uxplima.uxmlib.gui.input.TextInput input = Objects.requireNonNull(textInput, "textInput");
         EconomyNotifier notifier =
                 new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat());
 

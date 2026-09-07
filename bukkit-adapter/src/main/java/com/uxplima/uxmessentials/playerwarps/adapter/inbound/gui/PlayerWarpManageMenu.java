@@ -11,6 +11,8 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
@@ -28,12 +30,8 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpDescription;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -43,6 +41,11 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -87,11 +90,11 @@ public final class PlayerWarpManageMenu {
     private final PlayerLookup players;
     private final Messages messages;
     private final Notifier notifier;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openView;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openMembers;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openWhitelist;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openBans;
-    private final BiConsumer<PlayerRef, PlayerWarpName> openIcon;
+    private final BiConsumer<Player, PlayerWarpName> openView;
+    private final BiConsumer<Player, PlayerWarpName> openMembers;
+    private final BiConsumer<Player, PlayerWarpName> openWhitelist;
+    private final BiConsumer<Player, PlayerWarpName> openBans;
+    private final BiConsumer<Player, PlayerWarpName> openIcon;
     private final boolean sponsorEnabled;
     private final int sponsorDefaultDays;
 
@@ -109,11 +112,11 @@ public final class PlayerWarpManageMenu {
             Messages messages,
             Notifier notifier,
             SponsorConfig sponsorConfig,
-            BiConsumer<PlayerRef, PlayerWarpName> openView,
-            BiConsumer<PlayerRef, PlayerWarpName> openMembers,
-            BiConsumer<PlayerRef, PlayerWarpName> openWhitelist,
-            BiConsumer<PlayerRef, PlayerWarpName> openBans,
-            BiConsumer<PlayerRef, PlayerWarpName> openIcon) {
+            BiConsumer<Player, PlayerWarpName> openView,
+            BiConsumer<Player, PlayerWarpName> openMembers,
+            BiConsumer<Player, PlayerWarpName> openWhitelist,
+            BiConsumer<Player, PlayerWarpName> openBans,
+            BiConsumer<Player, PlayerWarpName> openIcon) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -151,7 +154,7 @@ public final class PlayerWarpManageMenu {
         bindings.condition(
                 "playerwarps:manage-sponsor", (ctx, args) -> subject(ctx).sponsorEnabled());
         registerActions(bindings);
-        menus.registerSpec(MANAGE_SPEC_ID, MenuSpecs.loadOrBundled(MANAGE_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(MANAGE_SPEC_ID, MenuSpecs.loadOrBundled(MANAGE_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /** Bind every management verb. Value-carrying ids are single-segment; the value-free ones stay namespaced. */
@@ -193,19 +196,23 @@ public final class PlayerWarpManageMenu {
      * viewer's entity thread. A warp that has since gone tells the viewer it is not found; a viewer who holds no role
      * on it is refused rather than shown an empty panel.
      */
-    public void open(PlayerRef viewer, PlayerWarpName name) {
+    public void open(Player viewer, PlayerWarpName name) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(name, "name");
         scheduler.async(() -> {
             Optional<PlayerWarp> found = repository.findByName(name);
             if (found.isEmpty()) {
-                notifier.send(viewer, PlayerWarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
+                notifier.send(
+                        BukkitRefs.toRef(viewer), PlayerWarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
                 return;
             }
             PlayerWarp warp = found.get();
-            Optional<WarpRole> role = authorization.roleFor(warp, viewer.uuid());
+            Optional<WarpRole> role = authorization.roleFor(warp, viewer.getUniqueId());
             if (role.isEmpty()) {
-                notifier.send(viewer, PlayerWarpError.NO_PERMISSION.messageKey(), Map.of("warp", name.value()));
+                notifier.send(
+                        BukkitRefs.toRef(viewer),
+                        PlayerWarpError.NO_PERMISSION.messageKey(),
+                        Map.of("warp", name.value()));
                 return;
             }
             menus.open(viewer, MANAGE_SPEC_ID, new Subject(warp, role.get(), sponsorEnabled));
@@ -221,18 +228,18 @@ public final class PlayerWarpManageMenu {
 
     /** Rename the warp to the typed line, reopening under the new name on success and the old one on any refusal. */
     private void rename(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName current = subject(ctx).name();
         Optional<PlayerWarpName> parsed = parseName(ctx.arg());
         if (parsed.isEmpty()) {
             notifier.send(viewer, PlayerwarpsMessageKey.PWARP_INVALID_NAME, Map.of("value", ctx.arg()));
-            open(viewer, current);
+            open(ctx.viewer(), current);
             return;
         }
         PlayerWarpName newName = parsed.get();
         scheduler.async(() -> {
             boolean renamed = editPlayerWarp.rename(viewer, current, newName).isOk();
-            open(viewer, renamed ? newName : current);
+            open(ctx.viewer(), renamed ? newName : current);
         });
     }
 
@@ -242,13 +249,13 @@ public final class PlayerWarpManageMenu {
      * invalid-value notice and changes nothing, so a bad line is never a stack trace. The panel reopens either way.
      */
     private <T> void editOptional(MenuActionContext ctx, Function<String, T> factory, EditVerb<T> edit) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         Optional<String> raw = optionalText(ctx.arg());
         if (raw.isEmpty()) {
             scheduler.async(() -> {
                 edit.apply(viewer, name, Optional.empty());
-                open(viewer, name);
+                open(ctx.viewer(), name);
             });
             return;
         }
@@ -257,86 +264,86 @@ public final class PlayerWarpManageMenu {
             value = factory.apply(raw.get());
         } catch (IllegalArgumentException invalid) {
             notifier.send(viewer, PlayerwarpsMessageKey.PWARP_INVALID_NAME, Map.of("value", raw.get()));
-            open(viewer, name);
+            open(ctx.viewer(), name);
             return;
         }
         scheduler.async(() -> {
             edit.apply(viewer, name, Optional.of(value));
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
     /** Cycle the access axis one step (PUBLIC → PASSWORD → WHITELIST → PRIVATE → PUBLIC), then reopen the panel. */
     private void cycleAccess(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Subject subject = subject(ctx);
         PlayerWarpName name = subject.name();
         WarpAccess next = nextAccess(subject.warp().access());
         scheduler.async(() -> {
             editPlayerWarp.setAccess(viewer, name, next);
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
     /** Store the typed line as the warp's password, off the tick thread; a blank line is ignored, never stored. */
     private void setPassword(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         String password = ctx.arg();
         if (password.isBlank()) {
-            open(viewer, name);
+            open(ctx.viewer(), name);
             return;
         }
         scheduler.async(() -> {
             editPlayerWarp.setPassword(viewer, name, password);
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
     /** Clear the warp's password (the confirm's accept branch), then reopen the panel. */
     private void clearPassword(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         scheduler.async(() -> {
             editPlayerWarp.clearPassword(viewer, name);
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
     /** Set the entry price parsed from {@code amount [currency]}; an unparsable line notices and changes nothing. */
     private void setPrice(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         Optional<WarpCost> price = parsePrice(ctx.arg());
         if (price.isEmpty()) {
             notifier.send(viewer, PlayerwarpsMessageKey.PWARP_INVALID_NAME, Map.of("value", ctx.arg()));
-            open(viewer, name);
+            open(ctx.viewer(), name);
             return;
         }
         scheduler.async(() -> {
             editPlayerWarp.setPrice(viewer, name, price.get());
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
     /** Re-anchor the warp where the viewer stands; the position is read here on the entity thread, the save off it. */
     private void move(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(ctx.player().getLocation(), "player location"));
         scheduler.async(() -> {
             editPlayerWarp.moveHere(viewer, name, at);
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
     /** Pay the warp's earnings bank out to the owner, then reopen so the new balance shows. */
     private void withdraw(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         scheduler.async(() -> {
             withdrawEarnings.withdraw(viewer, name);
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
@@ -346,24 +353,24 @@ public final class PlayerWarpManageMenu {
      * detail view rather than reopening a panel the viewer may no longer manage.
      */
     private void transfer(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         String targetName = ctx.arg().strip();
         if (targetName.isEmpty()) {
-            open(viewer, name);
+            open(ctx.viewer(), name);
             return;
         }
         scheduler.async(() -> {
             Optional<PlayerRef> newOwner = players.findByName(targetName);
             if (newOwner.isEmpty()) {
                 notifier.send(viewer, PlayerwarpsMessageKey.PWARP_INVALID_NAME, Map.of("value", targetName));
-                open(viewer, name);
+                open(ctx.viewer(), name);
                 return;
             }
             if (transferPlayerWarp.transfer(viewer, name, newOwner.get()).isOk()) {
-                openView.accept(viewer, name);
+                openView.accept(ctx.viewer(), name);
             } else {
-                open(viewer, name);
+                open(ctx.viewer(), name);
             }
         });
     }
@@ -374,12 +381,12 @@ public final class PlayerWarpManageMenu {
      * {@link BuySponsorship}, which delivers its own success or refusal notice; the panel reopens so the new state shows.
      */
     private void buySponsor(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         int days = parseDays(ctx.arg());
         scheduler.async(() -> {
             buySponsorship.buy(viewer, name, days);
-            open(viewer, name);
+            open(ctx.viewer(), name);
         });
     }
 
@@ -394,7 +401,7 @@ public final class PlayerWarpManageMenu {
 
     /** Archive the warp (a recoverable delete; the confirm's accept branch) off the tick thread; the window stays closed. */
     private void delete(MenuActionContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         PlayerWarpName name = subject(ctx).name();
         scheduler.async(() -> archivePlayerWarp.archive(viewer, name));
     }
@@ -407,7 +414,7 @@ public final class PlayerWarpManageMenu {
     /** The subject warp's display name for the info tile and the window title. */
     private String name(MenuContext ctx) {
         return messages.resolve(
-                ctx.viewer(),
+                BukkitRefs.toRef(ctx.viewer()),
                 PlayerwarpsMessageKey.PWARP_GUI_MANAGE_ENTRY_NAME,
                 Map.of("warp", displayName(subject(ctx))));
     }
@@ -419,7 +426,7 @@ public final class PlayerWarpManageMenu {
      */
     private String lore(MenuContext ctx) {
         PlayerWarp warp = subject(ctx).warp();
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         List<String> lines = new ArrayList<>();
         lines.add(line(viewer, PlayerwarpsMessageKey.PWARP_GUI_MANAGE_LORE_OWNER, Map.of("owner", warp.ownerName())));
         lines.add(line(

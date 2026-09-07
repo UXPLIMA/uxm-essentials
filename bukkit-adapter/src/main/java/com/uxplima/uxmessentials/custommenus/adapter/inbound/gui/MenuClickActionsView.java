@@ -12,12 +12,13 @@ import org.bukkit.inventory.ItemStack;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuSchema;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.menu.binding.MenuSchema;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.property.SelectorButton;
+import com.uxplima.uxmlib.menu.spec.ClickKind;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -25,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
  * {@link MenuOpenerProperty} whose click opens a gesture-list selector, one button per {@link ClickKind}, each
  * carrying the count of actions bound to it, and selecting a gesture opens that gesture's action {@link
  * MenuRefListEditor.RefList} (add / edit / remove / reorder, ids chosen from the schema's action catalog). Everything
- * is an engine child window routed through the row's {@link ClickContext}, so the whole flow rides the one holder and
+ * is an engine child window routed through the row's {@link PropertyClick}, so the whole flow rides the one holder and
  * teardown; the gesture list's back returns to the item editor and a gesture's list backs to the gesture list.
  */
 @NullMarked
@@ -63,7 +64,7 @@ public final class MenuClickActionsView {
                 context -> openGestures(context, session, itemId));
     }
 
-    private void openGestures(ClickContext context, MenuEditSession session, String itemId) {
+    private void openGestures(PropertyClick context, MenuEditSession session, String itemId) {
         List<SelectorButton> buttons = new ArrayList<>();
         for (int i = 0; i < GESTURES.size() && i < GESTURE_SLOTS.size(); i++) {
             ClickKind kind = GESTURES.get(i);
@@ -76,13 +77,15 @@ public final class MenuClickActionsView {
         context.opener()
                 .openSelector(
                         context.viewer(),
-                        guiText.text(context.viewer(), CustomMenusMessageKey.MENU_ACTION_EDITOR_GESTURE_TITLE),
+                        guiText.text(
+                                BukkitRefs.toRef(context.viewer()),
+                                CustomMenusMessageKey.MENU_ACTION_EDITOR_GESTURE_TITLE),
                         GESTURE_ROWS,
                         FILLER,
                         buttons);
     }
 
-    private void openGestureActions(ClickContext context, MenuEditSession session, String itemId, ClickKind kind) {
+    private void openGestureActions(PropertyClick context, MenuEditSession session, String itemId, ClickKind kind) {
         MenuRefListEditor.RefList list = new MenuRefListEditor.RefList(
                 CustomMenusMessageKey.MENU_ACTION_EDITOR_ACTIONS_TITLE,
                 Map.of("gesture", kind.name()),
@@ -101,19 +104,19 @@ public final class MenuClickActionsView {
         return total;
     }
 
-    private ItemStack gestureIcon(ClickContext context, MenuEditSession session, String itemId, ClickKind kind) {
+    private ItemStack gestureIcon(PropertyClick context, MenuEditSession session, String itemId, ClickKind kind) {
         int count = session.clickActions(itemId, kind).size();
         return ItemBuilder.of(GESTURE_ICON)
                 .name(guiText.text(
-                        context.viewer(),
+                        BukkitRefs.toRef(context.viewer()),
                         CustomMenusMessageKey.MENU_ACTION_EDITOR_GESTURE,
                         Map.of("gesture", kind.name(), "count", Integer.toString(count))))
                 .build();
     }
 
-    private ItemStack backIcon(ClickContext context) {
+    private ItemStack backIcon(PropertyClick context) {
         return ItemBuilder.of(BACK_ICON)
-                .name(guiText.text(context.viewer(), CustomMenusMessageKey.MENU_ACTION_EDITOR_BACK))
+                .name(guiText.text(BukkitRefs.toRef(context.viewer()), CustomMenusMessageKey.MENU_ACTION_EDITOR_BACK))
                 .build();
     }
 }

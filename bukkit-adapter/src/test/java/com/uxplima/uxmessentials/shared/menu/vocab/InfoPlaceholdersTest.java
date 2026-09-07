@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.InfoPlaceholders;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,7 +39,7 @@ class InfoPlaceholdersTest {
     void anUnknownStatisticNameResolvesToEmptyWithoutTouchingAnOnlinePlayer() {
         MenuBindings bindings = new MenuBindings();
         InfoPlaceholders.register(bindings);
-        MenuContext ctx = MenuContext.of(new PlayerRef(UUID.randomUUID(), "Ghost"), null, 0);
+        MenuContext ctx = MenuContext.of(TestViewer.of(UUID.randomUUID(), "Ghost"), null, 0);
 
         // A bad enum name is rejected by the parse step before any Bukkit.getPlayer lookup, so no server is needed.
         assertThat(bindings.placeholders().resolve("stat_NOT_A_REAL_STATISTIC", ctx))

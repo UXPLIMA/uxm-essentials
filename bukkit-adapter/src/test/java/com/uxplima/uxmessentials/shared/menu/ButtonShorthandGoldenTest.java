@@ -13,13 +13,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -28,6 +24,12 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +54,6 @@ class ButtonShorthandGoldenTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private Menus menus;
 
     @BeforeEach
@@ -60,7 +61,6 @@ class ButtonShorthandGoldenTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Viewer");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
 
         Logger log = new NoopLogger();
         MenuBindings bindings = new MenuBindings();
@@ -69,12 +69,12 @@ class ButtonShorthandGoldenTest {
         bindings.list("shorthand-pages", ctx -> ENTRIES);
 
         GuiText guiText = new GuiText(new KeyMessages());
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         Scheduler scheduler = new SyncScheduler();
-        menus = new Menus(renderer, scheduler, bindings.lists());
-        MenuListener listener =
-                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
+        MenuListener listener = new MenuListener(
+                renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -91,13 +91,13 @@ class ButtonShorthandGoldenTest {
                         .parse("rows = 1\nitems {\n  gated { slot = 0, material = DIAMOND, name = \"x\","
                                 + " permission = \"" + VIP_NODE + "\" }\n}\n"));
 
-        menus.open(viewer, "perm-menu", null);
+        menus.open(player, "perm-menu", null);
         assertThat(topItem(0))
                 .as("a viewer without the node never sees the permission-gated item")
                 .isNull();
 
         player.addAttachment(plugin, VIP_NODE, true);
-        menus.open(viewer, "perm-menu", null);
+        menus.open(player, "perm-menu", null);
         assertThat(topItem(0))
                 .as("granting the node reveals the item on the next open")
                 .isNotNull()
@@ -116,12 +116,12 @@ class ButtonShorthandGoldenTest {
                                 + "  gated { slot = 8, material = DIAMOND, name = \"x\", pages = \"2\" }\n"
                                 + "}\n"));
 
-        menus.open(viewer, "paged-menu", null, 0);
+        menus.open(player, "paged-menu", null, 0);
         assertThat(topItem(8))
                 .as("a pages = \"2\" item is hidden on page 1 (one-based)")
                 .isNull();
 
-        menus.open(viewer, "paged-menu", null, 1);
+        menus.open(player, "paged-menu", null, 1);
         assertThat(topItem(8))
                 .as("the same item shows on page 2, the page its range lists")
                 .isNotNull()

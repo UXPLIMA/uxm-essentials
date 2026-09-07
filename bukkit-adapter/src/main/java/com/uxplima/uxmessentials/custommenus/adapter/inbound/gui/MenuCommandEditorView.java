@@ -20,22 +20,24 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.command.OpenCommandSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.EntityEditorView;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.ListProperty;
+import com.uxplima.uxmlib.menu.property.ListPropertyLayout;
+import com.uxplima.uxmlib.menu.property.ListPropertyText;
+import com.uxplima.uxmlib.menu.property.TextProperty;
+import com.uxplima.uxmlib.menu.property.ToggleProperty;
+import com.uxplima.uxmlib.scheduler.Scheduler;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -70,6 +72,10 @@ public final class MenuCommandEditorView {
     private static final int BACK_SLOT = 22;
 
     private final GuiText guiText;
+
+    /** The colours the engine draws a list window in; asked per render so a theme reload is picked up. */
+    private final Supplier<Theme> theme;
+
     private final Scheduler scheduler;
     private final Messages messages;
     private final TextInput textInput;
@@ -79,6 +85,7 @@ public final class MenuCommandEditorView {
     public MenuCommandEditorView(
             Menus menus,
             GuiText guiText,
+            Supplier<Theme> theme,
             Scheduler scheduler,
             Messages messages,
             TextInput textInput,
@@ -86,6 +93,7 @@ public final class MenuCommandEditorView {
             BiConsumer<Player, PlayerRef> onBack) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
+        this.theme = Objects.requireNonNull(theme, "theme");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
@@ -96,13 +104,12 @@ public final class MenuCommandEditorView {
         this.view = EntityEditorView.<CommandTarget>builder()
                 .menus(menus)
                 .guiText(guiText)
-                .scheduler(scheduler)
                 .layout(layout)
                 .title(this::title)
-                .valueLore(CustomMenusMessageKey.MENU_PROPERTIES_VALUE_LORE)
-                .backName(CustomMenusMessageKey.MENU_COMMAND_BACK)
+                .valueLore(CustomMenusMessageKey.MENU_PROPERTIES_VALUE_LORE.key())
+                .backName(CustomMenusMessageKey.MENU_COMMAND_BACK.key())
                 .properties(this::properties)
-                .onBack(onBack)
+                .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .build();
     }
 
@@ -112,7 +119,7 @@ public final class MenuCommandEditorView {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(session, "session");
         Objects.requireNonNull(menuId, "menuId");
-        view.open(player, viewer, new CommandTarget(session, menuId));
+        view.open(player, new CommandTarget(session, menuId));
     }
 
     /** The property drawn at {@code slot}, exposed so a test can resolve it without firing a click. */
@@ -120,8 +127,8 @@ public final class MenuCommandEditorView {
         return view.propertyAt(slot, new CommandTarget(session, menuId));
     }
 
-    private Component title(PlayerRef viewer, CommandTarget target) {
-        return guiText.text(viewer, CustomMenusMessageKey.MENU_COMMAND_TITLE, Map.of("name", target.menuId()));
+    private Component title(Player viewer, CommandTarget target) {
+        return guiText.text(viewer, CustomMenusMessageKey.MENU_COMMAND_TITLE.key(), Map.of("name", target.menuId()));
     }
 
     private List<EditableProperty> properties(CommandTarget target) {
@@ -139,7 +146,7 @@ public final class MenuCommandEditorView {
 
     private EditableProperty enabledRow(CommandTarget target) {
         return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_COMMAND_ENABLED,
+                CustomMenusMessageKey.MENU_COMMAND_ENABLED.key(),
                 Material.COMMAND_BLOCK,
                 () -> target.session().command().isPresent(),
                 this::onOff,
@@ -150,35 +157,36 @@ public final class MenuCommandEditorView {
     private EditableProperty nameRow(CommandTarget target) {
         return new TextProperty(
                 TEXT_INPUT_KEY,
-                CustomMenusMessageKey.MENU_COMMAND_NAME,
-                CustomMenusMessageKey.MENU_COMMAND_NAME_PROMPT,
+                CustomMenusMessageKey.MENU_COMMAND_NAME.key(),
+                CustomMenusMessageKey.MENU_COMMAND_NAME_PROMPT.key(),
                 Material.NAME_TAG,
                 () -> command(target).map(OpenCommandSpec::name).orElse(""),
                 MenuCommandEditorView::validateName,
                 value -> apply(target, command -> command.withName(value)),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
     private EditableProperty aliasesRow(CommandTarget target) {
         return new ListProperty(
                 LIST_INPUT_KEY,
-                CustomMenusMessageKey.MENU_COMMAND_ALIASES,
+                CustomMenusMessageKey.MENU_COMMAND_ALIASES.key(),
                 Material.PAPER,
                 guiText,
+                theme,
                 () -> command(target).map(OpenCommandSpec::aliases).orElseGet(List::of),
                 aliases -> apply(target, command -> command.withAliases(aliases)),
                 new ListPropertyText(
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_TITLE,
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ENTRY_NAME,
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ENTRY_HINTS,
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ADD,
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ADD_PROMPT,
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_EDIT_PROMPT,
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_REMOVE_CONFIRM,
-                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_BACK),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_TITLE.key(),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ENTRY_NAME.key(),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ENTRY_HINTS.key(),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ADD.key(),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_ADD_PROMPT.key(),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_EDIT_PROMPT.key(),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_REMOVE_CONFIRM.key(),
+                        CustomMenusMessageKey.MENU_COMMAND_ALIASES_BACK.key()),
                 aliasLayout,
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -204,7 +212,7 @@ public final class MenuCommandEditorView {
 
     private EditableProperty consoleRow(CommandTarget target) {
         return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_COMMAND_CONSOLE,
+                CustomMenusMessageKey.MENU_COMMAND_CONSOLE.key(),
                 Material.LEVER,
                 () -> command(target).map(OpenCommandSpec::consoleAllowed).orElse(false),
                 this::onOff,
@@ -232,13 +240,13 @@ public final class MenuCommandEditorView {
             BiFunction<OpenCommandSpec, Optional<String>, OpenCommandSpec> set) {
         return new TextProperty(
                 TEXT_INPUT_KEY,
-                label,
-                prompt,
+                label.key(),
+                prompt.key(),
                 icon,
                 current,
                 raw -> Optional.of(raw),
                 value -> setOptional(target, value, set),
-                textInput,
+                textInput::prompt,
                 scheduler);
     }
 
@@ -288,9 +296,9 @@ public final class MenuCommandEditorView {
                 || value.equalsIgnoreCase("clear");
     }
 
-    private String onOff(PlayerRef viewer, boolean on) {
+    private String onOff(Player viewer, boolean on) {
         return messages.resolve(
-                viewer,
+                BukkitRefs.toRef(viewer),
                 on ? CustomMenusMessageKey.MENU_PROPERTIES_VALUE_ON : CustomMenusMessageKey.MENU_PROPERTIES_VALUE_OFF,
                 Map.of());
     }

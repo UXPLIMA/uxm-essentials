@@ -19,27 +19,9 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourSwatch;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -47,6 +29,26 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.EditorSpec;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ActionRegistry;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
+import com.uxplima.uxmlib.menu.property.colour.ColourPickerLayout;
+import com.uxplima.uxmlib.menu.property.colour.ColourPickerText;
+import com.uxplima.uxmlib.menu.property.colour.ColourProperty;
+import com.uxplima.uxmlib.menu.property.colour.ColourSwatch;
+import com.uxplima.uxmlib.menu.render.EditorRenderer;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.runtime.MenuListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,7 +79,6 @@ class MenuColourChildTest {
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
     private TextInput textInput;
@@ -90,7 +91,6 @@ class MenuColourChildTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         widget = new Widget();
@@ -177,7 +177,7 @@ class MenuColourChildTest {
         // writes the parsed ARGB through the setter and reopens the parent editor.
         openEditor();
         fireClick(PROP_SLOT, ClickType.LEFT);
-        ClickContext picker = engineContext();
+        PropertyClick picker = engineContext();
 
         property().applyCustom(picker, "#FF5733");
 
@@ -192,7 +192,7 @@ class MenuColourChildTest {
         widget.colour = 0xFF445566;
         openEditor();
         fireClick(PROP_SLOT, ClickType.LEFT);
-        ClickContext picker = engineContext();
+        PropertyClick picker = engineContext();
 
         property().applyCustom(picker, "not-a-colour");
 
@@ -210,7 +210,7 @@ class MenuColourChildTest {
         var recording = new RecordingScheduler();
         installEngine(recording);
 
-        menus.openEditor(viewer, editorSpec(), widget);
+        menus.openEditor(player, editorSpec(), widget);
         fireClick(PROP_SLOT, ClickType.LEFT); // open picker child
         fireClick(11, ClickType.LEFT); // swatch → setter + reopen parent
         fireClick(PROP_SLOT, ClickType.LEFT); // reopen the picker child
@@ -224,15 +224,15 @@ class MenuColourChildTest {
     }
 
     private void installEngine(Scheduler sched) {
-        EditorRenderer editorRenderer = new EditorRenderer(guiText);
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, sched, new ListSourceRegistry(), editorRenderer);
+        menus = new Menus(renderer, EngineScheduler.of(sched), new ListSourceRegistry(), editorRenderer);
         MenuListener listener = new MenuListener(
                 renderer,
                 new ActionRegistry(),
                 new ConditionRegistry(),
-                sched,
+                EngineScheduler.of(sched),
                 plugin,
                 editorRenderer,
                 menus.selectorOpener(),
@@ -241,35 +241,34 @@ class MenuColourChildTest {
     }
 
     private void openEditor() {
-        menus.openEditor(viewer, editorSpec(), widget);
+        menus.openEditor(player, editorSpec(), widget);
     }
 
     private EditorSpec editorSpec() {
         return EditorSpec.builder()
                 .layout(layout())
                 .title((v, subject) -> Component.text("edit"))
-                .valueLore(Key.VALUE_LORE)
-                .backName(Key.BACK)
+                .valueLore(Key.VALUE_LORE.key())
+                .backName(Key.BACK.key())
                 .properties(w -> List.<EditableProperty>of(property()))
-                .onBack((p, v) -> {})
+                .onBack(p -> {})
                 .build();
     }
 
     /** A context on the engine path: it carries the engine openers so a custom-hex reopen takes the engine branch. */
-    private ClickContext engineContext() {
-        return new ClickContext(
+    private PropertyClick engineContext() {
+        return new PropertyClick(
                 player,
-                viewer,
                 false,
                 false,
-                () -> menus.openEditor(viewer, editorSpec(), widget),
+                () -> menus.openEditor(player, editorSpec(), widget),
                 menus.selectorOpener(),
                 menus.confirmOpener());
     }
 
     private ColourProperty property() {
         return new ColourProperty(
-                Key.LABEL,
+                Key.LABEL.key(),
                 Material.PAINTING,
                 () -> widget.colour,
                 value -> widget.colour = value,
@@ -282,8 +281,8 @@ class MenuColourChildTest {
                 guiText,
                 ColourPickerText.shared(),
                 ColourPickerLayout.codeDefault(),
-                textInput,
-                scheduler);
+                textInput::prompt,
+                EngineScheduler.of(scheduler));
     }
 
     private static EntityEditorLayout layout() {

@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.vaults.command;
 import org.bukkit.Material;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
@@ -16,6 +15,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.domain.VaultItemPolicy;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 
 /**
  * Shared test fixtures for the vaults command/GUI tests: a {@link VaultView} and {@link VaultSelectorMenu}

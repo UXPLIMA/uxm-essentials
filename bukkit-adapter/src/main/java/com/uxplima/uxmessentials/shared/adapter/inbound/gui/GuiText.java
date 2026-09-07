@@ -3,8 +3,11 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 import java.util.Map;
 import java.util.Objects;
 
+import org.bukkit.entity.Player;
+
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -20,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * editor's own), so a new module's management GUI needs no bespoke text adapter.
  */
 @NullMarked
-public final class GuiText {
+public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
 
     private final Messages messages;
 
@@ -52,6 +55,38 @@ public final class GuiText {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
         return StyledText.render(stripBrandPrefix(messages.resolve(viewer, key, placeholders)));
+    }
+
+    /**
+     * The engine's own lookup: a catalog key as a plain string, for a live viewer.
+     *
+     * <p>uxmLib's menu engine names no {@link MessageKey} and no {@link PlayerRef}, so this is where the two
+     * vocabularies meet. A key is its catalog string and nothing else, which is what lets the lambda stand in
+     * for a constant here, and the viewer is narrowed to the record the catalog resolves a locale against.
+     */
+    @Override
+    public Component text(Player viewer, String key, Map<String, String> placeholders) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        return text(BukkitRefs.toRef(viewer), () -> key, placeholders);
+    }
+
+    /** The engine's unprefixed lookup, which strips the same brand token {@link #unprefixedText} does. */
+    @Override
+    public Component textUnprefixed(Player viewer, String key, Map<String, String> placeholders) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        return unprefixedText(BukkitRefs.toRef(viewer), () -> key, placeholders);
+    }
+
+    /**
+     * Operator-authored MiniMessage out of a menu file, rendered through the same style tags every other line
+     * here goes through. It carries its own words, so it needs no viewer and no catalog.
+     */
+    @Override
+    public Component render(String raw) {
+        Objects.requireNonNull(raw, "raw");
+        return StyledText.render(raw);
     }
 
     /** A leading {@code <tag:'…'>} or {@code <etag:'…'>} brand prefix token and the space after it, if present. */

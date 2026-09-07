@@ -5,8 +5,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.OpenMenuInfo;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.OpenMenuInfo;
 
 /**
  * The {@link MenuPlaceholders} seam over the live {@link Menus} façade. Every read maps a {@code UUID} onto the

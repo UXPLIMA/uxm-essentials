@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.shared.menu.eval;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.BottomSlots;
+import com.uxplima.uxmlib.menu.eval.BottomSlots;
 import org.junit.jupiter.api.Test;
 
 /**

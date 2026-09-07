@@ -48,6 +48,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailBox;
 import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -241,7 +242,7 @@ class SocialSpyCommandPathTest {
     }
 
     private static PlayerRef ref(Player player) {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     /** Resolves online players against the live mock server; "Ghost" is the one known offline profile. */

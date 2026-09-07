@@ -6,10 +6,9 @@ import java.util.function.BiConsumer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
+import com.uxplima.uxmlib.menu.property.PropertyClick;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -36,8 +35,8 @@ public final class ModerationActionProperty implements EditableProperty {
     }
 
     @Override
-    public MessageKey label() {
-        return label;
+    public String label() {
+        return label.key();
     }
 
     @Override
@@ -46,14 +45,14 @@ public final class ModerationActionProperty implements EditableProperty {
     }
 
     @Override
-    public String valueLore(PlayerRef viewer) {
+    public String valueLore(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         return valueHint;
     }
 
     @Override
-    public void onClick(ClickContext context) {
+    public void onClick(PropertyClick context) {
         Objects.requireNonNull(context, "context");
-        handler.accept(context.player(), context.reopen());
+        handler.accept(context.viewer(), context.reopen());
     }
 }

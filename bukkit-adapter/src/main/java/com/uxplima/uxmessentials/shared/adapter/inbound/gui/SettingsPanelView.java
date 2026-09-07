@@ -8,12 +8,14 @@ import java.util.function.Function;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.EditorSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.EditorSpec;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -47,16 +49,16 @@ public final class SettingsPanelView {
         this.layout = Objects.requireNonNull(builder.layout, "layout");
         this.properties = Objects.requireNonNull(builder.properties, "properties");
         BiConsumer<Player, PlayerRef> onBack = Objects.requireNonNull(builder.onBack, "onBack");
-        Objects.requireNonNull(builder.scheduler, "scheduler");
         this.spec = EditorSpec.builder()
                 .layout(layout)
-                .title((viewer, subject) -> guiText.text(viewer, title))
-                .valueLore(Objects.requireNonNull(builder.valueLore, "valueLore"))
-                .backName(Objects.requireNonNull(builder.backName, "backName"))
+                .title((viewer, subject) -> guiText.text(BukkitRefs.toRef(viewer), title))
+                .valueLore(
+                        Objects.requireNonNull(builder.valueLore, "valueLore").key())
+                .backName(Objects.requireNonNull(builder.backName, "backName").key())
                 // The subject is always the viewer's own PlayerRef, so the property provider re-reads its
                 // settings closing over it on every draw exactly as the bespoke panel re-read them per open.
                 .properties(subject -> settingsFor((PlayerRef) Objects.requireNonNull(subject, "subject")))
-                .onBack(onBack)
+                .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .build();
     }
 
@@ -69,7 +71,7 @@ public final class SettingsPanelView {
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        menus.openEditor(viewer, spec, viewer);
+        menus.openEditor(player, spec, viewer);
     }
 
     /**
@@ -92,7 +94,6 @@ public final class SettingsPanelView {
     @NullMarked
     public static final class Builder {
         private @Nullable GuiText guiText;
-        private @Nullable Scheduler scheduler;
         private @Nullable Menus menus;
         private @Nullable EntityEditorLayout layout;
         private @Nullable MessageKey title;
@@ -105,11 +106,6 @@ public final class SettingsPanelView {
 
         public Builder guiText(GuiText guiText) {
             this.guiText = Objects.requireNonNull(guiText, "guiText");
-            return this;
-        }
-
-        public Builder scheduler(Scheduler scheduler) {
-            this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
             return this;
         }
 

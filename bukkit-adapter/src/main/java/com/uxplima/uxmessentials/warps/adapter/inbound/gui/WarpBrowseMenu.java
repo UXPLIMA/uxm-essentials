@@ -11,11 +11,8 @@ import java.util.Optional;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -27,6 +24,11 @@ import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -99,7 +101,7 @@ public final class WarpBrowseMenu {
         bindings.condition(
                 "warps:browse-has-parent",
                 (ctx, args) -> ctx.subject(BrowseLevel.class).categoryId().isPresent());
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
     /**
@@ -112,7 +114,7 @@ public final class WarpBrowseMenu {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(warps, "warps");
         List<Warp> snapshot = List.copyOf(warps);
-        scheduler.onEntity(viewer, () -> menus.open(viewer, SPEC_ID, level(viewer, snapshot, Optional.empty())));
+        scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, level(viewer, snapshot, Optional.empty())));
     }
 
     /** The tile the slot being rendered or clicked stands for. */
@@ -221,11 +223,11 @@ public final class WarpBrowseMenu {
         BrowseLevel level = ctx.subject(BrowseLevel.class);
         BrowseRow row = ctx.entry(BrowseRow.class);
         if (row.kind() == Kind.CATEGORY) {
-            PlayerRef viewer = ctx.viewer();
-            menus.open(viewer, SPEC_ID, level(viewer, level.warps(), Optional.of(row.id())));
+            PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+            menus.open(ctx.viewer(), SPEC_ID, level(viewer, level.warps(), Optional.of(row.id())));
             return;
         }
-        warp(ctx.player(), ctx.viewer(), row.id());
+        warp(ctx.player(), BukkitRefs.toRef(ctx.viewer()), row.id());
     }
 
     /** Step up to the parent level: re-open the browse spec at the current level's parent category. */
@@ -233,8 +235,8 @@ public final class WarpBrowseMenu {
         BrowseLevel level = ctx.subject(BrowseLevel.class);
         Optional<String> parentId =
                 level.categoryId().flatMap(categoryRepository::find).flatMap(WarpCategory::parentCategoryId);
-        PlayerRef viewer = ctx.viewer();
-        menus.open(viewer, SPEC_ID, level(viewer, level.warps(), parentId));
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+        menus.open(ctx.viewer(), SPEC_ID, level(viewer, level.warps(), parentId));
     }
 
     /** Warp to the clicked warp and close the menu, on the viewer's entity thread (the hop moves the live player). */

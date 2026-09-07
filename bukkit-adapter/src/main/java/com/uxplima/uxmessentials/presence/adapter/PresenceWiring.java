@@ -36,11 +36,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -107,7 +108,14 @@ public final class PresenceWiring {
         // presence entry on the /uxmess gui hub opens the same panel for an admin (gated uxmessentials.presence.gui).
         GuiText guiText = new GuiText(kernel.messages());
         PresenceSettingsView settingsView = new PresenceSettingsView(
-                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services, store, vanishToggle, menus);
+                guiText,
+                new PaperScheduler(plugin),
+                guiLayouts,
+                kernel.messages(),
+                services,
+                store,
+                vanishToggle,
+                menus);
         guiRegistry.register(new ManagementGuiEntry(
                 "presence",
                 com.uxplima.uxmessentials.presence.application.PresenceMessageKey.GUI_SETTINGS_TITLE,

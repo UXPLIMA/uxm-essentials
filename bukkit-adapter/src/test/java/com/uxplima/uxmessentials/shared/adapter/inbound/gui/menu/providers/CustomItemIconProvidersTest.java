@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers;
+package com.uxplima.uxmlib.menu.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -10,10 +10,9 @@ import java.util.function.Function;
 
 import org.bukkit.Material;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadQuery;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +51,7 @@ class CustomItemIconProvidersTest {
     void setUp() {
         server = MockBukkit.mock();
         PlayerMock player = server.addPlayer();
-        ctx = MenuContext.of(new PlayerRef(player.getUniqueId(), player.getName()), null, 0);
+        ctx = MenuContext.of(player, null, 0);
     }
 
     @AfterEach
@@ -62,12 +61,14 @@ class CustomItemIconProvidersTest {
 
     @Test
     void absentPlugin_matchingSpecIsSilentlyEmpty() {
-        assertAbsentIsSilentEmpty(log -> new ItemsAdderIconProvider(server, log), "itemsadder:ruby_sword");
-        assertAbsentIsSilentEmpty(log -> new OraxenIconProvider(server, log), "oraxen:ruby_sword");
-        assertAbsentIsSilentEmpty(log -> new NexoIconProvider(server, log), "nexo:ruby_sword");
-        assertAbsentIsSilentEmpty(log -> new CraftEngineIconProvider(server, log), "craftengine:default:ruby_sword");
-        assertAbsentIsSilentEmpty(log -> new MMOItemsIconProvider(server, log), "mmoitems:SWORD:ruby");
-        assertAbsentIsSilentEmpty(log -> new ExecutableItemsIconProvider(server, log), "ei:ruby_sword");
+        assertAbsentIsSilentEmpty(
+                log -> new ItemsAdderIconProvider(server, EngineLog.of(log)), "itemsadder:ruby_sword");
+        assertAbsentIsSilentEmpty(log -> new OraxenIconProvider(server, EngineLog.of(log)), "oraxen:ruby_sword");
+        assertAbsentIsSilentEmpty(log -> new NexoIconProvider(server, EngineLog.of(log)), "nexo:ruby_sword");
+        assertAbsentIsSilentEmpty(
+                log -> new CraftEngineIconProvider(server, EngineLog.of(log)), "craftengine:default:ruby_sword");
+        assertAbsentIsSilentEmpty(log -> new MMOItemsIconProvider(server, EngineLog.of(log)), "mmoitems:SWORD:ruby");
+        assertAbsentIsSilentEmpty(log -> new ExecutableItemsIconProvider(server, EngineLog.of(log)), "ei:ruby_sword");
     }
 
     @Test
@@ -98,35 +99,35 @@ class CustomItemIconProvidersTest {
 
     @Test
     void eachProviderClaimsOnlyItsOwnPrefix() {
-        IconProvider itemsAdder = new ItemsAdderIconProvider(server, SILENT);
+        IconProvider itemsAdder = new ItemsAdderIconProvider(server, EngineLog.of(SILENT));
         // A bare material and a sibling's prefix both fall through, so the spec is left for the material fallback.
         assertThat(itemsAdder.icon("DIAMOND", ctx)).isEmpty();
         assertThat(itemsAdder.icon("oraxen:ruby", ctx)).isEmpty();
         assertThat(itemsAdder.icon("nexo:ruby", ctx)).isEmpty();
         assertThat(itemsAdder.icon("craftengine:ruby", ctx)).isEmpty();
         assertThat(itemsAdder.icon("mmoitems:SWORD:ruby", ctx)).isEmpty();
-        assertThat(new OraxenIconProvider(server, SILENT).icon("itemsadder:ruby", ctx))
+        assertThat(new OraxenIconProvider(server, EngineLog.of(SILENT)).icon("itemsadder:ruby", ctx))
                 .isEmpty();
-        assertThat(new NexoIconProvider(server, SILENT).icon("oraxen:ruby", ctx))
+        assertThat(new NexoIconProvider(server, EngineLog.of(SILENT)).icon("oraxen:ruby", ctx))
                 .isEmpty();
-        assertThat(new CraftEngineIconProvider(server, SILENT).icon("nexo:ruby", ctx))
+        assertThat(new CraftEngineIconProvider(server, EngineLog.of(SILENT)).icon("nexo:ruby", ctx))
                 .isEmpty();
-        assertThat(new MMOItemsIconProvider(server, SILENT).icon("DIAMOND", ctx))
+        assertThat(new MMOItemsIconProvider(server, EngineLog.of(SILENT)).icon("DIAMOND", ctx))
                 .isEmpty();
-        assertThat(new ExecutableItemsIconProvider(server, SILENT).icon("nexo:ruby", ctx))
+        assertThat(new ExecutableItemsIconProvider(server, EngineLog.of(SILENT)).icon("nexo:ruby", ctx))
                 .isEmpty();
     }
 
     @Test
     void mmoItemsMalformedIdIsEmpty() {
         // The bare id must be <TYPE>:<ID>; a single token cannot be a type/id pair, so it never resolves an item.
-        assertThat(new MMOItemsIconProvider(server, SILENT).icon("mmoitems:NOTYPE", ctx))
+        assertThat(new MMOItemsIconProvider(server, EngineLog.of(SILENT)).icon("mmoitems:NOTYPE", ctx))
                 .isEmpty();
     }
 
     @Test
     void fullChainRoutesEachPrefixDisjointlyAndKeepsSkullsAndPlainMaterials() {
-        IconProviders chain = IconProviders.full(server, SILENT, HeadQuery.ABSENT);
+        IconProviders chain = IconProviders.full(server, EngineLog.of(SILENT), HeadQuery.NONE);
 
         // The custom-item plugins are absent, so each prefix degrades to empty (the renderer's material fallback).
         assertThatCode(() -> {
@@ -150,13 +151,16 @@ class CustomItemIconProvidersTest {
 
     @Test
     void presentPluginButMissingSdk_reachesLookupAndWarnsExactlyOnceThenEmpty() {
-        assertReachesLookupAndWarnsOnce("ItemsAdder", log -> new ItemsAdderIconProvider(server, log), "itemsadder:x");
-        assertReachesLookupAndWarnsOnce("Oraxen", log -> new OraxenIconProvider(server, log), "oraxen:x");
-        assertReachesLookupAndWarnsOnce("Nexo", log -> new NexoIconProvider(server, log), "nexo:x");
         assertReachesLookupAndWarnsOnce(
-                "CraftEngine", log -> new CraftEngineIconProvider(server, log), "craftengine:default:x");
-        assertReachesLookupAndWarnsOnce("MMOItems", log -> new MMOItemsIconProvider(server, log), "mmoitems:SWORD:x");
-        assertReachesLookupAndWarnsOnce("ExecutableItems", log -> new ExecutableItemsIconProvider(server, log), "ei:x");
+                "ItemsAdder", log -> new ItemsAdderIconProvider(server, EngineLog.of(log)), "itemsadder:x");
+        assertReachesLookupAndWarnsOnce("Oraxen", log -> new OraxenIconProvider(server, EngineLog.of(log)), "oraxen:x");
+        assertReachesLookupAndWarnsOnce("Nexo", log -> new NexoIconProvider(server, EngineLog.of(log)), "nexo:x");
+        assertReachesLookupAndWarnsOnce(
+                "CraftEngine", log -> new CraftEngineIconProvider(server, EngineLog.of(log)), "craftengine:default:x");
+        assertReachesLookupAndWarnsOnce(
+                "MMOItems", log -> new MMOItemsIconProvider(server, EngineLog.of(log)), "mmoitems:SWORD:x");
+        assertReachesLookupAndWarnsOnce(
+                "ExecutableItems", log -> new ExecutableItemsIconProvider(server, EngineLog.of(log)), "ei:x");
     }
 
     /** With its plugin absent, a matching spec is empty and silent, the present-guard runs no reflection. */

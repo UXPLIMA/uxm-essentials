@@ -10,9 +10,10 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ReportingPlaceholders;
+import com.uxplima.uxmessentials.shared.menu.TestViewer;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +26,7 @@ import org.junit.jupiter.api.Test;
  */
 class PlaceholderRegistryTest {
 
-    private static final MenuContext CTX = MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0);
+    private static final MenuContext CTX = MenuContext.of(TestViewer.of(UUID.randomUUID(), "P"), null, 0);
 
     @Test
     void twoDisjointFallbacksEachRouteToTheirOwnFamily() {
@@ -76,16 +77,17 @@ class PlaceholderRegistryTest {
         registry.register("broken", ctx -> {
             throw new IllegalStateException("no");
         });
+        ReportingPlaceholders reporting = new ReportingPlaceholders(registry);
         List<LogRecord> logged = new ArrayList<>();
-        Logger logger = Logger.getLogger(PlaceholderRegistry.class.getName());
+        Logger logger = Logger.getLogger(ReportingPlaceholders.class.getName());
         Handler collector = collector(logged);
         boolean parents = logger.getUseParentHandlers();
         logger.setUseParentHandlers(false);
         logger.addHandler(collector);
         try {
-            assertThat(registry.resolveOrReport("broken", CTX)).isEmpty();
-            assertThat(registry.resolveOrReport("broken", CTX)).isEmpty();
-            assertThat(registry.resolveOrReport("broken", CTX)).isEmpty();
+            assertThat(reporting.resolveOrReport("broken", CTX)).isEmpty();
+            assertThat(reporting.resolveOrReport("broken", CTX)).isEmpty();
+            assertThat(reporting.resolveOrReport("broken", CTX)).isEmpty();
         } finally {
             logger.removeHandler(collector);
             logger.setUseParentHandlers(parents);
@@ -101,9 +103,11 @@ class PlaceholderRegistryTest {
         registry.register("fine", ctx -> "value");
         registry.fallback(id -> id.startsWith("papi_"), (id, ctx) -> "papi:" + id);
 
-        assertThat(registry.resolveOrReport("fine", CTX)).contains("value");
-        assertThat(registry.resolveOrReport("papi_x", CTX)).contains("papi:papi_x");
-        assertThat(registry.resolveOrReport("unknown", CTX)).isEmpty();
+        ReportingPlaceholders reporting = new ReportingPlaceholders(registry);
+
+        assertThat(reporting.resolveOrReport("fine", CTX)).contains("value");
+        assertThat(reporting.resolveOrReport("papi_x", CTX)).contains("papi:papi_x");
+        assertThat(reporting.resolveOrReport("unknown", CTX)).isEmpty();
     }
 
     /** Collects the registry's warnings into {@code records}, so "named once" can be asserted rather than described. */

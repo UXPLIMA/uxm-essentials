@@ -102,7 +102,7 @@ class ListCommandTest {
         execute(dispatcher, CommandSourceStackMock.from(alice), "list");
 
         assertThat(alice.getOpenInventory().getTopInventory().getHolder())
-                .isInstanceOf(com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder.class);
+                .isInstanceOf(com.uxplima.uxmlib.menu.runtime.MenuHolder.class);
     }
 
     private static com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> rebindRoot(

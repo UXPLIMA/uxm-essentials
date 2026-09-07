@@ -8,12 +8,12 @@ import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.CurrencyProvider;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
 
 /**
  * The economy slice of the menu action vocabulary: the ways a click (or an operator's {@code /menu} spec) can move
@@ -121,14 +121,14 @@ public final class EconomyActions {
     private static void giveMoney(MenuActionContext ctx, Currencies currencies, Logger log) {
         money(ctx, "give-money", log)
                 .ifPresent(arg ->
-                        currencies.resolve(arg.currency()).deposit(ctx.viewer().uuid(), arg.amount()));
+                        currencies.resolve(arg.currency()).deposit(ctx.viewer().getUniqueId(), arg.amount()));
     }
 
     /** Withdraw {@code <amount>} of {@code [currency-spec]} from the viewer; a bad amount warns+skips. */
     private static void takeMoney(MenuActionContext ctx, Currencies currencies, Logger log) {
         money(ctx, "take-money", log)
                 .ifPresent(arg ->
-                        currencies.resolve(arg.currency()).withdraw(ctx.viewer().uuid(), arg.amount()));
+                        currencies.resolve(arg.currency()).withdraw(ctx.viewer().getUniqueId(), arg.amount()));
     }
 
     /**
@@ -139,7 +139,7 @@ public final class EconomyActions {
     private static void setMoney(MenuActionContext ctx, Currencies currencies, Logger log) {
         money(ctx, "set-money", log).ifPresent(arg -> {
             CurrencyProvider provider = currencies.resolve(arg.currency());
-            UUID viewer = ctx.viewer().uuid();
+            UUID viewer = ctx.viewer().getUniqueId();
             double delta = arg.amount() - provider.balance(viewer);
             if (delta > 0) {
                 provider.deposit(viewer, delta);
@@ -153,14 +153,14 @@ public final class EconomyActions {
     private static void givePoints(MenuActionContext ctx, Currencies currencies, Logger log) {
         money(ctx, "give-points", log)
                 .ifPresent(arg ->
-                        currencies.resolve("playerpoints").deposit(ctx.viewer().uuid(), arg.amount()));
+                        currencies.resolve("playerpoints").deposit(ctx.viewer().getUniqueId(), arg.amount()));
     }
 
     /** Withdraw {@code <amount>} from the viewer's PlayerPoints balance; a convenience alias for the pinned currency. */
     private static void takePoints(MenuActionContext ctx, Currencies currencies, Logger log) {
         money(ctx, "take-points", log)
                 .ifPresent(arg ->
-                        currencies.resolve("playerpoints").withdraw(ctx.viewer().uuid(), arg.amount()));
+                        currencies.resolve("playerpoints").withdraw(ctx.viewer().getUniqueId(), arg.amount()));
     }
 
     /** Parse the {@code <amount> [currency-spec]} argument, warning through {@code log} when the amount is unusable. */
@@ -222,7 +222,7 @@ public final class EconomyActions {
         if (node.isEmpty()) {
             return; // no node to grant. Nothing to do, but not an error
         }
-        permissions.add(ctx.viewer().uuid(), node);
+        permissions.add(ctx.viewer().getUniqueId(), node);
     }
 
     /** Revoke {@code <node>} from the viewer through Vault; a blank node or an absent permission service is a no-op. */
@@ -231,7 +231,7 @@ public final class EconomyActions {
         if (node.isEmpty()) {
             return;
         }
-        permissions.remove(ctx.viewer().uuid(), node);
+        permissions.remove(ctx.viewer().getUniqueId(), node);
     }
 
     /** Parse a whole non-negative count; empty when the value is blank, non-numeric or negative. Exposed for tests. */

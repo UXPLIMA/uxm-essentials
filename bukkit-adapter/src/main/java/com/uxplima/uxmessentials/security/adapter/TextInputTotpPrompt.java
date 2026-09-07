@@ -6,9 +6,9 @@ import java.util.function.Consumer;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.input.InputRequest;
+import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -37,8 +37,7 @@ public final class TextInputTotpPrompt implements TotpPrompt {
         Objects.requireNonNull(onCancel, "onCancel");
         textInput.prompt(
                 player,
-                viewer,
-                InputRequest.of(INPUT_KEY, SecurityMessageKey.SECURITY_VERIFY_TOTP_PROMPT),
+                InputRequest.of(INPUT_KEY, SecurityMessageKey.SECURITY_VERIFY_TOTP_PROMPT.key()),
                 onSubmit,
                 onCancel);
     }

@@ -54,14 +54,10 @@ import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.RatingTally;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
@@ -78,6 +74,13 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.gui.input.TextInputTestKit;
+import com.uxplima.uxmlib.menu.EntityEditorLayout;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -176,7 +179,7 @@ class PlayerWarpOffThreadReadTest {
     }
 
     private PlayerRef ref() {
-        return new PlayerRef(player.getUniqueId(), player.getName());
+        return BukkitRefs.toRef(player);
     }
 
     private PlayerWarpServices services() {
@@ -280,13 +283,13 @@ class PlayerWarpOffThreadReadTest {
                 org.bukkit.Material.BARRIER,
                 org.bukkit.Material.BLACK_STAINED_GLASS_PANE);
         MenuBindings bindings = new MenuBindings();
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         PlayerWarpEditorView editor = new PlayerWarpEditorView(
                 menus,
                 guiText,
-                scheduler,
+                EngineScheduler.of(scheduler),
                 repository,
                 visibility,
                 archivePlayerWarp,
@@ -303,9 +306,9 @@ class PlayerWarpOffThreadReadTest {
     private PlayerWarpBrowseMenu browseView(Messages messages, Permissions permissions, Notifier notifier) {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         PlayerWarpBrowse browse =
                 query -> com.uxplima.uxmessentials.playerwarps.domain.Page.empty(query.page(), query.pageSize());
         UsePlayerWarp use = new UsePlayerWarp(
@@ -337,9 +340,9 @@ class PlayerWarpOffThreadReadTest {
     private PlayerWarpCategoriesMenu categoriesView(Messages messages) {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
-        MenuRenderer renderer =
-                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+        MenuRenderer renderer = new MenuRenderer(
+                new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         WarpCategoryRepository categories = new WarpCategoryRepository() {
             @Override
             public Optional<WarpCategory> find(String id) {

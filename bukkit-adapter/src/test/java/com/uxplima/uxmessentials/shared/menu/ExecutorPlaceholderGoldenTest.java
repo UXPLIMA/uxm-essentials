@@ -12,15 +12,17 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,7 +80,7 @@ class ExecutorPlaceholderGoldenTest {
 
     @Test
     void aSelfOpenReadsTheExecutorAsTheViewer() {
-        menus.open(new PlayerRef(steve.getUniqueId(), steve.getName()), "greet", null);
+        menus.open(steve, "greet", null);
         ItemStack item = topItemFor(steve);
 
         assertThat(plainName(item)).as("%player% is the viewer").isEqualTo("Steve");
@@ -89,10 +91,9 @@ class ExecutorPlaceholderGoldenTest {
 
     @Test
     void anOpenForAnotherNamesTheOpenerAsExecutorAndTheTargetAsPlayer() {
-        PlayerRef bobRef = new PlayerRef(bob.getUniqueId(), bob.getName());
-        PlayerRef steveRef = new PlayerRef(steve.getUniqueId(), steve.getName());
+        PlayerRef steveRef = BukkitRefs.toRef(steve);
 
-        menus.open(bobRef, "greet", null, 0, Map.of(), steveRef);
+        menus.open(bob, "greet", null, 0, Map.of(), MenuExecutor.attach(steveRef));
         ItemStack item = topItemFor(bob);
 
         assertThat(plainName(item))
@@ -105,16 +106,15 @@ class ExecutorPlaceholderGoldenTest {
 
     @Test
     void aPageFlipKeepsTheExecutorPointedAtTheOpener() {
-        PlayerRef bobRef = new PlayerRef(bob.getUniqueId(), bob.getName());
-        PlayerRef steveRef = new PlayerRef(steve.getUniqueId(), steve.getName());
+        PlayerRef steveRef = BukkitRefs.toRef(steve);
 
-        menus.open(bobRef, "greet", null, 0, Map.of(), steveRef);
+        menus.open(bob, "greet", null, 0, Map.of(), MenuExecutor.attach(steveRef));
         MenuHolder holder =
                 (MenuHolder) bob.getOpenInventory().getTopInventory().getHolder();
 
         // A page flip re-renders from holder.ctx().withPage(...); the copy carries the executor, so %executor% stays
         // the opener across the redraw.
-        assertThat(holder.ctx().withPage(1).executor().name()).isEqualTo("Steve");
+        assertThat(MenuExecutor.of(holder.ctx().withPage(1)).name()).isEqualTo("Steve");
     }
 
     private static ItemStack topItemFor(PlayerMock who) {

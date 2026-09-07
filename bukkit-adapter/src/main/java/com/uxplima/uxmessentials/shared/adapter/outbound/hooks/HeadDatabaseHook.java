@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.bukkit.Server;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.providers.HeadQuery;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,7 +42,7 @@ public final class HeadDatabaseHook implements PluginHook<HeadQuery> {
 
     @Override
     public HeadQuery whenAbsent() {
-        return HeadQuery.ABSENT;
+        return HeadQuery.NONE;
     }
 
     @Override

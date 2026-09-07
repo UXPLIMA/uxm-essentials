@@ -4,12 +4,15 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.providers.ContentRegions;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.providers.ContentRegions;
+import com.uxplima.uxmlib.menu.spec.MenuSpec;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,7 +44,8 @@ public final class SnapshotPreviewWindow {
 
     public SnapshotPreviewWindow(Menus menus, Path dataFolder, Logger log) {
         this.menus = Objects.requireNonNull(menus, "menus");
-        this.spec = MenuSpecs.loadOrBundled(SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, log);
+        this.spec = MenuSpecs.loadOrBundled(
+                SPEC_RESOURCE, Objects.requireNonNull(dataFolder, "dataFolder"), ROWS, EngineLog.of(log));
         List<Integer> slots = ContentRegions.slots(spec, REGION, SPEC_RESOURCE);
         if (slots.size() != SNAPSHOT_SLOTS) {
             throw new IllegalStateException(SPEC_RESOURCE + ": the '" + REGION + "' region must declare exactly "
@@ -56,9 +60,10 @@ public final class SnapshotPreviewWindow {
         Objects.requireNonNull(view, "view");
         bindings.placeholder(
                 "invrollback_preview_title",
-                ctx -> view.previewTitle(ctx.subject(SnapshotPreview.class), ctx.viewer()));
+                ctx -> view.previewTitle(ctx.subject(SnapshotPreview.class), BukkitRefs.toRef(ctx.viewer())));
         bindings.placeholder(
-                "invrollback_info_lore", ctx -> view.infoLore(ctx.subject(SnapshotPreview.class), ctx.viewer()));
+                "invrollback_info_lore",
+                ctx -> view.infoLore(ctx.subject(SnapshotPreview.class), BukkitRefs.toRef(ctx.viewer())));
         bindings.action(
                 "invrollback:restore",
                 action -> view.onRestoreClick(action.subject(SnapshotPreview.class), action.player()));
@@ -74,6 +79,6 @@ public final class SnapshotPreviewWindow {
 
     /** Show this window to {@code preview}'s viewer, carrying the preview as the menu's subject. */
     void open(SnapshotPreview preview) {
-        menus.open(preview.staff(), SPEC_ID, preview);
+        LivePlayers.of(preview.staff()).ifPresent(staff -> menus.open(staff, SPEC_ID, preview));
     }
 }

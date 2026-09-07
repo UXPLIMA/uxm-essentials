@@ -18,12 +18,8 @@ import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
@@ -35,6 +31,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -121,11 +122,11 @@ public final class HomeListMenu {
         bindings.placeholder("home_cell_name", this::cellName);
         bindings.placeholder("home_cell_lore", this::cellLore);
         bindings.action("homes:open-slot", this::openSlot);
-        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, log));
+        menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }
 
     /** Open the slot grid for {@code viewer}; the live player is resolved by the engine. */
-    public void open(PlayerRef viewer) {
+    public void open(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         menus.open(viewer, SPEC_ID, null);
     }
@@ -137,7 +138,7 @@ public final class HomeListMenu {
      * count and ceiling so an empty cell's lore can fill {@code {used}}/{@code {limit}} without re-reading the store.
      */
     private List<HomeCell> slots(MenuContext ctx) {
-        PlayerRef viewer = ctx.viewer();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Map<Integer, Home> bySlot = bySlot(viewer);
         int maxSlots = maxSlots(viewer);
         int used = bySlot.size();
@@ -163,9 +164,9 @@ public final class HomeListMenu {
         HomeCell cell = ctx.entry(HomeCell.class);
         Home home = cell.home();
         if (home == null) {
-            return messages.resolve(ctx.viewer(), HomesMessageKey.HOME_MENU_EMPTY_NAME, Map.of());
+            return messages.resolve(BukkitRefs.toRef(ctx.viewer()), HomesMessageKey.HOME_MENU_EMPTY_NAME, Map.of());
         }
-        return messages.resolve(ctx.viewer(), HomesMessageKey.HOME_MENU_DEFAULT_NAME, nameOf(home));
+        return messages.resolve(BukkitRefs.toRef(ctx.viewer()), HomesMessageKey.HOME_MENU_DEFAULT_NAME, nameOf(home));
     }
 
     /** The cell's resolved lore string: the home's coordinate panel for a filled cell, the empty quota line otherwise. */
@@ -174,11 +175,12 @@ public final class HomeListMenu {
         Home home = cell.home();
         if (home == null) {
             return messages.resolve(
-                    ctx.viewer(),
+                    BukkitRefs.toRef(ctx.viewer()),
                     HomesMessageKey.HOME_MENU_EMPTY_LORE,
                     Map.of("used", Integer.toString(cell.used()), "limit", Integer.toString(cell.maxSlots())));
         }
-        return messages.resolve(ctx.viewer(), HomesMessageKey.HOME_MENU_FILLED_LORE, filledLore(home));
+        return messages.resolve(
+                BukkitRefs.toRef(ctx.viewer()), HomesMessageKey.HOME_MENU_FILLED_LORE, filledLore(home));
     }
 
     /**
@@ -192,7 +194,7 @@ public final class HomeListMenu {
             openAction.open(ctx.viewer(), home);
             return;
         }
-        create(ctx.player(), ctx.viewer(), cell.index());
+        create(ctx.player(), BukkitRefs.toRef(ctx.viewer()), cell.index());
     }
 
     /**
@@ -206,24 +208,24 @@ public final class HomeListMenu {
                 com.uxplima.uxmessentials.homes.domain.HomeSlot.of(slotIndex);
         scheduler.onRegion(at, () -> {
             if (safeGuard.blockUnsafe() && !hasUnsafeBypass(viewer) && safeGuard.isUnsafe(at)) {
-                rejectCreate(viewer, HomesMessageKey.HOME_UNSAFE_LOCATION);
+                rejectCreate(player, HomesMessageKey.HOME_UNSAFE_LOCATION);
                 return;
             }
             ClaimDecision decision = claimService.canPlace(viewer, at);
             if (!decision.allowed()) {
-                rejectCreate(viewer, claimMessageKey(decision));
+                rejectCreate(player, claimMessageKey(decision));
                 return;
             }
             scheduler.async(() -> {
                 createHome.create(viewer, slot, at);
-                scheduler.onEntity(viewer, () -> open(viewer));
+                scheduler.onEntity(viewer, () -> open(player));
             });
         });
     }
 
-    private void rejectCreate(PlayerRef viewer, MessageKey key) {
-        scheduler.onEntity(viewer, () -> {
-            notifier.send(viewer, key);
+    private void rejectCreate(Player viewer, MessageKey key) {
+        scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
+            notifier.send(BukkitRefs.toRef(viewer), key);
             open(viewer);
         });
     }
@@ -281,7 +283,7 @@ public final class HomeListMenu {
     /** The seam that opens the per-home action menu for a clicked filled cell, injected so the grid does not name it. */
     @FunctionalInterface
     public interface OpenAction {
-        void open(PlayerRef viewer, Home home);
+        void open(Player viewer, Home home);
     }
 
     /**

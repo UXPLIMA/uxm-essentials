@@ -168,12 +168,9 @@ class GuiLayoutsLoaderTest {
                 filler = "BLACK_STAINED_GLASS_PANE"
                 """);
 
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout layout = new GuiLayouts(dir, NOOP)
+        com.uxplima.uxmlib.menu.EntityEditorLayout layout = new GuiLayouts(dir, NOOP)
                 .loadEntityEditor(
-                        "demo",
-                        "demo-editor",
-                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout.codeDefault(
-                                List.of(0), 8));
+                        "demo", "demo-editor", com.uxplima.uxmlib.menu.EntityEditorLayout.codeDefault(List.of(0), 8));
 
         assertThat(layout.rows()).isEqualTo(3);
         assertThat(layout.propertySlots()).containsExactly(10, 12, 14, 16);

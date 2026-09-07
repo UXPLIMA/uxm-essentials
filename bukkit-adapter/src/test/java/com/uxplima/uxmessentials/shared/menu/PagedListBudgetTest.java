@@ -12,17 +12,8 @@ import java.util.function.BiFunction;
 import org.bukkit.inventory.Inventory;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PagedListSourceRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PageRequest;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PagedResult;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -30,6 +21,17 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
+import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
+import com.uxplima.uxmlib.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmlib.menu.eval.PageRequest;
+import com.uxplima.uxmlib.menu.eval.PagedResult;
+import com.uxplima.uxmlib.menu.render.ItemRenderer;
+import com.uxplima.uxmlib.menu.render.MenuRenderer;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,7 +81,7 @@ class PagedListBudgetTest {
         placeholders.register("v", ctx -> (String) ctx.entry().orElseThrow());
         placeholders.register("page", ctx -> String.valueOf(ctx.page() + 1));
         placeholders.register("max_page", ctx -> String.valueOf(ctx.pageCount()));
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, placeholders);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, placeholders);
         renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
     }
 
@@ -151,7 +153,7 @@ class PagedListBudgetTest {
         paged.register("pw:browse", source);
         Menus menus = new Menus(
                 renderer,
-                new SyncScheduler(),
+                EngineScheduler.of(new SyncScheduler()),
                 new ListSourceRegistry(),
                 null,
                 null,
@@ -161,7 +163,7 @@ class PagedListBudgetTest {
                 BedrockScreen.NONE,
                 paged);
         menus.registerSpec("test", new MenuSpecLoader().parse(PAGED_HOCON));
-        menus.open(new PlayerRef(player.getUniqueId(), player.getName()), "test", null);
+        menus.open(player, "test", null);
         return player.getOpenInventory().getTopInventory();
     }
 

@@ -53,10 +53,6 @@ import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
@@ -71,6 +67,9 @@ import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmlib.gui.input.TextInput;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -281,10 +280,10 @@ public final class HomesWiring {
                 confirmUnsafeTeleport,
                 safeGuard,
                 claimService,
-                (viewer, home) -> iconHolder[0].openIcons(viewer, home),
-                (viewer, home) -> invitesHolder[0].open(viewer, home),
+                (player, home) -> iconHolder[0].openIcons(player, home),
+                (player, home) -> invitesHolder[0].open(player, home),
                 listHolder);
-        HomeMenus.ActionMenuOpener reopenAction = (player, viewer, home) -> actionMenu.open(viewer, home);
+        HomeMenus.ActionMenuOpener reopenAction = (player, viewer, home) -> actionMenu.open(player, home);
         HomeMenus homeMenus =
                 new HomeMenus(menus, kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts), reopenAction);
         homeMenus.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
@@ -317,7 +316,7 @@ public final class HomesWiring {
                 listLayout(guiLayouts),
                 unlimitedMax,
                 dateFormat,
-                actionMenu::open);
+                (player, home) -> actionMenu.open(player, home));
         listView.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         listHolder[0] = listView;
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, kernel.events(), clock);
@@ -355,13 +354,9 @@ public final class HomesWiring {
             boolean confirmUnsafeTeleport,
             SafeLocationGuard safeGuard,
             ClaimService claimService,
-            java.util.function.BiConsumer<
-                            com.uxplima.uxmessentials.shared.domain.PlayerRef,
-                            com.uxplima.uxmessentials.homes.domain.Home>
+            java.util.function.BiConsumer<org.bukkit.entity.Player, com.uxplima.uxmessentials.homes.domain.Home>
                     openIconPicker,
-            java.util.function.BiConsumer<
-                            com.uxplima.uxmessentials.shared.domain.PlayerRef,
-                            com.uxplima.uxmessentials.homes.domain.Home>
+            java.util.function.BiConsumer<org.bukkit.entity.Player, com.uxplima.uxmessentials.homes.domain.Home>
                     openInvites,
             HomeListMenu[] listHolder) {
         HomeActionMenu.Collaborators collaborators = new HomeActionMenu.Collaborators(
@@ -386,7 +381,7 @@ public final class HomesWiring {
                 claimService,
                 openIconPicker,
                 openInvites,
-                player -> listHolder[0].open(BukkitRefs.toRef(player)));
+                player -> listHolder[0].open(player));
         return new HomeActionMenu(collaborators);
     }
 
