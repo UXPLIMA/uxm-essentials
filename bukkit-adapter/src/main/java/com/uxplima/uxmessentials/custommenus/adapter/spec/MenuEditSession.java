@@ -45,6 +45,9 @@ public final class MenuEditSession {
     /** The viewer's own inventory slots a bottom-inventory menu additionally paints into, mirrors {@code MenuSpec}. */
     private static final int BOTTOM_SLOTS = 36;
 
+    /** The row count a bottom-inventory menu always has: the full double chest its raw slots line up with. */
+    private static final int BOTTOM_ROWS = 6;
+
     private String title;
     private int rows;
     private RefreshSpec refresh;
@@ -381,9 +384,23 @@ public final class MenuEditSession {
         return this;
     }
 
+    /**
+     * Turn the bottom canvas on or off. Turning it on also pins the menu to {@link #BOTTOM_ROWS} rows and clears any
+     * inventory type, because the raw-slot geometry that paints into the viewer's own inventory only lines up for a
+     * full double chest: the loader pins both facts on every load, and the writer refuses a spec that says otherwise.
+     * Doing it here means the transition can never leave the working copy in a shape no menu file can hold. The
+     * editor's rows stepper and inventory-type selector are locked for as long as the canvas is on, and the editor
+     * tells the operator what the pin changed, so neither the number nor the shape moves behind their back.
+     *
+     * <p>Turning the canvas off shrinks the addressable range instead, so an item placed in the bottom half is
+     * dropped from the working copy the same way a row shrink drops one.
+     */
     public MenuEditSession setBottomInventory(boolean bottomInventory) {
         this.bottomInventory = bottomInventory;
-        // Turning the bottom canvas off shrinks the addressable range, so drop any item that was placed in it.
+        if (bottomInventory) {
+            this.rows = BOTTOM_ROWS;
+            this.inventoryType = null;
+        }
         dropOrphanedItems();
         return this;
     }

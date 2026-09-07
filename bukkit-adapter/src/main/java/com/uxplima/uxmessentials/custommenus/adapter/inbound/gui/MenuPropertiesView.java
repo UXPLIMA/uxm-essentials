@@ -62,6 +62,14 @@ import org.jspecify.annotations.Nullable;
  * items in now-out-of-range slots: {@link MenuEditSession#setRows} drops those items so the working copy stays valid
  * and Save never fails on them; the smaller item count shows on the redraw. Back returns to the overview, Delete gates
  * behind the engine confirm and returns to the picker list.
+ *
+ * <p>Rows, inventory type and bottom inventory read as three independent fields and are not: a bottom-inventory menu
+ * is six rows and chest-only, because the raw-slot geometry that paints into the viewer's own inventory only lines up
+ * for a full double chest. While the bottom canvas is on, the rows stepper and the inventory-type selector are drawn
+ * as {@link MenuLockedProperty} stand-ins, which keep the label, the icon and the value, name the reason in the lore
+ * and refuse the click with a line in chat. Turning the canvas on pins the rows and clears the type in
+ * {@link MenuEditSession#setBottomInventory}, and the toggle reports what that changed. The operator therefore cannot
+ * build the shape at all, rather than building it in ten clicks and meeting the writer's refusal on Save.
  */
 @NullMarked
 public final class MenuPropertiesView {
@@ -241,7 +249,18 @@ public final class MenuPropertiesView {
                 scheduler);
     }
 
+    /**
+     * The row-count stepper, or the locked stand-in for it while bottom-inventory is on. A bottom-inventory menu is a
+     * full double chest, so the stepper has nothing left to offer: rather than let the operator step it to three and
+     * meet the writer's refusal on Save, the row says why it cannot move and refuses the click.
+     */
     private EditableProperty rowsRow(MenuTarget target) {
+        if (target.session().bottomInventory()) {
+            return lockedRow(
+                    CustomMenusMessageKey.MENU_PROPERTIES_ROWS,
+                    Material.LADDER,
+                    () -> Long.toString(target.session().rows()));
+        }
         return new NumberProperty(
                 CustomMenusMessageKey.MENU_PROPERTIES_ROWS.key(),
                 Material.LADDER,
@@ -254,7 +273,19 @@ public final class MenuPropertiesView {
                 scheduler);
     }
 
+    /**
+     * The window-shape selector, or the locked stand-in for it while bottom-inventory is on. The bottom canvas is
+     * chest-only, and a shape it named would be dropped on the next load, so the selector never opens.
+     */
     private EditableProperty inventoryTypeRow(MenuTarget target) {
+        if (target.session().bottomInventory()) {
+            return lockedRow(
+                    CustomMenusMessageKey.MENU_PROPERTIES_INVENTORY_TYPE,
+                    Material.HOPPER,
+                    () -> InventoryShape.fromToken(
+                                    target.session().inventoryType().orElse(null))
+                            .name());
+        }
         return new EnumProperty<>(
                 CustomMenusMessageKey.MENU_PROPERTIES_INVENTORY_TYPE.key(),
                 CustomMenusMessageKey.MENU_PROPERTIES_SELECT_INVENTORY_TYPE.key(),
@@ -294,14 +325,21 @@ public final class MenuPropertiesView {
                 scheduler);
     }
 
+    /**
+     * The bottom-canvas toggle. Turning it on pins the menu to six rows and clears its inventory type (the model does
+     * that, so no caller can skip it), and this row reports the pin, because a change to the operator's menu they did
+     * not spell out is exactly what this editor stopped doing.
+     */
     private EditableProperty bottomInventoryRow(MenuTarget target) {
-        return ToggleProperty.ofBoolean(
-                CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_INVENTORY.key(),
-                Material.LEATHER_CHESTPLATE,
-                () -> target.session().bottomInventory(),
-                this::onOff,
-                on -> target.session().setBottomInventory(on),
-                scheduler);
+        return new MenuNoticeProperty(
+                ToggleProperty.ofBoolean(
+                        CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_INVENTORY.key(),
+                        Material.LEATHER_CHESTPLATE,
+                        () -> target.session().bottomInventory(),
+                        this::onOff,
+                        on -> target.session().setBottomInventory(on),
+                        scheduler),
+                viewer -> reportBottomPin(viewer, target));
     }
 
     private EditableProperty refreshRow(MenuTarget target) {
@@ -463,6 +501,37 @@ public final class MenuPropertiesView {
 
     private static Map<String, String> name(MenuTarget target) {
         return Map.of("name", target.menuId(), "missing", "");
+    }
+
+    /** A field the bottom canvas has taken over: same label, same icon, the reason in the lore, the click refused. */
+    private EditableProperty lockedRow(MessageKey label, Material icon, Supplier<String> value) {
+        return new MenuLockedProperty(label, icon, value, this::bottomLockedLore, this::refuseBottomLocked);
+    }
+
+    /** The current value of a locked field, wrapped in the catalog line that names the reason it cannot move. */
+    private String bottomLockedLore(Player viewer, String value) {
+        return messages.resolve(
+                BukkitRefs.toRef(viewer), CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_LOCKED, Map.of("value", value));
+    }
+
+    /** Tell the viewer why the click did nothing. Sent on the click thread, which is the viewer's own. */
+    private void refuseBottomLocked(Player viewer) {
+        viewer.sendMessage(guiText.text(
+                BukkitRefs.toRef(viewer), CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_LOCKED_CLICK, Map.of()));
+    }
+
+    /**
+     * Report what turning the bottom canvas on did to the two fields it takes over. Nothing is said when the toggle
+     * went the other way: turning the canvas off only unlocks them, and the redraw shows that on its own.
+     */
+    private void reportBottomPin(Player viewer, MenuTarget target) {
+        if (!target.session().bottomInventory()) {
+            return;
+        }
+        viewer.sendMessage(guiText.text(
+                BukkitRefs.toRef(viewer),
+                CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_PINNED,
+                Map.of("rows", Long.toString(target.session().rows()))));
     }
 
     private String onOff(Player viewer, boolean on) {

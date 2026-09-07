@@ -118,6 +118,23 @@ class MenuEditSessionTest {
     }
 
     @Test
+    void turningTheBottomCanvasOnPinsTheRowsAndClearsTheInventoryType() {
+        // A bottom-inventory menu is a full double chest by definition: the loader pins it at six rows and drops any
+        // declared inventory-type. The model does the same on the transition, so the working copy is never left in a
+        // shape the writer cannot spell.
+        MenuEditSession session = MenuEditSession.from(loader.parse("rows = 3\ninventory-type = \"hopper\"\n"));
+
+        session.setBottomInventory(true);
+
+        assertThat(session.rows()).isEqualTo(6);
+        assertThat(session.inventoryType()).isEmpty();
+        MenuSpec spec = session.toSpec();
+        assertThat(spec.bottomInventory()).isTrue();
+        assertThat(spec.rows()).isEqualTo(6);
+        assertThat(spec.inventoryType()).isEmpty();
+    }
+
+    @Test
     void clearingTheInventoryTypeReturnsToTheChestDefault() {
         MenuEditSession session = MenuEditSession.from(loader.parse("rows = 3\ninventory-type = \"hopper\"\n"));
         assertThat(session.toSpec().inventoryType()).contains("hopper");

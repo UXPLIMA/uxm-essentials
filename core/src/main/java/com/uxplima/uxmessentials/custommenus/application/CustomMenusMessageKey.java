@@ -411,6 +411,15 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Label of the menu-property editor's bottom-inventory toggle. */
     MENU_PROPERTIES_BOTTOM_INVENTORY("menu.properties.bottom-inventory"),
 
+    /** Value lore of a menu-property field the bottom canvas has locked: the value ({@code {value}}) and the reason. */
+    MENU_PROPERTIES_BOTTOM_LOCKED("menu.properties.bottom-locked"),
+
+    /** Reply when a menu-property field locked by the bottom canvas is clicked, saying why nothing happened. */
+    MENU_PROPERTIES_BOTTOM_LOCKED_CLICK("menu.properties.bottom-locked-click"),
+
+    /** Reply when turning the bottom canvas on pins the menu to {@code {rows}} rows and clears its inventory type. */
+    MENU_PROPERTIES_BOTTOM_PINNED("menu.properties.bottom-pinned"),
+
     /** Label of the menu-property editor's open-requirement row (opens the condition ref-list). */
     MENU_PROPERTIES_OPEN_REQUIREMENT("menu.properties.open-requirement"),
 

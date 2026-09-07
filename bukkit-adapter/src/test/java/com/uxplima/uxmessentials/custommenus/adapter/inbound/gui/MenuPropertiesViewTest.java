@@ -78,6 +78,7 @@ class MenuPropertiesViewTest {
     private static final int ROWS_SLOT = 11; // PROPERTY_SLOTS[1]
     private static final int INVENTORY_TYPE_SLOT = 12; // PROPERTY_SLOTS[2]
     private static final int CHEST_ONLY_SLOT = 14; // PROPERTY_SLOTS[4]
+    private static final int BOTTOM_INVENTORY_SLOT = 15; // PROPERTY_SLOTS[5]
     private static final int OPEN_REQUIREMENT_SLOT = 16; // PROPERTY_SLOTS[6]
     private static final int OPEN_COMMAND_SLOT = 23; // PROPERTY_SLOTS[11]
     private static final int GRID_SLOT = 24; // PROPERTY_SLOTS[12]
@@ -132,6 +133,7 @@ class MenuPropertiesViewTest {
         loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, menus, NOOP);
         writeMenu("alpha", 3, "x { slot = 0, material = STONE, click { left = [\"close\"] } }");
         writeMenu("big", 6, "y { slot = 45, material = DIRT, click { left = [\"close\"] } }");
+        writeBottomCanvasMenu("canvas");
         names.addAll(loader.loadFrom(menusDir).loadedNames());
 
         MenuSpecPersistence persistence = new MenuSpecPersistence(new MenuFileWriter(), bindings, NOOP);
@@ -242,6 +244,79 @@ class MenuPropertiesViewTest {
     }
 
     @Test
+    void theRowsStepperIsRefusedWhileBottomInventoryIsOn() {
+        properties.open(player, viewer, "canvas"); // bottom inventory, so the menu is pinned at six rows
+        MenuEditSession session = session();
+
+        fireClick(ROWS_SLOT, ClickType.RIGHT); // would step 6 -> 5 on an ordinary menu
+
+        assertThat(session.rows()).isEqualTo(6);
+        assertThat(player.nextMessage()).contains(CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_LOCKED_CLICK.key());
+        assertThat(properties
+                        .propertyAt(ROWS_SLOT, session, "canvas")
+                        .orElseThrow()
+                        .valueLore(player))
+                .isEqualTo(CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_LOCKED.key());
+    }
+
+    @Test
+    void theInventoryTypeSelectorIsRefusedWhileBottomInventoryIsOn() {
+        properties.open(player, viewer, "canvas");
+        MenuEditSession session = session();
+
+        fireClick(INVENTORY_TYPE_SLOT, ClickType.LEFT); // would open the shape selector on an ordinary menu
+
+        assertThat(session.inventoryType()).isEmpty();
+        assertThat(player.nextMessage()).contains(CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_LOCKED_CLICK.key());
+        // No selector child window opened: the six-row property editor is still the inventory on screen.
+        assertThat(player.getOpenInventory().getTopInventory().getSize()).isEqualTo(54);
+        assertThat(properties
+                        .propertyAt(INVENTORY_TYPE_SLOT, session, "canvas")
+                        .orElseThrow()
+                        .valueLore(player))
+                .isEqualTo(CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_LOCKED.key());
+    }
+
+    @Test
+    void bothFieldsStepAgainOnceBottomInventoryIsOff() {
+        properties.open(player, viewer, "canvas");
+        MenuEditSession session = session();
+
+        fireClick(BOTTOM_INVENTORY_SLOT, ClickType.LEFT); // turn the bottom canvas off again
+
+        assertThat(session.bottomInventory()).isFalse();
+        assertThat(properties.propertyAt(ROWS_SLOT, session, "canvas")).get().isInstanceOf(NumberProperty.class);
+        assertThat(properties.propertyAt(INVENTORY_TYPE_SLOT, session, "canvas"))
+                .get()
+                .isInstanceOf(EnumProperty.class);
+
+        fireClick(ROWS_SLOT, ClickType.RIGHT);
+
+        assertThat(session.rows()).isEqualTo(5);
+    }
+
+    @Test
+    void turningBottomInventoryOnPinsTheRowsClearsTheTypeAndSaysSo() {
+        properties.open(player, viewer, "alpha"); // three rows, no bottom canvas
+        MenuEditSession session = session();
+        session.setInventoryType("hopper");
+
+        fireClick(BOTTOM_INVENTORY_SLOT, ClickType.LEFT);
+
+        assertThat(session.bottomInventory()).isTrue();
+        assertThat(session.rows()).isEqualTo(6);
+        assertThat(session.inventoryType()).isEmpty();
+        assertThat(player.nextMessage()).contains(CustomMenusMessageKey.MENU_PROPERTIES_BOTTOM_PINNED.key());
+
+        fireClick(SAVE_SLOT, ClickType.LEFT); // the shape the writer used to refuse now saves
+
+        MenuSpec reloaded = menus.registeredSpec("alpha").orElseThrow();
+        assertThat(reloaded.bottomInventory()).isTrue();
+        assertThat(reloaded.rows()).isEqualTo(6);
+        assertThat(reloaded.inventoryType()).isEmpty();
+    }
+
+    @Test
     void togglingChestOnlyMutatesTheSession() {
         properties.open(player, viewer, "alpha");
         MenuEditSession session = session();
@@ -324,6 +399,19 @@ class MenuPropertiesViewTest {
     private void forget(String name) {
         menus.unregisterSpec(name);
         names.remove(name);
+    }
+
+    /** A bottom-inventory menu: the loader pins it at six rows and chest-only, so two editor fields are locked. */
+    private void writeBottomCanvasMenu(String name) {
+        String hocon = """
+                bottom-inventory = true
+                items { z { slot = 0, material = STONE, click { left = ["close"] } } }
+                """;
+        try {
+            Files.writeString(menusDir.resolve(name + ".conf"), hocon);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("failed to seed menu " + name, failure);
+        }
     }
 
     private void writeMenu(String name, int rows, String item) {

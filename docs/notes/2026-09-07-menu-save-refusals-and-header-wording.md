@@ -36,6 +36,31 @@ Option 3 is what ships today, because it is the smallest thing that is not a sta
 is the one that matches the rest of the editor, since every other field the editor offers can be
 saved.
 
+### Decided: option 2, on 2026-09-07
+
+The owner took option 2. A refusal at save time is a late error message about a choice the interface
+offered ten clicks earlier, so the interface no longer offers it.
+
+- While bottom-inventory is on, the rows stepper and the inventory-type selector are drawn as
+  `MenuLockedProperty` stand-ins. Same label, same icon, same current value, so the grid does not
+  move; the value lore carries `menu.properties.bottom-locked` (the reason), and the click is
+  refused with `menu.properties.bottom-locked-click` in chat. That is the convention the vault
+  selector already uses for a slot the viewer does not own: the lore says why, the click says it
+  again, nothing else about the button changes. No new visual language was invented, because the
+  property editor's renderer offers a property only a label, an icon and one value line.
+- The transition from the other side is handled in `MenuEditSession.setBottomInventory`: turning the
+  canvas on pins the menu to six rows and clears the inventory type, which is what the loader does
+  on every load anyway. No caller can skip it. `MenuPropertiesView` wraps the toggle in a
+  `MenuNoticeProperty` that reports the result with `menu.properties.bottom-pinned`, so the change
+  to the operator's menu is never silent. Turning the canvas off says nothing: it only unlocks the
+  two fields, and the redraw shows that.
+- `setRows` and `setInventoryType` stay permissive on purpose. The two `MenuSpecPersistenceTest`
+  cases drive them directly and still pin the writer's refusals, which remain the backstop for the
+  shape reached by some route other than the editor. This fix does not replace them.
+
+Option 1 was not taken. With the editor unable to build the shape, a dedicated save status would
+name a state no supported path reaches.
+
 The third refusal, a `Ref` carrying an argument other than `value`, and the fourth, a non-empty
 `ClickSpec.conditions()`, are **not reachable here**. Every ref this plugin builds comes from
 `Ref.parse` or from the loader, and both put the whole tail under `value`; every `ClickSpec` this
