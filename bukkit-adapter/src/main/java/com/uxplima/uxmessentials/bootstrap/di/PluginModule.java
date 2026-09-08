@@ -209,7 +209,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
@@ -314,6 +314,7 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmlib.advancement.Toasts;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
+import com.uxplima.uxmlib.claim.ClaimProvidersConfig;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.gui.input.TextInputInstaller;
@@ -1096,7 +1097,7 @@ public final class PluginModule {
         // Which claim plugins to consult and how to fold their answers is a server-wide choice read once from the
         // root config.conf, then handed to every context whose region gate consults claimed land (homes, teleport,
         // poses) so all three see the same provider set.
-        ClaimProvidersConfig claimProviders = ClaimProvidersConfig.from(config, kernel.log());
+        ClaimProvidersConfig claimProviders = LibraryClaims.read(config, kernel.log());
         // The one join capture behind /alts, /seenip and /ipalts, built before the modules wire so both readers
         // observe the same recorder. Null when neither moderation nor security is enabled: nothing is recorded.
         IpCapture ipCapture = wireIpHistory(plugin, registry, config, persistence, kernel, resources);

@@ -114,90 +114,95 @@ public final class IntegrationCatalog {
                     IntegrationFamily.ITEMS,
                     "com.uxplima.uxmlib.menu.providers.ExecutableItemsIconProvider",
                     "ExecutableItems items as menu icons"),
+            // Every claims seam names a class in uxmLib. The nineteen adapters lived here until 2026-09-08 and
+            // are one copy in the library now, because the plugins written in September could not depend on
+            // this one and must not each carry the same reflection. The name is written un-relocated on
+            // purpose: this catalogue is read by the health check and by a drift guard, both of which run
+            // against the plain classpath, and never by a Class.forName inside the shaded jar.
             new Integration(
                     "Lands",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.LandsClaimProvider",
+                    "com.uxplima.uxmlib.claim.LandsClaimProvider",
                     "Lands claims gate homes and warps"),
             new Integration(
                     "GriefPrevention",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.GriefPreventionClaimProvider",
+                    "com.uxplima.uxmlib.claim.GriefPreventionClaimProvider",
                     "GriefPrevention claims gate homes and warps"),
             new Integration(
                     "GriefDefender",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.GriefDefenderClaimProvider",
+                    "com.uxplima.uxmlib.claim.GriefDefenderClaimProvider",
                     "GriefDefender claims gate homes and warps"),
             new Integration(
                     "ExcellentClaims",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.ExcellentClaimsClaimProvider",
+                    "com.uxplima.uxmlib.claim.ExcellentClaimsClaimProvider",
                     "ExcellentClaims claims gate homes and warps"),
             new Integration(
                     "SimpleClaimSystem",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.SimpleClaimSystemClaimProvider",
+                    "com.uxplima.uxmlib.claim.SimpleClaimSystemClaimProvider",
                     "SimpleClaimSystem claims gate homes and warps"),
             new Integration(
                     "RClaim",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.RClaimClaimProvider",
+                    "com.uxplima.uxmlib.claim.RClaimClaimProvider",
                     "RClaim claims gate homes and warps"),
             new Integration(
                     "XClaim",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.XClaimClaimProvider",
+                    "com.uxplima.uxmlib.claim.XClaimClaimProvider",
                     "XClaim claims gate homes and warps"),
             new Integration(
                     "Homestead",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.HomesteadClaimProvider",
+                    "com.uxplima.uxmlib.claim.HomesteadClaimProvider",
                     "Homestead claims gate homes and warps"),
             new Integration(
                     "Towny",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.TownyClaimProvider",
+                    "com.uxplima.uxmlib.claim.TownyClaimProvider",
                     "town plots gate homes and warps"),
             new Integration(
                     "Kingdoms",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.KingdomsClaimProvider",
+                    "com.uxplima.uxmlib.claim.KingdomsClaimProvider",
                     "KingdomsX land gates homes and warps"),
             new Integration(
                     "HuskClaims",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.HuskClaimsClaimProvider",
+                    "com.uxplima.uxmlib.claim.HuskClaimsClaimProvider",
                     "HuskClaims claims gate homes and warps"),
             new Integration(
                     "HuskTowns",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.HuskTownsClaimProvider",
+                    "com.uxplima.uxmlib.claim.HuskTownsClaimProvider",
                     "HuskTowns town claims gate homes and warps"),
             new Integration(
                     "Factions",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.FactionsClaimProvider",
+                    "com.uxplima.uxmlib.claim.FactionsClaimProvider",
                     "FactionsUUID or SaberFactions territory gates homes and warps"),
             new Integration(
                     "BentoBox",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.BentoBoxClaimProvider",
+                    "com.uxplima.uxmlib.claim.BentoBoxClaimProvider",
                     "BentoBox islands gate homes and warps"),
             new Integration(
                     "Residence",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.ResidenceClaimProvider",
+                    "com.uxplima.uxmlib.claim.ResidenceClaimProvider",
                     "residences gate homes and warps"),
             new Integration(
                     "PlotSquared",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.PlotSquaredClaimProvider",
+                    "com.uxplima.uxmlib.claim.PlotSquaredClaimProvider",
                     "plots gate homes and warps"),
             new Integration(
                     "SuperiorSkyblock2",
                     IntegrationFamily.CLAIMS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.claim.SuperiorSkyblockClaimProvider",
+                    "com.uxplima.uxmlib.claim.SuperiorSkyblockClaimProvider",
                     "SuperiorSkyblock islands gate homes and warps"),
             new Integration(
                     "WorldGuard",

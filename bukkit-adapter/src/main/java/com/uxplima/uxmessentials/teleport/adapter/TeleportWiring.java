@@ -19,9 +19,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -92,6 +91,7 @@ import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import com.uxplima.uxmessentials.teleport.domain.SearchBudget;
+import com.uxplima.uxmlib.claim.ClaimProvidersConfig;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
@@ -421,7 +421,7 @@ public final class TeleportWiring {
             return new AlwaysAllowClaimService();
         }
         return new ClaimServiceImpl(
-                ClaimProviders.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()),
+                LibraryClaims.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()),
                 ClaimPolicySettings.defaults());
     }
 

@@ -47,14 +47,14 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
+import com.uxplima.uxmlib.claim.ClaimProvidersConfig;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
 import com.uxplima.uxmlib.packet.npc.internal.NmsNpcPackets;
@@ -279,7 +279,7 @@ public final class PosesWiring {
         }
         ClaimPolicySettings settings = new ClaimPolicySettings(false, true, 0, true);
         return new ClaimServiceImpl(
-                ClaimProviders.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()), settings);
+                LibraryClaims.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()), settings);
     }
 
     /**

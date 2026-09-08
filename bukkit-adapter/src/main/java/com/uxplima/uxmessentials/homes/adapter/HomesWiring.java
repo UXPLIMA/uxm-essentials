@@ -55,9 +55,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProvidersConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -67,6 +66,7 @@ import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmlib.claim.ClaimProvidersConfig;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -424,7 +424,7 @@ public final class HomesWiring {
         ClaimPolicySettings settings =
                 new ClaimPolicySettings(requireClaim, blockForeignClaims, foreignChunkDistance, checkTeleportAccess);
         return new ClaimServiceImpl(
-                ClaimProviders.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()), settings);
+                LibraryClaims.detectAll(claimProviders, plugin, plugin.getServer(), kernel.log()), settings);
     }
 
     private static SafeLocationGuard buildSafeGuard(Plugin plugin, ModuleContext ctx) {

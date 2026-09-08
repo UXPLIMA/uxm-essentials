@@ -14,13 +14,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
 /**
  * Keeps the three surfaces that must list every claim provider in lockstep. A provider becomes usable only when
- * all three agree: {@link ClaimProviders} registers it, {@code config.conf} exposes a {@code claims.providers}
+ * all three agree: {@link LibraryClaims} registers it, {@code config.conf} exposes a {@code claims.providers}
  * key an operator can toggle, and {@code paper-plugin.yml} declares its plugin as a {@code load: BEFORE}
  * dependency so it is loaded before us and its present-guard sees it. Add a provider to the registry but forget
  * the config line and an operator cannot discover the key to disable it; forget the dependency and the plugin
@@ -28,7 +28,7 @@ import org.yaml.snakeyaml.Yaml;
  *
  * <p>It reads only tracked sources, {@code /config.conf} and {@code /paper-plugin.yml} from the classpath, both
  * bundled from {@code src/main/resources}, and never touches {@code docs/}, which is gitignored and absent in a
- * clean CI checkout. The provider keys come from {@link ClaimProviders#candidateKeys()}, the single source of
+ * clean CI checkout. The provider keys come from {@link LibraryClaims#candidateKeys()}, the single source of
  * truth the registry itself derives, so the guard cannot drift from the set it checks: the config lines are read
  * from raw text (the toggle entries ship commented, so a HOCON parse would not see them) and the dependency
  * names are parsed from the YAML. {@code uxmclaims} is the one documented exception to the dependency check: it
@@ -72,10 +72,10 @@ class ClaimProviderCoverageDriftTest {
         Set<String> mapped = new HashSet<>(KEY_TO_PLUGIN.keySet());
         mapped.add(UXM_CLAIMS_KEY);
 
-        assertThat(ClaimProviders.candidateKeys())
+        assertThat(LibraryClaims.candidateKeys())
                 .as("registry keys must be unique")
                 .doesNotHaveDuplicates();
-        assertThat(new HashSet<>(ClaimProviders.candidateKeys()))
+        assertThat(new HashSet<>(LibraryClaims.candidateKeys()))
                 .as("every registered provider needs a KEY_TO_PLUGIN entry (or be the uxmclaims exception); a "
                         + "provider added to ClaimProviders must be mapped here so its paper-plugin.yml dependency "
                         + "is checked")
@@ -84,7 +84,7 @@ class ClaimProviderCoverageDriftTest {
 
     @Test
     void everyRegisteredKeyIsDocumentedInConfig() {
-        assertThat(missingFromConfig(ClaimProviders.candidateKeys(), providersBlock()))
+        assertThat(missingFromConfig(LibraryClaims.candidateKeys(), providersBlock()))
                 .as("a provider is registered but has no discoverable claims.providers toggle line in config.conf; "
                         + "add a commented '# <key> = false' entry so an operator can turn it off")
                 .isEmpty();
