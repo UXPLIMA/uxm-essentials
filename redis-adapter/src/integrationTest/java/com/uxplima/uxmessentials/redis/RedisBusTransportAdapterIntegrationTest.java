@@ -20,7 +20,6 @@ import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import io.lettuce.core.RedisURI;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
@@ -33,10 +32,16 @@ import org.testcontainers.utility.DockerImageName;
  * the verbatim bytes to its {@code onFrame} sink, which decode back equal to the original. This proves the seam
  * carries opaque bytes byte-identically over the live wire, not just over the fake-channel unit tests.
  *
- * <p>The broker is resolved in {@link #startRedis()} in priority order, so the test runs anywhere a real Redis
- * is available and skips cleanly (never fails) where none is: (1) an explicit {@code UXMESS_TEST_REDIS_URI} env
- * var / {@code uxmessentials.test.redis.uri} system property, (2) a reachable {@code redis://localhost:6379},
- * (3) a Testcontainers {@code redis:7-alpine} when Docker is available.
+ * <p>This is the one test in the repository that needs a machine the build cannot promise, so it lives in its
+ * own source set and {@code check} never runs it. It sat in {@code src/test} until 2026-09-08 and opened with
+ * an {@code assumeTrue} when no broker answered. JUnit records an abort as a skip, the suite reported green,
+ * and CONTRACT.md section 15 says there is no legitimate skip here: a test that cannot run needs a different
+ * task, not an excuse. Run it with {@code ./gradlew :redis-adapter:integrationTest}.
+ *
+ * <p>The broker is resolved in {@link #startRedis()} in priority order: (1) an explicit
+ * {@code UXMESS_TEST_REDIS_URI} env var / {@code uxmessentials.test.redis.uri} system property, (2) a reachable
+ * {@code redis://localhost:6379}, (3) a Testcontainers {@code redis:7-alpine} when Docker is available. With
+ * none of the three the run fails and says so, because somebody who asked for this task asked for a broker.
  */
 @org.jspecify.annotations.NullUnmarked
 class RedisBusTransportAdapterIntegrationTest {
@@ -70,8 +75,8 @@ class RedisBusTransportAdapterIntegrationTest {
             redisPort = started.getMappedPort(REDIS_PORT);
             return;
         }
-        Assumptions.assumeTrue(
-                false, "no Redis reachable (set UXMESS_TEST_REDIS_URI, run redis on :6379, or enable Docker)");
+        throw new IllegalStateException("no Redis reachable. Set UXMESS_TEST_REDIS_URI, run redis on :" + REDIS_PORT
+                + ", or enable Docker for the Testcontainers fallback.");
     }
 
     @AfterAll

@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -13,27 +12,25 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
  * Build-artifact guard: the {@code uxmEssentials-redis} shadow jar must ship Netty <em>relocated</em> under
  * {@code com.uxplima.uxmessentials.libs.netty} so it never clashes with Paper's own (differently-versioned)
  * bundled Netty when an operator drops this jar on a backend. {@code :redis-adapter:test} depends on
- * {@code shadowJar} (see build.gradle.kts) so the jar exists when this runs; the {@code assumeTrue} guard keeps
- * the test honest if invoked in isolation without the jar.
+ * {@code shadowJar} (see build.gradle.kts), so the jar exists whenever this runs.
+ *
+ * <p>Each of these three used to open with {@code assumeTrue(false, "...not built, skipping")} when the jar
+ * was missing. That was written as honesty and it was the opposite: the build guarantees the jar, so the
+ * branch could only ever be taken when something else had broken (a rename, a moved output directory, a
+ * dropped {@code dependsOn}), and in exactly that case the guard turned a real failure into a green skip.
+ * A missing jar is a failure with the reason in it now.
  */
 class ShadowJarNettyRelocationTest {
 
     @Test
     void shadow_jar_relocates_netty_and_keeps_lettuce_in_place() throws IOException {
-        Path jar = findShadowJar();
-        if (jar == null) {
-            assumeTrue(false, "uxmEssentials-redis shadow jar not built, skipping (run :redis-adapter:shadowJar)");
-            return;
-        }
-
-        List<String> entries = entryNames(jar);
+        List<String> entries = entryNames(shadowJar());
 
         assertThat(entries)
                 .as("Netty must be relocated, not shipped at io/netty (would clash with Paper's Netty)")
@@ -54,13 +51,7 @@ class ShadowJarNettyRelocationTest {
         // This companion depends on uxmlib-redis (and its uxmlib-common transitive), so it shades the toolkit. It
         // must be relocated to the same coordinates the main jar uses (never shipped bare at com/uxplima/uxmlib),
         // or it would clash on a backend with another plugin that bundles uxmlib.
-        Path jar = findShadowJar();
-        if (jar == null) {
-            assumeTrue(false, "uxmEssentials-redis shadow jar not built, skipping (run :redis-adapter:shadowJar)");
-            return;
-        }
-
-        List<String> entries = entryNames(jar);
+        List<String> entries = entryNames(shadowJar());
 
         assertThat(entries)
                 .as("uxmlib must be relocated, not shipped bare at com/uxplima/uxmlib")
@@ -76,13 +67,7 @@ class ShadowJarNettyRelocationTest {
         // copy of BusTransport (or the rest of core) rode along in this jar, the host's bus core would reject the
         // transport instance with a loader-constraint LinkageError: the exact bug this design fixes. So core's
         // packages must be absent from the companion jar; it resolves them from the host at runtime instead.
-        Path jar = findShadowJar();
-        if (jar == null) {
-            assumeTrue(false, "uxmEssentials-redis shadow jar not built, skipping (run :redis-adapter:shadowJar)");
-            return;
-        }
-
-        List<String> entries = entryNames(jar);
+        List<String> entries = entryNames(shadowJar());
 
         assertThat(entries)
                 .as("core's BusTransport SPI must NOT be shaded. The companion uses the host's copy")
@@ -92,17 +77,23 @@ class ShadowJarNettyRelocationTest {
                 .noneMatch(p -> p.equals("com/uxplima/uxmessentials/shared/network/RedisTransportFactory.class"));
     }
 
-    @Nullable private static Path findShadowJar() throws IOException {
+    /**
+     * The shadow jar this module builds. {@code :redis-adapter:test} depends on {@code shadowJar}, so it is
+     * there: not finding it means the task, its output directory or the jar's name has moved, and every
+     * assertion below would then be checking nothing.
+     */
+    private static Path shadowJar() throws IOException {
         Path libs = Path.of("build", "libs");
-        if (!Files.isDirectory(libs)) {
-            return null;
-        }
+        assertThat(libs)
+                .as("the shadow jar's output directory, which :redis-adapter:test depends on shadowJar to fill")
+                .isDirectory();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(libs, "uxmEssentials-redis*.jar")) {
             for (Path candidate : stream) {
                 return candidate;
             }
         }
-        return null;
+        throw new AssertionError("no uxmEssentials-redis*.jar in " + libs.toAbsolutePath()
+                + ": shadowJar did not run, or its archive name changed");
     }
 
     private static List<String> entryNames(Path jar) throws IOException {

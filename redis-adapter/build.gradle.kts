@@ -58,6 +58,31 @@ tasks.shadowJar {
     mergeServiceFiles()
 }
 
+// The live-broker round trip needs a Redis that this machine may not have, so it lives in its own source set
+// and `check` never runs it. It used to sit in src/test and open with an assumeTrue that aborted when no broker
+// answered: JUnit records an abort as a skip, the suite reported green, and CONTRACT.md section 15 says there is
+// no legitimate skip here. A test that needs a machine the build cannot promise is not a skip to excuse, it is a
+// test that belongs on a different task. Run it with `./gradlew :redis-adapter:integrationTest`, having set
+// UXMESS_TEST_REDIS_URI, or a Redis on :6379, or Docker for the Testcontainers fallback.
+val integrationTest: SourceSet by sourceSets.creating {
+    compileClasspath += sourceSets["main"].output + sourceSets["test"].output
+    runtimeClasspath += sourceSets["main"].output + sourceSets["test"].output
+}
+
+configurations["integrationTestImplementation"].extendsFrom(configurations["testImplementation"])
+configurations["integrationTestRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+// jspecify and the Error Prone annotations reach src/test as testCompileOnly from the convention plugin, and
+// a new source set inherits nothing by default: without this the moved test does not compile at all.
+configurations["integrationTestCompileOnly"].extendsFrom(configurations["testCompileOnly"])
+
+tasks.register<Test>("integrationTest") {
+    description = "The Redis round trip, against a real broker. Not part of check: it needs one to exist."
+    group = "verification"
+    testClassesDirs = integrationTest.output.classesDirs
+    classpath = integrationTest.runtimeClasspath
+    useJUnitPlatform()
+}
+
 tasks.assemble { dependsOn(tasks.shadowJar) }
 
 // ShadowJarNettyRelocationTest inspects the built jar, so the jar must exist before the test task runs

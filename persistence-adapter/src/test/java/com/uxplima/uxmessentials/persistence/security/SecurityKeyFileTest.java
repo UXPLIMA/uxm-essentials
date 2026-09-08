@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.persistence.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,14 +29,36 @@ class SecurityKeyFileTest {
         assertThat(SecurityKeyFile.loadOrCreate(keyFile)).isEqualTo(created);
     }
 
+    /**
+     * {@code SecurityKeyFile.ownerOnly} has two branches and this covers both, so the test runs everywhere and
+     * skips nowhere.
+     *
+     * <p>It used to open with {@code assumeThat(...).contains("posix")}, which meant that on a filesystem
+     * without the POSIX view the whole thing aborted, JUnit recorded a skip, and the suite went green having
+     * asserted nothing about the file that decrypts every stored TOTP secret. CONTRACT.md section 15 says
+     * there is no legitimate skip here. The condition is not an excuse to stop: it is the thing to branch on,
+     * exactly as the production code branches on it.
+     */
     @Test
     void theKeyFileIsOwnerOnlyFromTheMomentItExists(@TempDir Path folder) throws IOException {
         Path keyFile = folder.resolve("secret.key");
-        assumeThat(keyFile.getFileSystem().supportedFileAttributeViews()).contains("posix");
+        boolean posix = keyFile.getFileSystem().supportedFileAttributeViews().contains("posix");
 
         SecurityKeyFile.loadOrCreate(keyFile);
 
-        Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(keyFile);
-        assertThat(PosixFilePermissions.toString(permissions)).isEqualTo("rw-------");
+        assertThat(keyFile).as("the key file must exist on any filesystem").exists();
+        if (posix) {
+            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(keyFile);
+            assertThat(PosixFilePermissions.toString(permissions))
+                    .as("the permissions are passed to the create call, so there is no world-readable moment")
+                    .isEqualTo("rw-------");
+            return;
+        }
+        // Windows and anything else without the POSIX view: the OS and the directory ACL govern access and the
+        // file carries no permission bits of its own. What is still ours to hold is that the key survives the
+        // round trip, so a run that lands here proves the same file and not a different contract.
+        assertThat(SecurityKeyFile.loadOrCreate(keyFile))
+                .as("the key must read back byte for byte where the filesystem carries no permissions")
+                .hasSize(32);
     }
 }

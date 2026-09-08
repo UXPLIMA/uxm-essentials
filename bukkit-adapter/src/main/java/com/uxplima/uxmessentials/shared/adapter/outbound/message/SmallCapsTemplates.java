@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.message;
 
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.SmallCaps;
+import com.uxplima.uxmlib.text.style.SmallCaps;
 import org.jspecify.annotations.NullMarked;
 
 /**

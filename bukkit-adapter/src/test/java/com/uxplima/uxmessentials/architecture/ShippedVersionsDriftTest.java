@@ -95,6 +95,28 @@ class ShippedVersionsDriftTest {
                 .isEqualTo(javaPin());
     }
 
+    /**
+     * The release number is not a requirement, so it is not in the table above and it is not in the prose
+     * either. This file named {@code uxmEssentials-0.8.2.jar} in eleven places while the build fell back to
+     * 0.9.1, which is the same defect the uxmLib version in twenty one {@code CLAUDE.md} files was: a number
+     * a person types into a sentence is stale the day after they type it, and nothing tells them.
+     *
+     * <p>The jar names read {@code uxmEssentials-<version>.jar} now, and the versioning section points at the
+     * releases page. This holds that: a jar name in the README may not carry a number.
+     */
+    @Test
+    void theReadmeNamesNoReleaseNumber() {
+        Pattern numbered = Pattern.compile("uxmEssentials(?:-[a-z]+)?-([0-9]+\\.[0-9]+\\.[0-9]+)\\.jar");
+        Matcher found = numbered.matcher(read(repoRoot().resolve(README)));
+
+        assertThat(found.find())
+                .as(
+                        "%s must not print a release number: it named one in eleven places while the build"
+                                + " had moved past it. Write uxmEssentials-<version>.jar instead.",
+                        README)
+                .isFalse();
+    }
+
     @Test
     void theConventionPluginCompilesAgainstThePinnedJava() {
         String pinned = javaPin();
