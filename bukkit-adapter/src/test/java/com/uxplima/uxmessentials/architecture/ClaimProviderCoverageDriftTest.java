@@ -31,8 +31,14 @@ import org.yaml.snakeyaml.Yaml;
  * clean CI checkout. The provider keys come from {@link LibraryClaims#candidateKeys()}, the single source of
  * truth the registry itself derives, so the guard cannot drift from the set it checks: the config lines are read
  * from raw text (the toggle entries ship commented, so a HOCON parse would not see them) and the dependency
- * names are parsed from the YAML. {@code uxmclaims} is the one documented exception to the dependency check: it
- * is discovered reflectively with no load-order need.
+ * names are parsed from the YAML.
+ *
+ * <p>{@code uxmclaims} used to be the one exception, on the grounds that it is discovered reflectively rather
+ * than through the plugin manager. That is the wrong reading of what load order does here. The registry asks
+ * every candidate {@code active()} once, while the composite is built, and folds in only the ones that
+ * answered yes; a candidate that answers no at that moment is out for the whole run. uxmClaims answers by
+ * resolving a class out of another plugin's jar, so a uxmClaims that loads after us has no class to find and
+ * the provider is inactive until the next reload. It needs the declaration exactly as the other eighteen do.
  *
  * <p>Each real-corpus assertion is paired with a teeth test that fires the same detector on a synthetic missing
  * key, so a green result is a checked fact rather than a vacuous pass.
@@ -41,8 +47,9 @@ class ClaimProviderCoverageDriftTest {
 
     /**
      * Each registered provider key mapped to the plugin name {@code paper-plugin.yml} must list, verified against
-     * that provider's {@code active()} {@code getPlugin("...")} string. {@code uxmclaims} is deliberately absent
-     * it is the reflective, no-load-order exception, checked separately in {@link #theKeyToPluginMapCoversTheRegistryExactly}.
+     * that provider's {@code active()} {@code getPlugin("...")} string. {@code uxmclaims} is here too: it
+     * resolves a class out of another plugin's jar instead of asking the plugin manager, and a class that is
+     * not loaded yet is exactly as absent as a plugin that is not enabled yet.
      */
     private static final Map<String, String> KEY_TO_PLUGIN = Map.ofEntries(
             Map.entry("lands", "Lands"),
@@ -62,21 +69,18 @@ class ClaimProviderCoverageDriftTest {
             Map.entry("bentobox", "BentoBox"),
             Map.entry("residence", "Residence"),
             Map.entry("plotsquared", "PlotSquared"),
-            Map.entry("superiorskyblock", "SuperiorSkyblock2"));
-
-    /** The one provider discovered reflectively, so it carries no {@code paper-plugin.yml} load-order dependency. */
-    private static final String UXM_CLAIMS_KEY = "uxmclaims";
+            Map.entry("superiorskyblock", "SuperiorSkyblock2"),
+            Map.entry("uxmclaims", "uxmClaims"));
 
     @Test
     void theKeyToPluginMapCoversTheRegistryExactly() {
         Set<String> mapped = new HashSet<>(KEY_TO_PLUGIN.keySet());
-        mapped.add(UXM_CLAIMS_KEY);
 
         assertThat(LibraryClaims.candidateKeys())
                 .as("registry keys must be unique")
                 .doesNotHaveDuplicates();
         assertThat(new HashSet<>(LibraryClaims.candidateKeys()))
-                .as("every registered provider needs a KEY_TO_PLUGIN entry (or be the uxmclaims exception); a "
+                .as("every registered provider needs a KEY_TO_PLUGIN entry; a "
                         + "provider added to ClaimProviders must be mapped here so its paper-plugin.yml dependency "
                         + "is checked")
                 .isEqualTo(mapped);
@@ -91,7 +95,7 @@ class ClaimProviderCoverageDriftTest {
     }
 
     @Test
-    void everyRegisteredKeyExceptUxmClaimsDeclaresItsPluginDependency() {
+    void everyRegisteredKeyDeclaresItsPluginDependency() {
         assertThat(missingFromPaperPlugin(KEY_TO_PLUGIN, declaredServerDependencies()))
                 .as("a provider's plugin is not a paper-plugin.yml load-order dependency; without 'load: BEFORE' it "
                         + "may load after us and be silently inactive, so add it under dependencies.server")

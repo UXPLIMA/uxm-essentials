@@ -205,6 +205,11 @@ public final class IntegrationCatalog {
                     "com.uxplima.uxmlib.claim.SuperiorSkyblockClaimProvider",
                     "SuperiorSkyblock islands gate homes and warps"),
             new Integration(
+                    "uxmClaims",
+                    IntegrationFamily.CLAIMS,
+                    "com.uxplima.uxmlib.claim.UxmClaimsClaimProvider",
+                    "our own claims gate homes and warps"),
+            new Integration(
                     "WorldGuard",
                     IntegrationFamily.REGIONS,
                     "com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection",
