@@ -40,16 +40,23 @@ The Redis client is in no jar but the Redis companion, where Lettuce and its Net
 Reactor transitives are relocated. The main jar therefore carries no Redis client at all and
 has nothing to relocate.
 
-## 4.4 The local library checkout
+## 4.4 uxmLib arrives as a published artifact, and only that
 
-When uxmLib is checked out beside this repository, `settings.gradle.kts` includes it as a
-composite build, so a change in the library is picked up without publishing. Three directory
-names are accepted, because the GitHub repository was renamed and because the workspace keeps
-the library two levels up from a plugin. Without a sibling checkout the published artifacts
-resolve from `mavenLocal` as usual.
+The library reaches this plugin the way it reaches the other twenty six of the family: the version
+named in the catalogue, resolved from the workspace Maven repository through `mavenLocal()` and
+from JitPack after that. A change to the library is published with `scripts/publish-lib.sh` and the
+pin is raised.
 
-Matching only one of those names would drop the composite silently and fall back to whatever
-`mavenLocal` happens to hold, which reads as a stale library rather than as a missing one.
+There was a composite build here, and what it cost is worth keeping written down. It substituted
+the library's sibling checkout for the pinned version whenever that checkout existed, so this build
+compiled against whatever the working tree held and never once against the number it pins. The
+coordinates it used, `com.uxplima.uxmlib:*`, are the library's development group rather than its
+published one, and the newest artifact ever published under them was 0.46.0 while the pin read
+0.93.0. A fresh clone without the sibling could not resolve a single module, and no build here
+would have said so.
+
+That is the same failure the publishing script exists to stop, one level up: a green build that is
+green because something local stood in for the artifact it claims to use.
 
 ## 4.5 What `check` runs
 
