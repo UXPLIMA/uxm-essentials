@@ -7,6 +7,7 @@
 | `09-deployment.md` | The five jars, the three paths, the audit channel and what an upgrade does |
 | `permissions.md` | The node space, the four shapes, the numbered-node convention and the gates |
 | `05-testing.md` | Which layer gets which test, the contract suite, and the two kinds of guard |
+| `01-architecture.md` | The four layers, the ten build modules, and the persistence invariants |
 | `10-feature-modules.md` | What a module is, the eight method contract, and how to add one |
 | `11-economy-integration.md` | The three layers money crosses, and the rules that cost something |
 | `02-concurrency.md` | The four lanes, the scheduler port, and the enumerate then hop rule |
@@ -14,13 +15,12 @@
 
 ## What is cited and not here yet
 
-The javadoc of this repository points at twelve documents, 183 times. Six of them are not
+The javadoc of this repository points at twelve documents, 183 times. Five of them are not
 written. They are listed here so that a reader who follows a reference knows why it goes
 nowhere, and so the order of writing them is the order they are wanted in:
 
 | Document | References |
 |---|---|
-| `01-architecture.md` | 4 |
 | `14-ui-style.md` | 3 |
 | `08-glossary.md` | 2 |
 | `04-build.md` | 2 |
