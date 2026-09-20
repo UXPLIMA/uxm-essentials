@@ -5,6 +5,7 @@
 | Document | Holds |
 |---|---|
 | `10-feature-modules.md` | What a module is, the eight method contract, and how to add one |
+| `11-economy-integration.md` | The three layers money crosses, and the rules that cost something |
 | `notes/` | The lessons and the open defects, dated, one file each |
 
 ## What is cited and not here yet
@@ -15,7 +16,6 @@ nowhere, and so the order of writing them is the order they are wanted in:
 
 | Document | References |
 |---|---|
-| `11-economy-integration.md` | 36 |
 | `02-concurrency.md` | 31 |
 | `09-deployment.md` | 24 |
 | `permissions.md` | 21 |
