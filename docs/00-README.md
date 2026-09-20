@@ -8,6 +8,11 @@
 | `permissions.md` | The node space, the four shapes, the numbered-node convention and the gates |
 | `05-testing.md` | Which layer gets which test, the contract suite, and the two kinds of guard |
 | `01-architecture.md` | The four layers, the ten build modules, and the persistence invariants |
+| `03-paper-api.md` | Which platform API is used, the manifest, the PDC rule and the text path |
+| `04-build.md` | The catalogue, what is shaded, and the gates `check` runs |
+| `06-code-quality.md` | Warnings, swallowed failures, sizes and comments |
+| `08-glossary.md` | Where a context's words are defined, and the words that belong to all of them |
+| `14-ui-style.md` | One look: the palette, MiniMessage, the lore layout and the widths |
 | `10-feature-modules.md` | What a module is, the eight method contract, and how to add one |
 | `11-economy-integration.md` | The three layers money crosses, and the rules that cost something |
 | `02-concurrency.md` | The four lanes, the scheduler port, and the enumerate then hop rule |
@@ -15,24 +20,20 @@
 
 ## What is cited and not here yet
 
-The javadoc of this repository points at twelve documents, 183 times. Five of them are not
-written. They are listed here so that a reader who follows a reference knows why it goes
-nowhere, and so the order of writing them is the order they are wanted in:
+The javadoc points at fourteen documents, 401 times. Twelve are written, each from the call
+sites that cite it, and each says so at the top. Two are not:
 
 | Document | References |
 |---|---|
-| `14-ui-style.md` | 3 |
-| `08-glossary.md` | 2 |
-| `04-build.md` | 2 |
-| `03-paper-api.md` | 2 |
-| `06-code-quality.md` | 1 |
+| `12-migration.md` | 135 |
+| `13-i18n.md` | 19 |
 
-Each is written from the code that cites it, most cited first, and each one says at the top
-that it was.
+They are the two the original count missed, because it read only the references written with
+a `.md` on the end. `12-migration.md` is the most cited document in this repository.
 
-## Until one exists, read the guard
+## The guard is the other half
 
-Every rule those documents would state is already enforced by a test in
+Every rule these documents state is also enforced by a test in
 `bukkit-adapter/src/test/java/com/uxplima/uxmessentials/architecture/`, and each guard names
 the rule it keeps and the defect that paid for it. A guard cannot go stale: it fails the build
 the day the rule stops being true. `CLAUDE.md` section 3 lists them against the rules.
