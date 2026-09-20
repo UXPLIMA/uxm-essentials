@@ -4,6 +4,8 @@
 
 | Document | Holds |
 |---|---|
+| `12-migration.md` | The importer, what each source maps, the runbook and the config ladder |
+| `13-i18n.md` | The key, the locale chain, the twelve catalogues and the parity gate |
 | `09-deployment.md` | The five jars, the three paths, the audit channel and what an upgrade does |
 | `permissions.md` | The node space, the four shapes, the numbered-node convention and the gates |
 | `05-testing.md` | Which layer gets which test, the contract suite, and the two kinds of guard |
@@ -18,18 +20,16 @@
 | `02-concurrency.md` | The four lanes, the scheduler port, and the enumerate then hop rule |
 | `notes/` | The lessons and the open defects, dated, one file each |
 
-## What is cited and not here yet
+## Every document this repository cites now exists
 
-The javadoc points at fourteen documents, 401 times. Twelve are written, each from the call
-sites that cite it, and each says so at the top. Two are not:
+The javadoc points at fourteen documents, 401 times, and all fourteen are written. Each was
+written from the call sites that cite it, and each says so at the top, so a section number in
+a javadoc comment resolves to a section that answers it.
 
-| Document | References |
-|---|---|
-| `12-migration.md` | 135 |
-| `13-i18n.md` | 19 |
-
-They are the two the original count missed, because it read only the references written with
-a `.md` on the end. `12-migration.md` is the most cited document in this repository.
+The count was wrong for a while in a way worth remembering: it read only the references
+written with a `.md` on the end, which missed `12-migration` at 135 references, the most
+cited document here, and `13-i18n` at 19. A reference is `docs/12-migration §5.1` as often as
+it is `docs/12-migration.md`.
 
 ## The guard is the other half
 
