@@ -21,7 +21,7 @@ import java.util.stream.Stream;
 final class ProductionSources {
 
     /** Every Gradle module that ships production Java. */
-    private static final List<String> MODULES = List.of(
+    static final List<String> MODULES = List.of(
             "api",
             "bukkit-api",
             "core",
