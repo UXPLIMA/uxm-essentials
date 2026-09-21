@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Which is exactly the distinction this reads. A bare {@code docs/...} is this repository's own
  * document and has to be here. A reference carrying a repository in front of it,
- * {@code uxm-setups/docs/13-bedrock.md}, belongs to another checkout and is left alone: this guard cannot
+ * {@code uxm-briefs/docs/13-bedrock.md}, belongs to another checkout and is left alone: this guard cannot
  * see that tree and must not pretend to.
  */
 final class EveryCitedDocumentExistsTest {
@@ -86,7 +86,7 @@ final class EveryCitedDocumentExistsTest {
                 .containsExactly("01-architecture.md");
         assertThat(citedIn("See docs/adr/0004-every-menu-is-a-file.md."))
                 .containsExactly("adr/0004-every-menu-is-a-file.md");
-        assertThat(citedIn("One definition, two clients. See uxm-setups/docs/13-bedrock.md."))
+        assertThat(citedIn("One definition, two clients. See uxm-briefs/docs/13-bedrock.md."))
                 .isEmpty();
         assertThat(citedIn("see uxmsetups docs/11-placeholders.md")).containsExactly("11-placeholders.md");
     }
