@@ -37,8 +37,12 @@
   query is never built by concatenation: `SqlConcatenationDriftTest`.
 - **Dependency injection**: constructor injection, wired by hand in the bootstrap module.
 - **Static analysis**: Error Prone, NullAway, Spotless with Palantir Java Format.
-- **Tests**: JUnit 5, AssertJ, Mockito, MockBukkit, ArchUnit. 1509 of them, and none is
-  deleted, weakened or skipped.
+- **Tests**: JUnit 5, AssertJ, Mockito, MockBukkit, ArchUnit. **None is deleted, weakened or
+  skipped**, which is the rule; the count is not written here, because a count in prose goes stale
+  the day after somebody writes it. This line said 1509 for months. That was the number of test
+  classes when it was written, and on 2026-09-22 the build ran 9692 tests in 1526 classes, so a
+  reader comparing their run against it would have concluded that most of the suite had vanished.
+  `./gradlew build` prints the real number.
 
 ## 2. Architecture and the ubiquitous language
 
@@ -109,11 +113,15 @@ checks off the tick and a confirmed repair fixes only safe orphan data.
 
 `docs/notes/` holds the lessons and the open defects.
 
-**The numbered documents this repository's javadoc cites do not exist yet.** 183 references
-point at twelve files, `docs/01-architecture.md` through `docs/14-ui-style.md` and
-`docs/permissions.md`, and none of them is in the repository or in its history. They are being
-written from the code that cites them, most cited first. Until one exists, read the guard that
-enforces the rule instead: the guards are the half of the documentation that cannot go stale.
+**They exist now.** This paragraph said, until 2026-09-22, that the numbered documents the
+javadoc cites were not in the repository or in its history, and that they were being written
+most cited first. That is finished. `docs/` holds them, from `00-README.md` through
+`14-ui-style.md` plus `permissions.md`, and `EveryCitedDocumentExistsTest` proves that every
+reference from production code lands on a file that is there. No count is written here, for the
+reason section 1 gives about the test count.
+
+Read the guards beside them, not instead of them: the guards are the half of the documentation
+that cannot go stale, and this paragraph is what the other half does when nobody re-reads it.
 
 ## 7. When in doubt
 
