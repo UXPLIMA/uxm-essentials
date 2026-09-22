@@ -255,7 +255,6 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_CATEGORIES_TOP("pwarp.gui.categories.top"),
     PWARP_GUI_CATEGORIES_ENTRY_NAME("pwarp.gui.categories.entry-name"),
     PWARP_GUI_CATEGORIES_ENTRY_LORE("pwarp.gui.categories.entry-lore"),
-    PWARP_GUI_CATEGORIES_SPONSOR("pwarp.gui.categories.sponsor"),
     PWARP_GUI_CATEGORIES_SPONSOR_NAME("pwarp.gui.categories.sponsor-name"),
     PWARP_GUI_CATEGORIES_SPONSOR_LORE("pwarp.gui.categories.sponsor-lore"),
     PWARP_GUI_CATEGORIES_PREV("pwarp.gui.categories.prev"),
