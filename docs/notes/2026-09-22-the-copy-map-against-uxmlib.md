@@ -38,7 +38,7 @@ This is the first port and it is the one item 1 of the standing order names thir
 | `Tiles` | Both say "puts the title of a menu tile on the first line of its lore, under a blank name" |
 | ~~`MenuTitles`~~ | Confirmed and **rejected**, see below |
 | `EquipmentSlot` | Both say "the six slots a fake-player NPC can wear" |
-| `SerializedItems` | Both are one item written down as one line of text |
+| ~~`SerializedItems`~~ | Confirmed and **ported**, see below |
 | `Comparison` | Both are a comparison of two resolved operands under an operator |
 
 **`SerializedItems` carries a data compatibility risk and nothing else here does.** A stored
@@ -168,3 +168,29 @@ same sentence, compute the same number, and differ on the one decision that matt
 "looks identical" by reading the behaviour at the end of the method, not the description at the
 top of the file.** Four entries are still unconfirmed on that list, and `SerializedItems` is the
 one where getting it wrong costs data rather than colour.
+
+## `SerializedItems`: confirmed, and ported
+
+The entry flagged as the one where getting it wrong costs data, and the flag was right: the two
+codecs share the `b64:` prefix and **do not write the same bytes**. The library stamps a `UXMI`
+magic, a format version and the server's data version in front of the payload; this plugin wrote
+the bare payload. The same prefix meant two formats.
+
+**It was safe in one direction only.** The library's reader takes a header-less blob as well as a
+headered one, which is documented on `ItemSerialization.fromBase64` and is now pinned here by
+`StoredItemTokensStillReadTest`: every click action, hologram and rank reward already stored on
+every server keeps reading, and what is written from now on carries the header. The other
+direction would have been a data loss: this plugin's reader handed `UXMI...` straight to the
+deserialiser, which fails, and the item would have disappeared without a word.
+
+That test is not a test of the codec. It is the reason the port was allowed, kept where somebody
+will find it: if the library ever stops reading a header-less blob, it fails, and what fails with
+it is every payload written before today.
+
+**One defect was found on the way and fixed in the library.** `SerializedItems.decode` returns an
+`Optional`, which promises that nothing is a possible answer, and it threw instead: on a token
+that is not valid Base64, and on valid Base64 that is not an item. The caller shape the signature
+invites, `decode(token).ifPresent(...)`, met an exception. This plugin's own codec caught both and
+returned empty, so **the port would have been a regression without it**. uxmLib 0.100.0.
+
+Eleven files were repointed and two classes deleted.

@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.item.SerializedItems;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

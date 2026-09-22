@@ -5,8 +5,8 @@ import java.util.Optional;
 
 import org.bukkit.Material;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmlib.item.SerializedItems;
 import org.jspecify.annotations.NullMarked;
 
 /**

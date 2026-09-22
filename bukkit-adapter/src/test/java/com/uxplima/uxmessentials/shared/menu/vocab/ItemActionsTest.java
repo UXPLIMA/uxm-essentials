@@ -13,8 +13,8 @@ import org.bukkit.entity.Item;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.ItemActions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.item.SerializedItems;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;

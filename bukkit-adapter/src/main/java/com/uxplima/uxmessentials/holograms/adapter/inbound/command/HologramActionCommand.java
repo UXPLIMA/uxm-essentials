@@ -22,11 +22,11 @@ import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
+import com.uxplima.uxmlib.item.SerializedItems;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
