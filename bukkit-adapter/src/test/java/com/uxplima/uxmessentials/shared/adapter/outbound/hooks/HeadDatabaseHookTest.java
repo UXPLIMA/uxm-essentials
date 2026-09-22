@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import com.uxplima.uxmlib.hook.Integrations;
 import com.uxplima.uxmlib.menu.providers.HeadQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +69,7 @@ class HeadDatabaseHookTest {
     void absentDefaultAndInterfaceDeclareNoHeadDatabaseType() {
         // The structural confirmation that the no-op default carries no SDK type, so loading the interface (and
         // its ABSENT field initializer) on a HeadDatabase-less server cannot pull in me.arcaniax. Only
-        // HeadDatabaseService, reached past Hooks' present-guard, references HeadDatabase, and even then only
+        // HeadDatabaseService, reached past Integrations' present-guard, references HeadDatabase, and even then only
         // by reflective string name.
         assertThat(referencesHeadDatabaseSdk(HeadQuery.class)).isFalse();
         assertThat(referencesHeadDatabaseSdk(HeadQuery.NONE.getClass())).isFalse();
@@ -76,7 +77,8 @@ class HeadDatabaseHookTest {
 
     @Test
     void hookIsRegisteredAndResolvesToNonNullCapability() {
-        Hooks hooks = Hooks.resolve(server, HookHarness.SILENT, List.of(new HeadDatabaseHook(HookHarness.SILENT)));
+        Integrations hooks =
+                Integrations.resolve(server, HookHarness.SILENT_JDK, List.of(new HeadDatabaseHook(HookHarness.SILENT)));
 
         assertThat(hooks.provides(HeadQuery.class)).isTrue();
         assertThat(hooks.capability(HeadQuery.class)).isSameAs(HeadQuery.NONE);

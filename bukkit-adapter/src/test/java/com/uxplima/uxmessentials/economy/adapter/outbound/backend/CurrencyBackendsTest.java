@@ -7,10 +7,11 @@ import java.util.List;
 
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.hook.Integrations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,8 +86,8 @@ class CurrencyBackendsTest {
                 server, emptyHooks(), SILENT, mock(Scheduler.class), mock(WalletRepository.class), config);
     }
 
-    private Hooks emptyHooks() {
-        return Hooks.resolve(server, SILENT, List.of());
+    private Integrations emptyHooks() {
+        return Integrations.resolve(server, new SystemLoggerBridge("test", SILENT), List.of());
     }
 
     /** A config that serves no backend maps, so no CoinsEngine/zEssentials currencies are enumerated. */

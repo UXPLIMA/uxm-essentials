@@ -11,10 +11,10 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.Precision;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.EconomyQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.hook.Integrations;
 
 /**
  * The server economy as a currency backend, reached through the already-resolved {@link EconomyQuery} hook. No
@@ -29,7 +29,7 @@ public final class VaultCurrencyBackend implements CurrencyBackend {
 
     private final EconomyQuery economy;
 
-    public VaultCurrencyBackend(Hooks hooks) {
+    public VaultCurrencyBackend(Integrations hooks) {
         this.economy = Objects.requireNonNull(hooks, "hooks").capability(EconomyQuery.class);
     }
 

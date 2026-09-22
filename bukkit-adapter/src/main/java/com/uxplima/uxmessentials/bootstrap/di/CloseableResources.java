@@ -18,13 +18,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.bedrock.BedrockScreen;
+import com.uxplima.uxmlib.hook.Integrations;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -59,7 +59,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable UsageBinding usageBinding;
     private @Nullable WorldGeneratorResolver worldGeneratorResolver;
     private @Nullable WorldPhase worldPhase;
-    private @Nullable Hooks hooks;
+    private @Nullable Integrations hooks;
     private @Nullable Currencies currencies;
     private @Nullable Supplier<List<String>> menuNames;
     private @Nullable PlayerDataStore playerData;
@@ -186,12 +186,12 @@ public final class CloseableResources implements AutoCloseable {
      * permission, the multi-currency providers, HeadDatabase, the item providers) read their capability from
      * one place. Resolved once at wiring, when plugin presence is settled for the run.
      */
-    public void hooks(Hooks resolved) {
+    public void hooks(Integrations resolved) {
         this.hooks = Objects.requireNonNull(resolved, "resolved");
     }
 
     /** The resolved optional-plugin hooks, or null before wiring has constructed them. */
-    public @Nullable Hooks hooks() {
+    public @Nullable Integrations hooks() {
         return hooks;
     }
 

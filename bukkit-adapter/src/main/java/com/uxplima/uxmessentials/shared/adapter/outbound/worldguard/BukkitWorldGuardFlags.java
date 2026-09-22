@@ -10,6 +10,7 @@ import org.bukkit.World;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.WorldGuardFlags;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.hook.region.WorldGuardReflection;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

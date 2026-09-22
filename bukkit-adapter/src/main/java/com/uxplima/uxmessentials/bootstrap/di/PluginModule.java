@@ -217,10 +217,10 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.EconomyBackends;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
@@ -320,6 +320,7 @@ import com.uxplima.uxmlib.claim.ClaimProvidersConfig;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.gui.input.TextInputInstaller;
+import com.uxplima.uxmlib.hook.Integrations;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.providers.HeadQuery;
@@ -498,9 +499,9 @@ public final class PluginModule {
         // their capability from resources.hooks(). A missing soft-depend never loads an
         // external class: the no-op default carries none, so there is no NoClassDefFoundError path. Resolved
         // before the menu engine so the renderer's skull provider can read the HeadDatabase capability for hdb:<id>.
-        Hooks hooks = Hooks.resolve(
+        Integrations hooks = Integrations.resolve(
                 plugin.getServer(),
-                kernel.log(),
+                new SystemLoggerBridge(plugin.getName(), kernel.log()),
                 List.of(new VaultEconomyHook(), new VaultPermissionHook(), new HeadDatabaseHook(kernel.log())));
         resources.hooks(hooks);
 
@@ -1060,7 +1061,7 @@ public final class PluginModule {
             CloseableResources resources,
             Logger log,
             Bus bus,
-            Hooks hooks,
+            Integrations hooks,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings,
@@ -1194,7 +1195,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
-            Hooks hooks,
+            Integrations hooks,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
@@ -2056,7 +2057,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
-            Hooks hooks,
+            Integrations hooks,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,

@@ -16,10 +16,11 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.EconomyQuery;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PluginHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.hook.Integration;
+import com.uxplima.uxmlib.hook.Integrations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,12 +101,13 @@ class VaultCurrencyBackendTest {
         assertThat(economy.balances.get(ALICE.uuid())).isEqualTo(100.0);
     }
 
-    private Hooks hooksFor(EconomyQuery economy) {
-        return Hooks.resolve(server, SILENT, List.of(new StubEconomyHook(economy)));
+    private Integrations hooksFor(EconomyQuery economy) {
+        return Integrations.resolve(
+                server, new SystemLoggerBridge("test", SILENT), List.of(new StubEconomyHook(economy)));
     }
 
     /** Binds a supplied {@link EconomyQuery} as the resolved capability, touching no provider SDK type. */
-    private record StubEconomyHook(EconomyQuery economy) implements PluginHook<EconomyQuery> {
+    private record StubEconomyHook(EconomyQuery economy) implements Integration<EconomyQuery> {
 
         @Override
         public String pluginName() {

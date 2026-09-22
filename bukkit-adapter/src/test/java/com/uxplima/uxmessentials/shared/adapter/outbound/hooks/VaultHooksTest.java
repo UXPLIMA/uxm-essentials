@@ -15,6 +15,8 @@ import java.util.UUID;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 
+import com.uxplima.uxmlib.hook.Integration;
+import com.uxplima.uxmlib.hook.Integrations;
 import net.milkbowl.vault.economy.AbstractEconomy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.permission.Permission;
@@ -89,7 +91,7 @@ class VaultHooksTest {
     void absentDefaultsAndInterfacesDeclareNoVaultSdkType() {
         // The structural confirmation that the no-op default carries no SDK type, so loading the interface (and
         // its ABSENT field initializer) on a Vault-less server cannot pull in net.milkbowl. Only the two
-        // VaultXService classes, reached past Hooks' present-guard, are allowed to mention it.
+        // VaultXService classes, reached past Integrations' present-guard, are allowed to mention it.
         assertThat(referencesVaultSdk(EconomyQuery.class)).isFalse();
         assertThat(referencesVaultSdk(EconomyQuery.ABSENT.getClass())).isFalse();
         assertThat(referencesVaultSdk(PermissionQuery.class)).isFalse();
@@ -164,8 +166,9 @@ class VaultHooksTest {
         assertThat(query.primaryGroup(ALICE)).isEmpty();
     }
 
-    private <T> T resolve(PluginHook<T> hook) {
-        return Hooks.resolve(server, HookHarness.SILENT, List.of(hook)).capability(hook.capability());
+    private <T> T resolve(Integration<T> hook) {
+        return Integrations.resolve(server, HookHarness.SILENT_JDK, List.of(hook))
+                .capability(hook.capability());
     }
 
     private <S> void registerVaultPlugin(Class<S> service, S provider) {

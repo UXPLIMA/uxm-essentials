@@ -11,10 +11,10 @@ import com.uxplima.uxmessentials.economy.application.SerialisingCurrencyBackend;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackend;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.hook.Integrations;
 
 /**
  * Builds the closed set of currency backends this server actually has. The native ledger and Paper experience are
@@ -34,7 +34,12 @@ public final class CurrencyBackends {
     private CurrencyBackends() {}
 
     public static CurrencyBackendRegistry discover(
-            Server server, Hooks hooks, Logger log, Scheduler scheduler, WalletRepository wallets, ConfigStore config) {
+            Server server,
+            Integrations hooks,
+            Logger log,
+            Scheduler scheduler,
+            WalletRepository wallets,
+            ConfigStore config) {
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(hooks, "hooks");
         Objects.requireNonNull(log, "log");

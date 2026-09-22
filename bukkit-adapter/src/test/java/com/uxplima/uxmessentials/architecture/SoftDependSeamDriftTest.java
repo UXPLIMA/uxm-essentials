@@ -86,21 +86,19 @@ class SoftDependSeamDriftTest {
 
     /**
      * The WorldGuard singleton, the head of every reflective walk into it. Duplicating that walk is what this
-     * round removed, so the class name may be spelled in exactly one place.
+     * round removed. Since uxmLib 0.109.0 the one walk is uxmLib's {@code WorldGuardReflection}, which this
+     * plugin wrote and gave to the library, so the class name is spelled nowhere in this plugin at all.
      */
     private static final String WORLD_GUARD_BOOTSTRAP = "\"com.sk89q.worldguard.WorldGuard\"";
 
-    private static final String WORLD_GUARD_SEAM = "WorldGuardReflection.java";
-
     /**
      * WorldEdit's Bukkit-to-WorldEdit adapter, the head of the location/world conversion every region query
-     * needs. Allowed in the WorldGuard seam and in the WorldEdit selection reader, which talks to WorldEdit
-     * itself rather than to WorldGuard.
+     * needs. uxmLib's WorldGuard seam holds the region half, so here it is allowed only in the WorldEdit
+     * selection reader, which talks to WorldEdit itself rather than to WorldGuard.
      */
     private static final String WORLD_EDIT_ADAPTER = "\"com.sk89q.worldedit.bukkit.BukkitAdapter\"";
 
-    private static final Set<String> WORLD_EDIT_ADAPTER_SEAMS =
-            Set.of(WORLD_GUARD_SEAM, "WorldEditRegionSelection.java");
+    private static final Set<String> WORLD_EDIT_ADAPTER_SEAMS = Set.of("WorldEditRegionSelection.java");
 
     @Test
     void eachSoftDependIsProbedFromOnePlace() {
@@ -133,17 +131,18 @@ class SoftDependSeamDriftTest {
     void theWorldGuardBootstrapChainIsSpelledOnce() {
         assertThat(filesNaming(WORLD_GUARD_BOOTSTRAP))
                 .as("the WorldGuard singleton starts every reflective walk into it; a duplicated chain breaks "
-                        + "silently and independently on the next WorldGuard release. Call WorldGuardReflection "
-                        + "instead (instance / regionContainer / flagRegistry / createQuery / adapt / adaptWorld / "
-                        + "applicableRegions).")
-                .containsExactly(WORLD_GUARD_SEAM);
+                        + "silently and independently on the next WorldGuard release. Call uxmLib's "
+                        + "WorldGuardReflection instead (instance / regionContainer / flagRegistry / createQuery / "
+                        + "adapt / adaptWorld / applicableRegions).")
+                .isEmpty();
     }
 
     @Test
     void theWorldEditAdapterIsSpelledOnlyInItsTwoSeams() {
         assertThat(filesNaming(WORLD_EDIT_ADAPTER))
-                .as("Bukkit-to-WorldEdit conversion belongs to WorldGuardReflection#adapt / #adaptWorld for region "
-                        + "work, and to the WorldEdit selection reader for WorldEdit's own selection API")
+                .as(
+                        "Bukkit-to-WorldEdit conversion belongs to uxmLib's WorldGuardReflection#adapt / #adaptWorld for region "
+                                + "work, and to the WorldEdit selection reader for WorldEdit's own selection API")
                 .containsExactlyInAnyOrderElementsOf(new TreeSet<>(WORLD_EDIT_ADAPTER_SEAMS));
     }
 

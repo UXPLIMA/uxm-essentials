@@ -92,6 +92,29 @@ For these, the honest answers are the two the workspace rules allow: this plugin
 or the library grows the capability **as a mechanism** and this plugin builds on it. Neither is
 free, and neither is decided here.
 
+**Decided on 2026-09-22 by the owner: whatever is soundest for the long run, and the library may
+gain what is good.** Read one by one, the three split along the workspace line between a mechanism
+and the game:
+
+- **`Hooks` and `PluginHook` went to the library**, as `com.uxplima.uxmlib.hook.Integration<T>` and
+  `Integrations` (uxmLib 0.109.0). Resolving an optional plugin once to a typed capability with a
+  no-op default, and degrading when its SDK is broken, is a mechanism any plugin with an optional
+  dependency can use. The library's own `PluginHook` and `HookRegistry` were kept, because
+  `RegionService` extends the first and the second binds late, which is a different job. The
+  library logs through `System.Logger`, so `SystemLoggerBridge` writes its lines into this
+  plugin's own port. `HooksTest` stayed here against the library types, and the library carries
+  the same cases, two of them merged, as the five of `IntegrationsTest`.
+- **`WorldGuardReflection` went to the library**, as `com.uxplima.uxmlib.hook.region.WorldGuardReflection`
+  (0.109.0, with `isDeny` made public in 0.110.0). The library held a second, smaller copy for its
+  claim provider, and a reflective chain is exactly the code that must exist once. The library's
+  copy is gone and its claim provider uses this one. `SoftDependSeamDriftTest` now holds that the
+  WorldGuard chain is spelled nowhere in this plugin.
+- **`WorldGuardRegionService` stays here.** Creating a region, setting its flags, its members and
+  its priority from a window is the regions module, which is a product feature of this plugin. It
+  now stands on the library's walk rather than on a copy of it.
+
+Group D is closed. This plugin and every other plugin moved to uxmLib 0.111.0 together.
+
 ## What this map does not say
 
 It does not say that a class in group A is worth porting on its own. Four health types are

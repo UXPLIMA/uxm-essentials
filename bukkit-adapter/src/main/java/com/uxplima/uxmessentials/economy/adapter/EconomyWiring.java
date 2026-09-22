@@ -75,7 +75,6 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -84,6 +83,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.ProviderVaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
+import com.uxplima.uxmlib.hook.Integrations;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
@@ -123,7 +123,7 @@ public final class EconomyWiring {
             ModuleContext ctx,
             Persistence persistence,
             Bus bus,
-            Hooks hooks,
+            Integrations hooks,
             com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
                     picker,
@@ -205,7 +205,7 @@ public final class EconomyWiring {
             Plugin plugin,
             ModuleContext ctx,
             KernelPorts kernel,
-            Hooks hooks,
+            Integrations hooks,
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletRepository repository,

@@ -5,14 +5,15 @@ import java.util.Objects;
 import org.bukkit.Server;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.hook.Integration;
 import com.uxplima.uxmlib.menu.providers.HeadQuery;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The {@link PluginHook} for HeadDatabase: it integrates with the {@code HeadDatabase} plugin and resolves to a
+ * The {@link Integration} for HeadDatabase: it integrates with the {@code HeadDatabase} plugin and resolves to a
  * {@link HeadQuery}. It names {@link HeadDatabaseService} only inside {@link #whenPresent}, and that service
  * reaches HeadDatabase purely by reflection; so on a server without HeadDatabase the service is never
- * constructed and the SDK is never loaded. {@code Hooks} hands callers the no-op {@link HeadQuery#ABSENT},
+ * constructed and the SDK is never loaded. {@code Integrations} hands callers the no-op {@link HeadQuery#ABSENT},
  * which carries no {@code me.arcaniax} type.
  *
  * <p>Presence here is stricter than plugin-enabled alone: HeadDatabase must be enabled <em>and</em> its
@@ -20,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
  * rather than to a real query that cannot reach the SDK.
  */
 @NullMarked
-public final class HeadDatabaseHook implements PluginHook<HeadQuery> {
+public final class HeadDatabaseHook implements Integration<HeadQuery> {
 
     private static final String PLUGIN_NAME = "HeadDatabase";
 
@@ -48,7 +49,7 @@ public final class HeadDatabaseHook implements PluginHook<HeadQuery> {
     @Override
     public HeadQuery whenPresent(Server server) {
         Objects.requireNonNull(server, "server");
-        // The single reference to the SDK-touching service, reached only past Hooks' present-guard.
+        // The single reference to the SDK-touching service, reached only past Integrations' present-guard.
         return new HeadDatabaseService(log);
     }
 

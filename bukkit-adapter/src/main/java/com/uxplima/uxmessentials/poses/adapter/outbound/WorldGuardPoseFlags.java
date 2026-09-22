@@ -10,9 +10,9 @@ import org.bukkit.World;
 
 import com.uxplima.uxmessentials.poses.application.port.PoseRegionFlags;
 import com.uxplima.uxmessentials.poses.domain.PoseType;
-import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.hook.region.WorldGuardReflection;
 import org.jspecify.annotations.NullMarked;
 
 /**

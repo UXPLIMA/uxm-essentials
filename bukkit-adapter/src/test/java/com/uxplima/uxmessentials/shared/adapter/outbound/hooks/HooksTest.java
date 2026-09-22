@@ -8,6 +8,8 @@ import java.util.List;
 
 import org.bukkit.Server;
 
+import com.uxplima.uxmlib.hook.Integration;
+import com.uxplima.uxmlib.hook.Integrations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,7 +70,8 @@ class HooksTest {
 
     @Test
     void resolve_isKeyedByCapabilityAndRejectsUnknownTypes() {
-        Hooks hooks = Hooks.resolve(MockBukkit.getMock(), HookHarness.SILENT, List.of(new GreetingHook()));
+        Integrations hooks =
+                Integrations.resolve(MockBukkit.getMock(), HookHarness.SILENT_JDK, List.of(new GreetingHook()));
 
         assertThat(hooks.provides(Greeting.class)).isTrue();
         assertThat(hooks.provides(String.class)).isFalse();
@@ -78,8 +81,8 @@ class HooksTest {
 
     @Test
     void resolve_rejectsTwoHooksClaimingTheSameCapability() {
-        assertThatThrownBy(() -> Hooks.resolve(
-                        MockBukkit.getMock(), HookHarness.SILENT, List.of(new GreetingHook(), new GreetingHook())))
+        assertThatThrownBy(() -> Integrations.resolve(
+                        MockBukkit.getMock(), HookHarness.SILENT_JDK, List.of(new GreetingHook(), new GreetingHook())))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -88,7 +91,8 @@ class HooksTest {
         // The bootstrap contract: an incompatible SDK surfaces inside whenPresent, and one broken integration
         // must not take the server's whole enable with it.
         MockBukkit.createMockPlugin(FAKE_PLUGIN);
-        Hooks hooks = Hooks.resolve(MockBukkit.getMock(), HookHarness.SILENT, List.of(new BrokenHook()));
+        Integrations hooks =
+                Integrations.resolve(MockBukkit.getMock(), HookHarness.SILENT_JDK, List.of(new BrokenHook()));
 
         assertThat(hooks.capability(Greeting.class)).isSameAs(Greeting.ABSENT);
     }
@@ -114,7 +118,7 @@ class HooksTest {
     }
 
     /** The ordinary hook: resolves to a real greeting when its plugin is installed. */
-    private static final class GreetingHook implements PluginHook<Greeting> {
+    private static final class GreetingHook implements Integration<Greeting> {
 
         @Override
         public String pluginName() {
@@ -148,7 +152,7 @@ class HooksTest {
     }
 
     /** A hook whose real implementation cannot be built: stands in for an incompatible or partial SDK. */
-    private static final class BrokenHook implements PluginHook<Greeting> {
+    private static final class BrokenHook implements Integration<Greeting> {
 
         @Override
         public String pluginName() {

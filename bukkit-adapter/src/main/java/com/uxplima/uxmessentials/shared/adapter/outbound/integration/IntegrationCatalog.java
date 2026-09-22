@@ -212,7 +212,7 @@ public final class IntegrationCatalog {
             new Integration(
                     "WorldGuard",
                     IntegrationFamily.REGIONS,
-                    "com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection",
+                    "com.uxplima.uxmlib.hook.region.WorldGuardReflection",
                     "region membership and flags gate teleports, poses and menu requirements"),
             new Integration(
                     "WorldEdit",

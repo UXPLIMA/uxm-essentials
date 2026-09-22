@@ -2,11 +2,14 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.hooks;
 
 import java.util.List;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.hook.Integration;
+import com.uxplima.uxmlib.hook.Integrations;
 import org.mockbukkit.mockbukkit.MockBukkit;
 
 /**
- * Reusable present/absent test harness for {@link PluginHook}s, the seam every later hook feature (Vault,
+ * Reusable present/absent test harness for {@link Integration}s, the seam every later hook feature (Vault,
  * HeadDatabase, the item providers) reuses for its absent-path test. A hook test mocks the server in its own
  * {@code @BeforeEach}/{@code @AfterEach}, then drives the hook through one of two entry points:
  *
@@ -38,11 +41,14 @@ final class HookHarness {
         public void debug(String message, Object... args) {}
     };
 
+    /** The same silence, in the shape uxmLib logs through. */
+    static final System.Logger SILENT_JDK = new SystemLoggerBridge("test", SILENT);
+
     private HookHarness() {}
 
     /** Resolve {@code hook} with its target plugin ABSENT; returns the no-op capability. */
-    static <T> T absent(PluginHook<T> hook) {
-        Hooks hooks = Hooks.resolve(MockBukkit.getMock(), SILENT, List.of(hook));
+    static <T> T absent(Integration<T> hook) {
+        Integrations hooks = Integrations.resolve(MockBukkit.getMock(), SILENT_JDK, List.of(hook));
         return hooks.capability(hook.capability());
     }
 
@@ -50,9 +56,9 @@ final class HookHarness {
      * Register a fake plugin named {@code hook.pluginName()} into the current mock, then resolve to the real
      * capability. The mock must already be active (the caller's {@code @BeforeEach} ran {@code MockBukkit.mock()}).
      */
-    static <T> T present(PluginHook<T> hook) {
+    static <T> T present(Integration<T> hook) {
         MockBukkit.createMockPlugin(hook.pluginName());
-        Hooks hooks = Hooks.resolve(MockBukkit.getMock(), SILENT, List.of(hook));
+        Integrations hooks = Integrations.resolve(MockBukkit.getMock(), SILENT_JDK, List.of(hook));
         return hooks.capability(hook.capability());
     }
 }

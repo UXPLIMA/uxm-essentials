@@ -1,20 +1,15 @@
 /**
- * The optional-plugin hook SPI: the foundation every later soft-depend integration plugs into. A
- * {@link com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PluginHook} names a target plugin, reports
- * whether it is present and enabled, and resolves to a typed capability that always has a safe absent default;
- * the {@link com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks} façade resolves every registered
- * hook once at bootstrap (presence is stable for a server run) and hands callers the capability by class, so a
- * feature consumes an integration without ever null-checking or try/catching a missing plugin.
+ * This plugin's optional integrations: Vault's economy and permissions, and HeadDatabase. Each one is a
+ * {@link com.uxplima.uxmlib.hook.Integration} that names its plugin and resolves to a typed capability with a
+ * safe no-op default, and uxmLib's {@link com.uxplima.uxmlib.hook.Integrations} resolves all of them once at
+ * enable and hands a caller the capability by class.
  *
- * <p>Every hook keeps the target plugin's SDK types behind {@code whenPresent}, and the no-op default carries
- * none of them: the same lazy-structure the claim-provider adapters use. Because {@code Hooks} calls
- * {@code whenPresent} only past the present-guard, a server without the soft-depend never constructs the real
- * implementation and never loads its external classes: there is no {@link java.lang.NoClassDefFoundError} path
- * when a soft-depend is absent.
+ * <p>The model was written here and moved into uxmLib on 2026-09-22, because it is a mechanism every plugin
+ * with an optional dependency can use. What stays here is what this plugin integrates with.
  *
- * <p>{@code PlaceholderApiHook} is the worked example that proves the pattern; the real integrations (Vault
- * economy/permission, the multi-currency providers, HeadDatabase, the item providers) follow it in later
- * features, and the {@code HookHarness} in the matching test package is the reusable present/absent harness.
+ * <p>Every integration keeps the other plugin's types behind {@code whenPresent}, and the no-op default names
+ * none of them, so a server without the plugin never constructs the real side and never loads its classes.
+ * The {@code HookHarness} in the matching test package is the present and absent harness.
  */
 @NullMarked
 package com.uxplima.uxmessentials.shared.adapter.outbound.hooks;

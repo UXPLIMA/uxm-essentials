@@ -7,7 +7,7 @@ import java.util.logging.Logger;
 
 import org.bukkit.Server;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardReflection;
+import com.uxplima.uxmlib.hook.region.WorldGuardReflection;
 import org.jspecify.annotations.NullMarked;
 
 /**
