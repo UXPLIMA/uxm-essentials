@@ -102,6 +102,28 @@ class ItemActionsTest {
         assertThat(viewer.getInventory().contains(Material.GOLDEN_APPLE, 3)).isTrue();
     }
 
+    /**
+     * A damaged serialized token is a fail-soft skip here, the same as an unknown material.
+     *
+     * <p>The library's codec draws a line this call site does not: an empty answer means the token is not
+     * its own and a caller should pass it along, and an exception means the token was its own and is
+     * broken. That distinction is right where a chain of icon providers is walking tokens, and it is not
+     * this call site's: a click action resolving an item has nowhere to pass it along to, so both are a
+     * skip and a warning.
+     *
+     * <p>This plugin's own codec used to answer both with an empty, so taking the library's without a
+     * catch here would have thrown out of a click on a payload an operator had truncated.
+     */
+    @Test
+    void giveItemWithADamagedSerializedTokenIsAFailSoftNoOp() {
+        assertThatCode(() -> invoke("give-item", SerializedItems.PREFIX + "@@@not base64@@@"))
+                .describedAs("a click is not a place to throw over a payload somebody truncated")
+                .doesNotThrowAnyException();
+
+        assertThat(viewer.getInventory().isEmpty()).isTrue();
+        assertThat(log.warnings).anyMatch(line -> line.contains("unresolved_item"));
+    }
+
     @Test
     void giveItemWithAnUnknownMaterialIsAFailSoftNoOp() {
         assertThatCode(() -> invoke("give-item", "NOT_A_REAL_ITEM")).doesNotThrowAnyException();

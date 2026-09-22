@@ -187,11 +187,19 @@ That test is not a test of the codec. It is the reason the port was allowed, kep
 will find it: if the library ever stops reading a header-less blob, it fails, and what fails with
 it is every payload written before today.
 
-**One defect was found on the way and fixed in the library.** `SerializedItems.decode` returns an
-`Optional`, which promises that nothing is a possible answer, and it threw instead: on a token
-that is not valid Base64, and on valid Base64 that is not an item. The caller shape the signature
-invites, `decode(token).ifPresent(...)`, met an exception. This plugin's own codec caught both and
-returned empty, so **the port would have been a regression without it**. uxmLib 0.100.0.
+**One thing I called a defect on the way was not one, and correcting it is the more useful
+record.** `SerializedItems.decode` returns an `Optional` and throws on a damaged token, and I read
+that as a signature not keeping its promise. It is keeping a different one: **empty means the
+token is not mine**, so a caller walking a chain of icon providers passes it along, and the
+exception means it was mine and is broken. `SerializedStackIconProviderTest` in uxmLib had already
+written that down, from the caller's side, and I changed the method without reading the test that
+guarded it. The change was reverted in uxmLib 0.101.0 and the codec's own test now states the rule
+from the codec's side too.
+
+**What the port needed instead was a catch here, and that is where the decision belongs.** An
+icon provider chain has somewhere to pass a token along to; a click action resolving an item has
+not, so `ItemActions.resolveItem` catches and treats a damaged payload as the skip its own javadoc
+already promised. That is one call site, not a library change.
 
 Eleven files were repointed and two classes deleted.
 

@@ -142,6 +142,11 @@ public final class ItemActions {
      * Resolve an item token into a stack: a {@code b64:} token decodes through {@link SerializedItems}, and anything
      * else parses as {@code <material> [amount]}. Empty when the token is blank, the material is unknown, the amount
      * is malformed, or the serialized payload is corrupt: every caller reads an empty result as a fail-soft skip.
+     *
+     * <p>The codec draws a line this call site does not. Its empty means the token is not its own, so a caller
+     * walking a chain of providers should pass it along, and its exception means the token was its own and is
+     * broken. That is right where something else might still claim the token. Here nothing can: a click action
+     * resolving an item has nowhere to pass it to, so a damaged payload is a skip and a warning like any other.
      */
     private static Optional<ItemStack> resolveItem(String token) {
         String trimmed = token.strip();
@@ -149,7 +154,11 @@ public final class ItemActions {
             return Optional.empty();
         }
         if (SerializedItems.isSerialized(trimmed)) {
-            return SerializedItems.decode(trimmed);
+            try {
+                return SerializedItems.decode(trimmed);
+            } catch (IllegalArgumentException damaged) {
+                return Optional.empty();
+            }
         }
         return ItemArg.parse(trimmed).flatMap(arg -> {
             Material material = Material.matchMaterial(arg.material());
