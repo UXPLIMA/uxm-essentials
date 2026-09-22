@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmlib.condition.Comparison;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -82,15 +83,28 @@ final class ClickActionGates {
         return permissions.has(BukkitRefs.toRef(viewer), trimmed) ? Verdict.PASS : Verdict.DENY;
     }
 
+    /**
+     * Compare two resolved values, through the library's comparison rather than one of our own.
+     *
+     * <p>Ours split on the first operator symbol it found anywhere in the text, so an operator character
+     * inside a placeholder body split the expression there: {@code %math_1>2% < 5} became a left of
+     * {@code %math_1} and a right of {@code 2% < 5}, which resolved to nothing and compared nothing. It
+     * only went wrong for a single character operator sorting after the one inside the placeholder,
+     * which is why it survived: the half that works is the half people test.
+     *
+     * <p>The library's skips a {@code %...%} span whole, and knows three operators ours never had, so a
+     * gate here reads the same vocabulary as a condition in every other plugin of ours.
+     */
     Verdict condition(Player viewer, String value) {
-        Optional<Comparison> parsed = Comparison.parse(value);
-        if (parsed.isEmpty()) {
+        Comparison.ParsedComparison parsed;
+        try {
+            parsed = Comparison.parse(value);
+        } catch (IllegalArgumentException malformed) {
             log.warn("event=click_action_bad_condition value={}", value);
             return Verdict.PASS; // malformed: skip the gate, keep running
         }
         UnaryOperator<String> bridge = PlaceholderApiSupport.messageBridge(viewer.getUniqueId());
-        Comparison comparison = parsed.get();
-        boolean satisfied = comparison.evaluate(bridge.apply(comparison.left()), bridge.apply(comparison.right()));
+        boolean satisfied = parsed.comparison().test(bridge.apply(parsed.left()), bridge.apply(parsed.right()));
         return satisfied ? Verdict.PASS : Verdict.DENY;
     }
 

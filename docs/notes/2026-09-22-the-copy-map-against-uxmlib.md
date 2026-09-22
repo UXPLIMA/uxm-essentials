@@ -39,7 +39,7 @@ This is the first port and it is the one item 1 of the standing order names thir
 | ~~`MenuTitles`~~ | Confirmed and **rejected**, see below |
 | ~~`EquipmentSlot`~~ | Identical, and blocked by the core rule. See below |
 | ~~`SerializedItems`~~ | Confirmed and **ported**, see below |
-| `Comparison` | Both are a comparison of two resolved operands under an operator |
+| ~~`Comparison`~~ | Confirmed and **ported**, on correctness. See below |
 
 **`SerializedItems` carries a data compatibility risk and nothing else here does.** A stored
 click-action payload was written by this plugin's codec; if the two formats differ by a byte,
@@ -230,3 +230,46 @@ together.
 **That is the second time the port question has paid without a port.** `MenuTitles` asked whether
 two width tables agree and left a test behind; `Tiles` found a setting that reached half the
 screen. **Comparing two implementations is worth doing even when the answer is to keep both.**
+
+## `Comparison`: confirmed, ported, and it was a bug
+
+The last entry on the list, and the only one where the library's is better rather than different.
+
+**This plugin's split on the first operator symbol it could find anywhere in the text.** So an
+operator character inside a placeholder body split the expression there:
+
+```
+%math_1>2% < 5   ->   left "%math_1"   right "2% < 5"
+```
+
+which then resolved to nothing, compared nothing, and reported whatever fell out. The gate is a
+`CONDITION` on a click action and comparing PlaceholderAPI values is its entire job.
+
+**It only went wrong for a single character operator whose symbol sorts after the one inside the
+placeholder.** `%math_2<3% >= 5` reads correctly, because `>=` is tried before `<`. That is the
+worst shape a bug can have: the half that works is the half anybody would test.
+
+The library's parse skips a `%...%` span whole, which its own javadoc names as the reason. It
+also knows three operators this plugin never had, `?=`, `*` and `||`, so a gate here now reads
+the same vocabulary as a condition in every other plugin of ours.
+
+**One behaviour changes and it is worth knowing.** An ordering compare between two non-numbers
+was `false` here and is a lexicographic comparison in the library. That is an edge an operator
+reaches only by writing an ordering compare on text, which is almost certainly a mistake either
+way, and neither answer is silently worse than the other.
+
+**The gate's catch changed shape and is pinned.** Ours answered a malformed expression with an
+empty Optional; the library's throws. `ConditionGateComparisonTest` asserts the exception type
+and message, because if that ever changed a mistyped gate would abort a click chain instead of
+being skipped, and nothing else in this repository would notice.
+
+## The map is finished
+
+Eleven entries in group A: two ported, two rejected on policy, five blocked by the core rule, and
+the last two are the health types that travel with the four. Twelve in group B, keep both. Seven
+in group C, which is the adapter audit and a separate exercise. Three in group D, which is the
+owner's.
+
+**Two ports out of thirty seven shared names, and three defects found on the way**: a `decode`
+that threw where its signature promised an empty, a tile glyph that reached half the screen, and
+a condition that split inside a placeholder. **The map was worth more than the ports.**
