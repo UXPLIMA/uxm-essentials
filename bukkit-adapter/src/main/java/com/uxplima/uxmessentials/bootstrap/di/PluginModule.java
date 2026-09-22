@@ -58,6 +58,7 @@ import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
+import com.uxplima.uxmessentials.bootstrap.FamilyCommandWords;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
 import com.uxplima.uxmessentials.bootstrap.command.GuiSubcommand;
 import com.uxplima.uxmessentials.bootstrap.command.HelpCommand;
@@ -883,7 +884,13 @@ public final class PluginModule {
                 .toList());
         CommandCatalogConfig.Loaded loaded =
                 new CommandCatalogConfig(plugin.getDataFolder().toPath(), kernel.log()).loadAll();
-        CommandCatalog.Resolution resolution = CommandCatalog.resolve(defs, loaded.overrides(), loaded.guiDefault());
+        // A word another plugin of ours ships belongs to that plugin while it is installed, rather than to
+        // whichever of the two the server happened to load last. See FamilyCommandWords.
+        CommandCatalog.Resolution resolution = CommandCatalog.resolve(
+                defs,
+                loaded.overrides(),
+                loaded.guiDefault(),
+                FamilyCommandWords.reservedOn(plugin.getServer().getPluginManager()));
         resolution.warnings().forEach(w -> kernel.log().warn("command catalog: {}", w.message()));
         // Seed the editable root file from the resolved surface so a fresh install lands a self-documenting
         // commands.conf. The loader above first migrates the historical commands/commands.conf location.

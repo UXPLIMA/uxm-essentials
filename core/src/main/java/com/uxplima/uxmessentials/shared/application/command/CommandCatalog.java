@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.application.command;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,13 +41,31 @@ public final class CommandCatalog {
      */
     public static Resolution resolve(
             List<CommandDefinition> definitions, Map<String, CommandOverride> overrides, boolean guiDefault) {
+        return resolve(definitions, overrides, guiDefault, Map.of());
+    }
+
+    /**
+     * As {@link #resolve(List, Map, boolean)}, with the words another installed plugin of ours owns. A word in
+     * {@code reserved} (keyed by the word, valued by the plugin that owns it) is never claimed here: an alias
+     * that names one is dropped, and a command whose name is one stays off, each with a warning that names the
+     * owner. Two plugins registering one word are otherwise resolved by load order, which is no rule at all.
+     * An operator who wants the command anyway renames it in {@code commands.conf}.
+     */
+    public static Resolution resolve(
+            List<CommandDefinition> definitions,
+            Map<String, CommandOverride> overrides,
+            boolean guiDefault,
+            Map<String, String> reserved) {
         Objects.requireNonNull(definitions, "definitions");
         Objects.requireNonNull(overrides, "overrides");
+        Objects.requireNonNull(reserved, "reserved");
+        Map<String, String> owners = new HashMap<>();
+        reserved.forEach((word, owner) -> owners.put(key(word), owner));
         List<EffectiveCommand> out = new ArrayList<>();
         List<CatalogWarning> warnings = new ArrayList<>();
-        Set<String> claimed = new HashSet<>();
+        Set<String> claimed = new HashSet<>(owners.keySet());
         for (CommandDefinition def : definitions) {
-            out.add(resolveOne(def, overrides.get(def.id().value()), claimed, warnings, guiDefault));
+            out.add(resolveOne(def, overrides.get(def.id().value()), claimed, owners, warnings, guiDefault));
         }
         return new Resolution(out, warnings);
     }
@@ -55,6 +74,7 @@ public final class CommandCatalog {
             CommandDefinition def,
             @Nullable CommandOverride ov,
             Set<String> claimed,
+            Map<String, String> owners,
             List<CatalogWarning> warnings,
             boolean guiDefault) {
         boolean enabled = ov == null || ov.enabled();
@@ -63,8 +83,14 @@ public final class CommandCatalog {
         if (!enabled) {
             return new EffectiveCommand(def.id(), name, List.of(), Map.of(), false, gui);
         }
+        String owner = owners.get(key(name));
+        if (owner != null) {
+            warnings.add(new CatalogWarning("'" + name + "' belongs to " + owner + ", which is installed, so '"
+                    + def.id() + "' stays off. Rename it in commands.conf to keep it."));
+            return new EffectiveCommand(def.id(), name, List.of(), Map.of(), false, gui);
+        }
         name = claimName(def, name, claimed, warnings);
-        List<String> aliases = claimAliases(def, ov, claimed, warnings);
+        List<String> aliases = claimAliases(def, ov, claimed, owners, warnings);
         Set<String> globallyVisible = new HashSet<>();
         globallyVisible.add(key(name));
         aliases.forEach(alias -> globallyVisible.add(key(alias)));
@@ -103,11 +129,21 @@ public final class CommandCatalog {
     }
 
     private static List<String> claimAliases(
-            CommandDefinition def, @Nullable CommandOverride ov, Set<String> claimed, List<CatalogWarning> warnings) {
+            CommandDefinition def,
+            @Nullable CommandOverride ov,
+            Set<String> claimed,
+            Map<String, String> owners,
+            List<CatalogWarning> warnings) {
         List<String> wanted = ov == null ? def.defaultAliases() : ov.aliases();
         List<String> out = new ArrayList<>();
         for (String alias : wanted) {
             String aliasKey = key(alias);
+            String owner = owners.get(aliasKey);
+            if (owner != null) {
+                warnings.add(new CatalogWarning("alias '" + alias + "' for '" + def.id() + "' belongs to " + owner
+                        + ", which is installed, dropping"));
+                continue;
+            }
             if (claimed.contains(aliasKey)) {
                 warnings.add(new CatalogWarning("alias '" + alias + "' for '" + def.id() + "' collides, dropping"));
                 continue;
