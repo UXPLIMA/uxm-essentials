@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 
+import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -60,6 +61,44 @@ class BukkitVanishBuffsTest {
 
         assertThat(alice.hasPotionEffect(PotionEffectType.NIGHT_VISION)).isFalse();
         assertThat(alice.getAllowFlight()).isFalse();
+    }
+
+    @Test
+    void aReloadThatTurnedNightVisionOffStillTakesTheGrantedOneBack() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+        new BukkitVanishBuffs(server, new InlineScheduler(), true, false).apply(ref);
+
+        // The module was reloaded with night vision off while Alice was vanished: the new wiring's buffs clear her.
+        new BukkitVanishBuffs(server, new InlineScheduler(), false, false).clear(ref);
+
+        assertThat(alice.hasPotionEffect(PotionEffectType.NIGHT_VISION)).isFalse();
+    }
+
+    @Test
+    void aNightVisionThePlayerDrankIsNotTheOneTakenBack() {
+        PlayerMock alice = server.addPlayer("Alice");
+        alice.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 3600, 0));
+        BukkitVanishBuffs buffs = new BukkitVanishBuffs(server, new InlineScheduler(), true, false);
+
+        buffs.clear(BukkitRefs.toRef(alice));
+        buffs.settle(BukkitRefs.toRef(alice));
+
+        assertThat(alice.hasPotionEffect(PotionEffectType.NIGHT_VISION)).isTrue();
+    }
+
+    @Test
+    void settlingTakesBackOnlyTheNightVisionAVanishLeftBehind() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+        new BukkitVanishBuffs(server, new InlineScheduler(), true, true).apply(ref);
+
+        // Alice rejoined after a restart, not vanished: the saved infinite night vision goes, the flight she may
+        // hold for another reason is not this call's to decide.
+        new BukkitVanishBuffs(server, new InlineScheduler(), true, true).settle(ref);
+
+        assertThat(alice.hasPotionEffect(PotionEffectType.NIGHT_VISION)).isFalse();
+        assertThat(alice.getAllowFlight()).isTrue();
     }
 
     /** A scheduler that runs every task inline so the entity-thread hop fires at once. */

@@ -52,6 +52,7 @@ public final class SetVanishLevel {
     public Optional<VanishLevel> reapply(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         if (!store.isVanished(who.uuid())) {
+            buffs.settle(who);
             return Optional.empty();
         }
         VanishLevel level = levels.useLevel(who);

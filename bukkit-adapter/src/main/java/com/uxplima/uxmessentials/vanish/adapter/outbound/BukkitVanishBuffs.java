@@ -64,13 +64,35 @@ public final class BukkitVanishBuffs implements VanishBuffs {
         }
     }
 
+    @Override
+    public void settle(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        scheduler.onEntity(who, () -> onLive(who, BukkitVanishBuffs::takeBackNightVision));
+    }
+
     private void revoke(Player player) {
-        if (nightVision) {
-            player.removePotionEffect(PotionEffectType.NIGHT_VISION);
-        }
+        // Whatever the toggle says now: a reload that turned night vision off must still take back the one it
+        // granted before, and only that one.
+        takeBackNightVision(player);
         if (allowFlight && !fliesByGameMode(player)) {
             player.setFlying(false);
             player.setAllowFlight(false);
+        }
+    }
+
+    /**
+     * Remove the night vision a vanish granted, recognised by what only a vanish writes: infinite, level one, and no
+     * ambient tint, particles or icon. A potion the player drank has a length and shows itself, so it stays.
+     */
+    private static void takeBackNightVision(Player player) {
+        PotionEffect held = player.getPotionEffect(PotionEffectType.NIGHT_VISION);
+        if (held != null
+                && held.isInfinite()
+                && held.getAmplifier() == 0
+                && !held.isAmbient()
+                && !held.hasParticles()
+                && !held.hasIcon()) {
+            player.removePotionEffect(PotionEffectType.NIGHT_VISION);
         }
     }
 

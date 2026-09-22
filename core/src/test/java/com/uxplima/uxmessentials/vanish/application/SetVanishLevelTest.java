@@ -48,6 +48,17 @@ class SetVanishLevelTest {
     }
 
     @Test
+    void aVisiblePlayerHasAnyBuffAVanishLeftBehindSettled() {
+        // A player who is not vanished on (re)join may still carry the infinite night vision a vanish granted
+        // before a reload or a restart: the potion is saved with the player. Settling takes that one back and
+        // touches nothing else, so a flight they hold for another reason is left alone.
+        setVanishLevel.reapply(who);
+
+        assertThat(buffs.settled).containsExactly(who);
+        assertThat(buffs.cleared).isEmpty();
+    }
+
+    @Test
     void aVanishedPlayerHasTheirLevelReResolvedAndReapplied() {
         store.vanish(who.uuid(), VanishLevel.DEFAULT); // currently at level 1
         levels.useLevel = VanishLevel.of(3); // permissions now say level 3
@@ -82,6 +93,12 @@ class SetVanishLevelTest {
     private static final class RecordingBuffs implements VanishBuffs {
         private final List<PlayerRef> applied = new ArrayList<>();
         private final List<PlayerRef> cleared = new ArrayList<>();
+        private final List<PlayerRef> settled = new ArrayList<>();
+
+        @Override
+        public void settle(PlayerRef target) {
+            settled.add(target);
+        }
 
         @Override
         public void apply(PlayerRef target) {

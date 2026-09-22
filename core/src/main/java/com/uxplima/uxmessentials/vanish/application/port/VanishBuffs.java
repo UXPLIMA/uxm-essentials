@@ -22,4 +22,11 @@ public interface VanishBuffs {
 
     /** Remove the granted buffs from {@code who} and restore their flight to the game-mode default; a no-op offline. */
     void clear(PlayerRef who);
+
+    /**
+     * Take back from a player who is not vanished whatever a vanish left on them and nothing else. The night vision a
+     * vanish grants is infinite and saved with the player, so a reload or a restart that dropped them from the store
+     * left it on them for good. Flight is not touched here: a visible player may hold it for another reason.
+     */
+    default void settle(PlayerRef who) {}
 }
