@@ -128,6 +128,20 @@ final class EveryGuardThisPluginNeedsIsHereTest {
     }
 
     @Test
+    @DisplayName("a plugin that ships a message catalogue guards that every key is read")
+    void thedeadKeyGuardIsHere() {
+        if (!sourceHolds("implementsMessageKey")) {
+            return;
+        }
+        assertThat(aGuardReads("MessageKeyCatalog.all()"))
+                .describedAs("a key nothing sends is a line a translator was paid for and a player can never"
+                        + " be shown, and the parity guard cannot see it: it proves the twelve catalogues"
+                        + " carry exactly the constant set, which says nothing about whether anything reads"
+                        + " them. Sixty three of them were found by hand on 2026-09-22")
+                .isTrue();
+    }
+
+    @Test
     @DisplayName("the scan reads every module, so it cannot pass by finding nothing")
     void thescanReadsThePlugin() {
         assertThat(ProductionSources.files())

@@ -83,6 +83,11 @@ Each item names the guard that fails the build.
   `IntegrationCatalogDriftTest`.
 - Every claim provider appears on all three surfaces: `ClaimProviderCoverageDriftTest`.
 - The shipped document and the build name the same versions: `ShippedVersionsDriftTest`.
+- No key nobody reads. Every `MessageKey` constant is sent by the code, named bare inside its own
+  message package, named by a shipped window, or is one the menu engine looks up itself:
+  `EveryKeyIsReadDriftTest`. Sixty three of them were neither on 2026-09-22, and the parity guard
+  could not see one: it proves the twelve catalogues carry exactly the constant set, which says
+  nothing about whether anything reads them.
 - **Every guard can fail.** `GuardIntegrityDriftTest` is the guard on the guards, and it is
   why a guard is proved by breaking it before it is trusted.
 
