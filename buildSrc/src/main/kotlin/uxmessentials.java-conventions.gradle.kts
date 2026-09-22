@@ -106,6 +106,19 @@ tasks.withType<Test>().configureEach {
     // heap. With a fixed ceiling every machine runs the test JVM the same way, and one runner-sized value
     // is what the build is verified against.
     maxHeapSize = "2g"
+    // A guard reads files the compiler never turns into a class: the text of the sources, comments
+    // included, the documents, and the version catalogue. Gradle reruns a test only when one of its
+    // inputs changes, and none of those were inputs, so a change to a comment or a document left the
+    // test up to date and the build green without running the guards that read it. Proved in uxmGlow
+    // on 2026-09-22: a comment naming ActionContext.builder( broke three guards and the build passed.
+    // The whole repository's text is declared, because a guard in one module may read another.
+    inputs.files(
+            rootProject.fileTree(rootProject.projectDir) {
+                include("**/src/main/java/**", "**/src/test/java/**", "docs/**", "gradle/libs.versions.toml")
+                exclude("**/build/**", ".gradle/**", "buildSrc/**")
+            })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("guardedText")
 }
 
 // A skipped test protects nothing, and it reports as green. MockBukkit turns an unimplemented mock into a
