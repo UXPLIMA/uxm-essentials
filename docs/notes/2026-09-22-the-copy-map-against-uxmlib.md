@@ -273,3 +273,44 @@ owner's.
 **Two ports out of thirty seven shared names, and three defects found on the way**: a `decode`
 that threw where its signature promised an empty, a tile glyph that reached half the screen, and
 a condition that split inside a placeholder. **The map was worth more than the ports.**
+
+## Group C, the adapter audit: `Scheduler` and `Messages`
+
+The standing order names these two as ports to move. Read against the code, **neither is a
+reimplementation and neither should move.** The reason is the same for both and it is not a
+matter of taste.
+
+**`Scheduler`.** The core port is
+`onGlobal/onRegion/onEntity/async/asyncAfter/laterGlobal/repeatGlobal`, taking `PlayerRef` and
+`Position`, which are this plugin's domain types. uxmLib's takes `org.bukkit.Entity` and
+`org.bukkit.Location` and hands back a `TaskHandle`. **Core could not use the library's port if
+it wanted to**: the whole point of declaring this one is that core names no Bukkit type.
+`FoliaScheduler` is the translation from domain types to Paper's region schedulers, which is
+what an outbound adapter is; and `EngineScheduler.Adapter` already bridges to uxmLib's
+`Scheduler` at the one place uxmLib asks for one.
+
+One difference worth knowing rather than fixing: on teardown the library runs a one-shot inline
+and warns about a dropped timer, while `FoliaScheduler` returns silently for everything once
+`plugin.isEnabled()` is false. Both are documented decisions in their own javadoc, and this
+one's reasoning is that the only work scheduled during teardown is display cleanup for players
+who are being disconnected anyway.
+
+**`Messages`.** The core port is `String resolve(PlayerRef, MessageKey, Map<String, String>)`:
+a plain string, `{brace}` placeholders, no MiniMessage. uxmLib's renders an Adventure
+`Component` through MiniMessage with `TagResolver`s. Core may not know Adventure, so the port
+returns a `String` and cannot be the library's. `CatalogMessages` is the adapter and it does
+one thing: look the template up for the viewer's locale and substitute braces.
+
+**Verdict for both: no work, and the standing order's list is one step out of date here.** These
+two were named as ports to move; what they are is ports that already exist, behind adapters that
+already do the translating. Nothing about them looks like the duplication the list was worried
+about.
+
+### One observation from the same read, recorded rather than chased
+
+`bukkit-adapter` calls `MiniMessage.deserialize` in fifty four places, fifteen with a resolver
+and thirty nine without. Most of the bare ones are the command layer building a colour prefix by
+hand, which is consistent with the decision that operator console output is plain. **Whether any
+of them is operator-written content that should have resolved a palette token, and rendered
+`<body>` as literal text instead, is a separate question and a real one.** It wants its own
+pass, with the answer per call site rather than per count.
