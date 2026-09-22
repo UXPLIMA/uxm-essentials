@@ -35,6 +35,11 @@ public final class ThemeFile {
     /** The character a tile's title line opens with; the library ships none, and this plugin has always drawn one. */
     private static final String TITLE_GLYPH = "\u25C6";
 
+    /** The glyph this plugin ships for a tile title, which a theme may replace. */
+    public static String titleGlyph() {
+        return TITLE_GLYPH;
+    }
+
     private ThemeFile() {}
 
     /** The shared file, worked out from this plugin's data folder. */

@@ -60,11 +60,31 @@ public final class StyleTags {
      */
     private static final Set<String> MONEY_CATEGORIES = Set.of("economy", "bank", "loan", "trade", "vault");
 
+    /** What a tile title is drawn with until a theme is read, which is what this plugin ships. */
+    private static volatile String titleGlyph = ThemeFile.titleGlyph();
+
     private StyleTags() {}
 
     /** The colours every line is painted with. */
     public static Palette palette() {
         return palette;
+    }
+
+    /**
+     * The glyph a tile title is drawn with, which the theme owns.
+     *
+     * <p>{@link Tiles} held it as a constant of its own until 2026-09-22, so an operator who changed
+     * {@code glyphs.title} changed it for every tile uxmLib draws and for none of the tiles this plugin
+     * draws itself. One setting, two glyphs, on one server.
+     */
+    public static String titleGlyph() {
+        return titleGlyph;
+    }
+
+    /** Take the glyph a server wrote down, alongside {@link #use(Palette)} and on the same reload. */
+    public static void useTitleGlyph(String glyph) {
+        Objects.requireNonNull(glyph, "glyph");
+        titleGlyph = glyph;
     }
 
     /**

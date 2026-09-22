@@ -453,6 +453,9 @@ public final class PluginModule {
                 () -> {
                     StyleTags.use(ThemeFile.read(themeFolder));
                     engineTheme.reload();
+                    // The glyph as well as the colours. Both live in the theme and a reload that moved
+                    // one and not the other is how the two drifted apart in the first place.
+                    StyleTags.useTitleGlyph(engineTheme.get().glyph("title"));
                 },
                 "colours re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.

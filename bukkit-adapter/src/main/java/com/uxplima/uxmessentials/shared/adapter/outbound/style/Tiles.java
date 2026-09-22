@@ -27,9 +27,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class Tiles {
 
-    /** The diamond that opens a tile's title, in the icon grey the rest of the lore icons use. */
-    private static final String DIAMOND_GLYPH = "◆ ";
-
     /** Every lore line is padded a space either side, so the text never touches the edge of the tooltip. */
     private static final String PADDING = " ";
 
@@ -86,9 +83,11 @@ public final class Tiles {
 
     /** The title line itself: the diamond, then the title in its gradient, padded either side. */
     private static Component head(Component name) {
-        // The glyph is built here rather than held, because its colour comes from the palette and a
-        // server may reload that while the server runs.
-        Component diamond = Component.text(DIAMOND_GLYPH, StyleTags.icon());
+        // The glyph is built here rather than held, because both halves of it come from the theme and a
+        // server may reload that while the server runs: the colour from the palette, and the character
+        // itself, which was a constant here until 2026-09-22. An operator who changed glyphs.title
+        // changed it for every tile uxmLib draws and for none of these.
+        Component diamond = Component.text(StyleTags.titleGlyph() + PADDING, StyleTags.icon());
         return PAD.append(diamond).append(Gradients.title(name)).append(PAD);
     }
 

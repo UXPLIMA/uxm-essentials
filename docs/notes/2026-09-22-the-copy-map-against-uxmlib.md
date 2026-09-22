@@ -35,9 +35,9 @@ This is the first port and it is the one item 1 of the standing order names thir
 
 | Class | Why it looks the same |
 |---|---|
-| `Tiles` | Both say "puts the title of a menu tile on the first line of its lore, under a blank name" |
+| ~~`Tiles`~~ | Confirmed and **rejected**, but it found a defect. See below |
 | ~~`MenuTitles`~~ | Confirmed and **rejected**, see below |
-| `EquipmentSlot` | Both say "the six slots a fake-player NPC can wear" |
+| ~~`EquipmentSlot`~~ | Identical, and blocked by the core rule. See below |
 | ~~`SerializedItems`~~ | Confirmed and **ported**, see below |
 | `Comparison` | Both are a comparison of two resolved operands under an operator |
 
@@ -194,3 +194,39 @@ invites, `decode(token).ifPresent(...)`, met an exception. This plugin's own cod
 returned empty, so **the port would have been a regression without it**. uxmLib 0.100.0.
 
 Eleven files were repointed and two classes deleted.
+
+## `EquipmentSlot`: identical, and blocked for the same reason the health types are
+
+The same six constants in the same order. This plugin adds a `parse(String)` that answers with an
+empty rather than throwing; the library has none.
+
+It lives in `core/npc/domain`, and `core` takes no uxmLib. So this is the health types again, and
+it is worth naming the pattern rather than the instance: **group A splits by module, not by
+similarity.** Nothing in `core` is portable however identical it is, and the only entries that
+were ever candidates are the ones already living in `bukkit-adapter`.
+
+That leaves group A with one port done, `SerializedItems`, and one rejected, `MenuTitles` and
+`Tiles`.
+
+## `Tiles`: not a port, and it found a defect anyway
+
+Same job and three real differences. The library takes a `Theme` as an argument and reads the
+glyph off it; this one reads a static palette and **held the glyph as a constant of its own**. The
+library paints the title bold; this one does not. The library refuses to double a trailing blank
+line with `endsBlank`; this one always appends the pad.
+
+Threading a `Theme` through every call site to gain one implementation is not worth the churn,
+and the bold difference is a look decision that belongs to the canon rather than to a port. Not a
+port.
+
+**But the glyph was a defect on its own, and it is fixed.** `ThemeFile` writes `glyphs.title` into
+the theme the library's renderers read, and its own javadoc calls it "the one glyph a tile title
+is drawn with". `Tiles` never asked for it. So an operator who changed `glyphs.title` changed it
+for every tile uxmLib draws and for none of the tiles this plugin draws itself: **one setting, two
+glyphs, on one server**, with nothing anywhere saying which was which. `StyleTags` holds it now,
+beside the palette, and both installation points set it so a theme reload moves both halves
+together.
+
+**That is the second time the port question has paid without a port.** `MenuTitles` asked whether
+two width tables agree and left a test behind; `Tiles` found a setting that reached half the
+screen. **Comparing two implementations is worth doing even when the answer is to keep both.**

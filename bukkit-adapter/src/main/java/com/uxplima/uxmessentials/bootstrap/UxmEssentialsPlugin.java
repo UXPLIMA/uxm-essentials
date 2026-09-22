@@ -83,6 +83,7 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         // this plugin ships, which is what every server has seen until now.
         try {
             StyleTags.use(ThemeFile.read(getDataFolder().toPath()));
+            StyleTags.useTitleGlyph(ThemeFile.theme(getDataFolder().toPath()).glyph("title"));
         } catch (RuntimeException unreadableTheme) {
             getLogger().log(Level.WARNING, "using the shipped colours: " + unreadableTheme.getMessage());
         }
