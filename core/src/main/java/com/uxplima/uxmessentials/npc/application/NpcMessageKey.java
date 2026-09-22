@@ -33,7 +33,6 @@ public enum NpcMessageKey implements MessageKey {
     NPC_SKIN_FETCHING_URL("npc.skin.fetching-url"),
     NPC_SKIN_FETCH_FAILED("npc.skin.fetch-failed"),
     NPC_SKIN_GENERATE_FAILED("npc.skin.generate-failed"),
-    NPC_SKIN_PLAYER_NOT_FOUND("npc.skin.player-not-found"),
     NPC_SKIN_PLAYER_OFFLINE("npc.skin.player-offline"),
     NPC_SKIN_UNAVAILABLE("npc.skin.unavailable"),
     NPC_SKIN_UNSIGNED("npc.skin.unsigned"),
@@ -186,7 +185,6 @@ public enum NpcMessageKey implements MessageKey {
     // management GUI: selector titles
     NPC_GUI_SELECT_TYPE("npc.gui.select.type"),
     NPC_GUI_SELECT_POSE("npc.gui.select.pose"),
-    NPC_GUI_SELECT_GLOW_COLOR("npc.gui.select.glow-color"),
 
     // management GUI, equipment sub-menu
     NPC_GUI_EQUIP_TITLE("npc.gui.equip.title"),

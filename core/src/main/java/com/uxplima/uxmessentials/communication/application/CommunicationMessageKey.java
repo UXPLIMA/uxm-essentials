@@ -55,7 +55,6 @@ public enum CommunicationMessageKey implements MessageKey {
 
     // /communication gui, the admin panel chrome (title, value lore, back) shared by every panel button.
     GUI_PANEL_TITLE("communication.gui.panel.title"),
-    GUI_PANEL_VALUE_LORE("communication.gui.panel.value-lore"),
     GUI_PANEL_BACK("communication.gui.panel.back"),
     GUI_PANEL_ACTION_HINT("communication.gui.panel.action-hint"),
     // The chat-lock toggle button and its two value states.

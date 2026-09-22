@@ -39,7 +39,6 @@ public enum DiscordlinkMessageKey implements MessageKey {
     // /discordlink gui. The per-player link-status panel
     GUI_TITLE("discordlink.gui.title"),
     GUI_VALUE_LORE("discordlink.gui.value-lore"),
-    GUI_ACTION_HINT("discordlink.gui.action-hint"),
     GUI_BACK("discordlink.gui.back"),
     GUI_STATUS("discordlink.gui.status"),
     GUI_STATUS_LINKED("discordlink.gui.status-linked"),
