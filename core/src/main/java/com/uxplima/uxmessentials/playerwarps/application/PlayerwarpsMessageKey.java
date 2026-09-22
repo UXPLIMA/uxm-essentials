@@ -55,7 +55,6 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_WRONG_PASSWORD("pwarp.wrong-password"),
     PWARP_PASSWORD_SET("pwarp.password-set"),
     PWARP_PASSWORD_CLEARED("pwarp.password-cleared"),
-    PWARP_LOCK_TOGGLED("pwarp.lock-toggled"),
     PWARP_WORLD_BLACKLISTED("pwarp.world-blacklisted"),
     PWARP_RATED("pwarp.rated"),
     PWARP_RATING("pwarp.rating"),
@@ -226,7 +225,6 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_MANAGE_DESCRIPTION("pwarp.gui.manage.description"),
     PWARP_GUI_MANAGE_DESCRIPTION_PROMPT("pwarp.gui.manage.description-prompt"),
     PWARP_GUI_MANAGE_ICON("pwarp.gui.manage.icon"),
-    PWARP_GUI_MANAGE_ICON_PROMPT("pwarp.gui.manage.icon-prompt"),
     PWARP_GUI_MANAGE_CATEGORY("pwarp.gui.manage.category"),
     PWARP_GUI_MANAGE_CATEGORY_PROMPT("pwarp.gui.manage.category-prompt"),
     PWARP_GUI_MANAGE_ACCESS("pwarp.gui.manage.access"),
@@ -333,9 +331,6 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_PROP_ICON("pwarp.gui.prop.icon"),
     PWARP_GUI_PROP_ICON_PROMPT("pwarp.gui.prop.icon-prompt"),
     PWARP_GUI_PROP_VISIBILITY("pwarp.gui.prop.visibility"),
-    PWARP_GUI_PROP_LOCK("pwarp.gui.prop.lock"),
-    PWARP_GUI_PROP_PASSWORD("pwarp.gui.prop.password"),
-    PWARP_GUI_PROP_PASSWORD_PROMPT("pwarp.gui.prop.password-prompt"),
     PWARP_GUI_PROP_DEPARTURE_SOUND("pwarp.gui.prop.departure-sound"),
     PWARP_GUI_PROP_DEPARTURE_SOUND_PROMPT("pwarp.gui.prop.departure-sound-prompt"),
     PWARP_GUI_PROP_ARRIVAL_SOUND("pwarp.gui.prop.arrival-sound"),
@@ -351,9 +346,6 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_VALUE_NONE("pwarp.gui.value.none"),
     PWARP_GUI_VALUE_PUBLIC("pwarp.gui.value.public"),
     PWARP_GUI_VALUE_PRIVATE("pwarp.gui.value.private"),
-    PWARP_GUI_VALUE_LOCKED("pwarp.gui.value.locked"),
-    PWARP_GUI_VALUE_UNLOCKED("pwarp.gui.value.unlocked"),
-    PWARP_GUI_VALUE_SET("pwarp.gui.value.set"),
     PWARP_GUI_SELECT_VISIBILITY("pwarp.gui.select.visibility");
 
     private final String key;

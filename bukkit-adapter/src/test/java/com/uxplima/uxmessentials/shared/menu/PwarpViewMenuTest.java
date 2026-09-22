@@ -33,6 +33,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
@@ -135,6 +136,29 @@ class PwarpViewMenuTest {
         assertThat(inv.getItem(11).getType()).isEqualTo(Material.ENDER_PEARL); // teleport (open card)
         assertThat(inv.getItem(13).getType()).isEqualTo(Material.NETHER_STAR); // favourite (not yet starred)
         assertThat(inv.getItem(15).getType()).isEqualTo(Material.EXPERIENCE_BOTTLE); // rate (viewer is not the owner)
+    }
+
+    @Test
+    void theBackButtonCarriesTheLoreWrittenForIt() {
+        // Every other button in this window carries a lore line and the back button did not, while
+        // pwarp.gui.view.back-lore sat unread in twelve catalogues.
+        Inventory inv = openView(warp(otherOwner, WarpAccess.PUBLIC));
+
+        assertThat(loreOf(inv.getItem(22)))
+                .anyMatch(line -> line.contains(PlayerwarpsMessageKey.PWARP_GUI_VIEW_BACK_LORE.key()));
+    }
+
+    /** The plain text of an item's lore, which is what a viewer reads under its name. */
+    private static java.util.List<String> loreOf(org.bukkit.inventory.ItemStack item) {
+        java.util.List<net.kyori.adventure.text.Component> lore =
+                java.util.Objects.requireNonNull(item.getItemMeta()).lore();
+        if (lore == null) {
+            return java.util.List.of();
+        }
+        return lore.stream()
+                .map(line -> net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(line))
+                .toList();
     }
 
     @Test
