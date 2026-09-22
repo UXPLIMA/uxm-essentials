@@ -268,8 +268,10 @@ public final class CreateWizard {
         try {
             CustomCommandWriter.write(directory, command);
         } catch (IOException failure) {
+            // The answers were fine and the disk was not, so say that. This branch sent WIZARD_INVALID, which
+            // tells the operator their last answer was unusable and sends them looking in the wrong place.
             log.warn("could not write the definition '{}': {}", draft.id.value(), String.valueOf(failure.getMessage()));
-            feedback.send(draft.player, CustomCommandsMessageKey.CUSTOMCOMMAND_WIZARD_INVALID);
+            feedback.send(draft.player, CustomCommandsMessageKey.CUSTOMCOMMAND_WRITE_FAILED);
             return;
         }
         onSaved.accept(draft.id.value());

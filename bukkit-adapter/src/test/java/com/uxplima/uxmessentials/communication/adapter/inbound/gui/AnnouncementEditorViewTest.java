@@ -17,6 +17,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.communication.domain.StoredAnnouncement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -127,6 +128,38 @@ class AnnouncementEditorViewTest {
     void tearDown() {
         Guis.uninstall();
         MockBukkit.unmock();
+    }
+
+    @Test
+    void creatingAnIdThatExistsSaysSoAndLeavesTheAnnouncementAlone() {
+        // The collision reopened the list and said nothing, so an operator who reused an id saw the window
+        // blink and no announcement appear. communication.announce.editor.create-exists was written for
+        // exactly this and nothing sent it.
+        store.save(StoredAnnouncement.fresh("welcome", "<gray>welcome"));
+
+        view.create(player, "welcome");
+
+        assertThat(messagesTo(player))
+                .anyMatch(line -> line.contains(CommunicationMessageKey.ANNOUNCE_EDITOR_CREATE_EXISTS.key()));
+        assertThat(store.find("welcome").orElseThrow().lines()).containsExactly("<gray>welcome");
+    }
+
+    @Test
+    void creatingAFreshIdSaysItWasCreated() {
+        view.create(player, "rules");
+
+        assertThat(messagesTo(player))
+                .anyMatch(line -> line.contains(CommunicationMessageKey.ANNOUNCE_EDITOR_CREATED.key()));
+        assertThat(store.find("rules")).isPresent();
+    }
+
+    /** Everything the player was told, drained in order. */
+    private static List<String> messagesTo(org.mockbukkit.mockbukkit.entity.PlayerMock player) {
+        List<String> lines = new java.util.ArrayList<>();
+        for (String line = player.nextMessage(); line != null; line = player.nextMessage()) {
+            lines.add(line);
+        }
+        return lines;
     }
 
     @Test

@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.communication.application.port.AnnouncementStor
 import com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerSettings;
 import com.uxplima.uxmessentials.communication.domain.StoredAnnouncement;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -111,6 +112,7 @@ public final class AnnouncementEditorView {
     private final AnnouncementStore store;
     private final AnnouncerSettingsStore settingsStore;
     private final TextInput textInput;
+    private final CommandFeedback feedback;
     private final ListPropertyLayout messageListLayout;
     private final EntityListView<StoredAnnouncement> list;
     private final EntityEditorView<StoredAnnouncement> editor;
@@ -131,6 +133,7 @@ public final class AnnouncementEditorView {
         this.theme = Objects.requireNonNull(theme, "theme");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(messages);
         this.store = Objects.requireNonNull(store, "store");
         this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
@@ -357,19 +360,38 @@ public final class AnnouncementEditorView {
             list.open(player, viewer);
             return;
         }
-        String id = text.trim();
+        create(player, text.trim());
+    }
+
+    /**
+     * Create the announcement {@code id} and land in its editor, or say why not.
+     *
+     * <p>Package visible so the collision and the creation can be driven from a test without a prompt: both
+     * branches used to be silent, and an operator who reused an id watched the window blink and no
+     * announcement appear while {@code communication.announce.editor.create-exists} sat unsent in twelve
+     * catalogues.
+     */
+    void create(Player player, String id) {
+        PlayerRef viewer = BukkitRefs.toRef(player);
         scheduler.async(() -> {
             if (store.exists(id)) {
-                // A create collision keeps the existing announcement untouched and just reopens the list; the
-                // create is a no-op rather than an overwrite, so an operator never loses an announcement by reusing
-                // an id.
-                scheduler.entity(player, () -> list.open(player, viewer));
+                // A create collision keeps the existing announcement untouched; the create is a no-op rather
+                // than an overwrite, so an operator never loses an announcement by reusing an id, and now they
+                // are told that is what happened.
+                scheduler.entity(player, () -> {
+                    feedback.send(player, CommunicationMessageKey.ANNOUNCE_EDITOR_CREATE_EXISTS, Map.of("id", id));
+                    list.open(player, viewer);
+                });
                 return;
             }
             // A fresh announcement seeds one placeholder line carrying the id; the operator edits the message next.
             store.save(StoredAnnouncement.fresh(id, "<gray>" + id));
             // Land straight in the new announcement's editor.
-            store.find(id).ifPresent(created -> scheduler.entity(player, () -> editor.open(player, created)));
+            store.find(id)
+                    .ifPresent(created -> scheduler.entity(player, () -> {
+                        feedback.send(player, CommunicationMessageKey.ANNOUNCE_EDITOR_CREATED, Map.of("id", id));
+                        editor.open(player, created);
+                    }));
         });
     }
 

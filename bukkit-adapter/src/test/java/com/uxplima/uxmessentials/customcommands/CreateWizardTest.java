@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.customcommands.adapter.CustomCommandLoader;
 import com.uxplima.uxmessentials.customcommands.adapter.inbound.command.CreateWizard;
 import com.uxplima.uxmessentials.customcommands.adapter.inbound.command.WizardPrompt;
+import com.uxplima.uxmessentials.customcommands.application.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ArgumentKind;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
@@ -155,6 +156,39 @@ class CreateWizardTest {
 
         assertThat(Files.exists(directory.resolve("selam.conf"))).isFalse();
         assertThat(saved).isEmpty();
+    }
+
+    @Test
+    void aFileThatCannotBeWrittenSaysSoRatherThanBlamingTheAnswer() throws Exception {
+        // The disk failure branch sent CUSTOMCOMMAND_WIZARD_INVALID, which tells the operator their last
+        // answer was unusable when the answers were fine and the write was not. The line written for this
+        // case, customcommand.write-failed, shipped in twelve languages and nothing ever sent it.
+        Path wall = Files.writeString(directory.resolve("wall"), "this is a file, not a directory");
+        prompt.script("selamla", "none", "none", "none", "yes", "done", "message:hello", "done", "save");
+
+        new CreateWizard(
+                        prompt,
+                        wall,
+                        () -> taken,
+                        new CommandFeedback(new KeyMessages()),
+                        saved::add,
+                        new SilentLogger())
+                .start(player, "selam");
+
+        assertThat(messagesTo(player))
+                .anyMatch(line -> line.contains(CustomCommandsMessageKey.CUSTOMCOMMAND_WRITE_FAILED.key()));
+        assertThat(messagesTo(player))
+                .noneMatch(line -> line.contains(CustomCommandsMessageKey.CUSTOMCOMMAND_WIZARD_SAVED.key()));
+        assertThat(saved).isEmpty();
+    }
+
+    /** Everything the player was told, drained in order. */
+    private static List<String> messagesTo(PlayerMock player) {
+        List<String> lines = new ArrayList<>();
+        for (String line = player.nextMessage(); line != null; line = player.nextMessage()) {
+            lines.add(line);
+        }
+        return lines;
     }
 
     private CreateWizard wizard() {
