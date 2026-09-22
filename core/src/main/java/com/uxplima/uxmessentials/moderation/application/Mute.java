@@ -114,10 +114,26 @@ public final class Mute {
             notifier.send(
                     actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
         }
+        confirmToActor(actor, target, effective);
         if (!silent) {
             announce(actor, target, reason, effective);
         }
         return Result.ok(mute);
+    }
+
+    /**
+     * Tell the person who ran the command that it landed, timed or permanent. Separate from the staff
+     * broadcast and never suppressed with it: a silent mute hides the sanction from the channel, not from
+     * the operator, and while this was missing a {@code /mute -s} looked exactly like a command that did
+     * nothing. Ban, warn, unmute and unjail have always answered this way.
+     */
+    private void confirmToActor(PlayerRef actor, PlayerRef target, Optional<Duration> effective) {
+        effective.ifPresentOrElse(
+                span -> notifier.send(
+                        actor,
+                        ModerationMessageKey.MUTE_APPLIED_TIMED,
+                        Map.of("player", target.name(), "duration", SanctionDuration.format(span))),
+                () -> notifier.send(actor, ModerationMessageKey.MUTE_APPLIED, Map.of("player", target.name())));
     }
 
     private void announce(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Duration> effective) {

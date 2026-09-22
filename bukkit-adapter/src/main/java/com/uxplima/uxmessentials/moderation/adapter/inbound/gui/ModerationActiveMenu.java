@@ -93,6 +93,11 @@ public final class ModerationActiveMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("moderation:active", ctx -> subject(ctx).rows());
+        // The empty state. A quiet server used to show an empty box while the sentence written for it sat
+        // unread in twelve catalogues, so the spec draws a tile gated on this condition and the tile gives
+        // the slot back the moment there is a row to put there.
+        bindings.condition(
+                "moderation:none-active", (ctx, args) -> subject(ctx).rows().isEmpty());
         bindings.placeholder("mod_active_icon", ctx -> row(ctx).icon());
         bindings.placeholder("mod_active_player", ctx -> row(ctx).player());
         bindings.placeholder("mod_active_type", ctx -> row(ctx).type());

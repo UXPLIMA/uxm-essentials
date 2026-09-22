@@ -14,6 +14,7 @@ import org.bukkit.inventory.ItemStack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.menu.EntityEditorView;
 import com.uxplima.uxmlib.menu.EntityListSpec;
 import com.uxplima.uxmlib.menu.Menus;
@@ -55,6 +56,8 @@ public final class EntityListView<T> {
     private final EntityListLayout layout;
     private final MessageKey title;
     private final @Nullable MessageKey emptyTitle;
+    private final @Nullable MessageKey emptyName;
+    private final @Nullable MessageKey emptyLore;
     private final MessageKey prevName;
     private final MessageKey nextName;
     private final @Nullable MessageKey createName;
@@ -71,6 +74,8 @@ public final class EntityListView<T> {
         this.layout = Objects.requireNonNull(builder.layout, "layout");
         this.title = Objects.requireNonNull(builder.title, "title");
         this.emptyTitle = builder.emptyTitle;
+        this.emptyName = builder.emptyName;
+        this.emptyLore = builder.emptyLore;
         this.prevName = Objects.requireNonNull(builder.prevName, "prevName");
         this.nextName = Objects.requireNonNull(builder.nextName, "nextName");
         this.createName = builder.createName;
@@ -103,6 +108,11 @@ public final class EntityListView<T> {
      * <p>When the snapshot is empty and the caller wired an {@code emptyTitle}, the window opens under that title
      * instead. The engine then draws just the filler and nav, an empty-state panel rather than a head grid, so a
      * list with nothing to show no longer needs a bespoke empty-state window.
+     *
+     * <p>A caller may also wire an {@code emptyTile}, a name and a lore drawn in the middle of the grid while the
+     * list is empty. A title alone leaves the window looking broken rather than empty, and the jail manager had
+     * exactly that: {@code moderation.gui.jail.list-empty-name} and its lore shipped in twelve languages and
+     * nothing drew either of them. The tile is inert and it is gone the moment there is an entity to show.
      */
     private EntityListSpec spec(PlayerRef viewer) {
         List<T> snapshot = entities.get();
@@ -120,6 +130,9 @@ public final class EntityListView<T> {
                 .entities(() -> List.<Object>copyOf(entities.get()))
                 .iconRenderer((v, entity) -> iconRenderer.apply(BukkitRefs.toRef(v), cast(entity)))
                 .onSelect((player, entity) -> onSelect.accept(player, cast(entity)));
+        if (snapshot.isEmpty() && emptyName != null) {
+            spec.extraButtons(List.of(new EntityListSpec.ExtraButton(emptySlot(), emptyTile(viewer), player -> {})));
+        }
         if (onCreate != null && createName != null && layout.createSlot().isPresent()) {
             spec.onCreate(
                     layout.createSlot().getAsInt(), layout.createIcon(), guiText.text(viewer, createName), onCreate);
@@ -129,6 +142,27 @@ public final class EntityListView<T> {
                     layout.actionSlot().getAsInt(), layout.actionIcon(), guiText.text(viewer, actionName), onAction);
         }
         return spec.build();
+    }
+
+    /** The middle content slot, where a one tile empty state reads as a sentence rather than a stray icon. */
+    private int emptySlot() {
+        List<Integer> slots = contentSlots();
+        return slots.get(slots.size() / 2);
+    }
+
+    /**
+     * The empty state tile: the wired name, the wired lore under it, and nothing to click. The material is the
+     * layout's fallback icon rather than a literal, because a material named inside a generic shell is a
+     * material no operator can change: {@code GuiShellsAreLayoutDrivenDriftTest} fails the build over one, and
+     * it failed over this line before it read the layout.
+     */
+    private ItemStack emptyTile(PlayerRef viewer) {
+        ItemBuilder item = ItemBuilder.of(layout.base().fallbackIcon())
+                .name(guiText.text(viewer, Objects.requireNonNull(emptyName)));
+        if (emptyLore != null) {
+            item.lore(List.of(guiText.text(viewer, emptyLore)));
+        }
+        return item.build();
     }
 
     /** Cast the engine's type-erased entity back to {@code T}; it is always one of this view's own entities. */
@@ -160,6 +194,8 @@ public final class EntityListView<T> {
         private @Nullable EntityListLayout layout;
         private @Nullable MessageKey title;
         private @Nullable MessageKey emptyTitle;
+        private @Nullable MessageKey emptyName;
+        private @Nullable MessageKey emptyLore;
         private @Nullable MessageKey prevName;
         private @Nullable MessageKey nextName;
         private @Nullable MessageKey createName;
@@ -190,6 +226,17 @@ public final class EntityListView<T> {
 
         public Builder<T> title(MessageKey title) {
             this.title = Objects.requireNonNull(title, "title");
+            return this;
+        }
+
+        /**
+         * The name and lore of the tile drawn in the middle of the grid while the list is empty. Optional: a
+         * list that omits it draws nothing there, which is what every list did before and what left the jail
+         * manager looking broken instead of empty.
+         */
+        public Builder<T> emptyTile(MessageKey emptyName, MessageKey emptyLore) {
+            this.emptyName = Objects.requireNonNull(emptyName, "emptyName");
+            this.emptyLore = Objects.requireNonNull(emptyLore, "emptyLore");
             return this;
         }
 

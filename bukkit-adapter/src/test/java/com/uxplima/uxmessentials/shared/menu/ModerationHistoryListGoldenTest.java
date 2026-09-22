@@ -68,6 +68,9 @@ class ModerationHistoryListGoldenTest {
 
     private static final UUID TARGET = UUID.randomUUID();
 
+    /** The middle of the content grid, where the empty-state tile is drawn. */
+    private static final int EMPTY_SLOT = 22;
+
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
@@ -130,6 +133,29 @@ class ModerationHistoryListGoldenTest {
         baseline.put(48, new Snapshot(Material.ARROW, "moderation.gui.history.prev"));
         baseline.put(50, new Snapshot(Material.ARROW, "moderation.gui.history.next"));
         return baseline;
+    }
+
+    @Test
+    void anEmptyHistoryDrawsTheSentenceWrittenForIt() {
+        // A player with a clean record showed an empty box: moderation.gui.history.empty-name and its lore
+        // shipped in twelve languages and no window drew either of them.
+        openEngine();
+
+        ItemStack tile = player.getOpenInventory().getTopInventory().getItem(EMPTY_SLOT);
+        assertThat(tile).isNotNull();
+        assertThat(plainName(tile)).contains(ModerationMessageKey.MOD_GUI_HISTORY_EMPTY_NAME.key());
+    }
+
+    @Test
+    void theEmptySentenceGivesTheSlotBackWhenThereIsHistory() {
+        history.add(entry(SanctionAction.BAN));
+
+        openEngine();
+
+        ItemStack tile = player.getOpenInventory().getTopInventory().getItem(EMPTY_SLOT);
+        assertThat(tile == null ? "" : plainName(tile))
+                .as("the tile sits in the content grid, so it has to disappear rather than cover a row")
+                .doesNotContain(ModerationMessageKey.MOD_GUI_HISTORY_EMPTY_NAME.key());
     }
 
     private Map<Integer, Snapshot> snapshotEngine() {

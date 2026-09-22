@@ -21,6 +21,7 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -48,6 +49,7 @@ import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.menu.property.EditableProperty;
 import com.uxplima.uxmlib.menu.render.EditorRenderer;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
 import com.uxplima.uxmlib.menu.render.MenuRenderer;
@@ -153,6 +155,22 @@ class ModerationGuiTest {
         // The history list now renders through the menu engine (ModerationHistoryListGoldenTest); the detail
         // screen's only job is to hand that engine the clicked punishment's target.
         assertThat(historyOpened).containsExactly(target);
+    }
+
+    @Test
+    void theHistoryButtonCarriesTheHintWrittenForIt() {
+        UUID target = uuid("Mallory");
+        repository.addBan(target, Instant.now().plus(Duration.ofDays(7)));
+        ActivePunishment punishment = repository.firstActive();
+
+        EditableProperty history = detail.grid()
+                .propertyAt(HISTORY_SLOT, punishment)
+                .orElseThrow(() -> new AssertionError("no property at the history slot"));
+
+        assertThat(history.valueLore(player))
+                .as("moderation.gui.detail.history-hint was written for this button and the button was"
+                        + " handed the empty string instead, so the line shipped in twelve languages unread")
+                .isEqualTo(ModerationMessageKey.MOD_GUI_DETAIL_HISTORY_HINT.key());
     }
 
     @Test

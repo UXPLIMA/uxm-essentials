@@ -100,6 +100,9 @@ public final class JailListView {
                 .entities(snapshot::get)
                 .iconRenderer(this::icon)
                 .onSelect((player, name) -> openEdit(player, name))
+                .emptyTile(
+                        ModerationMessageKey.MOD_GUI_JAIL_LIST_EMPTY_NAME,
+                        ModerationMessageKey.MOD_GUI_JAIL_LIST_EMPTY_LORE)
                 .onCreate(ModerationMessageKey.MOD_GUI_JAIL_LIST_CREATE, this::promptCreate)
                 .build();
     }

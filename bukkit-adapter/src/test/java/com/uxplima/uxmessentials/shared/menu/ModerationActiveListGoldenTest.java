@@ -98,6 +98,9 @@ class ModerationActiveListGoldenTest {
 
     private static final int DETAIL_REVOKE_SLOT = 26;
 
+    /** The middle of the content grid, where the empty-state tile is drawn. */
+    private static final int EMPTY_SLOT = 22;
+
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
@@ -198,6 +201,30 @@ class ModerationActiveListGoldenTest {
         baseline.put(48, new Snapshot(Material.ARROW, "moderation.gui.list.prev"));
         baseline.put(50, new Snapshot(Material.ARROW, "moderation.gui.list.next"));
         return baseline;
+    }
+
+    @Test
+    void anEmptyListDrawsTheSentenceWrittenForIt() {
+        // A quiet server showed an empty box: moderation.gui.list.empty-name and its lore shipped in twelve
+        // languages and no window drew either of them.
+        openEngine();
+
+        ItemStack tile = player.getOpenInventory().getTopInventory().getItem(EMPTY_SLOT);
+        assertThat(tile).isNotNull();
+        assertThat(plainName(tile)).contains(ModerationMessageKey.MOD_GUI_LIST_EMPTY_NAME.key());
+        assertThat(plainLore(tile)).contains(ModerationMessageKey.MOD_GUI_LIST_EMPTY_LORE.key());
+    }
+
+    @Test
+    void theEmptySentenceGivesTheSlotBackAsSoonAsThereIsSomethingToShow() {
+        repository.ban(MALLORY, Instant.now().plus(Duration.ofDays(7)));
+
+        openEngine();
+
+        ItemStack tile = player.getOpenInventory().getTopInventory().getItem(EMPTY_SLOT);
+        assertThat(tile == null ? "" : plainName(tile))
+                .as("the empty tile sits in the content grid, so it has to disappear rather than cover a row")
+                .doesNotContain(ModerationMessageKey.MOD_GUI_LIST_EMPTY_NAME.key());
     }
 
     private Map<Integer, Snapshot> snapshotEngine() {

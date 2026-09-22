@@ -125,6 +125,44 @@ class SilentBroadcastAndCapTest {
     }
 
     @Test
+    void aMuteTellsTheActorItLanded() {
+        // The confirmations were written and never sent. Ban, warn, unmute and unjail all tell the actor;
+        // mute, tempban and jail told nobody but the target and the staff channel, so a silent sanction
+        // looked to the person who ran it exactly like a command that did nothing.
+        mute(ModerationFakes.exempt()).mute(ACTOR, TARGET, "1h", Optional.of("spam"), false);
+
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.MUTE_APPLIED_TIMED)).isTrue();
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.MUTE_APPLIED)).isFalse();
+    }
+
+    @Test
+    void aPermanentMuteTellsTheActorTheLineWithNoDurationInIt() {
+        mute(ModerationFakes.exempt()).mute(ACTOR, TARGET, "", Optional.empty(), false);
+
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.MUTE_APPLIED)).isTrue();
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.MUTE_APPLIED_TIMED)).isFalse();
+    }
+
+    @Test
+    void aSilentMuteStillTellsTheActor() {
+        mute(ModerationFakes.exempt()).mute(ACTOR, TARGET, "1h", Optional.of("spam"), true);
+
+        assertThat(broadcast.announced).isEmpty();
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.MUTE_APPLIED_TIMED))
+                .as("a silent sanction suppresses the staff channel, not the answer to the person who ran it")
+                .isTrue();
+    }
+
+    @Test
+    void aTempbanTellsTheActorItLanded() {
+        FakeSanctions sanctions = new FakeSanctions(TARGET);
+        tempban(sanctions, ModerationFakes.exempt()).tempban(ACTOR, TARGET, "1d", Optional.of("cheating"), true);
+
+        assertThat(broadcast.announced).isEmpty();
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.TEMPBAN_APPLIED)).isTrue();
+    }
+
+    @Test
     void nonSilentWarnBroadcastsAndSilentDoesNot() {
         IssueWarn warn = issueWarn(WarnEscalation.NONE);
 
@@ -285,6 +323,21 @@ class SilentBroadcastAndCapTest {
                 SanctionSync.NONE,
                 AddressStrictness.NORMAL,
                 new FakeIpHistoryStore(),
+                clock);
+    }
+
+    private TempBan tempban(FakeSanctions sanctions, Permissions perms) {
+        return new TempBan(
+                repository,
+                sanctions,
+                guard,
+                notifier,
+                audit,
+                events,
+                history,
+                new SanctionDurationLimit(perms),
+                broadcast,
+                SanctionSync.NONE,
                 clock);
     }
 

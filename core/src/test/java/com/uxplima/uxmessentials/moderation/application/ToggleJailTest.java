@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctions;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
+import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingSink;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,8 @@ class ToggleJailTest {
 
     private FakeModerationRepository repository;
     private FakeSanctions sanctions;
+    private RecordingSink sink;
+    private Jail jail;
     private ToggleJail toggleJail;
 
     @BeforeEach
@@ -43,9 +46,29 @@ class ToggleJailTest {
         ModerationGuard guard = new ModerationGuard(ModerationFakes.exempt());
         sanctions = new FakeSanctions(TARGET);
         var jails = ModerationFakes.jails(Set.of("cells", "block-a"), Set.of());
-        Jail jail = new Jail(repository, jails, sanctions, guard, ModerationFakes.notifier(), audit, events, clock);
-        Unjail unjail = new Unjail(repository, sanctions, ModerationFakes.notifier(), audit, events, clock);
+        sink = new RecordingSink();
+        jail = new Jail(
+                repository, jails, sanctions, guard, ModerationFakes.recordingNotifier(sink), audit, events, clock);
+        Unjail unjail =
+                new Unjail(repository, sanctions, ModerationFakes.recordingNotifier(sink), audit, events, clock);
         toggleJail = new ToggleJail(repository, jails, jail, unjail);
+    }
+
+    @Test
+    void jailingTellsTheActorItLanded() {
+        // Ban, warn, unmute and unjail all answer the person who ran them; jail told the target and the
+        // audit log and nobody else, so moderation.jail.applied shipped in twelve languages unsent.
+        toggleJail.toggle(ADMIN, TARGET, "cells", Optional.of("grief"));
+
+        assertThat(sink.sent(ADMIN, ModerationMessageKey.JAIL_APPLIED)).isTrue();
+    }
+
+    @Test
+    void aTimedJailTellsTheActorHowLongItIsFor() {
+        jail.jail(ADMIN, TARGET, "cells", "1h", Optional.of("grief"));
+
+        assertThat(sink.sent(ADMIN, ModerationMessageKey.JAIL_APPLIED_TIMED)).isTrue();
+        assertThat(sink.sent(ADMIN, ModerationMessageKey.JAIL_APPLIED)).isFalse();
     }
 
     @Test

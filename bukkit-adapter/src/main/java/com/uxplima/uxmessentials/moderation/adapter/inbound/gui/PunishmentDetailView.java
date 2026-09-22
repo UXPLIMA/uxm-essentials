@@ -40,8 +40,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PunishmentDetailView {
 
-    private static final String EMPTY_VALUE_HINT = "";
-
     private final GuiText guiText;
     private final Scheduler scheduler;
     private final PunishmentRevoker revoker;
@@ -121,7 +119,7 @@ public final class PunishmentDetailView {
                 new ModerationActionProperty(
                         ModerationMessageKey.MOD_GUI_DETAIL_HISTORY,
                         Material.BOOKSHELF,
-                        EMPTY_VALUE_HINT,
+                        viewer -> plain(viewer, ModerationMessageKey.MOD_GUI_DETAIL_HISTORY_HINT),
                         (player, reopen) -> onHistory.accept(player, punishment)));
     }
 

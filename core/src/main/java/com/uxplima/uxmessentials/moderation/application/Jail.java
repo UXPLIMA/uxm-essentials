@@ -95,6 +95,7 @@ public final class Jail {
         repository.saveJail(target, sentence);
         sanctions.sendToJail(target, jail);
         notifyTarget(target, jail, parsed, reason);
+        confirmToActor(actor, target, jail, parsed);
         events.publish(new PlayerJailed(target, sentence, now));
         audit.jailed(actor, target, jail, parsed.duration().map(SanctionDuration::format), true, reason);
         return Result.ok(sentence);
@@ -110,6 +111,27 @@ public final class Jail {
             return (JailState.Active) JailState.wallClockTimed(jail, now.plus(duration.get()), issuer, reason, now);
         }
         return (JailState.Active) JailState.onlineTimed(jail, duration.get(), issuer, reason, now);
+    }
+
+    /**
+     * Tell the person who ran the command that it landed, timed or permanent. Ban, warn, unmute and unjail
+     * have always answered this way and jail did not, so the operator read the target's notice in the staff
+     * channel or nothing at all.
+     */
+    private void confirmToActor(PlayerRef actor, PlayerRef target, String jail, SanctionDuration.Parsed parsed) {
+        parsed.duration()
+                .ifPresentOrElse(
+                        span -> notifier.send(
+                                actor,
+                                ModerationMessageKey.JAIL_APPLIED_TIMED,
+                                Map.of(
+                                        "player", target.name(),
+                                        "jail", jail,
+                                        "duration", SanctionDuration.format(span))),
+                        () -> notifier.send(
+                                actor,
+                                ModerationMessageKey.JAIL_APPLIED,
+                                Map.of("player", target.name(), "jail", jail)));
     }
 
     private void notifyTarget(PlayerRef target, String jail, SanctionDuration.Parsed parsed, Optional<String> reason) {

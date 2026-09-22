@@ -358,6 +358,11 @@ class ShippedSpecBindingsDriftTest {
             "pwarp-viewer-can",
             "playerwarps:manage-sponsor",
             "moderation:confirm-silent-offered",
+            // The empty state gates: each list menu registers one and its spec draws the sentence written for
+            // a window with nothing in it behind that gate.
+            "moderation:none-active",
+            "moderation:no-history",
+            "moderation:none-jailed",
             "economy:can-add-member",
             "economy:multi-currency",
             "economy:exchange-has-rate",

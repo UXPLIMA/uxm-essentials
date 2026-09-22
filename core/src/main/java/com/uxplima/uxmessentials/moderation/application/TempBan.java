@@ -110,6 +110,12 @@ public final class TempBan {
             notifier.send(
                     actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
         }
+        // The answer to the person who ran the command, separate from the staff channel and never suppressed
+        // with it: a silent tempban hides the sanction from the channel, not from the operator.
+        notifier.send(
+                actor,
+                ModerationMessageKey.TEMPBAN_APPLIED,
+                Map.of("player", target.name(), "duration", SanctionDuration.format(span)));
         if (!silent) {
             broadcast.announce(
                     ModerationMessageKey.MOD_BROADCAST_TEMPBAN,

@@ -17,11 +17,13 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.DelJail;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
+import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocator;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
@@ -58,6 +60,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 class JailListViewTest {
 
     private static final int FIRST_JAIL_SLOT = 0;
+    /** The middle of the content grid, where the empty-state tile is drawn. */
+    private static final int EMPTY_SLOT = 22;
+
     private static final int EDIT_ROWS = 3;
     private static final int EDIT_ANCHOR_SLOT = 11;
     private static final int EDIT_GOTO_SLOT = 13;
@@ -74,6 +79,7 @@ class JailListViewTest {
     private DelJail delJail;
     private Sanctions sanctions;
     private JailLocator jailLocator;
+    private ListJails listJails;
     private JailListView view;
 
     @BeforeEach
@@ -88,7 +94,7 @@ class JailListViewTest {
         delJail = mock(DelJail.class);
         sanctions = mock(Sanctions.class);
         jailLocator = mock(JailLocator.class);
-        ListJails listJails = mock(ListJails.class);
+        listJails = mock(ListJails.class);
         when(services.setJail()).thenReturn(setJail);
         when(services.delJail()).thenReturn(delJail);
         when(services.listJails()).thenReturn(listJails);
@@ -122,6 +128,34 @@ class JailListViewTest {
     void tearDown() {
         Guis.uninstall();
         MockBukkit.unmock();
+    }
+
+    @Test
+    void anEmptyJailListDrawsTheSentenceWrittenForIt() {
+        // No jails defined used to draw an empty box, while moderation.gui.jail.list-empty-name and its lore
+        // sat unread in twelve catalogues.
+        when(listJails.names()).thenReturn(List.of());
+
+        view.open(staff, staffRef);
+
+        ItemStack tile = staff.getOpenInventory().getTopInventory().getItem(EMPTY_SLOT);
+        assertThat(tile).isNotNull();
+        assertThat(plainName(tile)).contains(ModerationMessageKey.MOD_GUI_JAIL_LIST_EMPTY_NAME.key());
+    }
+
+    @Test
+    void theEmptySentenceIsGoneOnceAJailIsDefined() {
+        view.open(staff, staffRef);
+
+        ItemStack tile = staff.getOpenInventory().getTopInventory().getItem(EMPTY_SLOT);
+        assertThat(tile == null ? "" : plainName(tile))
+                .as("the tile sits in the content grid, so it has to disappear rather than cover a jail")
+                .doesNotContain(ModerationMessageKey.MOD_GUI_JAIL_LIST_EMPTY_NAME.key());
+    }
+
+    /** The plain text a viewer reads off a tile, wherever the canon puts it. */
+    private static String plainName(ItemStack item) {
+        return com.uxplima.uxmessentials.shared.menu.TileText.title(item);
     }
 
     @Test
