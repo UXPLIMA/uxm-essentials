@@ -38,7 +38,6 @@ public enum PosesMessageKey implements MessageKey {
     POSES_CRAWL_DISABLED("poses.crawl-disabled"),
 
     // Player-sit (stacking): sitting on another player's shoulders and the personal opt-out toggle.
-    POSES_PLAYERSIT_DISABLED("poses.playersit-disabled"),
     POSES_PLAYERSIT_TARGET_REFUSES("poses.playersit-target-refuses"),
     POSES_CANNOT_SIT_ON_SELF("poses.cannot-sit-on-self"),
     POSES_PLAYERSIT_NOW_ALLOWED("poses.playersit-now-allowed"),

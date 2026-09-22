@@ -39,7 +39,6 @@ public enum SecurityMessageKey implements MessageKey {
 
     // The bare /2fa root: its usage line, the enrolled/not-enrolled status lines, and the refusal when authenticator
     // enrolment is switched off server-side.
-    SECURITY_2FA_USAGE("security.2fa.usage"),
     SECURITY_2FA_STATUS("security.2fa.status"),
     SECURITY_2FA_STATUS_NONE("security.2fa.status-none"),
     SECURITY_2FA_FEATURE_DISABLED("security.2fa.feature-disabled"),
