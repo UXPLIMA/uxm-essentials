@@ -500,8 +500,10 @@ public final class PluginModule {
         // their capability from resources.hooks(). A missing soft-depend never loads an
         // external class: the no-op default carries none, so there is no NoClassDefFoundError path. Resolved
         // before the menu engine so the renderer's skull provider can read the HeadDatabase capability for hdb:<id>.
-        Integrations hooks = Integrations.resolve(
-                plugin.getServer(),
+        // This plugin loads at STARTUP, before Vault enables, so each integration answers with its no-op until
+        // the server has loaded and is bound then, behind the same capability every caller already holds.
+        Integrations hooks = Integrations.resolveWhenLoaded(
+                plugin,
                 new SystemLoggerBridge(plugin.getName(), kernel.log()),
                 List.of(new VaultEconomyHook(), new VaultPermissionHook(), new HeadDatabaseHook(kernel.log())));
         resources.hooks(hooks);
