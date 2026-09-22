@@ -158,3 +158,42 @@ val verifyNoSkippedTests =
     }
 
 tasks.named("check") { dependsOn(verifyNoSkippedTests) }
+
+// Taken from uxmLib, where it was written first, on 2026-09-22.
+// MockBukkit answers a method it has not implemented with UnimplementedOperationException, which extends
+// JUnit's TestAbortedException. A test that reaches one is therefore recorded as skipped rather than failed:
+// the build stays green, and every assertion after that call goes unrun without anybody being told. A skip
+// somebody wrote on purpose is a decision and stays allowed, an @Disabled with a reason or an integration
+// test with nothing to connect to; this one is a test that quietly stopped testing, so it fails the build.
+val verifyNoAbortedTests =
+    tasks.register("verifyNoAbortedTests") {
+        description = "Fails when a test was aborted by a MockBukkit method that is not implemented."
+        val results = layout.buildDirectory.dir("test-results/test")
+        doLast {
+            val abortedCase =
+                Regex(
+                    "<testcase name=\"([^\"]*)\" classname=\"([^\"]*)\"[^>]*>\\s*" +
+                        "<skipped[^>]*type=\"org\\.mockbukkit\\.mockbukkit\\.exception\\." +
+                        "UnimplementedOperationException"
+                )
+            val files = results.get().asFile.listFiles { file -> file.name.endsWith(".xml") } ?: emptyArray()
+            val aborted =
+                files.flatMap { file ->
+                    abortedCase.findAll(file.readText()).map { "${it.groupValues[2]}.${it.groupValues[1]}" }
+                }
+                    .sorted()
+            if (aborted.isNotEmpty()) {
+                throw GradleException(
+                    aborted.joinToString(
+                        prefix = "Aborted by an unimplemented MockBukkit method, so nothing the test " +
+                            "claims to check was checked:\n",
+                        separator = "\n",
+                        postfix = "\nAssert against what the mock implements, or mark the test @Disabled " +
+                            "with the reason, so the gap is one a reader can see.",
+                    ) { "  $it" }
+                )
+            }
+        }
+    }
+
+tasks.named<Test>("test") { finalizedBy(verifyNoAbortedTests) }
