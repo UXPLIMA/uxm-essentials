@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -60,6 +61,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable WorldPhase worldPhase;
     private @Nullable Hooks hooks;
     private @Nullable Currencies currencies;
+    private @Nullable Supplier<List<String>> menuNames;
     private @Nullable PlayerDataStore playerData;
     private @Nullable ServerConnector serverConnector;
     private @Nullable BedrockDetector bedrock;
@@ -205,6 +207,20 @@ public final class CloseableResources implements AutoCloseable {
     /** The multi-currency façade, or null before wiring has constructed it. */
     public @Nullable Currencies currencies() {
         return currencies;
+    }
+
+    /**
+     * Captures the live list of operator menus the custom-menus loader has registered, so the doctor can say
+     * how many windows were read without re-parsing anything and without the health checks, which are built
+     * before module wiring runs, holding a number that was true once.
+     */
+    public void menuNames(Supplier<List<String>> names) {
+        this.menuNames = Objects.requireNonNull(names, "names");
+    }
+
+    /** The loaded operator menus, or null before the custom-menus module has wired. */
+    public @Nullable Supplier<List<String>> menuNames() {
+        return menuNames;
     }
 
     /**

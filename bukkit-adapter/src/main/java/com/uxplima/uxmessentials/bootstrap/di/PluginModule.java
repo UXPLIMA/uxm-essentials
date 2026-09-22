@@ -71,7 +71,9 @@ import com.uxplima.uxmessentials.bootstrap.health.ClusterPeersHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.CommandConflictHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.DatabaseHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.EconomyProviderHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.MenuFilesHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.ModuleCountHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.PlaceholderExpansionHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SchedulerHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SoftDependencyHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
@@ -817,7 +819,7 @@ public final class PluginModule {
                 menuCurrencyBackends,
                 menuTextInputRef);
         bus.start();
-        registerPlaceholders(plugin, placeholders, resources, kernel.log());
+        boolean placeholdersPublished = registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
         // integration). These belong to no feature context: server links apply once on enable, the update checker
         // off by default, built on the uxmLib update toolkit. Self-registers its permission-gated join notice and
@@ -826,7 +828,8 @@ public final class PluginModule {
         IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel, persistence);
         resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
-        List<HealthCheck> healthChecks = healthChecks(plugin, registry, config, persistence, bus);
+        List<HealthCheck> healthChecks =
+                healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
         // ManagementGuiRegistry entries the viewer is permitted, each opening that module's own GUI. The
         // registry is constructed here and is threaded to module wiring (SP1+ each registers its opener);
@@ -916,7 +919,8 @@ public final class PluginModule {
         }
     }
 
-    private static void registerPlaceholders(
+    /** @return whether the expansion published, which the doctor's placeholders line reports. */
+    private static boolean registerPlaceholders(
             JavaPlugin plugin,
             PlaceholderContexts placeholders,
             CloseableResources resources,
@@ -924,9 +928,10 @@ public final class PluginModule {
         // The PlaceholderAPI expansion is registered only when the plugin is present and at least one context
         // contributed a read seam; otherwise this is a no-op and nothing is closed on disable. The registration
         // happens after every context is wired so every enabled placeholder group is reachable.
-        PlaceholderApiSupport.registerExpansion(
-                        placeholders, plugin.getPluginMeta().getVersion(), log)
-                .ifPresent(registration -> resources.onClose(registration::close));
+        Optional<PlaceholderApiSupport.Registration> registration = PlaceholderApiSupport.registerExpansion(
+                placeholders, plugin.getPluginMeta().getVersion(), log);
+        registration.ifPresent(open -> resources.onClose(open::close));
+        return registration.isPresent();
     }
 
     private static MigrationImportNode wireMigration(
@@ -952,7 +957,9 @@ public final class PluginModule {
             ModuleRegistry registry,
             ConfigStore config,
             Persistence persistence,
-            BusWiring.Wired bus) {
+            BusWiring.Wired bus,
+            CloseableResources resources,
+            boolean placeholdersPublished) {
         // Assembled after the modules are wired so the set reflects what is actually present: the database and
         // soft-depend probes always apply, the economy-provider ownership check only when economy is enabled.
         // The /uxmess doctor command runs each one off-tick (each is wrapped in HealthCheck.safe so a probe that
@@ -978,6 +985,17 @@ public final class PluginModule {
         checks.add(new SchedulerHealthCheck());
         checks.add(new UpdateHealthCheck(UpdateCheckSettings.from(config).enabled()));
         checks.add(new ModuleCountHealthCheck(registry, config));
+        // The two lines the estate asks of every doctor and this one did not have. The windows line reads the
+        // supplier the custom-menus wiring publishes, which is set after this list is built and is read only when
+        // an operator runs the command, so it is the live count rather than a number from boot.
+        checks.add(new MenuFilesHealthCheck(plugin.getDataFolder().toPath().resolve("menus"), () -> {
+            Supplier<List<String>> names = resources.menuNames();
+            return names == null ? List.of() : names.get();
+        }));
+        // Presence is asked of the class that owns the soft depend and never of the plugin manager here.
+        // SoftDependSeamDriftTest caught the second spelling the moment it was written, and its reason is
+        // the right one: a getPlugin check of our own calls a plugin that failed its own startup live.
+        checks.add(new PlaceholderExpansionHealthCheck(placeholdersPublished, PlaceholderApiSupport::isPresent));
         return List.copyOf(checks);
     }
 
@@ -1795,6 +1813,10 @@ public final class PluginModule {
                 guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The doctor's windows line reads this: how many of the operator's own menus the engine accepted. It is
+        // published rather than counted there because the health checks are built before module wiring runs and
+        // because a /menu reload changes the answer.
+        resources.menuNames(wired.menuNames());
     }
 
     private static void wireCustomCommands(
