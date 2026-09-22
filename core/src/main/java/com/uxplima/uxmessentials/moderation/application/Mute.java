@@ -82,6 +82,13 @@ public final class Mute {
         if (parsed.malformed()) {
             return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
+        // A sentence already in force is not replaced in silence. ALREADY_MUTED was declared, the public API
+        // promised ALREADY_IN_STATE for it and nothing ever returned it, so a second /mute overwrote the first
+        // and moderation.mute.already shipped in twelve languages unsent. An expired mute is not in force, so
+        // it is not this refusal: unmute first to change a live one.
+        if (repository.loadMute(target).isActiveAt(clock.instant())) {
+            return reject(actor, target, rawDuration, reason, ModerationError.ALREADY_MUTED);
+        }
         return apply(actor, target, parsed, reason, silent);
     }
 

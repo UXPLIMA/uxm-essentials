@@ -454,7 +454,12 @@ public final class ModerationWiring {
         return List.of(
                 new ModerationLoginListener(services.loginEnforcement()),
                 new ModerationJoinListener(services.jailCountdown(), repository, clock),
-                new FreezeMoveListener(sanctions),
+                new FreezeMoveListener(
+                        sanctions::isFrozen,
+                        kernel.messages(),
+                        kernel.messageSink(),
+                        clock,
+                        settings.freezeNoticeInterval()),
                 new MutedCommandListener(
                         repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock),
                 new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));

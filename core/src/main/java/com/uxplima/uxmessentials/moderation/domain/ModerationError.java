@@ -32,6 +32,9 @@ public enum ModerationError {
     /** The {@code /unmute} target was not muted. */
     NOT_MUTED(ModerationMessageKey.UNMUTE_NOT_MUTED),
 
+    /** The target is already serving a jail sentence, the jail half of {@link #ALREADY_MUTED}. */
+    ALREADY_JAILED(ModerationMessageKey.JAIL_ALREADY),
+
     /** The {@code /unjail} target was not jailed. */
     NOT_JAILED(ModerationMessageKey.UNJAIL_NOT_JAILED),
 

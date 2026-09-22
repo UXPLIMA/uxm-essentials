@@ -82,9 +82,19 @@ public final class Jail {
         if (!jails.exists(jail)) {
             return Optional.of(ModerationError.UNKNOWN_JAIL);
         }
-        return SanctionDuration.parse(rawDuration).malformed()
-                ? Optional.of(ModerationError.BAD_DURATION)
-                : Optional.empty();
+        if (SanctionDuration.parse(rawDuration).malformed()) {
+            return Optional.of(ModerationError.BAD_DURATION);
+        }
+        // The jail half of the mute rule: a sentence in force is not replaced in silence, and
+        // moderation.jail.already is the line that says so. Unjail first to move somebody.
+        //
+        // Last of the four, deliberately. A jail name that does not exist is a typo, and an operator who
+        // makes one while the target happens to be jailed should hear about the typo rather than about the
+        // sentence: the API test that pins "no jail by that name" reads exactly that case.
+        if (repository.loadJail(target).isActiveAt(clock.instant())) {
+            return Optional.of(ModerationError.ALREADY_JAILED);
+        }
+        return Optional.empty();
     }
 
     private Result<JailState.Active, ModerationError> apply(

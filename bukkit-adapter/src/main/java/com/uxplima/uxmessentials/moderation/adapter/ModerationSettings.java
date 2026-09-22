@@ -86,6 +86,14 @@ public final class ModerationSettings {
     }
 
     /**
+     * How long a frozen player goes between notices when they keep walking into the freeze. Zero turns the
+     * notice off; a negative number in the file reads as zero rather than as a throttle that never elapses.
+     */
+    public java.time.Duration freezeNoticeInterval() {
+        return java.time.Duration.ofSeconds(Math.max(0, config.getInt("freeze.notice-interval-seconds", 3)));
+    }
+
+    /**
      * How far a UUID ban reaches across the target's known addresses. {@code NORMAL} (the default) bans the
      * one account; {@code STRICT} also IP-bans every address the target has connected from (opt-in: it
      * broadens IP retention and catches anyone sharing the connection).

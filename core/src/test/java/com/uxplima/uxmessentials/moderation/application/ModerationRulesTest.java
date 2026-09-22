@@ -73,6 +73,34 @@ class ModerationRulesTest {
     }
 
     @Test
+    void mutingAnAlreadyMutedPlayerIsRefused() {
+        // ALREADY_MUTED was declared, and the public API promised ALREADY_IN_STATE for it, and no use case
+        // ever returned it: a second /mute overwrote the first in silence, and moderation.mute.already
+        // shipped in twelve languages unsent.
+        Mute mute = mute();
+        mute.mute(ADMIN, TARGET, "1h", Optional.of("spam"), false);
+
+        var result = mute.mute(ADMIN, TARGET, "2h", Optional.of("spam again"), false);
+
+        assertThat(result.errorOrThrow()).isEqualTo(ModerationError.ALREADY_MUTED);
+        assertThat(repository.loadMute(TARGET).isActiveAt(T0.plus(Duration.ofMinutes(90))))
+                .as("the first sentence stands; the operator unmutes before they re-mute")
+                .isFalse();
+    }
+
+    @Test
+    void anExpiredMuteIsNotAnAlreadyMutedRefusal() {
+        Mute mute = mute();
+        mute.mute(ADMIN, TARGET, "1h", Optional.of("spam"), false);
+
+        var result = muteAt(T0.plus(Duration.ofHours(2))).mute(ADMIN, TARGET, "1h", Optional.empty(), false);
+
+        assertThat(result.isOk())
+                .as("the refusal is about a sentence in force, not about one the player has served")
+                .isTrue();
+    }
+
+    @Test
     void exemptTargetCannotBeMutedAndTheRefusalIsAudited() {
         Mute mute = mute();
 
@@ -156,6 +184,29 @@ class ModerationRulesTest {
     }
 
     @Test
+    void jailingAnAlreadyJailedPlayerIsRefused() {
+        // The same unkept promise as the mute: moderation.jail.already was written, no code refused
+        // anything, and a second /jail silently replaced the sentence the first one gave.
+        Jail jail = new Jail(
+                repository,
+                ModerationFakes.jails(Set.of("cells", "block-a"), Set.of()),
+                new FakeSanctions(),
+                guard,
+                ModerationFakes.notifier(),
+                audit,
+                events,
+                clock);
+        jail.jail(ADMIN, TARGET, "cells", "", Optional.empty());
+
+        var result = jail.jail(ADMIN, TARGET, "block-a", "", Optional.empty());
+
+        assertThat(result.errorOrThrow()).isEqualTo(ModerationError.ALREADY_JAILED);
+        assertThat(((JailState.Active) repository.loadJail(TARGET)).jail())
+                .as("the first sentence stands; the operator unjails before they jail again")
+                .isEqualTo("cells");
+    }
+
+    @Test
     void jailRejectsAnUnknownJailName() {
         Jail jail = new Jail(
                 repository,
@@ -209,6 +260,11 @@ class ModerationRulesTest {
     }
 
     private Mute mute() {
+        return muteAt(T0);
+    }
+
+    /** The mute use case reading the clock at {@code when}, so a test can let a sentence run out. */
+    private Mute muteAt(java.time.Instant when) {
         return new Mute(
                 repository,
                 guard,
@@ -219,7 +275,7 @@ class ModerationRulesTest {
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
                 com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
-                clock);
+                java.time.Clock.fixed(when, java.time.ZoneOffset.UTC));
     }
 
     private IssueWarn issueWarn() {

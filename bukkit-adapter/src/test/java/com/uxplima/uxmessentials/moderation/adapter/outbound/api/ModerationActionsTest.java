@@ -153,6 +153,9 @@ class ModerationActionsTest {
         assertThat(actions().mute(ALICE.uuid(), "spam").join().valueOrThrow().isPermanent())
                 .isTrue();
 
+        // A sentence in force is not replaced in silence any more: the API answers ALREADY_IN_STATE, which
+        // is what it always said it would. So the permanent one is lifted before the timed one is applied.
+        actions().unmute(ALICE.uuid()).join();
         UxmSanction timed = actions()
                 .tempMute(ALICE.uuid(), Duration.ofHours(2), "spam")
                 .join()
